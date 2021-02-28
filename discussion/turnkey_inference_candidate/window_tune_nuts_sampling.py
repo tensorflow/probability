@@ -44,7 +44,7 @@ def _sample_posterior(target_log_prob_unconstrained,
                       use_wide_window_expanding_mode=True,
                       seed=None,
                       parallel_iterations=10,
-                      experimental_compile=True,
+                      jit_compile=True,
                       use_input_signature=False,
                       experimental_relax_shapes=False):
   """MCMC sampling with HMC/NUTS using an expanding epoch tuning scheme."""
@@ -96,7 +96,6 @@ def _sample_posterior(target_log_prob_unconstrained,
           target_log_prob_fn=target_log_prob_unconstrained,
           step_size=init_step_size,
           max_tree_depth=max_tree_depth,
-          seed=seed_stream(),
           parallel_iterations=parallel_iterations,
       ), conditioning_bijector)
 
@@ -117,7 +116,7 @@ def _sample_posterior(target_log_prob_unconstrained,
   @tf.function(
       input_signature=input_signature,
       autograph=False,
-      experimental_compile=experimental_compile,
+      jit_compile=jit_compile,
       experimental_relax_shapes=experimental_relax_shapes)
   def fast_adaptation_interval(num_steps, previous_state):
     """Step size only adaptation interval.
@@ -179,7 +178,7 @@ def _sample_posterior(target_log_prob_unconstrained,
   @tf.function(
       input_signature=input_signature,
       autograph=False,
-      experimental_compile=experimental_compile,
+      jit_compile=jit_compile,
       experimental_relax_shapes=experimental_relax_shapes)
   def slow_adaptation_interval(num_steps, previous_n, previous_state,
                                previous_mean, previous_cov):
@@ -231,7 +230,7 @@ def _sample_posterior(target_log_prob_unconstrained,
         pkr.inner_results.step_size,
     )
 
-  @tf.function(autograph=False, experimental_compile=experimental_compile)
+  @tf.function(autograph=False, jit_compile=jit_compile)
   def run_chain(num_results, current_state, previous_kernel_results):
     return tfp.mcmc.sample_chain(
         num_results=num_results,
@@ -240,7 +239,8 @@ def _sample_posterior(target_log_prob_unconstrained,
         previous_kernel_results=previous_kernel_results,
         kernel=hmc_inner,
         trace_fn=trace_fn,
-        parallel_iterations=parallel_iterations)
+        parallel_iterations=parallel_iterations,
+        seed=seed_stream())
 
   # Main sampling with tuning routine.
   num_steps_tuning_window_schedule0 = tuning_window_schedule[0]
@@ -326,7 +326,7 @@ def window_tune_nuts_sampling(target_log_prob,
                               use_wide_window_expanding_mode=True,
                               seed=None,
                               parallel_iterations=10,
-                              experimental_compile=True,
+                              jit_compile=True,
                               use_input_signature=True,
                               experimental_relax_shapes=False):
   """Sample from a density with NUTS and an expanding window tuning scheme.
@@ -346,7 +346,7 @@ def window_tune_nuts_sampling(target_log_prob,
   Currently, the tuning and sampling routine is run in Python, with each block
   of the tuning epoch (window 1, 2, and 3 in Stan [1]) run with two @tf.function
   compiled functions. The user can control the compilation options using the
-  kwargs `experimental_compile`, `use_input_signature`, and
+  kwargs `jit_compile`, `use_input_signature`, and
   `experimental_relax_shapes`.  Setting all to True would compile to XLA and
   potentially avoid the small overhead of function recompilation (note that it
   is not yet the case in XLA right now). It is not yet clear whether doing it
@@ -399,7 +399,7 @@ def window_tune_nuts_sampling(target_log_prob,
       It must be a positive integer. See `tf.while_loop` for more details.
       Note that if you set the seed to have deterministic output you should
       also set `parallel_iterations` to 1.
-    experimental_compile: kwarg pass to tf.function decorator. If True, the
+    jit_compile: kwarg pass to tf.function decorator. If True, the
       function is always compiled by XLA.
     use_input_signature: If True, generate an input_signature kwarg to pass to
       tf.function decorator.
@@ -562,7 +562,7 @@ def window_tune_nuts_sampling(target_log_prob,
       use_wide_window_expanding_mode=use_wide_window_expanding_mode,
       seed=seed,
       parallel_iterations=parallel_iterations,
-      experimental_compile=experimental_compile,
+      jit_compile=jit_compile,
       use_input_signature=use_input_signature,
       experimental_relax_shapes=experimental_relax_shapes)
   return forward_transform(

@@ -24,7 +24,7 @@ import functools
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.vi import csiszar_divergence
 
-_trace_loss = lambda loss, grads, variables: loss
+_trace_loss = lambda traceable_quantities: traceable_quantities.loss
 
 # Silent fallback to score-function gradients leads to difficult-to-debug
 # failures, so we force reparameterization gradients by default.
@@ -43,6 +43,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
                             variational_loss_fn=_reparameterized_elbo,
                             sample_size=1,
                             trainable_variables=None,
+                            jit_compile=None,
                             seed=None,
                             name='fit_surrogate_posterior'):
   """Fit a surrogate posterior to a target (unnormalized) log density.
@@ -124,15 +125,20 @@ def fit_surrogate_posterior(target_log_prob_fn,
       during the computation of the variational bound, i.e., those defining
       `surrogate_posterior` and the model `target_log_prob_fn`.
       Default value: `None`
-    seed: Python integer to seed the random number generator.
+    jit_compile: If True, compiles the loss function and gradient update using
+      XLA. XLA performs compiler optimizations, such as fusion, and attempts to
+      emit more efficient code. This may drastically improve the performance.
+      See the docs for `tf.function`. (In JAX, this will apply `jax.jit`).
+      Default value: `None`.
+    seed: Optional seed for reproducible sampling.
     name: Python `str` name prefixed to ops created by this function.
       Default value: 'fit_surrogate_posterior'.
 
   Returns:
-    results: `Tensor` or nested structure of `Tensor`s, according to the
-      return type of `result_fn`. Each `Tensor` has an added leading dimension
-      of size `num_steps`, packing the trajectory of the result over the course
-      of the optimization.
+    results: `Tensor` or nested structure of `Tensor`s, according to the return
+      type of `trace_fn`. Each `Tensor` has an added leading dimension of size
+      `num_steps`, packing the trajectory of the result over the course of the
+      optimization.
 
   #### Examples
 
@@ -298,4 +304,5 @@ def fit_surrogate_posterior(target_log_prob_fn,
                            convergence_criterion=convergence_criterion,
                            trace_fn=trace_fn,
                            trainable_variables=trainable_variables,
+                           jit_compile=jit_compile,
                            name=name)

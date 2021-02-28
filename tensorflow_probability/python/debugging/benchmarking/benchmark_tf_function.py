@@ -121,7 +121,7 @@ def _run_function_under_strategies(user_fn, iters, config, hardware,
 
   if RUNTIME_XLA in config.strategies:
     xla_fn = tf.function(
-        user_fn, autograph=use_autograph, experimental_compile=True)
+        user_fn, autograph=use_autograph, jit_compile=True)
     data_dicts.append(run_one(xla_fn, RUNTIME_XLA))
 
   if RUNTIME_XLA_AUTOCLUSTER in config.strategies:
@@ -157,9 +157,8 @@ def benchmark_tf_function(
     gpu_device='gpu:0'):
   """Time a TensorFlow function under a variety of strategies and hardware.
 
-  Runs the zero-argument callable `user_fn` `iters` times under the
-  strategies (any of Eager, tfe.function + graph, and XLA) and hardware (CPU,
-  GPU).
+  Runs the callable `user_fn` `iters` times under the strategies (any of Eager,
+  tfe.function + graph, and XLA) and hardware (CPU, GPU).
 
 
   # Example:
@@ -215,7 +214,7 @@ def benchmark_tf_function(
           extra_columns, use_autograph, print_intermediates)
 
   if HARDWARE_GPU in config.hardware:
-    if tf.test.is_gpu_available():
+    if tf.config.list_physical_devices('GPU'):
       with tf.device(gpu_device):
         data_dicts += _run_function_under_strategies(
             user_fn, iters, config, HARDWARE_GPU,

@@ -133,7 +133,7 @@ class GeneralizedParetoTest(test_util.TestCase):
         loc=loc, scale=scale, concentration=concentration, validate_args=True)
 
     x = np.array([1. - 1e-6, 3.1, 4.9]).astype(np.float32)
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -31,6 +32,7 @@ from tensorflow_probability.python.internal import custom_gradient as tfp_custom
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import implementation_selection
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -177,15 +179,19 @@ class Gamma(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(
-        zip(('concentration', 'log_rate'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration=0, rate=0, log_rate=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        rate=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            is_preferred=False),
+        log_rate=parameter_properties.ParameterProperties())
+    # pylint: enable=g-long-lambda
 
   @property
   def concentration(self):
@@ -262,6 +268,9 @@ class Gamma(distribution.Distribution):
     # Note that igamma returns the regularized incomplete gamma function,
     # which is what we want for the CDF.
     return tf.math.igamma(self.concentration, self._rate_parameter() * x)
+
+  def _quantile(self, p):
+    return tfp_math.igammainv(self.concentration, p) / self._rate_parameter()
 
   def _entropy(self):
     concentration = tf.convert_to_tensor(self.concentration)
@@ -379,7 +388,7 @@ def _tensorshape_or_scalar(v0, v1):
 def _random_gamma_cpu(
     shape, concentration, rate=None, log_rate=None, seed=None, log_space=False):
   """Sample using *fast* `tf.random.stateless_gamma`."""
-  bad_concentration = (concentration <= 0.) | tf.math.is_nan(concentration)
+  bad_concentration = (concentration < 0.) | tf.math.is_nan(concentration)
   safe_concentration = tf.where(
       bad_concentration,
       dtype_util.as_numpy_dtype(concentration.dtype)(100.), concentration)
@@ -433,9 +442,14 @@ def _random_gamma_cpu(
         tf.zeros((), dtype=samples.dtype))
     samples += (conc_lt_one_fix - log_rate)
 
+  # 0 rate is infinite scale, which implies a +inf sample.
+  # `if log_space` clobbered the `rate` variable with 1 a score lines ago.
   return tf.where(
-      bad_rate | bad_concentration,
-      dtype_util.as_numpy_dtype(concentration.dtype)(np.nan), samples)
+      (log_rate <= -np.inf if log_space else tf.equal(rate, 0.)),
+      tf.constant(np.inf, dtype=concentration.dtype),
+      tf.where(
+          bad_rate | bad_concentration,
+          dtype_util.as_numpy_dtype(concentration.dtype)(np.nan), samples))
 
 
 def _random_gamma_noncpu(
@@ -618,7 +632,7 @@ def _fix_zero_samples(s):
   # We use `tf.where` instead of `tf.maximum` because we need to allow for
   # `samples` to be `nan`, but `tf.maximum(nan, x) == x`.
   return tf.where(
-      s == 0, np.finfo(dtype_util.as_numpy_dtype(s.dtype)).tiny, s)
+      tf.equal(s, 0), np.finfo(dtype_util.as_numpy_dtype(s.dtype)).tiny, s)
 
 
 # TF custom_gradient doesn't support kwargs, so we wrap _random_gamma_gradient.
@@ -653,7 +667,7 @@ def random_gamma(
 
 def _random_gamma_rejection(
     shape, concentration, rate=None, log_rate=None, seed=None, log_space=False,
-    internal_dtype=tf.float64):
+    internal_dtype=None):
   """Samples from the gamma distribution.
 
   The sampling algorithm is rejection sampling [1], and pathwise gradients with
@@ -674,7 +688,9 @@ def _random_gamma_rejection(
       as if 0 (but possibly more efficiently). Mutually exclusive with `rate`.
     seed: (optional) The random seed.
     log_space: Optionally sample log(gamma) variates.
-    internal_dtype: dtype to use for internal computations.
+    internal_dtype: dtype to use for internal computations. If unspecified, we
+      use the same dtype as the output (i.e. the dtype of `concentration`,
+      `rate`, or `log_rate`) when `log_space==True`, and `tf.float64` otherwise.
 
   Returns:
     Differentiable samples from the gamma distribution.
@@ -691,13 +707,15 @@ def _random_gamma_rejection(
       seed, salt='random_gamma')
   output_dtype = dtype_util.common_dtype([concentration, rate, log_rate],
                                          dtype_hint=tf.float32)
+  if internal_dtype is None:
+    internal_dtype = output_dtype if log_space else tf.float64
 
   def rejection_sample(concentration):
     """Gamma rejection sampler."""
     # Note, concentration here already has a shape that is broadcast with rate.
     cast_concentration = tf.cast(concentration, internal_dtype)
 
-    good_params_mask = (concentration > 0.)
+    good_params_mask = (concentration >= 0.)
     # When replacing NaN values, use 100. for concentration, since that leads to
     # a high-likelihood of the rejection sampler accepting on the first pass.
     safe_concentration = tf.where(good_params_mask, cast_concentration, 100.)
@@ -713,23 +731,16 @@ def _random_gamma_rejection(
       """Generate and test samples."""
       v_seed, u_seed = samplers.split_seed(seed)
 
-      def generate_positive_v():
-        """Generate positive v."""
-        def _inner(seed):
-          x = samplers.normal(shape, dtype=internal_dtype, seed=seed)
-          # This implicitly broadcasts concentration up to sample shape.
-          v = 1 + c * x
-          return (x, v), v > 0.
-
-        # Note: It should be possible to remove this 'inner' call to
-        # `batched_las_vegas_algorithm` and merge the v > 0 check into the
-        # overall check for a good sample. This would lead to a slightly simpler
-        # implementation; it is unclear whether it would be faster. We include
-        # the inner loop so this implementation is more easily comparable to
-        # Ref. [1] and other implementations.
-        return brs.batched_las_vegas_algorithm(_inner, v_seed)[0]
-
-      (x, v) = generate_positive_v()
+      x = samplers.normal(shape, dtype=internal_dtype, seed=v_seed)
+      # This implicitly broadcasts concentration up to sample shape.
+      v = 1 + c * x
+      # In [1], there is an 'inner' rejection sampling loop which checks that
+      # v > 0 and generates a new normal sample if it's not, saving the rest of
+      # the computations below. We found that merging the check for  v > 0 with
+      # the `good_sample_mask` not only simplifies the code, but leads to a
+      # ~2x speedup for small concentrations on GPU, at the cost of deviating
+      # slightly from the implementation given in Ref. [1].
+      accept_v = v > 0.
       logv = tf.math.log1p(c * x)
       x2 = x * x
       v3 = v * v * v
@@ -744,7 +755,8 @@ def _random_gamma_rejection(
       # have to compute or not compute the logarithms for the entire batch, and
       # as the batch gets larger, the odds we compute it grow. Therefore we
       # don't bother with the "cheap" check.
-      good_sample_mask = tf.math.log(u) < (x2 / 2. + d * (1 - v3 + logv3))
+      good_sample_mask = tf.logical_and(
+          tf.math.log(u) < (x2 / 2. + d * (1 - v3 + logv3)), accept_v)
 
       return logv3 if log_space else v3, good_sample_mask
 
@@ -793,10 +805,14 @@ def _random_gamma_rejection(
 
   if log_space:
     if log_rate is None:
-      log_rate = tf.math.log(tf.where(rate > 0., rate, np.nan))
+      log_rate = tf.math.log(tf.where(rate >= 0., rate, np.nan))
     return concentration_samples - log_rate
   else:
     if rate is None:
       rate = tf.math.exp(log_rate)
-    corrected_rate = tf.where(rate > 0., rate, np.nan)  # log_rate=-inf case
-    return _fix_zero_samples(concentration_samples / corrected_rate)
+    corrected_rate = tf.where(rate >= 0., rate, np.nan)
+    # 0 rate is infinite scale, which implies a +inf sample.
+    ret = tf.where(
+        tf.equal(corrected_rate, 0), tf.constant(np.inf, dtype=output_dtype),
+        _fix_zero_samples(concentration_samples / corrected_rate))
+    return ret

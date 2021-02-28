@@ -24,6 +24,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
+        "//oryx/experimental/matching",
         "//oryx/experimental/mcmc",
         "//oryx/experimental/nn",
         "//oryx/experimental/optimizers",

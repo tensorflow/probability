@@ -40,7 +40,7 @@ class WeibullCDFBijectorTest(test_util.TestCase):
     self.assertStartsWith(bijector.name, 'weibull')
     x = np.array([[[0.], [1.], [14.], [20.], [100.]]], dtype=np.float32)
     # Weibull distribution
-    weibull_dist = stats.frechet_r(c=concentration, scale=scale)
+    weibull_dist = stats.weibull_min(c=concentration, scale=scale)
     y = weibull_dist.cdf(x).astype(np.float32)
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))

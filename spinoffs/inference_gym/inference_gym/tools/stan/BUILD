@@ -23,8 +23,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 # We can't use strict/pytype because `cmdstanpy` is not available internally.
 py_library(
     name = "brownian_motion",
@@ -79,8 +77,29 @@ py_library(
 )
 
 py_library(
+    name = "lorenz_system",
+    srcs = ["lorenz_system.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+        # numpy dep,
+    ],
+)
+
+py_library(
     name = "radon_contextual_effects",
     srcs = ["radon_contextual_effects.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":stan_model",
+        ":util",
+    ],
+)
+
+py_library(
+    name = "radon_contextual_effects_halfnormal",
+    srcs = ["radon_contextual_effects_halfnormal.py"],
     srcs_version = "PY3",
     deps = [
         ":stan_model",
@@ -134,6 +153,7 @@ py_library(
         ":item_response_theory",
         ":log_gaussian_cox_process",
         ":logistic_regression",
+        ":lorenz_system",
         ":probit_regression",
         ":radon_contextual_effects",
         ":sparse_logistic_regression",

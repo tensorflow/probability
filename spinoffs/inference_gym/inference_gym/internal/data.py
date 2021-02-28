@@ -19,12 +19,14 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from inference_gym.internal.datasets import brownian_motion_missing_middle_observations as brownian_motion_lib
+from inference_gym.internal.datasets import convection_lorenz_bridge as convection_lorenz_bridge_lib
 from inference_gym.internal.datasets import sp500_closing_prices as sp500_closing_prices_lib
 from inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib
 from inference_gym.internal.datasets import synthetic_log_gaussian_cox_process as synthetic_log_gaussian_cox_process_lib
 
 __all__ = [
     'brownian_motion_missing_middle_observations',
+    'convection_lorenz_bridge',
     'german_credit_numeric',
     'radon',
     'sp500_closing_prices',
@@ -86,15 +88,51 @@ def brownian_motion_missing_middle_observations():
 
   Returns:
     dataset: A Dict with the following keys:
-      locs: Float `Tensor` of observed loc parameters at each timestep.
+      observed_locs: Float `Tensor` of observed loc parameters at each timestep.
       observation_noise: Float `Tensor` of observation noise, must be positive.
       innovation_noise: Float `Tensor` of innovation noise, must be positive.
 
   """
   return dict(
-      locs=brownian_motion_lib.OBSERVED_LOC,
-      observation_noise=brownian_motion_lib.OBSERVATION_NOISE,
-      innovation_noise=brownian_motion_lib.INNOVATION_NOISE)
+      observed_locs=brownian_motion_lib.OBSERVED_LOC,
+      observation_noise_scale=brownian_motion_lib.OBSERVATION_NOISE,
+      innovation_noise_scale=brownian_motion_lib.INNOVATION_NOISE)
+
+
+def convection_lorenz_bridge():
+  """Synthetic dataset sampled from a LorenzSystem model.
+
+  This dataset simulates a Lorenz system for 30 timesteps with a step size
+  of 0.02. Only the convection (the first component of the state) is observed
+  with Gaussian observation noise and the middle ten timesteps are unobserved.
+
+  This model is based on the Lorenz Bridge system from [1].
+
+  #### References
+
+  1. Ambrogioni, Luca, Max Hinne, and Marcel van Gerven. "Automatic structured
+     variational inference." arXiv preprint arXiv:2002.00643 (2020).
+
+  Returns:
+    dataset: A `dict` with the following entries:
+      values: Float `Tensor` of observed convection values at each timestep.
+      observation_index: The index for the convection values in the underlying
+        state.
+      observation_mask: A 30-length Boolean `Tensor` that is `False` for the
+        middle ten observations and `True` elsewhere.
+      observation_scale : The `float` scale of the observation noise for the
+        system.
+      innovation_scale: The `float` scale of the innovation noise for the
+        system.
+      step_size: The `float` step size used to numerically integrate the system.
+  """
+  return dict(
+      observed_values=convection_lorenz_bridge_lib.OBSERVED_VALUES,
+      observation_index=convection_lorenz_bridge_lib.OBSERVATION_INDEX,
+      observation_mask=convection_lorenz_bridge_lib.OBSERVATION_MASK,
+      observation_scale=convection_lorenz_bridge_lib.OBSERVATION_SCALE,
+      innovation_scale=convection_lorenz_bridge_lib.INNOVATION_SCALE,
+      step_size=convection_lorenz_bridge_lib.STEP_SIZE)
 
 
 def german_credit_numeric(

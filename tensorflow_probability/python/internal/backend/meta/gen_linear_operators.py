@@ -131,6 +131,7 @@ def gen_module(module_name):
       'tensorflow_probability.python.internal.backend.numpy import')
   code = code.replace('tensor_util.constant_value(', '(')
   code = code.replace('tensor_util.is_tensor(', 'ops.is_tensor(')
+  code = code.replace('tensor_util.is_tf_type(', 'ops.is_tensor(')
   code = code.replace(
       'from tensorflow.python.ops.distributions import '
       'util as distribution_util', UTIL_IMPORTS)
@@ -161,6 +162,7 @@ def gen_module(module_name):
                       'linalg_ops.triangular_solve')
   code = code.replace('math_ops.cast', '_ops.cast')
   code = code.replace('math_ops.matmul', '_linalg.matmul')
+  code = code.replace('math_ops.range', 'array_ops.range')
   code = code.replace('ops.convert_to_tensor_v2_with_dispatch(',
                       'ops.convert_to_tensor(')
 
@@ -171,6 +173,10 @@ def gen_module(module_name):
   # Replace `x.set_shape(...)` with `tensorshape_util.set_shape(x, ...)`.
   code = re.sub(r' (\w*)\.set_shape\(',
                 ' tensorshape_util.set_shape(\\1, ', code)
+
+  # Replace in-place Python operators (e.g. `+=`) with implicit copying.
+  code = re.sub(r'([_a-zA-Z0-9.\[\]]+)[ ]{0,1}(\+|\-|\*|\/)[\=][ ]{0,1}',
+                '\\1 = \\1 \\2 ', code)
 
   for lint in DISABLED_LINTS:
     code = code.replace('pylint: enable={}'.format(lint),

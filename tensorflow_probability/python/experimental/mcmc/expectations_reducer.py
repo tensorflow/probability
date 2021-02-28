@@ -76,7 +76,7 @@ class ExpectationsReducer(reducer_base.Reducer):
         name=name or 'expectations_reducer'
     )
 
-  def initialize(self, initial_chain_state, initial_kernel_results):
+  def initialize(self, initial_chain_state, initial_kernel_results=None):
     """Initializes an empty `ExpectationsReducerState`.
 
     Args:
@@ -94,25 +94,22 @@ class ExpectationsReducer(reducer_base.Reducer):
       initial_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           initial_chain_state)
-      initial_kernel_results = tf.nest.map_structure(
-          tf.convert_to_tensor,
-          initial_kernel_results
-      )
+      if initial_kernel_results is not None:
+        initial_kernel_results = tf.nest.map_structure(
+            tf.convert_to_tensor,
+            initial_kernel_results,
+            expand_composites=True)
       initial_fn_results = tf.nest.map_structure(
           lambda fn: fn(initial_chain_state, initial_kernel_results),
-          self.transform_fn
-      )
-      stream = _prepare_args(initial_fn_results)
-      return tf.nest.map_structure(
-          lambda run_mean: ExpectationsReducerState(run_mean.initialize()),
-          stream
-      )
+          self.transform_fn)
+      return ExpectationsReducerState(tf.nest.map_structure(
+          sample_stats.RunningMean.from_example, initial_fn_results))
 
   def one_step(
       self,
       new_chain_state,
       current_reducer_state,
-      previous_kernel_results,
+      previous_kernel_results=None,
       axis=None):
     """Update the `current_reducer_state` with a new chain state.
 
@@ -146,28 +143,22 @@ class ExpectationsReducer(reducer_base.Reducer):
       new_chain_state = tf.nest.map_structure(
           tf.convert_to_tensor,
           new_chain_state)
-      previous_kernel_results = tf.nest.map_structure(
-          tf.convert_to_tensor,
-          previous_kernel_results
-      )
-      if not nest.is_nested(axis):
-        axis = nest_util.broadcast_structure(self.transform_fn, axis)
+      if previous_kernel_results is not None:
+        previous_kernel_results = tf.nest.map_structure(
+            tf.convert_to_tensor,
+            previous_kernel_results,
+            expand_composites=True)
       fn_results = tf.nest.map_structure(
           lambda fn: fn(new_chain_state, previous_kernel_results),
-          self.transform_fn
-      )
-      stream = _prepare_args(fn_results)
-      def update(run_mean, fn_results, state, axis):
-        return run_mean.update(state.expectation_state, fn_results, axis=axis)
-      updated_expectation = nest.map_structure_up_to(
-          self.transform_fn,
+          self.transform_fn)
+      if not nest.is_nested(axis):
+        axis = nest_util.broadcast_structure(fn_results, axis)
+      def update(fn_results, state, axis):
+        return state.update(fn_results, axis=axis)
+      return ExpectationsReducerState(nest.map_structure(
           update,
-          stream, fn_results, current_reducer_state, axis,
-          check_types=False)
-      return nest.map_structure_up_to(
-          self.transform_fn,
-          ExpectationsReducerState,
-          updated_expectation)
+          fn_results, current_reducer_state.expectation_state, axis,
+          check_types=False))
 
   def finalize(self, final_reducer_state):
     """Finalizes expectation calculation from the `final_reducer_state`.
@@ -185,16 +176,9 @@ class ExpectationsReducer(reducer_base.Reducer):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'expectations_reducer', 'finalize')):
-      fn_results = nest.map_structure_up_to(
-          self.transform_fn,
-          lambda state: state.expectation_state.mean,
-          final_reducer_state
-      )
-      stream = _prepare_args(fn_results)
-      return nest.map_structure_up_to(
-          self.transform_fn,
-          lambda run_mean, state: run_mean.finalize(state.expectation_state),
-          stream, final_reducer_state,
+      return nest.map_structure(
+          lambda state: state.mean,
+          final_reducer_state.expectation_state,
           check_types=False)
 
   @property
@@ -208,11 +192,3 @@ class ExpectationsReducer(reducer_base.Reducer):
   @property
   def parameters(self):
     return self._parameters
-
-
-def _prepare_args(fn_results):
-  """Creates a structure of compatible `RunningMean` streams."""
-  stream = tf.nest.map_structure(
-      lambda res: sample_stats.RunningMean(shape=res.shape, dtype=res.dtype),
-      fn_results)
-  return stream

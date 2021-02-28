@@ -25,10 +25,12 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 class Uniform(distribution.Distribution):
@@ -115,15 +117,14 @@ class Uniform(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(
-        zip(('low', 'high'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(low=0, high=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        low=parameter_properties.ParameterProperties(),
+        # TODO(b/169874884): Support decoupled parameterization.
+        high=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,))
 
   @property
   def low(self):
@@ -184,8 +185,11 @@ class Uniform(distribution.Distribution):
   def _cdf(self, x):
     low = tf.convert_to_tensor(self.low)
     high = tf.convert_to_tensor(self.high)
-    broadcast_shape = tf.broadcast_dynamic_shape(
-        tf.shape(x), self._batch_shape_tensor(low=low, high=high))
+    batch_shape = self.batch_shape
+    if not tensorshape_util.is_fully_defined(batch_shape):
+      batch_shape = self._batch_shape_tensor(low=low, high=high)
+    broadcast_shape = ps.broadcast_shape(
+        ps.shape(x), batch_shape)
     zeros = tf.zeros(broadcast_shape, dtype=self.dtype)
     ones = tf.ones(broadcast_shape, dtype=self.dtype)
     result_if_not_big = tf.where(x < low, zeros,

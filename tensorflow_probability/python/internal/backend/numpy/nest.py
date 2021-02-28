@@ -32,6 +32,7 @@ import collections
 
 # pylint: disable=unused-import
 from tree import _assert_shallow_structure
+from tree import _DOT
 from tree import _IF_SHALLOW_IS_SEQ_INPUT_MUST_BE_SEQ
 from tree import _INPUT_TREE_SMALLER_THAN_SHALLOW_TREE
 from tree import _is_attrs
@@ -40,9 +41,10 @@ from tree import _SHALLOW_TREE_HAS_INVALID_KEYS
 from tree import _STRUCTURES_HAVE_MISMATCHING_LENGTHS
 from tree import _STRUCTURES_HAVE_MISMATCHING_TYPES
 from tree import _yield_flat_up_to
+from tree import _yield_sorted_items
 from tree import _yield_value
 from tree import assert_same_structure
-from tree import flatten
+from tree import flatten as dm_flatten
 from tree import flatten_up_to
 from tree import flatten_with_path
 from tree import flatten_with_path_up_to
@@ -56,6 +58,14 @@ from tree import unflatten_as
 
 
 JAX_MODE = False
+
+
+def flatten(structure, expand_composites=False):
+  """Add expand_composites support for JAX."""
+  if expand_composites and JAX_MODE:
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    return tree_util.tree_leaves(structure)
+  return dm_flatten(structure)
 
 
 def map_structure(func, *structure, **kwargs):
@@ -211,7 +221,12 @@ def map_structure_with_tuple_paths_up_to(func, *structures, **kwargs):
   return map_structure_with_path_up_to(func, *structures, **kwargs)
 
 
-def pack_sequence_as(structure, flat_sequence):
+def pack_sequence_as(structure, flat_sequence, **kwargs):
+  expand_composites = kwargs.pop('expand_composites', False)
+  if expand_composites and JAX_MODE:
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    return tree_util.tree_unflatten(
+        tree_util.tree_structure(structure), flat_sequence)
   return unflatten_as(structure, flat_sequence)
 
 

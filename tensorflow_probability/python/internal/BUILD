@@ -31,8 +31,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
@@ -65,7 +63,7 @@ py_test(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -84,6 +82,7 @@ multi_substrate_py_library(
     name = "batched_rejection_sampler",
     srcs = ["batched_rejection_sampler.py"],
     deps = [
+        ":broadcast_util",
         ":samplers",
         # numpy dep,  # For np.nan
         # tensorflow dep,
@@ -107,11 +106,41 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "broadcast_util",
+    srcs = ["broadcast_util.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_library(
     name = "cache_util",
     srcs = ["cache_util.py"],
     deps = [
         # numpy dep,
         # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "callable_util",
+    srcs = ["callable_util.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "callable_util_test",
+    size = "small",
+    srcs = ["callable_util_test.py"],
+    deps = [
+        ":callable_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -297,6 +326,12 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
+)
+
+multi_substrate_py_library(
+    name = "parameter_properties",
+    srcs = ["parameter_properties.py"],
+    deps = ["//tensorflow_probability/python/bijectors:identity"],
 )
 
 multi_substrate_py_library(
@@ -556,6 +591,40 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "unnest",
+    srcs = ["unnest.py"],
+    srcs_version = "PY3",
+    deps = [],
+)
+
+multi_substrate_py_test(
+    name = "unnest_test",
+    size = "small",
+    srcs = ["unnest_test.py"],
+    deps = [
+        ":unnest",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "variadic_reduce",
+    srcs = [
+        "variadic_reduce.py",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        ":implementation_selection",
+        ":prefer_static",
+        ":tensorshape_util",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
 exports_files(
     [
         "assert_util.py",
@@ -572,6 +641,8 @@ exports_files(
         "test_combinations.py",
         "test_util.py",
         "test_util_test.py",
+        "unnest.py",
+        "unnest_test.py",
         "vectorization_util.py",
     ],
     visibility = [

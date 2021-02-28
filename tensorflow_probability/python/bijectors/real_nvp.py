@@ -22,8 +22,10 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import affine_scalar
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import chain as chain_lib
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import shift as shift_lib
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -46,7 +48,8 @@ class RealNVP(bijector_lib.Bijector):
   while the first `d` units are 'masked' and left unchanged. Real NVP's
   `shift_and_log_scale_fn` computes vector-valued quantities. For
   scale-and-shift transforms that do not depend on any masked units, i.e.
-  `d=0`, use the `tfb.Affine` bijector with learned parameters instead.
+  `d=0`, use the `tfb.Scale` and `tfb.Shift` bijectors with learned parameters
+  instead.
 
   Masking is currently only supported for base distributions with
   `event_ndims=1`. For more sophisticated masking schemes like checkerboard or
@@ -105,7 +108,7 @@ class RealNVP(bijector_lib.Bijector):
 
   x = nvp.sample()
   nvp.log_prob(x)
-  nvp.log_prob(0.)
+  nvp.log_prob([0.0, 0.0, 0.0])
   ```
 
   For more examples, see [Jang (2018)][3].
@@ -220,7 +223,12 @@ class RealNVP(bijector_lib.Bijector):
         def _bijector_fn(x0, input_depth, **condition_kwargs):
           shift, log_scale = shift_and_log_scale_fn(x0, input_depth,
                                                     **condition_kwargs)
-          return affine_scalar.AffineScalar(shift=shift, log_scale=log_scale)
+          bijectors = []
+          if shift is not None:
+            bijectors.append(shift_lib.Shift(shift))
+          if log_scale is not None:
+            bijectors.append(scale_lib.Scale(log_scale=log_scale))
+          return chain_lib.Chain(bijectors)
 
         bijector_fn = _bijector_fn
 
@@ -237,6 +245,10 @@ class RealNVP(bijector_lib.Bijector):
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
 
   @property
   def _masked_size(self):
@@ -337,7 +349,7 @@ def real_nvp_default_template(hidden_layers,
   Real NVP bijector, implement a conditioned shift/scale template that
   handles the `condition_kwargs`.
 
-  Arguments:
+  Args:
     hidden_layers: Python `list`-like of non-negative integer, scalars
       indicating the number of units in each hidden layer. Default: `[512,
         512]`.

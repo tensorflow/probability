@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import warnings
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
@@ -31,20 +30,12 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import slice_sampler_utils as ssu
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.random import random_ops
 
 
 __all__ = [
     'SliceSampler',
 ]
-
-
-# Cause all warnings to always be triggered.
-# Not having this means subsequent calls wont trigger the warning.
-warnings.filterwarnings('always',
-                        module='tensorflow_probability.*slice_sampler_kernel',
-                        append=True)  # Don't override user-set filters.
 
 
 class SliceSamplerKernelResults(
@@ -196,14 +187,10 @@ class SliceSampler(kernel_base.TransitionKernel):
        https://www.jstor.org/stable/3690278?seq=1#page_scan_tab_contents
   """
 
-  @deprecation.deprecated_args(
-      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
-      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                step_size,
                max_doublings,
-               seed=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -215,8 +202,6 @@ class SliceSampler(kernel_base.TransitionKernel):
         with `x_initial`. The size of the initial interval.
       max_doublings: Scalar positive int32 `tf.Tensor`. The maximum number of
       doublings to consider.
-      seed: Python integer to seed the random number generator. Deprecated, pass
-        seed to `tfp.mcmc.sample_chain`.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'slice_sampler_kernel').
 
@@ -227,12 +212,10 @@ class SliceSampler(kernel_base.TransitionKernel):
       kernel_results: `collections.namedtuple` of internal calculations used to
         advance the chain.
     """
-    self._seed_stream = SeedStream(seed, salt='slice_sampler')
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
         max_doublings=max_doublings,
-        seed=seed,
         name=name)
 
   @property
@@ -246,10 +229,6 @@ class SliceSampler(kernel_base.TransitionKernel):
   @property
   def max_doublings(self):
     return self._parameters['max_doublings']
-
-  @property
-  def seed(self):
-    return self._parameters['seed']
 
   @property
   def name(self):
@@ -289,13 +268,7 @@ class SliceSampler(kernel_base.TransitionKernel):
         `current_state`.
       TypeError: if `not target_log_prob.dtype.is_floating`.
     """
-    # TODO(b/159636942): Clean up after 2020-09-20.
-    if seed is not None:
-      seed = samplers.sanitize_seed(seed)
-    else:
-      if self._seed_stream.original_seed is not None:
-        warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
-      seed = samplers.sanitize_seed(self._seed_stream())
+    seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
 
     with tf.name_scope(mcmc_util.make_name(self.name, 'slice', 'one_step')):
       with tf.name_scope('initialize'):
@@ -358,7 +331,7 @@ class SliceSampler(kernel_base.TransitionKernel):
       return SliceSamplerKernelResults(
           target_log_prob=init_target_log_prob,
           bounds_satisfied=tf.zeros(
-              shape=tf.shape(init_target_log_prob), dtype=tf.bool),
+              shape=ps.shape(init_target_log_prob), dtype=tf.bool),
           direction=direction,
           upper_bounds=tf.zeros_like(init_target_log_prob),
           lower_bounds=tf.zeros_like(init_target_log_prob),
@@ -369,26 +342,20 @@ class SliceSampler(kernel_base.TransitionKernel):
 def _choose_random_direction(current_state_parts, batch_rank, seed=None):
   """Chooses a random direction in the event space."""
   seeds = samplers.split_seed(seed, n=len(current_state_parts))
-  # Chooses the random directions across each of the input components.
-  rnd_direction_parts = [
-      samplers.normal(
-          ps.shape(current_state_part), dtype=tf.float32, seed=part_seed)
-      for (current_state_part, part_seed) in zip(current_state_parts, seeds)
-  ]
-
-  # Sum squares over all of the input components. Note this takes all
-  # components into account.
-  sum_squares = sum(
-      tf.reduce_sum(  # pylint: disable=g-complex-comprehension
-          rnd_direction**2,
-          axis=ps.range(batch_rank, ps.rank(rnd_direction)),
-          keepdims=True) for rnd_direction in rnd_direction_parts)
-
-  # Normalizes the random direction fragments.
-  rnd_direction_parts = [rnd_direction / tf.sqrt(sum_squares)
-                         for rnd_direction in rnd_direction_parts]
-
-  return rnd_direction_parts
+  # Sample random directions across each of the input components.
+  def _sample_direction_part(state_part, part_seed):
+    state_part_shape = ps.shape(state_part)
+    batch_shape = state_part_shape[:batch_rank]
+    dimension = ps.reduce_prod(state_part_shape[batch_rank:])
+    return ps.reshape(
+        random_ops.spherical_uniform(
+            shape=batch_shape,
+            dimension=dimension,
+            dtype=state_part.dtype,
+            seed=part_seed),
+        state_part_shape)
+  return [_sample_direction_part(state_part, seed)
+          for state_part, seed in zip(current_state_parts, seeds)]
 
 
 def _sample_next(target_log_prob_fn,

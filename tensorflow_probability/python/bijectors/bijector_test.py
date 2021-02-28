@@ -80,12 +80,12 @@ class BaseBijectorTest(test_util.TestCase):
 
     with self.assertRaisesRegexp(
         NotImplementedError,
-        'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian.*'):
+        'inverse not implemented'):
       bij.inverse_log_det_jacobian(0, event_ndims=0)
 
     with self.assertRaisesRegexp(
         NotImplementedError,
-        'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian.*'):
+        'forward not implemented'):
       bij.forward_log_det_jacobian(0, event_ndims=0)
 
   @test_util.disable_test_for_backend(
@@ -123,6 +123,53 @@ class BaseBijectorTest(test_util.TestCase):
     with self.assertRaisesRegexp(
         error_clazz, 'Tensor conversion requested dtype'):
       b64.forward(x32)
+
+  @test_util.numpy_disable_gradient_test
+  def testAutodiffLogDetJacobian(self):
+
+    class NoJacobianBijector(tfb.Bijector):
+      """Bijector with no log det jacobian methods."""
+
+      def __init__(self, scale=2.):
+        parameters = dict(locals())
+        self._scale = tensor_util.convert_nonref_to_tensor(scale)
+        super(NoJacobianBijector, self).__init__(
+            validate_args=True,
+            forward_min_event_ndims=0,
+            parameters=parameters)
+
+      def _forward(self, x):
+        return tf.exp(self._scale * x)
+
+      def _inverse(self, y):
+        return tf.math.log(y) / self._scale
+
+    b = NoJacobianBijector(scale=1.4)
+    x = tf.convert_to_tensor([2., -3.])
+    [
+        fldj,
+        true_fldj,
+        ildj
+    ] = self.evaluate([
+        b.forward_log_det_jacobian(x, event_ndims=0),
+        tf.math.log(b._scale) + b._scale * x,
+        b.inverse_log_det_jacobian(b.forward(x), event_ndims=0)
+    ])
+    self.assertAllClose(fldj, true_fldj)
+    self.assertAllClose(fldj, -ildj)
+
+    y = tf.convert_to_tensor([27., 5.])
+    [
+        ildj,
+        true_ildj,
+        fldj
+    ] = self.evaluate([
+        b.inverse_log_det_jacobian(y, event_ndims=0),
+        -tf.math.log(tf.abs(y * b._scale)),
+        b.forward_log_det_jacobian(b.inverse(y), event_ndims=0)
+    ])
+    self.assertAllClose(ildj, true_ildj)
+    self.assertAllClose(ildj, -fldj)
 
 
 class IntentionallyMissingError(Exception):
@@ -192,6 +239,25 @@ class ExpOnlyJacobian(tfb.Bijector):
     return tf.math.log(x)
 
 
+class VectorExpOnlyJacobian(tfb.Bijector):
+  """An Exp bijector that operates only on vector (or higher-order) events."""
+
+  def __init__(self):
+    parameters = dict(locals())
+    super(VectorExpOnlyJacobian, self).__init__(
+        validate_args=False,
+        is_constant_jacobian=False,
+        forward_min_event_ndims=1,
+        parameters=parameters,
+        name='vector_exp')
+
+  def _inverse_log_det_jacobian(self, y):
+    return -tf.reduce_sum(tf.math.log(y), axis=-1)
+
+  def _forward_log_det_jacobian(self, x):
+    return tf.reduce_sum(tf.math.log(x), axis=-1)
+
+
 class ConstantJacobian(tfb.Bijector):
   """Only used for jacobian calculations."""
 
@@ -231,6 +297,24 @@ class UniqueCacheKey(tfb.Bijector):
 
   def _get_parameterization(self):
     return id(self)
+
+
+class UnspecifiedParameters(tfb.Bijector):
+  """A bijector that fails to pass `parameters` to the base class."""
+
+  def __init__(self, loc):
+    self._loc = loc
+    super(UnspecifiedParameters, self).__init__(
+        validate_args=False,
+        is_constant_jacobian=True,
+        forward_min_event_ndims=0,
+        name='unspecified_parameters')
+
+  def _forward(self, x):
+    return x + self._loc
+
+  def _forward_log_det_jacobian(self, x):
+    return tf.constant(0., x.dtype)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -393,11 +477,27 @@ class BijectorCachingTest(test_util.TestCase):
     self.assertLen(bijector_1._cache.weak_keys(direction='forward'), 1)
     self.assertLen(bijector_2._cache.weak_keys(direction='forward'), 1)
 
+  def testBijectorsWithUnspecifiedParametersDoNotShareCache(self):
+    bijector_1 = UnspecifiedParameters(loc=tf.constant(1., dtype=tf.float32))
+    bijector_2 = UnspecifiedParameters(loc=tf.constant(2., dtype=tf.float32))
+
+    x = tf.constant(3., dtype=tf.float32)
+    y_1 = bijector_1.forward(x)
+    y_2 = bijector_2.forward(x)
+
+    self.assertIsNot(y_1, y_2)
+    self.assertLen(bijector_1._cache.weak_keys(direction='forward'), 1)
+    self.assertLen(bijector_2._cache.weak_keys(direction='forward'), 1)
+
   def testInstanceCache(self):
     instance_cache_bijector = tfb.Exp()
     instance_cache_bijector._cache = cache_util.BijectorCache(
         bijector=instance_cache_bijector)
     global_cache_bijector = tfb.Exp()
+
+    # Ensure the global cache does not persist between tests in different
+    # execution regimes.
+    tfb.Exp._cache.clear()
 
     x = tf.constant(0., dtype=tf.float32)
     y = global_cache_bijector.forward(x)
@@ -432,11 +532,32 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
         np.sum(np.log(x), axis=(-1, -2)),
         self.evaluate(bij.forward_log_det_jacobian(x, event_ndims=2)))
 
+  def testNoReductionWhenEventNdimsIsOmitted(self):
+    x = [[[1., 2.], [3., 4.]]]
+
+    bij = ExpOnlyJacobian()
+    self.assertAllClose(
+        np.log(x),
+        self.evaluate(bij.forward_log_det_jacobian(x)))
+    self.assertAllClose(
+        -np.log(x),
+        self.evaluate(bij.inverse_log_det_jacobian(x)))
+
+    bij = VectorExpOnlyJacobian()
+    self.assertAllClose(
+        np.sum(np.log(x), axis=-1),
+        self.evaluate(bij.forward_log_det_jacobian(x)))
+    self.assertAllClose(
+        np.sum(-np.log(x), axis=-1),
+        self.evaluate(bij.inverse_log_det_jacobian(x)))
+
   def testReduceEventNdimsForwardRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
     with self.assertRaisesRegexp(ValueError, 'must be at least'):
       bij.forward_log_det_jacobian(x, event_ndims=0)
+    with self.assertRaisesRegexp(ValueError, 'Input must have rank at least'):
+      bij.forward_log_det_jacobian(x, event_ndims=4)
 
   def testReduceEventNdimsInverse(self):
     x = [[[1., 2.], [3., 4.]]]
@@ -456,6 +577,8 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
     with self.assertRaisesRegexp(ValueError, 'must be at least'):
       bij.inverse_log_det_jacobian(x, event_ndims=0)
+    with self.assertRaisesRegexp(ValueError, 'Input must have rank at least'):
+      bij.inverse_log_det_jacobian(x, event_ndims=4)
 
   def testReduceEventNdimsForwardConstJacobian(self):
     x = [[[1., 2.], [3., 4.]]]

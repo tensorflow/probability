@@ -395,7 +395,7 @@ class DeferredTensorBehavesLikeTensorInXLATest(test_util.TestCase):
       operator.le,
   )
   def testOperatorBinary(self, op):
-    @tf.function(autograph=False, experimental_compile=True)
+    @tf.function(autograph=False, jit_compile=True)
     def fn(y):
       x = tfp.util.DeferredTensor(y, tf.math.exp)
       y1 = op(2., x)

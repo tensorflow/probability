@@ -21,11 +21,13 @@ from __future__ import print_function
 
 # Distributions:
 from tensorflow_probability.python.distributions.autoregressive import Autoregressive
+from tensorflow_probability.python.distributions.batch_concat import BatchConcat
 from tensorflow_probability.python.distributions.batch_reshape import BatchReshape
 from tensorflow_probability.python.distributions.bates import Bates
 from tensorflow_probability.python.distributions.bernoulli import Bernoulli
 from tensorflow_probability.python.distributions.beta import Beta
 from tensorflow_probability.python.distributions.beta_binomial import BetaBinomial
+from tensorflow_probability.python.distributions.beta_quotient import BetaQuotient
 from tensorflow_probability.python.distributions.binomial import Binomial
 from tensorflow_probability.python.distributions.blockwise import Blockwise
 from tensorflow_probability.python.distributions.categorical import Categorical
@@ -40,7 +42,9 @@ from tensorflow_probability.python.distributions.dirichlet import Dirichlet
 from tensorflow_probability.python.distributions.dirichlet_multinomial import DirichletMultinomial
 from tensorflow_probability.python.distributions.distribution import Distribution
 from tensorflow_probability.python.distributions.doublesided_maxwell import DoublesidedMaxwell
+from tensorflow_probability.python.distributions.dpp import DeterminantalPointProcess
 from tensorflow_probability.python.distributions.empirical import Empirical
+from tensorflow_probability.python.distributions.exponentially_modified_gaussian import ExponentiallyModifiedGaussian
 from tensorflow_probability.python.distributions.exp_gamma import ExpGamma
 from tensorflow_probability.python.distributions.exp_gamma import ExpInverseGamma
 from tensorflow_probability.python.distributions.exponential import Exponential
@@ -53,6 +57,7 @@ from tensorflow_probability.python.distributions.generalized_normal import Gener
 from tensorflow_probability.python.distributions.generalized_pareto import GeneralizedPareto
 from tensorflow_probability.python.distributions.geometric import Geometric
 from tensorflow_probability.python.distributions.gumbel import Gumbel
+from tensorflow_probability.python.distributions.gev import GeneralizedExtremeValue
 from tensorflow_probability.python.distributions.half_cauchy import HalfCauchy
 from tensorflow_probability.python.distributions.half_normal import HalfNormal
 from tensorflow_probability.python.distributions.half_student_t import HalfStudentT
@@ -77,6 +82,8 @@ from tensorflow_probability.python.distributions.logistic import Logistic
 from tensorflow_probability.python.distributions.loglogistic import LogLogistic
 from tensorflow_probability.python.distributions.lognormal import LogNormal
 from tensorflow_probability.python.distributions.logitnormal import LogitNormal
+from tensorflow_probability.python.distributions.matrix_normal_linear_operator import MatrixNormalLinearOperator
+from tensorflow_probability.python.distributions.matrix_t_linear_operator import MatrixTLinearOperator
 from tensorflow_probability.python.distributions.mixture import Mixture
 from tensorflow_probability.python.distributions.mixture_same_family import MixtureSameFamily
 from tensorflow_probability.python.distributions.moyal import Moyal
@@ -104,9 +111,15 @@ from tensorflow_probability.python.distributions.relaxed_bernoulli import Relaxe
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import ExpRelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import RelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.sample import Sample
+from tensorflow_probability.python.distributions.sigmoid_beta import SigmoidBeta
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
+<<<<<<< HEAD
 from tensorflow_probability.python.distributions.skew_generalized_normal import SkewGeneralizedNormal
+=======
+from tensorflow_probability.python.distributions.skellam import Skellam
+>>>>>>> f7fb32575bc5fad85191af88fd7c48dcabb6d310
 from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
+from tensorflow_probability.python.distributions.stopping_ratio_logistic import StoppingRatioLogistic
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
@@ -157,6 +170,7 @@ __all__ = [
     'Bernoulli',
     'Beta',
     'BetaBinomial',
+    'BetaQuotient',
     'Binomial',
     'Blockwise',
     'Categorical',
@@ -167,7 +181,9 @@ __all__ = [
     'Deterministic',
     'DoublesidedMaxwell',
     'VectorDeterministic',
+    'DeterminantalPointProcess',
     'Empirical',
+    'ExponentiallyModifiedGaussian',
     'ExpGamma',
     'ExpInverseGamma',
     'Exponential',
@@ -182,6 +198,7 @@ __all__ = [
     'GaussianProcessRegressionModel',
     'VariationalGaussianProcess',
     'Gumbel',
+    'GeneralizedExtremeValue',
     'HalfCauchy',
     'HalfNormal',
     'HalfStudentT',
@@ -213,15 +230,23 @@ __all__ = [
     'PoissonLogNormalQuadratureCompound',
     'ProbitBernoulli',
     'Sample',
+    'SigmoidBeta',
     'SinhArcsinh',
+<<<<<<< HEAD
     'SkewGeneralizedNormal',
+=======
+    'Skellam',
+>>>>>>> f7fb32575bc5fad85191af88fd7c48dcabb6d310
     'SphericalUniform',
+    'StoppingRatioLogistic',
     'StudentT',
     'StudentTProcess',
     'Triangular',
     'TruncatedCauchy',
     'TruncatedNormal',
     'Uniform',
+    'MatrixNormalLinearOperator',
+    'MatrixTLinearOperator',
     'MultivariateNormalDiag',
     'MultivariateNormalFullCovariance',
     'MultivariateNormalLinearOperator',

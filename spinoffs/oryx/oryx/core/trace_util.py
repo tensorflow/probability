@@ -15,6 +15,7 @@
 # Lint as: python3
 """Module for JAX tracing utility functions."""
 import contextlib
+import threading
 from typing import Any, Dict, Generator, List
 
 import jax
@@ -88,26 +89,32 @@ def trees(f):
   return wrapped
 
 
-dynamic_contexts: Dict[jax_core.MainTrace, List[Any]] = {}
+class _ThreadLocalState(threading.local):
+
+  def __init__(self):
+    super().__init__()
+    self.dynamic_contexts: Dict[jax_core.MainTrace, List[Any]] = {}
+
+_thread_local_state = _ThreadLocalState()
 
 
 @contextlib.contextmanager
 def new_dynamic_context(master: jax_core.MainTrace,
                         context: Any) -> Generator[None, None, None]:
   """Creates a dynamic context for a trace."""
-  if master not in dynamic_contexts:
-    dynamic_contexts[master] = []
-  dynamic_contexts[master].append(context)
+  if master not in _thread_local_state.dynamic_contexts:
+    _thread_local_state.dynamic_contexts[master] = []
+  _thread_local_state.dynamic_contexts[master].append(context)
   try:
     yield
   finally:
-    dynamic_contexts[master].pop()
-    if not dynamic_contexts[master]:
-      del dynamic_contexts[master]
+    _thread_local_state.dynamic_contexts[master].pop()
+    if not _thread_local_state.dynamic_contexts[master]:
+      del _thread_local_state.dynamic_contexts[master]
 
 
 def get_dynamic_context(trace: jax_core.Trace) -> Any:
   """Returns the current active dynamic context for a trace."""
-  if trace.main not in dynamic_contexts:
+  if trace.main not in _thread_local_state.dynamic_contexts:
     raise ValueError(f'No dynamic context registered for trace: {trace}')
-  return dynamic_contexts[trace.main][-1]
+  return _thread_local_state.dynamic_contexts[trace.main][-1]

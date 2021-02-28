@@ -204,7 +204,6 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
     with ops.name_scope(name, values=graph_parents):
       super(LinearOperatorComposition, self).__init__(
           dtype=dtype,
-          graph_parents=None,
           is_non_singular=is_non_singular,
           is_self_adjoint=is_self_adjoint,
           is_positive_definite=is_positive_definite,
@@ -255,7 +254,7 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
     # Dummy Tensor of zeros.  Will never be materialized.
     zeros = array_ops.zeros(shape=self.operators[0].batch_shape_tensor())
     for operator in self.operators[1:]:
-      zeros += array_ops.zeros(shape=operator.batch_shape_tensor())
+      zeros = zeros + array_ops.zeros(shape=operator.batch_shape_tensor())
     batch_shape = array_ops.shape(zeros)
 
     return array_ops.concat((batch_shape, matrix_shape), 0)
@@ -278,13 +277,13 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
   def _determinant(self):
     result = self.operators[0].determinant()
     for operator in self.operators[1:]:
-      result *= operator.determinant()
+      result = result * operator.determinant()
     return result
 
   def _log_abs_determinant(self):
     result = self.operators[0].log_abs_determinant()
     for operator in self.operators[1:]:
-      result += operator.log_abs_determinant()
+      result = result + operator.log_abs_determinant()
     return result
 
   def _solve(self, rhs, adjoint=False, adjoint_arg=False):

@@ -57,12 +57,16 @@ class _SequentialMonteCarloTest(test_util.TestCase):
     kernel = SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=tfp.experimental.mcmc.resample_systematic,
-        resample_criterion_fn=tfp.experimental.mcmc.ess_below_threshold,
-        seed=test_util.test_seed())
+        resample_criterion_fn=tfp.experimental.mcmc.ess_below_threshold)
+    seed = test_util.test_seed()
+    tf.random.set_seed(seed)
+    seed_stream = tfp.util.SeedStream(seed=seed, salt='test')
     state, results = kernel.one_step(
         state=initial_state,
-        kernel_results=kernel.bootstrap_results(initial_state))
-    state, results = kernel.one_step(state=state, kernel_results=results)
+        kernel_results=kernel.bootstrap_results(initial_state),
+        seed=seed_stream())
+    state, results = kernel.one_step(state=state, kernel_results=results,
+                                     seed=seed_stream())
     state, results = self.evaluate(
         (tf.nest.map_structure(tf.convert_to_tensor, state),
          tf.nest.map_structure(tf.convert_to_tensor, results)))
@@ -71,12 +75,15 @@ class _SequentialMonteCarloTest(test_util.TestCase):
     kernel2 = SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=tfp.experimental.mcmc.resample_systematic,
-        resample_criterion_fn=tfp.experimental.mcmc.ess_below_threshold,
-        seed=test_util.test_seed())
+        resample_criterion_fn=tfp.experimental.mcmc.ess_below_threshold)
+    tf.random.set_seed(seed)
+    seed_stream = tfp.util.SeedStream(seed=seed, salt='test')
     state2, results2 = kernel2.one_step(
         state=initial_state,
-        kernel_results=kernel2.bootstrap_results(initial_state))
-    state2, results2 = kernel2.one_step(state=state2, kernel_results=results2)
+        kernel_results=kernel2.bootstrap_results(initial_state),
+        seed=seed_stream())
+    state2, results2 = kernel2.one_step(state=state2, kernel_results=results2,
+                                        seed=seed_stream())
     state2, results2 = self.evaluate(
         (tf.nest.map_structure(tf.convert_to_tensor, state2),
          tf.nest.map_structure(tf.convert_to_tensor, results2)))

@@ -31,15 +31,23 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import cholesky_outer_product as cholesky_outer_product_bijector
+from tensorflow_probability.python.bijectors import correlation_cholesky as correlation_cholesky_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
+from tensorflow_probability.python.random import random_ops
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -48,14 +56,57 @@ __all__ = [
 ]
 
 
-def _uniform_unit_norm(dimension, shape, dtype, seed):
-  """Returns a batch of points chosen uniformly from the unit hypersphere."""
-  # This works because the Gaussian distribution is spherically symmetric.
-  # raw shape: shape + [dimension]
-  raw = samplers.normal(
-      shape=ps.concat([shape, [dimension]], axis=0), seed=seed, dtype=dtype)
-  unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
-  return unit_norm
+class _ClipByValue(bijector_lib.Bijector):
+  """A bijector that clips by value.
+
+  This class is intended for minute numerical issues where `|clip(x) - x| <=
+  eps`, as it defines the derivative of its application to be exactly 1.
+  """
+
+  def __init__(self,
+               clip_value_min,
+               clip_value_max,
+               validate_args=False,
+               name='clip_by_value'):
+    """Instantiates the `ClipByValue` bijector.
+
+    Args:
+      clip_value_min: Floating-point `Tensor`.
+      clip_value_max: Floating-point `Tensor`.
+      validate_args: Python `bool` indicating whether arguments should be
+        checked for correctness.
+      name: Python `str` name given to ops managed by this object.
+    """
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([clip_value_min, clip_value_max],
+                                      dtype_hint=tf.float32)
+      self._clip_value_min = tensor_util.convert_nonref_to_tensor(
+          clip_value_min, dtype=dtype, name='clip_value_min')
+      self._clip_value_max = tensor_util.convert_nonref_to_tensor(
+          clip_value_max, dtype=dtype, name='clip_value_max')
+      super(_ClipByValue, self).__init__(
+          forward_min_event_ndims=0,
+          is_constant_jacobian=True,
+          dtype=dtype,
+          validate_args=validate_args,
+          parameters=parameters,
+          name=name)
+
+  @classmethod
+  def _is_increasing(cls):
+    return False
+
+  def _forward(self, x):
+    return clip_by_value_preserve_gradient(x, self._clip_value_min,
+                                           self._clip_value_max)
+
+  def _inverse(self, y):
+    return y
+
+  def _forward_log_det_jacobian(self, x):
+    # We deliberately ignore the clipping operation.
+    return tf.zeros([], dtype=dtype_util.base_dtype(x.dtype))
 
 
 def _replicate(n, tensor):
@@ -155,8 +206,10 @@ def sample_lkj(
       distance = tf.sqrt(norm)[..., tf.newaxis]
       # direction is u in reference [1].
       # direction shape: B + [n]
-      direction = _uniform_unit_norm(
-          n, concentration_shape, concentration.dtype,
+      direction = random_ops.spherical_uniform(
+          shape=concentration_shape,
+          dimension=n,
+          dtype=concentration.dtype,
           seed=seeds.pop())
       # raw_correlation is w in reference [1].
       raw_correlation = distance * direction  # shape: B + [n]
@@ -299,8 +352,16 @@ class LKJ(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            shape_fn=lambda sample_shape: sample_shape[:-2],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(
+                    low=tf.convert_to_tensor(
+                        1. + dtype_util.eps(dtype), dtype=dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def dimension(self):
@@ -453,21 +514,25 @@ class LKJ(distribution.Distribution):
         dtype=concentration.dtype)
     return answer
 
-  # TODO(b/146522000): The output of tfb.CorrelationCholesky() can have
-  # values > 1. Enable this bijector when that's fixed.
-  # def _default_event_space_bijector(self):
-  #   # TODO(b/145620027) Finalize choice of bijector.
-  #   cholesky_bijector = correlation_cholesky_bijector.CorrelationCholesky(
-  #       validate_args=self.validate_args)
-  #   if self.input_output_cholesky:
-  #     return cholesky_bijector
-  #   return chain_bijector.Chain([
-  #       cholesky_outer_product_bijector.CholeskyOuterProduct(
-  #           validate_args=self.validate_args),
-  #       cholesky_bijector
-  #   ], validate_args=self.validate_args)
   def _default_event_space_bijector(self):
-    return
+    # TODO(b/145620027) Finalize choice of bijector.
+    cholesky_bijector = correlation_cholesky_bijector.CorrelationCholesky(
+        validate_args=self.validate_args)
+
+    if self.input_output_cholesky:
+      return cholesky_bijector
+    return chain_bijector.Chain([
+        # We need to explictly clip the output of this bijector because the
+        # other two bijectors sometimes return values that exceed the bounds by
+        # an epsilon due to minute numerical errors. Even numerically stable
+        # algorithms (which the other two bijectors employ) allow for symmetric
+        # errors about the true value, which is inappropriate for a one-sided
+        # validity constraint associated with correlation matrices.
+        _ClipByValue(-1., tf.ones([], self.dtype)),
+        cholesky_outer_product_bijector.CholeskyOuterProduct(
+            validate_args=self.validate_args),
+        cholesky_bijector
+    ], validate_args=self.validate_args)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

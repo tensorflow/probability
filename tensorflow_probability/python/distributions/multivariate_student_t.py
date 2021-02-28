@@ -98,13 +98,13 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
   # Covariance is closely related to the sigma matrix (for df=3, it is 3x of the
   # sigma matrix).
 
-  mvt.covariance().eval()
+  mvt.covariance()
   # ==> [[ 1.08,  0.36,  0.18],
   #      [ 0.36,  0.87, -0.39],
   #      [ 0.18, -0.39,  0.78]]
 
   # Compute the pdf of an`R^3` observation; return a scalar.
-  mvt.prob([-1., 0, 1]).eval()  # shape: []
+  mvt.prob([-1., 0, 1])  # shape: []
 
   """
 

@@ -23,8 +23,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "sts",
     srcs = ["__init__.py"],
@@ -136,6 +134,7 @@ py_library(
         "//tensorflow_probability/python/distributions:joint_distribution_named",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/sts/internal",
         "//tensorflow_probability/python/util",
     ],
@@ -357,6 +356,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

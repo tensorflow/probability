@@ -109,10 +109,11 @@ class KernelPropertiesTest(test_util.TestCase):
     grads = tape.gradient(diag, wrt_vars)
     assert_no_none_grad(kernel, 'apply', wrt_vars, grads)
 
-    self.assertAllClose(
-        diag,
-        type(kernel)(**kernel._parameters).apply(
-            xs, xs, example_ndims=example_ndims))
+    # Check that reconstructing the kernel works
+    with tfp_hps.no_tf_rank_errors():
+      diag2 = self.evaluate(type(kernel)(**kernel._parameters).apply(
+          xs, xs, example_ndims=example_ndims))
+    self.assertAllClose(diag, diag2)
 
 
 CONSTRAINTS = {

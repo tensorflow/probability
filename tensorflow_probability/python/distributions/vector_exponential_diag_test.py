@@ -83,8 +83,8 @@ class VectorExponentialDiagTest(test_util.TestCase):
   def testSingularScaleRaises(self):
     mu = [-1., 1]
     diag = [1., 0]
-    dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
     with self.assertRaisesOpError('Singular'):
+      dist = tfd.VectorExponentialDiag(mu, diag, validate_args=True)
       self.evaluate(dist.sample(seed=test_util.test_seed()))
 
   def testSampleWithBroadcastScale(self):
@@ -186,7 +186,7 @@ class VectorExponentialDiagTest(test_util.TestCase):
         scale_diag=[[3., 2., 1.], [4., 5., 6.]],
         validate_args=True)
     x = np.array([[-8.3, -0.4, -1e-6]])
-    bijector_inverse_x = vex._experimental_default_event_space_bijector(
+    bijector_inverse_x = vex.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

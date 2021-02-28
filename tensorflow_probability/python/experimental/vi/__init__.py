@@ -14,6 +14,7 @@
 # ============================================================================
 """Experimental methods and objectives for variational inference."""
 
+from tensorflow_probability.python.experimental.vi import util
 from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_asvi_surrogate_posterior
 from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_factored_surrogate_posterior
 from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_trainable_location_scale_distribution
@@ -24,6 +25,7 @@ _allowed_symbols = [
     'build_factored_surrogate_posterior',
     'build_trainable_location_scale_distribution',
     'build_asvi_surrogate_posterior',
+    'util',
 ]
 
 all_util.remove_undocumented(__name__, _allowed_symbols)

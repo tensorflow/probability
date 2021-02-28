@@ -168,4 +168,4 @@ class Module(pytree.Pytree, metaclass=abc.ABCMeta):
 
 @ppl.log_prob.register(Module)
 def module_log_prob(module, *args, **kwargs):
-  return log_prob.log_prob(module, *args, **kwargs)
+  return log_prob.log_prob(module, *args, **kwargs)  # pytype: disable=wrong-arg-count

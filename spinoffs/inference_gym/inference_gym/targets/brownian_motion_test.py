@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for inference_gym.targets.stochastic_volatility."""
+"""Tests for inference_gym.targets.brownian_motion."""
 
 import functools
 import numpy as np
@@ -37,7 +37,9 @@ _small_observed_data = np.array(
 
 def _test_dataset():
   return dict(
-      locs=_fake_observed_data, innovation_noise=.1, observation_noise=.15)
+      observed_locs=_fake_observed_data,
+      innovation_noise_scale=.1,
+      observation_noise_scale=.15)
 
 
 @test_util.multi_backend_test(globals(), 'targets.brownian_motion_test')
@@ -59,20 +61,48 @@ class BrownianMotionTest(test_util.InferenceGymTestCase):
         check_ground_truth_mean=True,
         check_ground_truth_standard_deviation=True)
 
+  def testBrownianMotionUnknownScalesMissingMiddleObservations(self):
+    """Checks that unconstrained parameters yield finite joint densities."""
+    model = (
+        brownian_motion.BrownianMotionUnknownScalesMissingMiddleObservations())
+    self.validate_log_prob_and_transforms(
+        model,
+        sample_transformation_shapes=dict(
+            identity={'innovation_noise_scale': [],
+                      'observation_noise_scale': [],
+                      'locs': [30]}),
+        check_ground_truth_mean_standard_error=True,
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True)
+
   def testDeferred(self):
     """Checks that the dataset is not prematurely materialized."""
-    kwargs = dict(locs=_small_observed_data)
+    kwargs = dict(observed_locs=_small_observed_data)
     func = functools.partial(
         brownian_motion.BrownianMotion,
-        observation_noise=0.15,
-        innovation_noise=0.1)
+        observation_noise_scale=0.15,
+        innovation_noise_scale=0.1)
     self.validate_deferred_materialization(func, **kwargs)
 
   @test_util.numpy_disable_gradient_test
-  def testBrownianMotionHMC(self):
+  def testBrownianMotionMissingMiddleObservationsHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    model = brownian_motion.BrownianMotion(
-        locs=_small_observed_data, innovation_noise=0.1, observation_noise=0.15)
+    model = brownian_motion.BrownianMotionMissingMiddleObservations()
+
+    self.validate_ground_truth_using_hmc(
+        model,
+        num_chains=4,
+        num_steps=4000,
+        num_leapfrog_steps=18,
+        step_size=0.02,
+    )
+
+  @test_util.numpy_disable_gradient_test
+  def testBrownianMotionUnknownScalesMissingMiddleObservationsHMC(self):
+    """Checks approximate samples from the model against the ground truth."""
+    self.skipTest('b/171518508')
+    model = (
+        brownian_motion.BrownianMotionUnknownScalesMissingMiddleObservations())
 
     self.validate_ground_truth_using_hmc(
         model,
@@ -81,7 +111,6 @@ class BrownianMotionTest(test_util.InferenceGymTestCase):
         num_leapfrog_steps=15,
         step_size=0.03,
     )
-
 
 if __name__ == '__main__':
   tf.test.main()

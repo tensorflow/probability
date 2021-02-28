@@ -21,10 +21,13 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import exp as exp_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 
 __all__ = [
     'LogNormal',
@@ -71,8 +74,14 @@ class LogNormal(transformed_distribution.TransformedDistribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, scale=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def loc(self):
@@ -83,6 +92,18 @@ class LogNormal(transformed_distribution.TransformedDistribution):
   def scale(self):
     """Distribution parameter for the pre-transformed standard deviation."""
     return self.distribution.scale
+
+  def _log_prob(self, x):
+    answer = super(LogNormal, self)._log_prob(x)
+    # The formula inherited from TransformedDistribution computes `nan` for `x
+    # == 0`.  However, there's hope that it's not too inaccurate for small
+    # finite `x`, because `x` only appears as `log(x)`, and `log` is effectively
+    # discontinuous at 0.  Furthermore, the result should be dominated by the
+    # `log(x)**2` term, with no higher-order term that needs to be cancelled
+    # numerically.
+    return tf.where(tf.equal(x, 0.0),
+                    tf.constant(-np.inf, dtype=answer.dtype),
+                    answer)
 
   def _mean(self):
     return tf.exp(self.distribution.mean() + 0.5 * self.distribution.variance())

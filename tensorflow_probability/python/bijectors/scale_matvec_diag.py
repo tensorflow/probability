@@ -20,8 +20,10 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -103,3 +105,29 @@ class ScaleMatvecDiag(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  @property
+  def _composite_tensor_nonshape_params(self):
+    """A tuple describing which parameters are non-shape-related tensors.
+
+    Flattening in JAX involves many of the same considerations with regards to
+    identifying tensor arguments for the purposes of CompositeTensor, except
+    that shape-related items will be considered metadata.  This property
+    identifies the keys of parameters that are expected to be tensors, except
+    those that are shape-related.
+    """
+    return ('scale_diag',)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return {
+        'scale_diag': parameter_properties.ParameterProperties(event_ndims=1)
+    }
+
+
+@ldj_ratio.RegisterILDJRatio(ScaleMatvecDiag)
+def _ildj_ratio_scale_matvec_diag(p, x, q, y):
+  del x, y
+  return tf.math.reduce_sum(tf.math.log(tf.math.abs(q.scale.diag_part())) -
+                            tf.math.log(tf.math.abs(p.scale.diag_part())),
+                            axis=-1)

@@ -21,12 +21,14 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import multinomial
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -218,8 +220,17 @@ class DirichletMultinomial(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(total_count=0, concentration=1)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        total_count=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        concentration=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def total_count(self):
@@ -389,9 +400,13 @@ class DirichletMultinomial(distribution.Distribution):
 
     if is_init != tensor_util.is_ref(self._total_count):
       if self.validate_args:
-        assertions.extend(
-            distribution_util.assert_nonnegative_integer_form(
-                self._total_count))
+        total_count = tf.convert_to_tensor(self._total_count)
+        assertions.append(
+            distribution_util.assert_casting_closed(
+                total_count, target_dtype=tf.int32,
+                message='total_count cannot contain fractional components.'))
+        assertions.append(assert_util.assert_non_negative(
+            total_count, message='total_count must be non-negative'))
 
     if is_init != tensor_util.is_ref(self._concentration):
       if self.validate_args:

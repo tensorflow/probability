@@ -21,11 +21,13 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import logistic
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
@@ -195,13 +197,18 @@ class RelaxedBernoulli(distribution.Distribution):
             allow_nan_stats=self.allow_nan_stats),
         bijector=sigmoid_bijector.Sigmoid())
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return {'logits': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(temperature=0, logits=0, probs=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        temperature=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        logits=parameter_properties.ParameterProperties(),
+        probs=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=sigmoid_bijector.Sigmoid,
+            is_preferred=False))
+    # pylint: enable=g-long-lambda
 
   @property
   def temperature(self):
@@ -295,10 +302,38 @@ class RelaxedBernoulli(distribution.Distribution):
     return self._transformed_logistic().log_survival_function(y, **kwargs)
 
   def _cdf(self, y, **kwargs):
-    return self._transformed_logistic().cdf(y, **kwargs)
+    return tf.math.exp(self._log_cdf(y, **kwargs))
 
   def _log_cdf(self, y, **kwargs):
-    return self._transformed_logistic().log_cdf(y, **kwargs)
+    logits_y = tf.math.log(y) - tf.math.log1p(-y)
+    logistic_scale = tf.math.reciprocal(self._temperature)
+    logits_parameter = self._logits_parameter_no_checks()
+
+    inf_logits_same_sign = (
+        tf.math.is_inf(logits_y / logistic_scale) &
+        tf.math.is_inf(logits_parameter) &
+        (tf.math.equal(tf.math.sign(logits_y / logistic_scale),
+                       tf.math.sign(logits_parameter))))
+
+    numpy_dtype = dtype_util.as_numpy_dtype(self.dtype)
+
+    safe_logits_y = tf.where(inf_logits_same_sign, numpy_dtype(0.), logits_y)
+    safe_logistic_scale = tf.where(
+        inf_logits_same_sign, numpy_dtype(1.), logistic_scale)
+
+    # Handle the case when both logit parameters are infinite and opposite
+    # signs.
+    # When logits_parameter = +inf and logits_y = -inf, this results in
+    # probability 0.
+    # When logits_parameter = -inf and logits_y = +inf, this results in
+    # probability 1.
+    numpy_dtype = dtype_util.as_numpy_dtype(self.dtype)
+
+    return tf.where(
+        inf_logits_same_sign,
+        numpy_dtype(0.),
+        -tf.math.softplus(
+            -(safe_logits_y  / safe_logistic_scale - logits_parameter)))
 
   def _default_event_space_bijector(self):
     # TODO(b/145620027) Finalize choice of bijector.

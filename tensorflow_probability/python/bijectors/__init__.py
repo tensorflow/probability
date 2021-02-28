@@ -24,12 +24,14 @@ from tensorflow_probability.python.bijectors.absolute_value import AbsoluteValue
 from tensorflow_probability.python.bijectors.affine import Affine
 from tensorflow_probability.python.bijectors.affine_linear_operator import AffineLinearOperator
 from tensorflow_probability.python.bijectors.affine_scalar import AffineScalar
+from tensorflow_probability.python.bijectors.ascending import Ascending
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
 from tensorflow_probability.python.bijectors.bijector import Bijector
 from tensorflow_probability.python.bijectors.blockwise import Blockwise
 from tensorflow_probability.python.bijectors.chain import Chain
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.bijectors.cholesky_to_inv_cholesky import CholeskyToInvCholesky
+from tensorflow_probability.python.bijectors.composition import Composition
 from tensorflow_probability.python.bijectors.correlation_cholesky import CorrelationCholesky
 from tensorflow_probability.python.bijectors.cumsum import Cumsum
 from tensorflow_probability.python.bijectors.discrete_cosine_transform import DiscreteCosineTransform
@@ -39,17 +41,20 @@ from tensorflow_probability.python.bijectors.expm1 import Expm1
 from tensorflow_probability.python.bijectors.expm1 import Log1p
 from tensorflow_probability.python.bijectors.ffjord import FFJORD
 from tensorflow_probability.python.bijectors.fill_scale_tril import FillScaleTriL
-from tensorflow_probability.python.bijectors.fill_scale_tril import ScaleTriL
 from tensorflow_probability.python.bijectors.fill_triangular import FillTriangular
 from tensorflow_probability.python.bijectors.frechet_cdf import FrechetCDF
 from tensorflow_probability.python.bijectors.generalized_pareto import GeneralizedPareto
 from tensorflow_probability.python.bijectors.gev_cdf import GeneralizedExtremeValueCDF
+from tensorflow_probability.python.bijectors.glow import Glow
+from tensorflow_probability.python.bijectors.glow import GlowDefaultExitNetwork
+from tensorflow_probability.python.bijectors.glow import GlowDefaultNetwork
 from tensorflow_probability.python.bijectors.gompertz_cdf import GompertzCDF
 from tensorflow_probability.python.bijectors.gumbel_cdf import GumbelCDF
 from tensorflow_probability.python.bijectors.identity import Identity
 from tensorflow_probability.python.bijectors.inline import Inline
 from tensorflow_probability.python.bijectors.invert import Invert
 from tensorflow_probability.python.bijectors.iterated_sigmoid_centered import IteratedSigmoidCentered
+from tensorflow_probability.python.bijectors.joint_map import JointMap
 from tensorflow_probability.python.bijectors.kumaraswamy_cdf import KumaraswamyCDF
 from tensorflow_probability.python.bijectors.lambertw_transform import LambertWTail
 from tensorflow_probability.python.bijectors.masked_autoregressive import AutoregressiveNetwork
@@ -62,6 +67,7 @@ from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
 from tensorflow_probability.python.bijectors.ordered import Ordered
 from tensorflow_probability.python.bijectors.pad import Pad
 from tensorflow_probability.python.bijectors.permute import Permute
+from tensorflow_probability.python.bijectors.power import Power
 from tensorflow_probability.python.bijectors.power_transform import PowerTransform
 from tensorflow_probability.python.bijectors.rational_quadratic_spline import RationalQuadraticSpline
 from tensorflow_probability.python.bijectors.rayleigh_cdf import RayleighCDF
@@ -69,9 +75,13 @@ from tensorflow_probability.python.bijectors.real_nvp import real_nvp_default_te
 from tensorflow_probability.python.bijectors.real_nvp import RealNVP
 from tensorflow_probability.python.bijectors.reciprocal import Reciprocal
 from tensorflow_probability.python.bijectors.reshape import Reshape
+from tensorflow_probability.python.bijectors.restructure import pack_sequence_as
+from tensorflow_probability.python.bijectors.restructure import Restructure
+from tensorflow_probability.python.bijectors.restructure import tree_flatten
 from tensorflow_probability.python.bijectors.scale import Scale
 from tensorflow_probability.python.bijectors.scale_matvec_diag import ScaleMatvecDiag
 from tensorflow_probability.python.bijectors.scale_matvec_linear_operator import ScaleMatvecLinearOperator
+from tensorflow_probability.python.bijectors.scale_matvec_linear_operator import ScaleMatvecLinearOperatorBlock
 from tensorflow_probability.python.bijectors.scale_matvec_lu import MatvecLU
 from tensorflow_probability.python.bijectors.scale_matvec_lu import ScaleMatvecLU
 from tensorflow_probability.python.bijectors.scale_matvec_tril import ScaleMatvecTriL
@@ -99,6 +109,7 @@ __all__ = [
     "Affine",
     "AffineLinearOperator",
     "AffineScalar",
+    "Ascending",
     "AutoregressiveNetwork",
     "BatchNormalization",
     "Bijector",
@@ -107,6 +118,7 @@ __all__ = [
     "Chain",
     "CholeskyOuterProduct",
     "CholeskyToInvCholesky",
+    "Composition",
     "CorrelationCholesky",
     "Cumsum",
     "DiscreteCosineTransform",
@@ -117,6 +129,9 @@ __all__ = [
     "FillTriangular",
     "FrechetCDF",
     "GeneralizedPareto",
+    "Glow",
+    "GlowDefaultNetwork",
+    "GlowDefaultExitNetwork",
     "GompertzCDF",
     "GumbelCDF",
     "GeneralizedExtremeValueCDF",
@@ -124,6 +139,7 @@ __all__ = [
     "Inline",
     "Invert",
     "IteratedSigmoidCentered",
+    "JointMap",
     "KumaraswamyCDF",
     "LambertWTail",
     "Log",
@@ -136,18 +152,20 @@ __all__ = [
     "Ordered",
     "Pad",
     "Permute",
+    "Power",
     "PowerTransform",
     "RationalQuadraticSpline",
     "RayleighCDF",
     "RealNVP",
     "Reciprocal",
     "Reshape",
+    "Restructure",
     "Scale",
     "ScaleMatvecDiag",
     "ScaleMatvecLinearOperator",
+    "ScaleMatvecLinearOperatorBlock",
     "ScaleMatvecLU",
     "ScaleMatvecTriL",
-    "ScaleTriL",
     "Shift",
     "ShiftedGompertzCDF",
     "Sigmoid",
@@ -166,5 +184,7 @@ __all__ = [
     "WeibullCDF",
     "masked_autoregressive_default_template",
     "masked_dense",
+    "pack_sequence_as",
     "real_nvp_default_template",
+    "tree_flatten",
 ]

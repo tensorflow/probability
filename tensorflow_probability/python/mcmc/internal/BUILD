@@ -29,8 +29,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
@@ -59,6 +57,7 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:broadcast_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",

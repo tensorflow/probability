@@ -14,6 +14,7 @@
 # ============================================================================
 # Lint as: python3
 """Module for experimental Oryx libraries."""
+from oryx.experimental import matching
 from oryx.experimental import mcmc
 from oryx.experimental import nn
 from oryx.experimental import optimizers

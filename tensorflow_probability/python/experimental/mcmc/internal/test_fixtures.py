@@ -107,3 +107,13 @@ class TestReducer(tfp.experimental.mcmc.Reducer):
   def one_step(
       self, new_chain_state, current_reducer_state, previous_kernel_results):
     return new_chain_state
+
+
+def reduce(reducer, elems):
+  """Reduces `elems` along the first dimension with `reducer`."""
+  elems = tf.convert_to_tensor(elems)
+  state = reducer.initialize(elems[0])
+  def body(i, state):
+    return i + 1, reducer.one_step(elems[i], state)
+  _, state = tf.while_loop(lambda i, _: i < elems.shape[0], body, (0, state))
+  return reducer.finalize(state)

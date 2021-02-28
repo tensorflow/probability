@@ -90,7 +90,7 @@ class Autoregressive(distribution.Distribution):
   def _normal_fn(event_size):
     n = event_size * (event_size + 1) // 2
     p = tf.Variable(tfd.Normal(loc=0., scale=1.).sample(n))
-    affine = tfb.ScaleTriL(tfp.math.fill_triangular(0.25 * p))
+    affine = tfb.FillScaleTriL(tfp.math.fill_triangular(0.25 * p))
     def _fn(samples):
       scale = tf.exp(affine(samples))
       return tfd.Independent(
@@ -324,7 +324,5 @@ class Autoregressive(distribution.Distribution):
 
     return assertions
 
-  # pylint: disable=protected-access
   def _default_event_space_bijector(self):
-    return self._get_distribution0(
-        )._experimental_default_event_space_bijector()
+    return self._get_distribution0().experimental_default_event_space_bijector()

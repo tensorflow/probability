@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -95,7 +96,8 @@ class Permute(bijector.Bijector):
     """
     parameters = dict(locals())
     with tf.name_scope(name or 'permute') as name:
-      axis = tensor_util.convert_nonref_to_tensor(axis, name='axis')
+      axis = tensor_util.convert_nonref_to_tensor(
+          axis, name='axis', as_shape_tensor=True)
       if not dtype_util.is_integer(axis.dtype):
         raise TypeError('axis.dtype ({}) should be `int`-like.'.format(
             dtype_util.name(axis.dtype)))
@@ -123,6 +125,14 @@ class Permute(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        permutation=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED))
+
   @property
   def permutation(self):
     return self._permutation
@@ -130,6 +140,11 @@ class Permute(bijector.Bijector):
   @property
   def axis(self):
     return self._axis
+
+  @property
+  def _is_permutation(self):
+    # Definitely a permutation.
+    return True
 
   def _forward(self, x):
     y = tf.gather(x, self.permutation, axis=self.axis)

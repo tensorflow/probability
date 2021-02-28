@@ -260,7 +260,7 @@ class GammaGammaTest(test_util.TestCase):
         mixing_rate=1.,
         validate_args=True)
     with self.assertRaisesOpError('must be greater than or equal to 0'):
-      dist._experimental_default_event_space_bijector(
+      dist.experimental_default_event_space_bijector(
           ).inverse([-4.2, -0.3, -1e-6])
 
 if __name__ == '__main__':

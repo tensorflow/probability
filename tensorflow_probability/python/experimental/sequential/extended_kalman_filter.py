@@ -18,9 +18,9 @@ import functools
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.distributions.linear_gaussian_ssm import KalmanFilterState
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -38,7 +38,7 @@ def _initialize_accumulated_quantities(observations, num_timesteps):
   initial_arrays.append(tf.nest.map_structure(
       lambda _: tf.TensorArray(dtype=tf.int32, size=num_timesteps),
       observations))
-  return KalmanFilterState(*initial_arrays)
+  return linear_gaussian_ssm.KalmanFilterState(*initial_arrays)
 
 
 def _write_accumulated_quantities(
@@ -48,7 +48,7 @@ def _write_accumulated_quantities(
       nest.map_structure_up_to(
           element, lambda x, y: x.write(step, y[i]), element, updated_estimate)  # pylint: disable=cell-var-from-loop
       for i, element in enumerate(accumulated_quantities)]
-  return KalmanFilterState(*new_accumulated_quantities)
+  return linear_gaussian_ssm.KalmanFilterState(*new_accumulated_quantities)
 
 
 def _matmul_a_b_at(a, b):
@@ -193,7 +193,7 @@ def extended_kalman_filter(
 
     # Initialize the state estimate.
     initial_estimate = tf.nest.map_structure(
-        lambda _: KalmanFilterState(  # pylint: disable=g-long-lambda
+        lambda _: linear_gaussian_ssm.KalmanFilterState(  # pylint: disable=g-long-lambda
             predicted_mean=initial_state,
             predicted_cov=initial_covariance,
             filtered_mean=initial_state,
@@ -326,7 +326,7 @@ def extended_kalman_filter_one_step(
 
     log_marginal_likelihood = predictive_dist.log_prob(observation)
 
-    return KalmanFilterState(
+    return linear_gaussian_ssm.KalmanFilterState(
         filtered_mean=filtered_mean,
         filtered_cov=filtered_cov,
         predicted_mean=predicted_mean,

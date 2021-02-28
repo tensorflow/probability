@@ -21,6 +21,8 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.bayesian_model import BayesianModel
   from inference_gym.targets.brownian_motion import BrownianMotion
   from inference_gym.targets.brownian_motion import BrownianMotionMissingMiddleObservations
+  from inference_gym.targets.brownian_motion import BrownianMotionUnknownScales
+  from inference_gym.targets.brownian_motion import BrownianMotionUnknownScalesMissingMiddleObservations
   from inference_gym.targets.eight_schools import EightSchools
   from inference_gym.targets.ill_conditioned_gaussian import IllConditionedGaussian
   from inference_gym.targets.item_response_theory import ItemResponseTheory
@@ -29,11 +31,17 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.log_gaussian_cox_process import SyntheticLogGaussianCoxProcess
   from inference_gym.targets.logistic_regression import GermanCreditNumericLogisticRegression
   from inference_gym.targets.logistic_regression import LogisticRegression
+  from inference_gym.targets.lorenz_system import ConvectionLorenzBridge
+  from inference_gym.targets.lorenz_system import LorenzSystem
+  from inference_gym.targets.lorenz_system import ConvectionLorenzBridgeUnknownScales
+  from inference_gym.targets.lorenz_system import LorenzSystemUnknownScales
   from inference_gym.targets.model import Model
   from inference_gym.targets.neals_funnel import NealsFunnel
+  from inference_gym.targets.non_identifiable_quartic import NonIdentifiableQuarticMeasurementModel
   from inference_gym.targets.probit_regression import GermanCreditNumericProbitRegression
   from inference_gym.targets.probit_regression import ProbitRegression
   from inference_gym.targets.radon_contextual_effects import RadonContextualEffects
+  from inference_gym.targets.radon_contextual_effects import RadonContextualEffectsHalfNormalMinnesota
   from inference_gym.targets.radon_contextual_effects import RadonContextualEffectsMinnesota
   from inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
   from inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
@@ -50,6 +58,10 @@ __all__ = [
     'BayesianModel',
     'BrownianMotion',
     'BrownianMotionMissingMiddleObservations',
+    'BrownianMotionUnknownScales',
+    'BrownianMotionUnknownScalesMissingMiddleObservations',
+    'ConvectionLorenzBridge',
+    'ConvectionLorenzBridgeUnknownScales',
     'EightSchools',
     'GermanCreditNumericLogisticRegression',
     'GermanCreditNumericProbitRegression',
@@ -58,10 +70,14 @@ __all__ = [
     'ItemResponseTheory',
     'LogGaussianCoxProcess',
     'LogisticRegression',
+    'LorenzSystem',
+    'LorenzSystemUnknownScales',
     'Model',
     'NealsFunnel',
+    'NonIdentifiableQuarticMeasurementModel',
     'ProbitRegression',
     'RadonContextualEffects',
+    'RadonContextualEffectsHalfNormalMinnesota',
     'RadonContextualEffectsMinnesota',
     'SparseLogisticRegression',
     'StochasticVolatility',

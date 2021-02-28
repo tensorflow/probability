@@ -18,24 +18,27 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 # Dependency imports
 
+from absl.testing import parameterized
 import numpy as np
 from scipy import stats as sp_stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
+tfd = tfp.distributions
+
+JAX_MODE = False
+
 
 @test_util.test_all_tf_execution_regimes
 class IndependentDistributionTest(test_util.TestCase):
-
-  def setUp(self):
-    super(IndependentDistributionTest, self).setUp()
-    self._rng = np.random.RandomState(42)
 
   def assertRaises(self, error_class, msg):
     if tf.executing_eagerly():
@@ -61,7 +64,7 @@ class IndependentDistributionTest(test_util.TestCase):
 
     expected_log_prob_x = sp_stats.norm(loc, scale).logpdf(x_).sum(-1)
     self.assertAllClose(
-        expected_log_prob_x, actual_log_prob_x, rtol=1e-5, atol=0.)
+        expected_log_prob_x, actual_log_prob_x, rtol=1e-5, atol=1e-6)
 
   def testSampleAndLogProbMultivariate(self):
     loc = np.float32([[-1., 1], [1, -1]])
@@ -140,10 +143,13 @@ class IndependentDistributionTest(test_util.TestCase):
         ind.mode(),
     ])
 
-    self.assertAllClose(sample_mean_, actual_mean_, rtol=0.02, atol=0.)
-    self.assertAllClose(sample_var_, actual_var_, rtol=0.04, atol=0.)
-    self.assertAllClose(sample_std_, actual_std_, rtol=0.02, atol=0.)
-    self.assertAllClose(sample_entropy_, actual_entropy_, rtol=0.01, atol=0.)
+    # Bounds chosen so that the probability of each sample mean/variance/stddev
+    # differing by more than the given tolerance is roughly 1e-6.
+    self.assertAllClose(sample_mean_, actual_mean_, rtol=0.049, atol=0.)
+    self.assertAllClose(sample_var_, actual_var_, rtol=0.07, atol=0.)
+    self.assertAllClose(sample_std_, actual_std_, rtol=0.035, atol=0.)
+
+    self.assertAllClose(sample_entropy_, actual_entropy_, rtol=0.015, atol=0.)
     self.assertAllClose(loc, actual_mode_, rtol=1e-6, atol=0.)
 
   def testEventNdimsIsStaticWhenPossible(self):
@@ -269,7 +275,7 @@ class IndependentDistributionTest(test_util.TestCase):
     sample_shape = [4, 5]
     batch_shape = [10]
     image_shape = [28, 28, 1]
-    logits = 3 * self._rng.random_sample(
+    logits = 3 * np.random.random_sample(
         batch_shape + image_shape).astype(np.float32) - 1
 
     def expected_log_prob(x, logits):
@@ -308,7 +314,7 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertAllEqual(sample_shape + batch_shape + image_shape, x_shape)
     self.assertAllEqual(sample_shape + batch_shape, log_prob_x_shape)
     self.assertAllClose(
-        expected_log_prob(x_, logits), actual_log_prob_x, rtol=1e-6, atol=0.)
+        expected_log_prob(x_, logits), actual_log_prob_x, rtol=1.5e-6, atol=0.)
 
   def testMnistLikeStaticShape(self):
     self._testMnistLike(static_shape=True)
@@ -478,8 +484,10 @@ class IndependentDistributionTest(test_util.TestCase):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=8):
         getattr(dist, method)(np.zeros((4, 5, 2, 3)))
 
-  @test_util.jax_disable_test_missing_functionality(
-      'Shape sizes are statically known in JAX.')
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='NumpyVariable does not correctly handle unknown shapes. '
+      'And shape sizes are known statically in JAX.')
   def testChangingVariableShapes(self):
     if not tf.executing_eagerly():
       return
@@ -497,6 +505,63 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertAllEqual(
         (2, 3), tf.shape(dist.log_prob(np.zeros((2, 3, 7, 1, 1, 1)))))
 
+  @parameterized.named_parameters(dict(testcase_name=''),
+                                  dict(testcase_name='_jit', jit=True))
+  def test_kahan_precision(self, jit=False):
+    maybe_jit = lambda f: f
+    if jit:
+      self.skip_if_no_xla()
+      maybe_jit = tf.function(jit_compile=True)
+    stream = test_util.test_seed_stream()
+    n = 20_000
+    samps = tfd.Poisson(rate=1.).sample(n, seed=stream())
+    log_rate = tf.fill([n], tfd.Normal(0, .2).sample(seed=stream()))
+    pois = tfd.Poisson(log_rate=log_rate)
+    lp_fn = maybe_jit(tfd.Independent(pois, reinterpreted_batch_ndims=1,
+                                      experimental_use_kahan_sum=True).log_prob)
+    lp = lp_fn(samps)
+    pois64 = tfd.Poisson(log_rate=tf.cast(log_rate, tf.float64))
+    lp64 = tfd.Independent(pois64, reinterpreted_batch_ndims=1).log_prob(
+        tf.cast(samps, tf.float64))
+    # Evaluate together to ensure we use the same samples.
+    lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
+    # Fails ~75% CPU, 1-75% GPU --vary_seed runs w/o experimental_use_kahan_sum.
+    self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+
+  def testLargeLogProbDiff(self):
+    b = 15
+    n = 5_000
+    d0 = tfd.Independent(tfd.Normal(tf.fill([b, n], 0.), tf.fill([n], .1)),
+                         reinterpreted_batch_ndims=1,
+                         experimental_use_kahan_sum=True)
+    d1 = tfd.Independent(tfd.Normal(tf.fill([b, n], 1e-5), tf.fill([n], .1)),
+                         reinterpreted_batch_ndims=1,
+                         experimental_use_kahan_sum=True)
+    strm = test_util.test_seed_stream()
+    x0 = self.evaluate(  # overdispersed
+        tfd.Normal(0, 2).sample([b, n], seed=strm()))
+    x1 = self.evaluate(  # overdispersed, perturbed
+        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = d0.copy(distribution=tfd.Normal(
+        tf.cast(d0.distribution.loc, tf.float64),
+        tf.cast(d0.distribution.scale, tf.float64)))
+    d1_64 = d1.copy(distribution=tfd.Normal(
+        tf.cast(d1.distribution.loc, tf.float64),
+        tf.cast(d1.distribution.scale, tf.float64)))
+    self.assertNotAllZero(d0.log_prob(x0) < -1_000_000)
+    self.assertAllClose(
+        d0_64.log_prob(tf.cast(x0, tf.float64)) -
+        d1_64.log_prob(tf.cast(x1, tf.float64)),
+        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0., atol=0.01)
+    # In contrast: the below fails consistently w/ errors around 0.5-1.0
+    # self.assertAllClose(
+    #     d0_64.log_prob(tf.cast(x0, tf.float64)) -
+    #     d1_64.log_prob(tf.cast(x1, tf.float64)),
+    #     d0.log_prob(x0) - d1.log_prob(x1),
+    #     rtol=0., atol=0.007)
 
 if __name__ == '__main__':
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
+  os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()

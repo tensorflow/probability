@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import math
+
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -27,6 +29,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -118,13 +121,14 @@ class HalfNormal(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return {'scale': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(scale=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def scale(self):
@@ -150,11 +154,14 @@ class HalfNormal(distribution.Distribution):
         shape=shape, mean=0., stddev=1., dtype=self.dtype, seed=seed)
     return tf.abs(sampled * scale)
 
-  def _prob(self, x):
+  def _log_prob(self, x):
     scale = tf.convert_to_tensor(self.scale)
-    coeff = np.sqrt(2) / scale / np.sqrt(np.pi)
-    pdf = coeff * tf.exp(-0.5 * (x / scale)**2)
-    return pdf * tf.cast(x >= 0, self.dtype)
+    log_unnormalized = -0.5 * (x / scale)**2
+    log_normalization = tf.math.log(scale) + tf.constant(0.5 * np.log(np.pi/2.),
+                                                         dtype=self.dtype)
+    return tf.where(x >= 0,
+                    log_unnormalized - log_normalization,
+                    tf.constant(-np.inf, dtype=self.dtype))
 
   def _cdf(self, x):
     truncated_x = tf.nn.relu(x)
@@ -171,10 +178,10 @@ class HalfNormal(distribution.Distribution):
     return 0.5 * tf.math.log(np.pi * self.scale**2.0 / 2.0) + 0.5
 
   def _mean(self):
-    return self.scale * np.sqrt(2.0) / np.sqrt(np.pi)
+    return self.scale * math.sqrt(2.0) / math.sqrt(np.pi)
 
   def _quantile(self, p):
-    return np.sqrt(2.0) * self.scale * tf.math.erfinv(p)
+    return math.sqrt(2.0) * self.scale * tf.math.erfinv(p)
 
   def _mode(self):
     return tf.zeros(self.batch_shape_tensor())

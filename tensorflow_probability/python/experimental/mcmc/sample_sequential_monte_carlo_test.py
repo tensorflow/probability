@@ -234,7 +234,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
     make_transform_hmc_kernel_fn = gen_make_transform_hmc_kernel_fn(
         unconstraining_bijectors, num_leapfrog_steps=5)
 
-    @tf.function(autograph=False, experimental_compile=True)
+    @tf.function(autograph=False, jit_compile=True)
     def run_smc():
       # Ensure we're really in graph mode.
       assert hasattr(tf.constant([]), 'graph')

@@ -23,8 +23,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "internal",
     srcs = ["__init__.py"],

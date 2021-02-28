@@ -165,6 +165,7 @@ class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       name: Python `str` name prefixed to ops created by this class.
         Default value: "AutoregressiveStateSpaceModel".
     """
+    parameters = dict(locals())
     with tf.name_scope(name or 'AutoregressiveStateSpaceModel') as name:
 
       # The initial state prior determines the dtype of sampled values.
@@ -204,6 +205,7 @@ class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           initial_step=initial_step,
           validate_args=validate_args,
           name=name)
+      self._parameters = parameters
 
   @property
   def order(self):
@@ -385,7 +387,7 @@ class Autoregressive(StructuralTimeSeries):
                         coefficients_prior,
                         coefficient_constraining_bijector),
               Parameter('level_scale', level_scale_prior,
-                        tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                        tfb.Chain([tfb.Scale(scale=observed_stddev),
                                    tfb.Softplus()]))
           ],
           latent_size=order,

@@ -88,6 +88,10 @@ class FillTriangular(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
     return fill_triangular(x, upper=self._upper)
 
@@ -99,6 +103,10 @@ class FillTriangular(bijector.Bijector):
 
   def _inverse_log_det_jacobian(self, y):
     return tf.zeros([], dtype=y.dtype)
+
+  @property
+  def _is_permutation(self):
+    return True
 
   def _forward_event_shape(self, input_shape):
     batch_shape, d = input_shape[:-1], tf.compat.dimension_value(

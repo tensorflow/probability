@@ -215,7 +215,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
     Raises:
       ValueError: if components have different `num_timesteps`.
     """
-
+    parameters = dict(locals())
     with tf.name_scope(name or 'AdditiveStateSpaceModel') as name:
       # Check that all components have the same dtype
       dtype = tf.debugging.assert_same_float_dtype(component_ssms)
@@ -333,6 +333,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           name=name)
+      self._parameters = parameters
 
 
 class Sum(StructuralTimeSeries):
@@ -459,7 +460,7 @@ class Sum(StructuralTimeSeries):
       parameters = [Parameter('observation_noise_scale',
                               observation_noise_scale_prior,
                               tfb.Chain([
-                                  tfb.AffineScalar(scale=observed_stddev),
+                                  tfb.Scale(scale=observed_stddev),
                                   tfb.Softplus()]))]
       for component in components:
         for parameter in component.parameters:

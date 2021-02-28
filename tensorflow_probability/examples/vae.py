@@ -325,7 +325,7 @@ def image_tile_summary(name, tensor, rows=8, cols=8):
 def model_fn(features, labels, mode, params, config):
   """Builds the model function for use in an estimator.
 
-  Arguments:
+  Args:
     features: The input features for the estimator.
     labels: The labels, unused here.
     mode: Signifies whether it is train or test or predict.

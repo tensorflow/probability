@@ -26,11 +26,13 @@ from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import kumaraswamy_cdf as kumaraswamy_cdf
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -177,8 +179,16 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration1=0, concentration0=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration1=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        concentration0=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def concentration1(self):

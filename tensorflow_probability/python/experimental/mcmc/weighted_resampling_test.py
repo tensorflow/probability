@@ -277,7 +277,7 @@ class _SMCResamplersTest(test_util.TestCase):
 
   def maybe_compiler(self, f):
     if self.use_xla:
-      return tf.function(f, autograph=False, experimental_compile=True)
+      return tf.function(f, autograph=False, jit_compile=True)
     return f  # Do not compile.
 
 

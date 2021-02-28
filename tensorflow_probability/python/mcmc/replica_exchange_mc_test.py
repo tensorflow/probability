@@ -27,8 +27,9 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+from tensorflow_probability.python.internal import unnest
 
 tfd = tfp.distributions
 
@@ -38,17 +39,16 @@ JAX_MODE = False
 def init_tfp_randomwalkmetropolis(
     target_log_prob_fn,
     step_size,
-    seed=None, store_parameters_in_results=False, num_leapfrog_steps=None):  # pylint: disable=unused-argument
+    store_parameters_in_results=False, num_leapfrog_steps=None):  # pylint: disable=unused-argument
   return tfp.mcmc.RandomWalkMetropolis(
       target_log_prob_fn,
-      new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=step_size),
-      seed=seed)
+      new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=step_size))
 
 
 def init_tfp_adaptive_hmc(
     target_log_prob_fn,
     step_size,
-    num_leapfrog_steps=None, seed=None, store_parameters_in_results=False):  # pylint: disable=unused-argument
+    num_leapfrog_steps=None, store_parameters_in_results=False):  # pylint: disable=unused-argument
   return tfp.mcmc.simple_step_size_adaptation.SimpleStepSizeAdaptation(
       tfp.mcmc.HamiltonianMonteCarlo(
           target_log_prob_fn,
@@ -284,6 +284,11 @@ class REMCTest(test_util.TestCase):
     tf.random.set_seed(123)
     super(REMCTest, self).setUp()
 
+  def assertRaisesError(self, msg):
+    if tf.executing_eagerly():
+      return self.assertRaisesRegexp(Exception, msg)
+    return self.assertRaisesOpError(msg)
+
   @parameterized.named_parameters([
       dict(  # pylint: disable=g-complex-comprehension
           testcase_name=(
@@ -374,7 +379,7 @@ class REMCTest(test_util.TestCase):
             states_.mean(), states_.std()))
 
     # Some shortened names.
-    replica_log_accept_ratio = mcmc_util.get_field(
+    replica_log_accept_ratio = unnest.get_innermost(
         kr_.post_swap_replica_results, 'log_accept_ratio')
     replica_states_ = kr_.post_swap_replica_states[0]  # Get rid of "parts"
 
@@ -455,92 +460,131 @@ class REMCTest(test_util.TestCase):
           tfp.mcmc.simple_step_size_adaptation.SimpleStepSizeAdaptationResults):
         self.assertAllEqual(
             np.repeat([step_size], axis=0, repeats=num_results),
-            mcmc_util.get_field(kr_.post_swap_replica_results, 'step_size'))
+            unnest.get_innermost(kr_.post_swap_replica_results, 'step_size'))
 
       self.assertAllEqual(
           np.repeat([num_leapfrog_steps], axis=0, repeats=num_results),
-          mcmc_util.get_field(
+          unnest.get_innermost(
               kr_.post_swap_replica_results, 'num_leapfrog_steps'))
 
   @test_util.numpy_disable_gradient_test('HMC')
-  def testAdaptingPerReplicaStepSize(self):
-    num_chains, num_events = 3, 2
+  @test_combinations.generate(
+      test_combinations.combine(
+          use_untempered_lp=[False, True],
+          use_xla=[False, True],
+      )
+  )
+  def testAdaptingPerReplicaStepSize(self, use_untempered_lp, use_xla):
+    num_chains, num_events = 4, 2
+    num_results = 250
     target = tfd.MultivariateNormalDiag(loc=[0.] * num_events)
-    inverse_temperatures = 0.5**np.arange(4, dtype=np.float32)
+
+    # The inverse_temperatures are decaying rapidly enough to force
+    # significantly different adapted step sizes.
+    # It's important not to make inverse_temperatures[-1] too small, or else
+    # the last few temperatures could be essentially the same when using an
+    # untempered_log_prob_fn.
+    inverse_temperatures = 0.25**np.arange(3, dtype=np.float32)
     num_replica = len(inverse_temperatures)
 
     # step_size is...
     #   Too large == 3!
     #   A shape that will broadcast across the chains, and (after adaptation)
-    #   give a diffeent value for each replica.
-    initial_step_scale = 3
-    step_size = initial_step_scale * np.ones((num_replica, 1, 1))
+    #   give a different value for each replica.
+    initial_step_size = 3 * np.ones((num_replica, 1, 1), dtype=np.float32)
+    target_accept_prob = 0.9
 
-    def make_kernel_fn(target_log_prob_fn):
-      hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    def _get_states_and_trace():
+      # Whether using the untempered_log_prob_fn setup or not, the target is
+      # target.log_prob.
+      # However, the untempered_log_prob_fn is very dispersed...it is as though
+      # it has a temperature of 100.
+      if use_untempered_lp:
+        target_log_prob_fn = None
+        untempered_log_prob_fn = lambda x: target.log_prob(x) / 100.
+        tempered_log_prob_fn = lambda x: target.log_prob(x) * 99 / 100.
+      else:
+        target_log_prob_fn = target.log_prob
+        untempered_log_prob_fn = None
+        tempered_log_prob_fn = None
+
+      def make_kernel_fn(target_log_prob_fn):
+        hmc = tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob_fn,
+            step_size=initial_step_size,
+            num_leapfrog_steps=3,
+        )
+        return tfp.mcmc.SimpleStepSizeAdaptation(
+            inner_kernel=hmc,
+            target_accept_prob=target_accept_prob,
+            adaptation_rate=0.01,
+            num_adaptation_steps=num_results,
+        )
+
+      adaptive_remc = tfp.mcmc.ReplicaExchangeMC(
           target_log_prob_fn=target_log_prob_fn,
-          step_size=step_size,
-          num_leapfrog_steps=3,
-      )
-      return tfp.mcmc.SimpleStepSizeAdaptation(
-          inner_kernel=hmc,
-          target_accept_prob=0.75,
-          adaptation_rate=0.03,
-          num_adaptation_steps=num_results,
+          untempered_log_prob_fn=untempered_log_prob_fn,
+          tempered_log_prob_fn=tempered_log_prob_fn,
+          inverse_temperatures=inverse_temperatures,
+          make_kernel_fn=make_kernel_fn,
+          state_includes_replicas=True,
       )
 
-    adaptive_remc = tfp.mcmc.ReplicaExchangeMC(
-        target_log_prob_fn=target.log_prob,
-        inverse_temperatures=inverse_temperatures,
-        make_kernel_fn=make_kernel_fn,
-        state_includes_replicas=True,
-    )
+      def trace_fn(_, results):
+        step_adapt_results = results.post_swap_replica_results
+        hmc_results = step_adapt_results.inner_results
+        return {
+            'step_size':
+                step_adapt_results.new_step_size,
+            'prob_accept':
+                tf.math.exp(tf.math.minimum(hmc_results.log_accept_ratio, 0.)),
+        }
 
-    num_results = 200
+      return tfp.mcmc.sample_chain(
+          num_results=num_results,
+          current_state=tf.zeros((num_replica, num_chains, num_events)),
+          kernel=adaptive_remc,
+          trace_fn=trace_fn,
+          num_burnin_steps=0,
+          seed=_set_seed(),
+      )
 
-    def trace_fn(_, results):
-      step_adapt_results = results.post_swap_replica_results
-      hmc_results = step_adapt_results.inner_results
-      return {
-          'step_size':
-              step_adapt_results.new_step_size,
-          'prob_accept':
-              tf.math.exp(tf.math.minimum(hmc_results.log_accept_ratio, 0.)),
-      }
+    if use_xla:
+      states, trace = tf.function(
+          _get_states_and_trace, jit_compile=True)()
+    else:
+      states, trace = _get_states_and_trace()
 
-    states, trace = tfp.mcmc.sample_chain(
-        num_results=num_results,
-        current_state=tf.zeros((num_replica, num_chains, num_events)),
-        kernel=adaptive_remc,
-        trace_fn=trace_fn,
-        num_burnin_steps=0,
-        seed=_set_seed(),
-    )
-
-    states_, final_step_size_, mean_accept_ = self.evaluate([
+    states_, final_step_size_, mean_accept_, ess_ = self.evaluate([
         states,
         trace['step_size'][-1],
         tf.reduce_mean(trace['prob_accept'][num_results // 2:], axis=0),
+        effective_sample_size(states, cross_chain_dims=-2),
     ])
 
     self.assertAllEqual((num_replica, 1, 1), final_step_size_.shape)
 
     self.assertAllClose(
-        0.75 * np.ones_like(mean_accept_), mean_accept_, atol=0.2)
+        target_accept_prob * np.ones_like(mean_accept_), mean_accept_, atol=0.2)
 
     # Step size should be increasing (with temperature).
-    np.testing.assert_array_less(0.05, np.diff(final_step_size_.ravel()))
+    np.testing.assert_array_less(0.0, np.diff(final_step_size_.ravel()))
 
     # Step size for the Temperature = 1 replica should have decreased
     # significantly from the large initial value.
-    self.assertEqual(initial_step_scale, 3)
+    self.assertEqual(initial_step_size[0, 0, 0], 3)
     self.assertLess(final_step_size_[0, 0, 0], 2)
 
     # The mean shouldn't be ridiculous.
-    self.assertAllClose(np.zeros((num_replica, num_chains, num_events)),
-                        np.mean(states_, axis=0),
-                        # Passed at atol = 8 / Sqrt(num_results).
-                        atol=16 / np.sqrt(num_results))
+    for r in range(num_replica):
+      x = states_[:, r]
+      mean = np.mean(x)
+      stddev = np.std(x)
+      n = np.min(ess_[r])
+      self.assertAllClose(np.zeros_like(mean),
+                          mean,
+                          atol=4 * stddev / np.sqrt(n),
+                          msg='Failed at replica {}'.format(r))
 
   @parameterized.named_parameters([
       # pylint: disable=line-too-long
@@ -595,7 +639,7 @@ class REMCTest(test_util.TestCase):
     remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
-      return mcmc_util.get_field(
+      return unnest.get_innermost(
           results.post_swap_replica_results, 'log_accept_ratio')
 
     if state_includes_replicas:
@@ -744,11 +788,12 @@ class REMCTest(test_util.TestCase):
 
   @parameterized.named_parameters([
       dict(  # pylint: disable=g-complex-comprehension
-          testcase_name=testcase_name + kernel_name,
+          testcase_name=testcase_name + kernel_name + ulpname,
           tfp_transition_kernel=tfp_transition_kernel,
           inverse_temperatures=inverse_temperatures,
           step_size_fn=step_size_fn,
-          ess_scaling=ess_scaling)
+          ess_scaling=ess_scaling,
+          use_untempered_log_prob_fn=use_untempered_log_prob_fn)
       for kernel_name, tfp_transition_kernel, ess_scaling in [
           ('HMC', tfp.mcmc.HamiltonianMonteCarlo, .1),  # NUMPY_DISABLE
           ('RWMH', init_tfp_randomwalkmetropolis, .009),
@@ -773,12 +818,16 @@ class REMCTest(test_util.TestCase):
            np.float32(np.stack([[1.0, 0.5, 0.25], [1.0, 0.25, 0.05]], axis=-1)),
            lambda x: 0.5 / np.sqrt(x).reshape(3, 2, 1))
       ]
+      for ulpname, use_untempered_log_prob_fn in [
+          ('NoUntemperedLogProb', False), ('YesUntemperedLogProb', True),
+      ]
   ])
   def test1EventDim2BatchDim3Replica(self,
                                      tfp_transition_kernel,
                                      inverse_temperatures,
                                      step_size_fn,
-                                     ess_scaling):
+                                     ess_scaling,
+                                     use_untempered_log_prob_fn):
     """Sampling from two batch diagonal multivariate normal."""
     step_size = (step_size_fn(inverse_temperatures) +
                  np.exp(np.pi) / 100).astype(np.float32)  # Prevent resonances.
@@ -802,15 +851,28 @@ class REMCTest(test_util.TestCase):
           step_size=step_size,
           num_leapfrog_steps=3)
 
+    target_log_prob_fn = tf.function(target.log_prob, autograph=False)
+
+    if use_untempered_log_prob_fn:
+      # This untempered_log_prob_fn should not change any of the results.
+      untempered_log_prob_fn = lambda x: tf.zeros_like(loc[..., 0])
+      tempered_log_prob_fn = target_log_prob_fn
+      target_log_prob_fn = None
+    else:
+      untempered_log_prob_fn = None
+      tempered_log_prob_fn = None
+
     remc = tfp.mcmc.ReplicaExchangeMC(
-        target_log_prob_fn=tf.function(target.log_prob, autograph=False),
+        target_log_prob_fn=target_log_prob_fn,
+        untempered_log_prob_fn=untempered_log_prob_fn,
+        tempered_log_prob_fn=tempered_log_prob_fn,
         inverse_temperatures=inverse_temperatures,
         make_kernel_fn=make_kernel_fn)
     remc.one_step = tf.function(remc.one_step, autograph=False)
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
       return [
-          mcmc_util.get_field(
+          unnest.get_innermost(
               results.post_swap_replica_results, 'log_accept_ratio'),
           results.post_swap_replica_states
       ]
@@ -887,12 +949,24 @@ class REMCTest(test_util.TestCase):
       for batch_idx in range(loc.shape[0]):
         _check_stats(replica_idx, batch_idx, ess_scaling)
 
-  @parameterized.named_parameters([dict(testcase_name='_slow_asserts',
-                                        asserts=True),
-                                   dict(testcase_name='_fast_execute_only',
-                                        asserts=False)])
+  @parameterized.named_parameters(
+      [
+          dict(
+              testcase_name='_slow_asserts',
+              asserts=True,
+              use_untempered_fn=False),
+          dict(
+              testcase_name='_fast_execute_only',
+              asserts=False,
+              use_untempered_fn=False),
+          dict(
+              testcase_name='_fast_with_untempered',
+              asserts=False,
+              use_untempered_fn=True)
+      ],)
   @test_util.numpy_disable_gradient_test('HMC')
-  def testMultipleCorrelatedStatesWithOneBatchDim(self, asserts):
+  def testMultipleCorrelatedStatesWithOneBatchDim(self, asserts,
+                                                  use_untempered_fn):
     dtype = np.float32
     true_mean = dtype([0, 0])
     true_cov = dtype([[1, 0.5], [0.5, 1]])
@@ -907,6 +981,15 @@ class REMCTest(test_util.TestCase):
       z = linop.solvevec(xy)
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
+    if use_untempered_fn:
+      # Should not change results at all
+      untempered_log_prob_fn = lambda x, unused_y: tf.zeros_like(x)
+      tempered_log_prob_fn = target_log_prob
+      target_log_prob = None
+    else:
+      untempered_log_prob_fn = None
+      tempered_log_prob_fn = None
+
     def make_kernel_fn(target_log_prob_fn):
       return tfp.mcmc.HamiltonianMonteCarlo(
           target_log_prob_fn=target_log_prob_fn,
@@ -916,7 +999,9 @@ class REMCTest(test_util.TestCase):
     remc = tfp.mcmc.ReplicaExchangeMC(
         target_log_prob_fn=target_log_prob,
         inverse_temperatures=[1., 0.9, 0.8],
-        make_kernel_fn=make_kernel_fn)
+        make_kernel_fn=make_kernel_fn,
+        untempered_log_prob_fn=untempered_log_prob_fn,
+        tempered_log_prob_fn=tempered_log_prob_fn)
 
     num_results = 13
     if asserts:
@@ -947,8 +1032,8 @@ class REMCTest(test_util.TestCase):
     self.assertGreater(np.min(ess_), num_results / 10, 'Bad sampling found!')
 
     # 6 standard errors for mean/variance estimates.
-    mean_atol = 6 / np.sqrt(np.min(ess_))
-    cov_atol = 6 * np.sqrt(2) / np.sqrt(np.min(ess_))
+    mean_atol = 8 / np.sqrt(np.min(ess_))
+    cov_atol = 8 * np.sqrt(2) / np.sqrt(np.min(ess_))
 
     self.assertAllClose(
         true_mean, states_[:, 0, :].mean(axis=0), atol=mean_atol)
@@ -1095,6 +1180,358 @@ class REMCTest(test_util.TestCase):
           current_state=current_state,
           kernel=remc,
           seed=_set_seed())
+
+  def testSpecifyingWrongCombinationOfLogProbArgsRaises(self):
+
+    def make_kernel_fn(target_log_prob_fn):
+      return tfp.mcmc.RandomWalkMetropolis(
+          target_log_prob_fn=target_log_prob_fn,
+          new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=0.1))
+
+    with self.subTest('provided tempered but not untempered'):
+      with self.assertRaisesRegex(ValueError, 'either neither or both'):
+        tfp.mcmc.ReplicaExchangeMC(
+            target_log_prob_fn=None,
+            untempered_log_prob_fn=None,
+            tempered_log_prob_fn=lambda x: 1.0,  # provided
+            inverse_temperatures=[1.],
+            make_kernel_fn=make_kernel_fn)
+
+    with self.subTest('provided untempered but not tempered'):
+      with self.assertRaisesRegex(ValueError, 'either neither or both'):
+        tfp.mcmc.ReplicaExchangeMC(
+            target_log_prob_fn=None,
+            untempered_log_prob_fn=lambda x: 1.0,  # provided
+            tempered_log_prob_fn=None,
+            inverse_temperatures=[1.],
+            make_kernel_fn=make_kernel_fn)
+
+    with self.subTest('provided all three'):
+      with self.assertRaisesRegex(ValueError, 'Exactly one'):
+        tfp.mcmc.ReplicaExchangeMC(
+            target_log_prob_fn=lambda x: 1.0,  # provided
+            untempered_log_prob_fn=lambda x: 1.0,  # provided
+            tempered_log_prob_fn=lambda x: 1.0,  # provided
+            inverse_temperatures=[1.],
+            make_kernel_fn=make_kernel_fn)
+
+  def testInvalidInverseTemperaturesRaises(self):
+
+    def make_kernel_fn(target_log_prob_fn):
+      return tfp.mcmc.RandomWalkMetropolis(
+          target_log_prob_fn=target_log_prob_fn,
+          new_state_fn=tfp.mcmc.random_walk_normal_fn(scale=0.1))
+
+    with self.subTest('Nothing raised if valid (even with validate_args)'):
+      tfp.mcmc.ReplicaExchangeMC(
+          target_log_prob_fn=None,
+          untempered_log_prob_fn=lambda x: 1.0,  # provided
+          tempered_log_prob_fn=lambda x: 1.0,  # provided
+          inverse_temperatures=[1., 0.5],
+          make_kernel_fn=make_kernel_fn,
+          validate_args=True,
+      )
+
+    with self.subTest('Negative temperatures not allowed'):
+      with self.assertRaisesError('must be non-negative'):
+        tfp.mcmc.ReplicaExchangeMC(
+            target_log_prob_fn=None,
+            untempered_log_prob_fn=lambda x: 1.0,  # provided
+            tempered_log_prob_fn=lambda x: 1.0,  # provided
+            inverse_temperatures=[-1., -0.5],
+            make_kernel_fn=make_kernel_fn,
+            validate_args=True,
+        )
+
+    with self.subTest('Zero temperatures not allowed without split tempering'):
+      with self.assertRaisesError('must be positive'):
+        tfp.mcmc.ReplicaExchangeMC(
+            target_log_prob_fn=lambda x: 1.0,  # provided
+            untempered_log_prob_fn=None,
+            tempered_log_prob_fn=None,
+            inverse_temperatures=[1., 0.5, 0.0],
+            make_kernel_fn=make_kernel_fn,
+            validate_args=True,
+        )
+
+  def testWithUntemperedLPemperatureGapNearOne(self):
+    inverse_temperatures = tf.convert_to_tensor([1., 0.0005, 0.])
+
+    if tf.executing_eagerly():
+      num_results = 50
+    else:
+      num_results = 1000
+
+    results = self.checkAndMakeResultsForTestingUntemperedLogProbFn(
+        likelihood_variance=tf.convert_to_tensor([0.05] * 4),
+        prior_variance=tf.convert_to_tensor([1.] * 4),
+        inverse_temperatures=inverse_temperatures,
+        num_results=num_results,
+    )
+
+    # Temperatures 0 and 1 are widely separated, so don't expect any swapping.
+    self.assertLess(results['conditional_swap_prob'][0], 0.05)
+
+    # Temperatures 1 and 2 are close, so they should swap.
+    self.assertGreater(results['conditional_swap_prob'][1], 0.95)
+
+  def testWithUntemperedLPTemperatureGapNearZero(self):
+    inverse_temperatures = tf.convert_to_tensor([1., 0.9999, 0.0])
+
+    if tf.executing_eagerly():
+      num_results = 50
+    else:
+      num_results = 10000
+
+    n_events = 5
+
+    results = self.checkAndMakeResultsForTestingUntemperedLogProbFn(
+        likelihood_variance=tf.convert_to_tensor([0.05] * n_events),
+        prior_variance=tf.convert_to_tensor([1.] * n_events),
+        inverse_temperatures=inverse_temperatures,
+        num_results=num_results,
+    )
+
+    # Temperatures 0 and 1 are close, so usually swap.
+    self.assertGreater(results['conditional_swap_prob'][0], 0.9)
+
+    # Temperatures 1 and 2 are far apart, so seldom swap.
+    self.assertLess(results['conditional_swap_prob'][1], 0.05)
+
+  def testWithUntemperedLPGeometricTemperaturesGivesReasonableSwaps(self):
+    inverse_temperatures = tf.convert_to_tensor([1., 0.5, 0.25])
+
+    if tf.executing_eagerly():
+      num_results = 50
+      tol_multiplier = 25
+      expected_max_conditional_swap_prob = 0.99
+    else:
+      num_results = 1000
+      tol_multiplier = 5
+      expected_max_conditional_swap_prob = 0.8
+
+    self.checkAndMakeResultsForTestingUntemperedLogProbFn(
+        likelihood_variance=tf.convert_to_tensor([0.25] * 4),
+        prior_variance=tf.convert_to_tensor([1.] * 4),
+        inverse_temperatures=inverse_temperatures,
+        num_results=num_results,
+        # The temperatures were dispersed geometrically, so expect a reasonable
+        # range of conditional swap probs.
+        expected_min_conditional_swap_prob=0.2,
+        expected_max_conditional_swap_prob=expected_max_conditional_swap_prob,
+        tol_multiplier=tol_multiplier,
+    )
+
+  def testWithUntemperedLPGeometricAndStateParts(self):
+    inverse_temperatures = tf.convert_to_tensor([1., 0.5, 0.25])
+
+    # The tolerance on these is not very tight...
+    # However, I (langmore) tried running these with num_results much higher,
+    # and we get progressively better results...so the algorithm is correct, but
+    # the sampling is inefficient (no preconditioning).
+    if tf.executing_eagerly():
+      num_results = 50
+      tol_multiplier = 25
+      expected_max_conditional_swap_prob = 0.99
+    else:
+      num_results = 5000
+      tol_multiplier = 30
+      expected_max_conditional_swap_prob = 0.9
+
+    self.checkAndMakeResultsForTestingUntemperedLogProbFn(
+        likelihood_variance=[
+            tf.convert_to_tensor([0.25] * 2),
+            tf.convert_to_tensor([0.45] * 2),
+        ],
+        prior_variance=[
+            tf.convert_to_tensor([0.5] * 2),
+            tf.convert_to_tensor([1.0] * 2),
+        ],
+        inverse_temperatures=inverse_temperatures,
+        num_results=num_results,
+        # The temperatures were dispersed geometrically, so expect a reasonable
+        # range of conditional swap probs.
+        expected_min_conditional_swap_prob=0.2,
+        expected_max_conditional_swap_prob=expected_max_conditional_swap_prob,
+        tol_multiplier=tol_multiplier,
+    )
+
+  @test_util.numpy_disable_gradient_test('HMC')
+  def checkAndMakeResultsForTestingUntemperedLogProbFn(
+      self,
+      likelihood_variance,
+      prior_variance,
+      inverse_temperatures,
+      num_results,
+      expected_min_conditional_swap_prob=None,
+      expected_max_conditional_swap_prob=None,
+      tol_multiplier=10,
+  ):
+    """Make dictionary of results and do some standard checks."""
+    # With an untempered log prob fn we can use beta = 0. This unfortunately
+    # requires a different setup in terms of step size than the usual tests, and
+    # we expect slightly different results. So we made our own special test.
+    inverse_temperatures = tf.convert_to_tensor(inverse_temperatures)
+    num_replica = inverse_temperatures.shape[0]
+    dtype = inverse_temperatures.dtype
+
+    is_list_like = isinstance(likelihood_variance, (list, tuple))
+    # If is_list_like, we will concatenate tensors along the way.
+    # The log prob fns we build will do this concatenation to inputs
+    # The "theoretical" outputs will be concatenated.
+    # It's up to the user to split back into "parts" if required.
+
+    if is_list_like:
+      assert isinstance(prior_variance, (list, tuple))
+      assert [len(v.shape) == 1 for v in likelihood_variance]
+      assert [len(v.shape) == 1 for v in prior_variance]
+      n_events = [v.shape[-1] for v in likelihood_variance]
+      likelihood_variance = tf.concat(likelihood_variance, axis=-1)
+      prior_variance = tf.concat(prior_variance, axis=-1)
+      current_state = [tf.zeros((num_replica, n)) for n in n_events]
+    else:
+      assert len(likelihood_variance.shape) == 1
+      assert len(prior_variance.shape) == 1
+      n_events = likelihood_variance.shape[-1]
+      likelihood_variance = tf.convert_to_tensor(likelihood_variance,
+                                                 dtype=dtype)
+      prior_variance = tf.convert_to_tensor(prior_variance, dtype=dtype)
+      current_state = tf.zeros((num_replica, n_events))
+
+    likelihood = tfd.MultivariateNormalDiag(
+        scale_diag=tf.sqrt(likelihood_variance))
+    prior = tfd.MultivariateNormalDiag(scale_diag=tf.sqrt(prior_variance))
+
+    def likelihood_log_prob(*x):
+      if is_list_like:
+        x = tf.concat(x, axis=-1)
+      else:
+        x = x[0]
+      return likelihood.log_prob(x)
+
+    def prior_log_prob(*x):
+      if is_list_like:
+        x = tf.concat(x, axis=-1)
+      else:
+        x = x[0]
+      return prior.log_prob(x)
+
+    # Precision is inverse of covariance. The (untempered) prior and
+    # (tempered) likelihood precisions add.
+    replica_precision = tf.linalg.LinearOperatorDiag(tf.stack([
+        beta / likelihood_variance + 1. / prior_variance
+        for beta in tf.unstack(inverse_temperatures)
+    ]))
+    replica_covariance = replica_precision.inverse()
+
+    replica_smallest_scale_length = tf.reduce_min(
+        tf.sqrt(replica_covariance.diag_part()), axis=-1)
+    step_size = 0.41234 * replica_smallest_scale_length[:, tf.newaxis]
+    num_leapfrog_steps = tf.cast(
+        tf.math.ceil(1.75 / tf.reduce_min(step_size)), tf.int32)
+
+    def make_kernel_fn(target_log_prob_fn):
+      return tfp.mcmc.HamiltonianMonteCarlo(
+          target_log_prob_fn=target_log_prob_fn,
+          step_size=step_size,
+          num_leapfrog_steps=num_leapfrog_steps,
+      )
+
+    remc = tfp.mcmc.ReplicaExchangeMC(
+        target_log_prob_fn=None,
+        untempered_log_prob_fn=prior_log_prob,
+        tempered_log_prob_fn=likelihood_log_prob,
+        inverse_temperatures=inverse_temperatures,
+        state_includes_replicas=True,
+        make_kernel_fn=make_kernel_fn,
+        swap_proposal_fn=tfp.mcmc.even_odd_swap_proposal_fn(1.),
+    )
+
+    def trace_fn(state, results):  # pylint: disable=unused-argument
+      return {
+          'replica_log_accept_ratio':
+              unnest.get_innermost(results.post_swap_replica_results,
+                                   'log_accept_ratio'),
+          'is_swap_accepted_adjacent':
+              results.is_swap_accepted_adjacent,
+          'is_swap_proposed_adjacent':
+              results.is_swap_proposed_adjacent,
+      }
+
+    replica_states, trace = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        # Start at one of the modes, in order to make mode jumping necessary
+        # if we want to pass test.
+        current_state=current_state,
+        kernel=remc,
+        num_burnin_steps=50,
+        trace_fn=trace_fn,
+        seed=test_util.test_seed())
+
+    # Make sure replicas are swapping. If they are not, then the individual
+    # replicas will converge even if the swap probabilities are incorrect.
+    conditional_swap_prob = (
+        tf.reduce_sum(
+            tf.cast(trace['is_swap_accepted_adjacent'], dtype), axis=0) /
+        tf.reduce_sum(
+            tf.cast(trace['is_swap_proposed_adjacent'], dtype), axis=0))
+    replica_prob_accept = tf.reduce_mean(
+        tf.exp(tf.minimum(trace['replica_log_accept_ratio'], 0.)), axis=0)
+
+    if is_list_like:
+      replica_states = tf.concat(replica_states, axis=-1)
+
+    results = self.evaluate({
+        'replica_states':
+            replica_states,
+        'replica_prob_accept':
+            replica_prob_accept,
+        'conditional_swap_prob':
+            conditional_swap_prob,
+        'theoretical_replica_mean':
+            tf.zeros_like(replica_covariance.diag_part()),
+        'theoretical_replica_variance':
+            replica_covariance.diag_part(),
+        'sample_replica_variance':
+            tfp.stats.variance(replica_states, sample_axis=0),
+        'sample_replica_mean':
+            tf.reduce_mean(replica_states, axis=0),
+        'replica_ess':
+            effective_sample_size(replica_states),
+    })
+
+    results['min_ess'] = np.min(results['replica_ess'])
+
+    # All replicas should be mixing well, individually.
+    self.assertGreater(
+        results['min_ess'],
+        num_results / 10,
+        msg='Bad sampling found!')
+    self.assertAllGreater(results['replica_prob_accept'], 0.6)
+
+    # If replicas are not swapping properly, other results may look nice
+    # even if swap probabilities are incorrect.
+    if expected_min_conditional_swap_prob is not None:
+      self.assertAllGreater(results['conditional_swap_prob'],
+                            expected_min_conditional_swap_prob)
+    if expected_max_conditional_swap_prob is not None:
+      self.assertAllLess(results['conditional_swap_prob'],
+                         expected_max_conditional_swap_prob)
+
+    mean_atol = tol_multiplier / np.sqrt(results['min_ess'])
+    cov_rtol = tol_multiplier * np.sqrt(2) / np.sqrt(results['min_ess'])
+
+    self.assertAllClose(
+        results['sample_replica_variance'],
+        results['theoretical_replica_variance'],
+        rtol=cov_rtol)
+
+    self.assertAllClose(
+        results['sample_replica_mean'],
+        results['theoretical_replica_mean'],
+        atol=mean_atol)
+
+    return results
 
 
 if __name__ == '__main__':

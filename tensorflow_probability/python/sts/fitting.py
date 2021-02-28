@@ -31,6 +31,7 @@ from tensorflow_probability.python.distributions import joint_distribution_named
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 
@@ -57,11 +58,21 @@ def sample_uniform_initial_state(parameter,
     `return_constrained=True`, and otherwise it is
     `parameter.bijector.inverse_event_shape(parameteter.prior.event_shape)`.
   """
-  unconstrained_prior_sample = parameter.bijector.inverse(
-      parameter.prior.sample(init_sample_shape, seed=seed))
+  # Get the shape and dtype of the unconstrained parameter value we'll
+  # use in inference, which should match the shape of a prior sample. If
+  # possible, elide the actual sampling by using `tf.function` to
+  # read off the shape statically.
+  unconstrained_prior_sample_fn = tf.function(
+      lambda: parameter.bijector.inverse(  # pylint: disable=g-long-lambda
+          parameter.prior.sample(init_sample_shape)))
+  param_shape = (
+      unconstrained_prior_sample_fn.get_concrete_function().output_shapes)
+  if not tensorshape_util.is_fully_defined(param_shape):
+    param_shape = tf.shape(unconstrained_prior_sample_fn())
+
   uniform_initializer = 4 * samplers.uniform(
-      tf.shape(unconstrained_prior_sample),
-      dtype=unconstrained_prior_sample.dtype,
+      shape=param_shape,
+      dtype=unconstrained_prior_sample_fn.get_concrete_function().output_dtypes,
       seed=seed) - 2
   if return_constrained:
     return parameter.bijector.forward(uniform_initializer)
@@ -431,11 +442,10 @@ def fit_with_hmc(model,
                       target_log_prob_fn=target_log_prob_fn,
                       step_size=initial_step_size,
                       num_leapfrog_steps=num_leapfrog_steps,
-                      state_gradients_are_stopped=True,
-                      seed=seed()),
+                      state_gradients_are_stopped=True),
                   bijector=[param.bijector for param in model.parameters]),
               num_adaptation_steps=int(num_warmup_steps * 0.8)),
-          parallel_iterations=1 if seed is not None else 10)
+          seed=seed())
     samples, kernel_results = run_hmc()
 
     return samples, kernel_results

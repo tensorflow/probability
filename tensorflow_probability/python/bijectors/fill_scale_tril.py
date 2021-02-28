@@ -26,12 +26,10 @@ from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.bijectors import transform_diagonal
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
     'FillScaleTriL',
-    'ScaleTriL',
 ]
 
 
@@ -125,58 +123,6 @@ class FillScaleTriL(chain.Chain):
           [transform_diagonal.TransformDiagonal(diag_bijector=diag_bijector),
            fill_triangular.FillTriangular()],
           validate_args=validate_args,
-          parameters=parameters,
-          name=name)
-
-
-class ScaleTriL(chain.Chain):
-  """DEPRECATED. Please use `tfp.bijectors.FillScaleTriL`."""
-
-  @deprecation.deprecated(
-      '2020-01-01',
-      '`ScaleTriL` has been deprecated and renamed `FillScaleTriL`; please use '
-      'that symbol instead.')
-  def __init__(self,
-               diag_bijector=None,
-               diag_shift=1e-5,
-               validate_args=False,
-               name='scale_tril'):
-    """Instantiates the `ScaleTriL` bijector.
-
-    Args:
-      diag_bijector: `Bijector` instance, used to transform the output diagonal
-        to be positive.
-        Default value: `None` (i.e., `tfb.Softplus()`).
-      diag_shift: Float value broadcastable and added to all diagonal entries
-        after applying the `diag_bijector`. Setting a positive
-        value forces the output diagonal entries to be positive, but
-        prevents inverting the transformation for matrices with
-        diagonal entries less than this value.
-        Default value: `1e-5`.
-      validate_args: Python `bool` indicating whether arguments should be
-        checked for correctness.
-        Default value: `False` (i.e., arguments are not validated).
-      name: Python `str` name given to ops managed by this object.
-        Default value: `scale_tril`.
-    """
-    parameters = dict(locals())
-    with tf.name_scope(name) as name:
-      if diag_bijector is None:
-        diag_bijector = softplus.Softplus(validate_args=validate_args)
-
-      if diag_shift is not None:
-        dtype = dtype_util.common_dtype([diag_bijector, diag_shift], tf.float32)
-        diag_shift = tensor_util.convert_nonref_to_tensor(diag_shift,
-                                                          name='diag_shift',
-                                                          dtype=dtype)
-        diag_bijector = chain.Chain([
-            shift.Shift(diag_shift),
-            diag_bijector
-        ])
-
-      super(ScaleTriL, self).__init__(
-          [transform_diagonal.TransformDiagonal(diag_bijector=diag_bijector),
-           fill_triangular.FillTriangular()],
-          validate_args=validate_args,
+          validate_event_size=False,
           parameters=parameters,
           name=name)

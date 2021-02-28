@@ -21,8 +21,10 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -98,6 +100,17 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+
   @property
   def loc(self):
     """The location parameter in the Generalized Extreme Value CDF."""
@@ -120,14 +133,18 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
   def _forward(self, x):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    concentration = tf.convert_to_tensor(self.concentration)
+    conc = tf.convert_to_tensor(self.concentration)
     with tf.control_dependencies(
         self._maybe_assert_valid_x(
-            x, loc=loc, scale=scale, concentration=concentration)):
+            x, loc=loc, scale=scale, concentration=conc)):
       z = (x - loc) / scale
+
+      equal_zero = tf.equal(conc, 0.)
+      # deal with case that gradient is N/A when conc = 0
+      safe_conc = tf.where(equal_zero, tf.ones_like(conc), conc)
       t = tf.where(
-          tf.equal(concentration, 0.), tf.math.exp(-z),
-          tf.math.exp(-tf.math.log1p(z * concentration) / concentration))
+          equal_zero, tf.math.exp(-z),
+          tf.math.exp(-tf.math.log1p(z * safe_conc) / safe_conc))
       return tf.exp(-t)
 
   def _inverse(self, y):
@@ -135,24 +152,34 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
       t = -tf.math.log(y)
 
       conc = tf.convert_to_tensor(self.concentration)
+
+      equal_zero = tf.equal(conc, 0.)
+      # deal with case that gradient is N/A when conc = 0
+      safe_conc = tf.where(equal_zero, tf.ones_like(conc), conc)
+
       z = tf.where(
-          tf.equal(conc, 0.), -tf.math.log(t),
-          tf.math.expm1(-tf.math.log(t) * conc) / conc)
+          equal_zero, -tf.math.log(t),
+          tf.math.expm1(-tf.math.log(t) * safe_conc) / safe_conc)
 
       return self.loc + self.scale * z
 
   def _forward_log_det_jacobian(self, x):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
-    concentration = tf.convert_to_tensor(self.concentration)
+    conc = tf.convert_to_tensor(self.concentration)
     with tf.control_dependencies(
         self._maybe_assert_valid_x(
-            x, loc=loc, scale=scale, concentration=concentration)):
+            x, loc=loc, scale=scale, concentration=conc)):
       z = (x - loc) / scale
+
+      equal_zero = tf.equal(conc, 0.)
+      # deal with case that gradient is N/A when conc = 0
+      safe_conc = tf.where(equal_zero, tf.ones_like(conc), conc)
+
       log_t = tf.where(
-          tf.equal(concentration, 0.), -z,
-          -tf.math.log1p(z * concentration) / concentration)
-      return (tf.math.multiply_no_nan(concentration + 1., log_t) -
+          equal_zero, -z,
+          -tf.math.log1p(z * safe_conc) / safe_conc)
+      return (tf.math.multiply_no_nan(conc + 1., log_t) -
               tf.math.exp(log_t) - tf.math.log(scale))
 
   def _inverse_log_det_jacobian(self, y):
@@ -170,11 +197,18 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
     concentration = (
         tf.convert_to_tensor(self.concentration) if concentration is None else
         concentration)
+    # We intentionally compute the boundary with (1.0 / concentration) * scale
+    # instead of just scale / concentration.
+    # Why?  The sampler returns loc + (foo / concentration) * scale,
+    # and at high-ish values of concentration, foo has a decent
+    # probability of being numerically exactly -1.  We therefore mimic
+    # the pattern of round-off that occurs in the sampler to make sure
+    # that samples emitted from this distribution will pass its own
+    # validations.  This is sometimes necessary: in TF's float32,
+    #   0.69314826 / 37.50019 < (1.0 / 37.50019) * 0.69314826
+    boundary = loc - (1.0 / concentration) * scale
     # The support of this bijector depends on the sign of concentration.
-    is_in_bounds = tf.where(
-        concentration > 0.,
-        x >= loc - scale / concentration,
-        x <= loc - scale / concentration)
+    is_in_bounds = tf.where(concentration > 0., x >= boundary, x <= boundary)
     # For concentration 0, the domain is the whole line.
     is_in_bounds = is_in_bounds | tf.math.equal(concentration, 0.)
 

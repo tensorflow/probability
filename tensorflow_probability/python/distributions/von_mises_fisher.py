@@ -26,6 +26,7 @@ from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import beta as beta_lib
 from tensorflow_probability.python.distributions import distribution
@@ -33,6 +34,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import spherical_uniform
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -41,46 +43,6 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = ['VonMisesFisher']
-
-
-def _bessel_ive(v, z, cache=None):
-  """Computes I_v(z)*exp(-abs(z)) using a recurrence relation, where z > 0."""
-  # TODO(b/67497980): Switch to a more numerically faithful implementation.
-  z = tf.convert_to_tensor(z)
-
-  wrap = lambda result: tf.debugging.check_numerics(result, 'besseli{}'.format(v
-                                                                              ))
-
-  if float(v) >= 2:
-    raise ValueError(
-        'Evaluating bessel_i by recurrence becomes imprecise for large v')
-
-  cache = cache or {}
-  safe_z = tf.where(z > 0, z, tf.ones_like(z))
-  if v in cache:
-    return wrap(cache[v])
-  if v == 0:
-    cache[v] = tf.math.bessel_i0e(z)
-  elif v == 1:
-    cache[v] = tf.math.bessel_i1e(z)
-  elif v == 0.5:
-    # sinh(x)*exp(-abs(x)), sinh(x) = (e^x - e^{-x}) / 2
-    sinhe = lambda x: (tf.exp(x - tf.abs(x)) - tf.exp(-x - tf.abs(x))) / 2
-    cache[v] = (
-        np.sqrt(2 / np.pi) * sinhe(z) *
-        tf.where(z > 0, tf.math.rsqrt(safe_z), tf.ones_like(safe_z)))
-  elif v == -0.5:
-    # cosh(x)*exp(-abs(x)), cosh(x) = (e^x + e^{-x}) / 2
-    coshe = lambda x: (tf.exp(x - tf.abs(x)) + tf.exp(-x - tf.abs(x))) / 2
-    cache[v] = (
-        np.sqrt(2 / np.pi) * coshe(z) *
-        tf.where(z > 0, tf.math.rsqrt(safe_z), tf.ones_like(safe_z)))
-  if v <= 1:
-    return wrap(cache[v])
-  # Recurrence relation:
-  cache[v] = (_bessel_ive(v - 2, z, cache) -
-              (2 * (v - 1)) * _bessel_ive(v - 1, z, cache) / z)
-  return wrap(cache[v])
 
 
 class VonMisesFisher(distribution.Distribution):
@@ -174,9 +136,6 @@ class VonMisesFisher(distribution.Distribution):
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
-
-    Raises:
-      ValueError: For known-bad arguments, i.e. unsupported event dimension.
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
@@ -190,9 +149,6 @@ class VonMisesFisher(distribution.Distribution):
       static_event_dim = tf.compat.dimension_value(
           tensorshape_util.with_rank_at_least(
               self._mean_direction.shape, 1)[-1])
-      if static_event_dim is not None and static_event_dim > 5:
-        raise ValueError('von Mises-Fisher ndims > 5 is not currently '
-                         'supported')
 
       # mean_direction is always reparameterized.
       # concentration is only for event_dim==3, via an inversion sampler.
@@ -209,8 +165,18 @@ class VonMisesFisher(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(mean_direction=1, concentration=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        mean_direction=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        concentration=parameter_properties.ParameterProperties(
+            shape_fn=lambda sample_shape: sample_shape[:-1],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def mean_direction(self):
@@ -260,15 +226,12 @@ class VonMisesFisher(distribution.Distribution):
     if concentration is None:
       concentration = tf.convert_to_tensor(self.concentration)
 
-    event_dim = tf.compat.dimension_value(self.event_shape[0])
-    if event_dim is None:
-      raise ValueError('von Mises-Fisher _log_normalizer currently only '
-                       'supports statically known event shape')
+    event_dim = tf.cast(self._event_shape_tensor()[0], self.dtype)
     safe_conc = tf.where(concentration > 0, concentration,
                          tf.ones_like(concentration))
     safe_lognorm = ((event_dim / 2 - 1) * tf.math.log(safe_conc) -
                     (event_dim / 2) * np.log(2 * np.pi) -
-                    tf.math.log(_bessel_ive(event_dim / 2 - 1, safe_conc)) -
+                    tfp_math.log_bessel_ive(event_dim / 2 - 1, safe_conc) -
                     tf.abs(safe_conc))
     log_nsphere_surface_area = (
         np.log(2.) + (event_dim / 2) * np.log(np.pi) -
@@ -328,11 +291,6 @@ class VonMisesFisher(distribution.Distribution):
 
     event_dimension_static = tf.compat.dimension_value(self.event_shape[0])
 
-    # TODO(b/141142878): Enable this; numerically unstable.
-    if event_dimension_static is not None and event_dimension_static > 2:
-      raise NotImplementedError(
-          'vMF covariance is numerically unstable for dim>2')
-
     mean_direction = tf.convert_to_tensor(self.mean_direction)
     concentration = tf.convert_to_tensor(self.concentration)
     event_dimension = tf.cast(self._event_shape_tensor(
@@ -381,7 +339,9 @@ class VonMisesFisher(distribution.Distribution):
     basis = tf.concat([[1.], tf.zeros([event_dim - 1], dtype=self.dtype)],
                       axis=0)
     u = tf.math.l2_normalize(basis - mean_direction, axis=-1)
-    return samples - 2 * tf.reduce_sum(samples * u, axis=-1, keepdims=True) * u
+    return tf.math.l2_normalize(
+        samples - 2 * tf.reduce_sum(samples * u, axis=-1, keepdims=True) * u,
+        axis=-1)
 
   def _sample_3d(self, n, mean_direction, concentration, seed=None):
     """Specialized inversion sampler for 3D."""
@@ -563,11 +523,6 @@ class VonMisesFisher(distribution.Distribution):
               tf.shape(mean_direction)[-1],
               1,
               message='`mean_direction` may not have scalar event shape'))
-      assertions.append(
-          assert_util.assert_less_equal(
-              tf.shape(mean_direction)[-1],
-              5,
-              message='von Mises-Fisher ndims > 5 is not currently supported'))
       assertions.append(
           assert_util.assert_near(
               1.,

@@ -292,7 +292,7 @@ class RelaxedOneHotCategoricalTest(test_util.TestCase):
     x = np.array([[0.3, 0.301, 0.2, 0.2], [0.15, 0.4, 0.3, 0.15]])
     with self.assertRaisesOpError('must sum to `1`'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x))
+          dist.experimental_default_event_space_bijector().inverse(x))
 
 
 @test_util.test_all_tf_execution_regimes

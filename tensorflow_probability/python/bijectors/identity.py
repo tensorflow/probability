@@ -66,6 +66,14 @@ class Identity(bijector.Bijector):
   def _is_increasing(cls):
     return True
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
+  @property
+  def _is_permutation(self):
+    return True
+
   def _forward(self, x):
     return x
 

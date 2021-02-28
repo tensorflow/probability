@@ -18,18 +18,22 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -187,14 +191,17 @@ class Beta(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    s = tf.convert_to_tensor(sample_shape, dtype=tf.int32)
-    return dict(concentration1=s, concentration0=s)
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration1=0, concentration0=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration1=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        concentration0=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def concentration1(self):
@@ -268,10 +275,19 @@ class Beta(distribution.Distribution):
   def _cdf(self, x):
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
-    shape = self._batch_shape_tensor(concentration1, concentration0)
+    shape = functools.reduce(
+        ps.broadcast_shape,
+        [ps.shape(concentration1),
+         ps.shape(concentration0),
+         ps.shape(x)])
     concentration1 = tf.broadcast_to(concentration1, shape)
     concentration0 = tf.broadcast_to(concentration0, shape)
-    return tf.math.betainc(concentration1, concentration0, x)
+    x = tf.broadcast_to(x, shape)
+
+    safe_x = tf.where(tf.logical_and(x >= 0, x < 1), x, 0.5)
+    answer = tf.math.betainc(concentration1, concentration0, safe_x)
+    return distribution_util.extend_cdf_outside_support(
+        x, answer, low=0., high=1.)
 
   def _log_unnormalized_prob(self, x, concentration1, concentration0):
     return (tf.math.xlogy(concentration1 - 1., x) +

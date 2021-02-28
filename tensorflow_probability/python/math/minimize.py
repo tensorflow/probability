@@ -22,8 +22,6 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-
 
 class MinimizeTraceableQuantities(collections.namedtuple(
     'MinimizeTraceableQuantities',
@@ -51,31 +49,12 @@ class MinimizeTraceableQuantities(collections.namedtuple(
   """
 
 
-# Backwards compatibility for older `trace_fns` that took separate
-# loss, grads, and params.
-def _maybe_wrap_old_style_trace_fn(trace_fn):
-  """Returns a `trace_fn that takes the single `minimizer_state` argument."""
-
-  def safe_trace_fn(traceable_quantities):
-    """A `trace_fn that takes the single `minimizer_state` argument."""
-    try:
-      return trace_fn(traceable_quantities)
-    except TypeError:
-      deprecated_trace_fn = deprecation.deprecated_args(
-          '2020-07-01',
-          'The signature for `trace_fn`s passed to `minimize` has changed. '
-          'Trace functions now take a single `traceable_quantities` argument, '
-          'which is a `tfp.math.MinimizeTraceableQuantities` namedtuple '
-          'containing `traceable_quantities.loss`, '
-          '`traceable_quantities.gradients`, etc. '
-          'Please update your `trace_fn` definition.',
-          ('loss', 'grads', 'variables')
-      )(trace_fn)
-      return deprecated_trace_fn(
-          traceable_quantities.loss,
-          traceable_quantities.gradients,
-          traceable_quantities.parameters)
-  return safe_trace_fn
+def _sanitize_traced_values(traced_values):
+  """Represents Python values and `None` as Tensors."""
+  return tf.nest.map_structure(
+      lambda x: (tf.zeros([0], dtype=tf.int32) if x is None  # pylint: disable=g-long-lambda
+                 else tf.convert_to_tensor(x)),
+      traced_values)
 
 
 def _tile_last_written_value(trace_array, last_written_idx):
@@ -89,10 +68,11 @@ def _tile_last_written_value(trace_array, last_written_idx):
 _trace_loss = lambda traceable_quantities: traceable_quantities.loss
 
 
-def _make_optimizer_step_fn(loss_fn, optimizer, trainable_variables):
+def _make_optimizer_step_fn(
+    loss_fn, optimizer, trainable_variables, jit_compile):
   """Construct a single optimization step."""
 
-  @tf.function(autograph=False)
+  @tf.function(autograph=False, jit_compile=jit_compile)
   def optimizer_step():
     """Run a single optimization step."""
     with tf.GradientTape(
@@ -127,7 +107,7 @@ def _make_training_loop_body(optimizer_step_fn,
         loss=loss, gradients=grads, parameters=parameters, step=step,
         has_converged=has_converged,
         convergence_criterion_state=convergence_criterion_state)
-    traced_values = trace_fn(traceable_quantities)
+    traced_values = _sanitize_traced_values(trace_fn(traceable_quantities))
     trace_arrays = tf.nest.map_structure(
         lambda ta, x: ta.write(step, x), trace_arrays, traced_values)
     potential_new_loop_vars = (
@@ -141,6 +121,7 @@ def _initialize_arrays(initial_values,
                        num_steps,
                        truncate_at_convergence):
   """Construct a structure of `TraceArray`s from initial values."""
+  initial_values = _sanitize_traced_values(initial_values)
   num_steps_ = tf.get_static_value(tf.convert_to_tensor(num_steps))
   size_is_dynamic = (num_steps_ is None or truncate_at_convergence)
   trace_arrays = tf.nest.map_structure(
@@ -163,6 +144,7 @@ def minimize(loss_fn,
              trainable_variables=None,
              trace_fn=_trace_loss,
              return_full_length_trace=True,
+             jit_compile=None,
              name='minimize'):
   """Minimize a loss function using a provided optimizer.
 
@@ -213,6 +195,11 @@ def minimize(loss_fn,
       optimization step. This enables use in contexts such as XLA that require
       shapes to be known statically.
       Default value: `True`.
+    jit_compile: If True, compiles the loss function and gradient update using
+      XLA. XLA performs compiler optimizations, such as fusion, and attempts to
+      emit more efficient code. This may drastically improve the performance.
+      See the docs for `tf.function`. (In JAX, this will apply `jax.jit`).
+      Default value: `None`.
     name: Python `str` name prefixed to ops created by this function.
       Default value: 'minimize'.
 
@@ -312,8 +299,6 @@ def minimize(loss_fn,
 
   """
 
-  trace_fn = _maybe_wrap_old_style_trace_fn(trace_fn)
-
   def convergence_detected(step, trace_arrays,
                            has_converged=None,
                            convergence_criterion_state=None):
@@ -333,7 +318,8 @@ def minimize(loss_fn,
     # then reused inside the training loop (i.e., it is only traced once).
     optimizer_step_fn = _make_optimizer_step_fn(
         loss_fn=loss_fn, optimizer=optimizer,
-        trainable_variables=trainable_variables)
+        trainable_variables=trainable_variables,
+        jit_compile=jit_compile)
     initial_loss, initial_grads, initial_parameters = optimizer_step_fn()
     has_converged = None
     initial_convergence_criterion_state = None

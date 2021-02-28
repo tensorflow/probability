@@ -33,13 +33,13 @@ tfb = tfp.bijectors
 class OrderedLogisticTest(test_util.TestCase):
 
   def _random_cutpoints(self, shape):
-    return self._ordered.inverse(self._rng.randn(*shape))
+    return self._ordered.forward(self._rng.randn(*shape))
 
   def _random_location(self, shape):
     return self._rng.randn(*shape)
 
   def setUp(self):
-    self._ordered = tfb.Ordered()
+    self._ordered = tfb.Ascending()
     self._rng = np.random.RandomState(test_util.test_seed())
     super(OrderedLogisticTest, self).setUp()
 

@@ -78,7 +78,7 @@ class MixtureSameFamily(distribution.Distribution):
   # Plot PDF.
   x = np.linspace(-2., 3., int(1e4), dtype=np.float32)
   import matplotlib.pyplot as plt
-  plt.plot(x, gm.prob(x).eval());
+  plt.plot(x, gm.prob(x));
 
   ### Create a mixture of two Bivariate Gaussians:
 
@@ -104,7 +104,7 @@ class MixtureSameFamily(distribution.Distribution):
     grid = np.concatenate([gx.ravel()[None, :], gy.ravel()[None, :]], axis=0)
     return grid.T.reshape(x.size, y.size, 2)
   grid = meshgrid(np.linspace(-2, 2, 100, dtype=np.float32))
-  plt.contour(grid[..., 0], grid[..., 1], gm.prob(grid).eval());
+  plt.contour(grid[..., 0], grid[..., 1], gm.prob(grid));
 
   ```
 
@@ -324,17 +324,15 @@ class MixtureSameFamily(distribution.Distribution):
     mask_batch_ndims = ps.rank(mask) - 1
     pad_ndims = batch_ndims - mask_batch_ndims
     mask_shape = ps.shape(mask)
-    mask = tf.reshape(
-        mask,
-        shape=ps.concat([
-            mask_shape[:-1],
-            ps.ones([pad_ndims], dtype=tf.int32),
-            mask_shape[-1:],
-            ps.ones([event_ndims], dtype=tf.int32),
-        ], axis=0))
+    target_shape = ps.concat([
+        mask_shape[:-1],
+        ps.ones([pad_ndims], dtype=tf.int32),
+        mask_shape[-1:],
+        ps.ones([event_ndims], dtype=tf.int32),
+    ], axis=0)
+    mask = tf.reshape(mask, shape=target_shape)
 
-    if x.dtype in [tf.bfloat16, tf.float16, tf.float32, tf.float64,
-                   tf.complex64, tf.complex128]:
+    if dtype_util.is_floating(x.dtype) or dtype_util.is_complex(x.dtype):
       masked = tf.math.multiply_no_nan(x, mask)
     else:
       masked = x * mask
@@ -455,7 +453,7 @@ class MixtureSameFamily(distribution.Distribution):
       3. Distributional transform currently only works for known rank of the
         batch tensor.
 
-    Arguments:
+    Args:
       x: Sample of mixture distribution
       event_shape: The event shape of this distribution
 
@@ -514,7 +512,7 @@ class MixtureSameFamily(distribution.Distribution):
       w_i^k = w_k prob_k(x_1, ..., x_i-1) / sum_k' w_k' prob_k'(x_1, ..., x_i-1)
     and w_0^k = w_k is the mixture probability of the k-th component.
 
-    Arguments:
+    Args:
       x: Sample of mixture distribution
       event_shape: The event shape of this distribution
 
@@ -684,7 +682,7 @@ def _prevent_2nd_derivative(x):
   NB: you need to apply a non-identity function to the output tensor for the
   exception to be raised.
 
-  Arguments:
+  Args:
     x: A tensor.
 
   Returns:

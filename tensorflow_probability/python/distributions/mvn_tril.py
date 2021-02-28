@@ -19,15 +19,28 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
     'MultivariateNormalTriL',
 ]
+
+
+class KahanLogDetLinOpTriL(tf.linalg.LinearOperatorLowerTriangular):
+  """Override `LinearOperatorLowerTriangular` logdet to use Kahan summation."""
+
+  def _log_abs_determinant(self):
+    return tfp_math.reduce_kahan_sum(
+        tf.math.log(tf.math.abs(self._get_diag())), axis=[-1]).total
 
 
 class MultivariateNormalTriL(
@@ -140,6 +153,7 @@ class MultivariateNormalTriL(
                scale_tril=None,
                validate_args=False,
                allow_nan_stats=True,
+               experimental_use_kahan_sum=False,
                name='MultivariateNormalTriL'):
     """Construct Multivariate Normal distribution on `R^k`.
 
@@ -175,6 +189,12 @@ class MultivariateNormalTriL(
         statistics (e.g., mean, mode, variance) use the value "`NaN`" to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values as well as
+        when computing the log-determinant of the scale matrix. Doing so
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
       name: Python `str` name prefixed to Ops created by this class.
 
     Raises:
@@ -200,7 +220,9 @@ class MultivariateNormalTriL(
         # No need to validate that scale_tril is non-singular.
         # LinearOperatorLowerTriangular has an assert_non_singular
         # method that is called by the Bijector.
-        scale = tf.linalg.LinearOperatorLowerTriangular(
+        linop_cls = (KahanLogDetLinOpTriL if experimental_use_kahan_sum else
+                     tf.linalg.LinearOperatorLowerTriangular)
+        scale = linop_cls(
             scale_tril,
             is_non_singular=True,
             is_self_adjoint=False,
@@ -210,13 +232,25 @@ class MultivariateNormalTriL(
           scale=scale,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
+          experimental_use_kahan_sum=experimental_use_kahan_sum,
           name=name)
       self._parameters = parameters
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=1, scale_tril=2)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        scale_tril=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, sample_shape[-1:]], axis=0),
+            default_constraining_bijector_fn=lambda: fill_scale_tril_bijector.
+            FillScaleTriL(diag_shift=dtype_util.eps(dtype))))
+    # pylint: enable=g-long-lambda
 
   @property
   def scale_tril(self):
     return self._scale_tril
+
+  _composite_tensor_nonshape_params = ('loc', 'scale_tril')

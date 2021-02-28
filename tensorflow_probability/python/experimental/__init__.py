@@ -32,11 +32,15 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental import auto_batching
+from tensorflow_probability.python.experimental import bijectors
+from tensorflow_probability.python.experimental import distribute
+from tensorflow_probability.python.experimental import distributions
 from tensorflow_probability.python.experimental import lazybones
 from tensorflow_probability.python.experimental import linalg
 from tensorflow_probability.python.experimental import marginalize
 from tensorflow_probability.python.experimental import mcmc
 from tensorflow_probability.python.experimental import nn
+from tensorflow_probability.python.experimental import parallel_filter
 from tensorflow_probability.python.experimental import sequential
 from tensorflow_probability.python.experimental import stats
 from tensorflow_probability.python.experimental import substrates
@@ -46,21 +50,28 @@ from tensorflow_probability.python.experimental.composite_tensor import as_compo
 from tensorflow_probability.python.experimental.composite_tensor import register_composite
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.internal.auto_composite_tensor import auto_composite_tensor
+from tensorflow_probability.python.internal.auto_composite_tensor import AutoCompositeTensor
 
 
 _allowed_symbols = [
     'auto_batching',
     'as_composite',
     'auto_composite_tensor',
+    'AutoCompositeTensor',
+    'bijectors',
+    'distribute',
+    'distributions',
     'lazybones',
     'linalg',
     'marginalize',
     'mcmc',
     'nn',
+    'parallel_filter',
     'register_composite',
     'sequential',
     'stats',
     'substrates',
+    'unnest',
     'util',
     'vi',
 ]

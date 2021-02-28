@@ -251,6 +251,16 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
     """
     self.assertNotAllEqual(a, tf.nest.map_structure(tf.zeros_like, a))
 
+  def assertAllNotNan(self, a):
+    """Assert that every entry in a `Tensor` is not NaN.
+
+    Args:
+      a: A `Tensor` whose entries must be verified as not NaN.
+    """
+    is_not_nan = ~np.isnan(self._GetNdArray(a))
+    all_true = np.ones_like(is_not_nan, dtype=np.bool)
+    self.assertAllEqual(all_true, is_not_nan)
+
   def assertAllNan(self, a):
     """Assert that every entry in a `Tensor` is NaN.
 
@@ -358,7 +368,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
 
   def skip_if_no_xla(self):
     try:
-      tf.function(lambda: tf.constant(0), experimental_compile=True)()
+      tf.function(lambda: tf.constant(0), jit_compile=True)()
     except (tf.errors.UnimplementedError, NotImplementedError) as e:
       if 'Could not find compiler' in str(e):
         self.skipTest('XLA not available')

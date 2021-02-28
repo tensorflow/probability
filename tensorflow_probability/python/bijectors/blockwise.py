@@ -21,10 +21,15 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import bijector as bijector_base
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
+
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Blockwise',
@@ -37,7 +42,7 @@ def _get_static_splits(splits):
   return splits if static_splits is None else static_splits
 
 
-class Blockwise(bijector_base.Bijector):
+class Blockwise(chain.Chain):
   """Bijector which applies a list of bijectors to blocks of a `Tensor`.
 
   More specifically, given [F_0, F_1, ... F_n] which are scalar or vector
@@ -110,127 +115,130 @@ class Blockwise(bijector_base.Bijector):
     if not name:
       name = 'blockwise_of_' + '_and_'.join([b.name for b in bijectors])
       name = name.replace('/', '')
+
     with tf.name_scope(name) as name:
+      for b in bijectors:
+        if (nest.is_nested(b.forward_min_event_ndims)
+            or nest.is_nested(b.inverse_min_event_ndims)):
+          raise ValueError('Bijectors must all be single-part.')
+        elif isinstance(b.forward_min_event_ndims, int):
+          if b.forward_min_event_ndims != b.inverse_min_event_ndims:
+            raise ValueError('Rank-changing bijectors are not supported.')
+          elif b.forward_min_event_ndims > 1:
+            raise ValueError('Only scalar and vector event-shape '
+                             'bijectors are supported at this time.')
+
+      b_joint = joint_map.JointMap(list(bijectors), name='jointmap')
+
+      block_sizes = (
+          np.ones(len(bijectors), dtype=np.int32)
+          if block_sizes is None else
+          _validate_block_sizes(block_sizes, bijectors, validate_args))
+      b_split = split.Split(
+          block_sizes, name='split', validate_args=validate_args)
+
+      if maybe_changes_size:
+        i_block_sizes = _validate_block_sizes(
+            ps.concat(b_joint.forward_event_shape_tensor(
+                ps.split(block_sizes, len(bijectors))), axis=0),
+            bijectors, validate_args)
+        maybe_changes_size = not tf.get_static_value(
+            ps.reduce_all(block_sizes == i_block_sizes))
+      b_concat = invert.Invert(
+          (split.Split(i_block_sizes, name='isplit')
+           if maybe_changes_size else b_split),
+          name='concat')
+
+      self._maybe_changes_size = maybe_changes_size
       super(Blockwise, self).__init__(
-          forward_min_event_ndims=1,
+          bijectors=[b_concat, b_joint, b_split],
           validate_args=validate_args,
           parameters=parameters,
           name=name)
 
-      if not bijectors:
-        raise ValueError('`bijectors` must not be empty.')
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
 
-      for bijector in bijectors:
-        if (bijector.forward_min_event_ndims > 1 or
-            bijector.inverse_min_event_ndims > 1):
-          # TODO(siege): In the future, it can be reasonable to support N-D
-          # bijectors by concatenating along some specific axis, broadcasting
-          # low-D bijectors appropriately.
-          raise NotImplementedError('Only scalar and vector event-shape '
-                                    'bijectors are supported at this time.')
+  @property
+  def _b_joint(self):
+    return self._bijectors[1]
 
-      self._bijectors = bijectors
-      self._maybe_changes_size = maybe_changes_size
+  @property
+  def _b_split(self):
+    return self._bijectors[-1]
 
-      if block_sizes is None:
-        block_sizes = np.ones(len(bijectors), dtype=np.int32)
-      self._block_sizes = ps.convert_to_shape_tensor(
-          block_sizes, name='block_sizes', dtype_hint=tf.int32)
-
-      self._block_sizes = _validate_block_sizes(self._block_sizes, bijectors,
-                                                validate_args)
+  @property
+  def _b_concat(self):
+    return self._bijectors[0].bijector
 
   @property
   def bijectors(self):
-    return self._bijectors
+    return self._b_joint.bijectors
 
   @property
   def block_sizes(self):
-    return self._block_sizes
+    return self._b_split.split_sizes
 
-  def _output_block_sizes(self):
-    return [
-        b.forward_event_shape_tensor(bs[tf.newaxis])[0]
-        for b, bs in zip(self.bijectors,
-                         tf.unstack(self.block_sizes, num=len(self.bijectors)))
-    ]
-
-  def _forward_event_shape(self, input_shape):
-    input_shape = tensorshape_util.with_rank_at_least(input_shape, 1)
-    static_block_sizes = tf.get_static_value(self.block_sizes)
-    if static_block_sizes is None:
-      return tensorshape_util.concatenate(input_shape[:-1], [None])
-
-    output_size = sum(
-        b.forward_event_shape([bs])[0]
-        for b, bs in zip(self.bijectors, static_block_sizes))
-
-    return tensorshape_util.concatenate(input_shape[:-1], [output_size])
-
-  def _forward_event_shape_tensor(self, input_shape):
-    output_size = ps.reduce_sum(self._output_block_sizes())
-    return ps.concat([input_shape[:-1], output_size[tf.newaxis]], -1)
-
-  def _inverse_event_shape(self, output_shape):
-    output_shape = tensorshape_util.with_rank_at_least(output_shape, 1)
-    static_block_sizes = tf.get_static_value(self.block_sizes)
-    if static_block_sizes is None:
-      return tensorshape_util.concatenate(output_shape[:-1], [None])
-
-    input_size = sum(static_block_sizes)
-
-    return tensorshape_util.concatenate(output_shape[:-1], [input_size])
-
-  def _inverse_event_shape_tensor(self, output_shape):
-    input_size = ps.reduce_sum(self.block_sizes)
-    return ps.concat([output_shape[:-1], input_size[tf.newaxis]], -1)
+  @property
+  def inverse_block_sizes(self):
+    return self._b_concat.split_sizes
 
   def _forward(self, x, **kwargs):
-    split_x = tf.split(x, _get_static_splits(self.block_sizes), axis=-1,
-                       num=len(self.bijectors))
-    # TODO(b/162023850): Sanitize the kwargs better.
-    split_y = [
-        b.forward(x_, **kwargs.get(b.name, {}))
-        for b, x_ in zip(self.bijectors, split_x)
-    ]
-    y = tf.concat(split_y, axis=-1)
+    y = super(Blockwise, self)._forward(x, **kwargs)
     if not self._maybe_changes_size:
       tensorshape_util.set_shape(y, x.shape)
     return y
 
   def _inverse(self, y, **kwargs):
-    split_y = tf.split(y, _get_static_splits(self._output_block_sizes()),
-                       axis=-1, num=len(self.bijectors))
-    split_x = [
-        b.inverse(y_, **kwargs.get(b.name, {}))
-        for b, y_ in zip(self.bijectors, split_y)
-    ]
-    x = tf.concat(split_x, axis=-1)
+    x = super(Blockwise, self)._inverse(y, **kwargs)
     if not self._maybe_changes_size:
       tensorshape_util.set_shape(x, y.shape)
     return x
 
-  def _forward_log_det_jacobian(self, x, **kwargs):
-    split_x = tf.split(x, _get_static_splits(self.block_sizes), axis=-1,
-                       num=len(self.bijectors))
-    fldjs = [
-        b.forward_log_det_jacobian(x_, event_ndims=1, **kwargs.get(b.name, {}))
-        for b, x_ in zip(self.bijectors, split_x)
-    ]
-    return sum(fldjs)
+  def _forward_event_shape(self, input_shape):
+    if not self._maybe_changes_size:
+      return input_shape
+    input_shape = tensorshape_util.with_rank_at_least(input_shape, 1)
+    static_block_sizes = tf.get_static_value(self.inverse_block_sizes)
+    if static_block_sizes is None:
+      return tensorshape_util.concatenate(input_shape[:-1], [None])
+    output_size = sum(static_block_sizes)
+    return tensorshape_util.concatenate(input_shape[:-1], [output_size])
 
-  def _inverse_log_det_jacobian(self, y, **kwargs):
-    split_y = tf.split(y, _get_static_splits(self._output_block_sizes()),
-                       axis=-1, num=len(self.bijectors))
-    ildjs = [
-        b.inverse_log_det_jacobian(y_, event_ndims=1, **kwargs.get(b.name, {}))
-        for b, y_ in zip(self.bijectors, split_y)
-    ]
-    return sum(ildjs)
+  def _inverse_event_shape(self, output_shape):
+    if not self._maybe_changes_size:
+      return output_shape
+    output_shape = tensorshape_util.with_rank_at_least(output_shape, 1)
+    static_block_sizes = tf.get_static_value(self.block_sizes)
+    if static_block_sizes is None:
+      return tensorshape_util.concatenate(output_shape[:-1], [None])
+    input_size = sum(static_block_sizes)
+    return tensorshape_util.concatenate(output_shape[:-1], [input_size])
+
+  def _forward_event_shape_tensor(self, x, **kwargs):
+    if not self._maybe_changes_size:
+      return x
+    return super(Blockwise, self)._forward_event_shape_tensor(x, **kwargs)
+
+  def _inverse_event_shape_tensor(self, y, **kwargs):
+    if not self._maybe_changes_size:
+      return y
+    return super(Blockwise, self)._inverse_event_shape_tensor(y, **kwargs)
+
+  def _walk_forward(self, step_fn, x, **kwargs):
+    return super(Blockwise, self)._walk_forward(
+        step_fn, x, **{self._b_joint.name: kwargs})
+
+  def _walk_inverse(self, step_fn, x, **kwargs):
+    return super(Blockwise, self)._walk_inverse(
+        step_fn, x, **{self._b_joint.name: kwargs})
 
 
 def _validate_block_sizes(block_sizes, bijectors, validate_args):
   """Helper to validate block sizes."""
+  block_sizes = ps.convert_to_shape_tensor(
+      block_sizes, name='block_sizes', dtype_hint=tf.int32)
   block_sizes_shape = block_sizes.shape
   if tensorshape_util.is_fully_defined(block_sizes_shape):
     if (tensorshape_util.rank(block_sizes_shape) != 1 or
@@ -240,6 +248,7 @@ def _validate_block_sizes(block_sizes, bijectors, validate_args):
           '`bijectors`. Got a `Tensor` with shape {} and `bijectors` of '
           'length {}'.format(block_sizes_shape, len(bijectors)))
     return block_sizes
+
   elif validate_args:
     message = ('`block_sizes` must be `None`, or a vector of the same length '
                'as `bijectors`.')
@@ -248,6 +257,8 @@ def _validate_block_sizes(block_sizes, bijectors, validate_args):
             tf.size(block_sizes), len(bijectors), message=message),
         assert_util.assert_equal(tf.rank(block_sizes), 1)
     ]):
-      return tf.identity(block_sizes)
-  else:
-    return block_sizes
+      block_sizes = tf.identity(block_sizes)
+
+  # Set the shape if missing to pass statically known structure to split.
+  tensorshape_util.set_shape(block_sizes, [len(bijectors)])
+  return block_sizes

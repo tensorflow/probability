@@ -200,7 +200,7 @@ class _ProximalHessianTest(object):
 
     def has_xla():
       try:
-        tf.function(lambda: tf.constant(0), experimental_compile=True)()
+        tf.function(lambda: tf.constant(0), jit_compile=True)()
         return True
       except (tf.errors.UnimplementedError, NotImplementedError, ValueError):
         return False
@@ -210,7 +210,7 @@ class _ProximalHessianTest(object):
     # - Many sparse ops are not supported by XLA so we can't and don't test this
     #   use case.
     compile_with_xla = has_xla() and not use_sparse_tensor
-    @tf.function(autograph=False, experimental_compile=compile_with_xla)
+    @tf.function(autograph=False, jit_compile=compile_with_xla)
     def run():
       model_coefficients, is_converged, _ = tfp.glm.fit_sparse(
           model_matrix,

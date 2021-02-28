@@ -24,10 +24,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import correlation_cholesky as correlation_cholesky_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import lkj
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -125,8 +127,16 @@ class CholeskyLKJ(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            shape_fn=lambda sample_shape: sample_shape[:-2],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(
+                    low=tf.convert_to_tensor(
+                        1. + dtype_util.eps(dtype), dtype=dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def dimension(self):
@@ -248,7 +258,7 @@ class CholeskyLKJ(distribution.Distribution):
       logpi = np.log(np.pi)
       ans = tf.zeros_like(concentration)
       for k in range(1, self.dimension):
-        ans = ans + logpi * (k / 2.)
+        ans = ans + tf.constant(logpi * k / 2., concentration.dtype)
         effective_concentration = concentration + (self.dimension - 1 - k) / 2.
         ans = ans + tfp_math.log_gamma_difference(
             k / 2., effective_concentration)

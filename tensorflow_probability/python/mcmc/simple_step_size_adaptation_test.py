@@ -33,15 +33,6 @@ from tensorflow_probability.python.internal import test_util
 
 _RATE = 1.01
 
-
-def _set_seed(seed):
-  """Helper which uses graph seed if using eager."""
-  # TODO(b/68017812): Deprecate once eager correctly supports seed.
-  if tf.executing_eagerly():
-    return None
-  return seed
-
-
 FakeMHKernelResults = collections.namedtuple(
     'FakeMHKernelResults', 'accepted_results, log_accept_ratio')
 
@@ -58,9 +49,9 @@ class FakeMHKernel(tfp.mcmc.TransitionKernel):
         store_parameters_in_results=store_parameters_in_results,
     )
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     new_state, new_accepted_results = self.parameters['inner_kernel'].one_step(
-        current_state, previous_kernel_results.accepted_results)
+        current_state, previous_kernel_results.accepted_results, seed=seed)
     return new_state, previous_kernel_results._replace(
         accepted_results=new_accepted_results)
 
@@ -88,7 +79,7 @@ class FakeSteppedKernel(tfp.mcmc.TransitionKernel):
         step_size=step_size,
         store_parameters_in_results=store_parameters_in_results)
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     return current_state, previous_kernel_results
 
   def bootstrap_results(self, current_state):
@@ -114,9 +105,9 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
   def inner_kernel(self):
     return self.parameters['inner_kernel']
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     new_state, new_inner_results = self.inner_kernel.one_step(
-        current_state, previous_kernel_results.inner_results)
+        current_state, previous_kernel_results.inner_results, seed=seed)
     return new_state, previous_kernel_results._replace(
         inner_results=new_inner_results)
 
@@ -356,6 +347,34 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
         tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(True), 1).is_calibrated)
     self.assertFalse(
         tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(False), 1).is_calibrated)
+
+  def testCustomReduceFn(self):
+    log_accept_ratio = tf.constant(
+        [np.log(0.1), np.log(1.)])
+    state = [
+        tf.zeros([2]),
+    ]
+
+    old_step_size = 1.
+    kernel = FakeMHKernel(
+        FakeSteppedKernel(step_size=old_step_size),
+        log_accept_ratio=log_accept_ratio)
+    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+        kernel,
+        num_adaptation_steps=1,
+        adaptation_rate=tf.constant(_RATE - 1., dtype=tf.float64),
+        reduce_fn=tf.reduce_max,
+        validate_args=True)
+
+    kernel_results = kernel.bootstrap_results(state)
+    for _ in range(2):
+      _, kernel_results = kernel.one_step(state, kernel_results)
+
+    step_size = self.evaluate(
+        kernel_results.inner_results.accepted_results.step_size,)
+
+    # If reduce_fn was left at default, this would have decreased.
+    self.assertAllClose(old_step_size * _RATE, step_size)
 
 
 # Reduce test weight by not running the (slow) `eager_no_tf_function` regime.

@@ -248,7 +248,7 @@ def make_prior(num_topics, initial_value):
 def model_fn(features, labels, mode, params, config):
   """Build the model function for use in an estimator.
 
-  Arguments:
+  Args:
     features: The input features for the estimator.
     labels: The labels, unused here.
     mode: Signifies whether it is train or test or predict.
@@ -353,7 +353,7 @@ def get_topics_strings(topics_words, alpha, vocabulary,
                        topics_to_print=10, words_per_topic=10):
   """Returns the summary of the learned topics.
 
-  Arguments:
+  Args:
     topics_words: KxV tensor with topics as rows and words as columns.
     alpha: 1xK tensor of prior Dirichlet concentrations for the
         topics.
@@ -464,7 +464,7 @@ def build_input_fns(data_dir, batch_size):
 
   Each object is represented as a bag-of-words vector.
 
-  Arguments:
+  Args:
     data_dir: Folder in which to store the data.
     batch_size: Batch size for both train and evaluation.
   Returns:

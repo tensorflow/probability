@@ -99,6 +99,9 @@ class TFVariableTest(test_util.TestCase, backend_test.VariableTestCase):
     arg_types = [inst.Type([inst.TensorType(shape=[], dtype=np.float32)])]
     TF_BACKEND.run_on_dummies(f, arg_types)
 
+  def testDtypeMergingBoolsDoesntRaise(self):
+    TF_BACKEND.merge_dtypes(np.bool, np.bool_)
+
 
 if __name__ == '__main__':
   tf.test.main()

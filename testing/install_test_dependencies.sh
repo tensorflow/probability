@@ -40,6 +40,9 @@
 # commands, telling pip to install the dependencies in the user install
 # directory.
 
+set -v  # print commands as they are executed
+set -e  # fail and exit on any command erroring
+
 # Get the absolute path to the directory containing this script.
 DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 
@@ -77,16 +80,29 @@ else
   TF_NIGHTLY_PACKAGE=tf-nightly-cpu
 fi
 
+PYTHON_PARSE_PACKAGE_JSON="
+import sys
+import json
+package_data = json.loads(sys.stdin.read())
+linux_versions = []
+for release, release_info in package_data['releases'].items():
+  if any('linux' in wheel['filename'] for wheel in release_info):
+    print(release)
+"
+
 find_good_tf_nightly_version_str() {
   PKG_NAME=$1
   # These are nightly builds we'd like to avoid for some reason; separated by
   # regex OR operator.
-  BAD_NIGHTLY_DATES="20200112\|20200113"
+  BAD_NIGHTLY_DATES="20200112\|20200113\|20210119\|20210219\|20210220\|\
+  20210221\|20210222\|20210224"
   # This will fail to find version 'X" and log available version strings to
   # stderr. We then sort, remove bad versions and take the last entry. This
   # allows us to avoid hardcoding the main version number, which would then need
   # to be updated on every new TF release.
-  python -m pip install $PKG_NAME==X 2>&1 \
+  VERSIONS=$(curl -s https://pypi.org/pypi/$PKG_NAME/json \
+    | python -c "$PYTHON_PARSE_PACKAGE_JSON")
+  echo $VERSIONS \
     | grep -o "[0-9.]\+dev[0-9]\{8\}" \
     | sort \
     | grep -v "$BAD_NIGHTLY_DATES" \
@@ -166,14 +182,10 @@ install_python_packages() {
 
   # The following unofficial dependencies are used only by tests.
   # TODO(b/148685448): Unpin Hypothesis and coverage versions.
-  python -m pip install $PIP_FLAGS hypothesis==3.56.5 coverage==4.4.2 matplotlib mock scipy
+  python -m pip install $PIP_FLAGS hypothesis==3.56.5 coverage==4.4.2 matplotlib mock mpmath scipy
 
   # Install additional TFP dependencies.
   python -m pip install $PIP_FLAGS decorator 'cloudpickle>=1.3' dm-tree
-
-  # Upgrade numpy to the latest to address issues that happen when testing with
-  # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
-  python -m pip install -U $PIP_FLAGS numpy
 
   # Print out all versions, as an FYI in the logs.
   python --version

@@ -45,7 +45,7 @@ class DataTest(test_util.InferenceGymTestCase):
   @test_util.numpy_disable_test_missing_functionality('No XLA in NumPy')
   def testGermanCreditNumericInXLA(self):
 
-    @tf.function(autograph=False, experimental_compile=True)
+    @tf.function(autograph=False, jit_compile=True)
     def load_dataset_in_xla():
       dataset = data.german_credit_numeric()
       # The actual dataset loading will happen in Eager mode, courtesy of the
@@ -67,7 +67,11 @@ class DataTest(test_util.InferenceGymTestCase):
 
   def testBrownianMotion(self):
     dataset = data.brownian_motion_missing_middle_observations()
-    self.assertEqual((30,), dataset['locs'].shape)
+    self.assertEqual((30,), dataset['observed_locs'].shape)
+
+  def testLorenzModel(self):
+    dataset = data.convection_lorenz_bridge()
+    self.assertEqual((30,), dataset['observed_values'].shape)
 
   @test_util.uses_tfds
   def testRadon(self):

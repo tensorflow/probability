@@ -92,13 +92,12 @@ def _event_size(event_shape, name=None):
 
     event_shape_const = tf.get_static_value(event_shape)
     if event_shape_const is not None:
-      return np.prod(event_shape_const)
+      return np.prod(event_shape_const, dtype=np.int32)
     else:
       return tf.reduce_prod(event_shape)
 
 
-# We mix-in `tf.Module` since Keras base class doesn't track tf.Modules.
-class DistributionLambda(tf.keras.layers.Lambda, tf.Module):
+class DistributionLambda(tf.keras.layers.Lambda):
   """Keras layer enabling plumbing TFP distributions through Keras models.
 
   A `DistributionLambda` is minimially characterized by a function that returns
@@ -205,12 +204,12 @@ class DistributionLambda(tf.keras.layers.Lambda, tf.Module):
     super(DistributionLambda, self).__init__(_fn, **kwargs)
 
     # We need to ensure Keras tracks variables (eg, from activity regularizers
-    # for type-II MLE). To accomplish this, we add the built distribution and
-    # kwargs as members so `vars` picks them up (this is how tf.Module
-    # implements its introspection).
+    # for type-II MLE). To accomplish this, we add the built distribution
+    # variables and kwargs as members so `vars` picks them up (this is how
+    # tf.Module implements its introspection).
     # Note also that we track all variables to support the user pattern:
     # `v.initializer for v in model.variable]`.
-    self._most_recently_built_distribution = None
+    self._most_recently_built_distribution_vars = None
     self._kwargs = kwargs
 
     self._make_distribution_fn = make_distribution_fn
@@ -220,25 +219,6 @@ class DistributionLambda(tf.keras.layers.Lambda, tf.Module):
     # API has a different way of injecting `_keras_history` than the
     # `keras.Sequential` way.
     self._enter_dunder_call = False
-
-  @property
-  def trainable_weights(self):
-    # We will append additional weights to what is already discovered from
-    # tensorflow/python/keras/engine/base_layer.py.
-    # Note: that in Keras-land "weights" is the source of truth for "variables."
-    from_keras = super(DistributionLambda, self).trainable_weights
-    from_module = list(tf.Module.trainable_variables.fget(self))
-    return self._dedup_weights(from_keras + from_module)
-
-  @property
-  def non_trainable_weights(self):
-    # We will append additional weights to what is already discovered from
-    # tensorflow/python/keras/engine/base_layer.py.
-    # Note: that in Keras-land "weights" is the source of truth for "variables."
-    from_keras = super(DistributionLambda, self).non_trainable_weights
-    from_module = [v for v in tf.Module.variables.fget(self)
-                   if not getattr(v, 'trainable', True)]
-    return self._dedup_weights(from_keras + from_module)
 
   def __call__(self, inputs, *args, **kwargs):
     self._enter_dunder_call = True
@@ -250,9 +230,9 @@ class DistributionLambda(tf.keras.layers.Lambda, tf.Module):
   def call(self, inputs, *args, **kwargs):
     distribution, value = super(DistributionLambda, self).call(
         inputs, *args, **kwargs)
-    # We always save the most recently built distribution for variable tracking
+    # We always save the most recently built distribution variables for tracking
     # purposes.
-    self._most_recently_built_distribution = distribution
+    self._most_recently_built_distribution_vars = distribution.variables
     if self._enter_dunder_call:
       # Its critical to return both distribution and concretization
       # so Keras can inject `_keras_history` to both. This is what enables
@@ -896,7 +876,7 @@ class IndependentLogistic(DistributionLambda):
     with tf.name_scope(name or 'IndependentLogistic_params_size'):
       event_shape = tf.convert_to_tensor(
           event_shape, name='event_shape', dtype_hint=tf.int32)
-      return 2 * _event_size(
+      return np.int32(2) * _event_size(
           event_shape, name=name or 'IndependentLogistic_params_size')
 
   def get_config(self):
@@ -1011,7 +991,7 @@ class IndependentNormal(DistributionLambda):
     with tf.name_scope(name or 'IndependentNormal_params_size'):
       event_shape = tf.convert_to_tensor(
           event_shape, name='event_shape', dtype_hint=tf.int32)
-      return 2 * _event_size(
+      return np.int32(2) * _event_size(
           event_shape, name=name or 'IndependentNormal_params_size')
 
   def get_config(self):
@@ -1510,7 +1490,7 @@ class MixtureSameFamily(DistributionLambda):
   def params_size(num_components, component_params_size, name=None):
     """Number of `params` needed to create a `MixtureSameFamily` distribution.
 
-    Arguments:
+    Args:
       num_components: Number of component distributions in the mixture
         distribution.
       component_params_size: Number of parameters needed to create a single

@@ -34,6 +34,7 @@ py_library(
     name = "optix",
     srcs = ["optix.py"],
     srcs_version = "PY3",
+    visibility = ["//visibility:private"],
     deps = [
         # jax dep,
         "//oryx/core:primitive",

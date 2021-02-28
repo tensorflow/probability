@@ -42,20 +42,19 @@ def mixture_stddev(mixture_weight_vector, mean_vector, stddev_vector):
   each component's mean and standard deviation can be provided.
 
   Args:
-    mixture_weight_vector: A 2D tensor with shape [batch_size, num_components]
-    mean_vector: A 2D tensor of mixture component means. Has shape `[batch_size,
-      num_components]`.
-    stddev_vector: A 2D tensor of mixture component standard deviations. Has
-      shape `[batch_size, num_components]`.
+    mixture_weight_vector: A Tensor with shape `batch_shape + [num_components]`
+    mean_vector: A Tensor of mixture component means. Has shape `batch_shape +
+      [num_components]`.
+    stddev_vector: A Tensor of mixture component standard deviations. Has
+      shape `batch_shape + [num_components]`.
 
   Returns:
-    A 1D tensor of shape `[batch_size]` representing the standard deviation of
+    A 1D tensor of shape `batch_shape` representing the standard deviation of
     the mixture distribution with given weights and component means and standard
     deviations.
   Raises:
     ValueError: If the shapes of the input tensors are not as expected.
   """
-  tensorshape_util.assert_has_rank(mixture_weight_vector.shape, 2)
   if not tensorshape_util.is_compatible_with(mean_vector.shape,
                                              mixture_weight_vector.shape):
     raise ValueError('Expecting means to have same shape as mixture weights.')
@@ -63,22 +62,31 @@ def mixture_stddev(mixture_weight_vector, mean_vector, stddev_vector):
                                              mixture_weight_vector.shape):
     raise ValueError('Expecting stddevs to have same shape as mixture weights.')
 
-  # Reshape the distribution parameters for batched vectorized dot products.
-  pi_for_dot_prod = tf.expand_dims(mixture_weight_vector, axis=1)
-  mu_for_dot_prod = tf.expand_dims(mean_vector, axis=2)
-  sigma_for_dot_prod = tf.expand_dims(stddev_vector, axis=2)
+  weighted_average_means = tf.reduce_sum(
+      mixture_weight_vector * mean_vector, axis=-1, keepdims=True)
+  deviations = mean_vector - weighted_average_means
+  return _hypot(_weighted_norm(mixture_weight_vector, deviations),
+                _weighted_norm(mixture_weight_vector, stddev_vector))
 
-  # weighted average of component means under mixture distribution.
-  mean_wa = tf.matmul(pi_for_dot_prod, mu_for_dot_prod)
-  mean_wa = tf.reshape(mean_wa, (-1,))
-  # weighted average of component variances under mixture distribution.
-  var_wa = tf.matmul(pi_for_dot_prod, tf.square(sigma_for_dot_prod))
-  var_wa = tf.reshape(var_wa, (-1,))
-  # weighted average of component squared means under mixture distribution.
-  sq_mean_wa = tf.matmul(pi_for_dot_prod, tf.square(mu_for_dot_prod))
-  sq_mean_wa = tf.reshape(sq_mean_wa, (-1,))
-  mixture_variance = var_wa + sq_mean_wa - tf.square(mean_wa)
-  return tf.sqrt(mixture_variance)
+
+def _hypot(x, y):
+  """Returns sqrt(x**2 + y**2) elementwise without overflow."""
+  # Notably, this implementation avoids overflow better than
+  # tf.experimental.numpy.hypot
+  mag = tf.maximum(tf.math.abs(x), tf.math.abs(y))
+  normalized_result = tf.sqrt(tf.square(x / mag) + tf.square(y / mag))
+  return tf.math.multiply_no_nan(normalized_result, mag)
+
+
+def _weighted_norm(weights, xs):
+  """Returns sqrt(sum_{axis=-1}(w_i * x_i**2)) without overflow in x_i**2."""
+  # Notably, this implementation differs from tf.norm in supporting weights and
+  # avoiding overflow.  The weights are assumed < 1, i.e., incapable of causing
+  # overflow themselves.
+  magnitude = tf.reduce_max(tf.math.abs(xs), axis=-1)
+  xs = xs / magnitude[..., tf.newaxis]
+  normalized_result = tf.sqrt(tf.reduce_sum(weights * tf.square(xs), axis=-1))
+  return tf.math.multiply_no_nan(normalized_result, magnitude)
 
 
 def shapes_from_loc_and_scale(loc, scale, name='shapes_from_loc_and_scale'):
@@ -420,38 +428,64 @@ def move_dimension(x, source_idx, dest_idx):
 def assert_integer_form(x,
                         summarize=None,
                         message=None,
-                        int_dtype=None,
+                        atol=None,
+                        rtol=None,
                         name='assert_integer_form'):
-  """Assert that x has integer components (or floats equal to integers).
+  """Assert that x has integer components (or floats near integers).
 
   Args:
-    x: Floating-point `Tensor`
+    x: Floating-point or integer `Tensor`.
     summarize: Print this many entries of each tensor.
     message: A string to prefix to the default message.
-    int_dtype: A `tf.dtype` used to cast the float to. The default (`None`)
-      implies the smallest possible signed int will be used for casting.
+    atol: Tensor. Same dtype as, and broadcastable to, x. The absolute
+      tolerance. Default is 10 * eps.
+    rtol: Tensor. Same dtype as, and broadcastable to, x. The relative
+      tolerance. Default is 10 * eps.
     name: A name for this operation (optional).
 
   Returns:
-    Op raising `InvalidArgumentError` if `cast(x, int_dtype) != x`.
+    Op raising `InvalidArgumentError` if `round(x) != x` within tolerance.
   """
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')
     if dtype_util.is_integer(x.dtype):
       return tf.no_op()
     message = message or '{} has non-integer components'.format(x)
-    if int_dtype is None:
-      try:
-        int_dtype = {
-            tf.float16: tf.int16,
-            tf.float32: tf.int32,
-            tf.float64: tf.int64,
-        }[dtype_util.base_dtype(x.dtype)]
-      except KeyError:
-        raise TypeError('Unrecognized type {}'.format(dtype_util.name(x.dtype)))
+    return assert_util.assert_near(
+        x, tf.round(x), atol=atol, rtol=rtol,
+        summarize=summarize, message=message, name=name)
+
+
+def assert_casting_closed(x,
+                          target_dtype,
+                          summarize=None,
+                          message=None,
+                          name='assert_casting_closed'):
+  """Assert that x is fixed under round-trip casting to `target_dtype`.
+
+  Note that even when `target_dtype` is the integer dtype of the same width as
+  the dtype of `x`, this is stronger than `assert_integer_form`.  This is
+  because any given floating-point format can represent integers outside the
+  range of the equally wide integer format.
+
+  Args:
+    x: Floating-point `Tensor`
+    target_dtype: A `tf.dtype` used to cast `x` to.
+    summarize: Print this many entries of each tensor.
+    message: A string to prefix to the default message.
+    name: A name for this operation (optional).
+
+  Returns:
+    Op raising `InvalidArgumentError` if `cast(x, target_dtype) != x`.
+  """
+  with tf.name_scope(name):
+    x = tf.convert_to_tensor(x, name='x')
+    if message is None:
+      message = 'Tensor values must be representable as {}.'.format(
+          target_dtype)
     return assert_util.assert_equal(
         x,
-        tf.cast(tf.cast(x, int_dtype), x.dtype),
+        tf.cast(tf.cast(x, target_dtype), x.dtype),
         summarize=summarize,
         message=message,
         name=name)
@@ -483,7 +517,7 @@ def assert_nondecreasing(x, summarize=None, message=None, name=None):
 
 
 def assert_nonnegative_integer_form(
-    x, name='assert_nonnegative_integer_form'):
+    x, atol=None, rtol=None, name='assert_nonnegative_integer_form'):
   """Assert x is a non-negative tensor, and optionally of integers."""
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')
@@ -494,18 +528,19 @@ def assert_nonnegative_integer_form(
     if not dtype_util.is_integer(x.dtype):
       assertions += [
           assert_integer_form(
-              x,
+              x, atol=atol, rtol=rtol,
               message='`{}` cannot contain fractional components.'.format(x)),
       ]
     return assertions
 
 
 def embed_check_nonnegative_integer_form(
-    x, name='embed_check_nonnegative_integer_form'):
+    x, atol=None, rtol=None, name='embed_check_nonnegative_integer_form'):
   """Assert x is a non-negative tensor, and optionally of integers."""
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')
-    return with_dependencies(assert_nonnegative_integer_form(x), x)
+    return with_dependencies(assert_nonnegative_integer_form(
+        x, atol=atol, rtol=rtol), x)
 
 
 def same_dynamic_shape(a, b):
@@ -833,9 +868,9 @@ def embed_check_integer_casting_closed(x,
       # Being here means _is_integer_like_by_dtype(target_dtype) = True.
       # Since this check implies the magnitude check below, we need only it.
       assertions += [
-          assert_integer_form(
+          assert_casting_closed(
               x,
-              int_dtype=target_dtype,
+              target_dtype,
               message='Elements must be {}-equivalent.'.format(
                   dtype_util.name(target_dtype))),
       ]
@@ -1430,3 +1465,39 @@ def is_distribution_instance(d):
   return (not tf_inspect.isclass(d) and
           hasattr(d, 'log_prob') and
           hasattr(d, 'sample'))
+
+
+def extend_cdf_outside_support(x, computed_cdf, low=None, high=None):
+  """Returns a CDF correctly extended outside a distribution's support interval.
+
+  This helper is useful when the natural formula for computing a CDF computes
+  the wrong thing outside the distribution's support.  For instance, a `nan` due
+  to invoking some special function with parameters out of bounds.
+
+  Note that correct gradients may require the "double-where" trick.  For that,
+  the caller must compute the `computed_cdf` Tensor with a doctored input that
+  replaces all out-of-support values of `x` with a "safe" in-support value that
+  is guaranteed not to produce a `nan` in the `computed_cdf` Tensor.  After
+  calling `extend_cdf_outside_support` those doctored CDF values will be ignored
+  in the primal computation, and any `nan`s thus avoided will not pollute the
+  gradients.
+
+  Args:
+    x: Tensor of input values at which the CDF is desired.
+    computed_cdf: Tensor of values computed for the CDF.  Must broadcast with
+      `x`.  Entries corresponding to points `x` falling below or above the given
+      support are ignored and replaced with 0 or 1, respectively.
+    low: Tensor of lower bounds for the support.  Must broadcast with `x`.
+    high: Tensor of upper bounds for the support.  Must broadcast with `x`.
+
+  Returns:
+    cdf: Tensor of corrected CDF values.  Each entry is either 0 if the
+      corresponding entry of `x` is outside the support from below, or the
+      computed CDF value if `x` is in the support, or 1 if `x` is outside the
+      support from above.
+  """
+  if low is not None:
+    computed_cdf = tf.where(x >= low, computed_cdf, 0.)
+  if high is not None:
+    computed_cdf = tf.where(x < high, computed_cdf, 1.)
+  return computed_cdf

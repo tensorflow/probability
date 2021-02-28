@@ -27,8 +27,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 # pytype_strict
 py_library(
     name = "targets",
@@ -43,8 +41,10 @@ py_library(
         ":item_response_theory",
         ":log_gaussian_cox_process",
         ":logistic_regression",
+        ":lorenz_system",
         ":model",
         ":neals_funnel",
+        ":non_identifiable_quartic",
         ":probit_regression",
         ":radon_contextual_effects",
         ":sparse_logistic_regression",
@@ -113,6 +113,7 @@ py_library(
         ":model",
         "//inference_gym/internal:data",
         "//inference_gym/targets/ground_truth:brownian_motion_missing_middle_observations",
+        "//inference_gym/targets/ground_truth:brownian_motion_unknown_scales_missing_middle_observations",
     ],
 )
 
@@ -139,6 +140,7 @@ py_library(
     deps = [
         ":model",
         # numpy dep,
+        "//inference_gym/targets/ground_truth:eight_schools",
     ],
 )
 
@@ -270,6 +272,36 @@ py_test(
 )
 
 py_library(
+    name = "lorenz_system",
+    srcs = ["lorenz_system.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":bayesian_model",
+        ":model",
+        # numpy dep,
+        "//inference_gym/internal:data",
+        "//inference_gym/targets/ground_truth:convection_lorenz_bridge",
+        "//inference_gym/targets/ground_truth:convection_lorenz_bridge_unknown_scales",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "lorenz_system_test",
+    size = "large",
+    srcs = ["lorenz_system_test.py"],
+    python_version = "PY3",
+    shard_count = 3,
+    srcs_version = "PY3",
+    deps = [
+        ":lorenz_system",
+        # numpy dep,
+        # tensorflow dep,
+        "//inference_gym/internal:test_util",
+    ],
+)
+
+py_library(
     name = "model",
     srcs = ["model.py"],
     srcs_version = "PY3",
@@ -318,6 +350,29 @@ py_test(
 )
 
 py_library(
+    name = "non_identifiable_quartic",
+    srcs = ["non_identifiable_quartic.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":bayesian_model",
+        ":model",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "non_identifiable_quartic_test",
+    srcs = ["non_identifiable_quartic_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":non_identifiable_quartic",
+        # tensorflow dep,
+        "//inference_gym/internal:test_util",
+    ],
+)
+
+py_library(
     name = "probit_regression",
     srcs = ["probit_regression.py"],
     srcs_version = "PY3",
@@ -355,6 +410,7 @@ py_library(
         ":model",
         "//inference_gym/internal:data",
         "//inference_gym/targets/ground_truth:radon_contextual_effects_minnesota",
+        "//inference_gym/targets/ground_truth:radon_contextual_effects_minnesota_halfnormal",
     ],
 )
 

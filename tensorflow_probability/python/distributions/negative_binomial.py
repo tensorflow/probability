@@ -21,14 +21,17 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
 class NegativeBinomial(distribution.Distribution):
@@ -114,8 +117,45 @@ class NegativeBinomial(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(total_count=0, logits=0, probs=0)
+  def experimental_from_mean_dispersion(cls, mean, dispersion, **kwargs):
+    """Constructs a NegativeBinomial from its mean and dispersion.
+
+    **Experimental: Naming, location of this API may change.**
+
+    In this parameterization, the dispersion is defined as the reciprocal of the
+    total count of failures, i.e. `dispersion = 1 / total_count`.
+
+    Args:
+      mean: The mean of the constructed distribution.
+      dispersion: The reciprocal of the total_count of the constructed
+        distribution.
+      **kwargs: Other keyword arguments passed directly to `__init__`, e.g.
+        `validate_args`.
+
+    Returns:
+      neg_bin: A distribution with the given parameterization.
+    """
+    dtype = dtype_util.common_dtype([mean, dispersion], dtype_hint=tf.float32)
+    dispersion = tensor_util.convert_nonref_to_tensor(dispersion, dtype=dtype)
+    mean = tensor_util.convert_nonref_to_tensor(mean, dtype=dtype)
+
+    total_count = DeferredTensor(dispersion, tf.math.reciprocal, dtype=dtype)
+
+    return cls(
+        total_count=total_count,
+        probs=DeferredTensor(mean, lambda mean: mean / (mean + total_count)),
+        **kwargs)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        total_count=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        logits=parameter_properties.ParameterProperties(),
+        probs=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=sigmoid_bijector.Sigmoid,
+            is_preferred=False))
 
   @property
   def total_count(self):
@@ -172,10 +212,12 @@ class NegativeBinomial(distribution.Distribution):
     total_count = tf.convert_to_tensor(self.total_count)
     shape = self._batch_shape_tensor(
         logits_or_probs=logits, total_count=total_count)
-    return tf.math.betainc(
+    safe_x = tf.where(x >= 0, x, 0.)
+    answer = tf.math.betainc(
         tf.broadcast_to(total_count, shape),
-        tf.broadcast_to(1. + x, shape),
+        tf.broadcast_to(1. + safe_x, shape),
         tf.broadcast_to(tf.sigmoid(-logits), shape))
+    return distribution_util.extend_cdf_outside_support(x, answer, low=0)
 
   def _log_prob(self, x):
     total_count = tf.convert_to_tensor(self.total_count)

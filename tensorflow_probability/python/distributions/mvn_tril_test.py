@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 # Dependency imports
 
 from absl.testing import parameterized
@@ -437,6 +439,32 @@ class MultivariateNormalTriLTest(test_util.TestCase):
       with tf.control_dependencies([scale.assign([[1., 0.], [1., 0.]])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @parameterized.named_parameters(dict(testcase_name=''),
+                                  dict(testcase_name='_jit', jit=True))
+  def test_kahan_precision(self, jit=False):
+    maybe_jit = lambda f: f
+    if jit:
+      self.skip_if_no_xla()
+      maybe_jit = tf.function(jit_compile=True)
+
+    n = 2_500
+    stream = test_util.test_seed_stream()
+    samps = tfd.Normal(0, 1).sample(n, seed=stream())
+
+    scale = tfd.LogNormal(0, .2).sample([7, 1], seed=stream())
+    mvn = tfd.MultivariateNormalTriL(
+        loc=tf.zeros([n]), scale_tril=tf.linalg.diag(tf.zeros([n]) + scale),
+        experimental_use_kahan_sum=True)
+    mvn64 = tfd.MultivariateNormalTriL(
+        loc=tf.zeros([n], dtype=tf.float64),
+        scale_tril=tf.linalg.diag(
+            tf.zeros([n], dtype=tf.float64) + tf.cast(scale, tf.float64)))
+    lp = maybe_jit(mvn.log_prob)(samps)
+    lp64 = mvn64.log_prob(tf.cast(samps, tf.float64))
+    lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
+    # With fast-math off, without Kahan fails 15-100%, max-abs-error ~.006
+    self.assertAllClose(lp64, lp, rtol=0, atol=.0008)
+
 
 def _compute_non_batch_kl(mu_a, sigma_a, mu_b, sigma_b):
   """Non-batch KL for N(mu_a, sigma_a), N(mu_b, sigma_b)."""
@@ -584,4 +612,6 @@ class MultivariateNormalTriLSlicingTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
+  os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()

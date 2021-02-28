@@ -32,6 +32,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -116,10 +117,10 @@ class Bates(distribution.Distribution):
   Compute some values for the pdf.
 
   ```python
-  dist.probs(50.).eval()    # shape: [3]
+  dist.prob(50.)    # shape: [3]
   x = [[50., 50., 50.],
        [5., 10., 20.]]      # shape: [2, 3]
-  dist.probs(x).eval()      # shape: [2]
+  dist.prob(x)      # shape: [2, 3]
   ```
   """
 
@@ -174,15 +175,17 @@ class Bates(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(
-        zip(('total_count', 'low', 'high'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 3)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(total_count=0, low=0, high=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        total_count=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        low=parameter_properties.ParameterProperties(),
+        # TODO(b/169874884): Support decoupled parameterization.
+        high=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,))
 
   @property
   def total_count(self):
@@ -271,13 +274,15 @@ class Bates(distribution.Distribution):
     if is_init != tensor_util.is_ref(self.total_count):
       total_count = tf.convert_to_tensor(self.total_count)
       limit = BATES_TOTAL_COUNT_STABILITY_LIMITS[self.dtype]
+      msg = '`total_count` must be representable as a 32-bit integer.'
       assertions.extend([
           assert_util.assert_positive(
               total_count,
               message='`total_count` must be positive.'),
-          distribution_util.assert_integer_form(
+          distribution_util.assert_casting_closed(
               total_count,
-              message='`total_count` must be integer-valued.'),
+              target_dtype=tf.int32,
+              message=msg),
           assert_util.assert_less_equal(
               tf.cast(total_count, self.dtype),
               tf.cast(limit, self.dtype),
@@ -345,7 +350,7 @@ def _bates_pdf(total_count, low, high, dtype, value):
     value_centered = (value - low) / range_
     value_adj = tf.clip_by_value(value_centered, 0., 1.)
     value_adj = tf.where(value_adj < .5, value_adj, 1. - value_adj)
-    value_adj = tf.where(tf.math.is_finite(value_adj), value_adj, low)
+    value_adj = tf.where(tf.math.is_finite(value_adj), value_adj, 0.)
     # Flatten to make segments; need to broadcast before flattening.
     shape = ps.broadcast_shape(ps.shape(value_adj), ps.shape(total_count))
     total_count_b = ps.broadcast_to(total_count, shape)
@@ -427,7 +432,7 @@ def _bates_cdf(total_count, low, high, dtype, value):
     value_centered = (value - low) / (high - low)
     value_adj = tf.clip_by_value(value_centered, 0., 1.)
     value_adj = tf.where(value_adj < .5, value_adj, 1. - value_adj)
-    value_adj = tf.where(tf.math.is_finite(value_adj), value_adj, low)
+    value_adj = tf.where(tf.math.is_finite(value_adj), value_adj, 0.)
     # Flatten to make segments; need to broadcast before flattening.
     shape = ps.broadcast_shape(ps.shape(value_adj), ps.shape(total_count))
     total_count_b = ps.broadcast_to(total_count, shape)
@@ -484,6 +489,9 @@ def _segmented_range(limits):
   Returns:
     segments: 1D `Tensor` of segment ranges.
   """
+  # To cope with [0]-shaped limits, which disagrees with the sensibilities of
+  # tf.repeat, we left-pad, then slice the output.
+  limits = tf.pad(limits, [[1, 0]], constant_values=0)
   return (tf.range(tf.reduce_sum(limits)) -
           tf.repeat(tf.concat([[0], tf.cumsum(limits[:-1])], axis=0), limits))
 

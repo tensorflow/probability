@@ -46,23 +46,44 @@ class TransformedTransitionKernelResults(
 
 def make_log_det_jacobian_fn(bijector, direction):
   """Makes a function which applies a list of Bijectors' `log_det_jacobian`s."""
-  if not mcmc_util.is_list_like(bijector):
-    bijector = [bijector]
   attr = '{}_log_det_jacobian'.format(direction)
+  if not mcmc_util.is_list_like(bijector):
+    dtype = getattr(bijector, '{}_dtype'.format(direction))()
+    if mcmc_util.is_list_like(dtype):
+      def multipart_fn(state_parts, event_ndims):
+        return getattr(bijector, attr)(state_parts, event_ndims)
+      return multipart_fn
+    elif tf.nest.is_nested(dtype):
+      raise ValueError(
+          'Only list-like multi-part bijectors are currently supported, but '
+          'got {}.'.format(tf.nest.map_structure(lambda _: '.', dtype)))
+    bijector = [bijector]
   def fn(state_parts, event_ndims):
-    return [
+    return sum([
         getattr(b, attr)(sp, event_ndims=e)
         for b, e, sp in zip(bijector, event_ndims, state_parts)
-    ]
+    ])
   return fn
 
 
 def make_transform_fn(bijector, direction):
   """Makes a function which applies a list of Bijectors' `forward`s."""
   if not mcmc_util.is_list_like(bijector):
+    dtype = getattr(bijector, '{}_dtype'.format(direction))()
+    if mcmc_util.is_list_like(dtype):
+      return getattr(bijector, direction)
+    elif tf.nest.is_nested(dtype):
+      raise ValueError(
+          'Only list-like multi-part bijectors are currently supported, but '
+          'got {}.'.format(tf.nest.map_structure(lambda _: '.', dtype)))
     bijector = [bijector]
   def fn(state_parts):
-    return [getattr(b, direction)(sp) for b, sp in zip(bijector, state_parts)]
+    if len(bijector) != len(state_parts):
+      raise ValueError('State has {} parts, but bijector has {}.'.format(
+          len(state_parts), len(bijector)))
+    transformed_parts = [
+        getattr(b, direction)(sp) for b, sp in zip(bijector, state_parts)]
+    return tf.nest.pack_sequence_as(state_parts, transformed_parts)
   return fn
 
 
@@ -106,7 +127,7 @@ def make_transformed_log_prob(
     tlp = log_prob_fn(*fn(state_parts))
     tlp_rank = prefer_static.rank(tlp)
     event_ndims = [(prefer_static.rank(sp) - tlp_rank) for sp in state_parts]
-    return tlp + sum(ldj_fn(state_parts, event_ndims))
+    return tlp + ldj_fn(state_parts, event_ndims)
   return transformed_log_prob_fn
 
 
@@ -131,16 +152,17 @@ def _update_target_log_prob(kernel, new_target_log_prob):
   """Replaces `target_log_prob_fn` of outermost `inner_kernel` of `kernel`."""
   kernel_stack = _make_kernel_stack(kernel)
   # Update to target_log_prob to `new_target_log_prob`.
-  prev_kernel = kernel_stack.pop().copy(target_log_prob_fn=new_target_log_prob)
+  with deprecation.silence():
+    prev_kernel = kernel_stack.pop().copy(
+        target_log_prob_fn=new_target_log_prob)
 
-  # Propagate the change upwards by reconstructing wrapper kernels.
-  while kernel_stack:
-    curr_kernel = kernel_stack.pop()
-    with deprecation.silence():
+    # Propagate the change upwards by reconstructing wrapper kernels.
+    while kernel_stack:
+      curr_kernel = kernel_stack.pop()
       updated_kernel = type(prev_kernel)(**prev_kernel.parameters)
       curr_kernel = curr_kernel.copy(inner_kernel=updated_kernel)
-    prev_kernel = curr_kernel
-  return prev_kernel
+      prev_kernel = curr_kernel
+    return prev_kernel
 
 
 class TransformedTransitionKernel(kernel_base.TransitionKernel):
@@ -377,8 +399,9 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
     with tf.name_scope(mcmc_util.make_name(
         self.name, 'transformed_kernel', 'one_step')):
       inner_kwargs = {} if seed is None else dict(seed=seed)
+      transformed_prev_state = previous_kernel_results.transformed_state
       transformed_next_state, kernel_results = self._inner_kernel.one_step(
-          previous_kernel_results.transformed_state,
+          transformed_prev_state,
           previous_kernel_results.inner_results,
           **inner_kwargs)
       transformed_next_state_parts = (
@@ -390,6 +413,9 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
       next_state = (
           next_state_parts if mcmc_util.is_list_like(transformed_next_state)
           else next_state_parts[0])
+      if mcmc_util.is_list_like(transformed_prev_state):
+        transformed_next_state = tf.nest.pack_sequence_as(
+            transformed_prev_state, transformed_next_state)
       kernel_results = TransformedTransitionKernelResults(
           transformed_state=transformed_next_state,
           inner_results=kernel_results)
@@ -452,14 +478,15 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
         transformed_init_state_parts = (
             self._transform_target_support_to_unconstrained(init_state_parts))
         transformed_init_state = (
-            transformed_init_state_parts if mcmc_util.is_list_like(init_state)
+            tf.nest.pack_sequence_as(init_state, transformed_init_state_parts)
+            if mcmc_util.is_list_like(init_state)
             else transformed_init_state_parts[0])
       else:
         if mcmc_util.is_list_like(transformed_init_state):
-          transformed_init_state = [
-              tf.convert_to_tensor(s, name='transformed_init_state')
-              for s in transformed_init_state
-          ]
+          transformed_init_state = tf.nest.pack_sequence_as(
+              transformed_init_state,
+              [tf.convert_to_tensor(s, name='transformed_init_state')
+               for s in transformed_init_state])
         else:
           transformed_init_state = tf.convert_to_tensor(
               value=transformed_init_state, name='transformed_init_state')

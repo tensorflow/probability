@@ -328,6 +328,10 @@ class FFJORD(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _solve_ode(self, ode_fn, state):
     """Solves the initial value problem defined by `ode_fn`.
 

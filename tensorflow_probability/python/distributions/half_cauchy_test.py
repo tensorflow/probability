@@ -507,7 +507,7 @@ class _HalfCauchyTest(object):
   def testSupportBijectorOutsideRange(self):
     dist = tfd.HalfCauchy(loc=[-3., 2., 5.4], scale=2., validate_args=True)
     with self.assertRaisesOpError('must be greater than or equal to 0'):
-      self.evaluate(dist._experimental_default_event_space_bijector().inverse(
+      self.evaluate(dist.experimental_default_event_space_bijector().inverse(
           [-4.2, 2. - 1e-6, 5.1]))
 
 

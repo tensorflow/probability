@@ -83,9 +83,9 @@ class HalfNormalTest(test_util.TestCase):
     self._testParamStaticShapes(tf.TensorShape(sample_shape), sample_shape)
 
   def testHalfNormalLogPDF(self):
-    batch_size = 6
-    scale = tf.constant([3.0] * batch_size)
-    x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], dtype=np.float32)
+
+    x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0, 60.], dtype=np.float32)
+    scale = tf.constant([3.0] * len(x))
     halfnorm = tfd.HalfNormal(scale=scale, validate_args=False)
 
     log_pdf = halfnorm.log_prob(x)
@@ -326,7 +326,7 @@ class HalfNormalTest(test_util.TestCase):
     kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
 
     kl_, kl_sample_ = self.evaluate([kl, kl_sample])
-    self.assertAllEqual(true_kl, kl_)
+    self.assertAllClose(true_kl, kl_, atol=2e-15)
     self.assertAllClose(true_kl, kl_sample_, atol=0., rtol=5e-2)
 
     zero_kl = tfd.kl_divergence(a, a)
@@ -361,7 +361,7 @@ class HalfNormalTest(test_util.TestCase):
   def testSupportBijectorOutsideRange(self):
     dist = tfd.HalfNormal(scale=[3.1, 2., 5.4], validate_args=True)
     x = np.array([-4.2, -1e-6, -1.3])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

@@ -18,14 +18,21 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
+
 # Dependency imports
 
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+
+tfb = tfp.bijectors
+tfd = tfp.distributions
+
+
+JAX_MODE = False
 
 
 @test_util.test_all_tf_execution_regimes
@@ -84,8 +91,7 @@ class SampleDistributionTest(test_util.TestCase):
   def test_transformed_affine(self):
     sample_shape = 3
     mvn = tfd.Independent(tfd.Normal(loc=[0., 0], scale=1), 1)
-    aff = tfb.Affine(scale_tril=[[0.75, 0.],
-                                 [0.05, 0.5]])
+    aff = tfb.ScaleMatvecTriL(scale_tril=[[0.75, 0.], [0.05, 0.5]])
 
     def expected_lp(y):
       x = aff.inverse(y)  # Ie, tf.random.normal([4, 3, 2])
@@ -266,6 +272,245 @@ class SampleDistributionTest(test_util.TestCase):
       self.evaluate([v.initializer for v in dist.trainable_variables])
       self.evaluate(dist.mean())
 
+  def test_broadcast_event(self):
+    d = tfd.Sample(tfd.Normal(0, 1, validate_args=True), 4, validate_args=True)
+    # Batch of 2 events: works.
+    two_batch = d.log_prob(tf.zeros([2, 4]))
+    self.assertEqual((2,), self.evaluate(two_batch).shape)
+    # Broadcast of event: works.
+    self.assertAllEqual(two_batch, d.log_prob(tf.zeros([2, 1])))
+
+  def test_misshapen_event(self):
+    d = tfd.Sample(tfd.Normal(0, 1, validate_args=True), 4, validate_args=True)
+    with self.assertRaisesRegexp(ValueError,
+                                 r'Incompatible shapes for broadcasting'):
+      self.evaluate(d.log_prob(tf.zeros([3])))
+
+  def test_bijector_shapes(self):
+    d = tfd.Sample(tfd.Uniform(tf.zeros([5]), 1.), 2)
+    b = d.experimental_default_event_space_bijector()
+    self.assertEqual((2,), d.event_shape)
+    self.assertEqual((2,), b.inverse_event_shape((2,)))
+    self.assertEqual((2,), b.forward_event_shape((2,)))
+    self.assertEqual((5, 2), b.forward_event_shape((5, 2)))
+    self.assertEqual((5, 2), b.inverse_event_shape((5, 2)))
+    self.assertEqual((3, 5, 2), b.inverse_event_shape((3, 5, 2)))
+    self.assertEqual((3, 5, 2), b.forward_event_shape((3, 5, 2)))
+
+    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), 2)
+    b = d.experimental_default_event_space_bijector()
+    self.assertEqual((2, 4, 4), d.event_shape)
+    dim = (4 * 3) // 2
+    self.assertEqual((5, 2, dim), b.inverse_event_shape((5, 2, 4, 4)))
+    self.assertEqual((5, 2, 4, 4), b.forward_event_shape((5, 2, dim)))
+    self.assertEqual((3, 5, 2, dim), b.inverse_event_shape((3, 5, 2, 4, 4)))
+    self.assertEqual((3, 5, 2, 4, 4), b.forward_event_shape((3, 5, 2, dim)))
+
+  def test_bijector_uniform(self):
+    d = tfd.Sample(tfd.Uniform(tf.zeros([5]), 1.), 2)
+    b = d.experimental_default_event_space_bijector()
+    # This line used to raise:
+    # InvalidArgumentError: Incompatible shapes: [5] vs. [5,2] [Op:Mul]
+    self.evaluate(b.forward(0.5 * tf.ones([5, 2])))
+    # This line used to raise:
+    # InvalidArgumentError: Incompatible shapes: [5,2] vs. [5] [Op:Sub]
+    self.evaluate(b.inverse(d.sample(seed=test_util.test_seed())))
+    nchains = 3
+    # This line used to raise:
+    # InvalidArgumentError: Incompatible shapes: [3,5,2] vs. [5] [Op:Sub]
+    self.evaluate(b.inverse(d.sample(nchains, seed=test_util.test_seed())))
+
+    init = tf.random.uniform(
+        (nchains,) + d.batch_shape + b.inverse_event_shape(d.event_shape),
+        minval=-2.,
+        maxval=2.,
+        seed=test_util.test_seed())
+    # This line used to raise:
+    # InvalidArgumentError: Incompatible shapes: [5] vs. [3,5,2] [Op:Mul]
+    self.evaluate(b.forward(init))
+    self.assertEqual((nchains,) + d.batch_shape,
+                     self.evaluate(d.log_prob(b.forward(init))).shape)
+
+  def test_bijector_cholesky_lkj(self):
+    # Let's try with a shape-shifting underlying bijector vec=>mat.
+    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), 2)
+    b = d.experimental_default_event_space_bijector()
+    y = self.evaluate(d.sample(seed=test_util.test_seed()))
+    x = b.inverse(y) + 0
+    self.assertAllClose(y, b.forward(x))
+    y = self.evaluate(d.sample(7, seed=test_util.test_seed()))
+    x = b.inverse(y) + 0
+    self.assertAllClose(y, b.forward(x))
+    d2 = tfd.Independent(tfd.CholeskyLKJ(4, concentration=tf.ones([5, 2])),
+                         reinterpreted_batch_ndims=1)
+    b2 = d2.experimental_default_event_space_bijector()
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x, event_ndims=len([2, 6])),
+        b.forward_log_det_jacobian(x, event_ndims=len([2, 6])))
+    x_sliced = x[..., :1, :]
+    x_bcast = tf.concat([x_sliced, x_sliced], axis=-2)
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x_bcast, event_ndims=len([2, 6])),
+        b.forward_log_det_jacobian(x_sliced, event_ndims=len([1, 6])))
+    # Should this test pass? Right now, Independent's default bijector does not
+    # broadcast the LDJ to match underlying batch shape.
+    # self.assertAllClose(
+    #     b2.forward_log_det_jacobian(x_sliced, event_ndims=len([1, 6])),
+    #     b.forward_log_det_jacobian(x_bcast, event_ndims=len([2, 6])))
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y, event_ndims=len([2, 4, 4])),
+        b.inverse_log_det_jacobian(y, event_ndims=len([2, 4, 4])))
+    y_sliced = y[..., :1, :, :]
+    y_bcast = tf.concat([y_sliced, y_sliced], axis=-3)
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y_bcast, event_ndims=len([2, 4, 4])),
+        b.inverse_log_det_jacobian(y_sliced, event_ndims=len([1, 4, 4])))
+    # Should this test pass? Right now, Independent's default bijector does not
+    # broadcast the LDJ to match underlying batch shape.
+    # self.assertAllClose(
+    #     b2.inverse_log_det_jacobian(y_sliced, event_ndims=len([1, 4, 4])),
+    #     b.inverse_log_det_jacobian(y_bcast, event_ndims=len([2, 4, 4])))
+    self.assertAllClose(
+        b.forward_log_det_jacobian(x_sliced, event_ndims=len([2, 6])),
+        -b.inverse_log_det_jacobian(y_bcast, event_ndims=len([2, 4, 4])),
+        rtol=1e-5)
+
+    # Now, with another sample shape.
+    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5])), [2, 7])
+    b = d.experimental_default_event_space_bijector()
+    y = self.evaluate(d.sample(11, seed=test_util.test_seed()))
+    x = b.inverse(y) + 0
+    self.assertAllClose(y, b.forward(x))
+    d2 = tfd.Independent(tfd.CholeskyLKJ(4, concentration=tf.ones([5, 2, 7])),
+                         reinterpreted_batch_ndims=2)
+    b2 = d2.experimental_default_event_space_bijector()
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x, event_ndims=len([2, 7, 6])),
+        b.forward_log_det_jacobian(x, event_ndims=len([2, 7, 6])))
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y, event_ndims=len([2, 7, 4, 4])),
+        b.inverse_log_det_jacobian(y, event_ndims=len([2, 7, 4, 4])))
+
+    # Now, with another batch shape.
+    d = tfd.Sample(tfd.CholeskyLKJ(4, concentration=tf.ones([5, 7])), 2)
+    b = d.experimental_default_event_space_bijector()
+    y = self.evaluate(d.sample(11, seed=test_util.test_seed()))
+    x = b.inverse(y) + 0
+    self.assertAllClose(y, b.forward(x))
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x, event_ndims=len([2, 7, 6])),
+        b.forward_log_det_jacobian(x, event_ndims=len([2, 7, 6])))
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y, event_ndims=len([2, 7, 4, 4])),
+        b.inverse_log_det_jacobian(y, event_ndims=len([2, 7, 4, 4])))
+
+    # Also verify it properly handles an extra "event" dim.
+    self.assertAllClose(
+        b2.forward_log_det_jacobian(x, event_ndims=len([5, 2, 7, 6])),
+        b.forward_log_det_jacobian(x, event_ndims=len([5, 2, 7, 6])))
+    self.assertAllClose(
+        b2.inverse_log_det_jacobian(y, event_ndims=len([5, 2, 7, 4, 4])),
+        b.inverse_log_det_jacobian(y, event_ndims=len([5, 2, 7, 4, 4])))
+
+  def test_bijector_scalar_underlying_ildj(self):
+    d = tfd.Normal(0., 1.)  # Uses Identity bijector, ildj=0.
+    bij = tfd.Sample(d, [1]).experimental_default_event_space_bijector()
+    ildj = bij.inverse_log_det_jacobian(tf.zeros([1, 1]), event_ndims=1)
+    self.assertAllEqual(0., ildj)
+    ildj = bij.inverse_log_det_jacobian(tf.zeros([1, 1]), event_ndims=2)
+    self.assertAllEqual(0., ildj)
+
+  def test_bijector_constant_underlying_ildj(self):
+    d = tfb.Scale([2., 3.])(tfd.Normal([0., 0.], 1.))
+    bij = tfd.Sample(d, [3]).experimental_default_event_space_bijector()
+    ildj = bij.inverse_log_det_jacobian(tf.zeros([2, 3]), event_ndims=1)
+    self.assertAllClose(-np.log([2., 3.]) * 3, ildj)
+    ildj = bij.inverse_log_det_jacobian(tf.zeros([2, 3]), event_ndims=2)
+    self.assertAllClose(-np.log([2., 3.]).sum() * 3, ildj)
+
+  @parameterized.named_parameters(dict(testcase_name=''),
+                                  dict(testcase_name='_jit', jit=True))
+  def test_kahan_precision(self, jit=False):
+    maybe_jit = lambda f: f
+    if jit:
+      self.skip_if_no_xla()
+      maybe_jit = tf.function(jit_compile=True)
+    stream = test_util.test_seed_stream()
+    n = 20_000
+    samps = tfd.Poisson(rate=1.).sample(n, seed=stream())
+    log_rate = tfd.Normal(0, .2).sample(seed=stream())
+    pois = tfd.Poisson(log_rate=log_rate)
+    lp = maybe_jit(
+        tfd.Sample(pois, n, experimental_use_kahan_sum=True).log_prob)(samps)
+    pois64 = tfd.Poisson(log_rate=tf.cast(log_rate, tf.float64))
+    lp64 = tfd.Sample(pois64, n).log_prob(tf.cast(samps, tf.float64))
+    # Evaluate together to ensure we use the same samples.
+    lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
+    # Fails 75% CPU, 0-80% GPU --vary_seed runs w/o experimental_use_kahan_sum.
+    self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+
+  def testLargeLogProbDiffScalarUnderlying(self):
+    shp = [25, 200]
+    d0 = tfd.Sample(tfd.Normal(0., .1), shp)
+    d1 = tfd.Sample(tfd.Normal(1e-5, .1), shp)
+    strm = test_util.test_seed_stream()
+    x0 = self.evaluate(  # overdispersed
+        tfd.Normal(0, 2).sample(shp, seed=strm()))
+    x1 = self.evaluate(  # overdispersed, perturbed
+        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = d0.copy(distribution=tfd.Normal(
+        tf.cast(d0.distribution.loc, tf.float64),
+        tf.cast(d0.distribution.scale, tf.float64)))
+    d1_64 = d1.copy(distribution=tfd.Normal(
+        tf.cast(d1.distribution.loc, tf.float64),
+        tf.cast(d1.distribution.scale, tf.float64)))
+    oracle_64 = tf.reduce_sum(
+        d0_64.distribution.log_prob(tf.cast(x0, tf.float64)) -
+        d1_64.distribution.log_prob(tf.cast(x1, tf.float64)))
+    self.assertAllClose(
+        oracle_64,
+        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0., atol=0.007)
+    # In contrast: below fails with errors of ~0.07 - 0.15
+    # self.assertAllClose(
+    #     oracle_64, d0.log_prob(x0) - d1.log_prob(x1), rtol=0., atol=0.007)
+
+  def testLargeLogProbDiffBatchOfVecUnderlying(self):
+    nsamp = 5
+    nbatch = 3
+    nevt = 250
+    dim = 500
+    d0 = tfd.Sample(tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 0.),
+                                               tf.fill([dim], .1)),
+                    sample_shape=nevt)
+    self.assertEqual(tf.float32, d0.dtype)
+    d1 = tfd.Sample(tfd.MultivariateNormalDiag(tf.fill([nbatch, dim], 1e-5),
+                                               d0.distribution.scale.diag),
+                    sample_shape=nevt)
+    strm = test_util.test_seed_stream()
+    x0 = self.evaluate(  # overdispersed
+        tfd.Normal(0, 2).sample([nsamp, nbatch, nevt, dim], seed=strm()))
+    x1 = self.evaluate(  # overdispersed + perturbed
+        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = d0.copy(distribution=tfd.MultivariateNormalDiag(
+        tf.cast(d0.distribution.loc, tf.float64),
+        tf.cast(d0.distribution.scale.diag, tf.float64)))
+    d1_64 = d1.copy(distribution=tfd.MultivariateNormalDiag(
+        tf.cast(d1.distribution.loc, tf.float64),
+        tf.cast(d1.distribution.scale.diag, tf.float64)))
+    oracle_64 = (d0_64.log_prob(tf.cast(x0, tf.float64)) -
+                 d1_64.log_prob(tf.cast(x1, tf.float64)))
+    self.assertNotAllZero(d0.log_prob(x0) < -10_000_000)
+    self.assertAllClose(
+        oracle_64,
+        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0., atol=0.045)
+    # In contrast, the following fails w/ abs errors of ~5. to 10.
+    # self.assertAllClose(
+    #     oracle_64, d0.log_prob(x0) - d1.log_prob(x1), rtol=0., atol=0.045)
+
 
 if __name__ == '__main__':
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
+  os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()

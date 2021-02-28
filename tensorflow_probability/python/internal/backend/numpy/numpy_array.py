@@ -231,7 +231,8 @@ def _one_hot(  # pylint: disable=unused-argument
 
 
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
-  return np.ones_like(input, dtype=utils.numpy_dtype(dtype))
+  return np.ones_like(ops.convert_to_tensor(input),
+                      dtype=utils.numpy_dtype(dtype))
 
 
 # TODO(b/136555907): Add unit-test.
@@ -328,6 +329,11 @@ builtin_slice = slice  # pylint: disable=invalid-name
 
 
 def _slice(input_, begin, size, name=None):  # pylint: disable=unused-argument,redefined-outer-name
+  if JAX_MODE:
+    input_ = np.asarray(input_)
+    size = [dim_size - start if size == -1 else size
+            for (size, start, dim_size) in zip(size, begin, input_.shape)]
+    return jax.lax.dynamic_slice(input_, begin, size)
   slices = tuple(
       builtin_slice(b, b + s if s != -1 else None) for b, s in zip(begin, size))
   return input_[slices]
@@ -335,6 +341,9 @@ def _slice(input_, begin, size, name=None):  # pylint: disable=unused-argument,r
 
 def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint: disable=unused-argument
   """Map tf.split -> np.split."""
+  if np.isscalar(num_or_size_splits):
+    return np.split(value, num_or_size_splits, axis)
+
   indices_or_sections = onp.array(num_or_size_splits)
   if indices_or_sections.ndim == 1:
     if any(idx == -1 for idx in indices_or_sections):
@@ -379,7 +388,7 @@ expand_dims = utils.copy_docstring(
 
 fill = utils.copy_docstring(
     'tf.fill',
-    lambda dims, value, name=None: np.full(dims, value))
+    lambda dims, value, name=None: np.full(dims, ops.convert_to_tensor(value)))
 
 gather = utils.copy_docstring(
     'tf.gather',

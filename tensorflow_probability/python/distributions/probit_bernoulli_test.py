@@ -199,8 +199,8 @@ class ProbitBernoulliTest(test_util.TestCase):
 
   def testBoundaryConditions(self):
     dist = tfd.ProbitBernoulli(probs=1.0, validate_args=True)
-    self.assertAllClose(np.nan, self.evaluate(dist.log_prob(0)))
-    self.assertAllClose([np.nan], [self.evaluate(dist.log_prob(1))])
+    self.assertAllClose(-np.inf, self.evaluate(dist.log_prob(0)))
+    self.assertAllClose([0], [self.evaluate(dist.log_prob(1))])
 
   def testEntropyNoBatch(self):
     p = 0.2

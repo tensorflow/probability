@@ -22,7 +22,7 @@ import collections
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.experimental.mcmc import sample
+from tensorflow_probability.python.experimental.mcmc import step
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -112,7 +112,7 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     """
     with tf.name_scope(
         mcmc_util.make_name(self.name, 'sample_discarding_kernel', 'one_step')):
-      new_chain_state, inner_kernel_results = sample.step_kernel(
+      new_chain_state, inner_kernel_results = step.step_kernel(
           num_steps=self._num_samples_to_skip(
               previous_kernel_results.call_counter
           ) + 1,
@@ -127,12 +127,14 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
       )
       return new_chain_state, new_kernel_results
 
-  def bootstrap_results(self, init_state):
+  def bootstrap_results(self, init_state, inner_results=None):
     """Instantiates a new kernel state with no calls.
 
     Args:
       init_state: `Tensor` or Python `list` of `Tensor`s representing the
         state(s) of the Markov chain(s).
+      inner_results: Optional results tuple for the inner kernel.  Will be
+        re-bootstrapped if omitted.
 
     Returns:
       kernel_results: `collections.namedtuple` of `Tensor`s representing
@@ -141,9 +143,10 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     with tf.name_scope(
         mcmc_util.make_name(
             self.name, 'sample_discarding_kernel', 'bootstrap_results')):
+      if inner_results is None:
+        inner_results = self.inner_kernel.bootstrap_results(init_state)
       return SampleDiscardingKernelResults(
-          tf.zeros((), dtype=tf.int32),
-          self.inner_kernel.bootstrap_results(init_state))
+          tf.zeros((), dtype=tf.int32), inner_results)
 
   @property
   def is_calibrated(self):

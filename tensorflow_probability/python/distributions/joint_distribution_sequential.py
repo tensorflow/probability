@@ -501,6 +501,8 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         dfn.append(_sliced_maker(d))
     return self.copy(model=self._model_unflatten(dfn))
 
+  _composite_tensor_nonshape_params = ('model',)
+
 
 def _unify_call_signature(i, dist_fn):
   """Creates `dist_fn_wrapped` which calls `dist_fn` with all prev nodes.

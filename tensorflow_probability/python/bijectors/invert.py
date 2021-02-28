@@ -81,6 +81,10 @@ class Invert(bijector_lib.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def forward_event_shape(self, input_shape):
     return self.bijector.inverse_event_shape(input_shape)
 
@@ -97,6 +101,10 @@ class Invert(bijector_lib.Bijector):
   def bijector(self):
     return self._bijector
 
+  @property
+  def _is_permutation(self):
+    return self.bijector._is_permutation  # pylint: disable=protected-access
+
   def _internal_is_increasing(self, **kwargs):
     return self.bijector._internal_is_increasing(**kwargs)  # pylint: disable=protected-access
 
@@ -112,8 +120,14 @@ class Invert(bijector_lib.Bijector):
   def forward_log_det_jacobian(self, x, event_ndims, **kwargs):
     return self.bijector.inverse_log_det_jacobian(x, event_ndims, **kwargs)
 
-  def forward_dtype(self, dtype, **kwargs):
+  def forward_dtype(self, dtype=bijector_lib.UNSPECIFIED, **kwargs):
     return self.bijector.inverse_dtype(dtype, **kwargs)
 
-  def inverse_dtype(self, dtype, **kwargs):
+  def inverse_dtype(self, dtype=bijector_lib.UNSPECIFIED, **kwargs):
     return self.bijector.forward_dtype(dtype, **kwargs)
+
+  def inverse_event_ndims(self, event_ndims, **kwargs):
+    return self.bijector.forward_event_ndims(event_ndims, **kwargs)
+
+  def forward_event_ndims(self, event_ndims, **kwargs):
+    return self.bijector.inverse_event_ndims(event_ndims, **kwargs)

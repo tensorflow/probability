@@ -21,13 +21,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import variadic_reduce
 from tensorflow_probability.python.math.scan_associative import scan_associative
 
 
@@ -38,12 +41,14 @@ __all__ = [
     'log_combinations',
     'log_cumsum_exp',
     'log1mexp',
+    'reduce_kahan_sum',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
     'smootherstep',
     'soft_sorting_matrix',
     'soft_threshold',
     'softplus_inverse',
+    'sqrt1pm1',
 ]
 
 
@@ -116,6 +121,96 @@ def log_cumsum_exp(x, axis=-1, name=None):
                                     dest_idx=axis)
 
 
+def _kahan_reduction(x, y):
+  """Implements the Kahan summation reduction."""
+  (s, c), (s1, c1) = x, y
+  for val in -c1, s1:
+    u = val - c
+    t = s + u
+    # TODO(b/173158845): XLA:CPU reassociates-to-zero the correction term.
+    c = (t - s) - u
+    s = t
+  return s, c
+
+
+def _kahan_reduce_bwd(aux, grads):
+  operands, inits, axis, unsqueezed_shape = aux
+  del inits, axis  # unused
+  return (tf.broadcast_to(tf.reshape(grads[0], unsqueezed_shape),
+                          ps.shape(operands[0])),
+          None)
+
+
+def _kahan_reduce_tangents(inits, axis, primals, tangents):
+  del inits, primals  # unused
+  doperands, = tangents
+  reduced_tangent = tf.reduce_sum(doperands[0], axis)
+  return (reduced_tangent, tf.zeros_like(reduced_tangent))
+
+
+_reduce_kahan_sum = variadic_reduce.make_variadic_reduce(
+    _kahan_reduction, _kahan_reduce_bwd, _kahan_reduce_tangents)
+
+
+class Kahan(collections.namedtuple('Kahan', ['total', 'correction'])):
+  """Result of Kahan summation, i.e. `sum = total - correction`."""
+  __slots__ = ()
+
+  def __add__(self, x):
+    return Kahan._make(_kahan_reduction(
+        self, x if isinstance(x, Kahan) else (x, 0)))
+
+  def __radd__(self, x):
+    return Kahan._make(_kahan_reduction(
+        self, x if isinstance(x, Kahan) else (x, 0)))
+
+  def __neg__(self):
+    return Kahan(-self.total, -self.correction)
+
+  def __sub__(self, y):
+    return Kahan._make(_kahan_reduction(
+        self, -y if isinstance(y, Kahan) else (-y, 0)))
+
+  def __rsub__(self, x):
+    return Kahan._make(_kahan_reduction(
+        x if isinstance(x, Kahan) else (x, 0), -self))
+
+
+def reduce_kahan_sum(input_tensor, axis=None, keepdims=False, name=None):
+  """Reduces the input tensor along the given axis using Kahan summation.
+
+  Returns both the total and the correction term, as a `namedtuple`, so that a
+  more accurate sum may be written as `total - correction`.
+
+  A practical use-case is computing the difference of two large (magnitude) sums
+  we expect to be nearly equal. If instead we take their difference as
+  `(s0.total - s1.total) - (s0.correction - s1.correction)`, we can retain more
+  precision in computing their difference.
+
+  Note: (TF + JAX) This function does not work properly on XLA:CPU without the
+  environment variable: `XLA_FLAGS=--xla_cpu_enable_fast_math=false`, due to
+  LLVM's reassociation optimizations, which simplify error terms to zero.
+
+  Args:
+    input_tensor: The tensor to sum.
+    axis: One of `None`, a Python `int`, or a sequence of Python `int`. The axes
+      to be reduced. `None` is taken as "reduce all axes".
+    keepdims: Python `bool` indicating whether we return a tensor with singleton
+      dimensions in the reduced axes (`True`), or squeeze the axes out (default,
+      `False`).
+    name: Optional name for ops in scope.
+
+  Returns:
+    reduced: A `Kahan(total, correction)` namedtuple.
+  """
+  with tf.name_scope(name or 'reduce_kahan_sum'):
+    t = tf.convert_to_tensor(input_tensor)
+    operands = (t, tf.zeros_like(t))
+    inits = (tf.zeros([], dtype=t.dtype),) * 2
+    return Kahan._make(
+        _reduce_kahan_sum(operands, inits, axis=axis, keepdims=keepdims))
+
+
 def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
   """Computes `log(mean(exp(input_tensor)))`.
 
@@ -146,7 +241,7 @@ def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
   """
   with tf.name_scope(name or 'reduce_logmeanexp'):
     lse = tf.reduce_logsumexp(input_tensor, axis=axis, keepdims=keepdims)
-    n = prefer_static.size(input_tensor) // prefer_static.size(lse)
+    n = ps.size(input_tensor) // ps.size(lse)
     log_n = tf.math.log(tf.cast(n, lse.dtype))
     return lse - log_n
 
@@ -243,6 +338,41 @@ def reduce_weighted_logsumexp(logx,
     if return_sign:
       return lswe, sgn
     return lswe
+
+
+def reduce_log_harmonic_mean_exp(input_tensor,
+                                 axis=None,
+                                 keepdims=False,
+                                 name=None):
+  """Computes `log(1 / mean(1 / exp(input_tensor)))`.
+
+  Reduces `input_tensor` along the dimensions given in `axis`.  Unless
+  `keepdims` is true, the rank of the tensor is reduced by 1 for each entry in
+  `axis`. If `keepdims` is true, the reduced dimensions are retained with length
+  1.
+
+  If `axis` has no entries, all dimensions are reduced, and a tensor with a
+  single element is returned.
+
+  This function is more numerically stable than `log(1 / mean(1 - exp(input)))`.
+  It avoids overflows caused by taking the exp of large inputs and underflows
+  caused by taking the log of small inputs.
+
+  Args:
+    input_tensor: The tensor to reduce. Should have numeric type.
+    axis: The dimensions to reduce. If `None` (the default), reduces all
+      dimensions. Must be in the range `[-rank(input_tensor),
+      rank(input_tensor))`.
+    keepdims:  Boolean.  Whether to keep the axis as singleton dimensions.
+      Default value: `False` (i.e., squeeze the reduced dimensions).
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'reduce_log_harmonic_mean_exp'`).
+
+  Returns:
+    log_mean_exp: The reduced tensor.
+  """
+  with tf.name_scope(name or 'reduce_log_harmonic_mean_exp'):
+    return -reduce_logmeanexp(-input_tensor, axis=axis, keepdims=keepdims)
 
 
 def soft_threshold(x, threshold, name=None):
@@ -495,7 +625,7 @@ def log_sub_exp(x, y, return_sign=False, name=None):
 
 
 def log1mexp(x, name=None):
-  """Compute `log(1 - exp(-|x|))` in a numerically stable way.
+  """Compute `log(1 - exp(-|x|))` elementwise in a numerically stable way.
 
   Args:
     x: Float `Tensor`.
@@ -503,7 +633,7 @@ def log1mexp(x, name=None):
       Default value: `None` (i.e., `'log1mexp'`).
 
   Returns:
-    log1mexp: Float `Tensor` of `log1mexp(a)`.
+    log1mexp: Float `Tensor` of `log1mexp(x)`.
 
   #### References
 
@@ -519,6 +649,29 @@ def log1mexp(x, name=None):
         # This switching point is recommended in [1].
         x < np.log(2), tf.math.log(-tf.math.expm1(-x)),
         tf.math.log1p(-tf.math.exp(-x)))
+
+
+def sqrt1pm1(x):
+  """Compute `sqrt(x + 1) - 1` elementwise in a numerically stable way.
+
+  Args:
+    x: Float `Tensor`.
+
+  Returns:
+    sqrt1pm1: Float `Tensor` of `sqrt1pm1(x)`.
+  """
+  # We follow Boost
+  # https://www.boost.org/doc/libs/1_49_0/libs/math/doc/sf_and_dist/html/math_toolkit/special/powers/sqrt1pm1.html
+  # and compute expm1(0.5 * log1p(x)).
+  #
+  # We can also derive an alternative formula by multiplying and
+  # dividing by sqrt(x + 1) + 1:
+  #   sqrt(x + 1) - 1 = (x + 1 - 1) / (sqrt(x + 1) + 1)
+  #                   = x / (sqrt(x + 1) + 1)
+  # The latter form is well-conditioned everywhere, and in particular
+  # does not experience catastrophic cancellation when x ~ 0.  However,
+  # without where-gating, it emits `nan` when x is `+inf`.
+  return tf.math.expm1(0.5 * tf.math.log1p(x))
 
 
 def _log_cosh_impl(x):

@@ -61,6 +61,12 @@ def hypothesis_max_examples(default=None):
   return int(os.environ.get('TFP_HYPOTHESIS_MAX_EXAMPLES', default or 20))
 
 
+def hypothesis_timeout():
+  # Use --test_env=TFP_HYPOTHESIS_TIMEOUT_SECS=600 to permit longer runs,
+  # ergo deeper exploration of the search tree.
+  return int(os.environ.get('TFP_HYPOTHESIS_TIMEOUT_SECS', 60))
+
+
 def hypothesis_reproduction_seed():
   # Use --test_env=TFP_HYPOTHESIS_REPRODUCE=hexjunk to reproduce a failure.
   return os.environ.get('TFP_HYPOTHESIS_REPRODUCE', None)
@@ -92,14 +98,21 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
       deadline=None,
       suppress_health_check=[hp.HealthCheck.too_slow],
       max_examples=hypothesis_max_examples(default=default_max_examples),
+      timeout=hypothesis_timeout(),
       print_blob=hp.PrintSettings.ALWAYS)
   kwds.update(kwargs)
   def decorator(test_method):
-    seed = hypothesis_reproduction_seed()
-    if seed is not None:
+    repro_seed = hypothesis_reproduction_seed()
+    if repro_seed is not None:
       # This implements the semantics of TFP_HYPOTHESIS_REPRODUCE via
       # the `hp.reproduce_failure` decorator.
-      test_method = hp.reproduce_failure('3.56.5', seed)(test_method)
+      test_method = hp.reproduce_failure('3.56.5', repro_seed)(test_method)
+    elif randomize_hypothesis():
+      # Hypothesis defaults to seeding its internal PRNG from the system time,
+      # so since we actually want randomization (including across machines) we
+      # have to force it.
+      entropy = os.urandom(64)
+      test_method = hp.seed(int.from_bytes(entropy, 'big'))(test_method)
     return hp.settings(**kwds)(test_method)
   return decorator
 
@@ -422,6 +435,7 @@ def broadcasting_params(draw,
                         enable_vars=False,
                         constraint_fn_for=lambda param: identity_fn,
                         mutex_params=(),
+                        param_strategy_fn=None,
                         dtype=np.float32):
   """Streategy for drawing parameters which jointly have the given batch shape.
 
@@ -454,6 +468,10 @@ def broadcasting_params(draw,
       mutually exclusive parameters (e.g., the 'probs' and 'logits' of a
       Categorical).  At most one parameter from each set will appear in the
       result.
+    param_strategy_fn: Optional callable with signature
+      `strategy = param_strategy_fn(shape, dtype, constraint_fn)`. If provided,
+      overrides the default strategy for generating float-valued parameters.
+      Default value: `constrained_tensors`.
     dtype: Dtype for generated parameters.
 
   Returns:
@@ -466,6 +484,8 @@ def broadcasting_params(draw,
   """
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
+  if param_strategy_fn is None:
+    param_strategy_fn = constrained_tensors
 
   params_event_ndims = params_event_ndims or {}
   remaining_params = set(params_event_ndims.keys())
@@ -491,12 +511,14 @@ def broadcasting_params(draw,
     hp.assume(len(param_shape) < 6)
 
     # TODO(axch): Can I replace `params_event_ndims` and `constraint_fn_for`
-    # with a map from params to `Suppport`s, and use `tensors_in_support` here
-    # instead of this explicit `constrained_tensors` function?
-    param_strategy = constrained_tensors(
-        constraint_fn_for(param), param_shape, dtype=dtype)
-    params_kwargs[param] = draw(maybe_variable(
-        param_strategy, enable_vars=enable_vars, dtype=dtype, name=param))
+    # with a map from params to `Suppport`s, and use `tensors_in_support` here?
+    param_strategy = param_strategy_fn(constraint_fn=constraint_fn_for(param),
+                                       shape=param_shape,
+                                       dtype=dtype)
+    params_kwargs[param] = draw(maybe_variable(param_strategy,
+                                               enable_vars=enable_vars,
+                                               dtype=dtype,
+                                               name=param))
   return params_kwargs
 
 
@@ -682,6 +704,11 @@ def no_tf_rank_errors():
   # have larger "event" shapes than the distribution itself.
   input_dims_pat = r'Unhandled input dimensions (8|9|[1-9][0-9]+)'
   input_rank_pat = r'inputs rank not in \[0,([6-9]|[1-9][0-9]+)\]'
+  is_not_implemented_pat = (r'is not implemented for tensors of '
+                            r'rank > (8|9|[1-9][0-9]+).')
+  does_not_work_pat = (r'does not work on tensors with '
+                       r'more than (8|9|[1-9][0-9]+) dimensions')
+  only_support_pat = r'only support up to 7 input dimensions'
   pat_1 = _rank_broadcasting_error_pattern(1, 6)
   pat_2 = _rank_broadcasting_error_pattern(6, 1)
   try:
@@ -699,6 +726,26 @@ def no_tf_rank_errors():
       hp.assume(False)
     elif re.search(input_rank_pat, msg):
       # We asked some TF op (PadV2?) to operate on a Tensor of rank >= 7.
+      hp.assume(False)
+    elif re.search(is_not_implemented_pat, msg):
+      # We asked some different TF op (ReverseV2?) to operate on a Tensor of
+      # rank >= 8.
+      hp.assume(False)
+    else:
+      raise
+  except tf.errors.InvalidArgumentError as e:
+    msg = str(e)
+    if re.search(only_support_pat, msg):
+      # We asked some TF op (Argmin/Argmax/...) to operate on a Tensor of
+      # rank >= 8.
+      hp.assume(False)
+    else:
+      raise
+  except ValueError as e:
+    msg = str(e)
+    if re.search(does_not_work_pat, msg):
+      # We asked some yet different TF op (ReverseV2 in graph mode?) to operate
+      # on a Tensor of rank >= 8.
       hp.assume(False)
     else:
       raise
@@ -721,6 +768,10 @@ def positive_definite(x):
       tf.matmul(x, x, transpose_b=True) +
       .1 * tf.linalg.eye(shp[-1], batch_shape=shp[:-2]))
   return symmetric(psd)
+
+
+def orthonormal(x):
+  return tf.linalg.qr(positive_definite(x)).q
 
 
 def lower_tril_positive_definite(x):

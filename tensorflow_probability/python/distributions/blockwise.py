@@ -328,7 +328,7 @@ class Blockwise(distribution_lib.Distribution):
     return self._flatten_and_concat_event(self._distribution.mean())
 
   def _default_event_space_bijector(self):
-    return self._distribution._experimental_default_event_space_bijector()  # pylint: disable=protected-access
+    return self._distribution.experimental_default_event_space_bijector()
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

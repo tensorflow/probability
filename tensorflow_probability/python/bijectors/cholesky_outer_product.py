@@ -26,6 +26,7 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -84,6 +85,10 @@ class CholeskyOuterProduct(bijector.Bijector):
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):
@@ -163,11 +168,11 @@ class CholeskyOuterProduct(bijector.Bijector):
           fldj = tf.squeeze(fldj, axis=-1)
         return fldj
 
-      shape = tf.shape(fldj)
-      maybe_squeeze_shape = tf.concat([
+      shape = ps.shape(fldj)
+      maybe_squeeze_shape = ps.concat([
           shape[:-1],
           distribution_util.pick_vector(
-              tf.equal(tf.rank(x), 2),
+              ps.equal(ps.rank(x), 2),
               np.array([], dtype=np.int32), shape[-1:])], 0)
       return tf.reshape(fldj, maybe_squeeze_shape)
 
@@ -208,4 +213,3 @@ class CholeskyOuterProduct(bijector.Bijector):
     is_positive_definite = assert_util.assert_positive(
         tf.linalg.diag_part(t), message="Input must be positive definite.")
     return [is_matrix, is_square, is_positive_definite]
-

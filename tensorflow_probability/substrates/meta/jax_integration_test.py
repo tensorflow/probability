@@ -67,6 +67,10 @@ class JaxIntegrationTest(absltest.TestCase):
     jax.jacfwd(f)(np.array([1, 2, 3.], np.float32))
     jax.jacfwd(vecf)(np.linspace(1, 3, 10).astype(np.float32))
 
+  def testVersion(self):
+    """Make sure tfp.__version__ is available to substrates."""
+    self.assertIsInstance(tfp.__version__, str)
+
 
 if __name__ == '__main__':
   absltest.main()

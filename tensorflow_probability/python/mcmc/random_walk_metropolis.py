@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import warnings
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
@@ -30,9 +29,6 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -41,12 +37,6 @@ __all__ = [
     'RandomWalkMetropolis',
     'UncalibratedRandomWalk',
 ]
-
-# Cause all warnings to always be triggered.
-# Not having this means subsequent calls wont trigger the warning.
-warnings.filterwarnings('always',
-                        module='tensorflow_probability.*random_walk_metropolis',
-                        append=True)  # Don't override user-set filters.
 
 
 class UncalibratedRandomWalkResults(
@@ -112,8 +102,7 @@ def random_walk_normal_fn(scale=1., name=None):
       if len(state_parts) != len(scales):
         raise ValueError('`scale` must broadcast with `state_parts`.')
 
-      part_seeds = samplers.split_seed(
-          seed, n=len(state_parts), salt='RandomWalkNormalFn')
+      part_seeds = samplers.split_seed(seed, n=len(state_parts))
       next_state_parts = [
           samplers.normal(  # pylint: disable=g-complex-comprehension
               mean=state_part,
@@ -175,8 +164,7 @@ def random_walk_uniform_fn(scale=1., name=None):
         scales *= len(state_parts)
       if len(state_parts) != len(scales):
         raise ValueError('`scale` must broadcast with `state_parts`.')
-      part_seeds = samplers.split_seed(
-          seed, n=len(state_parts), salt='RandomWalkUniformFn')
+      part_seeds = samplers.split_seed(seed, n=len(state_parts))
       next_state_parts = [
           samplers.uniform(  # pylint: disable=g-complex-comprehension
               minval=state_part - scale_part,
@@ -349,13 +337,9 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
 
   """
 
-  @deprecation.deprecated_args(
-      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
-      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                new_state_fn=None,
-               seed=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -369,8 +353,6 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
         a symmetric distribution centered at the input state part.
         Default value: `None` which is mapped to
           `tfp.mcmc.random_walk_normal_fn()`.
-      seed: Python integer to seed the random number generator. Deprecated, pass
-        seed to `tfp.mcmc.sample_chain`.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'rwm_kernel').
 
@@ -388,16 +370,11 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
     if new_state_fn is None:
       new_state_fn = random_walk_normal_fn()
 
-    seed_stream = SeedStream(seed, salt='rwm')
-    mh_kwargs = {} if seed is None else dict(seed=seed_stream())
-    uncal_kwargs = {} if seed is None else dict(seed=seed_stream())
     self._impl = metropolis_hastings.MetropolisHastings(
         inner_kernel=UncalibratedRandomWalk(
             target_log_prob_fn=target_log_prob_fn,
             new_state_fn=new_state_fn,
-            name=name,
-            **uncal_kwargs),
-        **mh_kwargs)
+            name=name))
 
   @property
   def target_log_prob_fn(self):
@@ -406,10 +383,6 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   @property
   def new_state_fn(self):
     return self._impl.inner_kernel.new_state_fn
-
-  @property
-  def seed(self):
-    return self._impl.inner_kernel.seed
 
   @property
   def name(self):
@@ -467,25 +440,19 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
   `RandomWalkMetropolis`.
   """
 
-  @deprecation.deprecated_args(
-      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
-      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   @mcmc_util.set_doc(RandomWalkMetropolis.__init__.__doc__)
   def __init__(self,
                target_log_prob_fn,
                new_state_fn=None,
-               seed=None,
                name=None):
     if new_state_fn is None:
       new_state_fn = random_walk_normal_fn()
 
     self._target_log_prob_fn = target_log_prob_fn
-    self._seed_stream = SeedStream(seed, salt='RandomWalkMetropolis')
     self._name = name
     self._parameters = dict(
         target_log_prob_fn=target_log_prob_fn,
         new_state_fn=new_state_fn,
-        seed=seed,
         name=name)
 
   @property
@@ -495,10 +462,6 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
   @property
   def new_state_fn(self):
     return self._parameters['new_state_fn']
-
-  @property
-  def seed(self):
-    return self._parameters['seed']
 
   @property
   def name(self):
@@ -526,43 +489,8 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
             for s in current_state_parts
         ]
 
-      # Seed handling complexity is due to users possibly expecting an old-style
-      # stateful seed to be passed to `self.new_state_fn`.
-      # In other words:
-      # - If we were given a seed, we sanitize it to stateless, and
-      #   if the `new_state_fn` doesn't like that, we crash and propagate
-      #   the error.  Rationale: The contract is stateless sampling given
-      #   seed, and doing otherwise would not meet it.
-      # - If we were not given a seed, we try `new_state_fn` with a stateless
-      #   seed.  Rationale: This is the future.
-      # - If it fails with a seed incompatibility problem (as best we can
-      #   detect from here), we issue a warning and try it again with a
-      #   stateful-style seed. Rationale: User code that didn't set seeds
-      #   shouldn't suddenly break.
-      # TODO(b/159636942): Clean up after 2020-09-20.
-      if seed is not None:
-        force_stateless = True
-        seed = samplers.sanitize_seed(seed)
-      else:
-        force_stateless = False
-        if self._seed_stream.original_seed is not None:
-          warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
-        stateful_seed = self._seed_stream()
-        seed = samplers.sanitize_seed(stateful_seed)
-      try:
-        next_state_parts = self.new_state_fn(current_state_parts, seed)  # pylint: disable=not-callable
-      except TypeError as e:
-        if ('Expected int for argument' not in str(e) and
-            TENSOR_SEED_MSG_PREFIX not in str(e)) or force_stateless:
-          raise
-        msg = (
-            'Falling back to `int` seed for `new_state_fn` {}. Please update '
-            'to use `tf.random.stateless_*` RNGs. '
-            'This fallback may be removed after 10-Sep-2020. ({})')
-        warnings.warn(msg.format(self.new_state_fn, str(e)))
-        seed = None
-        next_state_parts = self.new_state_fn(  # pylint: disable=not-callable
-            current_state_parts, stateful_seed)
+      seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
+      next_state_parts = self.new_state_fn(current_state_parts, seed)  # pylint: disable=not-callable
       # Compute `target_log_prob` so its available to MetropolisHastings.
       next_target_log_prob = self.target_log_prob_fn(*next_state_parts)  # pylint: disable=not-callable
 
@@ -574,7 +502,7 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
           UncalibratedRandomWalkResults(
               log_acceptance_correction=tf.zeros_like(next_target_log_prob),
               target_log_prob=next_target_log_prob,
-              seed=samplers.zeros_seed() if seed is None else seed,
+              seed=seed,
           ),
       ]
 

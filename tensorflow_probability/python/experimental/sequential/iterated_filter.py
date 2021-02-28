@@ -548,7 +548,7 @@ class IteratedFilter(object):
 
       if parameter_constraining_bijector is None:
         parameter_constraining_bijector = (
-            parameter_prior._experimental_default_event_space_bijector())  # pylint: disable=protected-access
+            parameter_prior.experimental_default_event_space_bijector())
       self._parameter_constraining_bijector = parameter_constraining_bijector
 
       # Augment the prior to include both parameters and states.

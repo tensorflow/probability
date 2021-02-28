@@ -21,18 +21,24 @@ from inference_gym.tools.stan import eight_schools as eight_schools_lib
 from inference_gym.tools.stan import item_response_theory
 from inference_gym.tools.stan import log_gaussian_cox_process
 from inference_gym.tools.stan import logistic_regression
+from inference_gym.tools.stan import lorenz_system
 from inference_gym.tools.stan import probit_regression
 from inference_gym.tools.stan import radon_contextual_effects
+from inference_gym.tools.stan import radon_contextual_effects_halfnormal
 from inference_gym.tools.stan import sparse_logistic_regression
 from inference_gym.tools.stan import stochastic_volatility
 
 __all__ = [
     'brownian_motion_missing_middle_observations',
+    'brownian_motion_unknown_scales_missing_middle_observations',
+    'convection_lorenz_bridge',
+    'convection_lorenz_bridge_unknown_scales',
     'eight_schools',
     'german_credit_numeric_logistic_regression',
     'german_credit_numeric_probit_regression',
     'german_credit_numeric_sparse_logistic_regression',
     'radon_contextual_effects_minnesota',
+    'radon_contextual_effects_minnesota_halfnormal',
     'stochastic_volatility_sp500',
     'stochastic_volatility_sp500_small',
     'synthetic_item_response_theory',
@@ -48,6 +54,40 @@ def brownian_motion_missing_middle_observations():
   """
   dataset = data.brownian_motion_missing_middle_observations()
   return brownian_motion.brownian_motion(**dataset)
+
+
+def brownian_motion_unknown_scales_missing_middle_observations():
+  """Brownian Motion with missing observations and unknown scale parameters.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.brownian_motion_missing_middle_observations()
+  return brownian_motion.brownian_motion_unknown_scales(
+      observed_locs=dataset['observed_locs'])
+
+
+def convection_lorenz_bridge():
+  """Lorenz System with observed convection and missing observations.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.convection_lorenz_bridge()
+  return lorenz_system.partially_observed_lorenz_system(**dataset)
+
+
+def convection_lorenz_bridge_unknown_scales():
+  """Lorenz System with observed convection and missing observations.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.convection_lorenz_bridge()
+  del dataset['innovation_scale']
+  del dataset['observation_scale']
+  return lorenz_system.partially_observed_lorenz_system_unknown_scales(
+      **dataset)
 
 
 def eight_schools():
@@ -102,6 +142,19 @@ def radon_contextual_effects_minnesota():
     if key.startswith('test_'):
       del dataset[key]
   return radon_contextual_effects.radon_contextual_effects(**dataset)
+
+
+def radon_contextual_effects_minnesota_halfnormal():
+  """Hierarchical radon model with contextual effects, with data from Minnesota.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.radon(state='MN')
+  for key in list(dataset.keys()):
+    if key.startswith('test_'):
+      del dataset[key]
+  return radon_contextual_effects_halfnormal.radon_contextual_effects(**dataset)
 
 
 def stochastic_volatility_sp500():

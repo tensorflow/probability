@@ -25,6 +25,7 @@ from oryx.core.ppl import transformations
 from oryx.internal import test_util
 
 seed = random.PRNGKey
+block = transformations.block
 conditional = transformations.conditional
 graph_replace = transformations.graph_replace
 joint_log_prob = transformations.joint_log_prob
@@ -84,6 +85,32 @@ class SampleTest(test_util.TestCase):
             'z': z,
             'x': z + random.normal(k2)
         })
+
+  def test_block_should_result_in_ignored_names_in_joint_sample(self):
+
+    def model(key):
+      k1, k2 = random.split(key)
+      z = random_variable(random_normal, name='z')(k1)
+      return random_variable(lambda key: random_normal(key) + z, name='x')(k2)
+
+    k1, _ = random.split(seed(0))
+    z = random.normal(k1)
+    self.assertDictEqual(
+        joint_sample(block(model, names=['x']))(seed(0)), {
+            'z': z,
+        })
+
+  def test_block_composing_with_intervene(self):
+    def program(key):
+      k1, k2, k3 = random.split(key, 3)
+      a = random_variable(random_normal, name='a')(k1)
+      b = a + random_variable(random_normal, name='b')(k2)
+      c = random_variable(b + random_normal(k3), name='c')
+      return c
+
+    program_without_a = block(program, names=['a'])
+    c_given_b = intervene(program_without_a, b=10.)
+    self.assertLess(abs(10 - c_given_b(random.PRNGKey(0))), 4.)
 
   def test_observing_latent_injects_value(self):
 

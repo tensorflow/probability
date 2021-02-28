@@ -38,6 +38,7 @@ multi_substrate_py_library(
         ":feature_transformed",
         ":kumaraswamy_transformed",
         ":matern",
+        ":parabolic",
         ":polynomial",
         ":positive_semidefinite_kernel",
         ":rational_quadratic",
@@ -138,10 +139,35 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "matern_test",
-    size = "small",
+    size = "medium",
     srcs = ["matern_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
+    shard_count = 2,
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "parabolic",
+    srcs = ["parabolic.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "parabolic_test",
+    size = "small",
+    srcs = ["parabolic_test.py"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

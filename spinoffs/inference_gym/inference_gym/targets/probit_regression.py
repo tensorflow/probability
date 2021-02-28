@@ -39,7 +39,17 @@ def _add_bias(features):
 
 
 class ProbitRegression(bayesian_model.BayesianModel):
-  """Bayesian probit regression with a Gaussian prior."""
+  """Bayesian probit regression with a Gaussian prior.
+
+  ```none
+  # The `+ 1` is for the bias term.
+  for i in range(num_features + 1):
+    weights[i] ~ Normal(loc=0, scale=1)
+
+  for j in range(num_datapoints):
+    label[j] ~ Bernoulli(probit=concat([features[j], [1]) @ weights)
+  ```
+  """
 
   def __init__(
       self,

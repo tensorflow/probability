@@ -299,7 +299,7 @@ class CovarianceTest(test_util.TestCase):
     cov_kd = tfp.stats.covariance(x, y, event_axis=-1, keepdims=True)
     self.assertAllEqual((1, 3, 2, 2), cov_kd.shape)
     cov_kd = self.evaluate(cov_kd)
-    self.assertAllEqual(cov, cov_kd[0, ...])
+    self.assertAllClose(cov, cov_kd[0, ...])
 
     for i in range(3):  # Iterate over batch index.
       x_i = x[:, i, :]  # Pick out ith batch of samples.
@@ -325,7 +325,7 @@ class CovarianceTest(test_util.TestCase):
         x, y, sample_axis=[1, 3], event_axis=[2], keepdims=True)
     self.assertAllEqual((4, 1, 2, 2, 1), cov_kd.shape)
     cov_kd = self.evaluate(cov_kd)
-    self.assertAllEqual(cov, cov_kd[:, 0, :, :, 0])
+    self.assertAllClose(cov, cov_kd[:, 0, :, :, 0])
 
     for i in range(4):  # Iterate over batch index.
       # Get ith batch of samples, and permute/reshape to [n_samples, n_events]
@@ -352,7 +352,7 @@ class CovarianceTest(test_util.TestCase):
         x, y, sample_axis=[0, 2], event_axis=[1], keepdims=True)
     self.assertAllEqual((1, 3, 3, 1, 5), cov_kd.shape)
     cov_kd = self.evaluate(cov_kd)
-    self.assertAllEqual(cov, cov_kd[0, :, :, 0, :])
+    self.assertAllClose(cov, cov_kd[0, :, :, 0, :])
 
     for i in range(5):  # Iterate over batch index.
       # Get ith batch of samples, and permute/reshape to [n_samples, n_events]
@@ -383,7 +383,7 @@ class CovarianceTest(test_util.TestCase):
         x_ph, y_ph, sample_axis=[0, 3], event_axis=[1, 2], keepdims=True)
     cov_kd = self.evaluate(cov_kd)
     self.assertAllEqual((1, 3, 4, 3, 4, 1, 6), cov_kd.shape)
-    self.assertAllEqual(cov, cov_kd[0, :, :, :, :, 0, :])
+    self.assertAllClose(cov, cov_kd[0, :, :, :, :, 0, :])
 
     for i in range(6):  # Iterate over batch index.
       # Get ith batch of samples, and permute/reshape to [n_samples, n_events]
@@ -423,6 +423,15 @@ class CovarianceTest(test_util.TestCase):
     # traceback went to tf.concat((batch_axis, event_axis, sample_axis), 0)
     # Test passes when this does not fail.
     tfp.stats.covariance(x)
+
+  def test_jit(self):
+    self.skip_if_no_xla()
+
+    @tf.function(jit_compile=True)
+    def cov(x):
+      return tfp.stats.covariance(x)
+
+    self.evaluate(cov(tf.random.normal([1000, 4], seed=test_util.test_seed())))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -476,7 +485,7 @@ class CorrelationTest(test_util.TestCase):
     corr_kd = tfp.stats.correlation(x, y, event_axis=-1, keepdims=True)
     self.assertAllEqual((1, 3, 2, 2), corr_kd.shape)
     corr_kd = self.evaluate(corr_kd)
-    self.assertAllEqual(corr, corr_kd[0, ...])
+    self.assertAllClose(corr, corr_kd[0, ...])
 
     for i in range(3):  # Iterate over batch index.
       x_i = x[:, i, :]  # Pick out ith batch of samples.

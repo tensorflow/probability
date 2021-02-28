@@ -216,6 +216,12 @@ class InverseTest(test_util.TestCase):
     self.assertEqual(x, 1.)
     self.assertEqual(ildj_, 0.)
 
+  def test_sow_happens_in_forward_pass(self):
+    def f(x, y):
+      return x, harvest.sow(x, name='x', tag='foo') * y
+    vals = harvest.reap(core.inverse(f), tag='foo')(1., 1.)
+    self.assertDictEqual(vals, dict(x=1.))
+
   def test_inverse_of_nest(self):
     def f(x):
       x = harvest.nest(lambda x: x, scope='foo')(x)
@@ -242,6 +248,14 @@ class InverseTest(test_util.TestCase):
     onp.testing.assert_allclose(x, np.ones(2))
     onp.testing.assert_allclose(y, np.ones(2))
     onp.testing.assert_allclose(ildj_, 0., atol=1e-6, rtol=1e-6)
+
+  def test_inverse_of_reshape(self):
+    def f(x):
+      return np.reshape(x, (4,))
+    f_inv = core.inverse_and_ildj(f, np.ones((2, 2)))
+    x, ildj_ = f_inv(np.ones(4))
+    onp.testing.assert_allclose(x, np.ones((2, 2)))
+    onp.testing.assert_allclose(ildj_, 0.)
 
   def test_sigmoid_ildj(self):
     def naive_sigmoid(x):

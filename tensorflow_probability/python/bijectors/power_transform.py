@@ -70,6 +70,10 @@ class PowerTransform(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   @property
   def power(self):
     """The `c` in: `Y = g(X) = (1 + X * c)**(1 / c)`."""

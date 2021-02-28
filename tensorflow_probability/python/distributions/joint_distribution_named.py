@@ -204,6 +204,8 @@ class JointDistributionNamed(
   def _flat_resolve_names(self, distribution_names=None, leaf_name='x'):
     return self._dist_fn_name
 
+  _composite_tensor_nonshape_params = ('model',)
+
 
 class _Node(object):
 

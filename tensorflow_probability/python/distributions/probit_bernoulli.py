@@ -19,12 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -100,13 +101,13 @@ class ProbitBernoulli(distribution.Distribution):
         parameters=parameters,
         name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return {'probits': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(probits=0, probs=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        probits=parameter_properties.ParameterProperties(),
+        probs=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=sigmoid_bijector.Sigmoid,
+            is_preferred=False))
 
   @property
   def probits(self):
@@ -142,7 +143,8 @@ class ProbitBernoulli(distribution.Distribution):
   def _log_prob(self, event):
     log_probs0, log_probs1 = self._outcome_log_probs()
     event = tf.cast(event, log_probs0.dtype)
-    return event * (log_probs1 - log_probs0) + log_probs0
+    return (tf.math.multiply_no_nan(log_probs0, 1 - event) +
+            tf.math.multiply_no_nan(log_probs1, event))
 
   def _outcome_log_probs(self):
     if self._probits is None:

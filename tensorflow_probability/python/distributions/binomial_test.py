@@ -193,6 +193,13 @@ class BinomialTest(test_util.TestCase):
     self.assertEqual((2, 2), pmf.shape)
     self.assertEqual((2, 2), cdf.shape)
 
+  def testCdfBeyondSupport(self):
+    p = [[0.1, 0.9]]
+    counts = [[-1., 4.]]
+    binom = tfd.Binomial(total_count=3., probs=p, validate_args=False)
+    cdf = binom.cdf(counts)
+    self.assertAllEqual([[0., 1.]], self.evaluate(cdf))
+
   def testBinomialMean(self):
     n = 5.
     p = [0.1, 0.2, 0.7]
@@ -243,35 +250,9 @@ class BinomialTest(test_util.TestCase):
     self.assertEqual((3,), binom.mode().shape)
     self.assertAllClose(expected_modes, self.evaluate(binom.mode()))
 
-  def testUnivariateLogConcaveDistributionRejectionSamplerGeometric(self):
-    seed = test_util.test_seed()
-    n = int(5e5)
-
-    probs = np.float32([0.7, 0.8, 0.3, 0.2])
-    geometric = tfd.Geometric(probs=probs)
-    x = binomial_lib._log_concave_rejection_sampler(
-        mode=geometric.mode(), prob_fn=geometric.prob, dtype=geometric.dtype,
-        sample_shape=[n], distribution_minimum=0, seed=seed)
-
-    x = x + 1  ## scipy.stats.geom is 1-indexed instead of 0-indexed.
-    sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
-    [
-        sample_mean_,
-        sample_variance_,
-    ] = self.evaluate([
-        sample_mean,
-        sample_variance,
-    ])
-    self.assertAllEqual([4], sample_mean.shape)
-    self.assertAllClose(
-        stats.geom.mean(probs), sample_mean_, atol=0., rtol=0.10)
-    self.assertAllEqual([4], sample_variance.shape)
-    self.assertAllClose(
-        stats.geom.var(probs), sample_variance_, atol=0., rtol=0.20)
-
-  def testSampleUnbiasedNonScalarBatch(self):
-    probs = self._rng.rand(4, 3).astype(np.float32)
-    counts = np.float32([4, 11., 20.])
+  def testSampleUnbiasedBroadcastingBatch(self):
+    probs = self._rng.rand(4, 3).astype(np.float64)
+    counts = np.float64([4, 11., 20.])
     dist = tfd.Binomial(total_count=counts, probs=probs, validate_args=True)
     n = int(1e5)
     x = dist.sample(n, seed=test_util.test_seed())
@@ -290,26 +271,26 @@ class BinomialTest(test_util.TestCase):
     self.assertAllClose(
         stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
 
-  def testSampleUnbiasedScalarBatch(self):
-    counts = np.float32(5.)
-    probs = self._rng.rand(4).astype(np.float32)
-    dist = tfd.Binomial(total_count=counts, probs=probs, validate_args=True)
-    n = int(1e5)
-    x = dist.sample(n, seed=test_util.test_seed())
-    sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
-    [
-        sample_mean_,
-        sample_variance_,
-    ] = self.evaluate([
-        sample_mean,
-        sample_variance,
-    ])
-    self.assertAllEqual([4], sample_mean.shape)
-    self.assertAllClose(
-        stats.binom.mean(counts, probs), sample_mean_, atol=0., rtol=0.10)
-    self.assertAllEqual([4], sample_variance.shape)
-    self.assertAllClose(
-        stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
+  def testSampleUnbiasedVectorBatch(self):
+    for counts in np.float32(5.), np.float32(50.):
+      probs = self._rng.rand(4).astype(np.float32)
+      dist = tfd.Binomial(total_count=counts, probs=probs, validate_args=True)
+      n = int(1e5)
+      x = dist.sample(n, seed=test_util.test_seed())
+      sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)
+      [
+          sample_mean_,
+          sample_variance_,
+      ] = self.evaluate([
+          sample_mean,
+          sample_variance,
+      ])
+      self.assertAllEqual([4], sample_mean.shape)
+      self.assertAllClose(
+          stats.binom.mean(counts, probs), sample_mean_, atol=0., rtol=0.10)
+      self.assertAllEqual([4], sample_variance.shape)
+      self.assertAllClose(
+          stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
 
   def testSampleExtremeValues(self):
     total_count = tf.constant(17., dtype=tf.float32)
@@ -404,7 +385,7 @@ class BinomialTest(test_util.TestCase):
     self.assertAllClose(
         *self.evaluate([logit(d.prob(1.)), d.logits_parameter()]),
         # Set atol because logit(0.5) == 0.
-        atol=1e-6, rtol=1e-4)
+        atol=3e-6, rtol=1e-4)
     self.assertAllClose(
         *self.evaluate([d.prob(1.), d.probs_parameter()]),
         atol=0, rtol=1e-4)
@@ -491,17 +472,17 @@ class BinomialSamplingTest(test_util.TestCase):
 
   def testSampleXLA(self):
     self.skip_if_no_xla()
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     probs = np.random.rand(4, 3).astype(np.float32)
     counts = np.float32([4, 11., 20.])
     dist = tfd.Binomial(total_count=counts, probs=probs, validate_args=True)
     # Verify the compile succeeds going all the way through the distribution.
     self.evaluate(
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
-                    experimental_compile=True)())
+                    jit_compile=True)())
     # Also test the low-level sampler and verify the XLA-friendly variant.
     _, runtime = self.evaluate(
-        tf.function(binomial_lib._random_binomial, experimental_compile=True)(
+        tf.function(binomial_lib._random_binomial, jit_compile=True)(
             shape=tf.constant([], dtype=tf.int32),
             counts=tf.constant(10.), probs=tf.constant(.5),
             seed=test_util.test_seed()))

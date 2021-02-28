@@ -44,7 +44,12 @@ class _SmoothSeasonalStateSpaceModelTest(object):
         num_timesteps=3, param_vals=[drift_scale])
 
     self.assertAllEqual(component.latent_size, 4)
-    self.assertAllEqual(ssm.latent_size, 4)
+    self.assertAllEqual(
+        self.evaluate(
+            tf.convert_to_tensor(
+                ssm.latent_size_tensor()
+                )),
+        4)
 
   def test_basic_statistics_no_latent_variance_one_frequency(self):
     # fix the latent variables at the value 1 so the results are deterministic

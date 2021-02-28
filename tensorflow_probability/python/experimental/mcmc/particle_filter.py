@@ -23,8 +23,8 @@ from tensorflow_probability.python.experimental.mcmc import sequential_monte_car
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-from tensorflow_probability.python.util import SeedStream
 
 __all__ = [
     'infer_trajectories',
@@ -129,7 +129,7 @@ def infer_trajectories(observations,
   """Use particle filtering to sample from the posterior over trajectories.
 
   ${particle_filter_arg_str}
-    seed: Python `int` seed for random ops.
+    seed: Optional seed, for reproducible results.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'infer_trajectories'`).
   Returns:
@@ -227,7 +227,8 @@ def infer_trajectories(observations,
 
   """
   with tf.name_scope(name or 'infer_trajectories') as name:
-    seed = SeedStream(seed, 'infer_trajectories')
+    pf_seed, resample_seed = samplers.split_seed(
+        seed, salt='infer_trajectories')
     (particles,
      log_weights,
      parent_indices,
@@ -245,7 +246,7 @@ def infer_trajectories(observations,
          num_transitions_per_observation=num_transitions_per_observation,
          trace_fn=_default_trace_fn,
          trace_criterion_fn=lambda *_: True,
-         seed=seed,
+         seed=pf_seed,
          name=name)
     weighted_trajectories = reconstruct_trajectories(particles, parent_indices)
 
@@ -253,7 +254,7 @@ def infer_trajectories(observations,
     resample_indices = resample_fn(log_probs=log_weights[-1],
                                    event_size=num_particles,
                                    sample_shape=(),
-                                   seed=seed)
+                                   seed=resample_seed)
     trajectories = tf.nest.map_structure(
         lambda x: mcmc_util.index_remapping_gather(x,  # pylint: disable=g-long-lambda
                                                    resample_indices,
@@ -315,7 +316,7 @@ def particle_filter(observations,
       Default value: `None`.
     parallel_iterations: Passed to the internal `tf.while_loop`.
       Default value: `1`.
-    seed: Python `int` seed for random ops.
+    seed: Optional seed for reproducible results.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'particle_filter'`).
   Returns:
@@ -325,7 +326,7 @@ def particle_filter(observations,
       and stacks the traced results across all steps.
   """
 
-  seed = SeedStream(seed, 'particle_filter')
+  init_seed, loop_seed = samplers.split_seed(seed, salt='particle_filter')
   with tf.name_scope(name or 'particle_filter'):
     num_observation_steps = ps.size0(tf.nest.flatten(observations)[0])
     num_timesteps = (
@@ -343,13 +344,14 @@ def particle_filter(observations,
         initial_state_prior=initial_state_prior,
         initial_state_proposal=initial_state_proposal,
         num_particles=num_particles,
-        seed=seed)
-    propose_and_update_log_weights_fn = _particle_filter_propose_and_update_log_weights_fn(
-        observations=observations,
-        transition_fn=transition_fn,
-        proposal_fn=proposal_fn,
-        observation_fn=observation_fn,
-        num_transitions_per_observation=num_transitions_per_observation)
+        seed=init_seed)
+    propose_and_update_log_weights_fn = (
+        _particle_filter_propose_and_update_log_weights_fn(
+            observations=observations,
+            transition_fn=transition_fn,
+            proposal_fn=proposal_fn,
+            observation_fn=observation_fn,
+            num_transitions_per_observation=num_transitions_per_observation))
 
     kernel = smc_kernel.SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
@@ -359,21 +361,29 @@ def particle_filter(observations,
     # Use `trace_scan` rather than `sample_chain` directly because the latter
     # would force us to trace the state history (with or without thinning),
     # which is not always appropriate.
-    final_result, traced_results = mcmc_util.trace_scan(
-        loop_fn=(
-            lambda state_and_results, _: kernel.one_step(*state_and_results)),
-        initial_state=(initial_weighted_particles,
+    def seeded_one_step(seed_state_results, _):
+      seed, state, results = seed_state_results
+      one_step_seed, next_seed = samplers.split_seed(seed)
+      next_state, next_results = kernel.one_step(
+          state, results, seed=one_step_seed)
+      return next_seed, next_state, next_results
+
+    final_seed_state_result, traced_results = mcmc_util.trace_scan(
+        loop_fn=seeded_one_step,
+        initial_state=(loop_seed,
+                       initial_weighted_particles,
                        kernel.bootstrap_results(initial_weighted_particles)),
         elems=tf.ones([num_timesteps]),
-        trace_fn=lambda state_and_results: trace_fn(*state_and_results),
+        trace_fn=lambda seed_state_results: trace_fn(*seed_state_results[1:]),
         trace_criterion_fn=(
-            lambda state_and_results: trace_criterion_fn(*state_and_results)),
+            lambda seed_state_results: trace_criterion_fn(  # pylint: disable=g-long-lambda
+                *seed_state_results[1:])),
         static_trace_allocation_size=static_trace_allocation_size,
         parallel_iterations=parallel_iterations)
 
     if trace_criterion_fn is never_trace:
       # Return results from just the final step.
-      traced_results = trace_fn(*final_result)
+      traced_results = trace_fn(*final_seed_state_result[1:])
 
     return traced_results
 

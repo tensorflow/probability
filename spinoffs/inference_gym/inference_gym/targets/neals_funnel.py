@@ -38,7 +38,13 @@ class NealsFunnel(model.Model):
   first dimensions by `exp(x0 / 2)` where  `x0` is the value of the first
   dimension.
 
-  This distribution is notable for having a relatively very narrow "neck" region
+  ```none
+  x[0] ~ Normal(loc=0, scale=3)
+  for i in range(1, ndims):
+    x[i] ~ Normal(loc=0, scale=exp(x[0] / 2))
+  ```
+
+  This distribution is notable for having a relatively narrow "neck" region
   which is challenging for HMC to explore. This distribution resembles the
   posteriors of centrally parameterized hierarchical models.
 

@@ -301,11 +301,11 @@ class DirichletTest(test_util.TestCase):
     dist = tfd.Dirichlet(conc, validate_args=True)
     eps = 1e-5
     with self.assertRaisesOpError('must sum to `1`'):
-      self.evaluate(dist._experimental_default_event_space_bijector(
+      self.evaluate(dist.experimental_default_event_space_bijector(
           ).inverse([0.2, 0.5 + eps, 0.3]))
 
     with self.assertRaisesOpError('must be non-negative|must sum to `1`'):
-      self.evaluate(dist._experimental_default_event_space_bijector(
+      self.evaluate(dist.experimental_default_event_space_bijector(
           ).inverse([0.7, 0.3, -eps]))
 
 

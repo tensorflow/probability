@@ -95,16 +95,28 @@ class ZipfTest(test_util.TestCase):
   def testZipfLogPmf_InvalidArgs(self):
     power = tf.constant([4.0])
     # Non-integer samples are rejected if validate_args is True and
-    # interpolate_nondiscrete is False.
-    non_integer_samples = [0.99, 4.5, 5.001, 1e-6, -3, -2, -1]
+    # force_probs_to_zero_outside_support is True.
+    zipf = tfd.Zipf(
+        power=power,
+        force_probs_to_zero_outside_support=True,
+        validate_args=True)
+    non_integer_samples = [0.99, 4.5, 5.001, 1e-5]
     for x in non_integer_samples:
-      zipf = tfd.Zipf(
-          power=power, interpolate_nondiscrete=False, validate_args=True)
 
-      with self.assertRaisesOpError("Condition (x == y|x >= 0)"):
+      with self.assertRaisesOpError("cannot contain fractional components"):
         self.evaluate(zipf.log_prob(x))
 
-      with self.assertRaisesOpError("Condition (x == y|x >= 0)"):
+      with self.assertRaisesOpError("cannot contain fractional components"):
+        self.evaluate(zipf.prob(x))
+
+    # Negative samples are rejected if validate_args is True.
+    zipf = tfd.Zipf(power=power, validate_args=True)
+    negative_samples = [-3, -2, -1]
+    for x in negative_samples:
+      with self.assertRaisesOpError("must be non-negative"):
+        self.evaluate(zipf.log_prob(x))
+
+      with self.assertRaisesOpError("must be non-negative"):
         self.evaluate(zipf.prob(x))
 
   def testZipfLogPmf_IntegerArgs(self):
@@ -155,7 +167,9 @@ class ZipfTest(test_util.TestCase):
     x = [-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.2]
 
     zipf = tfd.Zipf(
-        power=power, interpolate_nondiscrete=False, validate_args=False)
+        power=power,
+        force_probs_to_zero_outside_support=True,
+        validate_args=False)
     log_pmf = zipf.log_prob(x)
     self.assertEqual((batch_size,), log_pmf.shape)
 
@@ -226,7 +240,9 @@ class ZipfTest(test_util.TestCase):
     x = [-3.5, -0.5, 0., 1, 1.1, 2.2, 3.1, 4., 5., 5.5, 6.4, 7.8]
 
     zipf = tfd.Zipf(
-        power=power, interpolate_nondiscrete=False, validate_args=False)
+        power=power,
+        force_probs_to_zero_outside_support=True,
+        validate_args=False)
     log_cdf = zipf.log_cdf(x)
     self.assertEqual((batch_size,), log_cdf.shape)
     self.assertAllClose(self.evaluate(log_cdf), stats.zipf.logcdf(x, power_v))

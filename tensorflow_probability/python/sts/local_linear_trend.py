@@ -22,7 +22,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
 from tensorflow_probability.python.internal import distribution_util as dist_util
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
@@ -155,7 +158,7 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       name: Python `str` name prefixed to ops created by this class.
         Default value: "LocalLinearTrendStateSpaceModel".
     """
-
+    parameters = dict(locals())
     with tf.name_scope(name or 'LocalLinearTrendStateSpaceModel') as name:
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -202,6 +205,7 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           allow_nan_stats=allow_nan_stats,
           validate_args=validate_args,
           name=name)
+      self._parameters = parameters
 
   @property
   def level_scale(self):
@@ -217,6 +221,85 @@ class LocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
   def observation_noise_scale(self):
     """Standard deviation of the observation noise."""
     return self._observation_noise_scale
+
+  def _joint_sample_n(self, n, seed=None):
+    """Draw a joint sample from the prior over latents and observations.
+
+    This sampler is specific to LocalLinearTrend models and is faster than the
+    generic LinearGaussianStateSpaceModel implementation.
+
+    Args:
+      n: `int` `Tensor` number of samples to draw.
+      seed: Optional `int` `Tensor` seed for the random number generator.
+    Returns:
+      latents: `float` `Tensor` of shape `concat([[n], self.batch_shape,
+        [self.num_timesteps, self.latent_size]], axis=0)` representing samples
+        of latent trajectories.
+      observations: `float` `Tensor` of shape `concat([[n], self.batch_shape,
+        [self.num_timesteps, self.observation_size]], axis=0)` representing
+        samples of observed series generated from the sampled `latents`.
+    """
+    with tf.name_scope('joint_sample_n'):
+      (initial_state_seed,
+       level_jumps_seed,
+       slope_jumps_seed,
+       prior_observation_seed) = samplers.split_seed(
+           seed, n=4, salt='LocalLinearTrendStateSpaceModel_joint_sample_n')
+
+      if self.batch_shape.is_fully_defined():
+        batch_shape = self.batch_shape.as_list()
+      else:
+        batch_shape = self.batch_shape_tensor()
+      sample_and_batch_shape = ps.cast(
+          ps.concat([[n], batch_shape], axis=0), tf.int32)
+
+      # Sample the initial timestep from the prior.  Since we want
+      # this sample to have full batch shape (not just the batch shape
+      # of the self.initial_state_prior object which might in general be
+      # smaller), we augment the sample shape to include whatever
+      # extra batch dimensions are required.
+      initial_level_and_slope = self.initial_state_prior.sample(
+          linear_gaussian_ssm._augment_sample_shape(  # pylint: disable=protected-access
+              self.initial_state_prior,
+              sample_and_batch_shape,
+              self.validate_args),
+          seed=initial_state_seed)
+
+      # Sample the latent random walk on slopes.
+      jumps_shape = ps.concat([sample_and_batch_shape,
+                               [self.num_timesteps - 1]], axis=0)
+      slope_jumps = samplers.normal(
+          jumps_shape,
+          dtype=self.dtype,
+          seed=slope_jumps_seed) * self.slope_scale[..., tf.newaxis]
+      prior_slope_sample = tf.cumsum(
+          tf.concat([initial_level_and_slope[..., 1:],
+                     slope_jumps],
+                    axis=-1),
+          axis=-1)
+
+      # Sample latent levels, given latent slopes.
+      level_jumps = samplers.normal(
+          jumps_shape,
+          dtype=self.dtype,
+          seed=level_jumps_seed) * self.level_scale[..., tf.newaxis]
+      prior_level_sample = tf.cumsum(
+          tf.concat([initial_level_and_slope[..., :1],
+                     level_jumps + prior_slope_sample[..., :-1]],
+                    axis=-1),
+          axis=-1)
+
+      # Sample noisy observations, given latent levels.
+      prior_observation_sample = prior_level_sample + (
+          samplers.normal(ps.shape(prior_level_sample),
+                          dtype=self.dtype,
+                          seed=prior_observation_seed) *
+          self.observation_noise_scale[..., tf.newaxis])
+
+      return (tf.stack([prior_level_sample,
+                        prior_slope_sample],
+                       axis=-1),
+              prior_observation_sample[..., tf.newaxis])
 
 
 class LocalLinearTrend(StructuralTimeSeries):
@@ -321,7 +404,7 @@ class LocalLinearTrend(StructuralTimeSeries):
               initial_slope_prior.stddev()
           ], axis=-1))
 
-      scaled_softplus = tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+      scaled_softplus = tfb.Chain([tfb.Scale(scale=observed_stddev),
                                    tfb.Softplus()])
       super(LocalLinearTrend, self).__init__(
           parameters=[

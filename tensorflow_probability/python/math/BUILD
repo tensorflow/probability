@@ -29,8 +29,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "math",
     srcs = ["__init__.py"],
@@ -41,10 +39,13 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/math/ode",
     ],
     deps = [
+        ":bessel",
         ":custom_gradient",
         ":diag_jacobian",
         ":generic",
         ":gradient",
+        ":gram_schmidt",
+        ":hypergeometric",
         ":interpolation",
         ":linalg",
         ":minimize",
@@ -57,6 +58,34 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/math/ode",
         "//tensorflow_probability/python/math/psd_kernels",
         "//tensorflow_probability/python/random",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "bessel",
+    srcs = [
+        "bessel.py",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "bessel_test",
+    size = "medium",
+    srcs = ["bessel_test.py"],
+    shard_count = 2,
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -86,6 +115,32 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "gram_schmidt",
+    srcs = [
+        "gram_schmidt.py",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "gram_schmidt_test",
+    size = "small",
+    srcs = ["gram_schmidt_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_library(
     name = "generic",
     srcs = ["generic.py"],
     srcs_version = "PY3",
@@ -96,6 +151,8 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:variadic_reduce",
+        # tensorflow/compiler/jit dep,
     ],
 )
 
@@ -103,13 +160,13 @@ multi_substrate_py_test(
     name = "generic_test",
     size = "medium",
     srcs = ["generic_test.py"],
+    shard_count = 3,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
-#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -121,6 +178,8 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal/backend/numpy:tf_inspect",
     ],
 )
 
@@ -133,6 +192,37 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "hypergeometric",
+    srcs = [
+        "hypergeometric.py",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "hypergeometric_test",
+    size = "medium",
+    srcs = ["hypergeometric_test.py"],
+    jax_size = "large",
+    shard_count = 3,
+    deps = [
+        # absl/testing:parameterized dep,
+        # mpmath dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:hypergeometric",
     ],
 )
 
@@ -306,7 +396,9 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:callable_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -402,17 +494,4 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
-)
-
-exports_files(
-    [
-        "generic.py",
-        "generic_test.py",
-        "gradient.py",
-        "gradient_test.py",
-        "linalg.py",
-        "numeric.py",
-        "special.py",
-    ],
-    visibility = ["//tensorflow_probability:__subpackages__"],
 )

@@ -85,6 +85,10 @@ class AbsoluteValue(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _is_increasing(self):
     return False, True
 

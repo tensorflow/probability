@@ -219,7 +219,7 @@ class NelderMeadTest(test_util.TestCase):
 
     start = tf.constant([-1.0, 1.0])
     results = tf.function(
-        tfp.optimizer.nelder_mead_minimize, experimental_compile=True)(
+        tfp.optimizer.nelder_mead_minimize, jit_compile=True)(
             rosenbrock,
             initial_vertex=start,
             func_tolerance=1e-12,

@@ -18,8 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-
 import collections
+import os
 
 # Dependency imports
 from absl.testing import parameterized
@@ -36,6 +36,7 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
+JAX_MODE = False
 Root = tfd.JointDistributionCoroutineAutoBatched.Root
 
 
@@ -594,31 +595,31 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     models = {}
     def coroutine_model():
-      g = yield tfd.LogNormal(0., [1., 2.])
-      df = yield tfd.Exponential([1., 2.])
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+      high = yield tfd.LogNormal(0., 1)
+      yield tfd.Uniform(low=[-1., -2.], high=high)
     models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
 
     models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.LogNormal(0., [1., 2.]),
-        tfd.Exponential([1., 2.]),
-        lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
-        lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+        tfd.LogNormal(0., 1.),
+        lambda high: tfd.Uniform(low=[-1., -2.], high=high)
     ]
 
     models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('g', tfd.LogNormal(0., [1., 2.])),
-        ('df', tfd.Exponential([1., 2.])),
-        ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
-        ('x', lambda loc, df: tfd.StudentT(tf.expand_dims(df, -1), loc, 1))))
+        ('high', tfd.LogNormal(0., 1.)),
+        ('x', lambda high: tfd.Uniform(low=[-1., -2.], high=high))))
 
-    joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
-    joint_bijector = joint._experimental_default_event_space_bijector()
-    x = self.evaluate(joint.sample(seed=test_util.test_seed()))
-    self.assertAllClose(
-        x,
-        self.evaluate(joint_bijector.forward(joint_bijector.inverse(x))))
+    joint = jd_class(models[jd_class], validate_args=True)
+    joint_bijector = joint.experimental_default_event_space_bijector()
+
+    y = self.evaluate(joint.sample([2, 3], seed=test_util.test_seed()))
+    x = joint_bijector.inverse(y)
+    self.assertAllClose(y, joint_bijector.forward(x))
+
+    event_ndims = tf.nest.pack_sequence_as(joint.dtype, [0, 1])
+    fldj = joint_bijector.forward_log_det_jacobian(x, event_ndims=event_ndims)
+    ildj = joint_bijector.inverse_log_det_jacobian(y, event_ndims=event_ndims)
+    self.assertAllEqual(fldj.shape, [2, 3])
+    self.assertAllClose(fldj, -ildj)
 
   def test_nested_joint_distributions(self):
     batch_shape = [2, 3]
@@ -650,6 +651,61 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     lp2 = joint.log_prob(z2)
     self.assertAllEqual(lp2.shape, [5])
 
+  @parameterized.named_parameters(*[
+      dict(testcase_name='_{}{}'.format(jd_class.__name__,  # pylint: disable=g-complex-comprehension
+                                        '_jit' if jit else ''),
+           jd_class=jd_class, jit=jit)
+      for jd_class in (tfd.JointDistributionCoroutineAutoBatched,
+                       tfd.JointDistributionSequentialAutoBatched,
+                       tfd.JointDistributionNamedAutoBatched)
+      for jit in (False, True)
+  ])
+  def test_kahan_precision(self, jd_class, jit):
+    maybe_jit = lambda f: f
+    if jit:
+      self.skip_if_no_xla()
+      if not JAX_MODE and not tf.test.is_gpu_available():
+        self.skipTest('b/179303849')
+      maybe_jit = tf.function(jit_compile=True)
+
+    def make_models(dtype):
+      models = {}
+      def mk_20k_poisson(log_rate):
+        return tfd.Poisson(log_rate=tf.broadcast_to(log_rate[..., tf.newaxis],
+                                                    log_rate.shape + (20_000,)))
+      def coroutine_model():
+        log_rate = yield tfd.Normal(0., dtype(.2), name='log_rate')
+        yield mk_20k_poisson(log_rate).copy(name='x')
+      models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+      models[tfd.JointDistributionSequentialAutoBatched] = [
+          tfd.Normal(0., dtype(.2)), mk_20k_poisson
+      ]
+
+      models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
+          ('log_rate', tfd.Normal(0., dtype(.2))), ('x', mk_20k_poisson)))
+      return models
+
+    joint = jd_class(make_models(np.float32)[jd_class], validate_args=True,
+                     experimental_use_kahan_sum=True)
+    joint64 = jd_class(make_models(np.float64)[jd_class], validate_args=True)
+    stream = test_util.test_seed_stream()
+    nsamp = 7
+    xs = self.evaluate(
+        joint.sample(log_rate=tf.zeros([nsamp]), seed=stream()))
+    if isinstance(xs, dict):
+      xs['log_rate'] = tfd.Normal(0, .2).sample(nsamp, seed=stream())
+    else:
+      xs = (tfd.Normal(0, .2).sample(nsamp, seed=stream()), xs[1])
+    xs64 = tf.nest.map_structure(lambda x: tf.cast(x, tf.float64), xs)
+    lp = maybe_jit(joint.copy(validate_args=not jit).log_prob)(xs)
+    lp64 = joint64.log_prob(xs64)
+    lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
+    # Without Kahan, example max-abs-diff: ~0.06
+    self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+
 
 if __name__ == '__main__':
+  # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
+  os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
   tf.test.main()

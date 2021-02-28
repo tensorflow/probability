@@ -29,8 +29,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "stats",
     srcs = ["__init__.py"],
@@ -155,6 +153,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

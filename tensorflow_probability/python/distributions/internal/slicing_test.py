@@ -18,9 +18,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -184,6 +187,18 @@ class SlicingTest(test_util.TestCase):
           param_event_ndims=2,
           slices=make_slices[:, :3, ..., -2:, :],
           dist_batch_shape=tf.constant([7, 6, 5]))
+
+  def test_jitted_slices(self):
+    self.skip_if_no_xla()
+    shp = [7, 6, 5, 4]
+    t = tf.cast(tf.reshape(tf.range(np.prod(shp)), shp), tf.float32)
+    @tf.function(jit_compile=True)
+    def f(ix):
+      return slicing._slice_params_to_dict(
+          tfd.MultivariateNormalDiag(t, tf.ones([shp[-1]])),
+          dict(loc=1, scale_diag=1),
+          slices=make_slices[..., ix, :])
+    self.assertAllEqual(t[:, 3], f(tf.constant(3))['loc'])
 
 
 if __name__ == '__main__':

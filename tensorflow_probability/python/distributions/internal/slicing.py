@@ -21,8 +21,11 @@ from __future__ import print_function
 import collections
 import warnings
 
-import six
 import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
+
 
 __all__ = ['batch_slice']
 
@@ -56,11 +59,11 @@ def _slice_single_param(param, param_event_ndims, slices, dist_batch_shape):
     new_param: A `Tensor`, batch-sliced according to slices.
   """
   # Extend param shape with ones on the left to match dist_batch_shape.
-  param_shape = tf.shape(param)
-  insert_ones = tf.ones(
-      [tf.size(dist_batch_shape) + param_event_ndims - tf.rank(param)],
+  param_shape = ps.shape(param)
+  insert_ones = ps.ones(
+      [ps.size(dist_batch_shape) + param_event_ndims - ps.rank(param)],
       dtype=param_shape.dtype)
-  new_param_shape = tf.concat([insert_ones, param_shape], axis=0)
+  new_param_shape = ps.concat([insert_ones, param_shape], axis=0)
   full_batch_param = tf.reshape(param, new_param_shape)
   param_slices = []
   # We separately track the batch axis from the parameter axis because we want
@@ -90,14 +93,14 @@ def _slice_single_param(param, param_event_ndims, slices, dist_batch_shape):
     if isinstance(slc, slice):
       start, stop, step = slc.start, slc.stop, slc.step
       if start is not None:
-        start = tf.where(is_broadcast, 0, start)
+        start = ps.where(is_broadcast, 0, start)
       if stop is not None:
-        stop = tf.where(is_broadcast, 1, stop)
+        stop = ps.where(is_broadcast, 1, stop)
       if step is not None:
-        step = tf.where(is_broadcast, 1, step)
+        step = ps.where(is_broadcast, 1, step)
       param_slices.append(slice(start, stop, step))
     else:  # int, or int Tensor, e.g. d[d.batch_shape_tensor()[0] // 2]
-      param_slices.append(tf.where(is_broadcast, 0, slc))
+      param_slices.append(ps.where(is_broadcast, 0, slc))
     param_dim_idx += 1
     batch_dim_idx += 1
   param_slices.extend([ALL_SLICE] * param_event_ndims)
@@ -116,7 +119,7 @@ def _slice_params_to_dict(dist, params_event_ndims, slices):
     overrides: `str->Tensor` `dict` of batch-sliced parameter overrides.
   """
   override_dict = {}
-  for param_name, param_event_ndims in six.iteritems(params_event_ndims):
+  for param_name, param_event_ndims in params_event_ndims.items():
     # Verify that either None or a legit value is in the parameters dict.
     if param_name not in dist.parameters:
       raise ValueError('Distribution {} is missing advertised '
@@ -135,10 +138,13 @@ def _slice_params_to_dict(dist, params_event_ndims, slices):
       warnings.warn('Unable to find property getter for parameter Tensor {} '
                     'on {}, falling back to Distribution.dtype {}'.format(
                         param_name, dist, dtype))
-    param = tf.convert_to_tensor(value=param, dtype=dtype)
+    param = tf.convert_to_tensor(param, dtype=dtype)
+    dist_batch_shape = dist.batch_shape
+    if not tensorshape_util.is_fully_defined(dist_batch_shape):
+      dist_batch_shape = dist.batch_shape_tensor()
     override_dict[param_name] = _slice_single_param(param, param_event_ndims,
                                                     slices,
-                                                    dist.batch_shape_tensor())
+                                                    dist_batch_shape)
   return override_dict
 
 

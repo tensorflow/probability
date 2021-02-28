@@ -111,6 +111,10 @@ class VariationalGaussianProcessTest(test_util.TestCase):
         sample_shape, seed=test_util.test_seed())
 
     if is_static or tf.executing_eagerly():
+      self.assertAllEqual(
+          vgp.observation_noise_variance.shape, tf.TensorShape([]))
+      self.assertAllEqual(
+          vgp.predictive_noise_variance.shape, tf.TensorShape([]))
       self.assertAllEqual(vgp.batch_shape_tensor(), batch_shape)
       self.assertAllEqual(vgp.event_shape_tensor(), event_shape)
       self.assertAllEqual(samples.shape,
@@ -120,6 +124,10 @@ class VariationalGaussianProcessTest(test_util.TestCase):
       self.assertAllEqual(samples.shape,
                           sample_shape + batch_shape + event_shape)
     else:
+      self.assertAllEqual(
+          self.evaluate(tf.shape(vgp.observation_noise_variance)), [])
+      self.assertAllEqual(
+          self.evaluate(tf.shape(vgp.predictive_noise_variance)), [])
       self.assertAllEqual(self.evaluate(vgp.batch_shape_tensor()), batch_shape)
       self.assertAllEqual(self.evaluate(vgp.event_shape_tensor()), event_shape)
       self.assertAllEqual(self.evaluate(samples).shape,

@@ -245,6 +245,7 @@ class JointDistributionCoroutineAutoBatched(
       batch_ndims=0,
       use_vectorized_map=True,
       validate_args=False,
+      experimental_use_kahan_sum=False,
       name=None,
   ):
     """Construct the `JointDistributionCoroutineAutoBatched` distribution.
@@ -270,13 +271,21 @@ class JointDistributionCoroutineAutoBatched(
         If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
         Default value: `False`.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values, which
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
       name: The name for ops managed by the distribution.
         Default value: `None` (i.e., `JointDistributionCoroutine`).
     """
+    parameters = dict(locals())
     super(JointDistributionCoroutineAutoBatched, self).__init__(
         model, sample_dtype=sample_dtype, batch_ndims=batch_ndims,
         use_vectorized_map=use_vectorized_map, validate_args=validate_args,
+        experimental_use_kahan_sum=experimental_use_kahan_sum,
         name=name or 'JointDistributionCoroutineAutoBatched')
+    self._parameters = self._no_dependency(parameters)
 
   @property
   def _require_root(self):
@@ -394,7 +403,8 @@ class JointDistributionNamedAutoBatched(
   """
 
   def __init__(self, model, batch_ndims=0, use_vectorized_map=True,
-               validate_args=False, name=None):
+               validate_args=False, experimental_use_kahan_sum=False,
+               name=None):
     """Construct the `JointDistributionNamedAutoBatched` distribution.
 
     Args:
@@ -413,13 +423,21 @@ class JointDistributionNamedAutoBatched(
         If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
         Default value: `False`.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values, which
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
       name: The name for ops managed by the distribution.
         Default value: `None` (i.e., `JointDistributionNamed`).
     """
+    parameters = dict(locals())
     super(JointDistributionNamedAutoBatched, self).__init__(
         model, batch_ndims=batch_ndims, use_vectorized_map=use_vectorized_map,
         validate_args=validate_args,
+        experimental_use_kahan_sum=experimental_use_kahan_sum,
         name=name or 'JointDistributionNamedAutoBatched')
+    self._parameters = self._no_dependency(parameters)
 
 
 # TODO(b/159723894): Reduce complexity by eliminating use of mixins.
@@ -533,7 +551,8 @@ class JointDistributionSequentialAutoBatched(
   """
 
   def __init__(self, model, batch_ndims=0, use_vectorized_map=True,
-               validate_args=False, name=None):
+               validate_args=False, experimental_use_kahan_sum=False,
+               name=None):
     """Construct the `JointDistributionSequentialAutoBatched` distribution.
 
     Args:
@@ -552,10 +571,18 @@ class JointDistributionSequentialAutoBatched(
         If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
         Default value: `False`.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values, which
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
       name: The name for ops managed by the distribution.
         Default value: `None` (i.e., `JointDistributionSequential`).
     """
+    parameters = dict(locals())
     super(JointDistributionSequentialAutoBatched, self).__init__(
         model, batch_ndims=batch_ndims, use_vectorized_map=use_vectorized_map,
         validate_args=validate_args,
+        experimental_use_kahan_sum=experimental_use_kahan_sum,
         name=name or 'JointDistributionSequentialAutoBatched')
+    self._parameters = self._no_dependency(parameters)

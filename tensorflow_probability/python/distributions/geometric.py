@@ -22,10 +22,12 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -57,6 +59,7 @@ class Geometric(distribution.Distribution):
   def __init__(self,
                logits=None,
                probs=None,
+               force_probs_to_zero_outside_support=False,
                validate_args=False,
                allow_nan_stats=True,
                name='Geometric'):
@@ -73,6 +76,16 @@ class Geometric(distribution.Distribution):
         represents the probability of success for independent Geometric
         distributions and must be in the range `(0, 1]`. Only one of `logits`
         or `probs` should be specified.
+      force_probs_to_zero_outside_support: Python `bool`. When `True`, negative
+        and non-integer values are evaluated "strictly": `log_prob` returns
+        `-inf`, `prob` returns `0`, and `cdf` and `sf` correspond.  When
+        `False`, the implementation is free to save computation (and TF graph
+        size) by evaluating something that matches the Geometric pmf at integer
+        values `k` but produces an unrestricted result on other inputs. In the
+        case of Geometric distribution, the `log_prob` formula in this case
+        happens to be the continuous function `k * log(1 - probs) + log(probs)`.
+        Note that this function is not a normalized probability log-density.
+        Default value: `False`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -93,6 +106,8 @@ class Geometric(distribution.Distribution):
           probs, dtype=dtype, name='probs')
       self._logits = tensor_util.convert_nonref_to_tensor(
           logits, dtype=dtype, name='logits')
+      self._force_probs_to_zero_outside_support = (
+          force_probs_to_zero_outside_support)
       super(Geometric, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -102,8 +117,13 @@ class Geometric(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(logits=0, probs=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        logits=parameter_properties.ParameterProperties(),
+        probs=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=softmax_centered_bijector
+            .SoftmaxCentered,
+            is_preferred=False))
 
   @property
   def logits(self):
@@ -114,6 +134,11 @@ class Geometric(distribution.Distribution):
   def probs(self):
     """Input argument `probs`."""
     return self._probs
+
+  @property
+  def force_probs_to_zero_outside_support(self):
+    """Return 0 probabilities on non-integer inputs."""
+    return self._force_probs_to_zero_outside_support
 
   def _batch_shape_tensor(self):
     x = self._probs if self._logits is None else self._logits
@@ -156,7 +181,7 @@ class Geometric(distribution.Distribution):
       x = tf.floor(x)
     return tf.where(
         x < 0.,
-        dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+        dtype_util.as_numpy_dtype(x.dtype)(0.),
         (1. + x) * tf.math.log1p(-probs))
 
   def _log_cdf(self, x):
@@ -175,7 +200,16 @@ class Geometric(distribution.Distribution):
     if not self.validate_args:
       # For consistency with cdf, we take the floor.
       x = tf.floor(x)
-    return tf.math.xlog1py(x, -probs) + tf.math.log(probs)
+
+    log_probs = tf.math.xlog1py(x, -probs) + tf.math.log(probs)
+
+    if self.force_probs_to_zero_outside_support:
+      # Set log_prob = -inf when value is less than 0, ie prob = 0.
+      log_probs = tf.where(
+          x < 0.,
+          dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+          log_probs)
+    return log_probs
 
   def _entropy(self):
     logits, probs = self._logits_and_probs_no_checks()

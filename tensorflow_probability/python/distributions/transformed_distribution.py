@@ -21,7 +21,10 @@ import functools
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.distributions import distribution as distribution_lib
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -82,6 +85,23 @@ class TransformedDistribution(distribution_lib.Distribution):
     * and similarly for: `cdf`, `prob`, `log_survival_function`,
      `survival_function`.
 
+  Kullback-Leibler divergence is also well defined for `TransformedDistribution`
+  instances that have matching bijectors.  Bijector matching is performed via
+  the `Bijector.__eq__` method, e.g., `td1.bijector == td2.bijector`, as part
+  of the KL calculation.  If the underlying bijectors do not match, a
+  `NotImplementedError` is raised when calling `kl_divergence`.  This is the
+  same behavior as calling `kl_divergence` when two distributions do not have
+  a registered KL divergence.
+
+  **Note** Due to the current constraints imposed on bijector equality testing,
+  `kl_divergence` may behave differently in eager mode computation vs. traced
+  computation.  For example, if a TD Bijector's parameters are `Tensor` objects,
+  and are themselves derived from e.g. a Variable, some stateful operation, or
+  from an argument to a `tf.function` then Bijector equality cannot be known
+  during the call to `kl_divergence` and the bijectors are assumed unequal.
+  In this case, calling `kl_divergence` may raise an exception in
+  graph / tf.function mode, but work just fine in eager / numpy mode.
+
   A simple example constructing a Log-Normal distribution from a Normal
   distribution:
 
@@ -116,9 +136,7 @@ class TransformedDistribution(distribution_lib.Distribution):
   tfb = tfp.bijectors
   normal = tfd.TransformedDistribution(
     distribution=tfd.Normal(loc=0., scale=1.),
-    bijector=tfb.Affine(
-      shift=-1.,
-      scale_identity_multiplier=2.)
+    bijector=tfb.Shift(shift=-1.)(tfb.Scale(scale=2.)),
     name='NormalTransformedDistribution')
   ```
 
@@ -271,12 +289,11 @@ class TransformedDistribution(distribution_lib.Distribution):
     # dtype.)
     if tf.nest.is_nested(base_batch_shape_tensor):
       if self._is_joint:
-        return base_batch_shape_tensor
-
+        return tf.nest.pack_sequence_as(
+            self.dtype, tf.nest.flatten(base_batch_shape_tensor))
       base_batch_shape_tensor = functools.reduce(
           ps.broadcast_shape,
           tf.nest.flatten(base_batch_shape_tensor))
-
     return base_batch_shape_tensor
 
   def _batch_shape(self):
@@ -290,7 +307,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     # the batch shape components of the base distribution are broadcast to
     # obtain the batch shape of the transformed distribution.
     batch_shape = self.distribution.batch_shape
-    if tf.nest.is_nested(batch_shape) and not self._is_joint:
+    if tf.nest.is_nested(batch_shape):
+      if self._is_joint:
+        return tf.nest.pack_sequence_as(
+            self.dtype, tf.nest.flatten(batch_shape))
       batch_shape = functools.reduce(
           tf.broadcast_static_shape, tf.nest.flatten(batch_shape))
     return batch_shape
@@ -460,6 +480,32 @@ class TransformedDistribution(distribution_lib.Distribution):
     y = self._set_sample_static_shape(y, sample_shape)
     return y
 
+  def _stddev(self, **kwargs):
+    if not self.bijector.is_constant_jacobian:
+      raise NotImplementedError('`stddev` is not implemented for non-affine '
+                                '`bijectors`.')
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      raise NotImplementedError('`stddev` is not implemented when '
+                                '`bijector` is not injective.')
+    if not (self.bijector._is_scalar  # pylint: disable=protected-access
+            or self.bijector._is_permutation):  # pylint: disable=protected-access
+      raise NotImplementedError('`stddev` is not implemented when `bijector` '
+                                'is a multivariate transformation.')
+
+    # A scalar affine bijector is of the form `forward(x) = scale * x + shift`,
+    # where the standard deviation is invariant to the shift, so we extract the
+    # shift and subtract it.
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x_stddev = self.distribution.stddev(**distribution_kwargs)
+    y_stddev_plus_shift = self.bijector.forward(x_stddev, **bijector_kwargs)
+    shift = self.bijector.forward(
+        tf.nest.map_structure(
+            tf.zeros_like, x_stddev),
+        **bijector_kwargs)
+    return tf.nest.map_structure(
+        tf.abs,
+        tf.nest.map_structure(tf.subtract, y_stddev_plus_shift, shift))
+
   def _entropy(self, **kwargs):
     if not self.bijector.is_constant_jacobian:
       raise NotImplementedError('`entropy` is not implemented.')
@@ -491,12 +537,56 @@ class TransformedDistribution(distribution_lib.Distribution):
     tensorshape_util.set_shape(entropy, self.batch_shape)
     return entropy
 
-  # pylint: disable=protected-access, not-callable
+  # pylint: disable=not-callable
   def _default_event_space_bijector(self):
-    if self.distribution._experimental_default_event_space_bijector() is None:
+    if self.distribution.experimental_default_event_space_bijector() is None:
       return None
     return self.bijector(
-        self.distribution._experimental_default_event_space_bijector())
-  # pylint: enable=protected-access, not-callable
+        self.distribution.experimental_default_event_space_bijector())
+  # pylint: enable=not-callable
 
   _composite_tensor_shape_params = ()
+
+
+@kullback_leibler.RegisterKL(TransformedDistribution, TransformedDistribution)
+def _kl_transformed_transformed(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b Transformed.
+
+  Args:
+    a: instance of a TransformedDistribution object.
+    b: instance of a TransformedDistribution object.
+    name: Name to use for created operations.
+      Default value: `None` (i.e., `'kl_normal_normal'`).
+
+  Returns:
+    kl_div: Batchwise KL(a || b)
+
+  Raises:
+    NotImplementedError: If `a.bijector != b.bijector`.
+  """
+  with tf.name_scope(name or 'kl_transformed_transformed'):
+    if a.bijector == b.bijector:
+      return kullback_leibler.kl_divergence(a.distribution, b.distribution)
+  raise NotImplementedError(
+      'Unable to calculate KL divergence between {} and {} because '
+      'their bijectors are not equal: {} vs. {}'.format(
+          a, b, a.bijector, b.bijector))
+
+
+@log_prob_ratio.RegisterLogProbRatio(TransformedDistribution)
+def _transformed_log_prob_ratio(p, x, q, y):
+  """Computes p.log_prob(x) - q.log_prob(y) for p and q both TDs."""
+  x_ = p.bijector.inverse(x)
+  y_ = q.bijector.inverse(y)
+
+  base_log_prob_ratio = log_prob_ratio.log_prob_ratio(
+      p.distribution, x_, q.distribution, y_)
+
+  event_ndims = tf.nest.map_structure(
+      ps.rank_from_shape,
+      p.event_shape_tensor,
+      tf.nest.map_structure(tensorshape_util.merge_with,
+                            p.event_shape, q.event_shape))
+  ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
+      p.bijector, x, q.bijector, y, event_ndims)
+  return base_log_prob_ratio + tf.cast(ildj_ratio, base_log_prob_ratio.dtype)

@@ -78,8 +78,7 @@ register_binary(lax.mul_p)(mul_left, mul_right)
 
 
 def div_left(left_val, out_val, ildj_):
-  return left_val / out_val, (
-      (np.log(left_val) - 2 * np.log(out_val)) + ildj_)
+  return left_val / out_val, ((np.log(left_val) - 2 * np.log(out_val)) + ildj_)
 
 
 def div_right(right_val, out_val, ildj_):
@@ -132,13 +131,29 @@ def concatenate_ildj(incells, outcells, *, dimension):
 ildj_registry[lax.concatenate_p] = concatenate_ildj
 
 
-def sow_ildj(incells, outcells, **params):
+def tie_all_ildj(incells, outcells, **params):
   del params
-  new_cells = [incell.join(outcell) for incell, outcell
-               in safe_zip(incells, outcells)]
+  new_cells = [
+      incell.join(outcell) for incell, outcell in safe_zip(incells, outcells)
+  ]
   return new_cells, new_cells, None
+
+
+ildj_registry[primitive.tie_all_p] = tie_all_ildj
+
+
+def sow_ildj(incells, outcells, **params):
+  if all(incell.top() for incell in incells) and all(
+      not outcell.top() for outcell in outcells):
+    # In forward evaluation mode, we want to still sow the values.
+    invals = [incell.val for incell in incells]
+    outvals = harvest.sow_p.bind(*invals, **params)
+    new_outcells = [InverseAndILDJ.new(outval) for outval in outvals]
+    return incells, new_outcells, None
+  return tie_all_ildj(incells, outcells, **params)
+
+
 ildj_registry[harvest.sow_p] = sow_ildj
-ildj_registry[primitive.tie_all_p] = sow_ildj
 
 
 def reshape_ildj(incells, outcells, **params):
@@ -151,9 +166,8 @@ def reshape_ildj(incells, outcells, **params):
     ))], None
   elif outcell.top() and not incell.top():
     val = outcell.val
-    ndslice = NDSlice.new(np.reshape(val, incell.aval.shape))
     new_incells = [
-        InverseAndILDJ(incell.aval, [ndslice])
+        InverseAndILDJ.new(np.reshape(val, incell.aval.shape))
     ]
     return new_incells, outcells, None
   return incells, outcells, None
@@ -176,3 +190,19 @@ jax.scipy.special.expit.def_inverse_unary(f_inv=jax.scipy.special.logit,
                                           f_ildj=expit_ildj)
 jax.scipy.special.logit.def_inverse_unary(f_inv=jax.scipy.special.expit,
                                           f_ildj=logit_ildj)
+
+
+def convert_element_type_ildj(incells, outcells, *, new_dtype, **params):
+  """InverseAndILDJ rule for convert_element_type primitive."""
+  incell, = incells
+  outcell, = outcells
+  if incell.top() and not outcell.top():
+    outcells = [InverseAndILDJ.new(lax.convert_element_type_p.bind(
+        incell.val, new_dtype=new_dtype, **params))]
+  elif outcell.top() and not incell.top():
+    val = outcell.val
+    incells = [
+        InverseAndILDJ.new(lax.convert_element_type_p.bind(
+            val, new_dtype=incell.aval.dtype, **params))]
+  return incells, outcells, None
+ildj_registry[lax.convert_element_type_p] = convert_element_type_ildj

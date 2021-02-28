@@ -62,7 +62,7 @@ class ItemResponseTheoryTest(test_util.InferenceGymTestCase,
         sample_transformation_shapes=dict(
             identity={
                 'mean_student_ability': [],
-                'student_ability': [20],
+                'centered_student_ability': [20],
                 'question_difficulty': [10],
             },
             test_nll=[],
@@ -99,7 +99,7 @@ class ItemResponseTheoryTest(test_util.InferenceGymTestCase,
         sample_transformation_shapes=dict(
             identity={
                 'mean_student_ability': [],
-                'student_ability': [20],
+                'centered_student_ability': [20],
                 'question_difficulty': [10],
             },
             test_nll=[],
@@ -118,7 +118,7 @@ class ItemResponseTheoryTest(test_util.InferenceGymTestCase,
         sample_transformation_shapes=dict(
             identity={
                 'mean_student_ability': [],
-                'student_ability': [400],
+                'centered_student_ability': [400],
                 'question_difficulty': [100],
             },),
         check_ground_truth_mean_standard_error=True,
@@ -134,7 +134,7 @@ class ItemResponseTheoryTest(test_util.InferenceGymTestCase,
     self.validate_ground_truth_using_hmc(
         model,
         num_chains=4,
-        num_steps=5000,
+        num_steps=4000,
         num_leapfrog_steps=10,
         step_size=0.025,
     )

@@ -13,11 +13,12 @@
 # limitations under the License.
 # ============================================================================
 # Lint as: python3
-"""Reimplementation of jax.experimental.optix.
+"""Reimplementation of a subset of the optax library using Oryx's state system.
 
-There are a few key differences:
-1. We use Oryx's state API to handle variables.
-2. We change the order of the arguments of the optimiser's update function.
+This module is an advanced example of how to write stateful code using Oryx. For
+a more complete and supported optimizers package that includes additional
+transformations and other features,  please take a look at
+[Optax](https://github.com/deepmind/optax).
 """
 import itertools
 
@@ -25,7 +26,7 @@ import jax
 from jax import lax
 from jax import random
 from jax import tree_util
-import jax.numpy as np
+import jax.numpy as jnp
 
 from oryx.core import primitive
 from oryx.core import state
@@ -59,25 +60,26 @@ __all__ = [
 
 def clip(max_delta):
 
-  def update(params, updates):
+  def update(updates, params):
     del params
-    return tree_map(lambda g: np.clip(updates, -max_delta, max_delta), updates)
+    return tree_map(lambda g: jnp.clip(updates, -max_delta, max_delta), updates)
 
   return update
 
 
 def global_norm(items):
-  return np.sqrt(np.sum(np.array([np.sum(x**2) for x in tree_leaves(items)])))
+  return jnp.sqrt(
+      jnp.sum(jnp.array([jnp.sum(x**2) for x in tree_leaves(items)])))
 
 
 def clip_by_global_norm(max_norm):
   """Returns a function that clips updates to a provided max norm."""
 
-  def update(params, updates):
+  def update(updates, params):
     del params
     g_norm = global_norm(updates)
     trigger = g_norm < max_norm
-    updates = tree_map(lambda t: np.where(trigger, t, t * (max_norm / g_norm)),
+    updates = tree_map(lambda t: jnp.where(trigger, t, t * (max_norm / g_norm)),
                        updates)
     return updates
 
@@ -87,12 +89,12 @@ def clip_by_global_norm(max_norm):
 def trace(decay, nesterov):
   """Returns a function that combines updates with a running state."""
 
-  def update(params, updates, init_key=None):
+  def update(updates, params, *, init_key):
     del params
     if init_key is None:
       raise ValueError('`init_key` cannot be `None`.')
     tr = state.variable(
-        tree_map(lambda g: np.zeros(g.shape), updates),
+        tree_map(lambda g: jnp.zeros(g.shape), updates),
         key=init_key,
         name='trace')
     f = lambda g, t: g + decay * t
@@ -110,14 +112,17 @@ def _update_moment(updates, moments, decay, order):
 
 def scale_by_rms(decay=0.9, eps=1e-8):
   """Returns a function that scales updates by the RMS of the updates."""
-  def update(params, updates, init_key=None):
+
+  def update(updates, params, *, init_key):
     del params
     if init_key is None:
       raise ValueError('`init_key` cannot be `None`.')
     nu = state.variable(
-        tree_map(lambda g: np.zeros(g.shape), updates), key=init_key, name='nu')
+        tree_map(lambda g: jnp.zeros(g.shape), updates),
+        key=init_key,
+        name='nu')
     nu = state.assign(_update_moment(updates, nu, decay, 2), name='nu')
-    updates = tree_map(lambda g, n: g / (np.sqrt(n + eps)), updates, nu)
+    updates = tree_map(lambda g, n: g / (jnp.sqrt(n + eps)), updates, nu)
     return updates
 
   return update
@@ -126,19 +131,19 @@ def scale_by_rms(decay=0.9, eps=1e-8):
 def scale_by_stddev(decay=0.9, eps=1e-8):
   """Returns a function that scales updates by their standard deviation."""
 
-  def update(params, updates, init_key=None):
+  def update(updates, params, *, init_key):
     del params
     if init_key is None:
       raise ValueError('`init_key` cannot be `None`.')
     mu_key, nu_key = random.split(init_key)
     mu = state.variable(
-        tree_map(lambda g: np.zeros(g.shape), updates), key=mu_key, name='mu')
+        tree_map(lambda g: jnp.zeros(g.shape), updates), key=mu_key, name='mu')
     nu = state.variable(
-        tree_map(lambda g: np.zeros(g.shape), updates), key=nu_key, name='nu')
+        tree_map(lambda g: jnp.zeros(g.shape), updates), key=nu_key, name='nu')
     mu = state.assign(_update_moment(updates, mu, decay, 1), name='mu')
     nu = state.assign(_update_moment(updates, nu, decay, 2), name='nu')
-    updates = tree_map(lambda g, m, n: g / np.sqrt(n - m**2 + eps), updates, mu,
-                       nu)
+    updates = tree_map(lambda g, m, n: g / jnp.sqrt(n - m**2 + eps), updates,
+                       mu, nu)
     return updates
 
   return update
@@ -147,22 +152,22 @@ def scale_by_stddev(decay=0.9, eps=1e-8):
 def scale_by_adam(b1=0.9, b2=0.999, eps=1e-8):
   """Scales updates according to Adam update rules."""
 
-  def update(params, updates, init_key=None):
+  def update(updates, params, *, init_key):
     del params
     if init_key is None:
       raise ValueError('`init_key` cannot be `None`.')
     count_key, mu_key, nu_key = random.split(init_key, 3)
     count = state.variable(0., key=count_key, name='count')
     mu = state.variable(
-        tree_map(lambda g: np.zeros(g.shape), updates), key=mu_key, name='mu')
+        tree_map(lambda g: jnp.zeros(g.shape), updates), key=mu_key, name='mu')
     nu = state.variable(
-        tree_map(lambda g: np.zeros(g.shape), updates), key=nu_key, name='nu')
+        tree_map(lambda g: jnp.zeros(g.shape), updates), key=nu_key, name='nu')
     mu = state.assign(_update_moment(updates, mu, b1, 1), name='mu')
     nu = state.assign(_update_moment(updates, nu, b2, 2), name='nu')
     count = state.assign(count + 1., name='count', key=updates)
     mu_hat = tree_map(lambda t: t / (1 - b1**count), mu)
     nu_hat = tree_map(lambda t: t / (1 - b2**count), nu)
-    updates = tree_map(lambda m, v: m / (np.sqrt(v) + eps), mu_hat, nu_hat)
+    updates = tree_map(lambda m, v: m / (jnp.sqrt(v) + eps), mu_hat, nu_hat)
     return updates
 
   return update
@@ -170,7 +175,7 @@ def scale_by_adam(b1=0.9, b2=0.999, eps=1e-8):
 
 def scale(step_size):
 
-  def update(params, updates):
+  def update(updates, params):
     del params
     return tree_map(lambda g: step_size * g, updates)
 
@@ -180,7 +185,7 @@ def scale(step_size):
 def scale_by_schedule(step_size_fn):
   """Returns a function that scales updates according to an input schedule."""
 
-  def update(params, updates, init_key=None):
+  def update(updates, params, *, init_key):
     del params
     if init_key is None:
       raise ValueError('`init_key` cannot be `None`.')
@@ -196,7 +201,7 @@ def scale_by_schedule(step_size_fn):
 def add_noise(eta, gamma, seed):
   """Returns a function that adds noise to updates."""
 
-  def update(params, updates, init_key=None):
+  def update(updates, params, *, init_key):
     del params
     count_key, seed_key = random.split(init_key)
     count = state.variable(0., key=count_key, name='count')
@@ -219,12 +224,12 @@ def add_noise(eta, gamma, seed):
 def apply_every(k=1):
   """Returns a function that accumulates updates and applies them all at once."""
 
-  def update(params, updates, init_key=None):
+  def update(updates, params, *, init_key):
     del params
     count_key, grad_acc_key = random.split(init_key)
     count = state.variable(0., key=count_key, name='count')
     grad_acc = state.variable(
-        tree_map(lambda g: np.zeros(g.shape), updates),
+        tree_map(lambda g: jnp.zeros(g.shape), updates),
         key=grad_acc_key,
         name='grad_acc')
 
@@ -244,13 +249,14 @@ def apply_every(k=1):
 
 def chain(*args, **kwargs):
   """Composes update functions together serially."""
-  def update(params, updates, init_key=None):
+
+  def update(updates, params, *, init_key):
     keys = random.split(init_key, len(args) + len(kwargs))
     names = [f'update_{i}' for i in range(len(args))] + list(kwargs.keys())
-    for (name, key, update_fn) in zip(
-        names, keys, itertools.chain(args, kwargs.values())):
-      step = state.init(update_fn, name=name)(key, params, updates)
-      updates = step(params, updates)
+    for (name, key, update_fn) in zip(names, keys,
+                                      itertools.chain(args, kwargs.values())):
+      step = state.init(update_fn, name=name)(key, updates, params)
+      updates = step(updates, params)
     return updates
 
   return update
@@ -283,9 +289,9 @@ def apply_updates(params, updates):
 
 def gradient_descent(update, objective):
 
-  def step(params, *args, init_key=None):
+  def step(params, *args, init_key):
     out, updates = jax.value_and_grad(objective)(params, *args)
-    updates = primitive.tie_in(out, update(params, updates, init_key=init_key))
+    updates = primitive.tie_in(out, update(updates, params, init_key=init_key))
     return apply_updates(params, updates)
 
   return step
@@ -294,7 +300,7 @@ def gradient_descent(update, objective):
 def optimize(objective, update, num_iters):
   """Runs several iterations of optimization and returns the result."""
 
-  def run(params, init_key=None):
+  def run(params, *, init_key):
     opt = state.init(
         gradient_descent(update, objective), name='opt')(init_key, params)
 
@@ -303,7 +309,7 @@ def optimize(objective, update, num_iters):
       params, opt = opt.call_and_update(params)
       return (opt, params), ()
 
-    opt, params = lax.scan(body, (opt, params), np.arange(num_iters))[0]
+    opt, params = lax.scan(body, (opt, params), jnp.arange(num_iters))[0]
     opt, params = primitive.tie_all(state.assign(opt, name='opt'), params)
     return params
 

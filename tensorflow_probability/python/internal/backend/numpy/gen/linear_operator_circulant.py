@@ -146,7 +146,6 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
 
       super(_BaseLinearOperatorCirculant, self).__init__(
           dtype=dtypes.as_dtype(input_output_dtype),
-          graph_parents=None,
           is_non_singular=is_non_singular,
           is_self_adjoint=is_self_adjoint,
           is_positive_definite=is_positive_definite,
@@ -523,7 +522,7 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
       axis = np.arange(spec_rank - self.block_depth, spec_rank, dtype=np.int32)
     else:
       spec_rank = array_ops.rank(self.spectrum)
-      axis = math_ops.range(spec_rank - self.block_depth, spec_rank)
+      axis = array_ops.range(spec_rank - self.block_depth, spec_rank)
 
     # Real diag part "re_d".
     # Suppose tensor_shape.TensorShape(spectrum.shape) = [B1,...,Bb, N1, N2]

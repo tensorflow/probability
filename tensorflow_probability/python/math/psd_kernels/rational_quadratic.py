@@ -70,7 +70,7 @@ class RationalQuadratic(PositiveSemidefiniteKernel):
        representation of the Matern class with applications in state space
        approximations and Bayesian quadrature. In _28th IEEE International
        Workshop on Machine Learning for Signal Processing_, 2018.
-       https://users.aalto.fi/~karvont2/pdf/TronarpKarvonenSarkka2018-MLSP.pdf
+       https://acris.aalto.fi/ws/portalfiles/portal/30548539/ELEC_Tronarp_etal_Mixture_Presentation_of_the_Matern_MLSP2018.pdf
   """
 
   def __init__(

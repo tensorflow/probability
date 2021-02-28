@@ -18,18 +18,17 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python import random as tfp_random
+from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
-from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import batched_rejection_sampler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import implementation_selection
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -66,133 +65,21 @@ def _bdtr(k, n, p):
   # Write:
   #   where(unsafe, safe_output, betainc(where(unsafe, safe_input, input)))
   ones = tf.ones_like(n - k)
-  k_eq_n = tf.equal(k, n)
-  safe_dn = tf.where(k_eq_n, ones, n - k)
+  safe_dn = tf.where(tf.logical_or(k < 0, k >= n), ones, n - k)
   dk = tf.math.betainc(a=safe_dn, b=k + 1, x=1 - p)
-  return tf.where(k_eq_n, ones, dk)
-
-
-def _log_concave_rejection_sampler(
-    mode,
-    prob_fn,
-    dtype,
-    sample_shape=(),
-    distribution_minimum=None,
-    distribution_maximum=None,
-    seed=None):
-  """Utility for rejection sampling from log-concave discrete distributions.
-
-  This utility constructs an easy-to-sample-from upper bound for a discrete
-  univariate log-concave distribution (for discrete univariate distributions, a
-  necessary and sufficient condition is p_k^2 >= p_{k-1} p_{k+1} for all k).
-  The method requires that the mode of the distribution is known. While a better
-  method can likely be derived for any given distribution, this method is
-  general and easy to implement. The expected number of iterations is bounded by
-  4+m, where m is the probability of the mode. For details, see [(Devroye,
-  1979)][1].
-
-  Args:
-    mode: Tensor, the mode[s] of the [batch of] distribution[s].
-    prob_fn: Python callable, counts -> prob(counts).
-    dtype: DType of the generated samples.
-    sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-    distribution_minimum: Tensor of type `dtype`. The minimum value
-      taken by the distribution. The `prob` method will only be called on values
-      greater than equal to the specified minimum. The shape must broadcast with
-      the batch shape of the distribution. If unspecified, the domain is treated
-      as unbounded below.
-    distribution_maximum: Tensor of type `dtype`. The maximum value
-      taken by the distribution. See `distribution_minimum` for details.
-    seed: Python integer or `Tensor` instance, for seeding PRNG.
-
-  Returns:
-    samples: a `Tensor` with prepended dimensions `sample_shape`.
-
-  #### References
-
-  [1] Luc Devroye. A Simple Generator for Discrete Log-Concave
-      Distributions. Computing, 1987.
-
-  [2] Dillon et al. TensorFlow Distributions. 2017.
-      https://arxiv.org/abs/1711.10604
-  """
-  mode = tf.broadcast_to(
-      mode, ps.concat([sample_shape, ps.shape(mode)], axis=0))
-
-  mode_height = prob_fn(mode)
-  mode_shape = ps.shape(mode)
-
-  top_width = 1. + mode_height / 2.  # w in ref [1].
-  top_fraction = top_width / (1 + top_width)
-  exponential_distribution = exponential.Exponential(
-      rate=tf.constant(1., dtype=dtype))  # E in ref [1].
-
-  if distribution_minimum is None:
-    distribution_minimum = tf.constant(-np.inf, dtype)
-  if distribution_maximum is None:
-    distribution_maximum = tf.constant(np.inf, dtype)
-
-  def proposal(seed):
-    """Proposal for log-concave rejection sampler."""
-    (top_lobe_fractions_seed,
-     exponential_samples_seed,
-     top_selector_seed,
-     rademacher_seed) = samplers.split_seed(
-         seed, n=4, salt='log_concave_rejection_sampler_proposal')
-
-    top_lobe_fractions = samplers.uniform(
-        mode_shape, seed=top_lobe_fractions_seed, dtype=dtype)  # V in ref [1].
-    top_offsets = top_lobe_fractions * top_width / mode_height
-
-    exponential_samples = exponential_distribution.sample(
-        mode_shape, seed=exponential_samples_seed)  # E in ref [1].
-    exponential_height = (exponential_distribution.prob(exponential_samples) *
-                          mode_height)
-    exponential_offsets = (top_width + exponential_samples) / mode_height
-
-    top_selector = samplers.uniform(
-        mode_shape, seed=top_selector_seed, dtype=dtype)  # U in ref [1].
-    on_top_mask = tf.less_equal(top_selector, top_fraction)
-
-    unsigned_offsets = tf.where(on_top_mask, top_offsets, exponential_offsets)
-    offsets = tf.round(
-        tfp_random.rademacher(
-            mode_shape, seed=rademacher_seed, dtype=dtype) *
-        unsigned_offsets)
-
-    potential_samples = mode + offsets
-    envelope_height = tf.where(on_top_mask, mode_height, exponential_height)
-
-    return potential_samples, envelope_height
-
-  def target(values):
-    # Check for out of bounds rather than in bounds to avoid accidentally
-    # masking a `nan` value.
-    out_of_bounds_mask = (
-        (values < distribution_minimum) | (values > distribution_maximum))
-    in_bounds_values = tf.where(
-        out_of_bounds_mask, tf.constant(0., dtype=values.dtype), values)
-    probs = prob_fn(in_bounds_values)
-    return tf.where(
-        out_of_bounds_mask, tf.constant(0., dtype=probs.dtype), probs)
-
-  return tf.stop_gradient(
-      batched_rejection_sampler.batched_rejection_sampler(
-          proposal, target, seed, dtype=dtype)[0])  # Discard `num_iters`.
+  return distribution_util.extend_cdf_outside_support(k, dk, low=0, high=n)
 
 
 def _random_binomial_cpu(
     shape,
     counts,
-    probs=None,
-    logits=None,
+    probs,
     output_dtype=tf.float32,
     seed=None,
     name=None):
   """Sample using *fast* `tf.random.stateless_binomial`."""
   with tf.name_scope(name or 'binomial_cpu'):
-    if probs is None:
-      probs = tf.where(counts > 0, tf.math.sigmoid(logits), 0)
+    probs = tf.where(counts > 0, probs, 0)
     batch_shape = ps.broadcast_shape(ps.shape(counts), ps.shape(probs))
     samples = tf.random.stateless_binomial(
         shape=ps.concat([shape, batch_shape], axis=0),
@@ -200,23 +87,145 @@ def _random_binomial_cpu(
   return samples
 
 
+# These functions are ported from random_binomial_op.cc in TF and manually
+# vectorized.
+
+
+def _binomial_inversion(counts, probs, full_shape, seed):
+  """Use multiple geometric samples to sample binomials with count*prob < 10."""
+  # Binomial inversion. Given probs, sum geometric random variables until they
+  # exceed counts. The number of random variables used is binomially
+  # distributed. This is also known as binomial inversion, as this is equivalent
+  # to inverting the Binomial CDF.
+  seed = samplers.sanitize_seed(seed)
+  zero_init = tf.zeros(full_shape, counts.dtype)
+
+  def cond(keep_going, *_):
+    return keep_going
+
+  # If probs were 1 we would loop forever. :(
+  # But probs is always <= 0.5 here, as guaranteed by the caller.
+  log1minusprob = tf.math.log1p(-probs)
+
+  def body(unused_keep_going, geom_sum, num_geom, seed):
+    u_seed, next_seed = samplers.split_seed(seed)
+    u = samplers.uniform(full_shape, seed=u_seed, dtype=counts.dtype)
+    geom = tf.math.ceil(tf.math.log(u) / log1minusprob)
+    geom_sum += geom
+    keep_going = (geom_sum <= counts)
+    num_geom = tf.where(keep_going, num_geom + 1, num_geom)
+    return tf.reduce_any(keep_going), geom_sum, num_geom, next_seed
+
+  _, _, num_geom, _ = tf.while_loop(
+      cond, body, (True, zero_init, zero_init, seed))
+  return num_geom
+
+
+def _stirling_approx_tail(k):
+  """Utility for `_btrs`."""
+  tail_values = tf.constant(
+      [0.0810614667953272, 0.0413406959554092, 0.0276779256849983,
+       0.02079067210376509, 0.0166446911898211, 0.0138761288230707,
+       0.0118967099458917, 0.0104112652619720, 0.00925546218271273,
+       0.00833056343336287],
+      dtype=k.dtype)
+
+  safe_tail_k = tf.clip_by_value(tf.cast(k, tf.int32), 0, 9)
+  kp1sq = (k + 1) * (k + 1)
+  nontail = (1.0 / 12 - (1.0 / 360 - 1.0 / 1260 / kp1sq) / kp1sq) / (k + 1)
+  return tf.where(k <= 9, tf.gather(tail_values, safe_tail_k), nontail)
+
+
+def _btrs(counts, probs, full_shape, seed):
+  """Binomial transformed rejection sampler, for count*prob >= 10."""
+  # We use a transformation-rejection algorithm from
+  # pairs of uniform random variables due to Hormann.
+  # https://www.tandfonline.com/doi/abs/10.1080/00949659308811496
+
+  seed = samplers.sanitize_seed(seed)
+  # This is spq in the paper.
+  stddev = tf.math.sqrt(counts * probs * (1 - probs))
+
+  # Other coefficients for Transformed Rejection sampling.
+  b = 1.15 + 2.53 * stddev
+  a = -0.0873 + 0.0248 * b + 0.01 * probs
+  c = counts * probs + 0.5
+  r = probs / (1 - probs)
+
+  alpha = (2.83 + 5.1 / b) * stddev
+  m = tf.math.floor((counts + 1) * probs)
+
+  def batched_las_vegas_trial_fn(seed):
+    u_seed, v_seed = samplers.split_seed(seed)
+    u = samplers.uniform(full_shape, seed=u_seed, dtype=counts.dtype) - 0.5
+    v = samplers.uniform(full_shape, seed=v_seed, dtype=counts.dtype)
+    us = 0.5 - tf.math.abs(u)
+    k = tf.math.floor((2 * a / us + b) * u + c)
+
+    # When the bounding box is tight, this criteria is more numerically stable
+    # and equally valid. Particularly on GPU/TPU, it may make the difference
+    # between terminating and non-terminating loops.
+    v_r = 0.92 - 4.2 / b
+    accept_boxed = (us >= 0.07) & (v <= v_r)
+
+    # Reject non-sensical answers.
+    reject = (k < 0) | (k > counts)
+
+    # This deviates from Hormann's BTRS algorithm, as there is a log missing.
+    # For all (u, v) pairs outside of the bounding box, this calculates the
+    # transformed-reject ratio.
+    v = tf.math.log(v * alpha / (a / (us * us) + b))
+    upperbound = (
+        (m + 0.5) * tf.math.log((m + 1) / (r * (counts - m + 1))) +
+        (counts + 1) * tf.math.log((counts - m + 1) / (counts - k + 1)) +
+        (k + 0.5) * tf.math.log(r * (counts - k + 1) / (k + 1)) +
+        _stirling_approx_tail(m) + _stirling_approx_tail(counts - m) -
+        _stirling_approx_tail(k) - _stirling_approx_tail(counts - k))
+    accept_bounded = v <= upperbound
+    return k, (~reject) & (accept_boxed | accept_bounded)
+
+  return batched_rejection_sampler.batched_las_vegas_algorithm(
+      batched_las_vegas_trial_fn, seed=seed)[0]  # Pick out samples.
+
+
 def _random_binomial_noncpu(
     shape,
     counts,
-    probs=None,
-    logits=None,
+    probs,
     output_dtype=tf.float32,
     seed=None,
     name=None):
   """Sample using XLA-friendly python-based rejection sampler."""
   with tf.name_scope(name or 'binomial_noncpu'):
-    dist = Binomial(total_count=counts, logits=logits, probs=probs)
-    samples = _log_concave_rejection_sampler(
-        dist.mode(), prob_fn=dist.prob, dtype=dist.dtype, sample_shape=shape,
-        distribution_minimum=tf.zeros((), dtype=dist.dtype),
-        distribution_maximum=counts, seed=seed)
-    samples = tf.cast(samples, output_dtype)
-  return samples
+    probs = tf.where(counts > 0, probs, 0)
+
+    batch_shape = ps.broadcast_shape(ps.shape(counts), ps.shape(probs))
+    full_shape = ps.concat([shape, batch_shape], axis=0)
+
+    inversion_seed, btrs_seed = samplers.split_seed(seed)
+
+    p_lt_half = probs < .5
+    q = tf.where(p_lt_half, probs, 1 - probs)
+    q_is_nan = tf.math.is_nan(q)
+    q_le_0 = (q <= 0.)
+    q = tf.where(q_is_nan | q_le_0, tf.constant(.01, q.dtype), q)
+
+    use_inversion = counts * q < 10.
+    counts_for_inversion = tf.where(use_inversion, counts, 0)
+    inversion_samples = _binomial_inversion(
+        counts_for_inversion, q, full_shape, inversion_seed)
+
+    counts_for_btrs = tf.where(
+        use_inversion, tf.constant(10000., counts.dtype), counts)
+    q_for_btrs = tf.where(use_inversion, tf.constant(.5, q.dtype), q)
+    btrs_samples = _btrs(counts_for_btrs, q_for_btrs, full_shape, btrs_seed)
+
+    samples = tf.where(use_inversion, inversion_samples, btrs_samples)
+    samples = tf.where(q_le_0, tf.zeros([], samples.dtype), samples)
+    samples = tf.where(
+        q_is_nan, tf.constant(float('nan'), samples.dtype), samples)
+    samples = tf.where(p_lt_half, samples, counts - samples)
+    return tf.stop_gradient(tf.cast(samples, output_dtype))
 
 
 # tf.function required to access Grappler's implementation_selector.
@@ -226,8 +235,7 @@ def _random_binomial_noncpu(
 def _random_binomial(
     shape,
     counts,
-    probs=None,
-    logits=None,
+    probs,
     output_dtype=tf.float32,
     seed=None,
     name=None):
@@ -238,7 +246,6 @@ def _random_binomial(
       broadcast shape of `counts` with `probs|logits`.
     counts: Batch of total_count.
     probs: Batch of p(success).
-    logits: Batch of log-odds(success).
     output_dtype: DType of samples.
     seed: int or Tensor seed.
     name: Optional name for related ops.
@@ -250,7 +257,7 @@ def _random_binomial(
   with tf.name_scope(name or 'random_binomial'):
     seed = samplers.sanitize_seed(seed)
     shape = ps.convert_to_shape_tensor(shape, dtype_hint=tf.int32, name='shape')
-    params = dict(shape=shape, counts=counts, probs=probs, logits=logits,
+    params = dict(shape=shape, counts=counts, probs=probs,
                   output_dtype=output_dtype, seed=seed, name=name)
     sampler_impl = implementation_selection.implementation_selecting(
         fn_name='binomial',
@@ -379,8 +386,15 @@ class Binomial(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(total_count=0, logits=0, probs=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        total_count=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        logits=parameter_properties.ParameterProperties(),
+        probs=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=sigmoid_bijector.Sigmoid,
+            is_preferred=False))
 
   @property
   def total_count(self):
@@ -436,13 +450,16 @@ class Binomial(distribution.Distribution):
   @distribution_util.AppendDocstring(_binomial_sample_note)
   def _sample_n(self, n, seed=None):
     seed = samplers.sanitize_seed(seed, salt='binomial')
+    total_count = tf.convert_to_tensor(self._total_count)
+    if self._probs is None:
+      probs = self._probs_parameter_no_checks(total_count=total_count)
+    else:
+      probs = tf.convert_to_tensor(self._probs)
+
     return _random_binomial(
         shape=ps.convert_to_shape_tensor([n]),
-        counts=tf.convert_to_tensor(self._total_count),
-        probs=(None if self._probs is None else
-               tf.convert_to_tensor(self._probs)),
-        logits=(None if self._logits is None else
-                tf.convert_to_tensor(self._logits)),
+        counts=total_count,
+        probs=probs,
         output_dtype=self.dtype,
         seed=seed)[0]
 
@@ -532,7 +549,11 @@ class Binomial(distribution.Distribution):
     assertions = []
     if not self.validate_args:
       return assertions
-    assertions.extend(distribution_util.assert_nonnegative_integer_form(counts))
+    assertions.append(distribution_util.assert_casting_closed(
+        counts, target_dtype=tf.int32,
+        message='counts cannot contain fractional components.'))
+    assertions.append(assert_util.assert_non_negative(
+        counts, message='counts must be non-negative.'))
     assertions.append(
         assert_util.assert_less_equal(
             counts, self.total_count,

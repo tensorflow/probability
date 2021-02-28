@@ -26,12 +26,40 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 # pytype_strict
 py_library(
     name = "brownian_motion_missing_middle_observations",
     srcs = ["brownian_motion_missing_middle_observations.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "convection_lorenz_bridge",
+    srcs = ["convection_lorenz_bridge.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "convection_lorenz_bridge_unknown_scales",
+    srcs = ["convection_lorenz_bridge_unknown_scales.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "eight_schools",
+    srcs = ["eight_schools.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,
@@ -120,8 +148,18 @@ py_library(
 
 # pytype_strict
 py_library(
-    name = "eight_schools",
-    srcs = ["eight_schools.py"],
+    name = "brownian_motion_unknown_scales_missing_middle_observations",
+    srcs = ["brownian_motion_unknown_scales_missing_middle_observations.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "radon_contextual_effects_minnesota_halfnormal",
+    srcs = ["radon_contextual_effects_minnesota_halfnormal.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,

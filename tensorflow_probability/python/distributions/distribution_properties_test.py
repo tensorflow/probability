@@ -38,12 +38,57 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import experimental as tfe
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
 
 
+<<<<<<< HEAD
+=======
+WORKING_PRECISION_TEST_BLOCK_LIST = (
+    # The difficulty concerns Mixtures of component distributions whose samples
+    # have different dtypes.
+    'Mixture',
+)
+
+
+NO_NANS_TEST_BLOCK_LIST = (
+    'BetaQuotient',  # b/178925774
+    'Dirichlet',  # b/169689852
+    'ExpRelaxedOneHotCategorical',  # b/169663302
+    # Independent log_prob unavoidably emits `nan` if the underlying
+    # distribution yields a +inf on one sample and a -inf on another.
+    'Independent',
+    'LogitNormal',  # TODO(axch): Maybe nan problem hints at accuracy problem
+    # Mixtures of component distributions whose samples have different dtypes
+    # cannot pass validate_args.
+    'Mixture',
+    'MixtureSameFamily',  # b/169790025
+    'OneHotCategorical',  # b/169680869
+    # TODO(axch) Re-enable after CDFs of underlying distributions are tested
+    # for NaN production.
+    'QuantizedDistribution',
+    # Sample log_prob unavoidably emits `nan` if the underlying distribution
+    # yields a +inf on one sample and a -inf on another.  This can happen even
+    # with iid samples, if one sample is at a pole of the distribution, and the
+    # other is far enough into the tail to round to +inf.  Weibull with a low
+    # concentration is an example of a distribution that can produce this
+    # effect.
+    'Sample',
+    'TransformedDistribution',  # Bijectors may introduce nans
+    # TODO(axch): Edit C++ sampler to reject numerically out-of-bounds samples
+    'TruncatedNormal',
+)
+
+NANS_EVEN_IN_SAMPLE_LIST = (
+    'Mixture',  # b/169847344.  Not a nan, but can't always sample from Mixture
+    'TransformedDistribution',  # Bijectors may introduce nans
+)
+>>>>>>> f7fb32575bc5fad85191af88fd7c48dcabb6d310
 
 # Batch slicing requires implementing `_params_event_ndims`.  Generic
 # instantiation (per `instantiable_base_dists`, below) also requires
@@ -74,6 +119,48 @@ SLICING_LOGPROB_RTOL.update({
 })
 
 
+def tensor_to_f64(x):
+  if tf.is_tensor(x) and x.dtype.is_floating:
+    return tf.cast(x, dtype=tf.float64)
+  else:
+    return x
+
+
+@test_util.test_all_tf_execution_regimes
+class LogProbConsistentPrecisionTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())
+                          + list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    if dist_name in WORKING_PRECISION_TEST_BLOCK_LIST:
+      self.skipTest('{} is blocked'.format(dist_name))
+    def eligibility_filter(name):
+      return name not in WORKING_PRECISION_TEST_BLOCK_LIST
+    dist = data.draw(dhps.distributions(
+        dist_name=dist_name, eligibility_filter=eligibility_filter,
+        enable_vars=False, validate_args=False))
+    hp.note('Trying distribution {}'.format(
+        self.evaluate_dict(dist.parameters)))
+    seed = test_util.test_seed()
+    with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
+      samples = dist.sample(5, seed=seed)
+      self.assertIn(samples.dtype, [tf.float32, tf.int32])
+      self.assertEqual(dist.log_prob(samples).dtype, tf.float32)
+
+    def log_prob_function(dist, x):
+      return dist.log_prob(x)
+
+    dist64 = tf.nest.map_structure(
+        tensor_to_f64, tfe.as_composite(dist), expand_composites=True)
+    with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
+      result64 = log_prob_function(dist64, tensor_to_f64(samples))
+    self.assertEqual(result64.dtype, tf.float64)
+
+
 @test_util.test_all_tf_execution_regimes
 class ReproducibilityTest(test_util.TestCase):
 
@@ -102,33 +189,65 @@ class ReproducibilityTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-class EventSpaceBijectorsTest(test_util.TestCase):
+class NoNansTest(test_util.TestCase, dhps.TestCase):
 
-  def check_bad_loc_scale(self, dist):
-    if hasattr(dist, 'distribution'):
-      # BatchReshape, Independent, TransformedDistribution, and
-      # QuantizedDistribution
-      self.check_bad_loc_scale(dist.distribution)
-    if isinstance(dist, tfd.MixtureSameFamily):
-      self.check_bad_loc_scale(dist.mixture_distribution)
-      self.check_bad_loc_scale(dist.components_distribution)
-    if isinstance(dist, tfd.Mixture):
-      self.check_bad_loc_scale(dist.cat)
-      self.check_bad_loc_scale(dist.components)
-    if hasattr(dist, 'loc') and hasattr(dist, 'scale'):
-      try:
-        loc_ = tf.convert_to_tensor(dist.loc)
-        scale_ = tf.convert_to_tensor(dist.scale)
-      except (ValueError, TypeError):
-        # If they're not Tensor-convertible, don't try to check them.  This is
-        # the case, in, for example, multivariate normal, where the scale is a
-        # `LinearOperator`.
-        return
-      loc, scale = self.evaluate([loc_, scale_])
-      hp.assume(np.all(np.abs(loc / scale) < 1e7))
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                          list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    if dist_name in NO_NANS_TEST_BLOCK_LIST:
+      self.skipTest('{} is blocked'.format(dist_name))
+    def eligibility_filter(name):
+      return name not in NO_NANS_TEST_BLOCK_LIST
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
+                                        eligibility_filter=eligibility_filter))
+    samples = self.check_samples_not_nan(dist)
+    self.assume_loc_scale_ok(dist)
+
+    hp.note('Testing on samples {}'.format(samples))
+    with tfp_hps.no_tf_rank_errors():
+      lp = self.evaluate(dist.log_prob(samples))
+    self.assertAllEqual(np.zeros_like(lp), np.isnan(lp))
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(NO_NANS_TEST_BLOCK_LIST)
+      if dname not in NANS_EVEN_IN_SAMPLE_LIST)
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testSampleOnly(self, dist_name, data):
+    def eligibility_filter(name):
+      # We use this eligibility filter to focus the test's attention
+      # on sub-distributions that are not already tested by the sample
+      # and log_prob test.  However, we also include some relatively
+      # widely used distributions to make sure that at least one legal
+      # sub-distribution exists for every meta-distribution we may be
+      # testing.
+      return ((name in NO_NANS_TEST_BLOCK_LIST
+               or name in dhps.QUANTIZED_BASE_DISTS)
+              and name not in NANS_EVEN_IN_SAMPLE_LIST)
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
+                                        eligibility_filter=eligibility_filter))
+    self.check_samples_not_nan(dist)
+
+  def check_samples_not_nan(self, dist):
+    hp.note('Trying distribution {}'.format(
+        self.evaluate_dict(dist.parameters)))
+    seed = test_util.test_seed(sampler_type='stateless')
+    with tfp_hps.no_tf_rank_errors():
+      samples = self.evaluate(dist.sample(20, seed=seed))
+    self.assertAllEqual(np.zeros_like(samples), np.isnan(samples))
+    return samples
+
+
+@test_util.test_all_tf_execution_regimes
+class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
 
   def check_event_space_bijector_constrains(self, dist, data):
-    event_space_bijector = dist._experimental_default_event_space_bijector()
+    event_space_bijector = dist.experimental_default_event_space_bijector()
     if event_space_bijector is None:
       return
 
@@ -163,7 +282,7 @@ class EventSpaceBijectorsTest(test_util.TestCase):
     dist = data.draw(dhps.base_distributions(
         dist_name=dist_name, enable_vars=True))
     self.evaluate([var.initializer for var in dist.variables])
-    self.check_bad_loc_scale(dist)
+    self.assume_loc_scale_ok(dist)
     self.check_event_space_bijector_constrains(dist, data)
 
   # TODO(b/146572907): Fix `enable_vars` for metadistributions and
@@ -181,8 +300,90 @@ class EventSpaceBijectorsTest(test_util.TestCase):
         dist_name=dist_name, enable_vars=True,
         eligibility_filter=ok))
     self.evaluate([var.initializer for var in dist.variables])
-    self.check_bad_loc_scale(dist)
+    self.assume_loc_scale_ok(dist)
     self.check_event_space_bijector_constrains(dist, data)
+
+
+@test_util.test_all_tf_execution_regimes
+class ParameterBijectorsTest(test_util.TestCase):
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testCanConstructAndSampleDistribution(self, data):
+
+    # TODO(b/169874884): Implement `width` parameters to work around the need
+    # for a high > low` joint constraint.
+    high_gt_low_constraint_dists = ('Bates', 'PERT', 'Triangular',
+                                    'TruncatedCauchy', 'TruncatedNormal',
+                                    'Uniform')
+    not_annotated_dists = ('Empirical|event_ndims=0', 'Empirical|event_ndims=1',
+                           'Empirical|event_ndims=2', 'FiniteDiscrete',
+                           'MultivariateStudentTLinearOperator',
+                           'PoissonLogNormalQuadratureCompound',
+                           'SphericalUniform', 'SinhArcsinh',
+                           'StoppingRatioLogistic',)
+    non_trainable_dists = (
+        high_gt_low_constraint_dists + not_annotated_dists +
+        dhps.INSTANTIABLE_META_DISTS)
+
+    non_trainable_tensor_params = (
+        'atol',
+        'rtol',
+        'eigenvectors',  # TODO(b/171872834): DeterminantalPointProcess
+        'total_count',
+        'num_samples',
+        'df',  # Can't represent constraint that Wishart df > dimension.
+        'mean_direction')  # TODO(b/118492439): Add `UnitVector` bijector.
+    non_trainable_non_tensor_params = ('dimension', 'dtype'
+                                      )  # Required by Zipf.
+
+    dist = data.draw(
+        dhps.distributions(
+            eligibility_filter=(lambda name: name not in non_trainable_dists)))
+    sample_shape = tuple(
+        self.evaluate(
+            tf.concat([dist.batch_shape_tensor(),
+                       dist.event_shape_tensor()],
+                      axis=0)))
+
+    params = type(dist).parameter_properties(num_classes=2)
+    params64 = type(dist).parameter_properties(dtype=tf.float64, num_classes=2)
+
+    new_parameters = {}
+    seeds = {k: s for (k, s) in zip(
+        params.keys(),
+        samplers.split_seed(test_util.test_seed(), n=len(params)))}
+    for param_name, param in params.items():
+      if param_name in non_trainable_tensor_params:
+        new_parameters[param_name] = dist.parameters[param_name]
+      elif param.is_preferred:
+        b = param.default_constraining_bijector_fn()
+        unconstrained_shape = (
+            b.inverse_event_shape_tensor(
+                param.shape_fn(sample_shape=sample_shape)))
+        unconstrained_param = samplers.normal(
+            unconstrained_shape, seed=seeds[param_name])
+        new_parameters[param_name] = b.forward(unconstrained_param)
+
+        # Check that passing a float64 `eps` works with float64 parameters.
+        b_float64 = params64[param_name].default_constraining_bijector_fn()
+        b_float64(tf.cast(unconstrained_param, tf.float64))
+
+    # Copy over any non-Tensor parameters.
+    new_parameters.update({
+        k: v
+        for (k, v) in dist.parameters.items()
+        if k in non_trainable_non_tensor_params
+    })
+
+    # Sanity check that we got valid parameters.
+    new_parameters['validate_args'] = True
+    new_dist = type(dist)(**new_parameters)
+    x = self.evaluate(new_dist.sample(seed=test_util.test_seed()))
+    self.assertEqual(sample_shape, x.shape)
+
+    # Valid parameters should give non-nan samples.
+    self.assertAllFalse(np.isnan(x))
 
 
 def _all_shapes(thing):
@@ -361,6 +562,29 @@ class DistributionSlicingTest(test_util.TestCase):
     dist = tfb.Expm1()(dist)
     samps = 1.7182817 + tf.zeros_like(dist.sample(seed=test_util.test_seed()))
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
+
+
+# Don't decorate with test_util.test_all_tf_execution_regimes, since we're
+# explicitly mixing modes.
+class TestMixingGraphAndEagerModes(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in  sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                           list(dhps.INSTANTIABLE_META_DISTS))
+  )
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testSampleEagerCreatedDistributionInGraphMode(self, dist_name, data):
+    if not tf.executing_eagerly():
+      self.skipTest('Only test mixed eager/graph behavior in eager tests.')
+    # Create in eager mode.
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False))
+
+    @tf.function
+    def f():
+      dist.sample()
+    f()
 
 
 if __name__ == '__main__':

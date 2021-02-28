@@ -50,6 +50,7 @@ TF2_FRIENDLY_DISTS = (
     'Bernoulli',
     'Beta',
     'BetaBinomial',
+    'BetaQuotient',
     'Binomial',
     'Chi',
     'Chi2',
@@ -58,6 +59,7 @@ TF2_FRIENDLY_DISTS = (
     'Cauchy',
     'ContinuousBernoulli',
     'Deterministic',
+    'DeterminantalPointProcess',
     'Dirichlet',
     'DirichletMultinomial',
     'DoublesidedMaxwell',
@@ -72,6 +74,7 @@ TF2_FRIENDLY_DISTS = (
     'GeneralizedPareto',
     'Geometric',
     'Gumbel',
+    'GeneralizedExtremeValue',
     'HalfCauchy',
     'HalfNormal',
     'HalfStudentT',
@@ -101,7 +104,9 @@ TF2_FRIENDLY_DISTS = (
     'ProbitBernoulli',
     'RelaxedBernoulli',
     'ExpRelaxedOneHotCategorical',
+    'SigmoidBeta',
     # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
+    'Skellam',
     'SphericalUniform',
     'StudentT',
     'Triangular',
@@ -136,6 +141,7 @@ SPECIAL_DISTS = (
     'Independent',  # (has strategy)
     'Mixture',  # (has strategy)
     'MixtureSameFamily',  # (has strategy)
+    'MultivariateNormalDiagPlusLowRank',  # Some batch shapes fail (b/177958275)
     'Sample',  # (has strategy)
     'TransformedDistribution',  # (has strategy)
     'QuantizedDistribution',  # (has strategy)
@@ -148,6 +154,8 @@ MUTEX_PARAMS = (
     set(['logits', 'probs']),
     set(['probits', 'probs']),
     set(['rate', 'log_rate']),
+    set(['rate1', 'log_rate1']),
+    set(['rate2', 'log_rate2']),
     set(['scale', 'log_scale']),
     set(['scale', 'scale_tril', 'scale_diag', 'scale_identity_multiplier']),
 )
@@ -174,8 +182,8 @@ QUANTIZED_BASE_DISTS = (
 # TODO(b/128518790): Eliminate / minimize the fudge factors in here.
 
 
-def constrain_between_eps_and_one_minus_eps(eps=1e-6):
-  return lambda x: eps + (1 - 2 * eps) * tf.sigmoid(x)
+def constrain_between_eps_and_one_minus_eps(eps0=1e-6, eps1=1e-6):
+  return lambda x: eps0 + (1 - (eps0 + eps1)) * tf.sigmoid(x)
 
 
 def ensure_high_gt_low(low, high):
@@ -256,10 +264,22 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'concentration1':
         tfp_hps.softplus_plus_eps(),
+    'concentration0_numerator':
+        tfp_hps.softplus_plus_eps(),
+    'concentration1_numerator':
+        tfp_hps.softplus_plus_eps(1.),
+    'concentration0_denominator':
+        tfp_hps.softplus_plus_eps(),
+    'concentration1_denominator':
+        tfp_hps.softplus_plus_eps(1.),
     'covariance_matrix':
         tfp_hps.positive_definite,
     'df':
         tfp_hps.softplus_plus_eps(),
+    'DeterminantalPointProcess.eigenvalues':
+        tfp_hps.softplus_plus_eps(),
+    'eigenvectors':
+        tfp_hps.orthonormal,
     'InverseGaussian.loc':
         tfp_hps.softplus_plus_eps(),
     'JohnsonSU.tailweight':
@@ -281,7 +301,9 @@ CONSTRAINTS = {
     'RelaxedCategorical.probs':
         tf.math.softmax,
     'Zipf.power':
-        tfp_hps.softplus_plus_eps(1 + 1e-6),  # strictly > 1
+        # Strictly > 1.  See also b/175929563 (rejection sampler
+        # iterates too much and emits `nan` for powers too close to 1).
+        tfp_hps.softplus_plus_eps(1 + 1e-4),
     'ContinuousBernoulli.probs':
         tf.sigmoid,
     'Geometric.logits':  # TODO(b/128410109): re-enable down to -50
@@ -292,8 +314,12 @@ CONSTRAINTS = {
         constrain_between_eps_and_one_minus_eps(),
     'Binomial.probs':
         tf.sigmoid,
+    # Constrain probs away from 0 to avoid immense samples.
+    # See b/178842153.
+    'NegativeBinomial.logits':
+        lambda x: tf.minimum(x, 15.),
     'NegativeBinomial.probs':
-        tf.sigmoid,
+        constrain_between_eps_and_one_minus_eps(eps0=0., eps1=1e-6),
     'Bernoulli.probs':
         tf.sigmoid,
     'PlackettLuce.scores':
@@ -304,9 +330,17 @@ CONSTRAINTS = {
         tf.sigmoid,
     'cutpoints':
         # Permit values that aren't too large
-        lambda x: tfb.Ordered().inverse(10 * tf.math.tanh(x)),
+        lambda x: tfb.Ascending().forward(10 * tf.math.tanh(x)),
+    # Capping log_rate because of weird semantics of Poisson with very
+    # large rates (see b/178842153).
     'log_rate':
-        lambda x: tf.maximum(x, -16.),
+        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),
+    # Capping log_rate1 and log_rate2 to 15. This is because if both are large
+    # (meaning the rates are `inf`), then the Skellam distribution is undefined.
+    'log_rate1':
+        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),
+    'log_rate2':
+        lambda x: tf.minimum(tf.maximum(x, -16.), 15.),
     'log_scale':
         lambda x: tf.maximum(x, -16.),
     'mixing_concentration':
@@ -314,6 +348,10 @@ CONSTRAINTS = {
     'mixing_rate':
         tfp_hps.softplus_plus_eps(),
     'rate':
+        tfp_hps.softplus_plus_eps(),
+    'rate1':
+        tfp_hps.softplus_plus_eps(),
+    'rate2':
         tfp_hps.softplus_plus_eps(),
     'scale':
         tfp_hps.softplus_plus_eps(),
@@ -339,6 +377,16 @@ CONSTRAINTS = {
         fix_lkj,
     'LKJ':
         fix_lkj,
+    'MultivariateNormalDiagPlusLowRank.scale_diag':
+        # Ensure that the diagonal component is large enough to avoid being
+        # overwhelmed  by the (singular) low-rank perturbation.
+        tfp_hps.softplus_plus_eps(1. + 1e-6),
+    'MultivariateNormalDiagPlusLowRank.scale_perturb_diag':
+        tfp_hps.softplus_plus_eps(),
+    'MultivariateNormalDiagPlusLowRank.scale_perturb_factor':
+        # Prevent large low-rank perturbations from creating numerically
+        # singular matrices.
+        tf.math.tanh,
     'PERT':
         fix_pert,
     'Triangular':
@@ -558,31 +606,6 @@ def stringify_slices(slices):
   return pretty_slices
 
 
-@hps.composite
-def broadcasting_params(draw,
-                        dist_name,
-                        batch_shape,
-                        event_dim=None,
-                        enable_vars=False):
-  """Strategy for drawing parameters broadcasting to `batch_shape`."""
-  if dist_name not in INSTANTIABLE_BASE_DISTS:
-    raise ValueError('Unknown Distribution name {}'.format(dist_name))
-
-  params_event_ndims = INSTANTIABLE_BASE_DISTS[dist_name].params_event_ndims
-
-  def _constraint(param):
-    return constraint_for(dist_name, param)
-
-  return draw(
-      tfp_hps.broadcasting_params(
-          batch_shape,
-          params_event_ndims,
-          event_dim=event_dim,
-          enable_vars=enable_vars,
-          constraint_fn_for=_constraint,
-          mutex_params=MUTEX_PARAMS))
-
-
 def prime_factors(v):
   """Compute the prime factors of v."""
   factors = []
@@ -625,6 +648,7 @@ def base_distribution_unconstrained_params(draw,
                                            batch_shape=None,
                                            event_dim=None,
                                            enable_vars=False,
+                                           param_strategy_fn=None,
                                            params=None):
   """Strategy for drawing unconstrained parameters of a base Distribution.
 
@@ -646,6 +670,10 @@ def base_distribution_unconstrained_params(draw,
       initialization in slicing_test.  If `False`, the returned parameters are
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}.
+    param_strategy_fn: Optional callable with signature
+      `strategy = param_strategy_fn(shape, dtype, constraint_fn)`. If provided,
+      overrides the default strategy for generating float-valued parameters.
+      Default value: `None`.
     params: An optional set of Distribution parameters. If params are not
       provided, Hypothesis will choose a set of parameters.
 
@@ -661,11 +689,21 @@ def base_distribution_unconstrained_params(draw,
     batch_shape = draw(tfp_hps.shapes())
 
   # Draw raw parameters
+  if dist_name not in INSTANTIABLE_BASE_DISTS:
+    raise ValueError('Unknown Distribution name {}'.format(dist_name))
+  params_event_ndims = INSTANTIABLE_BASE_DISTS[dist_name].params_event_ndims
+
   params_kwargs = draw(
-      broadcasting_params(
-          dist_name, batch_shape, event_dim=event_dim, enable_vars=enable_vars))
-  hp.note('Forming dist {} with raw parameters {}'.format(
-      dist_name, params_kwargs))
+      tfp_hps.broadcasting_params(
+          batch_shape,
+          params_event_ndims,
+          event_dim=event_dim,
+          enable_vars=enable_vars,
+          constraint_fn_for=lambda param: constraint_for(dist_name, param),
+          mutex_params=MUTEX_PARAMS,
+          param_strategy_fn=param_strategy_fn))
+  hp.note('Forming dist {} with raw parameters {}'.format(dist_name,
+                                                          params_kwargs))
 
   return params_kwargs, batch_shape
 
@@ -718,8 +756,9 @@ def base_distributions(draw,
                        event_dim=None,
                        enable_vars=False,
                        eligibility_filter=lambda name: True,
-                       validate_args=True,
-                       params=None):
+                       params=None,
+                       param_strategy_fn=None,
+                       validate_args=True):
   """Strategy for drawing arbitrary base Distributions.
 
   This does not draw compound distributions like `Independent`,
@@ -740,11 +779,15 @@ def base_distributions(draw,
       initialization in slicing_test.  If `False`, the returned parameters are
       all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
       `tfp.util.TransformedVariable`}.
-    eligibility_filter: Optional Python callable.  Blacklists some Distribution
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn at the top level.
-    validate_args: Python `bool`; whether to enable runtime assertions.
     params: An optional set of Distribution parameters. If params are not
       provided, Hypothesis will choose a set of parameters.
+    param_strategy_fn: Optional callable with signature
+      `strategy = param_strategy_fn(shape, dtype, constraint_fn)`. If provided,
+      overrides the default strategy for generating float-valued parameters.
+      Default value: `None`.
+    validate_args: Python `bool`; whether to enable runtime assertions.
 
   Returns:
     dists: A strategy for drawing Distributions with the specified `batch_shape`
@@ -766,13 +809,14 @@ def base_distributions(draw,
 
   if params is None:
     params_unconstrained, batch_shape = draw(
-        base_distribution_unconstrained_params(dist_name,
-                                               batch_shape=batch_shape,
-                                               event_dim=event_dim,
-                                               enable_vars=enable_vars))
+        base_distribution_unconstrained_params(
+            dist_name,
+            batch_shape=batch_shape,
+            event_dim=event_dim,
+            enable_vars=enable_vars,
+            param_strategy_fn=param_strategy_fn))
     params = constrain_params(params_unconstrained, dist_name)
-  params = modify_params(
-      params, dist_name, validate_args=validate_args)
+  params = modify_params(params, dist_name, validate_args=validate_args)
   # Actually construct the distribution
   dist_cls = INSTANTIABLE_BASE_DISTS[dist_name].cls
   result_dist = dist_cls(**params)
@@ -1054,7 +1098,8 @@ def transformed_distributions(draw,
   if depth is None:
     depth = draw(depths())
 
-  bijector = draw(bijector_hps.unconstrained_bijectors())
+  bijector = draw(bijector_hps.unconstrained_bijectors(
+      validate_args=validate_args))
   hp.note('Drawing TransformedDistribution with bijector {}'.format(bijector))
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes())
@@ -1138,6 +1183,7 @@ def quantized_distributions(draw,
       event_dim=event_dim,
       enable_vars=enable_vars,
       eligibility_filter=ok,
+      validate_args=validate_args,
   )
   underlying = draw(underlyings)
 
@@ -1238,13 +1284,21 @@ def mixtures_same_family(draw,
         batch_shape,
         draw(tfp_hps.shapes(min_ndims=1, max_ndims=1, min_lastdimsize=2)))
 
+  # Cannot put a BatchReshape into a MixtureSameFamily, because the former
+  # doesn't support broadcasting, and the latter relies on it.  b/161984806.
+  def nested_eligibility_filter(dist_name):
+    if dist_name == 'BatchReshape':
+      return False
+    return eligibility_filter(dist_name)
+
   component = draw(
       distributions(
           batch_shape=batch_shape,
           event_dim=event_dim,
           enable_vars=enable_vars,
-          eligibility_filter=eligibility_filter,
-          depth=depth - 1))
+          eligibility_filter=nested_eligibility_filter,
+          depth=depth - 1,
+          validate_args=validate_args))
   hp.note('Drawing MixtureSameFamily with component {}; parameters {}'.format(
       component, params_used(component)))
   # scalar or same-shaped categorical?
@@ -1313,12 +1367,20 @@ def mixtures(draw,
   if event_dim is None:
     event_dim = draw(hps.integers(min_value=2, max_value=6))
 
+  # TODO(b/169441746): Re-enable nesting MixtureSameFamily inside Mixture when
+  # the weird edge case gets fixed.
+  def nested_eligibility_filter(dist_name):
+    if dist_name in ['MixtureSameFamily']:
+      return False
+    return eligibility_filter(dist_name)
+
   component_strategy = distributions(
       batch_shape=batch_shape,
       event_dim=event_dim,
       enable_vars=enable_vars,
-      eligibility_filter=eligibility_filter,
-      depth=depth - 1)
+      eligibility_filter=nested_eligibility_filter,
+      depth=depth - 1,
+      validate_args=validate_args)
   # Must ensure matching event shapes and dtypes.
   c0 = draw(component_strategy)
   components = [c0] + draw(hps.lists(
@@ -1337,7 +1399,7 @@ def mixtures(draw,
       cat, params_used(cat)))
   result_dist = tfd.Mixture(
       cat=cat, components=components,
-      validate_args=validate_args, use_static_graph=draw(hps.booleans()))
+      validate_args=validate_args)
   if batch_shape != result_dist.batch_shape:
     msg = ('Mixture strategy generated a bad batch shape for {}, should have'
            ' been {}.').format(result_dist, batch_shape)
@@ -1404,8 +1466,12 @@ def distributions(draw,
       or dist_name in INSTANTIABLE_BASE_DISTS
       or dist_name == 'Empirical'):
     return draw(base_distributions(
-        dist_name, batch_shape, event_dim, enable_vars,
-        eligibility_filter, validate_args))
+        dist_name,
+        batch_shape=batch_shape,
+        event_dim=event_dim,
+        enable_vars=enable_vars,
+        eligibility_filter=eligibility_filter,
+        validate_args=validate_args))
   if dist_name == 'BatchReshape':
     return draw(batch_reshapes(
         batch_shape, event_dim, enable_vars, depth,
@@ -1435,3 +1501,47 @@ def distributions(draw,
         batch_shape, event_dim, enable_vars,
         eligibility_filter, validate_args))
   raise ValueError('Unknown Distribution name {}'.format(dist_name))
+
+
+class TestCase(object):
+  """Mixin for TestCase-type classes with Hypothesis-specific utilities."""
+
+  def assume_loc_scale_ok(self, dist):
+    """Hypothesis assumption that `dist` has reasonable a location and scale.
+
+    To wit, `hp.assume` that location / scale < 1e7.  Why this check?  Because
+    by assumption we tend to think of samples as being near the location, with
+    nearness determined by the scale.  If the scale is close to machine epsilon
+    near the location, then the distribution is close to being numerically
+    degenerate, and therefore not a good test case.
+
+    This assumption is currently only checked for (batch) scalar locations and
+    scales, and only if the distribution is parameterized with parameters named
+    `loc` and `scale`.
+
+    The assumption is applied recursively through meta distributions.
+
+    Args:
+      dist: TFP `Distribution` to check.
+    """
+    if hasattr(dist, 'distribution'):
+      # BatchReshape, Independent, TransformedDistribution, and
+      # QuantizedDistribution
+      self.assume_loc_scale_ok(dist.distribution)
+    if isinstance(dist, tfd.MixtureSameFamily):
+      self.assume_loc_scale_ok(dist.mixture_distribution)
+      self.assume_loc_scale_ok(dist.components_distribution)
+    if isinstance(dist, tfd.Mixture):
+      self.assume_loc_scale_ok(dist.cat)
+      self.assume_loc_scale_ok(dist.components)
+    if hasattr(dist, 'loc') and hasattr(dist, 'scale'):
+      try:
+        loc_ = tf.convert_to_tensor(dist.loc)
+        scale_ = tf.convert_to_tensor(dist.scale)
+      except (ValueError, TypeError):
+        # If they're not Tensor-convertible, don't try to check them.  This is
+        # the case, in, for example, multivariate normal, where the scale is a
+        # `LinearOperator`.
+        return
+      loc, scale = self.evaluate([loc_, scale_])
+      hp.assume(np.all(np.abs(loc / scale) < 1e7))

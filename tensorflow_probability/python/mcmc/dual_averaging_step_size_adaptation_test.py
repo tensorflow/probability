@@ -90,7 +90,7 @@ class FakeSteppedKernel(tfp.mcmc.TransitionKernel):
         step_size=step_size,
         store_parameters_in_results=store_parameters_in_results)
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     return current_state, previous_kernel_results
 
   def bootstrap_results(self, current_state):
@@ -116,7 +116,7 @@ class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
   def inner_kernel(self):
     return self.parameters['inner_kernel']
 
-  def one_step(self, current_state, previous_kernel_results):
+  def one_step(self, current_state, previous_kernel_results, seed=None):
     new_state, new_inner_results = self.inner_kernel.one_step(
         current_state, previous_kernel_results.inner_results)
     return new_state, previous_kernel_results._replace(
@@ -533,6 +533,34 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     self.assertFalse(
         tfp.mcmc.DualAveragingStepSizeAdaptation(test_kernel(False),
                                                  1).is_calibrated)
+
+  def testCustomReduceFn(self):
+    log_accept_ratio = tf.constant(
+        [np.log(0.73), np.log(0.76)],
+        dtype=tf.float32)
+    state = [
+        tf.zeros([2]),
+    ]
+
+    old_step_size = 1.
+    kernel = FakeMHKernel(
+        FakeSteppedKernel(step_size=old_step_size),
+        log_accept_ratio=log_accept_ratio)
+    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+        kernel,
+        num_adaptation_steps=1,
+        reduce_fn=tf.reduce_max,
+        validate_args=True)
+
+    kernel_results = kernel.bootstrap_results(state)
+    for _ in range(2):
+      _, kernel_results = kernel.one_step(state, kernel_results)
+
+    step_size = self.evaluate(
+        kernel_results.inner_results.accepted_results.step_size,)
+
+    # If reduce_fn was left at default, this would have decreased.
+    self.assertAllClose(_UPDATE_01, step_size)
 
 
 @test_util.test_all_tf_execution_regimes

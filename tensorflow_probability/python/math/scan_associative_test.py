@@ -208,7 +208,7 @@ class ScanAssociativeTestStatic(_ScanAssociativeTest):
     # curry `scan_associative` so that the resulting function takes in `Tensors`
     # or `DeviceArrays`.
 
-    xla_scan = tf.function(experimental_compile=True)(
+    xla_scan = tf.function(jit_compile=True)(
         functools.partial(tfp.math.scan_associative, operator.add))
     result = xla_scan(elems)
 

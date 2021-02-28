@@ -168,6 +168,11 @@ __all__ = [
 def _astuple(x):
   """Attempt to convert the given argument to be a Python tuple."""
   try:
+    return (int(x),)
+  except TypeError:
+    pass
+
+  try:
     return tuple(x)
   except TypeError:
     pass
@@ -186,11 +191,12 @@ def _astuple(x):
 def _bincount(arr, weights=None, minlength=None, maxlength=None,  # pylint: disable=unused-argument
               dtype=np.int32, name=None):  # pylint: disable=unused-argument
   """Counts number of occurences of each value in `arr`."""
+  # TODO(https://github.com/google/jax/issues/5719): Use np.bincount directly?
   if not JAX_MODE:
     return np.bincount(arr, weights, minlength).astype(utils.numpy_dtype(dtype))
 
   dtype = utils.numpy_dtype(dtype)
-  num_buckets = np.max(arr) + 1
+  num_buckets = (np.max(arr) + 1) if np.size(arr) else 0
   if minlength is not None and maxlength is not None and minlength == maxlength:
     # In the case where we can use minlength directly, this helps avoids the
     # use of an abstract value, which prevents JAX JIT.
@@ -222,14 +228,14 @@ def _confusion_matrix(
   if not JAX_MODE:
     np.add.at(cmatrix, [labels, predictions], weights)
     return cmatrix
-  return jax.ops.index_add(cmatrix, [labels, predictions], weights)
+  return jax.ops.index_add(cmatrix, (labels, predictions), weights)
 
 
 def _cumop(op, x, axis=0, exclusive=False, reverse=False, name=None,
            initial_value=None):
   """Shared impl of cumsum/cumprod."""
   del name
-  axis = _astuple(axis)
+  axis = int(axis)
   result = op(_reverse(x, axis) if reverse else x, axis)
   if reverse:
     result = _reverse(result, axis)
@@ -337,8 +343,8 @@ def _segment_sum(data, segment_ids, name=None):  # pylint: disable=unused-argume
 
 
 def _segment_mean(data, segment_ids, name=None):
-  sm = _segment_sum(data, segment_ids, name=name)
-  denom = np.bincount(segment_ids - segment_ids[0])
+  sm = segment_sum(data, segment_ids, name=name)
+  denom = bincount(segment_ids - segment_ids[:1])
   return sm / denom.reshape(denom.shape + (1,) * (data.ndim - 1))
 
 
@@ -412,7 +418,7 @@ def _unsorted_segment_sum(data, segment_ids, num_segments, name=None):
 
 abs = utils.copy_docstring(  # pylint: disable=redefined-builtin
     'tf.math.abs',
-    lambda x, name=None: np.abs(x))
+    lambda x, name=None: np.abs(_convert_to_tensor(x)))
 
 accumulate_n = utils.copy_docstring(
     'tf.math.accumulate_n',
@@ -442,14 +448,14 @@ angle = utils.copy_docstring(
 argmax = utils.copy_docstring(
     'tf.math.argmax',
     lambda input, axis=None, output_type=np.int64, name=None: (  # pylint: disable=g-long-lambda
-        np.argmax(input, axis=0 if axis is None else _astuple(axis))
+        np.argmax(input, axis=0 if axis is None else int(axis))
         .astype(utils.numpy_dtype(output_type))))
 
 argmin = utils.copy_docstring(
     'tf.math.argmin',
     lambda input, axis=None, output_type=np.int64, name=None: (  # pylint: disable=g-long-lambda
         np.argmin(_convert_to_tensor(
-            input), axis=0 if axis is None else _astuple(axis))
+            input), axis=0 if axis is None else int(axis))
         .astype(utils.numpy_dtype(output_type))))
 
 asin = utils.copy_docstring(
@@ -563,7 +569,7 @@ erfinv = utils.copy_docstring(
 
 exp = utils.copy_docstring(
     'tf.math.exp',
-    lambda x, name=None: np.exp(x))
+    lambda x, name=None: np.exp(_convert_to_tensor(x)))
 
 expm1 = utils.copy_docstring(
     'tf.math.expm1',
@@ -805,16 +811,10 @@ reciprocal_no_nan = utils.copy_docstring(
 
 
 def _apply_reduction(op, input_tensor, axis=None, keepdims=False, name=None,  # pylint: disable=unused-argument
-                     include_dtype_kwarg=False, replace_nan=None):
+                     include_dtype_kwarg=False):
   """Implements reduce_* for nptf."""
   input_tensor = _convert_to_tensor(input_tensor)
   axis = _astuple(axis)
-  if replace_nan is not None and np.issubdtype(input_tensor.dtype, np.floating):
-    loc_is_nan = np.isnan(input_tensor)
-    input_tensor = np.where(  # reduce_*([nan, nan], 0) in TF returns nan.
-        loc_is_nan & ~np.all(loc_is_nan, axis=axis, keepdims=True),
-        np.asarray(replace_nan, dtype=input_tensor.dtype),
-        input_tensor)
   kwargs = dict(dtype=input_tensor.dtype) if include_dtype_kwarg else {}
   return op(input_tensor, axis=axis, keepdims=keepdims, **kwargs)
 
@@ -837,7 +837,7 @@ reduce_logsumexp = utils.copy_docstring(
 
 reduce_max = utils.copy_docstring(
     'tf.math.reduce_max',
-    utils.partial(_apply_reduction, np.max, replace_nan=-float('inf')))
+    utils.partial(_apply_reduction, np.max))
 
 reduce_mean = utils.copy_docstring(
     'tf.math.reduce_mean',
@@ -845,7 +845,7 @@ reduce_mean = utils.copy_docstring(
 
 reduce_min = utils.copy_docstring(
     'tf.math.reduce_min',
-    utils.partial(_apply_reduction, np.min, replace_nan=float('inf')))
+    utils.partial(_apply_reduction, np.min))
 
 reduce_prod = utils.copy_docstring(
     'tf.math.reduce_prod',

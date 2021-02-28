@@ -36,10 +36,11 @@ class PoissonTest(test_util.TestCase):
   def _make_poisson(self,
                     rate,
                     validate_args=True,
-                    interpolate_nondiscrete=True):
-    return tfd.Poisson(rate=rate,
-                       validate_args=validate_args,
-                       interpolate_nondiscrete=interpolate_nondiscrete)
+                    force_probs_to_zero_outside_support=False):
+    return tfd.Poisson(
+        rate=rate,
+        validate_args=validate_args,
+        force_probs_to_zero_outside_support=force_probs_to_zero_outside_support)
 
   def testPoissonShape(self):
     lam = tf.constant([3.0] * 5)
@@ -72,7 +73,7 @@ class PoissonTest(test_util.TestCase):
     x = np.array([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.],
                  dtype=np.float32)
     poisson = self._make_poisson(
-        rate=lam, interpolate_nondiscrete=False, validate_args=False)
+        rate=lam, force_probs_to_zero_outside_support=True, validate_args=False)
     log_pmf = poisson.log_prob(x)
     self.assertEqual(log_pmf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_pmf), stats.poisson.logpmf(x, lam_v))
@@ -86,7 +87,9 @@ class PoissonTest(test_util.TestCase):
     lam = tf.constant([3.0] * batch_size)
     x = tf.constant([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.])
     poisson = self._make_poisson(
-        rate=lam, interpolate_nondiscrete=True, validate_args=False)
+        rate=lam,
+        force_probs_to_zero_outside_support=False,
+        validate_args=False)
 
     expected_continuous_log_pmf = (
         x * poisson.log_rate_parameter()
@@ -136,8 +139,9 @@ class PoissonTest(test_util.TestCase):
 
     def poisson_log_prob(lam):
       return self._make_poisson(
-          rate=lam, interpolate_nondiscrete=False, validate_args=False
-          ).log_prob(x)
+          rate=lam,
+          force_probs_to_zero_outside_support=True,
+          validate_args=False).log_prob(x)
     _, dlog_pmf_dlam = self.evaluate(tfp.math.value_and_gradient(
         poisson_log_prob, lam))
 
@@ -169,7 +173,7 @@ class PoissonTest(test_util.TestCase):
                  dtype=np.float32)
 
     poisson = self._make_poisson(
-        rate=lam, interpolate_nondiscrete=False, validate_args=False)
+        rate=lam, force_probs_to_zero_outside_support=True, validate_args=False)
     log_cdf = poisson.log_cdf(x)
     self.assertEqual(log_cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_cdf), stats.poisson.logcdf(x, lam_v))
@@ -192,7 +196,8 @@ class PoissonTest(test_util.TestCase):
     expected_continuous_log_cdf = tf.math.log(expected_continuous_cdf)
 
     poisson = self._make_poisson(
-        rate=lam, interpolate_nondiscrete=True, validate_args=False)
+        rate=lam,
+        force_probs_to_zero_outside_support=False, validate_args=False)
     log_cdf = poisson.log_cdf(x)
     self.assertEqual(log_cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(log_cdf),
@@ -215,7 +220,9 @@ class PoissonTest(test_util.TestCase):
 
     def cdf(lam):
       return self._make_poisson(
-          rate=lam, interpolate_nondiscrete=False, validate_args=False).cdf(x)
+          rate=lam,
+          force_probs_to_zero_outside_support=True,
+          validate_args=False).cdf(x)
     _, dcdf_dlam = self.evaluate(tfp.math.value_and_gradient(cdf, lam))
 
     # A finite difference approximation of the derivative.
@@ -234,7 +241,8 @@ class PoissonTest(test_util.TestCase):
     lam_v = np.array([2.0, 4.0, 5.0], dtype=np.float32)
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=np.float32).T
 
-    poisson = self._make_poisson(rate=lam, interpolate_nondiscrete=False)
+    poisson = self._make_poisson(
+        rate=lam, force_probs_to_zero_outside_support=True)
     log_cdf = poisson.log_cdf(x)
     self.assertEqual(log_cdf.shape, (6, 3))
     self.assertAllClose(self.evaluate(log_cdf), stats.poisson.logcdf(x, lam_v))
@@ -364,11 +372,11 @@ class PoissonLogRateTest(PoissonTest):
   def _make_poisson(self,
                     rate,
                     validate_args=True,
-                    interpolate_nondiscrete=True):
+                    force_probs_to_zero_outside_support=False):
     return tfd.Poisson(
         log_rate=tf.math.log(rate),
         validate_args=validate_args,
-        interpolate_nondiscrete=interpolate_nondiscrete)
+        force_probs_to_zero_outside_support=force_probs_to_zero_outside_support)
 
   # No need to worry about the non-negativity of `rate` when using the
   # `log_rate` parameterization.
@@ -401,7 +409,7 @@ class PoissonSamplingTest(test_util.TestCase):
   def testSampleCPU(self):
     with tf.device('CPU'):
       _, runtime = self.evaluate(
-          poisson_lib._random_poisson(
+          poisson_lib.random_poisson(
               shape=tf.constant([], dtype=tf.int32),
               rates=tf.constant(10.),
               seed=test_util.test_seed()))
@@ -411,7 +419,7 @@ class PoissonSamplingTest(test_util.TestCase):
     if not tf.test.is_gpu_available():
       self.skipTest('no GPU')
     with tf.device('GPU'):
-      _, runtime = self.evaluate(poisson_lib._random_poisson(
+      _, runtime = self.evaluate(poisson_lib.random_poisson(
           shape=tf.constant([], dtype=tf.int32),
           rates=tf.constant(10.),
           seed=test_util.test_seed()))
@@ -419,16 +427,16 @@ class PoissonSamplingTest(test_util.TestCase):
 
   def testSampleXLA(self):
     self.skip_if_no_xla()
-    if not tf.executing_eagerly(): return  # experimental_compile is eager-only.
+    if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     log_rates = np.random.rand(4, 3).astype(np.float32)
     dist = tfd.Poisson(log_rate=log_rates, validate_args=True)
     # Verify the compile succeeds going all the way through the distribution.
     self.evaluate(
         tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
-                    experimental_compile=True)())
+                    jit_compile=True)())
     # Also test the low-level sampler and verify the XLA-friendly variant.
     _, runtime = self.evaluate(
-        tf.function(poisson_lib._random_poisson, experimental_compile=True)(
+        tf.function(poisson_lib.random_poisson, jit_compile=True)(
             shape=tf.constant([], dtype=tf.int32),
             rates=tf.constant(10.),
             seed=test_util.test_seed()))

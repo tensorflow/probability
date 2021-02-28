@@ -24,6 +24,8 @@ import sys
 
 # Dependency imports
 from absl.testing import parameterized
+import hypothesis as hp
+import hypothesis.strategies as hps
 import numpy as np
 import scipy
 import scipy.integrate
@@ -31,6 +33,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions import bates
+from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
 
 
@@ -76,7 +79,8 @@ class BatesTest(test_util.TestCase):
         self.evaluate(d.prob(1.))
 
   def testBatesIntegralTotalCount(self):
-    with self.assertRaisesOpError('`total_count` must be integer-valued.'):
+    msg = '`total_count` must be representable as a 32-bit integer.'
+    with self.assertRaisesOpError(msg):
       d = tfd.Bates(total_count=1.5, validate_args=True)
       self.evaluate(d.prob(1.))
 
@@ -130,7 +134,8 @@ class BatesTest(test_util.TestCase):
     self.evaluate(d.prob([.5, 1.]))
 
     self.evaluate(n.assign(n0 / 2.))
-    with self.assertRaisesOpError('`total_count` must be integer-valued.'):
+    with self.assertRaisesOpError(
+        '`total_count` must be representable as a 32-bit integer.'):
       self.evaluate(d.prob([.5, 1.]))
     self.evaluate(n.assign(n0))
     self.evaluate(d.prob([.5, 1.]))
@@ -179,12 +184,17 @@ class BatesTest(test_util.TestCase):
 
   @test_util.numpy_disable_test_missing_functionality('tf.ragged.range')
   @test_util.jax_disable_test_missing_functionality('tf.ragged.range')
-  def testSegmentedRange(self):
-    # TODO(b/157666350): Turn `testSegmentedRange` into a hypothesis test.
-    limits = np.array([3, 1, 4, 5, 4, 3, 10, 1])
+  @hp.given(hps.lists(hps.integers(min_value=0, max_value=10)))
+  @tfp_hps.tfp_hp_settings(default_max_examples=5)
+  def testSegmentedRange(self, limits):
+    limits = np.int32(limits)
     self.assertAllEqual(
-        self.evaluate(tf.ragged.range(limits).flat_values),
+        tf.ragged.range(limits).flat_values,
         bates._segmented_range(limits))
+
+  def testEmpty(self):
+    d = tfd.Bates(total_count=tf.zeros([0]))
+    self.evaluate(d.log_prob(d.sample(seed=test_util.test_seed())))
 
   def testBatesPDFLowTotalCount(self):
     ns = np.array([1., 2.])
@@ -253,21 +263,21 @@ class BatesTest(test_util.TestCase):
                         atol=5e-05, rtol=5e-05)
 
   def testBatesPDFonNaNs(self):
-    b = tfd.Bates(1, 0, 1)
-    values_with_nans = [
-        np.nan, -1., np.nan, 0., np.nan, .5, np.nan, 1., np.nan, 2., np.nan]
-    values = [v if i % 2 != 0 else 0. for i, v in enumerate(values_with_nans)]
-    probs = self.evaluate(b.log_prob(values))
-    probs_with_nans = self.evaluate(b.log_prob(values_with_nans))
-    should_be_nan = [probs_with_nans[i]
-                     for i, v in enumerate(values_with_nans)
-                     if np.isnan(v)]
-    self.assertAllNan(should_be_nan)
-    lhs = [probs[i] for i, v in enumerate(values_with_nans)
-           if not np.isnan(v)]
-    rhs = [probs_with_nans[i] for i, v in enumerate(values_with_nans)
-           if not np.isnan(v)]
-    self.assertAllEqual(lhs, rhs)
+    for b in [tfd.Bates(1, 0, 1), tfd.Bates(4, -10, -8)]:
+      values_with_nans = [
+          np.nan, -1., np.nan, 0., np.nan, .5, np.nan, 1., np.nan, 2., np.nan]
+      values = [v if i % 2 != 0 else 0. for i, v in enumerate(values_with_nans)]
+      probs = self.evaluate(b.log_prob(values))
+      probs_with_nans = self.evaluate(b.log_prob(values_with_nans))
+      should_be_nan = [probs_with_nans[i]
+                       for i, v in enumerate(values_with_nans)
+                       if np.isnan(v)]
+      self.assertAllNan(should_be_nan)
+      lhs = [probs[i] for i, v in enumerate(values_with_nans)
+             if not np.isnan(v)]
+      rhs = [probs_with_nans[i] for i, v in enumerate(values_with_nans)
+             if not np.isnan(v)]
+      self.assertAllEqual(lhs, rhs)
 
   def testBatesCDFLowTotalCount(self):
     ns = np.array([1., 2.])
@@ -298,6 +308,7 @@ class BatesTest(test_util.TestCase):
 
   def testBatesCDFHighTotalCount(self):
     # Compute with exact integer arithmetic.
+    # This only works when n*x is an integer.
     def exact(n, nx):
       fractional = sum(
           fractions.Fraction((-1)**k * (nx - k)**n * math.factorial(n),

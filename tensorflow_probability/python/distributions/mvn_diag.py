@@ -19,14 +19,28 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'MultivariateNormalDiag',
 ]
+
+
+class KahanLogDetLinOpDiag(tf.linalg.LinearOperatorDiag):
+  """Override `LinearOperatorDiag` logdet to use Kahan summation."""
+
+  def _log_abs_determinant(self):
+    log_det = tfp_math.reduce_kahan_sum(
+        tf.math.log(tf.math.abs(self._diag)), axis=[-1]).total
+    if dtype_util.is_complex(self.dtype):
+      log_det = tf.cast(log_det, dtype=self.dtype)
+    return log_det
 
 
 class MultivariateNormalDiag(
@@ -90,32 +104,32 @@ class MultivariateNormalDiag(
       loc=[1., -1],
       scale_diag=[1, 2.])
 
-  mvn.mean().eval()
+  mvn.mean()
   # ==> [1., -1]
 
-  mvn.stddev().eval()
+  mvn.stddev()
   # ==> [1., 2]
 
   # Evaluate this on an observation in `R^2`, returning a scalar.
-  mvn.prob([-1., 0]).eval()  # shape: []
+  mvn.prob([-1., 0])  # shape: []
 
   # Initialize a 3-batch, 2-variate scaled-identity Gaussian.
   mvn = tfd.MultivariateNormalDiag(
       loc=[1., -1],
       scale_identity_multiplier=[1, 2., 3])
 
-  mvn.mean().eval()  # shape: [3, 2]
+  mvn.mean()  # shape: [3, 2]
   # ==> [[1., -1]
   #      [1, -1],
   #      [1, -1]]
 
-  mvn.stddev().eval()  # shape: [3, 2]
+  mvn.stddev()  # shape: [3, 2]
   # ==> [[1., 1],
   #      [2, 2],
   #      [3, 3]]
 
   # Evaluate this on an observation in `R^2`, returning a length-3 vector.
-  mvn.prob([-1., 0]).eval()  # shape: [3]
+  mvn.prob([-1., 0])  # shape: [3]
 
   # Initialize a 2-batch of 3-variate Gaussians.
   mvn = tfd.MultivariateNormalDiag(
@@ -128,14 +142,14 @@ class MultivariateNormalDiag(
   # vector.
   x = [[-1., 0, 1],
        [-11, 0, 11.]]   # shape: [2, 3].
-  mvn.prob(x).eval()    # shape: [2]
+  mvn.prob(x)    # shape: [2]
   ```
 
   """
 
   @deprecation.deprecated_args(
       '2020-01-01',
-      '`scale_identity_multiplier` is deprecated; please combine it with '
+      '`scale_identity_multiplier` is deprecated; please combine it into '
       '`scale_diag` directly instead.',
       'scale_identity_multiplier')
   def __init__(self,
@@ -144,6 +158,7 @@ class MultivariateNormalDiag(
                scale_identity_multiplier=None,
                validate_args=False,
                allow_nan_stats=True,
+               experimental_use_kahan_sum=False,
                name='MultivariateNormalDiag'):
     """Construct Multivariate Normal distribution on `R^k`.
 
@@ -192,6 +207,12 @@ class MultivariateNormalDiag(
         statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values as well as
+        when computing the log-determinant of the scale matrix. Doing so
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`.
       name: Python `str` name prefixed to Ops created by this class.
 
     Raises:
@@ -211,7 +232,9 @@ class MultivariateNormalDiag(
             'please combine it directly into `scale_diag` instead.')
 
       if scale_diag is not None:
-        scale = tf.linalg.LinearOperatorDiag(
+        diag_cls = (KahanLogDetLinOpDiag if experimental_use_kahan_sum else
+                    tf.linalg.LinearOperatorDiag)
+        scale = diag_cls(
             diag=scale_diag,
             is_non_singular=True,
             is_self_adjoint=True,
@@ -247,9 +270,24 @@ class MultivariateNormalDiag(
           scale=scale,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
+          experimental_use_kahan_sum=experimental_use_kahan_sum,
           name=name)
       self._parameters = parameters
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=1, scale_diag=1, scale_identity_multiplier=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        scale_diag=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        scale_identity_multiplier=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            is_preferred=False))
+    # pylint: enable=g-long-lambda
+
+  _composite_tensor_nonshape_params = (
+      'loc', 'scale_diag', 'scale_identity_multiplier')

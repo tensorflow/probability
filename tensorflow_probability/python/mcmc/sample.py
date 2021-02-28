@@ -180,7 +180,7 @@ def sample_chain(
   tfd = tfp.distributions
 
   dims = 10
-  true_stddev = np.sqrt(np.linspace(1., 3., dims))
+  true_stddev = tf.sqrt(tf.linspace(1., 3., dims))
   likelihood = tfd.MultivariateNormalDiag(loc=0., scale_diag=true_stddev)
 
   states = tfp.mcmc.sample_chain(

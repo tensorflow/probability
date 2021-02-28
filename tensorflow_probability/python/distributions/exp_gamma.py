@@ -21,14 +21,17 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -57,7 +60,7 @@ class ExpGamma(distribution.Distribution):
   `tfb.Log()(tfd.Gamma(..))`):
 
   ```none
-  pdf(x; alpha, beta > 0) = exp(x)**(alpha - 1) exp(-exp(x) beta) / Z + x
+  pdf(x; alpha, beta > 0) = exp(x)**(alpha) exp(-exp(x) beta) / Z
   Z = Gamma(alpha) beta**(-alpha)
   ```
 
@@ -171,15 +174,19 @@ class ExpGamma(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(
-        zip(('concentration', 'log_rate'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration=0, rate=0, log_rate=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        rate=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            is_preferred=False),
+        log_rate=parameter_properties.ParameterProperties())
+    # pylint: enable=g-long-lambda
 
   @property
   def concentration(self):
@@ -252,6 +259,12 @@ class ExpGamma(distribution.Distribution):
       y = tf.math.exp(x) * self.rate
     return tf.math.igamma(self.concentration, y)
 
+  def _quantile(self, p):
+    y = tfp_math.igammainv(self.concentration, p)
+    if self.rate is None:
+      return tf.math.log(y) - self.log_rate
+    return tf.math.log(y / self.rate)
+
   def _mean(self):
     return tf.math.digamma(self.concentration) - self._log_rate_parameter()
 
@@ -296,7 +309,7 @@ class ExpInverseGamma(transformed_distribution.TransformedDistribution):
   The probability density function (pdf) is very similar to ExpGamma,
 
   ```none
-  pdf(x; alpha, beta > 0) = exp(-x)**(alpha - 1) exp(-exp(-x) beta) / Z - x
+  pdf(x; alpha, beta > 0) = exp(-x)**(alpha) exp(-exp(-x) beta) / Z
   Z = Gamma(alpha) beta**(-alpha)
   ```
 
@@ -405,15 +418,19 @@ class ExpInverseGamma(transformed_distribution.TransformedDistribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(
-        zip(('concentration', 'log_scale'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration=0, scale=0, log_scale=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            is_preferred=False),
+        log_scale=parameter_properties.ParameterProperties())
+    # pylint: enable=g-long-lambda
 
   @property
   def concentration(self):

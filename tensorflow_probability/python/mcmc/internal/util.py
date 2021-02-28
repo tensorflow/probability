@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 import warnings
 
 # Dependency imports
@@ -26,6 +25,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -38,15 +38,9 @@ from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tenso
 __all__ = [
     'choose',
     'enable_store_parameters_in_results',
-    'left_justified_expand_dims_like',
-    'left_justified_expand_dims_to',
-    'left_justified_broadcast_like',
-    'left_justified_broadcast_to',
     'index_remapping_gather',
     'is_list_like',
     'is_namedtuple_like',
-    'make_innermost_getter',
-    'make_innermost_setter',
     'make_name',
     'maybe_call_fn_and_grads',
     'prepare_state_parts',
@@ -60,6 +54,8 @@ __all__ = [
     'warn_if_parameters_are_not_simple_tensors',
 ]
 
+
+JAX_MODE = False
 
 SEED_CTOR_ARG_DEPRECATION_MSG = (
     'Seeding `tfp.mcmc.TransitionKernel` instances by constructor argument is '
@@ -77,36 +73,6 @@ class PrettyNamedTupleMixin(object):
         type(self).__name__,
         ',\n'.join('  {}={}'.format(k, repr(v).replace('\n', '\n    '))
                    for (k, v) in self._asdict().items()))
-
-
-def left_justified_expand_dims_like(x, reference, name=None):
-  """Right pads `x` with `rank(reference) - rank(x)` ones."""
-  with tf.name_scope(name or 'left_justified_expand_dims_like'):
-    return left_justified_expand_dims_to(x, ps.rank(reference))
-
-
-def left_justified_expand_dims_to(x, rank, name=None):
-  """Right pads `x` with `rank - rank(x)` ones."""
-  with tf.name_scope(name or 'left_justified_expand_dims_to'):
-    expand_ndims = ps.maximum(rank - ps.rank(x), 0)
-    expand_shape = ps.concat(
-        [ps.shape(x),
-         ps.ones(shape=[expand_ndims], dtype=tf.int32)],
-        axis=0)
-    return ps.reshape(x, expand_shape)
-
-
-def left_justified_broadcast_like(x, reference, name=None):
-  """Broadcasts `x` to shape of reference, in a left-justified manner."""
-  with tf.name_scope(name or 'left_justified_broadcast_like'):
-    return left_justified_broadcast_to(x, ps.shape(reference))
-
-
-def left_justified_broadcast_to(x, shape, name=None):
-  """Broadcasts `x` to shape, in a left-justified manner."""
-  with tf.name_scope(name or 'left_justified_broadcast_to'):
-    return tf.broadcast_to(
-        left_justified_expand_dims_to(x, ps.size(shape)), shape)
 
 
 def prepare_state_parts(state_or_state_part, dtype=None, name=None):
@@ -145,7 +111,8 @@ def make_name(super_name, default_super_name, sub_name):
 def _choose_base_case(is_accepted,
                       proposed,
                       current,
-                      name=None):
+                      name=None,
+                      addr=None,):
   """Helper to `choose` which expand_dims `is_accepted` and applies tf.where."""
   def _where(proposed, current):
     """Wraps `tf.where`."""
@@ -158,33 +125,41 @@ def _choose_base_case(is_accepted,
       name = name.rpartition('/')[2].rsplit(':', 1)[0]
     # Since this is an internal utility it is ok to assume
     # tf.shape(proposed) == tf.shape(current).
-    return tf.where(left_justified_expand_dims_like(is_accepted, proposed),
+    return tf.where(bu.left_justified_expand_dims_like(is_accepted, proposed),
                     proposed, current, name=name)
   with tf.name_scope(name or 'choose'):
     if not is_list_like(proposed):
       return _where(proposed, current)
-    return [(choose(is_accepted, p, c, name=name) if is_namedtuple_like(p)
-             else _where(p, c))
-            for p, c in zip(proposed, current)]
+    return tf.nest.pack_sequence_as(
+        current,
+        [(_choose_recursive(is_accepted, p, c, name=name, addr=f'{addr}[i]')
+          if is_namedtuple_like(p) else
+          _where(p, c)) for i, (p, c) in enumerate(zip(proposed, current))])
+
+
+def _choose_recursive(is_accepted, proposed, current, name=None, addr='<root>'):
+  """Recursion helper which also reports the address of any failures."""
+  with tf.name_scope(name or 'choose'):
+    if not is_namedtuple_like(proposed):
+      return _choose_base_case(is_accepted, proposed, current, name=name,
+                               addr=addr)
+    if not isinstance(proposed, type(current)):
+      raise TypeError(
+          f'Type of `proposed` ({type(proposed).__name__}) must be identical '
+          f'to type of `current` ({type(current).__name__}). (At "{addr}".)')
+    items = {}
+    for fn in proposed._fields:
+      items[fn] = _choose_recursive(is_accepted,
+                                    getattr(proposed, fn),
+                                    getattr(current, fn),
+                                    name=name,
+                                    addr=f'{addr}/{fn}')
+    return type(proposed)(**items)
 
 
 def choose(is_accepted, proposed, current, name=None):
   """Helper which expand_dims `is_accepted` then applies tf.where."""
-  with tf.name_scope(name or 'choose'):
-    if not is_namedtuple_like(proposed):
-      return _choose_base_case(is_accepted, proposed, current, name=name)
-    if not isinstance(proposed, type(current)):
-      raise TypeError('Type of `proposed` ({}) must be identical to '
-                      'type of `current` ({})'.format(
-                          type(proposed).__name__,
-                          type(current).__name__))
-    items = {}
-    for fn in proposed._fields:
-      items[fn] = choose(is_accepted,
-                         getattr(proposed, fn),
-                         getattr(current, fn),
-                         name=name)
-    return type(proposed)(**items)
+  return _choose_recursive(is_accepted, proposed, current, name=name)
 
 
 def strip_seeds(obj):
@@ -413,7 +388,7 @@ def trace_scan(loop_fn,
 
     initial_state = tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(x, name='initial_state'),
-        initial_state)
+        initial_state, expand_composites=True)
     elems = tf.convert_to_tensor(elems, name='elems')
 
     length = ps.size0(elems)
@@ -426,24 +401,32 @@ def trace_scan(loop_fn,
     elems_array = elems_array.unstack(elems)
 
     # Initialize trace arrays.
-    dynamic_size, initial_size = True, 0
     if trace_criterion_fn is None:
       dynamic_size, initial_size = tf.is_tensor(length), length
-    elif static_trace_allocation_size:
+    elif static_trace_allocation_size is not None:
       dynamic_size, initial_size = False, static_trace_allocation_size
-    trace_arrays = tf.nest.map_structure(
-        lambda x: tf.TensorArray(x.dtype,  # pylint: disable=g-long-lambda
-                                 size=initial_size,
-                                 dynamic_size=dynamic_size,
-                                 element_shape=x.shape),
-        trace_fn(initial_state))
+    elif JAX_MODE or (not tf.executing_eagerly() and
+                      control_flow_util.GraphOrParentsInXlaContext(
+                          tf1.get_default_graph())):
+      dynamic_size, initial_size = False, length
+    else:
+      dynamic_size, initial_size = True, 0
+    initial_trace = trace_fn(initial_state)
+    flat_initial_trace = tf.nest.flatten(initial_trace, expand_composites=True)
+    trace_arrays = []
+    for trace_elt in flat_initial_trace:
+      trace_arrays.append(
+          tf.TensorArray(
+              trace_elt.dtype,
+              size=initial_size,
+              dynamic_size=dynamic_size,
+              element_shape=trace_elt.shape))
 
     # Helper for writing a (structured) state to (structured) arrays.
     def trace_one_step(num_steps_traced, trace_arrays, state):
-      return tf.nest.map_structure(
-          lambda ta, x: ta.write(num_steps_traced, x),
-          trace_arrays,
-          trace_fn(state))
+      return [ta.write(num_steps_traced, x) for ta, x in
+              zip(trace_arrays,
+                  tf.nest.flatten(trace_fn(state), expand_composites=True))]
 
     def _body(i, state, num_steps_traced, trace_arrays):
       elem = elems_array.read(i)
@@ -463,74 +446,21 @@ def trace_scan(loop_fn,
         loop_vars=(0, initial_state, 0, trace_arrays),
         parallel_iterations=parallel_iterations)
 
-    stacked_trace = tf.nest.map_structure(lambda x: x.stack(), trace_arrays)
+    # unflatten
+    stacked_trace = tf.nest.pack_sequence_as(
+        initial_trace, [ta.stack() for ta in trace_arrays],
+        expand_composites=True)
 
     # Restore the static length if we know it.
     static_length = tf.TensorShape(None if dynamic_size else initial_size)
+
     def _merge_static_length(x):
       tensorshape_util.set_shape(x, static_length.concatenate(x.shape[1:]))
       return x
 
-    stacked_trace = tf.nest.map_structure(_merge_static_length, stacked_trace)
+    stacked_trace = tf.nest.map_structure(
+        _merge_static_length, stacked_trace, expand_composites=True)
     return final_state, stacked_trace
-
-
-def make_innermost_setter(setter):
-  """Wraps a setter so it applies to the inner-most results in `kernel_results`.
-
-  The wrapped setter unwraps `kernel_results` and applies `setter` to the first
-  results without an `inner_results` attribute.
-
-  Args:
-    setter: A callable that takes the kernel results as well as some `*args` and
-      `**kwargs` and returns a modified copy of those kernel results.
-
-  Returns:
-    new_setter: A wrapped `setter`.
-  """
-
-  @functools.wraps(setter)
-  def _new_setter(kernel_results, *args, **kwargs):
-    """Wrapped setter."""
-    results_stack = []
-    while hasattr(kernel_results, 'inner_results'):
-      results_stack.append(kernel_results)
-      kernel_results = kernel_results.inner_results
-
-    new_kernel_results = setter(kernel_results, *args, **kwargs)
-    for outer_results in reversed(results_stack):
-      new_kernel_results = outer_results._replace(
-          inner_results=new_kernel_results)
-
-    return new_kernel_results
-
-  return _new_setter
-
-
-def make_innermost_getter(getter):
-  """Wraps a getter so it applies to the inner-most results in `kernel_results`.
-
-  The wrapped getter unwraps `kernel_results` and returns the return value of
-  `getter` called with the first results without an `inner_results` attribute.
-
-  Args:
-    getter: A callable that takes Kernel results and returns some value.
-
-  Returns:
-    new_getter: A wrapped `getter`.
-  """
-
-  @functools.wraps(getter)
-  def _new_getter(kernel_results, *args, **kwargs):
-    """Wrapped getter."""
-    results_stack = []
-    while hasattr(kernel_results, 'inner_results'):
-      results_stack.append(kernel_results)
-      kernel_results = kernel_results.inner_results
-
-    return getter(kernel_results, *args, **kwargs)
-
-  return _new_getter
 
 
 def enable_store_parameters_in_results(kernel):
@@ -728,30 +658,3 @@ def index_remapping_gather(params,
     return dist_util.move_dimension(result_t,
                                     source_idx=broadcast_indices_ndims - 1,
                                     dest_idx=axis)
-
-
-# TODO(b/111801087): Use a standardized API, when available.
-@make_innermost_getter
-def get_field(kernel_results, field_name):
-  """Get field value from kernel_results or kernel_results.accepted_results."""
-  attr = getattr(kernel_results, field_name, None)
-  if attr is not None:
-    return attr
-  accepted_results = getattr(kernel_results, 'accepted_results', None)
-  if accepted_results is None:
-    raise TypeError('Cannot extract {} from {}'.format(
-        field_name, kernel_results))
-  return get_field(accepted_results, field_name)
-
-
-@make_innermost_setter
-def update_field(kernel_results, field_name, value):
-  """Set field value in kernel_results or kernel_results.accepted_results."""
-  if hasattr(kernel_results, field_name):
-    return kernel_results._replace(**{field_name: value})
-  accepted_results = getattr(kernel_results, 'accepted_results', None)
-  if accepted_results is None:
-    raise TypeError('Cannot set {} in {}'.format(
-        field_name, kernel_results))
-  return kernel_results._replace(
-      accepted_results=update_field(accepted_results, field_name, value))

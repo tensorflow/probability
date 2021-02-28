@@ -19,8 +19,10 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import vector_exponential_linear_operator as velo
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -190,7 +192,7 @@ class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
   vex = tfd.VectorExponentialDiag(scale_diag=[1., 2.])
 
   # Compute the pdf of an`R^2` observation; return a scalar.
-  vex.prob([3., 4.]).eval()  # shape: []
+  vex.prob([3., 4.])  # shape: []
 
   # Initialize a 2-batch of 3-variate Vector Exponential's.
   loc = [[1., 2, 3],
@@ -203,7 +205,7 @@ class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
   # Compute the pdf of two `R^3` observations; return a length-2 vector.
   x = [[1.9, 2.2, 3.1],
        [10., 1.0, 9.0]]     # shape: [2, 3]
-  vex.prob(x).eval()    # shape: [2]
+  vex.prob(x)    # shape: [2]
   ```
 
   """
@@ -295,5 +297,16 @@ class VectorExponentialDiag(velo.VectorExponentialLinearOperator):
     self._parameters = parameters
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=1, scale_diag=1, scale_identity_multiplier=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        scale_diag=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        scale_identity_multiplier=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            is_preferred=False))
+    # pylint: enable=g-long-lambda

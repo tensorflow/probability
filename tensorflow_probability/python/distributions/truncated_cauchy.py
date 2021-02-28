@@ -26,30 +26,24 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.math.generic import log_sub_exp as _log_sub_exp
+from tensorflow_probability.python.math import special as tfp_math
 
 __all__ = [
     'TruncatedCauchy',
 ]
 
 
-def _cauchy_cdf(z):
-  return tf.atan(z) / np.pi + 0.5
-
-
-def _log_cauchy_cdf(z):
-  return tf.math.log1p(2 / np.pi * tf.atan(z)) - np.log(2)
-
-
-def _cauchy_quantile(p):
-  return tf.tan(np.pi * (p - 0.5))
+def _cauchy_cdf_diff(x, y):
+  return tfp_math.atan_difference(x, y) / np.pi
 
 
 class TruncatedCauchy(distribution.Distribution):
@@ -180,17 +174,7 @@ class TruncatedCauchy(distribution.Distribution):
     if std_low is None or std_high is None:
       std_low, std_high = self._standardized_low_and_high(
           loc=loc, scale=scale, low=low, high=high)
-    # NOTE: If `std_high - std_low` is small compared to `abs(std_high)` and
-    # `abs(std_low)`, then, instead of `atan(std_high) - atan(std_low)` here,
-    # it may be more numerically stable to use the arctan summation formula:
-    #   ```
-    #   atan(std_high) - atan(std_low)
-    #     = atan((std_high - std_low) / (1 + std_high * std_low))
-    #   ```
-    # In the typical case, we expect `std_low` and `std_high` to be far apart,
-    # relative to their magnitudes.  (This note applies to `_log_normalizer`,
-    # `_mean`, and `_variance`, as well.)
-    return _cauchy_cdf(std_high) - _cauchy_cdf(std_low)
+    return _cauchy_cdf_diff(std_high, std_low)
 
   def _log_normalizer(self,
                       loc=None,
@@ -199,21 +183,28 @@ class TruncatedCauchy(distribution.Distribution):
                       high=None,
                       std_low=None,
                       std_high=None):
-    if std_low is None or std_high is None:
-      std_low, std_high = self._standardized_low_and_high(
-          loc=loc, scale=scale, low=low, high=high)
-    return _log_sub_exp(
-        _log_cauchy_cdf(std_high), _log_cauchy_cdf(std_low))
-
-  @staticmethod
-  def _param_shapes(sample_shape):
-    # All parameters are of the same shape
-    shape = tf.convert_to_tensor(sample_shape, dtype=tf.int32)
-    return {'loc': shape, 'scale': shape, 'high': shape, 'low': shape}
+    return tf.math.log(self._normalizer(
+        loc=loc,
+        scale=scale,
+        low=low,
+        high=high,
+        std_low=std_low,
+        std_high=std_high))
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, scale=0, low=0, high=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        low=parameter_properties.ParameterProperties(),
+        # TODO(b/169874884): Support decoupled parameterization.
+        high=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,))
+    # pylint: enable=g-long-lambda
 
   @property
   def loc(self):
@@ -249,20 +240,12 @@ class TruncatedCauchy(distribution.Distribution):
 
   def _sample_n(self, n, seed=None):
     loc, scale, low, high = self._loc_scale_low_high()
-    std_low, std_high = self._standardized_low_and_high(
-        low=low, high=high, loc=loc, scale=scale)
     batch_shape = self._batch_shape_tensor(
         loc=loc, scale=scale, low=low, high=high)
     sample_and_batch_shape = ps.concat([[n], batch_shape], axis=0)
 
-    std_samples = _cauchy_quantile(
-        samplers.uniform(
-            sample_and_batch_shape,
-            minval=_cauchy_cdf(std_low),
-            maxval=_cauchy_cdf(std_high),
-            dtype=self.dtype,
-            seed=seed))
-    return std_samples * scale + loc
+    u = samplers.uniform(sample_and_batch_shape, dtype=self.dtype, seed=seed)
+    return self._quantile(u, loc=loc, scale=scale, low=low, high=high)
 
   def _log_prob(self, x):
     loc, scale, low, high = self._loc_scale_low_high()
@@ -279,12 +262,8 @@ class TruncatedCauchy(distribution.Distribution):
     loc, scale, low, high = self._loc_scale_low_high()
     std_low, std_high = self._standardized_low_and_high(
         low=low, high=high, loc=loc, scale=scale)
-    # NOTE: If `x - low` is small, it may be more numerically stable to use the
-    # arctan summation formula here (and in `_log_cdf`) instead of computing
-    # `atan((x - loc) / scale) - atan((low - loc) / scale)`.
-    # See, e.g., https://proofwiki.org/wiki/Difference_of_Arctangents .
     return tf.clip_by_value(
-        ((_cauchy_cdf((x - loc) / scale) - _cauchy_cdf(std_low))
+        ((_cauchy_cdf_diff((x - loc) / scale, std_low))
          / self._normalizer(std_low=std_low, std_high=std_high)),
         clip_value_min=0., clip_value_max=1.)
 
@@ -293,8 +272,7 @@ class TruncatedCauchy(distribution.Distribution):
     std_low, std_high = self._standardized_low_and_high(
         low=low, high=high, loc=loc, scale=scale)
     return (
-        _log_sub_exp(_log_cauchy_cdf((x - loc) / scale),
-                     _log_cauchy_cdf(std_low))
+        tf.math.log(_cauchy_cdf_diff((x - loc) / scale, std_low))
         - self._log_normalizer(std_low=std_low, std_high=std_high))
 
   def _mean(self):
@@ -306,7 +284,7 @@ class TruncatedCauchy(distribution.Distribution):
     # see http://parker.ad.siu.edu/Olive/ch4.pdf .
     t = (tf.math.log1p(tf.math.square(std_high))
          - tf.math.log1p(tf.math.square(std_low)))
-    t = t / (2 * (tf.math.atan(std_high) - tf.math.atan(std_low)))
+    t = t / (2 * tfp_math.atan_difference(std_high, std_low))
     return loc + scale * t
 
   def _mode(self):
@@ -330,23 +308,38 @@ class TruncatedCauchy(distribution.Distribution):
 
     # Formula from David Olive, "Applied Robust Statistics" --
     # see http://parker.ad.siu.edu/Olive/ch4.pdf .
-    atan_std_low = tf.math.atan(std_low)
-    atan_std_high = tf.math.atan(std_high)
-    t = ((std_high - std_low - (atan_std_high - atan_std_low))
-         / (atan_std_high - atan_std_low))
+    atan_diff = tfp_math.atan_difference(std_high, std_low)
+    t = (std_high - std_low - atan_diff) / atan_diff
     std_mean = ((tf.math.log1p(tf.math.square(std_high))
-                 - tf.math.log1p(tf.math.square(std_low)))
-                / (2 * (atan_std_high - atan_std_low)))
+                 - tf.math.log1p(tf.math.square(std_low))) / (2 * atan_diff))
     return tf.math.square(scale) * (t - tf.math.square(std_mean))
 
-  def _quantile(self, p):
-    loc, scale, low, high = self._loc_scale_low_high()
+  def _quantile(self, p, loc=None, scale=None, low=None, high=None):
+    loc, scale, low, high = self._loc_scale_low_high(loc, scale, low, high)
     std_low, std_high = self._standardized_low_and_high(
         low=low, high=high, loc=loc, scale=scale)
-    x = _cauchy_quantile(
-        p * self._normalizer(std_low=std_low, std_high=std_high)
-        + _cauchy_cdf(std_low))
-    return scale * x + loc
+    # Use the sum of tangents formula.
+    # First, the quantile of the cauchy distribution is tan(pi * (x - 0.5)).
+    # and the cdf of the cauchy distribution is 0.5 + arctan(x) / np.pi
+    # WLOG, we will assume loc = 0 , scale = 1 (these can be taken in to account
+    # by rescaling and shifting low and high, and then scaling the output).
+    # We would like to compute quantile(p * (cdf(high) - cdf(low)) + cdf(low))
+    # This is the same as:
+    # tan(pi * (cdf(low) + (cdf(high) - cdf(low)) * p - 0.5))
+    # Let a = pi * (cdf(low) - 0.5), b = pi * (cdf(high) - cdf(low)) * u
+    # By using the formula for the cdf we have:
+    # a = arctan(low), b = arctan_difference(high, low) * u
+    # Thus the quantile is now tan(a + b).
+    # By appealing to the sum of tangents formula we have:
+    # tan(a + b) = (tan(a) + tan(b)) / (1 - tan(a) * tan(b)) =
+    # (low + tan(b)) / (1 - low * tan(b))
+    # Thus for a 'standard' truncated cauchy we have the quantile as:
+    # quantile(p) = (low + tan(b)) / (1 - low * tan(b)) where
+    # b = arctan_difference(high, low) * p.
+
+    tanb = tf.math.tan(tfp_math.atan_difference(std_high, std_low) * p)
+    x = (std_low + tanb) / (1 - std_low * tanb)
+    return x * scale + loc
 
   def _default_event_space_bijector(self):
     return sigmoid_bijector.Sigmoid(

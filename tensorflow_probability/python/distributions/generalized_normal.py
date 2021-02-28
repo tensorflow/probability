@@ -24,12 +24,15 @@ import functools
 import numpy as np
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -131,15 +134,18 @@ class GeneralizedNormal(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(
-        zip(('loc', 'scale', 'power'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 3)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, scale=0, power=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        power=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def loc(self):
@@ -201,32 +207,45 @@ class GeneralizedNormal(distribution.Distribution):
     log_unnormalized = -tf.pow(tf.abs(x - loc) / scale, power)
     return log_unnormalized - log_normalization
 
+  def _cdf_zero_mean(self, x):
+    scale = tf.convert_to_tensor(self.scale)
+    power = tf.convert_to_tensor(self.power)
+    zero = tf.constant(0., dtype=self.dtype)
+    half = tf.constant(0.5, dtype=self.dtype)
+    one = tf.constant(1., dtype=self.dtype)
+    # Double tf.where to avoid incorrect gradient at x == 0.
+    x_is_zero = tf.equal(x, zero)
+    safe_x = tf.where(x_is_zero, one, x)
+    half_gamma = half * tf.math.igammac(
+        tf.math.reciprocal(power),
+        tf.pow(tf.abs(safe_x) / scale, power))
+    return tf.where(
+        x_is_zero,
+        half,
+        tf.where(x > zero, one - half_gamma, half_gamma),
+    )
+
   def _cdf(self, x):
+    loc = tf.convert_to_tensor(self.loc)
+    return self._cdf_zero_mean(x - loc)
+
+  def _survival_function(self, x):
+    loc = tf.convert_to_tensor(self.loc)
+    # sf(x) = cdf(-x) for loc == 0, because distribution is symmetric.
+    return self._cdf_zero_mean(loc - x)
+
+  def _quantile(self, p):
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
     power = tf.convert_to_tensor(self.power)
     ipower = tf.math.reciprocal(power)
-    half = tf.constant(0.5, dtype=self.dtype)  # 0.5 is fp64 in numpy
-
-    # For the CDF computation, we need to use a double-where a la:
-    # https://github.com/tensorflow/probability/blob/master/discussion/where-nan.pdf
-    # to avoid NaN gradients. This comes from computing (loc - x) ** power when
-    # x > loc. If power is a not an even integer, then this value is not defined
-    # or is negative, both of which are not valid values for `igamma`.
-
-    loc_stop_grad = tf.stop_gradient(loc)
-    # Use values that are right below loc and above loc. At loc, this will
-    # result in `gamma|igamma(c)(1. / power, 0.)`. This has an undefined
-    # gradient at 0.
-    safe_x_lt_loc = tf.where(x > loc_stop_grad, loc_stop_grad - half, x)
-    safe_x_gt_loc = tf.where(x < loc_stop_grad, loc_stop_grad + half, x)
-    cdf = tf.where(
-        x < loc,
-        half * tf.math.igammac(
-            ipower, tf.pow((loc - safe_x_lt_loc) / scale, power)),
-        half + half * tf.math.igamma(
-            ipower, tf.pow((safe_x_gt_loc - loc) / scale, power)))
-    return cdf
+    quantile = tf.where(
+        p < 0.5,
+        loc - tf.math.pow(
+            tfp_math.igammacinv(ipower, 2. * p), ipower) * scale,
+        loc + tf.math.pow(
+            tfp_math.igammainv(ipower, 2. * p - 1.), ipower) * scale)
+    return quantile
 
   def _entropy(self):
     scale = tf.convert_to_tensor(self.scale)

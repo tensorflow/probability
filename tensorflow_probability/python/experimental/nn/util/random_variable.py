@@ -77,7 +77,7 @@ class RandomVariable(DeferredTensor):
   tfd = tfp.distributions
   tfn = tfp.experimental.nn
   x = tfn.util.RandomVariable(tfd.Normal(0, 1))
-  @tf.function(autograph=False, experimental_compile=True)
+  @tf.function(autograph=False, jit_compile=True)
   def run():
     return tf.convert_to_tensor(x)
   first = run()

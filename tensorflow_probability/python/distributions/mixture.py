@@ -21,7 +21,6 @@ from __future__ import print_function
 import warnings
 
 # Dependency imports
-import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import categorical
@@ -35,6 +34,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 # Cause all warnings to always be triggered.
@@ -50,6 +50,10 @@ class Mixture(distribution.Distribution):
   The `Mixture` object implements batched mixture distributions.
   The mixture model is defined by a `Categorical` distribution (the mixture)
   and a python list of `Distribution` objects.
+
+  In the common case that the component distributions are all the same
+  `Distribution` class (potentially with different parameters), it's probably
+  better to use `tfp.distributions.MixtureSameFamily` instead.
 
   Methods supported include `log_prob`, `prob`, `mean`, `sample`, and
   `entropy_lower_bound`.
@@ -76,12 +80,16 @@ class Mixture(distribution.Distribution):
 
   """
 
+  @deprecation.deprecated_args(
+      '2021-01-14', 'The `use_static_graph` argument is deprecated.'
+      ' Mixture behaves equivalently to `use_static_graph=True`,'
+      ' and the flag is ignored.', 'use_static_graph')
   def __init__(self,
                cat,
                components,
                validate_args=False,
                allow_nan_stats=True,
-               use_static_graph=False,
+               use_static_graph=True,
                name='Mixture'):
     """Initialize a Mixture distribution.
 
@@ -92,6 +100,10 @@ class Mixture(distribution.Distribution):
 
     The `num_classes` of `cat` must be possible to infer at graph construction
     time and match `len(components)`.
+
+    In the common case that the component distributions are all the same
+    `Distribution` class (potentially with different parameters), it's probably
+    better to use `tfp.distributions.MixtureSameFamily` instead.
 
     Args:
       cat: A `Categorical` distribution instance, representing the probabilities
@@ -107,11 +119,7 @@ class Mixture(distribution.Distribution):
        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
         batch member. If `True`, batch members with valid parameters leading to
         undefined statistics will return NaN for this statistic.
-      use_static_graph: Calls to `sample` will not rely on dynamic tensor
-        indexing, allowing for some static graph compilation optimizations, but
-        at the expense of sampling all underlying distributions in the mixture.
-        (Possibly useful when running on TPUs).
-        Default value: `False` (i.e., use dynamic indexing).
+      use_static_graph: Deprecated and ignored.
       name: A name for this distribution (optional).
 
     Raises:
@@ -189,7 +197,6 @@ class Mixture(distribution.Distribution):
       self._num_components = static_num_components
       self._static_event_shape = static_event_shape
       self._static_batch_shape = static_batch_shape
-      self._use_static_graph = use_static_graph
 
       super(Mixture, self).__init__(
           dtype=dtype,
@@ -299,116 +306,16 @@ class Mixture(distribution.Distribution):
     except TypeError as e:  # Can happen for Tensor seed.
       seed_stream = None
       seed_stream_err = e
-    if self._use_static_graph:
-      # This sampling approach is almost the same as the approach used by
-      # `MixtureSameFamily`. The differences are due to having a list of
-      # `Distribution` objects rather than a single object, and maintaining
-      # random seed management that is consistent with the non-static code
-      # path.
-      samples = []
-      cat_samples = self.cat.sample(n, seed=seeds[0])
 
-      for c in range(self.num_components):
-        try:
-          samples.append(self.components[c].sample(n, seed=seeds[c + 1]))
-          if seed_stream is not None:
-            seed_stream()
-        except TypeError as e:
-          if ('Expected int for argument' not in str(e) and
-              TENSOR_SEED_MSG_PREFIX not in str(e)):
-            raise
-          if seed_stream is None:
-            raise seed_stream_err
-          msg = (
-              'Falling back to stateful sampling for `components[{}]` {} of '
-              'type `{}`. Please update to use `tf.random.stateless_*` RNGs. '
-              'This fallback may be removed after 20-Aug-2020. ({})')
-          warnings.warn(msg.format(c, self.components[c].name,
-                                   type(self.components[c]),
-                                   str(e)))
-          samples.append(self.components[c].sample(n, seed=seed_stream()))
-      stack_axis = -1 - tensorshape_util.rank(self._static_event_shape)
-      x = tf.stack(samples, axis=stack_axis)  # [n, B, k, E]
-      npdt = dtype_util.as_numpy_dtype(x.dtype)
-      mask = tf.one_hot(
-          indices=cat_samples,  # [n, B]
-          depth=self._num_components,  # == k
-          on_value=npdt(1),
-          off_value=npdt(0))  # [n, B, k]
-      mask = distribution_util.pad_mixture_dimensions(
-          mask, self, self._cat,
-          tensorshape_util.rank(self._static_event_shape))  # [n, B, k, [1]*e]
-      return tf.reduce_sum(x * mask, axis=stack_axis)  # [n, B, E]
-
-    n = tf.convert_to_tensor(n, name='n')
-    static_n = tf.get_static_value(n)
-    n = int(static_n) if static_n is not None else n
+    # This sampling approach is almost the same as the approach used by
+    # `MixtureSameFamily`. The differences are due to having a list of
+    # `Distribution` objects rather than a single object.
+    samples = []
     cat_samples = self.cat.sample(n, seed=seeds[0])
 
-    static_samples_shape = cat_samples.shape
-    if tensorshape_util.is_fully_defined(static_samples_shape):
-      samples_shape = tensorshape_util.as_list(static_samples_shape)
-      samples_size = tensorshape_util.num_elements(static_samples_shape)
-    else:
-      samples_shape = tf.shape(cat_samples)
-      samples_size = tf.size(cat_samples)
-    static_batch_shape = self.batch_shape
-    if tensorshape_util.is_fully_defined(static_batch_shape):
-      batch_shape = tensorshape_util.as_list(static_batch_shape)
-      batch_size = tensorshape_util.num_elements(static_batch_shape)
-    else:
-      batch_shape = tf.shape(cat_samples)[1:]
-      batch_size = tf.reduce_prod(batch_shape)
-    static_event_shape = self.event_shape
-    if tensorshape_util.is_fully_defined(static_event_shape):
-      event_shape = np.array(
-          tensorshape_util.as_list(static_event_shape), dtype=np.int32)
-    else:
-      event_shape = None
-
-    # Get indices into the raw cat sampling tensor. We will
-    # need these to stitch sample values back out after sampling
-    # within the component partitions.
-    samples_raw_indices = tf.reshape(tf.range(0, samples_size), samples_shape)
-
-    # Partition the raw indices so that we can use
-    # dynamic_stitch later to reconstruct the samples from the
-    # known partitions.
-    partitioned_samples_indices = tf.dynamic_partition(
-        data=samples_raw_indices,
-        partitions=cat_samples,
-        num_partitions=self.num_components)
-
-    # Copy the batch indices n times, as we will need to know
-    # these to pull out the appropriate rows within the
-    # component partitions.
-    batch_raw_indices = tf.reshape(
-        tf.tile(tf.range(0, batch_size), [n]), samples_shape)
-
-    # Explanation of the dynamic partitioning below:
-    #   batch indices are i.e., [0, 1, 0, 1, 0, 1]
-    # Suppose partitions are:
-    #     [1 1 0 0 1 1]
-    # After partitioning, batch indices are cut as:
-    #     [batch_indices[x] for x in 2, 3]
-    #     [batch_indices[x] for x in 0, 1, 4, 5]
-    # i.e.
-    #     [1 1] and [0 0 0 0]
-    # Now we sample n=2 from part 0 and n=4 from part 1.
-    # For part 0 we want samples from batch entries 1, 1 (samples 0, 1),
-    # and for part 1 we want samples from batch entries 0, 0, 0, 0
-    #   (samples 0, 1, 2, 3).
-    partitioned_batch_indices = tf.dynamic_partition(
-        data=batch_raw_indices,
-        partitions=cat_samples,
-        num_partitions=self.num_components)
-    samples_class = [None for _ in range(self.num_components)]
-
     for c in range(self.num_components):
-      n_class = tf.size(partitioned_samples_indices[c])
       try:
-        samples_class_c = self.components[c].sample(
-            n_class, seed=seeds[c + 1])
+        samples.append(self.components[c].sample(n, seed=seeds[c + 1]))
         if seed_stream is not None:
           seed_stream()
       except TypeError as e:
@@ -424,49 +331,24 @@ class Mixture(distribution.Distribution):
         warnings.warn(msg.format(c, self.components[c].name,
                                  type(self.components[c]),
                                  str(e)))
-        samples_class_c = self.components[c].sample(
-            n_class, seed=seed_stream())
-
-      if event_shape is None:
-        batch_ndims = prefer_static.rank_from_shape(batch_shape)
-        event_shape = tf.shape(samples_class_c)[1 + batch_ndims:]
-
-      # Pull out the correct batch entries from each index.
-      # To do this, we may have to flatten the batch shape.
-
-      # For sample s, batch element b of component c, we get the
-      # partitioned batch indices from
-      # partitioned_batch_indices[c]; and shift each element by
-      # the sample index. The final lookup can be thought of as
-      # a matrix gather along locations (s, b) in
-      # samples_class_c where the n_class rows correspond to
-      # samples within this component and the batch_size columns
-      # correspond to batch elements within the component.
-      #
-      # Thus the lookup index is
-      #   lookup[c, i] = batch_size * s[i] + b[c, i]
-      # for i = 0 ... n_class[c] - 1.
-      lookup_partitioned_batch_indices = (
-          batch_size * tf.range(n_class) + partitioned_batch_indices[c])
-      samples_class_c = tf.reshape(
-          samples_class_c, tf.concat([[n_class * batch_size], event_shape],
-                                     0))
-      samples_class_c = tf.gather(
-          samples_class_c,
-          lookup_partitioned_batch_indices,
-          name='samples_class_c_gather')
-      samples_class[c] = samples_class_c
-
-    # Stitch back together the samples across the components.
-    lhs_flat_ret = tf.dynamic_stitch(
-        indices=partitioned_samples_indices, data=samples_class)
-    # Reshape back to proper sample, batch, and event shape.
-    ret = tf.reshape(
-        lhs_flat_ret, tf.concat([samples_shape, event_shape], 0))
-    tensorshape_util.set_shape(
-        ret,
-        tensorshape_util.concatenate(static_samples_shape, self.event_shape))
-    return ret
+        samples.append(self.components[c].sample(n, seed=seed_stream()))
+    stack_axis = -1 - tensorshape_util.rank(self._static_event_shape)
+    x = tf.stack(samples, axis=stack_axis)  # [n, B, k, E]
+    # TODO(b/170730865): Is all this masking stuff really called for?
+    npdt = dtype_util.as_numpy_dtype(x.dtype)
+    mask = tf.one_hot(
+        indices=cat_samples,  # [n, B]
+        depth=self._num_components,  # == k
+        on_value=npdt(1),
+        off_value=npdt(0))  # [n, B, k]
+    mask = distribution_util.pad_mixture_dimensions(
+        mask, self, self._cat,
+        tensorshape_util.rank(self._static_event_shape))  # [n, B, k, [1]*e]
+    if x.dtype.is_floating:
+      masked = tf.math.multiply_no_nan(x, mask)
+    else:
+      masked = x * mask
+    return tf.reduce_sum(masked, axis=stack_axis)  # [n, B, E]
 
   def entropy_lower_bound(self, name='entropy_lower_bound'):
     r"""A lower bound on the entropy of this mixture model.

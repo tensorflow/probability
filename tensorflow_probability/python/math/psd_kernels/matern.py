@@ -22,11 +22,14 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import bessel as tfp_math
 from tensorflow_probability.python.math.psd_kernels.internal import util
 from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = [
+    'GeneralizedMatern',
     'MaternOneHalf',
     'MaternThreeHalves',
     'MaternFiveHalves',
@@ -88,6 +91,138 @@ class _AmplitudeLengthScaleMixin(object):
             message='{} must be positive.'.format(arg_name)))
     return assertions
 
+  def _apply(self, x1, x2, example_ndims=0):
+    pairwise_square_distance = util.sum_rightmost_ndims_preserving_shape(
+        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=example_ndims)
+
+  def _matrix(self, x1, x2):
+    pairwise_square_distance = util.pairwise_square_distance_matrix(
+        x1, x2, self.feature_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance, example_ndims=2)
+
+  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
+    pairwise_square_distance = util.pairwise_square_distance_tensor(
+        x1, x2, self.feature_ndims, x1_example_ndims, x2_example_ndims)
+    return self._apply_with_distance(
+        x1, x2, pairwise_square_distance,
+        example_ndims=(x1_example_ndims + x2_example_ndims))
+
+
+class GeneralizedMatern(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
+  """Generalized Matern Kernel.
+
+  This kernel parameterizes the Matern family of kernels.
+
+  The kernel has the following form:
+
+  ```none
+    k(x, y) = amplitude ** 2 * 2 ** (1 - v) / Gamma(v) * s ** v * K(v, s)
+  ```
+  where
+    * `s` is `sqrt(2 * v) * d / l`.
+    * `v` is the degrees of freedom parameter `df`.
+    * `d` is the Euclidean distance `||x - y||**2`.
+    * `l` is the `length_scale`.
+    * `K(v, s)` is the Modified Bessel function of the second kind.
+
+  where the double-bars represent vector length (i.e. Euclidean, or L2 Norm).
+  This kernel, acts over the space `S = R^(D1 x D2 .. x Dd)`.
+
+  Warning: Gradients are not available with respect to the `df` parameter.
+  Warning: It is recommended that for `df = 0.5, 1.5, 2.5` to use the
+  specialized kernels `MaternOneHalf`, `MaternThreeHalves` and
+  `MaternFiveHalves` instead.
+  """
+
+  def __init__(self,
+               df,
+               amplitude=None,
+               length_scale=None,
+               feature_ndims=1,
+               validate_args=False,
+               name='GeneralizedMatern'):
+    parameters = dict(locals())
+    with tf.name_scope(name) as name:
+      super(GeneralizedMatern, self)._init_params(amplitude, length_scale)
+      dtype = util.maybe_get_common_dtype([self._amplitude, df])
+      self._df = tensor_util.convert_nonref_to_tensor(
+          df, name='df', dtype=dtype)
+      super(GeneralizedMatern, self).__init__(
+          feature_ndims,
+          dtype=dtype,
+          name=name,
+          validate_args=validate_args,
+          parameters=parameters)
+
+  @property
+  def df(self):
+    """Degree of Freedom parameter."""
+    return self._df
+
+  def _batch_shape(self):
+    scalar_shape = tf.TensorShape([])
+    return tf.broadcast_static_shape(
+        super(GeneralizedMatern, self)._batch_shape(),
+        scalar_shape if self.df is None else self.df.shape)
+
+  def _batch_shape_tensor(self):
+    return tf.broadcast_dynamic_shape(
+        super(GeneralizedMatern, self)._batch_shape_tensor(),
+        [] if self.df is None else tf.shape(self.df))
+
+  def _apply_with_distance(
+      self, x1, x2, pairwise_square_distance, example_ndims=0):
+    # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
+    norm = util.sqrt_with_finite_grads(pairwise_square_distance)
+    if self.length_scale is not None:
+      length_scale = tf.convert_to_tensor(self.length_scale)
+      length_scale = util.pad_shape_with_ones(
+          length_scale, ndims=example_ndims)
+      norm /= length_scale
+    df = tf.convert_to_tensor(self.df)
+    df = tf.stop_gradient(df)
+    df = util.pad_shape_with_ones(df, ndims=example_ndims)
+    norm = tf.math.sqrt(2 * df) * norm
+
+    # When norm -> 0, the expression should tend to zero (along
+    # with the gradient).
+    safe_norm = tf.where(
+        tf.math.equal(norm, 0.),
+        dtype_util.as_numpy_dtype(self.dtype)(1.),
+        norm)
+    log_result = tf.where(
+        tf.math.equal(norm, 0.),
+        dtype_util.as_numpy_dtype(self.dtype)(0.),
+        df * tf.math.log(safe_norm) + tf.math.log(
+            tfp_math.bessel_kve(df, safe_norm)) - safe_norm)
+
+    log_result = log_result - tf.math.lgamma(df) + (1. - df) * np.log(2.)
+
+    if self.amplitude is not None:
+      amplitude = tf.convert_to_tensor(self.amplitude)
+      amplitude = util.pad_shape_with_ones(
+          amplitude, ndims=example_ndims)
+      log_result = log_result + 2. * tf.math.log(amplitude)
+    return tf.exp(log_result)
+
+  def _parameter_control_dependencies(self, is_init):
+    """Control dependencies for parameters."""
+    if not self.validate_args:
+      return []
+    assertions = []
+    for arg_name, arg in dict(
+        df=self.df,
+        amplitude=self.amplitude,
+        length_scale=self.length_scale).items():
+      if arg is not None and is_init != tensor_util.is_ref(arg):
+        assertions.append(assert_util.assert_positive(
+            arg,
+            message='{} must be positive.'.format(arg_name)))
+    return assertions
+
 
 class MaternOneHalf(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
   """Matern Kernel with parameter 1/2.
@@ -100,7 +235,7 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
   The kernel has the following form:
 
   ```none
-    k(x, y) = amplitude**2  * exp(-||x - y|| / length_scale)
+    k(x, y) = amplitude ** 2  * exp(-||x - y|| / length_scale)
   ```
 
   where the double-bars represent vector length (i.e. Euclidean, or L2 Norm).
@@ -156,27 +291,8 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
       amplitude = tf.convert_to_tensor(self.amplitude)
       amplitude = util.pad_shape_with_ones(
           amplitude, ndims=example_ndims)
-      log_result += 2. * tf.math.log(amplitude)
+      log_result = log_result + 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
-
-  def _apply(self, x1, x2, example_ndims=0):
-    pairwise_square_distance = util.sum_rightmost_ndims_preserving_shape(
-        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
-    return self._apply_with_distance(
-        x1, x2, pairwise_square_distance, example_ndims=example_ndims)
-
-  def _matrix(self, x1, x2):
-    pairwise_square_distance = util.pairwise_square_distance_matrix(
-        x1, x2, self.feature_ndims)
-    return self._apply_with_distance(
-        x1, x2, pairwise_square_distance, example_ndims=2)
-
-  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
-    pairwise_square_distance = util.pairwise_square_distance_tensor(
-        x1, x2, self.feature_ndims, x1_example_ndims, x2_example_ndims)
-    return self._apply_with_distance(
-        x1, x2, pairwise_square_distance,
-        example_ndims=(x1_example_ndims + x2_example_ndims))
 
 
 class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
@@ -186,7 +302,7 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
 
   ```none
     z = sqrt(3) * ||x - y|| / length_scale
-    k(x, y) = (1 + z) * exp(-z)
+    k(x, y) = amplitude ** 2 * (1 + z) * exp(-z)
   ```
 
   where the double-bars represent vector length (i.e. Euclidean, or L2 Norm).
@@ -243,27 +359,8 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
     if self.amplitude is not None:
       amplitude = tf.convert_to_tensor(self.amplitude)
       amplitude = util.pad_shape_with_ones(amplitude, example_ndims)
-      log_result += 2. * tf.math.log(amplitude)
+      log_result = log_result + 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
-
-  def _apply(self, x1, x2, example_ndims=0):
-    pairwise_square_distance = util.sum_rightmost_ndims_preserving_shape(
-        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
-    return self._apply_with_distance(
-        x1, x2, pairwise_square_distance, example_ndims=example_ndims)
-
-  def _matrix(self, x1, x2):
-    pairwise_square_distance = util.pairwise_square_distance_matrix(
-        x1, x2, self.feature_ndims)
-    return self._apply_with_distance(
-        x1, x2, pairwise_square_distance, example_ndims=2)
-
-  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
-    pairwise_square_distance = util.pairwise_square_distance_tensor(
-        x1, x2, self.feature_ndims, x1_example_ndims, x2_example_ndims)
-    return self._apply_with_distance(
-        x1, x2, pairwise_square_distance,
-        example_ndims=(x1_example_ndims + x2_example_ndims))
 
 
 class MaternFiveHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
@@ -273,7 +370,7 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
 
   ```none
     z = sqrt(5) * ||x - y|| / length_scale
-    k(x, y) = (1 + z + (z ** 2) / 3) * exp(-z)
+    k(x, y) = amplitude ** 2 * (1 + z + (z ** 2) / 3) * exp(-z)
   ```
 
   where the double-bars represent vector length (i.e. Euclidean, or L2 Norm).
@@ -330,24 +427,5 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
     if self.amplitude is not None:
       amplitude = tf.convert_to_tensor(self.amplitude)
       amplitude = util.pad_shape_with_ones(amplitude, example_ndims)
-      log_result += 2. * tf.math.log(amplitude)
+      log_result = log_result + 2. * tf.math.log(amplitude)
     return tf.exp(log_result)
-
-  def _apply(self, x1, x2, example_ndims=0):
-    pairwise_square_distance = util.sum_rightmost_ndims_preserving_shape(
-        tf.math.squared_difference(x1, x2), ndims=self.feature_ndims)
-    return self._apply_with_distance(
-        x1, x2, pairwise_square_distance, example_ndims=example_ndims)
-
-  def _matrix(self, x1, x2):
-    pairwise_square_distance = util.pairwise_square_distance_matrix(
-        x1, x2, self.feature_ndims)
-    return self._apply_with_distance(
-        x1, x2, pairwise_square_distance, example_ndims=2)
-
-  def _tensor(self, x1, x2, x1_example_ndims, x2_example_ndims):
-    pairwise_square_distance = util.pairwise_square_distance_tensor(
-        x1, x2, self.feature_ndims, x1_example_ndims, x2_example_ndims)
-    return self._apply_with_distance(
-        x1, x2, pairwise_square_distance,
-        example_ndims=(x1_example_ndims + x2_example_ndims))

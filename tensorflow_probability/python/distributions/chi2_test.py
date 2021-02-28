@@ -77,6 +77,17 @@ class Chi2Test(test_util.TestCase):
     self.assertEqual(cdf.shape, (6,))
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
+  def testChi2Quantile(self):
+    batch_size = 6
+    df = np.linspace(1., 20., batch_size).astype(np.float64)[..., np.newaxis]
+    x = np.linspace(0., 1., 13).astype(np.float64)
+    chi2 = tfd.Chi2(df=df, validate_args=True)
+    expected_quantile = stats.chi2.ppf(x, df)
+
+    quantile = chi2.quantile(x)
+    self.assertEqual(quantile.shape, (batch_size, 13))
+    self.assertAllClose(self.evaluate(quantile), expected_quantile)
+
   def testChi2Mean(self):
     df_v = np.array([1., 3, 5], dtype=np.float64)
     expected_mean = stats.chi2.mean(df_v)
@@ -167,7 +178,7 @@ class Chi2Test(test_util.TestCase):
     df = np.array([2., 4., 7.])
     dist = tfd.Chi2(df, validate_args=True)
     x = np.array([-8.3, -0.4, -1e-6])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

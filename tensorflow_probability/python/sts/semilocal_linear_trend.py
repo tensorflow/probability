@@ -173,7 +173,7 @@ class SemiLocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       name: Python `str` name prefixed to ops created by this class.
         Default value: "SemiLocalLinearTrendStateSpaceModel".
     """
-
+    parameters = dict(locals())
     with tf.name_scope(name or 'SemiLocalLinearTrendStateSpaceModel') as name:
       dtype = initial_state_prior.dtype
 
@@ -211,6 +211,7 @@ class SemiLocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           allow_nan_stats=allow_nan_stats,
           validate_args=validate_args,
           name=name)
+      self._parameters = parameters
 
   @property
   def level_scale(self):
@@ -428,7 +429,7 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
       else:
         autoregressive_coef_bijector = tfb.Identity()  # unconstrained
 
-      stddev_preconditioner = tfb.AffineScalar(scale=observed_stddev)
+      stddev_preconditioner = tfb.Scale(scale=observed_stddev)
       scaled_softplus = tfb.Chain([stddev_preconditioner, tfb.Softplus()])
       super(SemiLocalLinearTrend, self).__init__(
           parameters=[

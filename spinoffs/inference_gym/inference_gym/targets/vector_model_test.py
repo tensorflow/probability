@@ -270,14 +270,14 @@ class VectorModelTest(test_util.InferenceGymTestCase, parameterized.TestCase):
     self.assertAllAssertsNested(
         self.assertEqual, {
             'mean_student_ability': tf.float32,
-            'student_ability': tf.float32,
+            'centered_student_ability': tf.float32,
             'question_difficulty': tf.float32,
         }, base_model.dtype)
     self.assertEqual(tf.float32, vec_model.dtype)
     self.assertAllAssertsNested(
         self.assertEqual, {
             'mean_student_ability': [],
-            'student_ability': [400],
+            'centered_student_ability': [400],
             'question_difficulty': [100],
         },
         base_model.event_shape,

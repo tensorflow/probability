@@ -65,8 +65,18 @@ class Softsign(bijector.Bijector):
   def _is_increasing(cls):
     return True
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   def _forward(self, x):
-    return x / (1. + tf.math.abs(x))
+    abs_x = tf.math.abs(x)
+    # This is right for finite x, but if x == +-inf, this formula will give nan,
+    # whereas the correct answer is sign(x).
+    answer = x / (1. + abs_x)
+    # So we explicitly fix it, by masking off any x big enough that 1 + abs_x ==
+    # abs_x even in float 64.
+    return tf.where(abs_x >= 1e20, tf.math.sign(x), answer)
 
   def _inverse(self, y):
     with tf.control_dependencies(self._assertions(y)):

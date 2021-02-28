@@ -22,19 +22,24 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'InverseGaussian',
@@ -117,15 +122,23 @@ class InverseGaussian(distribution.Distribution):
 
       super(InverseGaussian, self).__init__(
           dtype=self._loc.dtype,
-          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, concentration=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def loc(self):
@@ -151,24 +164,16 @@ class InverseGaussian(distribution.Distribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None):
-    # See https://en.wikipedia.org/wiki/Inverse_Gaussian_distribution or
-    # https://www.jstor.org/stable/2683801
-    concentration = tf.convert_to_tensor(self.concentration)
+    seed = samplers.sanitize_seed(seed, salt='inverse_gaussian')
+
     loc = tf.convert_to_tensor(self.loc)
-    chi2_seed, unif_seed = samplers.split_seed(seed, salt='inverse_gaussian')
-    shape = ps.concat([[n], self._batch_shape_tensor(
-        loc=loc, concentration=concentration)], axis=0)
-    sampled_chi2 = tf.square(samplers.normal(
-        shape, seed=chi2_seed, dtype=self.dtype))
-    sampled_uniform = samplers.uniform(
-        shape, seed=unif_seed, dtype=self.dtype)
-    sampled = (
-        loc + tf.square(loc) * sampled_chi2 / (2. * concentration) -
-        loc / (2. * concentration) *
-        tf.sqrt(4. * loc * concentration * sampled_chi2 +
-                tf.square(loc * sampled_chi2)))
-    return tf.where(sampled_uniform <= loc / (loc + sampled),
-                    sampled, tf.square(loc) / sampled)
+    concentration = tf.convert_to_tensor(self.concentration)
+    total_shape = ps.concat(
+        [ps.convert_to_shape_tensor([n]),
+         self._batch_shape_tensor(loc=loc, concentration=concentration)],
+        axis=0)
+    return _random_inverse_gaussian_gradient(
+        total_shape, loc, concentration, seed)
 
   def _log_prob(self, x):
     concentration = tf.convert_to_tensor(self.concentration)
@@ -226,3 +231,141 @@ class InverseGaussian(distribution.Distribution):
           self.loc,
           message='Argument `loc` must be positive.'))
     return assertions
+
+
+def _random_inverse_gaussian_no_gradient(shape, loc, concentration, seed):
+  """Sample from Inverse Gaussian distribution."""
+  # See https://en.wikipedia.org/wiki/Inverse_Gaussian_distribution or
+  # https://www.jstor.org/stable/2683801
+  dtype = dtype_util.common_dtype([loc, concentration], tf.float32)
+  concentration = tf.convert_to_tensor(concentration)
+  loc = tf.convert_to_tensor(loc)
+  chi2_seed, unif_seed = samplers.split_seed(seed, salt='inverse_gaussian')
+  sampled_chi2 = tf.square(samplers.normal(shape, seed=chi2_seed, dtype=dtype))
+  sampled_uniform = samplers.uniform(shape, seed=unif_seed, dtype=dtype)
+  # Wikipedia defines an intermediate x with the formula
+  #   x = loc + loc ** 2 * y / (2 * conc)
+  #       - loc / (2 * conc) * sqrt(4 * loc * conc * y + loc ** 2 * y ** 2)
+  # where y ~ N(0, 1)**2 (sampled_chi2 above) and conc is the concentration.
+  # Let us write
+  #   w = loc * y / (2 * conc)
+  # Then we can extract the common factor in the last two terms to obtain
+  #   x = loc + loc * w * (1 - sqrt(2 / w + 1))
+  # Now we see that the Wikipedia formula suffers from catastrphic
+  # cancellation for large w (e.g., if conc << loc).
+  #
+  # Fortunately, we can fix this by multiplying both sides
+  # by 1 + sqrt(2 / w + 1).  We get
+  #   x * (1 + sqrt(2 / w + 1)) =
+  #     = loc * (1 + sqrt(2 / w + 1)) + loc * w * (1 - (2 / w + 1))
+  #     = loc * (sqrt(2 / w + 1) - 1)
+  # The term sqrt(2 / w + 1) + 1 no longer presents numerical
+  # difficulties for large w, and sqrt(2 / w + 1) - 1 is just
+  # sqrt1pm1(2 / w), which we know how to compute accurately.
+  # This just leaves the matter of small w, where 2 / w may
+  # overflow.  In the limit a w -> 0, x -> loc, so we just mask
+  # that case.
+  sqrt1pm1_arg = 4 * concentration / (loc * sampled_chi2)  # 2 / w above
+  safe_sqrt1pm1_arg = tf.where(sqrt1pm1_arg < np.inf, sqrt1pm1_arg, 1.0)
+  denominator = 1.0 + tf.sqrt(safe_sqrt1pm1_arg + 1.0)
+  ratio = tfp_math.sqrt1pm1(safe_sqrt1pm1_arg) / denominator
+  sampled = loc * tf.where(sqrt1pm1_arg < np.inf, ratio, 1.0)  # x above
+  return tf.where(sampled_uniform <= loc / (loc + sampled),
+                  sampled, tf.square(loc) / sampled)
+
+
+def _random_inverse_gaussian_fwd(shape, loc, concentration, seed):
+  """Compute output, aux (collaborates with _random_inverse_gaussian_bwd)."""
+  samples = _random_inverse_gaussian_no_gradient(
+      shape, loc, concentration, seed)
+  return samples, (samples, shape, loc, concentration)
+
+
+def _compute_partials(samples, loc, concentration):
+  """Compute the Implicit Gradients for the samples."""
+  # The implicit gradient here is derived in Appendix H.1 of [1].
+  # Note that [1] uses the parametermization (1 / loc, concentration), and the
+  # formula below are modified accordingly.
+  # References
+  # [1] W. Lin, M. Schmidt, M. Khan. Handling the Positive-Definite Constraint
+  # in the Bayesian Learning Rule. https://arxiv.org/abs/2002.10060v8
+  dtype = dtype_util.common_dtype([samples, loc, concentration], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  norm = normal.Normal(numpy_dtype(0.), numpy_dtype(1.))
+  z = -tf.math.sqrt(concentration / samples) * (samples / loc + 1.)
+  log_mills_ratio = norm.log_cdf(z) - norm.log_prob(z)
+  partial_c = (
+      numpy_dtype(np.log(2.)) - tf.math.log(loc) -
+      0.5 * tf.math.log(concentration) + 1.5 * tf.math.log(samples) +
+      log_mills_ratio)
+  partial_c = samples / concentration - tf.math.exp(partial_c)
+
+  partial_l = (
+      numpy_dtype(np.log(2.)) + 0.5 * tf.math.log(concentration) +
+      1.5 * tf.math.log(samples) + log_mills_ratio)
+  # We divide by -loc**2, since we need to take in to account that [1] is
+  # parameterized by 1 / loc (hence by the chain rule we incur a - 1 / loc**2
+  # factor, where the negative sign is cancelled out.
+  partial_l = tf.math.exp(partial_l) / tf.math.square(loc)
+  return partial_c, partial_l
+
+
+def _random_inverse_gaussian_bwd(aux, g):
+  """The gradient of the inverse gaussian samples."""
+  samples, shape, loc, concentration = aux
+  partial_concentration, partial_loc = _compute_partials(
+      samples, loc, concentration)
+  dsamples = g
+
+  # These will need to be shifted by the extra dimensions added from
+  # `sample_shape`.
+  reduce_dims = tf.range(
+      tf.size(shape) - tf.maximum(tf.rank(concentration), tf.rank(loc)))
+  grad_concentration = tf.math.reduce_sum(
+      dsamples * partial_concentration, axis=reduce_dims)
+  grad_loc = tf.math.reduce_sum(dsamples * partial_loc, axis=reduce_dims)
+
+  if (tensorshape_util.is_fully_defined(concentration.shape) and
+      tensorshape_util.is_fully_defined(loc.shape) and
+      concentration.shape == loc.shape):
+    return grad_concentration, grad_loc, None  # seed=None
+
+  ax_loc, ax_conc = tf.raw_ops.BroadcastGradientArgs(
+      s0=ps.shape(loc), s1=ps.shape(concentration))
+  grad_concentration = tf.reshape(
+      tf.math.reduce_sum(grad_concentration, axis=ax_conc),
+      ps.shape(concentration))
+  grad_loc = tf.reshape(
+      tf.math.reduce_sum(grad_loc, axis=ax_loc), ps.shape(loc))
+
+  return grad_loc, grad_concentration, None  # seed=None
+
+
+def _random_inverse_gaussian_jvp(shape, primals, tangents):
+  """Computes JVP for inverse_gaussian sample (supports JAX custom derivative)."""
+  loc, concentration, seed = primals
+  dloc, dconcentration, dseed = tangents
+  del dseed
+  # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
+  dconcentration = tf.broadcast_to(dconcentration, shape)
+  dloc = tf.broadcast_to(dloc, shape)
+
+  samples = _random_inverse_gaussian_no_gradient(
+      shape, loc, concentration, seed)
+
+  partial_concentration, partial_loc = _compute_partials(
+      samples, loc, concentration)
+
+  dsamples = (partial_concentration * dconcentration + partial_loc * dloc)
+  return samples, dsamples
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_random_inverse_gaussian_fwd,
+    vjp_bwd=_random_inverse_gaussian_bwd,
+    jvp_fn=_random_inverse_gaussian_jvp,
+    nondiff_argnums=(0,))
+def _random_inverse_gaussian_gradient(
+    shape, loc, concentration, seed):
+  return _random_inverse_gaussian_no_gradient(shape, loc, concentration, seed)
+

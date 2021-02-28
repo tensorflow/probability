@@ -39,7 +39,21 @@ def _add_bias(features):
 
 
 class SparseLogisticRegression(bayesian_model.BayesianModel):
-  """Bayesian logistic regression with a sparsity-inducing prior."""
+  """Bayesian logistic regression with a sparsity-inducing prior.
+
+  ```none
+  global_scale ~ Gamma(0.5, 0.5)
+
+  # The `+ 1` is for the bias term.
+  for i in range(num_features + 1):
+    unscaled_weights[i] ~ Normal(loc=0, scale=1)
+    local_scales[i] ~ Gamma(0.5, 0.5)
+    weights[i] = unscaled_weights[i] * local_scales[i] * global_scale
+
+  for j in range(num_datapoints):
+    label[j] ~ Bernoulli(logit=concat([features[j], [1]) @ weights)
+  ```
+  """
 
   def __init__(self,
                train_features,

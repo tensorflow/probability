@@ -195,6 +195,24 @@ class MixtureStddevTest(test_util.TestCase):
 
     self.assertAllClose(expected_devs, self.evaluate(mix_dev))
 
+  def test_reproduce_bug_169359285(self):
+    mixture_weight_vector = [
+        [3.46246948e-10, 1.91437426e-08, 0.999999881, 7.18619435e-12,
+         2.2613047e-09, 1.99994091e-10, 1.10241352e-07, 3.18231095e-08]]
+    mean_vector = [
+        [823.835449, -897.290955, 2554.36426, -2.47223473,
+         1082.69666, 504.688751, 1291.00989, 954.730896]]
+    stddev_vector = [
+        [0.000924979395, 0.000693350448, 0.00416708598, 5.63207436,
+         0.000353494543, 0.00704913, 0.0127898213, 0.00763763487]]
+    mixture_weight_vector = tf.convert_to_tensor(mixture_weight_vector)
+    mean_vector = tf.convert_to_tensor(mean_vector)
+    stddev_vector = tf.convert_to_tensor(stddev_vector)
+    result = self.evaluate(distribution_util.mixture_stddev(
+        mixture_weight_vector, mean_vector, stddev_vector))
+    self.assertAllClose(
+        np.array([0.70164], dtype=np.float32), result, rtol=1e-5)
+
 
 @test_util.test_all_tf_execution_regimes
 class PadMixtureDimensionsTest(test_util.TestCase):
@@ -517,7 +535,7 @@ class AssertCloseTest(test_util.TestCase):
 
     with self.assertRaisesOpError('has non-integer components'):
       with tf.control_dependencies(
-          [distribution_util.assert_integer_form(w)]):
+          [distribution_util.assert_integer_form(w, atol=0, rtol=0)]):
         self.evaluate(tf.identity(w))
 
 
@@ -550,9 +568,9 @@ class MaybeGetStaticTest(test_util.TestCase):
     if tf.executing_eagerly(): return
     x = tf1.placeholder_with_default(
         np.array([2.], dtype=np.int32), shape=[1])
-    self.assertEqual(None, distribution_util.maybe_get_static_value(x))
-    self.assertEqual(
-        None, distribution_util.maybe_get_static_value(x, dtype=np.float64))
+    self.assertIsNone(distribution_util.maybe_get_static_value(x))
+    self.assertIsNone(
+        distribution_util.maybe_get_static_value(x, dtype=np.float64))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -971,7 +989,7 @@ class ExpandToVectorTest(test_util.TestCase):
 
   def _check(self, expected, actual, expected_dtype=np.int32):
     self.assertAllEqual(expected, actual)
-    self.assertEquals(expected_dtype, actual.dtype)
+    self.assertEqual(expected_dtype, actual.dtype)
 
   def test_expand_to_vector_on_literals(self):
     self._check_static([1], distribution_util.expand_to_vector(1))

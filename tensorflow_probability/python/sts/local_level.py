@@ -145,7 +145,7 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       name: Python `str` name prefixed to ops created by this class.
         Default value: "LocalLevelStateSpaceModel".
     """
-
+    parameters = dict(locals())
     with tf.name_scope(name or 'LocalLevelStateSpaceModel') as name:
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -180,6 +180,7 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           allow_nan_stats=allow_nan_stats,
           validate_args=validate_args,
           name=name)
+      self._parameters = parameters
 
   @property
   def level_scale(self):
@@ -326,7 +327,7 @@ class LocalLevel(StructuralTimeSeries):
       super(LocalLevel, self).__init__(
           parameters=[
               Parameter('level_scale', level_scale_prior,
-                        tfb.Chain([tfb.AffineScalar(scale=observed_stddev),
+                        tfb.Chain([tfb.Scale(scale=observed_stddev),
                                    tfb.Softplus()])),
           ],
           latent_size=1,

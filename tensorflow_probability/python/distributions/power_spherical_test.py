@@ -426,11 +426,11 @@ class _PowerSphericalTest(object):
     x[0][0] += 0.01
     with self.assertRaisesOpError('must sum to `1`'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x[0]))
+          dist.experimental_default_event_space_bijector().inverse(x[0]))
 
     with self.assertRaisesOpError('must be non-negative'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x[1]))
+          dist.experimental_default_event_space_bijector().inverse(x[1]))
 
   def VerifyPowerSphericaUniformZeroKL(self, dim):
     seed_stream = test_util.test_seed_stream()
@@ -442,7 +442,7 @@ class _PowerSphericalTest(object):
         seed=seed_stream())
     mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
     # Zero concentration is the same as a uniform distribution on the sphere.
-    # Check that the KL divergence is zero.
+    # Check that the log_probs agree and the KL divergence is zero.
     concentration = self.dtype(0.)
 
     ps = tfp.distributions.PowerSpherical(
@@ -452,10 +452,12 @@ class _PowerSphericalTest(object):
 
     x = ps.sample(int(5e4), seed=test_util.test_seed())
 
-    kl_sample = tf.reduce_mean(ps.log_prob(x) - su.log_prob(x), axis=0)
+    ps_lp = ps.log_prob(x)
+    su_lp = su.log_prob(x)
+    ps_lp_, su_lp_ = self.evaluate([ps_lp, su_lp])
+    self.assertAllClose(ps_lp_, su_lp_, rtol=1e-6)
     true_kl = tfp.distributions.kl_divergence(ps, su)
-    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
-    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=1e-1)
+    true_kl_ = self.evaluate([true_kl])
     self.assertAllClose(true_kl_, np.zeros_like(true_kl_), atol=1e-4)
 
   def VerifyPowerSphericaUniformKL(self, dim):

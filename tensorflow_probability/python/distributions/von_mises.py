@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
@@ -30,10 +31,12 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.gradient import value_and_gradient
 
 __all__ = ['VonMises']
@@ -147,15 +150,15 @@ class VonMises(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return dict(
-        zip(('loc', 'concentration'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
-
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, concentration=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def loc(self):
@@ -368,7 +371,7 @@ def von_mises_cdf(x, concentration):
   using automatic differentiation. We use forward mode for the series case
   (which allows to save memory) and backward mode for the Normal approximation.
 
-  Arguments:
+  Args:
     x: The point at which to evaluate the CDF.
     concentration: The concentration parameter of the von Mises distribution.
 
@@ -495,7 +498,7 @@ def _von_mises_cdf_normal(x, concentration, dtype):
 def _von_mises_sample_no_gradient(shape, concentration, seed):
   """Performs rejection sampling for standardized von Mises.
 
-  Arguments:
+  Args:
     shape: The output sample shape.
     concentration: The concentration parameter of the distribution.
     seed: The random seed.
@@ -543,13 +546,14 @@ def _von_mises_sample_no_gradient(shape, concentration, seed):
 
   s = tf.where(concentration > s_concentration_cutoff, s_exact, s_approximate)
 
-  def loop_body(done, u, w, seed):
+  def loop_body(done, u_in, w, seed):
     """Resample the non-accepted points."""
     # We resample u each time completely. Only its sign is used outside the
     # loop, which is random.
     u_seed, v_seed, next_seed = samplers.split_seed(seed, n=3)
     u = samplers.uniform(
         shape, minval=-1., maxval=1., dtype=concentration.dtype, seed=u_seed)
+    tensorshape_util.set_shape(u, u_in.shape)
     z = tf.cos(np.pi * u)
     # Update the non-accepted points.
     w = tf.where(done, w, (1. + s * z) / (s + z))
@@ -637,7 +641,7 @@ def _von_mises_sample_jvp(shape, primals, tangents):
 def _von_mises_sample_with_gradient(shape, concentration, seed):
   """Performs rejection sampling for standardized von Mises.
 
-  Arguments:
+  Args:
     shape: The output sample shape.
     concentration: The concentration parameter of the distribution.
     seed: (optional) The random seed.
@@ -658,7 +662,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
   The sampling algorithm is rejection sampling with wrapped Cauchy proposal [1].
   The samples are pathwise differentiable using the approach of [2].
 
-  Arguments:
+  Args:
     shape: The output sample shape.
     concentration: The concentration parameter of the von Mises distribution.
     dtype: The data type of concentration and the outputs.

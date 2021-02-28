@@ -178,7 +178,7 @@ def inverse_and_ildj(f, *trace_args, reduce_ildj=True):
     flat_incells = [InverseAndILDJ.unknown(aval) for aval in flat_forward_avals]
     flat_outcells = safe_map(InverseAndILDJ.new, flat_args)
     env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr.jaxpr,
-                              flat_constcells, flat_incells, flat_outcells)
+                              flat_constcells, flat_incells, flat_outcells)  # pytype: disable=wrong-arg-types
     flat_incells = [env.read(invar) for invar in jaxpr.jaxpr.invars]
     if any(not flat_incell.top() for flat_incell in flat_incells):
       raise ValueError('Cannot invert function.')
@@ -332,7 +332,7 @@ primitive.register_hop_transformation_rule('inverse', hop_inverse_rule)
 def initial_ildj(incells, outcells, *, jaxpr, num_consts, **_):
   const_cells, incells = jax_util.split_list(incells, [num_consts])
   env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr, const_cells,
-                            incells, outcells)
+                            incells, outcells)  # pytype: disable=wrong-arg-types
   new_incells = [env.read(invar) for invar in jaxpr.invars]
   new_outcells = [env.read(outvar) for outvar in jaxpr.outvars]
   return const_cells + new_incells, new_outcells, None
@@ -373,8 +373,16 @@ def map_ildj(prim, incells, outcells, **params):
   flat_vals, in_tree = tree_util.tree_flatten((mapped_incells, mapped_outcells))
   f, aux = flat_propagate(f, in_tree)
   # Assume all invars as mapped
-  new_mapped_invars = (True,) * len(flat_vals)
-  new_params = dict(params, mapped_invars=new_mapped_invars)
+  new_in_axes = (0,) * len(flat_vals)
+  new_params = dict(params, in_axes=new_in_axes)
+  if 'donated_invars' in params:
+    new_params['donated_invars'] = (False,) * len(flat_vals)
+  if 'out_axes' in params:
+    assert all(out_axis == 0 for out_axis in params['out_axes'])
+    new_params['out_axes_thunk'] = jax_util.HashableFunction(
+        lambda: (0,) * aux().num_leaves,
+        closure=('ildj', params['out_axes']))
+    del new_params['out_axes']
   subenv_vals = prim.bind(f, *flat_vals, **new_params)
   subenv_tree = aux()
   subenv = tree_util.tree_unflatten(subenv_tree, subenv_vals)

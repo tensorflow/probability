@@ -31,7 +31,6 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":sample_stats",
-        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -42,6 +41,11 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/mcmc:diagnostic",
         "//tensorflow_probability/python/stats",
     ],
 )
@@ -51,7 +55,6 @@ py_test(
     size = "small",
     srcs = ["sample_stats_test.py"],
     python_version = "PY3",
-    shard_count = 10,
     srcs_version = "PY3",
     deps = [
         ":sample_stats",

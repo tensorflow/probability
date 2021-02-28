@@ -19,13 +19,13 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 from scipy import special as sp_special
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.distributions.von_mises_fisher import _bessel_ive
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -34,16 +34,6 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
                          test_util.TestCase):
-
-  def testBesselIve(self):
-    with self.assertRaisesRegexp(ValueError, r'imprecise for large v'):
-      _bessel_ive(2.0, 1.0)
-    # Zero is not a supported value for z.
-    with self.assertRaisesOpError(r'NaN'):
-      self.evaluate(_bessel_ive(1.5, 0.0))
-    z = np.logspace(-6, 2, 20).astype(np.float64)
-    for v in np.float64([-0.5, 0, 0.5, 1, 1.5]):
-      self.assertAllClose(sp_special.ive(v, z), _bessel_ive(v, z))
 
   def testReproducibleGraph(self):
     vmf = tfp.distributions.VonMisesFisher(
@@ -159,12 +149,11 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     vmf_samples = vmf.sample(
         sample_shape=[nsamples], seed=test_util.test_seed())
     samples = tf.concat([uniforms, vmf_samples], axis=0)
-    samples = tf.debugging.check_numerics(samples, 'samples')
-    samples = self.evaluate(samples)
     log_prob = vmf.log_prob(samples)
+    samples = tf.debugging.check_numerics(samples, 'samples')
     log_prob = tf.debugging.check_numerics(log_prob, 'log_prob')
-    conc = self.evaluate(vmf.concentration)
-    mean_dir = self.evaluate(vmf.mean_direction)
+    samples, log_prob, conc, mean_dir = self.evaluate([
+        samples, log_prob, vmf.concentration, vmf.mean_direction])
     log_true_sphere_surface_area = (
         np.log(2) + (dim / 2) * np.log(np.pi) - sp_special.gammaln(dim / 2))
     expected = (
@@ -175,8 +164,7 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
                  np.log(sp_special.ive(dim / 2 - 1, conc)) -
                  np.abs(conc),
                  -log_true_sphere_surface_area))
-    self.assertAllClose(expected, self.evaluate(log_prob),
-                        atol=atol)
+    self.assertAllClose(expected, log_prob, atol=atol)
 
   def _verifySampleAndPdfConsistency(self, vmf, rtol=0.075):
     """Verifies samples are consistent with the PDF using importance sampling.
@@ -262,49 +250,20 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
         cov,
         atol=0.015)
 
-  def testSampleAndPdfConsistency2d(self):
-    mean_dir = tf.math.l2_normalize([[1., 2], [-2, -3]], axis=-1)
-    concentration = [[0], [1e-5], [0.1], [1], [10]]
+  @parameterized.parameters(2, 3, 4, 5, 10, 20)
+  def testSampleAndPdfConsistency(self, dim):
+    seed_stream = test_util.test_seed_stream()
+    mean_direction = tf.random.uniform(
+        minval=1., maxval=2., shape=[2, dim], seed=seed_stream())
+    mean_direction = tf.nn.l2_normalize(mean_direction, axis=-1)
+    concentration = tf.random.uniform(
+        minval=1e-4, maxval=10., shape=[5, 1], seed=seed_stream())
     vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_dir, concentration=concentration,
+        mean_direction=mean_direction, concentration=concentration,
         validate_args=True, allow_nan_stats=False)
     self._verifySampleAndPdfConsistency(vmf)
     self._verifyCovariance(vmf)
     self._verifyPdfWithNumpy(vmf)
-
-  def testSampleAndPdfConsistency3d(self):
-    mean_dir = tf.math.l2_normalize([[1., 2, 3], [-2, -3, -1]], axis=-1)
-    concentration = [[0], [1e-5], [0.1], [1], [10]]
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_dir, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
-    self._verifySampleAndPdfConsistency(vmf)
-    # TODO(bjp): Enable self._verifyCovariance(vmf)
-    self._verifyPdfWithNumpy(vmf, atol=.002)
-
-  def testSampleAndPdfConsistency4d(self):
-    mean_dir = tf.math.l2_normalize([[1., 2, 3, 4], [-2, -3, -1, 0]], axis=-1)
-    concentration = [[0], [1e-4], [0.1], [1], [10]]
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_dir, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
-    self._verifySampleAndPdfConsistency(vmf)
-    # TODO(bjp): Enable self._verifyCovariance(vmf)
-    self._verifyPdfWithNumpy(vmf)
-
-  def testSampleAndPdfConsistency5d(self):
-    mean_dir = tf.math.l2_normalize(
-        [[1., 2, 3, 4, 5], [-2, -3, -1, 0, 1]], axis=-1)
-    # TODO(bjp): Numerical instability 0 < k < 1e-2 concentrations.
-    # Should resolve by eliminating the bessel_i recurrence in favor of
-    # a more stable algorithm, e.g. cephes.
-    concentration = [[0], [5e-2], [0.1], [1], [10]]
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_dir, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
-    self._verifySampleAndPdfConsistency(vmf)
-    # TODO(bjp): Enable self._verifyCovariance(vmf)
-    self._verifyPdfWithNumpy(vmf, atol=2e-4)
 
   def VerifyVonMisesFisherUniformZeroKL(self, dim):
     seed_stream = test_util.test_seed_stream()
@@ -359,15 +318,12 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     kl_sample = tf.reduce_mean(vmf.log_prob(x) - su.log_prob(x), axis=0)
     true_kl = tfp.distributions.kl_divergence(vmf, su)
     true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
-    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=7e-2)
+    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=0.3)
 
-  def testKLVonMisesFisherSphericalUniformDim2(self):
-    self.VerifyVonMisesFisherUniformZeroKL(dim=2)
-    self.VerifyVonMisesFisherUniformKL(dim=2)
-
-  def testKLVonMisesFisherSphericalUniformDim3(self):
-    self.VerifyVonMisesFisherUniformZeroKL(dim=3)
-    self.VerifyVonMisesFisherUniformKL(dim=3)
+  @parameterized.parameters(2, 3, 5, 10, 20)
+  def testKLVonMisesFisherSphericalUniformDim(self, dim):
+    self.VerifyVonMisesFisherUniformZeroKL(dim=dim)
+    self.VerifyVonMisesFisherUniformKL(dim=dim)
 
   def VerifyEntropy(self, dim):
     seed_stream = test_util.test_seed_stream()
@@ -394,11 +350,9 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
         vmf.entropy(), sample_entropy])
     self.assertAllClose(sample_entropy, true_entropy, rtol=3e-2)
 
-  def testEntropyDim2(self):
-    self.VerifyEntropy(dim=2)
-
-  def testEntropyDim3(self):
-    self.VerifyEntropy(dim=3)
+  @parameterized.parameters(2, 3, 5, 10, 20)
+  def testEntropyDim(self, dim):
+    self.VerifyEntropy(dim=dim)
 
   def testInternalShapeInference(self):
     # Regression test for the effect of b/139013403 on vMF sampling.
@@ -507,11 +461,11 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
     x[0][0] += 0.01
     with self.assertRaisesOpError('must sum to `1`'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x[0]))
+          dist.experimental_default_event_space_bijector().inverse(x[0]))
 
     with self.assertRaisesOpError('must be non-negative'):
       self.evaluate(
-          dist._experimental_default_event_space_bijector().inverse(x[1]))
+          dist.experimental_default_event_space_bijector().inverse(x[1]))
 
 if __name__ == '__main__':
   tf.test.main()

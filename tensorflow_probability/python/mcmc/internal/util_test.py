@@ -28,6 +28,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal import util
@@ -295,6 +296,33 @@ class TraceScanTest(test_util.TestCase):
     self.assertAllClose(7 + 6 + 5 + 4 + 3 + 2 + 1, final_state)
     self.assertAllClose([3, 5, 14], trace)
 
+  @test_util.jax_disable_test_missing_functionality('b/171298381')
+  @test_util.numpy_disable_test_missing_functionality('No expanding composites')
+  def testComposite(self):
+    auto_normal = auto_composite_tensor.auto_composite_tensor(
+        tfd.Normal, omit_kwargs=('name',))
+
+    def _loop_fn(state, element):
+      return state + element
+
+    def _trace_fn(state):
+      return [state, 2 * state, auto_normal(state, 0.1)]
+
+    final_state, trace = util.trace_scan(
+        loop_fn=_loop_fn, initial_state=0., elems=[1., 2.], trace_fn=_trace_fn)
+
+    self.assertAllClose([], tensorshape_util.as_list(final_state.shape))
+    self.assertAllClose([2], tensorshape_util.as_list(trace[0].shape))
+    self.assertAllClose([2], tensorshape_util.as_list(trace[1].shape))
+
+    self.assertAllClose(3, final_state)
+    self.assertAllClose([1, 3], trace[0])
+    self.assertAllClose([2, 6], trace[1])
+
+    self.assertIsInstance(trace[2], tfd.Normal)
+    self.assertAllClose([1., 3.], trace[2].loc)
+    self.assertAllClose([0.1, 0.1], trace[2].scale)
+
 
 WrapperResults = collections.namedtuple('WrapperResults',
                                         'inner_results, value')
@@ -402,70 +430,6 @@ class IndexRemappingGatherTest(test_util.TestCase):
             for m in range(params.shape[4]):
               self.assertEqual(params[i, j, indices[j, k, l], l, m],
                                result_[i, j, k, l, m])
-
-
-class MakeInnermostSetterTest(test_util.TestCase):
-
-  def testNoWrapper(self):
-    results = SimpleResults(1)
-    new_results = util.make_innermost_setter(_test_setter_fn)(results)
-    self.assertEqual(2, new_results.value)
-
-  def testNoWrapperArg(self):
-    results = SimpleResults(1)
-    new_results = util.make_innermost_setter(_test_setter_fn)(results, 2)
-    self.assertEqual(3, new_results.value)
-
-  def testNoWrapperKwarg(self):
-    results = SimpleResults(1)
-    new_results = util.make_innermost_setter(_test_setter_fn)(
-        results, increment=2)
-    self.assertEqual(3, new_results.value)
-
-  def testOneWrapper(self):
-    results = WrapperResults(inner_results=SimpleResults(1), value=2)
-    new_results = util.make_innermost_setter(_test_setter_fn)(results)
-    self.assertEqual(2, new_results.value)
-    self.assertEqual(2, new_results.inner_results.value)
-
-  def testTwoWrappers(self):
-    results = WrapperResults(
-        inner_results=WrapperResults(inner_results=SimpleResults(1), value=2),
-        value=3)
-    new_results = util.make_innermost_setter(_test_setter_fn)(results)
-    self.assertEqual(3, new_results.value)
-    self.assertEqual(2, new_results.inner_results.value)
-    self.assertEqual(2, new_results.inner_results.inner_results.value)
-
-
-class MakeInnermostGetterTest(test_util.TestCase):
-
-  def testNoWrapper(self):
-    results = SimpleResults(1)
-    inner_results = util.make_innermost_getter(lambda r: r)(results)
-    self.assertIs(inner_results, results)
-
-  def testNoWrapperArg(self):
-    results = SimpleResults(1)
-    value = util.make_innermost_getter(lambda r, a: r.value + a)(results, 1)
-    self.assertEqual(2, value)
-
-  def testNoWrapperKwarg(self):
-    results = SimpleResults(1)
-    value = util.make_innermost_getter(lambda r, a: r.value + a)(results, a=1)
-    self.assertEqual(2, value)
-
-  def testOneWrapper(self):
-    results = WrapperResults(inner_results=SimpleResults(1), value=2)
-    inner_results = util.make_innermost_getter(lambda r: r)(results)
-    self.assertIs(inner_results, results.inner_results)
-
-  def testTwoWrappers(self):
-    results = WrapperResults(
-        inner_results=WrapperResults(inner_results=SimpleResults(1), value=2),
-        value=3)
-    inner_results = util.make_innermost_getter(lambda r: r)(results)
-    self.assertIs(inner_results, results.inner_results.inner_results)
 
 
 class FakeWrapperOld(object):
@@ -578,54 +542,6 @@ class SimpleTensorWarningTest(test_util.TestCase):
     self.assertFalse(
         any('Please consult the docstring' in str(warning.message)
             for warning in triggered))
-
-
-FakeKernelResults = collections.namedtuple('FakeKernelResults', 'some_field')
-
-
-FakeKernelAcceptedResults = collections.namedtuple(
-    'FakeKernelAcceptedResults',
-    'accepted_results')
-
-
-class GetFieldTest(test_util.TestCase):
-
-  @parameterized.parameters(
-      [FakeKernelResults(some_field='yak')],
-      [FakeKernelAcceptedResults(
-          accepted_results=FakeKernelResults(some_field='yak'))]
-  )
-  def testValidKernelResults(self, kernel_results):
-    self.assertEqual(util.get_field(kernel_results, 'some_field'), 'yak')
-    with self.assertRaisesRegexp(TypeError, 'extract some_other_field'):
-      util.get_field(kernel_results, 'some_other_field')
-
-  def testIncompleteKernelResults(self):
-    kernel_results = FakeKernelResults(some_field='zebra')
-    with self.assertRaisesRegexp(TypeError, 'extract some_other_field'):
-      util.get_field(kernel_results, 'some_other_field')
-
-
-class UpdateFieldTest(test_util.TestCase):
-
-  @parameterized.parameters(
-      [FakeKernelResults(some_field='yak')],
-      [FakeKernelAcceptedResults(
-          accepted_results=FakeKernelResults(some_field='yak'))]
-    )
-  def testValidKernelResults(self, kernel_results):
-    updated_kernel_results = util.update_field(
-        kernel_results, 'some_field', 'moose')
-    self.assertEqual(
-        util.get_field(
-            updated_kernel_results, 'some_field'), 'moose')
-    with self.assertRaisesRegexp(TypeError, 'set some_other_field'):
-      util.update_field(kernel_results, 'some_other_field', 'antelope')
-
-  def testIncompletedKernelResults(self):
-    kernel_results = FakeKernelResults(some_field='ibex')
-    with self.assertRaisesRegexp(TypeError, 'set some_other_field'):
-      util.update_field(kernel_results, 'some_other_field', 'goat')
 
 
 if __name__ == '__main__':

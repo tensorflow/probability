@@ -21,13 +21,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
 __all__ = [
     'rademacher',
     'rayleigh',
+    'spherical_uniform',
 ]
 
 
@@ -53,6 +57,7 @@ def rademacher(shape, dtype=tf.float32, seed=None, name=None):
     # memory (host or device) as the downstream cast will want to put it.  The
     # convention on GPU is that int32 are in host memory and int64 are in device
     # memory.
+    shape = ps.convert_to_shape_tensor(shape)
     generation_dtype = tf.int64 if tf.as_dtype(dtype) != tf.int32 else tf.int32
     random_bernoulli = samplers.uniform(
         shape, minval=0, maxval=2, dtype=generation_dtype, seed=seed)
@@ -98,3 +103,82 @@ def rayleigh(shape, scale=None, dtype=tf.float32, seed=None, name=None):
     if scale is None:
       return x
     return x * scale
+
+
+def spherical_uniform(
+    shape,
+    dimension,
+    dtype=tf.float32,
+    seed=None,
+    name=None):
+  """Generates `Tensor` drawn from a uniform distribution on the sphere.
+
+  Args:
+    shape: Vector-shaped, `int` `Tensor` representing shape of output.
+    dimension: Scalar `int` `Tensor`, representing the dimensionality of the
+      space where the sphere is embedded.
+    dtype: (Optional) TF `dtype` representing `dtype` of output.
+      Default value: `tf.float32`.
+    seed: (Optional) Python integer to seed the random number generator.
+      Default value: `None` (i.e., no seed).
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., 'random_rayleigh').
+
+  Returns:
+    spherical_uniform: `Tensor` with specified `shape` and `dtype` consisting
+      of positive real values drawn from a Rayleigh distribution with specified
+      `scale`.
+  """
+  with tf.name_scope(name or 'spherical_uniform'):
+    seed = samplers.sanitize_seed(seed)
+    dimension = ps.convert_to_shape_tensor(ps.cast(dimension, dtype=tf.int32))
+    shape = ps.convert_to_shape_tensor(shape, dtype=tf.int32)
+    dimension_static = tf.get_static_value(dimension)
+    sample_shape = ps.concat([shape, [dimension]], axis=0)
+    sample_shape = ps.convert_to_shape_tensor(sample_shape)
+    # Special case one and two dimensions. This is to guard against the case
+    # where the normal samples are zero. This can happen in dimensions 1 and 2.
+    if dimension_static is not None:
+      # This is equivalent to sampling Rademacher random variables.
+      if dimension_static == 1:
+        return rademacher(sample_shape, dtype=dtype, seed=seed)
+      elif dimension_static == 2:
+        u = samplers.uniform(
+            shape, minval=0, maxval=2 * np.pi, dtype=dtype, seed=seed)
+        return tf.stack([tf.math.cos(u), tf.math.sin(u)], axis=-1)
+      else:
+        normal_samples = samplers.normal(
+            shape=ps.concat([shape, [dimension_static]], axis=0),
+            seed=seed,
+            dtype=dtype)
+        unit_norm = normal_samples / tf.norm(
+            normal_samples, ord=2, axis=-1)[..., tf.newaxis]
+        return unit_norm
+
+    # If we can't determine the dimension statically, tf.where between the
+    # different options.
+    r_seed, u_seed, n_seed = samplers.split_seed(
+        seed, n=3, salt='spherical_uniform_dynamic_shape')
+    rademacher_samples = rademacher(sample_shape, dtype=dtype, seed=r_seed)
+    u = samplers.uniform(
+        shape, minval=0, maxval=2 * np.pi, dtype=dtype, seed=u_seed)
+    twod_samples = tf.concat(
+        [tf.math.cos(u)[..., tf.newaxis],
+         tf.math.sin(u)[..., tf.newaxis] * tf.ones(
+             [dimension - 1], dtype=dtype)], axis=-1)
+
+    normal_samples = samplers.normal(
+        shape=ps.concat([shape, [dimension]], axis=0),
+        seed=n_seed,
+        dtype=dtype)
+    nd_samples = normal_samples / tf.norm(
+        normal_samples, ord=2, axis=-1)[..., tf.newaxis]
+
+    return tf.where(
+        tf.math.equal(dimension, 1),
+        rademacher_samples,
+        tf.where(
+            tf.math.equal(dimension, 2),
+            twod_samples,
+            nd_samples))
+

@@ -122,9 +122,9 @@ def bijector_supports():
     return BIJECTOR_SUPPORTS
   Support = tfp_hps.Support  # pylint: disable=invalid-name
   supports = {
-      'AffineScalar':
-          BijectorSupport(Support.SCALAR_UNCONSTRAINED,
-                          Support.SCALAR_UNCONSTRAINED),
+      'Ascending':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_STRICTLY_INCREASING),
       'BatchNormalization':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_UNCONSTRAINED),
@@ -196,6 +196,9 @@ def bijector_supports():
       'Permute':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_UNCONSTRAINED),
+      'Power':
+          BijectorSupport(Support.SCALAR_POSITIVE,
+                          Support.SCALAR_POSITIVE),
       'PowerTransform':  # The domain is parameter dependent.
           BijectorSupport(Support.OTHER, Support.SCALAR_POSITIVE),
       'RationalQuadraticSpline':
@@ -221,9 +224,6 @@ def bijector_supports():
       'ScaleMatvecTriL':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
                           Support.VECTOR_UNCONSTRAINED),
-      'ScaleTriL':
-          BijectorSupport(Support.VECTOR_SIZE_TRIANGULAR,
-                          Support.MATRIX_LOWER_TRIL_POSITIVE_DEFINITE),
       'Shift':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
@@ -275,7 +275,8 @@ def bijector_supports():
 
 @hps.composite
 def unconstrained_bijectors(draw, max_forward_event_ndims=None,
-                            must_preserve_event_ndims=False):
+                            must_preserve_event_ndims=False,
+                            validate_args=True):
   """Strategy for drawing forward-unconstrained bijectors.
 
   The bijectors emitted by this are those whose `forward` computation
@@ -287,6 +288,7 @@ def unconstrained_bijectors(draw, max_forward_event_ndims=None,
       `forward_event_ndims`.
     must_preserve_event_ndims: Optional python `bool`, `True` if the returned
       bijector must preserve the rank of the event.
+    validate_args: Python `bool`; whether to enable runtime assertions.
 
   Returns:
     unconstrained: A strategy for drawing such bijectors.
@@ -317,9 +319,10 @@ def unconstrained_bijectors(draw, max_forward_event_ndims=None,
     acceptable_keys = [k for k in instantiable_bijectors().keys()
                        if is_acceptable(supports[k].invert())]
     underlying = draw(hps.sampled_from(acceptable_keys))
-    underlying = instantiable_bijectors()[underlying][0](validate_args=True)
-    return tfb.Invert(underlying, validate_args=True)
-  return instantiable_bijectors()[bijector_name][0](validate_args=True)
+    underlying = instantiable_bijectors()[underlying][0](
+        validate_args=validate_args)
+    return tfb.Invert(underlying, validate_args=validate_args)
+  return instantiable_bijectors()[bijector_name][0](validate_args=validate_args)
 
 
 def distribution_eligilibility_filter_for(bijector):
@@ -422,7 +425,9 @@ def gev_constraint(loc, scale, conc):
   """Maps `s` to support based on `loc`, `scale` and `conc`."""
   def constrain(x):
     c = tf.convert_to_tensor(conc)
-    endpoint = loc - scale / c
+    # We intentionally compute the endpoint with (1.0 / concentration) * scale,
+    # for the same reason as in GeneralizedExtremeValueCDF._maybe_assert_valid_x
+    endpoint = loc - (1.0 / c) * scale
     return tf.where(c > 0.,
                     tf.math.softplus(x) + endpoint,
                     tf.where(

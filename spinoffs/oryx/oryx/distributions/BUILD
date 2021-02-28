@@ -37,8 +37,8 @@ py_library(
     srcs_version = "PY3",
     deps = [
         # jax dep,
-        # six dep,
         "//oryx/core:primitive",
+        "//oryx/core/interpreters:harvest",
         "//oryx/core/interpreters:log_prob",
         "//oryx/core/interpreters:unzip",
         "//oryx/core/interpreters/inverse",

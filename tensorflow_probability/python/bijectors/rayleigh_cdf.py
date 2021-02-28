@@ -19,8 +19,10 @@ from __future__ import division
 from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -70,6 +72,13 @@ class RayleighCDF(bijector.Bijector):
           parameters=parameters,
           name=name,
           dtype=dtype)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   @property
   def scale(self):

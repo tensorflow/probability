@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import warnings
+
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
@@ -29,6 +31,12 @@ __all__ = [
 
 
 JAX_MODE = False
+
+# Cause all warnings to always be triggered.
+# Not having this means subsequent calls won't trigger the warning.
+warnings.filterwarnings('always',
+                        module='tensorflow_probability.*tensor_array_ops',
+                        append=True)  # Don't override user-set filters.
 
 
 class TensorArray(object):
@@ -106,13 +114,20 @@ class TensorArray(object):
     index = np.array(index, dtype=np.int32)
     value = np.array(value, dtype=self.dtype)
     if isinstance(self._data, list):
+      if JAX_MODE:
+        warnings.warn(
+            'Writing to nptf.TensorArray with unknown size in JAX. This will '
+            'not work well with while loops. {}'.format(repr(self)))
       new_data = list(self._data)
       if self.dynamic_size:
         new_data.extend([None]*(int(index) - len(new_data) + 1))
       new_data[index] = value
     elif JAX_MODE:
       import jax  # pylint: disable=g-import-not-at-top
-      new_data = jax.ops.index_update(self._data, index, value)
+      try:
+        new_data = jax.ops.index_update(self._data, index, value)
+      except:
+        raise ValueError('Error writing to {}'.format(repr(self)))
     else:
       raise ValueError('Unexpected type: {}'.format(type(self._data)))
     return TensorArray(self.dtype, data=new_data,
@@ -154,21 +169,24 @@ class TensorArray(object):
     raise NotImplementedError('If you need this feature, please email '
                               '`tfprobability@tensorflow.org`.')
 
+  def __repr__(self):
+    return ('tf2{}.TensorArray(dtype={}, size={}, dynamic_size={}, '
+            'element_shape={}, len(data)={})').format(
+                'jax' if JAX_MODE else 'numpy',
+                self._dtype, self._size, self._dynamic_size,
+                self._element_shape, len(self._data))
+
 
 if JAX_MODE:
   from jax import tree_util  # pylint: disable=g-import-not-at-top
 
-  def to_tree(val):
+  def flatten(val):
     vals = (val._data,)  # pylint: disable=protected-access
     aux = dict(dtype=val.dtype, element_shape=val.element_shape,
                dynamic_size=val.dynamic_size)
     return vals, aux
 
-  def from_tree(aux, vals):
+  def unflatten(aux, vals):
     return TensorArray(data=vals[0], **aux)
 
-  tree_util.register_pytree_node(
-      TensorArray,
-      to_tree,
-      from_tree
-  )
+  tree_util.register_pytree_node(TensorArray, flatten, unflatten)

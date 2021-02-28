@@ -624,6 +624,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
           tfd.Sample(tfd.Normal(0., 1.), num_features))
       yield tfd.Independent(tfd.Deterministic(weights_noncentered * scale),
                             reinterpreted_batch_ndims=1)
+
     # Currently sample_dtype is only used for `tf.nest.pack_structure_as`. In
     # the future we may use it for error checking and/or casting.
     sample_dtype = collections.namedtuple('Model', [
@@ -644,6 +645,18 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     tf.nest.assert_same_structure(sample_dtype, xs)
     self.assertEqual([3, 4], joint.log_prob(
         joint.sample([3, 4], seed=test_util.test_seed())).shape)
+
+    # Check that a list dtype doesn't get corrupted by `tf.Module` wrapping.
+    sample_dtype = [None, None, None, None]
+    joint = tfd.JointDistributionCoroutine(
+        lambda: noncentered_horseshoe_prior(4),
+        sample_dtype=sample_dtype,
+        validate_args=True)
+    ds, xs = joint.sample_distributions([2, 3], seed=test_util.test_seed())
+    self.assertEqual(type(sample_dtype), type(xs))
+    self.assertEqual(type(sample_dtype), type(ds))
+    tf.nest.assert_same_structure(sample_dtype, ds)
+    tf.nest.assert_same_structure(sample_dtype, xs)
 
   def test_repr_with_custom_sample_dtype(self):
     def model():
@@ -842,7 +855,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       yield tfd.Logistic(b, a, validate_args=True)
 
     jd = tfd.JointDistributionCoroutine(dists, validate_args=True)
-    joint_bijector = jd._experimental_default_event_space_bijector()
+    joint_bijector = jd.experimental_default_event_space_bijector()
 
     def _finite_difference_ldj(bijectors, transform_direction, xs, delta):
       transform_plus = [getattr(b, transform_direction)(x + delta)
@@ -862,7 +875,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
       bijectors = []
       try:
         while True:
-          b = d._experimental_default_event_space_bijector()
+          b = d.experimental_default_event_space_bijector()
           y = ys[index] if xs is None else b(xs[index])
           if ys is None:
             y = b(xs[index])
@@ -925,6 +938,30 @@ class JointDistributionCoroutineTest(test_util.TestCase):
           self.evaluate(inverse_joint_event_shape[i]),
           self.evaluate(bijectors[i].inverse_event_shape_tensor(
               event_shapes[i])))
+
+  def test_default_event_space_bijector_nested(self):
+    @tfd.JointDistributionCoroutine
+    def inner():
+      a = yield Root(tfd.Exponential(1., name='a'))
+      yield tfd.Sample(tfd.LogNormal(a, a), [5], name='b')
+
+    @tfd.JointDistributionCoroutine
+    def outer():
+      yield Root(inner)
+      yield Root(inner)
+      yield Root(inner)
+
+    xs = outer.sample(seed=test_util.test_seed())
+
+    outer_bij = outer.experimental_default_event_space_bijector()
+    joint_ldj = outer_bij.forward_log_det_jacobian(xs, [(0, 1)] * len(xs))
+
+    inner_bij = inner.experimental_default_event_space_bijector()
+    inner_ldjs = [inner_bij.forward_log_det_jacobian(x, (0, 1)) for x in xs]
+
+    # Evaluate both at once, to make sure we're using the same samples.
+    joint_ldj_, inner_ldjs_ = self.evaluate((joint_ldj, inner_ldjs))
+    self.assertAllClose(joint_ldj_, sum(inner_ldjs_))
 
   def test_sample_kwargs(self):
 
@@ -1014,7 +1051,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     assert_equal(sample_type(a=[], b=[], c=[]), model.batch_shape_tensor())
 
     # Check the default bijector.
-    b = model._experimental_default_event_space_bijector()
+    b = model.experimental_default_event_space_bijector()
     sample2 = self.evaluate(b.forward(b.inverse(sample)))
     self.assertAllClose(sample2, sample)
 
@@ -1128,6 +1165,28 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     with self.assertRaisesRegexp(TypeError, r'Expected int for argument'):
       d.sample(seed=samplers.zeros_seed())
+
+  def test_pinning(self):
+    """Test pinning a component distribution."""
+
+    def model_fn():
+      c = yield Root(tfd.LogNormal(0., 1., name='c'))
+      b = yield tfd.Normal(c, 1., name='b')
+      yield tfd.Normal(c + b, 1e-3, name='a')
+
+    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+    samp = self.evaluate(d.experimental_pin(b=1.5).sample_unpinned(
+        seed=test_util.test_seed()))
+    self.assertEqual(('c', 'a'), samp._fields)
+    self.assertAllClose(samp.c + 1.5, samp.a, atol=3e-3)
+
+    samp = self.evaluate(d.experimental_pin(None, .75).sample_unpinned(
+        seed=test_util.test_seed()))
+    self.assertAllClose(samp.c + .75, samp.a, atol=3e-3)
+
+    samp = self.evaluate(d.experimental_pin([None, 7.5]).sample_unpinned(
+        seed=test_util.test_seed()))
+    self.assertAllClose(samp.c + 7.5, samp.a, atol=3e-3)
 
 
 if __name__ == '__main__':

@@ -29,8 +29,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "mcmc",
     srcs = ["__init__.py"],
@@ -116,20 +114,6 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
-    name = "legacy_dual_averaging_step_size_adaptation_test",
-    size = "medium",
-    srcs = ["legacy_dual_averaging_step_size_adaptation_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # absl/testing:parameterized dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
 multi_substrate_py_library(
     name = "hmc",
     srcs = ["hmc.py"],
@@ -164,24 +148,6 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
-    name = "legacy_hmc_test",
-    size = "medium",
-    timeout = "long",
-    srcs = ["legacy_hmc_test.py"],
-    python_version = "PY3",
-    shard_count = 6,
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # scipy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
 multi_substrate_py_library(
     name = "nuts",
     srcs = ["nuts.py"],
@@ -190,6 +156,7 @@ multi_substrate_py_library(
         ":kernel",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:broadcast_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:generic",
@@ -220,20 +187,6 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["nuts_test.py"],
     disabled_substrates = ["numpy"],
-    shard_count = 7,
-    srcs_version = "PY3",
-    tags = ["nozapfhahn"],
-    deps = [
-        ":nuts_testlib",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
-    name = "legacy_nuts_test",
-    size = "large",
-    srcs = ["legacy_nuts_test.py"],
-    python_version = "PY3",
     shard_count = 7,
     srcs_version = "PY3",
     tags = ["nozapfhahn"],
@@ -292,21 +245,6 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
-    name = "legacy_langevin_test",
-    size = "medium",
-    timeout = "long",
-    srcs = ["legacy_langevin_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
 multi_substrate_py_library(
     name = "kernel",
     srcs = ["kernel.py"],
@@ -341,19 +279,6 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
-    name = "legacy_metropolis_hastings_test",
-    srcs = ["legacy_metropolis_hastings_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
 multi_substrate_py_library(
     name = "random_walk_metropolis",
     srcs = ["random_walk_metropolis.py"],
@@ -380,20 +305,6 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
-    name = "legacy_random_walk_metropolis_test",
-    size = "medium",
-    srcs = ["legacy_random_walk_metropolis_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
 multi_substrate_py_library(
     name = "replica_exchange_mc",
     srcs = ["replica_exchange_mc.py"],
@@ -402,8 +313,10 @@ multi_substrate_py_library(
         ":kernel",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:broadcast_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:unnest",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -423,24 +336,8 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
-    name = "legacy_replica_exchange_mc_test",
-    size = "medium",
-    timeout = "long",
-    srcs = ["legacy_replica_exchange_mc_test.py"],
-    python_version = "PY3",
-    shard_count = 11,
-    srcs_version = "PY3",
-    deps = [
-        # absl/logging dep,
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:unnest",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
 
@@ -469,22 +366,6 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
-    name = "legacy_sample_test",
-    size = "medium",
-    timeout = "long",
-    srcs = ["legacy_sample_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
 multi_substrate_py_library(
     name = "sample_annealed_importance",
     srcs = ["sample_annealed_importance.py"],
@@ -502,20 +383,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["sample_annealed_importance_test.py"],
     numpy_tags = ["notap"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
-    name = "legacy_sample_annealed_importance_test",
-    size = "medium",
-    srcs = ["legacy_sample_annealed_importance_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -566,7 +433,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/mcmc/internal:slice_sampler_utils",
         "//tensorflow_probability/python/mcmc/internal:util",
-        "//tensorflow_probability/python/util:seed_stream",
+        "//tensorflow_probability/python/random:random_ops",
     ],
 )
 
@@ -577,23 +444,6 @@ multi_substrate_py_test(
     srcs = ["slice_sampler_test.py"],
     numpy_tags = ["notap"],  # too slow.
     shard_count = 6,
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/mcmc/internal",
-    ],
-)
-
-py_test(
-    name = "legacy_slice_sampler_test",
-    size = "medium",
-    timeout = "long",
-    srcs = ["legacy_slice_sampler_test.py"],
-    python_version = "PY3",
-    shard_count = 6,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -622,22 +472,6 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["transformed_kernel_test.py"],
     shard_count = 6,
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
-    name = "legacy_transformed_kernel_test",
-    size = "medium",
-    timeout = "long",
-    srcs = ["legacy_transformed_kernel_test.py"],
-    python_version = "PY3",
-    shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -696,6 +530,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:unnest",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc/internal",
     ],
@@ -705,19 +540,6 @@ multi_substrate_py_test(
     name = "simple_step_size_adaptation_test",
     size = "medium",
     srcs = ["simple_step_size_adaptation_test.py"],
-    deps = [
-        # absl/testing:parameterized dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_test(
-    name = "legacy_simple_step_size_adaptation_test",
-    srcs = ["legacy_simple_step_size_adaptation_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,

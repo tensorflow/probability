@@ -119,9 +119,8 @@ class HeavyTailOnlyBijectorTest(test_util.TestCase, parameterized.TestCase):
     else:
       value = np.float64(value)
       expected = np.float64(expected)
-    self.assertAllClose(ht._inverse_log_det_jacobian(
-        tf.convert_to_tensor(value)),
-                        expected)
+    self.assertAllClose(expected,
+                        ht.inverse_log_det_jacobian(value, event_ndims=0))
 
 
 class LambertWGaussianizationTest(test_util.TestCase, parameterized.TestCase):

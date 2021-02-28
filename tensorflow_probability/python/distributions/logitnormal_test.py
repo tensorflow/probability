@@ -34,13 +34,40 @@ tfd = tfp.distributions
 class LogitNormalTest(test_util.TestCase):
 
   def testLogitNormalMeanApprox(self):
-    loc, scale = [0., 1.5], 0.4
+    loc, scale = [-1.5, 0., 1.5], 0.4
     dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
-    x = dist.sample(6000, seed=test_util.test_seed())
+    x = dist.sample(int(10e3), seed=test_util.test_seed())
     mean_sample = tf.reduce_mean(x, axis=0)
     [mean_sample_, mean_approx_] = self.evaluate([
         mean_sample, dist.mean_approx()])
-    self.assertAllClose(mean_sample_, mean_approx_, atol=0.02, rtol=0.02)
+    self.assertAllClose(mean_sample_, mean_approx_, atol=1e-4, rtol=0.01)
+
+  def testLogitNormalMeanLogProbApprox(self):
+    loc, scale = [-1.5, 0., 1.5], 0.4
+    dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
+    x = dist.sample(int(10e3), seed=test_util.test_seed())
+    y = tf.constant([0., 0.1, 0.5, 1.], dist.dtype)[:, tf.newaxis]
+    mean_sample = tf.reduce_mean(
+        tfd.Bernoulli(probs=x).log_prob(y[..., tf.newaxis]),
+        axis=1)
+    [mean_sample_, mean_approx_, mean_approx_default_] = self.evaluate([
+        mean_sample, dist.mean_log_prob_approx(y), dist.mean_log_prob_approx()])
+    self.assertAllClose(mean_sample_, mean_approx_, atol=1e-4, rtol=0.02)
+    self.assertAllClose(mean_sample_[-1], mean_approx_default_,
+                        atol=1e-4, rtol=0.02)
+
+  def testLogitNormalVarianceApprox(self):
+    seed_stream = test_util.test_seed_stream()
+    loc = tf.random.uniform(shape=[30], seed=seed_stream())
+    scale = tf.random.uniform(
+        minval=0.1, maxval=5., shape=[30], seed=seed_stream())
+    dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
+    x = dist.sample(int(10e3), seed=test_util.test_seed())
+    variance_sample = tf.math.reduce_variance(x, axis=0)
+    [variance_sample_, variance_approx_] = self.evaluate([
+        variance_sample, dist.variance_approx()])
+    self.assertAllClose(
+        variance_sample_, variance_approx_, atol=1e-4, rtol=0.03)
 
   def testLogitNormalLogitNormalKL(self):
     batch_size = 6
@@ -98,7 +125,7 @@ class LogitNormalTest(test_util.TestCase):
     dist = tfd.LogitNormal(mu, sigma, validate_args=True)
     eps = 1e-6
     x = np.array([-2.3, -eps, 1. + eps, 1.4])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 

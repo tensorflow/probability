@@ -317,12 +317,14 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
             shift, log_scale = tf.unstack(params, num=2, axis=-1)
           else:
             shift, log_scale = params
+
           bijectors = []
           if shift is not None:
             bijectors.append(shift_lib.Shift(shift))
           if log_scale is not None:
-            bijectors.append(scale_lib.Scale(tf.exp(log_scale)))
-          return chain.Chain(bijectors)
+            bijectors.append(scale_lib.Scale(log_scale=log_scale))
+          return chain.Chain(bijectors, validate_event_size=False)
+
         bijector_fn = _bijector_fn
 
       if validate_args:
@@ -330,12 +332,16 @@ class MaskedAutoregressiveFlow(bijector_lib.Bijector):
       # Still do this assignment for variable tracking.
       self._shift_and_log_scale_fn = shift_and_log_scale_fn
       self._bijector_fn = bijector_fn
-      super(MaskedAutoregressiveFlow, self).__init__(
+      super().__init__(
           forward_min_event_ndims=self._event_ndims,
           is_constant_jacobian=is_constant_jacobian,
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
 
   def _forward(self, x, **kwargs):
     static_event_size = tensorshape_util.num_elements(
@@ -433,7 +439,7 @@ def masked_dense(inputs,
 
   See [Germain et al. (2015)][1] for detailed explanation.
 
-  Arguments:
+  Args:
     inputs: Tensor input.
     units: Python `int` scalar representing the dimensionality of the output
       space.
@@ -640,6 +646,9 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
 
   #### Example
 
+  The `AutoregressiveNetwork` can be used to do density estimation as is shown
+  in the below example:
+
   ```python
   # Generate data -- as in Figure 1 in [Papamakarios et al. (2017)][2]).
   n = 2000
@@ -674,6 +683,63 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
   # Use the fitted distribution.
   distribution.sample((3, 1))
   distribution.log_prob(np.ones((3, 2), dtype=np.float32))
+  ```
+
+  The `conditional` argument can be used to instead build a conditional density
+  estimator. To do this the conditioning variable must be passed as a `kwarg`:
+
+  ```python
+  # Generate data as the mixture of two distributions.
+  n = 2000
+  c = np.r_[
+    np.zeros(n//2),
+    np.ones(n//2)
+  ]
+  mean_0, mean_1 = 0, 5
+  x = np.r_[
+    np.random.randn(n//2).astype(dtype=np.float32) + mean_0,
+    np.random.randn(n//2).astype(dtype=np.float32) + mean_1
+  ]
+
+  # Density estimation with MADE.
+  made = tfb.AutoregressiveNetwork(
+    params=2,
+    hidden_units=[2, 2],
+    event_shape=(1,),
+    conditional=True,
+    kernel_initializer=tfk.initializers.VarianceScaling(0.1),
+    conditional_event_shape=(1,)
+  )
+
+  distribution = tfd.TransformedDistribution(
+    distribution=tfd.Sample(tfd.Normal(loc=0., scale=1.), sample_shape=[1]),
+    bijector=tfb.MaskedAutoregressiveFlow(made))
+
+  # Construct and fit model.
+  x_ = tfkl.Input(shape=(1,), dtype=tf.float32)
+  c_ = tfkl.Input(shape=(1,), dtype=tf.float32)
+  log_prob_ = distribution.log_prob(
+    x_, bijector_kwargs={'conditional_input': c_})
+  model = tfk.Model([x_, c_], log_prob_)
+
+  model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.1),
+                loss=lambda _, log_prob: -log_prob)
+
+  batch_size = 25
+  model.fit(x=[x, c],
+            y=np.zeros((n, 0), dtype=np.float32),
+            batch_size=batch_size,
+            epochs=3,
+            steps_per_epoch=n // batch_size,
+            shuffle=True,
+            verbose=True)
+
+  # Use the fitted distribution to sample condition on c = 1
+  n_samples = 1000
+  cond = 1
+  samples = distribution.sample(
+    (n_samples,),
+    bijector_kwargs={'conditional_input': cond * np.ones((n_samples, 1))})
   ```
 
   #### Examples: Handling Rank-2+ Tensors
@@ -832,7 +898,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
                **kwargs):
     """Constructs the MADE layer.
 
-    Arguments:
+    Args:
       params: Python integer specifying the number of parameters to output
         per input.
       event_shape: Python `list`-like of positive integers (or a single int),
@@ -884,7 +950,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
       **kwargs: Additional keyword arguments passed to this layer (but not to
         the `tf.keras.layer.Dense` layers constructed by this layer).
     """
-    super(AutoregressiveNetwork, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     self._params = params
     self._event_shape = _list(event_shape) if event_shape is not None else None
@@ -1024,7 +1090,7 @@ class AutoregressiveNetwork(tf.keras.layers.Layer):
     # the specs of the network's input layers.
     self._network.input_spec = None
     # Record that the layer has been built.
-    super(AutoregressiveNetwork, self).build(input_shape)
+    super().build(input_shape)
 
   def call(self, x, conditional_input=None):
     """Transforms the inputs and returns the outputs.

@@ -137,6 +137,21 @@ def f(key):
 joint_log_prob(f)({'z': 0., 'x': 0.})  # ==> -1.837877
 ```
 
+### `block`
+`block` takes a probabilistic program and a sequence of string names and returns
+the same program except that downstream transformations will ignore the provided
+names.
+
+Example:
+```python
+def f(key):
+  k1, k2 = random.split(key)
+  z = random_variable(random.normal, name='z')(k1)
+  return z + random_variable(random.normal, name='x')(k2)
+joint_sample(block(f, names=['x']))(random.PRNGKey(0))  # ==> {'z': -0.0495}
+```
+
+
 ### `intervene`
 `intervene` takes a probabilistic program and a dictionary mapping names to
 values of intervened random variables, and returns a new probabilistic program.
@@ -197,7 +212,7 @@ graph_replace(f, 'x', 'y') # returns a program p(y | x)
 import functools
 import types
 
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 from jax import util as jax_util
 
@@ -206,6 +221,7 @@ from oryx.core.interpreters import harvest
 from oryx.core.interpreters import log_prob as lp
 
 __all__ = [
+    'block',
     'random_variable',
     'rv',
     'nest',
@@ -269,10 +285,9 @@ def function_random_variable(f: Program,
   """
 
   def wrapped(*args, **kwargs):
-    result = f(*args, **kwargs)
     if name is not None:
-      result = random_variable(result, name=name)
-    return result
+      return random_variable(nest(f, scope=name)(*args, **kwargs), name=name)
+    return f(*args, **kwargs)
 
   return wrapped
 
@@ -308,6 +323,19 @@ def joint_sample(f: Program) -> Program:
 def joint_log_prob(f: Program) -> Scalar:
   """Returns a function that computes the log probability of all of a program's random variables."""
   return log_prob(joint_sample(f))
+
+
+def block(f: Program, names: Sequence[str]) -> Program:
+  """Returns a program that removes the provided names from transformations."""
+
+  def program(key, *args, **kwargs):
+    return harvest.harvest(
+        f,
+        tag=RANDOM_VARIABLE,
+        blocklist=names,
+        mode=harvest.HarvestMode.PLANT_ONLY)({}, key, *args, **kwargs)[0]
+
+  return program
 
 
 def intervene(f: Program, **observations: Dict[str, Any]) -> Program:
@@ -352,13 +380,9 @@ def intervene(f: Program, **observations: Dict[str, Any]) -> Program:
   """
 
   def wrapped(*args, **kwargs):
-    result, latents = harvest.harvest(
-        f, tag=RANDOM_VARIABLE)(observations, *args, **kwargs)
-    latents = {
-        name: harvest.sow(value, tag=RANDOM_VARIABLE, name=name, mode='strict')
-        for name, value in latents.items()
-    }
-    return primitive.tie_in(latents, result)
+    return harvest.harvest(
+        f, tag=RANDOM_VARIABLE, mode='plant_only')(observations, *args,
+                                                   **kwargs)[0]
 
   return wrapped
 

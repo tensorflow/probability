@@ -71,7 +71,7 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
   """Tests correctness of Sigmoid with `low` and `high` parameters set."""
 
   def testBijector(self):
-    low = np.array([-3., 0., 5.]).astype(np.float32)
+    low = np.array([[-3.], [0.], [5.]]).astype(np.float32)
     high = 12.
 
     bijector = tfb.Sigmoid(low=low, high=high, validate_args=True)
@@ -79,10 +79,11 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
     equivalent_bijector = tfb.Chain([
         tfb.Shift(shift=low), tfb.Scale(scale=high-low), tfb.Sigmoid()])
 
-    x = [[[1.], [2.], [-5.], [-0.3]]]
+    x = [[[1., 2., -5., -0.3]]]
     y = self.evaluate(equivalent_bijector.forward(x))
     self.assertAllClose(y, self.evaluate(bijector.forward(x)))
-    self.assertAllClose(x, self.evaluate(bijector.inverse(y)[..., -1:]))
+    self.assertAllClose(
+        x, self.evaluate(bijector.inverse(y)[..., :1, :]), rtol=1e-5)
     self.assertAllClose(
         self.evaluate(equivalent_bijector.inverse_log_det_jacobian(
             y, event_ndims=1)),
@@ -161,7 +162,7 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
   def testLeftTail(self, dtype, do_compile):
     x = np.linspace(-50., -8., 1000).astype(dtype)
 
-    @tf.function(autograph=False, experimental_compile=do_compile)
+    @tf.function(autograph=False, jit_compile=do_compile)
     def fn(x):
       return tf.math.log(tfb.Sigmoid().forward(x))
 

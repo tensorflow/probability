@@ -29,7 +29,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 
@@ -89,16 +89,15 @@ def cholesky_concat(chol, cols, name=None):
     dtype = dtype_util.common_dtype([chol, cols], dtype_hint=tf.float32)
     chol = tf.convert_to_tensor(chol, name='chol', dtype=dtype)
     cols = tf.convert_to_tensor(cols, name='cols', dtype=dtype)
-    n = prefer_static.shape(chol)[-1]
+    n = ps.shape(chol)[-1]
     mat_nm, mat_mm = cols[..., :n, :], cols[..., n:, :]
     solved_nm = tf.linalg.triangular_solve(chol, mat_nm)
     lower_right_mm = tf.linalg.cholesky(
         mat_mm - tf.matmul(solved_nm, solved_nm, adjoint_a=True))
     lower_left_mn = tf.math.conj(tf.linalg.matrix_transpose(solved_nm))
-    out_batch = prefer_static.shape(solved_nm)[:-2]
+    out_batch = ps.shape(solved_nm)[:-2]
     chol = tf.broadcast_to(
-        chol,
-        tf.concat([out_batch, prefer_static.shape(chol)[-2:]], axis=0))
+        chol, ps.concat([out_batch, ps.shape(chol)[-2:]], axis=0))
     top_right_zeros_nm = tf.zeros_like(solved_nm)
     return tf.concat([tf.concat([chol, top_right_zeros_nm], axis=-1),
                       tf.concat([lower_left_mn, lower_right_mm], axis=-1)],
@@ -146,16 +145,15 @@ def cholesky_update(chol, update_vector, multiplier=1., name=None):
     multiplier = tf.convert_to_tensor(
         multiplier, name='multiplier', dtype=dtype)
 
-    batch_shape = prefer_static.broadcast_shape(
-        prefer_static.broadcast_shape(
-            tf.shape(chol)[:-2],
-            tf.shape(update_vector)[:-1]), tf.shape(multiplier))
+    batch_shape = ps.broadcast_shape(
+        ps.broadcast_shape(
+            ps.shape(chol)[:-2],
+            ps.shape(update_vector)[:-1]), ps.shape(multiplier))
     chol = tf.broadcast_to(
-        chol, prefer_static.concat(
-            [batch_shape, tf.shape(chol)[-2:]], axis=0))
+        chol, ps.concat([batch_shape, tf.shape(chol)[-2:]], axis=0))
     update_vector = tf.broadcast_to(
-        update_vector, prefer_static.concat(
-            [batch_shape, tf.shape(update_vector)[-1:]], axis=0))
+        update_vector,
+        ps.concat([batch_shape, ps.shape(update_vector)[-1:]], axis=0))
     multiplier = tf.broadcast_to(multiplier, batch_shape)
 
     chol_diag = tf.linalg.diag_part(chol)
@@ -232,9 +230,8 @@ def _swap_m_with_i(vecs, m, i):
   m = tf.convert_to_tensor(m, dtype=tf.int64, name='m')
   i = tf.convert_to_tensor(i, dtype=tf.int64, name='i')
   trailing_elts = tf.broadcast_to(
-      tf.range(m + 1,
-               prefer_static.shape(vecs, out_type=tf.int64)[-1]),
-      prefer_static.shape(vecs[..., m + 1:]))
+      tf.range(m + 1, ps.shape(vecs, out_type=tf.int64)[-1]),
+      ps.shape(vecs[..., m + 1:]))
   trailing_elts = tf.where(
       tf.equal(trailing_elts, i),
       tf.gather(vecs, [m], axis=-1),
@@ -310,7 +307,7 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
     if isinstance(matrix, tf.linalg.LinearOperator):
       matrix_shape = tf.cast(matrix.shape_tensor(), tf.int64)
     else:
-      matrix_shape = prefer_static.shape(matrix, out_type=tf.int64)
+      matrix_shape = ps.shape(matrix, out_type=tf.int64)
 
     max_rank = tf.convert_to_tensor(
         max_rank, name='max_rank', dtype=tf.int64)
@@ -377,7 +374,7 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
       # TODO(b/130899118): Pad grad fails with int64 paddings.
       # Step 8.
       paddings = tf.concat([
-          tf.zeros([prefer_static.rank(pchol) - 1, 2], dtype=tf.int32),
+          tf.zeros([ps.rank(pchol) - 1, 2], dtype=tf.int32),
           [[tf.cast(m, tf.int32), 0]]], axis=0)
       diag_update = tf.pad(row**2, paddings=paddings)[..., 0, :]
       reverse_perm = _invert_permutation(perm)
@@ -395,7 +392,7 @@ def pivoted_cholesky(matrix, max_rank, diag_rtol=1e-3, name=None):
     m = np.int64(0)
     pchol = tf.zeros(matrix_shape, dtype=matrix.dtype)[..., :max_rank, :]
     perm = tf.broadcast_to(
-        prefer_static.range(matrix_shape[-1]), matrix_shape[:-1])
+        ps.range(matrix_shape[-1]), matrix_shape[:-1])
     _, pchol, _, _ = tf.while_loop(
         cond=cond, body=body, loop_vars=(m, pchol, perm, matrix_diag))
     pchol = tf.linalg.matrix_transpose(pchol)
@@ -918,7 +915,7 @@ def fill_triangular(x, upper=False, name=None):
     #   = 2 (n**2 / 2 + n / 2) - n**2
     #   = n**2 + n - n**2
     #   = n
-    ndims = prefer_static.rank(x)
+    ndims = ps.rank(x)
     if upper:
       x_list = [x, tf.reverse(x[..., n:], axis=[ndims - 1])]
     else:
@@ -985,7 +982,7 @@ def fill_triangular_inverse(x, upper=False, name=None):
       m = (n * (n + 1)) // 2
       static_final_shape = tensorshape_util.concatenate(
           tensorshape_util.with_rank_at_least(x.shape, 2)[:-2], [None])
-    ndims = prefer_static.rank(x)
+    ndims = ps.rank(x)
     if upper:
       initial_elements = x[..., 0, :]
       triangular_portion = x[..., 1:, :]
@@ -997,7 +994,7 @@ def fill_triangular_inverse(x, upper=False, name=None):
     consolidated_matrix = triangular_portion + rotated_triangular_portion
     end_sequence = tf.reshape(
         consolidated_matrix,
-        tf.concat([tf.shape(x)[:-2], [n * (n - 1)]], axis=0))
+        ps.concat([ps.shape(x)[:-2], [n * (n - 1)]], axis=0))
     y = tf.concat([initial_elements, end_sequence[..., :m - n]], axis=-1)
     tensorshape_util.set_shape(y, static_final_shape)
     return y

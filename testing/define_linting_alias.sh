@@ -39,4 +39,4 @@ DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 # `tfp_lints`.
 ALIAS_NAME=${1:-tfp_lints}
 
-alias $ALIAS_NAME="$DIR/testing/run_tfp_lints.sh"
+alias $ALIAS_NAME="$DIR/run_tfp_lints.sh"

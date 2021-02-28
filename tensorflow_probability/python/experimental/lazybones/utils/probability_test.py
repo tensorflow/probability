@@ -19,9 +19,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as np
+import scipy as osp
+from scipy import optimize
+from scipy import stats
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
 
 lb = tfp.experimental.lazybones
@@ -55,18 +58,71 @@ class DeferredProbabilityUtilsTest(test_util.TestCase):
     expected_p = jd.prob([3., 4.])
 
     [
-        expected_lp_, actual1_lp_, actual2_lp_,
-        expected_p_, actual1_p_, actual2_p_,
+        expected_lp_,
+        actual1_lp_,
+        actual2_lp_,
+        expected_p_,
+        actual1_p_,
+        actual2_p_,
     ] = self.evaluate(
         lb.DeferredInput([
-            expected_lp, actual1_lp, actual2_lp,
-            expected_p, actual1_p, actual2_p,
+            expected_lp,
+            actual1_lp,
+            actual2_lp,
+            expected_p,
+            actual1_p,
+            actual2_p,
         ]).eval())
 
     self.assertAlmostEqual(expected_lp_, actual1_lp_, places=4)
     self.assertAlmostEqual(expected_lp_, actual2_lp_, places=4)
     self.assertAlmostEqual(expected_p_, actual1_p_, places=4)
     self.assertAlmostEqual(expected_p_, actual2_p_, places=4)
+
+  def test_end_to_end_scipy_ppl(self):
+    sp = lb.DeferredInput(osp)
+    st = lb.DeferredInput(stats)
+
+    # Data simulation
+    n_feature = 15
+    n_obs = 1000
+    hyper_mu_ = np.array(10.)
+    hyper_sigma_ = np.array(2.)
+    sigma_ = np.array(1.5)
+
+    beta_ = hyper_mu_ + hyper_sigma_ * np.random.randn(n_feature)
+    design_matrix = np.random.rand(n_obs, n_feature)
+    y_ = design_matrix @ beta_ + np.random.randn(n_obs) * sigma_
+
+    # Lazybones model
+    hyper_mu = st.norm(0., 100.).rvs()
+    hyper_sigma = st.halfnorm(0., 5.).rvs()
+    beta = st.norm(hyper_mu, hyper_sigma).rvs(n_feature)
+    y_hat = sp.matmul(design_matrix, beta)
+    sigma = st.halfnorm(0., 5.).rvs()
+    y = st.norm(y_hat, sigma).mean()
+
+    # Inference with MAP
+    def target_log_prob_fn(*values):
+      return lb.utils.distribution_measure(
+          vertexes=[hyper_mu, hyper_sigma, beta, sigma, y],
+          values=[*values, y_],
+          get_attr_fn=lambda dist: dist.logpdf,
+          combine=sum,
+          reduce_op=np.sum)
+
+    def loss_fn(x):
+      return -target_log_prob_fn(x[0], np.exp(x[1]), x[2:-1], np.exp(x[-1]))
+
+    output = optimize.minimize(
+        loss_fn, np.random.randn(n_feature + 3), method='L-BFGS-B')
+
+    x = np.concatenate([
+        hyper_mu_[None],
+        np.log(hyper_sigma_[None]), beta_,
+        np.log(sigma_[None])
+    ])
+    self.assertAllClose(x, output.x, rtol=.1)
 
 
 if __name__ == '__main__':

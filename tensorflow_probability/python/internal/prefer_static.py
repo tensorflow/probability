@@ -37,6 +37,7 @@ try:
 except ImportError:
   from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
 
+from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -109,8 +110,10 @@ def _get_static_value(pred):
     pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
     # TODO(jamieas): remove the dependency on `pywrap_tensorflow`.
+    # Explicitly check for ops.Tensor, to avoid an AttributeError
+    # when requesting `KerasTensor.graph`.
     # pylint: disable=protected-access
-    if pred_value is None:
+    if pred_value is None and isinstance(pred, ops.Tensor):
       pred_value = c_api.TF_TryEvaluateConstant_wrapper(pred.graph._c_graph,
                                                         pred._as_tf_output())
     # pylint: enable=protected-access
@@ -134,7 +137,8 @@ def _convert_to_shape_tensor_jax(value, dtype=None, dtype_hint=None, name=None):
   """Converts vectors and scalars of `int`-like to `ndarray`."""
   dtype = dtype_util.as_numpy_dtype(dtype or dtype_hint or np.int32)
   try:
-    return np.array([int(v) for v in value], dtype=dtype)
+    return np.array([_convert_to_shape_tensor_jax(v, dtype) for v in value],
+                    dtype=dtype)
   except:  # JAX throws raw Exception in some cases.  # pylint: disable=bare-except
     pass
   return np.array(int(value), dtype=dtype)
@@ -202,7 +206,7 @@ def broadcast_shape(x_shape, y_shape):
   computed statically and returned as a `TensorShape`.  Otherwise, a rank-1
   `Tensor` will be returned.
 
-  Arguments:
+  Args:
     x_shape: A `TensorShape` or rank-1 integer `Tensor`.  The input `Tensor` is
       broadcast against this shape.
     y_shape: A `TensorShape` or rank-1 integer `Tensor`.  The input `Tensor` is
@@ -227,7 +231,7 @@ def cond(pred, true_fn=None, false_fn=None, name=None):
   If `pred` is a bool or has a constant value, we return either `true_fn()`
   or `false_fn()`, otherwise we use `tf.cond` to dynamically route to both.
 
-  Arguments:
+  Args:
     pred: A scalar determining whether to return the result of `true_fn` or
       `false_fn`.
     true_fn: The callable to be performed if pred is true.
@@ -438,6 +442,7 @@ cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)
 expm1 = _prefer_static(tf.math.expm1, nptf.math.expm1)
 floor = _prefer_static(tf.math.floor, nptf.math.floor)
+fill = _prefer_static(tf.fill, nptf.fill)
 gather = _prefer_static(tf.gather, nptf.gather)
 greater = _prefer_static(tf.greater, nptf.greater)
 identity = _prefer_static(tf.identity, nptf.identity)
@@ -468,6 +473,7 @@ reduce_min = _prefer_static(tf.reduce_min, nptf.reduce_min)
 reduce_prod = _prefer_static(tf.reduce_prod, nptf.reduce_prod)
 reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
+reverse = _prefer_static(tf.reverse, nptf.reverse)
 round = _prefer_static(tf.math.round, nptf.math.round)  # pylint: disable=redefined-builtin
 rsqrt = _prefer_static(tf.math.rsqrt, nptf.math.rsqrt)
 slice = _prefer_static(tf.slice, nptf.slice)  # pylint: disable=redefined-builtin

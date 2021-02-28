@@ -24,9 +24,11 @@ from tensorflow_probability.python.math.psd_kernels.exponentiated_quadratic impo
 from tensorflow_probability.python.math.psd_kernels.feature_scaled import FeatureScaled
 from tensorflow_probability.python.math.psd_kernels.feature_transformed import FeatureTransformed
 from tensorflow_probability.python.math.psd_kernels.kumaraswamy_transformed import KumaraswamyTransformed
+from tensorflow_probability.python.math.psd_kernels.matern import GeneralizedMatern
 from tensorflow_probability.python.math.psd_kernels.matern import MaternFiveHalves
 from tensorflow_probability.python.math.psd_kernels.matern import MaternOneHalf
 from tensorflow_probability.python.math.psd_kernels.matern import MaternThreeHalves
+from tensorflow_probability.python.math.psd_kernels.parabolic import Parabolic
 from tensorflow_probability.python.math.psd_kernels.polynomial import Linear
 from tensorflow_probability.python.math.psd_kernels.polynomial import Polynomial
 from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
@@ -39,11 +41,13 @@ _allowed_symbols = [
     'ExpSinSquared',
     'FeatureScaled',
     'FeatureTransformed',
+    'GeneralizedMatern',
     'KumaraswamyTransformed',
     'Linear',
     'MaternFiveHalves',
     'MaternOneHalf',
     'MaternThreeHalves',
+    'Parabolic',
     'Polynomial',
     'PositiveSemidefiniteKernel',
     'RationalQuadratic',

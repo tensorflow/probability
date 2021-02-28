@@ -22,43 +22,22 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.bijectors import ordered as ordered_bijector
+from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 # TODO(b/149334734): Consider rewriting this underlying class via using
 # QuantizedDistribution.
-
-
-def _broadcast_cat_event_and_params(event, params, base_dtype):
-  """Broadcasts the event or distribution parameters."""
-  if dtype_util.is_floating(event.dtype):
-    # When `validate_args=True` we've already ensured int/float casting
-    # is closed.
-    event = tf.cast(event, dtype=tf.int32)
-  elif not dtype_util.is_integer(event.dtype):
-    raise TypeError('`value` should have integer `dtype` or '
-                    '`self.dtype` ({})'.format(base_dtype))
-  shape_known_statically = (
-      tensorshape_util.rank(params.shape) is not None and
-      tensorshape_util.is_fully_defined(params.shape[:-1]) and
-      tensorshape_util.is_fully_defined(event.shape))
-  if not shape_known_statically or params.shape[:-1] != event.shape:
-    params = params * tf.ones_like(event[..., tf.newaxis],
-                                   dtype=params.dtype)
-    params_shape = tf.shape(params)[:-1]
-    event = event * tf.ones(params_shape, dtype=event.dtype)
-    if tensorshape_util.rank(params.shape) is not None:
-      tensorshape_util.set_shape(event, params.shape[:-1])
-
-  return event, params
 
 
 class OrderedLogistic(distribution.Distribution):
@@ -234,14 +213,17 @@ class OrderedLogistic(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(cutpoints=1, loc=0)
-
-  @staticmethod
-  def _param_shapes(sample_shape):
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
     return dict(
-        zip(('loc', 'scale'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+        cutpoints=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, [num_classes]], axis=0),
+            default_constraining_bijector_fn=lambda: invert_bijector.Invert(
+                ordered_bijector.Ordered())),
+        loc=parameter_properties.ParameterProperties())
+    # pylint: enable=g-long-lambda
 
   @property
   def cutpoints(self):
@@ -275,15 +257,8 @@ class OrderedLogistic(distribution.Distribution):
     return ps.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
 
   def _sample_n(self, n, seed=None):
-    # TODO(b/149334734): Consider sampling from the Logistic distribution,
-    # and then truncating based on cutpoints. This could be faster than the
-    # given sampling scheme.
-    logits = tf.reshape(
-        self.categorical_log_probs(), [-1, self._num_categories()])
-    draws = samplers.categorical(logits, n, dtype=self.dtype, seed=seed)
-    return tf.reshape(
-        tf.transpose(draws),
-        shape=ps.concat([[n], self._batch_shape_tensor()], axis=0))
+    return categorical.Categorical(
+        logits=self.categorical_log_probs()).sample(n, seed)
 
   def _batch_shape_tensor(self, cutpoints=None, loc=None):
     cutpoints = self.cutpoints if cutpoints is None else cutpoints
@@ -303,58 +278,19 @@ class OrderedLogistic(distribution.Distribution):
     return tf.TensorShape([])
 
   def _log_prob(self, x):
-    # TODO(b/149334734): Consider using QuantizedDistribution for the log_prob
-    # computation for better precision.
     num_categories = self._num_categories()
-    x, augmented_log_survival = _broadcast_cat_event_and_params(
-        event=x,
-        params=tf.math.log_sigmoid(
-            self.loc[..., tf.newaxis] - self._augmented_cutpoints()),
-        base_dtype=dtype_util.base_dtype(self.dtype))
-    x_flat = tf.reshape(x, [-1, 1])
-    augmented_log_survival_flat = tf.reshape(
-        augmented_log_survival, [-1, num_categories + 1])
-    log_survival_flat_xm1 = tf.gather(
-        params=augmented_log_survival_flat,
-        indices=tf.clip_by_value(x_flat, 0, num_categories),
-        batch_dims=1)
-    log_survival_flat_x = tf.gather(
-        params=augmented_log_survival_flat,
-        indices=tf.clip_by_value(x_flat + 1, 0, num_categories),
-        batch_dims=1)
-    log_prob_flat = tfp_math.log_sub_exp(
-        log_survival_flat_xm1, log_survival_flat_x)
-    # Deal with case where both survival probabilities are -inf, which gives
-    # `log_prob_flat = nan` when it should be -inf.
-    minus_inf = tf.constant(-np.inf, dtype=log_prob_flat.dtype)
-    log_prob_flat = tf.where(
-        x_flat > num_categories - 1, minus_inf, log_prob_flat)
-    return tf.reshape(log_prob_flat, shape=ps.shape(x))
+    x_safe = tf.where((x > num_categories - 1) | (x < 0), 0, x)
+    log_probs = categorical.Categorical(
+        logits=self.categorical_log_probs()).log_prob(x_safe)
+    neg_inf = dtype_util.as_numpy_dtype(log_probs.dtype)(-np.inf)
+    return tf.where((x > num_categories - 1) | (x < 0), neg_inf, log_probs)
 
-  def _log_cdf(self, x):
-    return tfp_math.log1mexp(self._log_survival_function(x))
-
-  def _log_survival_function(self, x):
-    num_categories = self._num_categories()
-    x, augmented_log_survival = _broadcast_cat_event_and_params(
-        event=x,
-        params=tf.math.log_sigmoid(
-            self.loc[..., tf.newaxis] - self._augmented_cutpoints()),
-        base_dtype=dtype_util.base_dtype(self.dtype))
-    x_flat = tf.reshape(x, [-1, 1])
-    augmented_log_survival_flat = tf.reshape(
-        augmented_log_survival, [-1, num_categories + 1])
-    log_survival_flat = tf.gather(
-        params=augmented_log_survival_flat,
-        indices=tf.clip_by_value(x_flat + 1, 0, num_categories),
-        batch_dims=1)
-    return tf.reshape(log_survival_flat, shape=ps.shape(x))
+  def _cdf(self, x):
+    return categorical.Categorical(logits=self.categorical_log_probs()).cdf(x)
 
   def _entropy(self):
-    log_probs = self.categorical_log_probs()
-    return -tf.reduce_sum(
-        tf.math.multiply_no_nan(log_probs, tf.math.exp(log_probs)),
-        axis=-1)
+    return categorical.Categorical(
+        logits=self.categorical_log_probs()).entropy()
 
   def _mode(self):
     log_probs = self.categorical_log_probs()
@@ -402,7 +338,9 @@ class OrderedLogistic(distribution.Distribution):
     assertions = []
     if not self.validate_args:
       return assertions
-    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(distribution_util.assert_casting_closed(
+        x, target_dtype=tf.int32))
+    assertions.append(assert_util.assert_non_negative(x))
     assertions.append(
         assert_util.assert_less_equal(
             x, tf.cast(self._num_categories(), x.dtype),
@@ -433,5 +371,6 @@ def _kl_ordered_logistic_ordered_logistic(a, b, name=None):
     a_log_probs = a.categorical_log_probs()
     b_log_probs = b.categorical_log_probs()
     return tf.reduce_sum(
-        tf.math.exp(a_log_probs) * (a_log_probs - b_log_probs),
+        tf.math.multiply_no_nan(
+            a_log_probs - b_log_probs, tf.math.exp(a_log_probs)),
         axis=-1)

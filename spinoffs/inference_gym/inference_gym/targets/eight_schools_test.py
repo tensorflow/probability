@@ -28,12 +28,14 @@ class EightSchoolsTest(test_util.InferenceGymTestCase):
     model = eight_schools.EightSchools()
     self.validate_log_prob_and_transforms(
         model,
-        sample_transformation_shapes=dict(
-            identity={
-                'avg_effect': [],
-                'log_stddev': [],
-                'school_effects': [8],
-            }))
+        sample_transformation_shapes=dict(identity={
+            'avg_effect': [],
+            'log_stddev': [],
+            'school_effects': [8],
+        }),
+        check_ground_truth_mean_standard_error=True,
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True)
 
   @test_util.numpy_disable_gradient_test
   def testEightSchoolsHMC(self):

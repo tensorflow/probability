@@ -40,6 +40,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 # Symbol import needed to avoid BUILD-dependency cycle
 from tensorflow_probability.python.math.generic import log1mexp
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -75,6 +76,7 @@ _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ['kl_divergence', 'cross_entropy']
 
 
 UNSET_VALUE = object()
+
 
 JAX_MODE = False  # Overwritten by rewrite script.
 
@@ -320,7 +322,8 @@ class _DistributionMeta(abc.ABCMeta):
       return
     def flatten(dist):
       param_names = set(dist._composite_tensor_nonshape_params)  # pylint: disable=protected-access
-      components = {param_name: value for param_name, value
+      components = {param_name: getattr(
+          dist, param_name, value) for param_name, value
                     in dist.parameters.items() if param_name in param_names}
       metadata = {param_name: value for param_name, value
                   in dist.parameters.items() if param_name not in param_names}
@@ -328,6 +331,16 @@ class _DistributionMeta(abc.ABCMeta):
         keys, values = zip(*sorted(components.items()))
       else:
         keys, values = (), ()
+      # Mimics the logic in `tfp.experimental.composite_tensor` where we
+      # aggressively try to convert arguments into Tensors.
+      def _maybe_convert_to_tensor(value, name):
+        try:
+          value = tf.convert_to_tensor(value, name=name)
+        except (ValueError, TypeError, AssertionError):
+          pass
+        return value
+      values = tuple([_maybe_convert_to_tensor(value, name) for value, name,
+                      in zip(values, keys)])
       return values, (keys, metadata)
     def unflatten(info, xs):
       keys, metadata = info
@@ -457,11 +470,11 @@ class Distribution(_BaseDistribution):
 
   # Will raise exception if ANY batch member has a < 1 or b < 1.
   dist = distributions.beta(a, b, allow_nan_stats=False)
-  mode = dist.mode().eval()
+  mode = dist.mode()
 
   # Will return NaN for batch members with either a < 1 or b < 1.
   dist = distributions.beta(a, b, allow_nan_stats=True)  # Default behavior
-  mode = dist.mode().eval()
+  mode = dist.mode()
   ```
 
   In all cases, an exception is raised if *invalid* parameters are passed, e.g.
@@ -470,7 +483,7 @@ class Distribution(_BaseDistribution):
   # Will raise an exception if any Op is run.
   negative_a = -1.0 * a  # beta distribution by definition has a > 0.
   dist = distributions.beta(negative_a, b, allow_nan_stats=True)
-  dist.mean().eval()
+  dist.mean()
   ```
 
   """
@@ -525,7 +538,7 @@ class Distribution(_BaseDistribution):
     for i, t in enumerate(graph_parents):
       if t is None or not tf.is_tensor(t):
         raise ValueError('Graph parent item %d is not a Tensor; %s.' % (i, t))
-    self._dtype = dtype
+    self._dtype = self._no_dependency(dtype)
     self._reparameterization_type = reparameterization_type
     self._allow_nan_stats = allow_nan_stats
     self._validate_args = validate_args
@@ -576,6 +589,39 @@ class Distribution(_BaseDistribution):
     return ()
 
   @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    raise NotImplementedError(
+        '_parameter_properties` is not implemented: {}'.format(cls.__name__))
+
+  @classmethod
+  def parameter_properties(cls, dtype=tf.float32, num_classes=None):
+    """Returns a dict mapping constructor arg names to property annotations.
+
+    This dict should include an entry for each of the distribution's
+    `Tensor`-valued constructor arguments.
+
+    Args:
+      dtype: Optional float `dtype` to assume for continuous-valued parameters.
+        Some constraining bijectors require advance knowledge of the dtype
+        because certain constants (e.g., `tfb.Softplus.low`) must be
+        instantiated with the same dtype as the values to be transformed.
+      num_classes: Optional `int` `Tensor` number of classes to assume when
+        inferring the shape of parameters for categorical-like distributions.
+        Otherwise ignored.
+
+    Returns:
+      parameter_properties: A
+        `str -> `tfp.python.internal.parameter_properties.ParameterProperties`
+        dict mapping constructor argument names to `ParameterProperties`
+        instances.
+    """
+    with tf.name_scope('parameter_properties'):
+      return cls._parameter_properties(dtype, num_classes=num_classes)
+
+  @classmethod
+  @deprecation.deprecated('2021-03-01',
+                          'The `param_shapes` method of `tfd.Distribution` is '
+                          'deprecated; use `parameter_properties` instead.')
   def param_shapes(cls, sample_shape, name='DistributionParamShapes'):
     """Shapes of parameters given the desired shape of a call to `sample()`.
 
@@ -594,9 +640,16 @@ class Distribution(_BaseDistribution):
       `dict` of parameter name to `Tensor` shapes.
     """
     with tf.name_scope(name):
-      return cls._param_shapes(sample_shape)
+      param_shapes = {}
+      for (param_name, param) in cls.parameter_properties().items():
+        param_shapes[param_name] = tf.convert_to_tensor(
+            param.shape_fn(sample_shape), dtype=tf.int32)
+      return param_shapes
 
   @classmethod
+  @deprecation.deprecated(
+      '2021-03-01', 'The `param_static_shapes` method of `tfd.Distribution` is '
+      'deprecated; use `parameter_properties` instead.')
   def param_static_shapes(cls, sample_shape):
     """param_shapes with static (i.e. `TensorShape`) shapes.
 
@@ -635,10 +688,6 @@ class Distribution(_BaseDistribution):
 
     return static_params
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    raise NotImplementedError('_param_shapes not implemented')
-
   @property
   def name(self):
     """Name prepended to all ops created by this `Distribution`."""
@@ -667,27 +716,21 @@ class Distribution(_BaseDistribution):
   def _params_event_ndims(cls):
     """Returns a dict mapping constructor argument names to per-event rank.
 
-    Distributions may implement this method to provide support for slicing
-    (`__getitem__`) on the batch axes.
-
-    Examples: Normal has scalar parameters, so would return
-    `{'loc': 0, 'scale': 0}`. On the other hand, MultivariateNormalTriL has
-    vector loc and matrix scale, so returns `{'loc': 1, 'scale_tril': 2}`. When
-    a distribution accepts multiple parameterizations, either all possible
-    parameters may be specified by the dict, e.g. Bernoulli returns
-    `{'logits': 0, 'probs': 0}`, or if convenient only the parameters relevant
-    to this instance may be specified.
-
-    Parameter dtypes are inferred from Tensor attributes on the distribution
-    where available, e.g. `bernoulli.probs`, 'mvn.scale_tril', falling back with
-    a warning to the dtype of the distribution.
+    The ranks are pulled from `cls.parameter_properties()`; this is a
+    convenience wrapper.
 
     Returns:
       params_event_ndims: Per-event parameter ranks, a `str->int dict`.
     """
-    raise NotImplementedError(
-        '{} does not support batch slicing; must implement '
-        '_params_event_ndims.'.format(cls))
+    try:
+      return {
+          k: param.event_ndims
+          for (k, param) in cls.parameter_properties().items()
+      }
+    except NotImplementedError:
+      raise NotImplementedError(
+          '{} does not support batch slicing; must implement '
+          '_parameter_properties.'.format(cls))
 
   def __getitem__(self, slices):
     """Slices the batch axes of this distribution, returning a new instance.
@@ -777,13 +820,14 @@ class Distribution(_BaseDistribution):
       return slicing.batch_slice(self, self._params_event_ndims(),
                                  override_parameters_kwargs, Ellipsis)
     except NotImplementedError:
-      parameters = dict(self.parameters, **override_parameters_kwargs)
-      d = type(self)(**parameters)
-      # pylint: disable=protected-access
-      d._parameters = parameters
-      d._parameters_sanitized = True
-      # pylint: enable=protected-access
-      return d
+      pass
+    parameters = dict(self.parameters, **override_parameters_kwargs)
+    d = type(self)(**parameters)
+    # pylint: disable=protected-access
+    d._parameters = self._no_dependency(parameters)
+    d._parameters_sanitized = True
+    # pylint: enable=protected-access
+    return d
 
   def _batch_shape_tensor(self):
     raise NotImplementedError(
@@ -1269,7 +1313,7 @@ class Distribution(_BaseDistribution):
         return self._variance(**kwargs)
       except NotImplementedError:
         try:
-          return tf.square(self._stddev(**kwargs))
+          return tf.nest.map_structure(tf.square, self._stddev(**kwargs))
         except NotImplementedError:
           pass
         raise
@@ -1304,7 +1348,7 @@ class Distribution(_BaseDistribution):
         return self._stddev(**kwargs)
       except NotImplementedError:
         try:
-          return tf.sqrt(self._variance(**kwargs))
+          return tf.nest.map_structure(tf.sqrt, self._variance(**kwargs))
         except NotImplementedError:
           pass
         raise
@@ -1428,30 +1472,47 @@ class Distribution(_BaseDistribution):
     # must ensure that assertions are applied for both `self` and `other`.
     return self._kl_divergence(other)
 
-  def _default_event_space_bijector(self):
+  def _default_event_space_bijector(self, *args, **kwargs):
     raise NotImplementedError(
         '_default_event_space_bijector` is not implemented: {}'.format(
             type(self).__name__))
 
-  def _experimental_default_event_space_bijector(self):
+  @deprecation.deprecated(
+      '2020-10-20',
+      'Use `experimental_default_event_space_bijector` instead.')
+  def _experimental_default_event_space_bijector(self, *args, **kwargs):
+    return self.experimental_default_event_space_bijector(*args, **kwargs)
+
+  def experimental_default_event_space_bijector(self, *args, **kwargs):
     """Bijector mapping the reals (R**n) to the event space of the distribution.
+
+    Distributions with continuous support may implement
+    `_default_event_space_bijector` which returns a subclass of
+    `tfp.bijectors.Bijector` that maps R**n to the distribution's event space.
+    For example, the default bijector for the `Beta` distribution
+    is `tfp.bijectors.Sigmoid()`, which maps the real line to `[0, 1]`, the
+    support of the `Beta` distribution. The default bijector for the
+    `CholeskyLKJ` distribution is `tfp.bijectors.CorrelationCholesky`, which
+    maps R^(k * (k-1) // 2) to the submanifold of k x k lower triangular
+    matrices with ones along the diagonal.
+
+    The purpose of `experimental_default_event_space_bijector` is
+    to enable gradient descent in an unconstrained space for Variational
+    Inference and Hamiltonian Monte Carlo methods. Some effort has been made to
+    choose bijectors such that the tails of the distribution in the
+    unconstrained space are between Gaussian and Exponential.
+
+    For distributions with discrete event space, or for which TFP currently
+    lacks a suitable bijector, this function returns `None`.
+
+    Args:
+      *args: Passed to implementation `_default_event_space_bijector`.
+      **kwargs: Passed to implementation `_default_event_space_bijector`.
 
     Returns:
       event_space_bijector: `Bijector` instance or `None`.
-
-    Distributions with continuous support have a
-    `_default_event_space_bijector`, a subclass of `tfp.bijectors.Bijector`
-    that maps R**n to the distribution's event space. For example, the
-    `_default_event_space_bijector` of the `Beta` distribution is
-    `tfb.Sigmoid()`, which maps the real line to `[0, 1]`, the support of the
-    `Beta` distribution. The purpose of `_default_event_space_bijector` is
-    to enable gradient descent in an unconstrained space for Variational
-    Inference and Hamiltonian Monte Carlo methods. An effort has been made to
-    choose bijectors such that the tails of the distribution in the
-    unconstrained space are between Gaussian and Exponential. For distributions
-    with discrete event space, `_default_event_space_bijector` returns `None`.
     """
-    return self._default_event_space_bijector()
+    return self._default_event_space_bijector(*args, **kwargs)
 
   def __str__(self):
     if self.batch_shape:
@@ -1505,6 +1566,13 @@ class Distribution(_BaseDistribution):
         if not deps:
           yield name_scope
           return
+        # In eager mode, some `assert_util.assert_xyz` calls return None. If a
+        # Distribution is created in eager mode with `validate_args=True`, then
+        # used in a `tf.function` context, it can result in errors when
+        # `tf.convert_to_tensor` is called on the inputs to
+        # `tf.control_dependencies` below. To avoid these errors, we drop the
+        # `None`s here.
+        deps = [x for x in deps if x is not None]
         with tf.control_dependencies(deps) as deps_scope:
           yield deps_scope
 

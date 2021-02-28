@@ -209,6 +209,45 @@ class RelaxedBernoulliTest(test_util.TestCase):
       d = tfd.RelaxedBernoulli(0.5, logits=logits, validate_args=True)
       d.sample(seed=test_util.test_seed())
 
+  def testCdfAgreesWithLogProb(self):
+    # Shape [N, 1, 1, 1]. This is to support broadcasting and the last dimension
+    # for evaluating against the quadrature nodes.
+
+    # Choose probs in a modest range such that the density isn't extremeely
+    # skewed for quadrature.
+    probs = tf.random.uniform(
+        minval=0.3,
+        maxval=0.7,
+        shape=[int(1e2)],
+        dtype=np.float64,
+        seed=test_util.test_seed())[..., tf.newaxis, tf.newaxis, tf.newaxis]
+    temp = np.array([0.5, 1., 2.], dtype=np.float64)[
+        ..., np.newaxis, np.newaxis]
+    dist = tfd.RelaxedBernoulli(temp, probs=probs, validate_args=True)
+
+    x = np.array([0.1, 0.25, 0.5, 0.75, 0.9], dtype=np.float64)
+    # Do quadrature on the probability density from 0 to x.
+    nodes, weights = scipy.special.roots_legendre(500)
+    rescaled_nodes = x[..., np.newaxis] / 2. * (nodes + 1.)
+    expected_log_cdf = (tf.math.log(x / 2.) + tf.math.reduce_logsumexp(
+        np.log(weights) + dist.log_prob(rescaled_nodes), axis=-1))[
+            ..., tf.newaxis, :]
+    actual_log_cdf, expected_log_cdf = self.evaluate(
+        [dist.log_cdf(x), expected_log_cdf])
+    self.assertAllClose(expected_log_cdf, actual_log_cdf, rtol=2e-2)
+
+  def testCdfNotNanNearEndpoints(self):
+    probs = np.linspace(0., 1., 30, dtype=np.float32)[..., None]
+    temp = 1e-1
+    dist = tfd.RelaxedBernoulli(temp, probs=probs, validate_args=True)
+    x = [0., 0.25, 0.5, 0.75, 1.]
+    cdf = self.evaluate(dist.cdf(x))
+    self.assertFalse(np.any(np.isnan(cdf)))
+    # Check that the CDF is strictly increasing for probs not in {0, 1}.
+    self.assertTrue(np.all(np.diff(cdf[1:-1]) >= 0.))
+    self.assertAllEqual([1., 1., 1., 1., 1.], cdf[0])
+    self.assertAllEqual([0., 0., 0., 0., 1.], cdf[-1])
+
 
 @test_util.test_all_tf_execution_regimes
 class RelaxedBernoulliFromVariableTest(test_util.TestCase):
@@ -278,9 +317,10 @@ class RelaxedBernoulliFromVariableTest(test_util.TestCase):
     dist = tfd.RelaxedBernoulli(temp, probs=probs, validate_args=True)
     eps = 1e-6
     x = np.array([-2.3, -eps, 1. + eps, 1.4])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
+
 
 if __name__ == '__main__':
   tf.test.main()

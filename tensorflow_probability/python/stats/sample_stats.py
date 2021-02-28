@@ -319,8 +319,8 @@ def covariance(x,
   cov_matrix = tfp.stats.covariance(x, y, sample_axis=0, event_axis=-1)
   ```
 
-  Notice we divide by `N` (the numpy default), which does not create `NaN`
-  when `N = 1`, but is slightly biased.
+  Notice we divide by `N`, which does not create `NaN` when `N = 1`, but is
+  slightly biased.
 
   Args:
     x:  A numeric `Tensor` holding samples.
@@ -351,7 +351,7 @@ def covariance(x,
   with tf.name_scope(name or 'covariance'):
     x = tf.convert_to_tensor(x, name='x')
     # Covariance *only* uses the centered versions of x (and y).
-    x -= tf.reduce_mean(x, axis=sample_axis, keepdims=True)
+    x = x - tf.reduce_mean(x, axis=sample_axis, keepdims=True)
 
     if y is None:
       y = x
@@ -360,7 +360,7 @@ def covariance(x,
       # If x and y have different shape, sample_axis and event_axis will likely
       # be wrong for one of them!
       tensorshape_util.assert_is_compatible_with(x.shape, y.shape)
-      y -= tf.reduce_mean(y, axis=sample_axis, keepdims=True)
+      y = y - tf.reduce_mean(y, axis=sample_axis, keepdims=True)
 
     if event_axis is None:
       return tf.reduce_mean(
@@ -393,12 +393,9 @@ def covariance(x,
       batch_axis = ps.setdiff1d(
           ps.range(0, ps.rank(x)), ps.concat((sample_axis, event_axis), 0))
 
-    event_axis = ps.cast(
-        event_axis, dtype=tf.int32)
-    sample_axis = ps.cast(
-        sample_axis, dtype=tf.int32)
-    batch_axis = ps.cast(
-        batch_axis, dtype=tf.int32)
+    event_axis = ps.cast(event_axis, dtype=tf.int32)
+    sample_axis = ps.cast(sample_axis, dtype=tf.int32)
+    batch_axis = ps.cast(batch_axis, dtype=tf.int32)
 
     # Permute x/y until shape = B + E + S
     perm_for_xy = ps.concat((batch_axis, event_axis, sample_axis), 0)
@@ -821,6 +818,6 @@ def _squeeze(x, axis):
   if axis is None:
     return tf.squeeze(x, axis=None)
   axis = ps.convert_to_shape_tensor(axis, name='axis', dtype=tf.int32)
-  axis += ps.zeros([1], dtype=axis.dtype)  # Make axis at least 1d.
+  axis = _make_list_or_1d_tensor(axis)  # Ensure at least 1d.
   keep_axis = ps.setdiff1d(ps.range(0, ps.rank(x)), axis)
   return tf.reshape(x, ps.gather(ps.shape(x), keep_axis))

@@ -12,142 +12,113 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for drivers in a Streaming Reductions Framework."""
+"""Tests for high(er) level drivers for streaming MCMC."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
-import warnings
-
 # Dependency imports
-import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
-from tensorflow_probability.python.experimental.mcmc.sample import step_kernel
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 
-class StepKernelTest(test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class RunTest(test_util.TestCase):
 
-  @test_util.test_all_tf_execution_regimes
-  def test_simple_operation(self):
+  def test_simple_reduction(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    final_state, kernel_results = step_kernel(
-        num_steps=2,
-        current_state=0,
+    fake_reducer = test_fixtures.NaiveMeanReducer()
+    result = tfp.experimental.mcmc.sample_chain(
+        num_results=5,
+        current_state=0.,
         kernel=fake_kernel,
-        return_final_kernel_results=True
+        reducer=fake_reducer,
     )
-    final_state, kernel_results = self.evaluate([final_state, kernel_results])
-    self.assertEqual(final_state, 2)
-    self.assertEqual(kernel_results.counter_1, 2)
-    self.assertEqual(kernel_results.counter_2, 4)
+    last_sample, reduction_result, kernel_results = self.evaluate([
+        result.final_state, result.reduction_results,
+        result.final_kernel_results
+    ])
+    self.assertEqual(5, last_sample)
+    self.assertEqual(3, reduction_result)
+    self.assertEqual(5, kernel_results.counter_1)
+    self.assertEqual(10, kernel_results.counter_2)
 
-  @test_util.test_all_tf_execution_regimes
-  def test_defined_pkr(self):
+    # Warm-restart the underlying kernel but not the reduction
+    result_2 = tfp.experimental.mcmc.sample_chain(
+        num_results=5,
+        current_state=last_sample,
+        kernel=fake_kernel,
+        reducer=fake_reducer,
+        previous_kernel_results=kernel_results,
+    )
+    last_sample_2, reduction_result_2, kernel_results_2 = self.evaluate([
+        result_2.final_state, result_2.reduction_results,
+        result_2.final_kernel_results
+    ])
+    self.assertEqual(10, last_sample_2)
+    self.assertEqual(8, reduction_result_2)
+    self.assertEqual(10, kernel_results_2.counter_1)
+    self.assertEqual(20, kernel_results_2.counter_2)
+
+  def test_reducer_warm_restart(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    init_pkr = test_fixtures.TestTransitionKernelResults(
-        tf.constant(2, dtype=tf.int32), tf.constant(3, dtype=tf.int32))
-    final_state, kernel_results = step_kernel(
-        num_steps=2,
-        current_state=0,
-        previous_kernel_results=init_pkr,
+    fake_reducer = test_fixtures.NaiveMeanReducer()
+    result = tfp.experimental.mcmc.sample_chain(
+        num_results=5,
+        current_state=0.,
         kernel=fake_kernel,
-        return_final_kernel_results=True
+        reducer=fake_reducer,
     )
-    final_state, kernel_results = self.evaluate([final_state, kernel_results])
-    self.assertEqual(final_state, 2)
-    self.assertEqual(kernel_results.counter_1, 4)
-    self.assertEqual(kernel_results.counter_2, 7)
+    last_sample, red_res, kernel_results = self.evaluate([
+        result.final_state, result.reduction_results,
+        result.final_kernel_results
+    ])
+    self.assertEqual(3, red_res)
+    self.assertEqual(5, last_sample)
+    self.assertEqual(5, kernel_results.counter_1)
+    self.assertEqual(10, kernel_results.counter_2)
 
-  @test_util.test_all_tf_execution_regimes
-  def test_initial_state(self):
+    # Warm-restart the underlying kernel and the reduction using the provided
+    # restart package
+    result_2 = tfp.experimental.mcmc.sample_chain(
+        num_results=5, **result.resume_kwargs)
+    last_sample_2, reduction_result_2, kernel_results_2 = self.evaluate([
+        result_2.final_state, result_2.reduction_results,
+        result_2.final_kernel_results
+    ])
+    self.assertEqual(5.5, reduction_result_2)
+    self.assertEqual(10, last_sample_2)
+    self.assertEqual(10, kernel_results_2.counter_1)
+    self.assertEqual(20, kernel_results_2.counter_2)
+
+  def test_tracing_a_reduction(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    final_state = step_kernel(
-        num_steps=2,
-        current_state=1,
+    fake_reducer = test_fixtures.NaiveMeanReducer()
+    result = tfp.experimental.mcmc.sample_chain(
+        num_results=5,
+        current_state=0.,
         kernel=fake_kernel,
+        reducer=fake_reducer,
+        trace_fn=lambda _state, _kr, reductions: reductions
     )
-    final_state = self.evaluate(final_state)
-    self.assertEqual(final_state, 3)
+    trace = self.evaluate(result.trace)
+    self.assertAllEqual(trace, [1.0, 1.5, 2.0, 2.5, 3.0])
 
-  @test_util.test_all_tf_execution_regimes
-  def test_calibration_warning(self):
-    with warnings.catch_warnings(record=True) as triggered:
-      kernel = test_fixtures.TestTransitionKernel(is_calibrated=False)
-      tfp.mcmc.sample_chain(
-          num_results=2,
-          current_state=0,
-          kernel=kernel,
-          trace_fn=lambda current_state, kernel_results: kernel_results,
-          seed=test_util.test_seed())
-    self.assertTrue(
-        any('supplied `TransitionKernel` is not calibrated.' in str(
-            warning.message) for warning in triggered))
-
-  @test_util.test_all_tf_execution_regimes
-  def test_seed_reproducibility(self):
-    first_fake_kernel = test_fixtures.RandomTransitionKernel()
-    second_fake_kernel = test_fixtures.RandomTransitionKernel()
-    seed = samplers.sanitize_seed(test_util.test_seed())
-    last_state_t = step_kernel(
-        num_steps=1,
-        current_state=0,
-        kernel=test_fixtures.RandomTransitionKernel(),
-        seed=seed,
+  def test_tracing_no_reduction(self):
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    result = tfp.experimental.mcmc.sample_chain(
+        num_results=5,
+        current_state=0.,
+        kernel=fake_kernel,
+        trace_fn=lambda state, _kr: state + 10
     )
-    for num_steps in range(2, 5):
-      first_final_state_t = step_kernel(
-          num_steps=num_steps,
-          current_state=0.,
-          kernel=first_fake_kernel,
-          seed=seed,
-      )
-      second_final_state_t = step_kernel(
-          num_steps=num_steps,
-          current_state=1.,  # difference should be irrelevant
-          kernel=second_fake_kernel,
-          seed=seed,
-      )
-      last_state, first_final_state, second_final_state = self.evaluate([
-          last_state_t, first_final_state_t, second_final_state_t
-      ])
-      self.assertEqual(first_final_state, second_final_state)
-      self.assertNotEqual(first_final_state, last_state)
-      last_state_t = first_final_state_t
-
-  @test_util.test_graph_mode_only
-  def test_smart_for_loop_uses_tf_while(self):
-    dtype = np.float32
-    true_mean = dtype([0, 0])
-    true_cov = dtype([[1, 0.5],
-                      [0.5, 1]])
-    true_cov_chol = np.linalg.cholesky(true_cov)
-    num_results = 100
-    counter = collections.Counter()
-
-    def target_log_prob(x, y):
-      counter['target_calls'] += 1
-      z = tf.stack([x, y], axis=-1) - true_mean
-      z = tf.linalg.triangular_solve(true_cov_chol, z[..., tf.newaxis])[..., 0]
-      return -0.5 * tf.reduce_sum(z**2., axis=-1)
-
-    _ = tfp.experimental.mcmc.step_kernel(
-        num_steps=num_results,
-        current_state=[dtype(-2), dtype(2)],
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
-            target_log_prob_fn=target_log_prob,
-            step_size=[0.5, 0.5],
-            num_leapfrog_steps=2),
-        return_final_kernel_results=False,
-        seed=test_util.test_seed())
-
-    self.assertAllEqual(dict(target_calls=4), counter)
+    trace = self.evaluate(result.trace)
+    self.assertAllEqual(trace, [11.0, 12.0, 13.0, 14.0, 15.0])
 
 
 if __name__ == '__main__':

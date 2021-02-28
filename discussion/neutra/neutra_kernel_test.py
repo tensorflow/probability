@@ -73,7 +73,7 @@ class NeutraKernelTest(tf.test.TestCase, parameterized.TestCase):
         current_state=tf.zeros([16, 2], dtype),
         kernel=kernel,
         trace_fn=None,
-        parallel_iterations=1)
+        seed=tfp_test_util.test_seed())
     self.assertEqual(1000, debug_fn.count)
 
     sample_mean = tf.reduce_mean(input_tensor=chain, axis=[0, 1])
@@ -120,7 +120,7 @@ class NeutraKernelTest(tf.test.TestCase, parameterized.TestCase):
             lambda s: tf.zeros([16] + s.as_list()), target_dist.event_shape),
         kernel=kernel,
         trace_fn=None,
-        parallel_iterations=1)
+        seed=tfp_test_util.test_seed())
 
     sample_mean_2d = tf.reduce_mean(input_tensor=chain_2d, axis=[0, 1])
     sample_mean_4d = tf.reduce_mean(input_tensor=chain_4d, axis=[0, 1])

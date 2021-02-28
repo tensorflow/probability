@@ -27,6 +27,9 @@ toc:
 - title: TensorFlow Probability on JAX
   path: /probability/examples/TensorFlow_Probability_on_JAX
   status: new
+- title: Automatically Batched Joint Distributions
+  path: /probability/examples/JointDistributionAutoBatched_A_Gentle_Tutorial
+  status: new
 - heading: "Tutorials"
 - title:  Probabilistic regression
   path: /probability/examples/Probabilistic_Layers_Regression
@@ -70,11 +73,15 @@ toc:
   path: /probability/examples/STS_approximate_inference_for_models_with_non_Gaussian_observations
 - title: Structural time series
   path: /probability/examples/Structural_Time_Series_Modeling_Case_Studies_Atmospheric_CO2_and_Electricity_Demand
+- title: Variational Inference and Joint Distributions
+  path: /probability/examples/Variational_Inference_and_Joint_Distributions
 - title: Covariance estimation
   path: /probability/examples/TensorFlow_Probability_Case_Study_Covariance_Estimation
 - heading: "Releases"
 - title: TFP 0.11.0
   path: /probability/examples/TFP_Release_Notebook_0_11_0
+- title: TFP 0.12.1
+  path: /probability/examples/TFP_Release_Notebook_0_12_1
 - title: "Tutorials (TF1)"
   style: accordion
   status: deprecated
@@ -83,4 +90,3 @@ toc:
     path: /probability/examples/Fitting_DPMM_Using_pSGLD
   - title: HLM R stan
     path: /probability/examples/HLM_TFP_R_Stan
-

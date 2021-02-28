@@ -111,6 +111,10 @@ class Split(bijector.Bijector):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
+
   @property
   def num_splits(self):
     return self._num_splits
@@ -122,6 +126,10 @@ class Split(bijector.Bijector):
   @property
   def axis(self):
     return self._axis
+
+  @property
+  def _is_permutation(self):
+    return True
 
   def _inverse(self, y):
     """Returns the inverse `Bijector` evaluation, i.e., X = g^{-1}(Y).
@@ -291,10 +299,6 @@ class Split(bijector.Bijector):
       inverse_event_shape_tensor: `Tensor`, `int32` vector indicating
         event-portion shape after applying `inverse`.
     """
-    output_shapes = [
-        tf.convert_to_tensor(t, dtype_hint=tf.int32, name='output_shape')
-        for t in output_shapes]
-
     # Validate `output_shapes` statically if possible and get assertions.
     is_validated = self._validate_output_shapes(
         [tensorshape_util.constant_value_as_shape(s) for s in output_shapes])
@@ -324,11 +328,15 @@ class Split(bijector.Bijector):
         to the number of splits.
 
     Returns:
-      inverse_event_shape_tensor: `TensorShape` indicating event-portion shape
-        after applying `inverse`. Possibly unknown.
+      inverse_event_shape: `TensorShape` indicating event-portion shape after
+        applying `inverse`. Possibly unknown.
     """
     self._validate_output_shapes(output_shapes)
-    shapes = [tf.TensorShape(s).as_list() for s in output_shapes]
+    shapes = []
+    for s in output_shapes:
+      if tensorshape_util.rank(s) is None:
+        return tf.TensorShape(None)
+      shapes.append(tf.TensorShape(s).as_list())
     axis = tf.get_static_value(self.axis)
 
     if self.split_sizes is None:
@@ -373,9 +381,10 @@ class Split(bijector.Bijector):
     return [dtype] * self.num_splits
 
   def _inverse_dtype(self, dtype):
-    if any(d != dtype[0] for d in dtype):
+    dtype = set(dtype) - {None}
+    if len(dtype) > 1:
       raise ValueError('All dtypes must be equivalent.')
-    return dtype[0]
+    return dtype.pop() if dtype else None
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

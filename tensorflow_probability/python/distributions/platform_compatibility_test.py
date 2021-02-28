@@ -46,15 +46,12 @@ from tensorflow_probability.python.internal import test_util
 XLA_UNFRIENDLY_DISTS = frozenset([
     # TODO(b/159995894): SegmentMean not registered for XLA.
     'Bates',
-    # TODO(b/159996837):
-    'Categorical',
-    # TODO(b/159996484): Continuous Bernoulli nan/inf locations mismatch.
-    'ContinuousBernoulli',
-    # TODO(b/159997119): Finite discrete produces NaNs.
-    'FiniteDiscrete',
     # TODO(b/159996966)
     'Gamma',
-    'OneHotCategorical',
+    # TODO(b/173546024)
+    'GeneralizedExtremeValue',
+    # TODO(b/163118820)
+    'LogLogistic',
     'LogNormal',
     # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
     'NegativeBinomial',
@@ -65,14 +62,10 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'Poisson',
     # TODO(b/137956955): Add support for hypothesis testing
     'SinhArcsinh',
-    # TruncatedCauchy has log_probs that are very far off.
-    'TruncatedCauchy',
     # TODO(b/159997353): StatelessTruncatedNormal missing in XLA.
     'TruncatedNormal',
     'Weibull',
     'WishartTriL',  # log_probs are very far off.
-    # TODO(b/159997700) No XLA Zeta
-    'Zipf',
 ])
 
 NO_SAMPLE_PARAM_GRADS = {
@@ -97,16 +90,16 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'DirichletMultinomial',  # Times out. (b/164143676)
     'Multinomial',  # TensorListConcatV2 fallback broken: b/166658748
-    'PlackettLuce',  # No converter for TopKV2
+    'Skellam',
     # 'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
-    'HalfStudentT',  # Numerical problem: b/149785284
-    'StudentT',  # Numerical problem: b/149785284
+    'BetaQuotient',
+    'ExponentiallyModifiedGaussian',  # b/174778704
+    'Skellam',
     'TruncatedNormal',  # Numerical problem: b/150811273
-    'VonMisesFisher',  # No converter for CheckNumerics
     'Wishart',  # Actually works, but disabled because log_prob of sample is
                 # ill-conditioned for reasons unrelated to pfor.
     'WishartTriL',  # Same as Wishart.
@@ -117,36 +110,53 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
 # TODO(b/142827327): Bring tolerance down to 0 for all distributions.
 VECTORIZED_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_ATOL.update({
-    'CholeskyLKJ': 1e-4,
-    'LKJ': 1e-3,
+    'Beta': 1e-5,
     'BetaBinomial': 1e-5,
+    'BetaQuotient': 2e-5,
+    'CholeskyLKJ': 1e-4,
+    'GammaGamma': 2e-5,
+    'LKJ': 1e-3,
+    'PowerSpherical': 2e-5,
 })
 
 VECTORIZED_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_RTOL.update({
+    'Beta': 1e-5,
+    'GammaGamma': 1e-4,
     'NegativeBinomial': 1e-5,
+    'PERT': 1e-5,
     'PowerSpherical': 5e-5,
 })
 
 # TODO(b/142827327): Bring tolerance down to 0 for all distributions.
 XLA_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 XLA_LOGPROB_ATOL.update({
+    'Beta': 1e-4,
+    'BetaBinomial': 5e-6,
+    'BetaQuotient': 1e-4,
     'Binomial': 5e-6,
+    'Categorical': 5e-6,  # sparse_softmax_cross_entropy_with_logits
+    'DeterminantalPointProcess': 1e-5,
     'DirichletMultinomial': 1e-4,
-    'ExpGamma': 1e-3,  # TODO(b/166257329)
-    'ExpInverseGamma': 1e-3,  # TODO(b/166257329)
+    'ExpGamma': 2e-3,  # TODO(b/166257329)
+    'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
-    'InverseGamma': 5e-5,
-    'Kumaraswamy': 3e-6,
+    'FiniteDiscrete': 6e-6,  # sparse_softmax_cross_entropy_with_logits
+    'HalfCauchy': 2e-6,
+    'InverseGamma': 1e-4,
+    'Kumaraswamy': 4e-5,
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
     'PowerSpherical': 2e-5,
+    'SigmoidBeta': 5e-4,
+    'Skellam': 1e-4
 })
 
 XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
 XLA_LOGPROB_RTOL.update({
     'Beta': 5e-4,
     'BetaBinomial': 5e-4,
+    'BetaQuotient': 5e-4,
     'Binomial': 4e-6,
     'Categorical': 6e-6,
     'Chi': 2e-4,
@@ -163,19 +173,27 @@ XLA_LOGPROB_RTOL.update({
     'Geometric': 5e-5,
     'InverseGamma': 5e-3,
     'JohnsonSU': 1e-2,
-    'LKJ': 5e-3,
-    'LogLogistic': 1.5e-2,  # TODO(b/163118820)
+    'LKJ': .07,
     'Multinomial': 3e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
-    'Pareto': 2e-2,  # TODO(b/159997708)
     'PERT': 5e-4,
     'Poisson': 3e-2,  # TODO(b/159999573)
     'PowerSpherical': .003,
     'RelaxedBernoulli': 3e-3,
+    'SigmoidBeta': 5e-4,
+    'TruncatedCauchy': 2e-5,
     'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
     'WishartTriL': 1e-5,
 })
+
+
+SKIP_KL_CHECK_DIST_VAR_GRADS = [
+    'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
+    'JohnsonSU',  # TD's KL gradients do not rely on bijector variables.
+    'GeneralizedExtremeValue',  # TD's KL gradients do not rely on bijector
+                                # variables.
+]
 
 
 def extra_tensor_conversions_allowed(dist):
@@ -193,7 +211,7 @@ def extra_tensor_conversions_allowed(dist):
   return 0
 
 
-@test_util.test_all_tf_execution_regimes
+@test_util.test_graph_and_eager_modes
 class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
 
   @parameterized.named_parameters(
@@ -281,6 +299,8 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
     # that is produces non-None gradients.
     try:
       for d1, d2 in (dist, dist2), (dist2, dist):
+        if dist_name in SKIP_KL_CHECK_DIST_VAR_GRADS:
+          continue
         with tf.GradientTape() as tape:
           with tfp_hps.assert_no_excessive_var_usage(
               '`kl_divergence` of (`{}` (vars {}), `{}` (vars {}))'.format(
@@ -296,6 +316,7 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
                                      d1, d2, var, d1, d1.variables, d2,
                                      d2.variables))
     except NotImplementedError:
+      # Raised by kl_divergence if no registered KL is found.
       pass
 
     # Test that log_prob produces non-None gradients, except for distributions
@@ -379,7 +400,8 @@ class DistributionCompositeTensorTest(test_util.TestCase):
     dist = data.draw(
         dhps.distributions(
             dist_name=dist_name, enable_vars=False, validate_args=False))
-    self._test_sample_and_log_prob(dist_name, dist)
+    with tfp_hps.no_tf_rank_errors():
+      self._test_sample_and_log_prob(dist_name, dist)
 
 
 @test_util.test_graph_mode_only
@@ -390,15 +412,18 @@ class DistributionXLATest(test_util.TestCase):
 
     num_samples = 3
     sample = self.evaluate(
-        tf.function(experimental_compile=True)(dist.sample)(
+        tf.function(dist.sample, jit_compile=True)(
             num_samples, seed=seed))
+    hp.note('Trying distribution {}'.format(
+        self.evaluate_dict(dist.parameters)))
     hp.note('Drew samples {}'.format(sample))
 
-    xla_lp = tf.function(experimental_compile=True)(dist.log_prob)(
-        tf.convert_to_tensor(sample))
-    graph_lp = dist.log_prob(sample)
-    xla_lp_, graph_lp_ = self.evaluate((xla_lp, graph_lp))
-    self.assertAllClose(xla_lp_, graph_lp_,
+    xla_lp = self.evaluate(
+        tf.function(dist.log_prob, jit_compile=True)(
+            tf.convert_to_tensor(sample)))
+    with tfp_hps.no_tf_rank_errors():
+      graph_lp = self.evaluate(dist.log_prob(sample))
+    self.assertAllClose(xla_lp, graph_lp,
                         atol=XLA_LOGPROB_ATOL[dist_name],
                         rtol=XLA_LOGPROB_RTOL[dist_name])
 
@@ -414,14 +439,23 @@ class DistributionXLATest(test_util.TestCase):
     self._test_sample_and_log_prob(dist_name, dist)
 
 
-@test_util.test_graph_and_eager_modes
+# Autovectorization tests run in graph mode only, because vectorized_map
+# works in graph mode (applies tf.function wrapping) internally. The purpose of
+# these tests is to verify that converters exist for all distribution ops and
+# give results consistent with manual batching; searching for discrepancies
+# between graph and eager behavior is out of scope.
+@test_util.test_graph_mode_only
 class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
 
   def _test_vectorization(self, dist_name, dist):
     seed = test_util.test_seed()
 
+    # TODO(b/171752261): New stateless samplers don't work with pfor.
+    enable_auto_vectorized_sampling = False
+
     num_samples = 3
-    if dist_name in SAMPLE_AUTOVECTORIZATION_IS_BROKEN:
+    if (not enable_auto_vectorized_sampling or
+        dist_name in SAMPLE_AUTOVECTORIZATION_IS_BROKEN):
       sample = self.evaluate(dist.sample(num_samples, seed=seed))
     else:
       sample = self.evaluate(tf.vectorized_map(
@@ -450,7 +484,8 @@ class DistributionsWorkWithAutoVectorizationTest(test_util.TestCase):
     dist = data.draw(dhps.distributions(
         dist_name=dist_name, enable_vars=False,
         validate_args=False))  # TODO(b/142826246): Enable validate_args.
-    self._test_vectorization(dist_name, dist)
+    with tfp_hps.no_tf_rank_errors():
+      self._test_vectorization(dist_name, dist)
 
 
 if __name__ == '__main__':

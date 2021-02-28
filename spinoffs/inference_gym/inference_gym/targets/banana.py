@@ -36,8 +36,15 @@ class Banana(model.Model):
   This distribution was first described in [1]. The distribution is constructed
   by transforming a 2-D normal distribution with scale [10, 1] by shifting the
   second dimension by `curvature * (x0**2 - 100)` where `x0` is the value of
-  the first dimension. If an N > 2 dimensions are requested, the remaining
+  the first dimension. If N > 2 dimensions are requested, the remaining
   dimensions are distributed as a standard normal.
+
+  ```none
+  x[0] ~ Normal(loc=0, scale=10)
+  x[1] ~ Normal(loc=curvature * (x[0]**2 - 100), scale=1)
+  for i in range(2, ndims):
+    x[i] ~ Normal(loc=0, scale=1)
+  ```
 
   This distribution is notable for having relatively narrow tails, while being
   derived from a simple, volume-preserving transformation of a normal

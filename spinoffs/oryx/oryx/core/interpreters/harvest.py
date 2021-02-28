@@ -120,10 +120,10 @@ reap(f, tag='intermediate')(1.)  # ==> {'y': 2.}
 reap(f, tag='intermediate')(5.)  # ==> {'y': 6.}
 ```
 """
+import enum
 from typing import Any, Callable, Dict, Iterable, List, FrozenSet, Tuple, Union
 
 import dataclasses
-import jax
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
@@ -131,6 +131,11 @@ from jax import lax
 from jax import linear_util as lu
 from jax import tree_util
 from jax import util as jax_util
+# pylint: disable=g-import-not-at-top
+try:
+  from jax._src.lax import control_flow as lax_control_flow
+except ImportError:
+  from jax.lax import lax_control_flow  # type: ignore
 from jax.interpreters import ad
 from jax.interpreters import batching
 from jax.interpreters import masking
@@ -155,12 +160,18 @@ safe_map = jax_util.safe_map
 safe_zip = jax_util.safe_zip
 
 
+class HarvestMode(enum.Enum):
+  REAP_PLANT = 'reap_plant'
+  PLANT_ONLY = 'plant_only'
+
+
 @dataclasses.dataclass(frozen=True)
 class HarvestSettings:
   """Contains the settings for a HarvestTrace."""
   tag: str
   blocklist: FrozenSet[str]
   allowlist: Union[FrozenSet[str], None]
+  mode: HarvestMode
 
 
 @dataclasses.dataclass
@@ -184,8 +195,9 @@ class HarvestContext:
       return values
     if name in self.plants:
       return self.handle_plant(values, name=name, mode=mode, tree=tree)
-    else:
+    elif self.settings.mode is not HarvestMode.PLANT_ONLY:
       return self.handle_reap(values, name=name, mode=mode, tree=tree)
+    return sow_p.bind(*values, name=name, tag=tag, mode=mode, tree=tree)
 
   def handle_reap(self, values, *, name, mode, tree):
     """Stores values in the context."""
@@ -321,10 +333,16 @@ class HarvestTrace(jax_core.Trace):
     if is_map:
       # TODO(sharadmv): figure out if invars are mapped or unmapped
       params = params.copy()
+      out_axes_thunk = params['out_axes_thunk']
+      @jax_util.as_hashable_function(closure=('harvest', out_axes_thunk))
+      def new_out_axes_thunk():
+        out_axes = out_axes_thunk()
+        assert all(out_axis == 0 for out_axis in out_axes)
+        return (0,) * out_tree().num_leaves
       new_params = dict(
           params,
-          mapped_invars=(True,) * len(tree_util.tree_leaves(plants)) +
-          params['mapped_invars'])
+          in_axes=(0,) * len(tree_util.tree_leaves(plants)) + params['in_axes'],
+          out_axes_thunk=new_out_axes_thunk)
     else:
       new_params = dict(params)
     all_args, all_tree = tree_util.tree_flatten((plants, vals))
@@ -332,11 +350,10 @@ class HarvestTrace(jax_core.Trace):
     if 'donated_invars' in params:
       new_params['donated_invars'] = ((False,) * num_plants
                                       + params['donated_invars'])
-    f, aux = harvest_eval(f, self, context.settings, all_tree)
+    f, out_tree = harvest_eval(f, self, context.settings, all_tree)
     out_flat = primitive.bind(
         f, *all_args, **new_params, name=jax_util.wrap_name(name, 'harvest'))
-    out_tree = aux()
-    out, reaps = tree_util.tree_unflatten(out_tree, out_flat)
+    out, reaps = tree_util.tree_unflatten(out_tree(), out_flat)
     out_tracers = safe_map(self.pure, out)
     reap_tracers = tree_util.tree_map(self.pure, reaps)
     if primitive is nest_p and reap_tracers:
@@ -365,6 +382,19 @@ class HarvestTrace(jax_core.Trace):
     return vals, todo
 
   post_process_map = post_process_call
+
+  def process_custom_jvp_call(self, primitive, fun, jvp, tracers):
+    # This implementation just drops the custom derivative rule.
+    # TODO(mattjj,sharadmv): don't drop the custom derivative rule
+    del primitive, jvp  # Unused.
+    return fun.call_wrapped(*tracers)
+
+  def process_custom_vjp_call(self, primitive, fun, fwd, bwd, tracers,
+                              out_trees):
+    # This implementation just drops the custom derivative rule.
+    # TODO(mattjj,sharadmv): don't drop the custom derivative rule
+    del primitive, fwd, bwd, out_trees  # Unused.
+    return fun.call_wrapped(*tracers)
 
 
 class HarvestTracer(jax_core.Tracer):
@@ -512,7 +542,8 @@ def harvest(f,
             *,
             tag: str,
             allowlist: Union[Iterable[str], None] = None,
-            blocklist: Iterable[str] = frozenset()):
+            blocklist: Iterable[str] = frozenset(),
+            mode='reap_plant'):
   """Transforms a function into a "functionalized" version.
 
   Sown values are namespaced using string "tags", where a value is sown (using
@@ -539,6 +570,9 @@ def harvest(f,
       other names will be ignored.
     blocklist: an iterable of strings of names that will be ignored while
       planting/reaping.
+    mode: `str`, either `'reap_plant'` (the default) or `'plant_only'`. In
+      `'plant_only'` mode, `harvest` will keep `sow`s in the function that were
+      not `plant`-ed.
 
   Returns:
     A function that takes in an additional initial input (a dictionary mapping
@@ -548,7 +582,7 @@ def harvest(f,
   blocklist = frozenset(blocklist)
   if allowlist is not None:
     allowlist = frozenset(allowlist)
-  settings = HarvestSettings(tag, blocklist, allowlist)
+  settings = HarvestSettings(tag, blocklist, allowlist, HarvestMode(mode))
 
   def wrapped(plants, *args, **kwargs):
     fun = lu.wrap_init(f, kwargs)
@@ -700,7 +734,8 @@ def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
       jaxpr_fun,
       tag=settings.tag,
       allowlist=settings.allowlist,
-      blocklist=settings.blocklist)
+      blocklist=settings.blocklist,
+      mode=settings.mode)
 
   def body(carry, x):
     x_plants, x_vals = x
@@ -724,7 +759,7 @@ def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
       abstract_arrays.raise_to_shaped(jax_core.get_aval(a)) for a in init)
   in_flat, in_tree = tree_util.tree_flatten((init, (xs_plants, xs)))
   body_jaxpr, new_consts, out_tree = (
-      jax.lax.lax_control_flow._initial_style_jaxpr(  # pylint: disable=protected-access
+      lax_control_flow._initial_style_jaxpr(  # pylint: disable=protected-access
           body, in_tree, init_avals + x_avals))
   new_values = list(new_consts) + in_flat
   num_xs_plants = len(new_values) - len(init) - len(xs) - len(new_consts)

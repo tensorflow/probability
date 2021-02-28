@@ -50,6 +50,7 @@ class GibbsSamplerTests(test_util.TestCase):
                         missing_prob=0,
                         true_noise_scale=0.1,
                         true_level_scale=0.04,
+                        true_slope_scale=0.02,
                         prior_class=tfd.InverseGamma,
                         dtype=tf.float32):
     seed = test_util.test_seed(sampler_type='stateless')
@@ -57,7 +58,8 @@ class GibbsSamplerTests(test_util.TestCase):
      weights_seed,
      noise_seed,
      level_seed,
-     is_missing_seed) = samplers.split_seed(seed, 5, salt='_build_test_model')
+     slope_seed,
+     is_missing_seed) = samplers.split_seed(seed, 6, salt='_build_test_model')
 
     design_matrix = samplers.normal(
         [num_timesteps, num_features], dtype=dtype, seed=design_seed)
@@ -67,9 +69,16 @@ class GibbsSamplerTests(test_util.TestCase):
     noise = samplers.normal(
         list(batch_shape) + [num_timesteps],
         dtype=dtype, seed=noise_seed) * true_noise_scale
-    level = tf.cumsum(samplers.normal(
+
+    level_residuals = samplers.normal(
         list(batch_shape) + [num_timesteps],
-        dtype=dtype, seed=level_seed) * true_level_scale, axis=-1)
+        dtype=dtype, seed=level_seed) * true_level_scale
+    if true_slope_scale is not None:
+      slope = tf.cumsum(samplers.normal(
+          list(batch_shape) + [num_timesteps],
+          dtype=dtype, seed=slope_seed) * true_slope_scale, axis=-1)
+      level_residuals += slope
+    level = tf.cumsum(level_residuals, axis=-1)
     time_series = (regression + noise + level)
     is_missing = samplers.uniform(
         list(batch_shape) + [num_timesteps],
@@ -84,39 +93,75 @@ class GibbsSamplerTests(test_util.TestCase):
         level_variance_prior=prior_class(
             concentration=tf.cast(0.01, dtype),
             scale=tf.cast(0.01 * 0.01, dtype)),
+        slope_variance_prior=None if true_slope_scale is None else prior_class(
+            concentration=tf.cast(0.01, dtype),
+            scale=tf.cast(0.01 * 0.01, dtype)),
         observation_noise_variance_prior=prior_class(
             concentration=tf.cast(0.01, dtype),
             scale=tf.cast(0.01 * 0.01, dtype)))
     return model, time_series, is_missing
 
-  def test_forecasts_are_sane(self):
+  @parameterized.named_parameters(
+      {'testcase_name': 'LocalLinearTrend', 'use_slope': True},
+      {'testcase_name': 'LocalLevel', 'use_slope': False})
+  def test_forecasts_match_reference(self, use_slope):
     seed = test_util.test_seed()
     num_observed_steps = 5
-    num_forecast_steps = 3
+    num_forecast_steps = 4
     model, observed_time_series, is_missing = self._build_test_model(
         num_timesteps=num_observed_steps + num_forecast_steps,
+        true_slope_scale=0.5 if use_slope else None,
         batch_shape=[3])
 
-    samples = gibbs_sampler.fit_with_gibbs_sampling(
-        model, tfp.sts.MaskedTimeSeries(
-            observed_time_series[..., :num_observed_steps, tf.newaxis],
-            is_missing[..., :num_observed_steps]),
-        num_results=5, num_warmup_steps=10, seed=seed)
+    samples = tf.function(
+        lambda: gibbs_sampler.fit_with_gibbs_sampling(  # pylint: disable=g-long-lambda
+            model, tfp.sts.MaskedTimeSeries(
+                observed_time_series[..., :num_observed_steps, tf.newaxis],
+                is_missing[..., :num_observed_steps]),
+            num_results=10000, num_warmup_steps=100, seed=seed))()
     predictive_dist = gibbs_sampler.one_step_predictive(
         model, samples, num_forecast_steps=num_forecast_steps,
         thin_every=1)
     predictive_mean, predictive_stddev = self.evaluate((
         predictive_dist.mean(), predictive_dist.stddev()))
-
     self.assertAllEqual(predictive_mean.shape,
                         [3, num_observed_steps + num_forecast_steps])
     self.assertAllEqual(predictive_stddev.shape,
                         [3, num_observed_steps + num_forecast_steps])
 
-    # Uncertainty should increase over the forecast period.
-    self.assertTrue(
-        np.all(predictive_stddev[..., num_observed_steps + 1:] >
-               predictive_stddev[..., num_observed_steps:-1]))
+    if use_slope:
+      parameter_samples = (samples.observation_noise_scale,
+                           samples.level_scale,
+                           samples.slope_scale,
+                           samples.weights)
+    else:
+      parameter_samples = (samples.observation_noise_scale,
+                           samples.level_scale,
+                           samples.weights)
+
+    # Note that although we expect the Gibbs-sampled forecasts to match a
+    # reference implementation, we *don't* expect the one-step predictions to
+    # match `tfp.sts.one_step_predictive`, because that makes predictions using
+    # a filtered posterior (i.e., given only previous observations) whereas the
+    # Gibbs-sampled latent `level`s will incorporate some information from
+    # future observations.
+    reference_forecast_dist = tfp.sts.forecast(
+        model,
+        observed_time_series=observed_time_series[..., :num_observed_steps],
+        parameter_samples=parameter_samples,
+        num_steps_forecast=num_forecast_steps)
+
+    reference_forecast_mean = self.evaluate(
+        reference_forecast_dist.mean()[..., 0])
+    reference_forecast_stddev = self.evaluate(
+        reference_forecast_dist.stddev()[..., 0])
+
+    self.assertAllClose(predictive_mean[..., -num_forecast_steps:],
+                        reference_forecast_mean,
+                        atol=1.0 if use_slope else 0.3)
+    self.assertAllClose(predictive_stddev[..., -num_forecast_steps:],
+                        reference_forecast_stddev,
+                        atol=2.0 if use_slope else 1.0)
 
   @parameterized.named_parameters(
       {'testcase_name': 'float32_xla', 'dtype': tf.float32, 'use_xla': True},
@@ -131,7 +176,7 @@ class GibbsSamplerTests(test_util.TestCase):
         batch_shape=[3],
         prior_class=gibbs_sampler.XLACompilableInverseGamma)
 
-    @tf.function(experimental_compile=use_xla)
+    @tf.function(jit_compile=use_xla)
     def do_sampling(observed_time_series, is_missing):
       return gibbs_sampler.fit_with_gibbs_sampling(
           model, tfp.sts.MaskedTimeSeries(
@@ -192,7 +237,7 @@ class GibbsSamplerTests(test_util.TestCase):
 
     bad_model.supports_gibbs_sampling = True
     with self.assertRaisesRegexp(
-        ValueError, 'parameters .* do not match the expected sampler state'):
+        ValueError, 'Expected the first model component to be an instance of'):
       gibbs_sampler.fit_with_gibbs_sampling(bad_model, observed_time_series)
 
     bad_model_with_correct_params = tfp.sts.Sum([
@@ -211,14 +256,16 @@ class GibbsSamplerTests(test_util.TestCase):
       gibbs_sampler.fit_with_gibbs_sampling(bad_model_with_correct_params,
                                             observed_time_series)
 
-  def test_sampled_level_has_correct_marginals(self):
+  @parameterized.named_parameters(
+      {'testcase_name': 'LocalLinearTrend', 'use_slope': True},
+      {'testcase_name': 'LocalLevel', 'use_slope': False})
+  def test_sampled_latents_have_correct_marginals(self, use_slope):
     seed = test_util.test_seed(sampler_type='stateless')
     residuals_seed, is_missing_seed, level_seed = samplers.split_seed(
         seed, 3, 'test_sampled_level_has_correct_marginals')
 
     num_timesteps = 10
-    initial_state_prior = tfd.MultivariateNormalDiag(loc=[-30.],
-                                                     scale_diag=[100.])
+
     observed_residuals = samplers.normal(
         [3, 1, num_timesteps], seed=residuals_seed)
     is_missing = samplers.uniform(
@@ -226,29 +273,52 @@ class GibbsSamplerTests(test_util.TestCase):
     level_scale = 1.5 * tf.ones([3, 1])
     observation_noise_scale = 0.2 * tf.ones([3, 1])
 
-    ssm = tfp.sts.LocalLevelStateSpaceModel(
-        num_timesteps=num_timesteps,
-        initial_state_prior=initial_state_prior,
-        observation_noise_scale=observation_noise_scale,
-        level_scale=level_scale)
+    if use_slope:
+      initial_state_prior = tfd.MultivariateNormalDiag(loc=[-30., 2.],
+                                                       scale_diag=[1., 0.2])
+      slope_scale = 0.5 * tf.ones([3, 1])
+      ssm = tfp.sts.LocalLinearTrendStateSpaceModel(
+          num_timesteps=num_timesteps,
+          initial_state_prior=initial_state_prior,
+          observation_noise_scale=observation_noise_scale,
+          level_scale=level_scale,
+          slope_scale=slope_scale)
+    else:
+      initial_state_prior = tfd.MultivariateNormalDiag(loc=[-30.],
+                                                       scale_diag=[100.])
+      slope_scale = None
+      ssm = tfp.sts.LocalLevelStateSpaceModel(
+          num_timesteps=num_timesteps,
+          initial_state_prior=initial_state_prior,
+          observation_noise_scale=observation_noise_scale,
+          level_scale=level_scale)
 
     posterior_means, posterior_covs = ssm.posterior_marginals(
         observed_residuals[..., tf.newaxis], mask=is_missing)
-    level_samples = gibbs_sampler._resample_level(
+    latents_samples = gibbs_sampler._resample_latents(
         observed_residuals=observed_residuals,
         level_scale=level_scale,
+        slope_scale=slope_scale,
         observation_noise_scale=observation_noise_scale,
         initial_state_prior=initial_state_prior,
         is_missing=is_missing,
         sample_shape=10000,
         seed=level_seed)
 
-    posterior_means_, posterior_covs_, level_samples_ = self.evaluate((
-        posterior_means, posterior_covs, level_samples))
-    self.assertAllClose(np.mean(level_samples_, axis=0),
-                        posterior_means_[..., 0], atol=0.1)
-    self.assertAllClose(np.std(level_samples_, axis=0),
-                        np.sqrt(posterior_covs_[..., 0, 0]), atol=0.1)
+    (posterior_means_,
+     posterior_covs_,
+     latents_means_,
+     latents_covs_) = self.evaluate((
+         posterior_means,
+         posterior_covs,
+         tf.reduce_mean(latents_samples, axis=0),
+         tfp.stats.covariance(latents_samples,
+                              sample_axis=0,
+                              event_axis=-1)))
+    self.assertAllClose(latents_means_,
+                        posterior_means_, atol=0.1)
+    self.assertAllClose(latents_covs_,
+                        posterior_covs_, atol=0.1)
 
   def test_sampled_scale_follows_correct_distribution(self):
     strm = test_util.test_seed_stream()

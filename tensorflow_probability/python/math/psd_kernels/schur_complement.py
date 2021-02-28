@@ -21,8 +21,6 @@ from __future__ import print_function
 import functools
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.bijectors import cholesky_outer_product
-from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
@@ -203,6 +201,13 @@ class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
         Default value: `"SchurComplement"`
     """
     parameters = dict(locals())
+
+    # Delayed import to avoid circular dependency between `tfp.bijectors` and
+    # `tfp.math`
+    # pylint: disable=g-import-not-at-top
+    from tensorflow_probability.python.bijectors import cholesky_outer_product
+    from tensorflow_probability.python.bijectors import invert
+    # pylint: enable=g-import-not-at-top
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [base_kernel, fixed_inputs, diag_shift], tf.float32)

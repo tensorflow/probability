@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -34,9 +35,6 @@ class Ordered(bijector.Bijector):
 
   Both the domain and the codomain of the mapping is [-inf, inf], however,
   the input of the forward mapping must be strictly increasing.
-  The inverse of the bijector applied to a normal random vector `y ~ N(0, 1)`
-  gives back a sorted random vector with the same distribution `x ~ N(0, 1)`
-  where `x = sort(y)`
 
   On the last dimension of the tensor, Ordered bijector performs:
   `y[0] = x[0]`
@@ -45,14 +43,18 @@ class Ordered(bijector.Bijector):
   #### Example Use:
 
   ```python
-  bijector.Ordered().forward([2, 3, 4])
+  bijectors.Ordered().forward([2, 3, 4])
   # Result: [2., 0., 0.]
 
-  bijector.Ordered().inverse([0.06428002, -1.07774478, -0.71530371])
+  bijectors.Ordered().inverse([0.06428002, -1.07774478, -0.71530371])
   # Result: [0.06428002, 0.40464228, 0.8936858]
   ```
   """
 
+  @deprecation.deprecated(
+      "2021-01-09", "`Ordered` bijector is deprecated; please use "
+      "`tfb.Invert(tfb.Ascending())` instead.",
+      warn_once=True)
   def __init__(self, validate_args=False, name="ordered"):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
@@ -61,6 +63,10 @@ class Ordered(bijector.Bijector):
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()
 
   def _forward(self, x):
     with tf.control_dependencies(self._assertions(x)):

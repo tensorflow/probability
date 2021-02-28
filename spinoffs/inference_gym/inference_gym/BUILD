@@ -16,7 +16,7 @@
 #   A package for target densities and benchmarking of inference algorithms
 #   against the same.
 
-# [internal] load pytype.bzl (pytype_library, pytype_strict_library)
+# [internal] load pytype.bzl (pytype_strict_library)
 # [internal] load dummy dependency
 
 package(
@@ -27,8 +27,6 @@ package(
 )
 
 licenses(["notice"])
-
-exports_files(["LICENSE"])
 
 # This target is here for convenience. Link to one of the `using_*` targets to
 # minimize the number of dependencies.
@@ -44,7 +42,6 @@ py_library(
     ],
 )
 
-# pytype
 py_library(
     name = "using_numpy",
     srcs = ["using_numpy.py"],
@@ -58,7 +55,6 @@ py_library(
     ],
 )
 
-# pytype
 py_library(
     name = "using_jax",
     srcs = ["using_jax.py"],
@@ -73,7 +69,6 @@ py_library(
     ],
 )
 
-# pytype
 py_library(
     name = "using_tensorflow",
     srcs = ["using_tensorflow.py"],

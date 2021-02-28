@@ -42,10 +42,13 @@ class BlockwiseBijectorTest(test_util.TestCase):
   def testExplicitBlocks(self, dynamic_shape, batch_shape):
     block_sizes = tf.convert_to_tensor(value=[2, 1, 3])
     block_sizes = tf1.placeholder_with_default(
-        block_sizes, shape=None if dynamic_shape else block_sizes.shape)
+        block_sizes,
+        shape=([None] * len(block_sizes.shape)
+               if dynamic_shape else
+               block_sizes.shape))
     exp = tfb.Exp()
     sp = tfb.Softplus()
-    aff = tfb.Affine(scale_diag=[2., 3., 4.])
+    aff = tfb.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
     blockwise = tfb.Blockwise(
         bijectors=[exp, sp, aff],
         block_sizes=block_sizes,
@@ -120,7 +123,7 @@ class BlockwiseBijectorTest(test_util.TestCase):
           block_sizes, shape=block_sizes.shape)
     exp = tfb.Exp()
     sc = tfb.SoftmaxCentered()
-    aff = tfb.Affine(scale_diag=[2., 3., 4.])
+    aff = tfb.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
     blockwise = tfb.Blockwise(
         bijectors=[exp, sc, aff],
         block_sizes=block_sizes,
@@ -198,7 +201,7 @@ class BlockwiseBijectorTest(test_util.TestCase):
   def testBijectiveAndFinite(self):
     exp = tfb.Exp()
     sp = tfb.Softplus()
-    aff = tfb.Affine(scale_diag=[2., 3., 4.])
+    aff = tfb.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
     blockwise = tfb.Blockwise(bijectors=[exp, sp, aff], block_sizes=[2, 1, 3])
 
     x = tf.cast([0.1, 0.2, 0.3, 0.4, 0.5, 0.6], dtype=tf.float32)
@@ -216,17 +219,17 @@ class BlockwiseBijectorTest(test_util.TestCase):
   def testImplicitBlocks(self):
     exp = tfb.Exp()
     sp = tfb.Softplus()
-    aff = tfb.Affine(scale_diag=[2.])
+    aff = tfb.ScaleMatvecDiag(scale_diag=[2.])
     blockwise = tfb.Blockwise(bijectors=[exp, sp, aff])
     self.assertAllEqual(self.evaluate(blockwise.block_sizes), [1, 1, 1])
 
   def testName(self):
     exp = tfb.Exp()
     sp = tfb.Softplus()
-    aff = tfb.Affine(scale_diag=[2., 3., 4.])
+    aff = tfb.ScaleMatvecDiag(scale_diag=[2., 3., 4.])
     blockwise = tfb.Blockwise(bijectors=[exp, sp, aff], block_sizes=[2, 1, 3])
     self.assertStartsWith(blockwise.name,
-                          'blockwise_of_exp_and_softplus_and_affine')
+                          'blockwise_of_exp_and_softplus_and_scale_matvec_diag')
 
   def testNameOneBijector(self):
     exp = tfb.Exp()
@@ -236,11 +239,6 @@ class BlockwiseBijectorTest(test_util.TestCase):
   def testRaisesEmptyBijectors(self):
     with self.assertRaisesRegexp(ValueError, '`bijectors` must not be empty'):
       tfb.Blockwise(bijectors=[])
-
-  def testRaisesBadBijectors(self):
-    with self.assertRaisesRegexp(NotImplementedError,
-                                 'Only scalar and vector event-shape'):
-      tfb.Blockwise(bijectors=[tfb.Reshape(event_shape_out=[1, 1])])
 
   def testRaisesBadBlocks(self):
     with self.assertRaisesRegexp(
@@ -287,10 +285,10 @@ class BlockwiseBijectorTest(test_util.TestCase):
     blockwise.inverse_log_det_jacobian(
         x, event_ndims=1, inner0={'arg': 7}, inner1={'arg': 8})
 
-    bijectors[0]._forward.assert_called_with(mock.ANY, arg=1)
-    bijectors[1]._forward.assert_called_with(mock.ANY, arg=2)
-    bijectors[0]._inverse.assert_called_with(mock.ANY, arg=3)
-    bijectors[1]._inverse.assert_called_with(mock.ANY, arg=4)
+    bijectors[0]._forward.assert_any_call(mock.ANY, arg=1)
+    bijectors[1]._forward.assert_any_call(mock.ANY, arg=2)
+    bijectors[0]._inverse.assert_any_call(mock.ANY, arg=3)
+    bijectors[1]._inverse.assert_any_call(mock.ANY, arg=4)
     bijectors[0]._forward_log_det_jacobian.assert_called_with(mock.ANY, arg=5)
     bijectors[1]._forward_log_det_jacobian.assert_called_with(mock.ANY, arg=6)
     bijectors[0]._inverse_log_det_jacobian.assert_called_with(mock.ANY, arg=7)

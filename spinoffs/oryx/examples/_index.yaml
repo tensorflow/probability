@@ -49,6 +49,9 @@ landing_page:
     - heading: "A Tour of Oryx"
       image_path: /resources/images/tf-logo-card-16x9.png
       path: https://tensorflow.org/probability/oryx/notebooks/a_tour_of_oryx
+    - heading: "Probabilistic Programming"
+      image_path: /resources/images/tf-logo-card-16x9.png
+      path: https://tensorflow.org/probability/oryx/notebooks/probabilistic_programming
     - heading: "Oryx on GitHub"
       image_path: /resources/images/github-card-16x9.png
       path: https://github.com/tensorflow/probability/tree/master/spinoffs/oryx

@@ -32,6 +32,7 @@ from tensorflow_probability.python.bijectors import softplus
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -268,6 +269,17 @@ class SoftClip(bijector.Bijector):
         is_constant_jacobian=not components,
         name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        low=parameter_properties.ParameterProperties(),
+        high=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        hinge_softness=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
+
   @property
   def low(self):
     return self._low
@@ -288,15 +300,16 @@ class SoftClip(bijector.Bijector):
     return self._chain.forward(x)
 
   def _forward_log_det_jacobian(self, x):
-    return self._chain._forward_log_det_jacobian(x)  # pylint: disable=protected-access
+    return self._chain.forward_log_det_jacobian(x, self.forward_min_event_ndims)
 
   def _inverse(self, y):
     with tf.control_dependencies(self._assert_valid_inverse_input(y)):
-      return self._chain._inverse(y)  # pylint: disable=protected-access
+      return self._chain.inverse(y)  # pylint: disable=protected-access
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._assert_valid_inverse_input(y)):
-      return self._chain._inverse_log_det_jacobian(y)  # pylint: disable=protected-access
+      return self._chain.inverse_log_det_jacobian(
+          y, self.inverse_min_event_ndims)
 
   def _assert_valid_inverse_input(self, y):
     assertions = []

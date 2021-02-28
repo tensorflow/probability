@@ -136,6 +136,12 @@ class DtypeUtilTest(test_util.TestCase):
     with self.assertRaisesRegex(TypeError, 'Found incompatible dtypes'):
       dtype_util.convert_to_dtype(example_tensor, dtype, dtype_hint)
 
+  @parameterized.parameters(np.float16, np.float32, np.float64, tf.float16,
+                            tf.float32, tf.float64)
+  def testEps(self, dtype):
+    self.assertEqual(
+        dtype_util.eps(dtype).dtype, dtype_util.as_numpy_dtype(dtype))
+
 
 @test_util.test_all_tf_execution_regimes
 class FloatDTypeTest(test_util.TestCase):

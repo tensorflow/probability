@@ -22,12 +22,13 @@ import numpy as np
 import six
 
 import tensorflow.compat.v2 as tf
-
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -202,8 +203,21 @@ class Categorical(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(logits=1, probs=1)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        logits=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, [num_classes]], axis=0)),
+        probs=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, [num_classes]], axis=0),
+            default_constraining_bijector_fn=softmax_centered_bijector
+            .SoftmaxCentered,
+            is_preferred=False))
+    # pylint: enable=g-long-lambda
 
   @property
   def logits(self):
@@ -374,7 +388,10 @@ class Categorical(distribution.Distribution):
     assertions = []
     if not self.validate_args:
       return assertions
-    assertions.extend(distribution_util.assert_nonnegative_integer_form(x))
+    assertions.append(distribution_util.assert_casting_closed(
+        x, target_dtype=tf.int32))
+    assertions.append(assert_util.assert_non_negative(
+        x, message='Categorical samples must be non-negative.'))
     assertions.append(
         assert_util.assert_less_equal(
             x, tf.cast(self._num_categories(), x.dtype),
@@ -449,6 +466,7 @@ def _kl_categorical_categorical(a, b, name=None):
     a_logits = a._logits_parameter_no_checks()  # pylint:disable=protected-access
     b_logits = b._logits_parameter_no_checks()  # pylint:disable=protected-access
     return tf.reduce_sum(
-        (tf.math.softmax(a_logits) *
-         (tf.math.log_softmax(a_logits) - tf.math.log_softmax(b_logits))),
+        tf.math.multiply_no_nan(
+            tf.math.log_softmax(a_logits) - tf.math.log_softmax(b_logits),
+            tf.math.softmax(a_logits)),
         axis=-1)

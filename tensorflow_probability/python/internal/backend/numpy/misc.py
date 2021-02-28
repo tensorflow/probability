@@ -64,7 +64,8 @@ def _argsort(values, axis=-1, direction='ASCENDING', stable=False, name=None):  
     values = np.negative(values)
   else:
     raise ValueError('Unrecognized direction: {}.'.format(direction))
-  return np.argsort(values, axis, kind='stable' if stable else 'quicksort')
+  return np.argsort(
+      values, axis, kind='stable' if stable else 'quicksort').astype(np.int32)
 
 
 def _histogram_fixed_width(values, value_range, nbins=100, dtype=np.int32,

@@ -18,6 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
+import re
+
 
 import hypothesis as hp
 from hypothesis.extra import numpy as hpnp
@@ -38,6 +41,7 @@ INSTANTIABLE_BASE_KERNELS = {
     'MaternOneHalf': dict(amplitude=0, length_scale=0),
     'MaternThreeHalves': dict(amplitude=0, length_scale=0),
     'MaternFiveHalves': dict(amplitude=0, length_scale=0),
+    'Parabolic': dict(amplitude=0, length_scale=0),
     # TODO(b/146073659): Polynomial as currently configured often produces
     # numerically ill-conditioned matrices. Disabled until we can make it more
     # reliable in the context of hypothesis tests.
@@ -154,6 +158,26 @@ def kernel_input(
     if draw(hps.booleans()):
       result = tfp_hps.defer_and_count_usage(result)
   return result
+
+
+@contextlib.contextmanager
+def no_pd_errors():
+  """Catch and ignore examples where a Cholesky decomposition fails.
+
+  This will typically occur when the matrix is not positive definite.
+
+  Yields:
+    None
+  """
+  # TODO(b/174591555): Instead of catching and `assume`ing away positive
+  # definite errors, avoid them in the first place.
+  try:
+    yield
+  except tf.errors.InvalidArgumentError as e:
+    if re.search(r'Cholesky decomposition was not successful', str(e)):
+      hp.assume(False)
+    else:
+      raise
 
 
 @hps.composite

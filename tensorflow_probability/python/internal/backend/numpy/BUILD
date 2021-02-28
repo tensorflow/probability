@@ -23,8 +23,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "numpy",
     srcs = ["__init__.py"],
@@ -365,7 +363,7 @@ py_library(
 py_library(
     name = "numpy_testlib",
     testonly = 1,
-    srcs_version = "PY2AND3",
+    srcs_version = "PY3",
     deps = [
         ":numpy",
         # absl/testing:parameterized dep,
@@ -415,7 +413,12 @@ py_test(
     name = "xla_test_gpu",
     size = "small",
     srcs = ["numpy_test.py"],
-    args = ["--test_mode=xla"],
+    args = [
+        "--test_mode=xla",
+        # TODO(b/168718272): reduce_*([nan, nan], axis=0) (GPU)
+        # histogram_fixed_width_bins fails with f32([0.]), [0.0, 0.0], 2
+        "--xla_disabled=math.reduce_min,math.reduce_max,histogram_fixed_width_bins",
+    ],
     main = "numpy_test.py",
     python_version = "PY3",
     shard_count = 11,
@@ -555,6 +558,8 @@ py_test(
     srcs_version = "PY3",
     tags = [
         "no-oss-ci",
+        "notap",
+        "tfp-guitar",
     ],
     deps = [
         ":linear_operator_gen",

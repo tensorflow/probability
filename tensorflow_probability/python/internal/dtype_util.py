@@ -30,6 +30,7 @@ __all__ = [
     'base_dtype',
     'base_equal',
     'common_dtype',
+    'eps',
     'is_bool',
     'is_complex',
     'is_floating',
@@ -66,7 +67,7 @@ def as_numpy_dtype(dtype):
 
 def base_dtype(dtype):
   """Returns a non-reference `dtype` based on this `dtype`."""
-  dtype = tf.as_dtype(dtype)
+  dtype = None if dtype is None else tf.as_dtype(dtype)
   if hasattr(dtype, 'base_dtype'):
     return dtype.base_dtype
   return dtype
@@ -97,7 +98,7 @@ def common_dtype(args_list, dtype_hint=None):
         raise TypeError(
             'Found incompatible dtypes, {} and {}. Seen so far: {}'.format(
                 dtype, dt, seen))
-  return dtype_hint if dtype is None else base_dtype(dtype)
+  return base_dtype(dtype_hint) if dtype is None else base_dtype(dtype)
 
 
 def convert_to_dtype(tensor_or_dtype, dtype=None, dtype_hint=None):
@@ -124,6 +125,11 @@ def convert_to_dtype(tensor_or_dtype, dtype=None, dtype_hint=None):
   if not SKIP_DTYPE_CHECKS and dtype and not base_equal(dtype, dt):
     raise TypeError('Found incompatible dtypes, {} and {}.'.format(dtype, dt))
   return dt
+
+
+def eps(dtype):
+  """Returns the distance between 1 and the next largest representable value."""
+  return np.finfo(as_numpy_dtype(dtype)).eps
 
 
 def is_bool(dtype):

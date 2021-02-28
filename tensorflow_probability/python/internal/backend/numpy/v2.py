@@ -61,10 +61,10 @@ Assert = debugging.Assert
 
 def _function(func=None, input_signature=None, autograph=True,  # pylint: disable=unused-argument
               experimental_autograph_options=None,  # pylint: disable=unused-argument
-              experimental_relax_shapes=False, experimental_compile=None):  # pylint: disable=unused-argument
+              experimental_relax_shapes=False, jit_compile=None):  # pylint: disable=unused-argument
   """Like `tf.function`, for JAX."""
   transform = lambda fn: fn
-  if experimental_compile:
+  if jit_compile:
     if JAX_MODE:
       from jax import jit  # pylint: disable=g-import-not-at-top
 
@@ -96,7 +96,17 @@ def _function(func=None, input_signature=None, autograph=True,  # pylint: disabl
 
       transform = jit_decorator
     else:
-      raise NotImplementedError('Could not find compiler: Numpy only.')
+
+      # The decoration will succeed, but calling such a function will fail. This
+      # allows us to have jitted top-level functions in a module, as long as
+      # they aren't called in Numpy mode.
+      def decorator(f):
+        @functools.wraps(f)
+        def wrapped_f(*args, **kwargs):
+          raise NotImplementedError('Could not find compiler: Numpy only.')
+        return wrapped_f
+
+      transform = decorator
   # This code path is for the `foo = tf.function(foo, ...)` use case.
   if func is not None:
     return transform(func)
@@ -108,11 +118,30 @@ def _function(func=None, input_signature=None, autograph=True,  # pylint: disabl
   return transform
 
 
+class _SingleReplicaContext(object):
+  """Dummy replica context for numpy."""
+
+  @property
+  def replica_id_in_sync_group(self):
+    if JAX_MODE:
+      raise NotImplementedError
+    return 0
+
+  @property
+  def num_replicas_in_sync(self):
+    if JAX_MODE:
+      raise NotImplementedError
+    return 1
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
 compat = collections.namedtuple('compat', 'dimension_value')(
     lambda dim: None if dim is None else int(dim))
+
+distribute = collections.namedtuple('distribute', 'get_replica_context')(
+    _SingleReplicaContext)
 
 function = utils.copy_docstring(
     'tf.function',

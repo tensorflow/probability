@@ -18,13 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
 import functools
 import math
 # Dependency imports
 
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -34,51 +34,230 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 __all__ = [
     'RunningCentralMoments',
-    'RunningCentralMomentsState',
     'RunningCovariance',
-    'RunningCovarianceState',
     'RunningMean',
-    'RunningMeanState',
     'RunningPotentialScaleReduction',
-    'RunningPotentialScaleReductionState',
     'RunningVariance',
 ]
 
 
-RunningCovarianceState = collections.namedtuple(
-    'RunningCovarianceState', 'num_samples, mean, sum_squared_residuals')
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
+class RunningCovariance(auto_composite_tensor.AutoCompositeTensor):
+  """A running covariance computation.
 
+  The running covariance computation supports batching. The `event_ndims`
+  parameter indicates the number of trailing dimensions to treat as part of
+  the event, and to compute covariance across. The leading dimensions, if
+  any, are treated as batch shape, and no cross terms are computed.
 
-def _update_running_covariance(
-    state, new_sample, event_ndims, dtype, axis
-):
-  """Updates the streaming `state` with a `new_sample`."""
-  new_sample = tf.cast(new_sample, dtype=dtype)
-  if axis is not None:
-    chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
-    chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
-    chunk_delta_mean = new_sample - tf.expand_dims(chunk_mean, axis=axis)
-    chunk_sum_squared_residuals = tf.reduce_sum(
-        _batch_outer_product(chunk_delta_mean, event_ndims),
-        axis=axis
+  For example, if the incoming samples have shape `[5, 7]`, the `event_ndims`
+  selects among three different covariance computations:
+  - `event_ndims=0` treats the samples as a `[5, 7]` batch of scalar random
+    variables, and computes their variances in batch.  The shape of the result
+    is `[5, 7]`.
+  - `event_ndims=1` treats the samples as a `[5]` batch of vector random
+    variables of shape `[7]`, and computes their covariances in batch.  The
+    shape of the result is `[5, 7, 7]`.
+  - `event_ndims=2` treats the samples as a single random variable of
+    shape `[5, 7]` and computes its covariance.  The shape of the result
+    is `[5, 7, 5, 7]`.
+
+  `RunningCovariance` is meant to serve general streaming covariance needs.
+  For a specialized version that fits streaming over MCMC samples, see
+  `CovarianceReducer` in `tfp.experimental.mcmc`.
+  """
+
+  def __init__(self, num_samples, mean, sum_squared_residuals, event_ndims,
+               name='RunningCovariance'):
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype(
+          [num_samples, mean, sum_squared_residuals], dtype_hint=tf.float32)
+      self.num_samples = tf.convert_to_tensor(num_samples, dtype=dtype)
+      self.mean = tf.convert_to_tensor(mean, dtype=dtype)
+      self.sum_squared_residuals = tf.convert_to_tensor(
+          sum_squared_residuals, dtype=dtype)
+      self.event_ndims = event_ndims
+      self.name = name
+
+  @classmethod
+  def from_shape(cls, shape=(), dtype=tf.float32, event_ndims=None,
+                 name='RunningCovariance'):
+    """Starts a `RunningCovariance` from shape and dtype metadata.
+
+    Args:
+      shape: Python `Tuple` or `TensorShape` representing the shape of incoming
+        samples.  This is useful to supply if the `RunningCovariance` will be
+        carried by a `tf.while_loop`, so that broadcasting does not change the
+        shape across loop iterations.
+      dtype: Dtype of incoming samples and the resulting statistics.
+        By default, the dtype is `tf.float32`. Any integer dtypes will be
+        cast to corresponding floats (i.e. `tf.int32` will be cast to
+        `tf.float32`), as intermediate calculations should be performing
+        floating-point division.
+      event_ndims:  Number of dimensions that specify the event shape, from
+        the inner-most dimensions.  Specifying `None` returns all cross
+        product terms (no batching) and is the default.
+      name: Python `str` name prefixed to Ops created by this class.
+
+    Returns:
+      cov: An empty `RunningCovariance`, ready for incoming samples.
+
+    Raises:
+      ValueError: if `event_ndims` is greater than the rank of the intended
+        incoming samples (operation is extraneous).
+    """
+    dtype = _float_dtype_like(dtype)
+    event_ndims = _default_covariance_event_ndims(event_ndims, shape)
+    if event_ndims == 0:
+      extra_ndims_shape = ()
+    else:
+      # event_ndims cannot be None by this point
+      extra_ndims_shape = shape[-event_ndims:]  # pylint: disable=invalid-unary-operand-type
+    return cls(
+        num_samples=tf.zeros((), dtype=dtype),
+        mean=tf.zeros(shape, dtype=dtype),
+        sum_squared_residuals=tf.zeros(
+            ps.concat([shape, extra_ndims_shape], axis=0), dtype=dtype),
+        event_ndims=event_ndims,
+        name=name,
     )
-  else:
-    chunk_n = tf.ones((), dtype=dtype)
-    chunk_mean = new_sample
-    chunk_sum_squared_residuals = tf.zeros(
-        ps.shape(state.sum_squared_residuals),
-        dtype=dtype)
 
-  new_n = state.num_samples + chunk_n
-  delta_mean = chunk_mean - state.mean
-  new_mean = state.mean + chunk_n * delta_mean / new_n
-  all_pairwise_deltas = _batch_outer_product(
-      delta_mean, event_ndims)
-  adj_factor = state.num_samples * chunk_n / (state.num_samples + chunk_n)
-  new_sum_squared_residuals = (state.sum_squared_residuals
-                               + chunk_sum_squared_residuals
-                               + adj_factor * all_pairwise_deltas)
-  return RunningCovarianceState(new_n, new_mean, new_sum_squared_residuals)
+  @classmethod
+  def from_example(cls, example, event_ndims=None, name='RunningCovariance'):
+    """Starts a `RunningCovariance` from an example.
+
+    Args:
+      example: A `Tensor`.  The `RunningCovariance` will accept samples
+        of the same dtype and broadcast-compatible shape as the example.
+      event_ndims:  Number of dimensions that specify the event shape, from
+        the inner-most dimensions.  Specifying `None` returns all cross
+        product terms (no batching) and is the default.
+      name: Python `str` name prefixed to Ops created by this class.
+
+    Returns:
+      cov: An empty `RunningCovariance`, ready for incoming samples.  Note
+        that by convention, the supplied example is used only for
+        initialization, but not counted as a sample.
+
+    Raises:
+      ValueError: if `event_ndims` is greater than the rank of the example.
+    """
+    return cls.from_shape(
+        ps.shape(example), example.dtype, event_ndims=event_ndims, name=name)
+
+  def update(self, new_sample, axis=None):
+    """Update the `RunningCovariance` with a new sample.
+
+    The update formula is from Philippe Pebay (2008) [1]. This implementation
+    supports both batched and chunked covariance computation. A "batch" is the
+    usual parallel computation, namely a batch of size N implies N independent
+    covariance computations, each stepping one sample (or chunk) at a time. A
+    "chunk" of size M implies incorporating M samples into a single covariance
+    computation at once, which is more efficient than one by one.
+
+    To further illustrate the difference between batching and chunking, consider
+    the following example:
+
+    ```python
+    # treat as 3 samples from each of 5 independent vector random variables of
+    # shape (2,)
+    sample = tf.ones((3, 5, 2))
+    running_cov = tfp.experimental.stats.RunningCovariance.from_shape(
+        (5, 2), event_ndims=1)
+    running_cov = running_cov.update(sample, axis=0)
+    final_cov = running_cov.covariance()
+    final_cov.shape # (5, 2, 2)
+    ```
+
+    Args:
+      new_sample: Incoming sample with shape and dtype compatible with those
+        used to form this `RunningCovariance`.
+      axis: If chunking is desired, this is an integer that specifies the axis
+        with chunked samples. For individual samples, set this to `None`. By
+        default, samples are not chunked (`axis` is None).
+
+    Returns:
+      cov: Newly allocated `RunningCovariance` updated to include `new_sample`.
+
+    #### References
+    [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
+         Covariances and Arbitrary-Order Statistical Moments. _Technical Report
+         SAND2008-6212_, 2008.
+         https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
+    """
+    with tf.name_scope((self.name or 'RunningCovariance') + '.update'):
+      dtype = self.mean.dtype
+      new_sample = tf.cast(new_sample, dtype=dtype)
+      if axis is not None:
+        chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
+        chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
+        chunk_delta_mean = new_sample - tf.expand_dims(chunk_mean, axis=axis)
+        chunk_sum_squared_residuals = tf.reduce_sum(
+            _batch_outer_product(chunk_delta_mean, self.event_ndims),
+            axis=axis
+        )
+      else:
+        chunk_n = tf.ones((), dtype=dtype)
+        chunk_mean = new_sample
+        chunk_sum_squared_residuals = tf.zeros(
+            ps.shape(self.sum_squared_residuals),
+            dtype=dtype)
+
+      new_n = self.num_samples + chunk_n
+      delta_mean = chunk_mean - self.mean
+      new_mean = self.mean + chunk_n * delta_mean / new_n
+      all_pairwise_deltas = _batch_outer_product(
+          delta_mean, self.event_ndims)
+      adj_factor = self.num_samples * chunk_n / (self.num_samples + chunk_n)
+      new_sum_squared_residuals = (self.sum_squared_residuals
+                                   + chunk_sum_squared_residuals
+                                   + adj_factor * all_pairwise_deltas)
+      return type(self)(
+          new_n, new_mean, new_sum_squared_residuals, self.event_ndims)
+
+  def covariance(self, ddof=0):
+    """Returns the covariance accumulated so far.
+
+    Args:
+      ddof: Requested dynamic degrees of freedom for the covariance calculation.
+        For example, use `ddof=0` for population covariance and `ddof=1` for
+        sample covariance. Defaults to the population covariance.
+
+    Returns:
+      covariance: An estimate of the covariance.
+    """
+    with tf.name_scope((self.name or 'RunningCovariance') + '.covariance'):
+      ddof = tf.convert_to_tensor(ddof, dtype_hint=self.num_samples.dtype)
+      return self.sum_squared_residuals / (self.num_samples - ddof)
+
+  def __repr__(self):
+    return (
+        'RunningCovariance(\n'
+        f'    num_samples={self.num_samples!r},\n'
+        f'    mean={self.mean!r},\n'
+        f'    sum_sqared_residuals={self.sum_squared_residuals!r},\n'
+        f'    event_ndims={self.event_ndims!r})')
+
+
+def _default_covariance_event_ndims(event_ndims, shape):
+  """Try to default `event_ndims` to 'full covariance' for the given `shape`."""
+  shape = tf.TensorShape(shape)
+  if event_ndims is None:
+    if shape.rank is None:
+      raise ValueError('Cannot default to computing all covariances for '
+                       'samples of statically unknown rank.')
+    else:
+      event_ndims = shape.rank
+  if shape.rank is not None and event_ndims > shape.rank:
+    raise ValueError('Cannot calculate cross-products in {} dimensions for '
+                     'samples of rank {}'.format(event_ndims, len(shape)))
+  if event_ndims > 13:
+    # This 13 is because we use an einsum to construct the needed outer product
+    # in `_batch_outer_product`.  Each event dimension requires two distinct
+    # characters to represent, and we don't want to rely on `tf.einsum`
+    # supporting a larger alphabet than lower-case English letters.
+    raise ValueError('`event_ndims` over 13 not supported')
+  return event_ndims
 
 
 def _batch_outer_product(target, event_ndims):
@@ -114,210 +293,136 @@ def _batch_outer_product(target, event_ndims):
   return tf.einsum(einsum_formula, target, target)
 
 
-class RunningCovariance(object):
-  """Holds metadata for and facilitates covariance computation.
-
-  `RunningCovariance` objects do not hold state information. That information,
-  which includes intermediate calculations, are held in a
-  `RunningCovarianceState` as returned via `initialize` and `update` method
-  calls.
-
-  The running covariance computation supports batching. The `event_ndims`
-  parameter indicates the number of trailing dimensions to treat as part of
-  the event, and to compute covariance across. The leading dimensions, if
-  any, are treated as batch shape, and no cross terms are computed.
-
-  For example, if the incoming samples have shape `[5, 7]`, the `event_ndims`
-  selects among three different covariance computations:
-  - `event_ndims=0` treats the samples as a `[5, 7]` batch of scalar random
-    variables, and computes their variances in batch.  The shape of the result
-    is `[5, 7]`.
-  - `event_ndims=1` treats the samples as a `[5]` batch of vector random
-    variables of shape `[7]`, and computes their covariances in batch.  The
-    shape of the result is `[5, 7, 7]`.
-  - `event_ndims=2` treats the samples as a single random variable of
-    shape `[5, 7]` and computes its covariance.  The shape of the result
-    is `[5, 7, 5, 7]`.
-
-  `RunningCovariance` is meant to serve general streaming covariance needs.
-  For a specialized version that fits streaming over MCMC samples, see
-  `CovarianceReducer` in `tfp.experimental.mcmc`.
-  """
-
-  def __init__(self, shape, event_ndims=None, dtype=tf.float32):
-    """Instantiates this object.
-
-    Args:
-      shape: Python `Tuple` or `TensorShape` representing the shape of
-        incoming samples.
-      event_ndims:  Number of dimensions that specify the event shape, from
-        the inner-most dimensions.  Specifying `None` returns all cross
-        product terms (no batching) and is the default.
-      dtype: Dtype of incoming samples and the resulting statistics.
-        By default, the dtype is `tf.float32`. Any integer dtypes will be
-        cast to corresponding floats (i.e. `tf.int32` will be cast to
-        `tf.float32`), as intermediate calculations should be performing
-        floating-point division.
-
-    Raises:
-      ValueError: if `event_ndims` is greater than the rank of the intended
-        incoming samples (operation is extraneous).
-    """
-    if event_ndims is None:
-      event_ndims = len(shape)
-    if event_ndims > len(shape):
-      raise ValueError('Cannot calculate cross-products in {} dimensions for '
-                       'samples of rank {}'.format(event_ndims, len(shape)))
-    if event_ndims > 13:
-      raise ValueError('`event_ndims` over 13 not supported')
-    self.shape = shape
-    self.event_ndims = event_ndims
-    if dtype is tf.int64:
-      dtype = tf.float64
-    elif dtype.is_integer:
-      dtype = tf.float32
-    self.dtype = dtype
-
-  def initialize(self):
-    """Initializes a `RunningCovarianceState` using previously defined metadata.
-
-    Returns:
-      state: `RunningCovarianceState` representing a stream of no inputs.
-    """
-    # we need a secondary `RunningCovarianceState` so that future calls to
-    # `update` are compatible with `tf.while_loop`. Namely, we need to
-    # somehow store the `event_ndims` and `dtype` without explicitly passing or
-    # returning them from a `tf.while_loop`
-    if self.event_ndims == 0:
-      extra_ndims_shape = ()
-    else:
-      extra_ndims_shape = self.shape[-self.event_ndims:]  # pylint: disable=invalid-unary-operand-type
-    return RunningCovarianceState(
-        num_samples=tf.zeros((), dtype=self.dtype),
-        mean=tf.zeros(self.shape, dtype=self.dtype),
-        sum_squared_residuals=tf.zeros(
-            self.shape + extra_ndims_shape, dtype=self.dtype),
-    )
-
-  def update(self, state, new_sample, axis=None):
-    """Update the `RunningCovarianceState` with a new sample.
-
-    The update formula is from Philippe Pebay (2008) [1]. This implementation
-    supports both batched and chunked covariance computation. A "batch" is the
-    usual parallel computation, namely a batch of size N implies N independent
-    covariance computations, each stepping one sample (or chunk) at a time. A
-    "chunk" of size M implies incorporating M samples into a single covariance
-    computation at once, which is more efficient than one by one.
-
-    To further illustrate the difference between batching and chunking, consider
-    the following example:
-
-    ```python
-    # treat as 3 samples from each of 5 independent vector random variables of
-    # shape (2,)
-    sample = tf.ones((3, 5, 2))
-    running_cov = tfp.experimental.stats.RunningCovariance(
-        (5, 2), event_ndims=1)
-    state = running_cov.initialize()
-    state = running_cov.update(state, sample, axis=0)
-    final_cov = running_cov.finalize(state)
-    final_cov.shape # (5, 2, 2)
-    ```
-
-    Args:
-      state: `RunningCovarianceState` that represents the current state of
-        running statistics.
-      new_sample: Incoming sample with shape and dtype compatible with those
-        used to form the `RunningCovarianceState`.
-      axis: If chunking is desired, this is an integer that specifies the axis
-        with chunked samples. For individual samples, set this to `None`. By
-        default, samples are not chunked (`axis` is None).
-
-    Returns:
-      state: `RunningCovarianceState` with updated calculations.
-
-    #### References
-    [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
-         Covariances and Arbitrary-Order Statistical Moments. _Technical Report
-         SAND2008-6212_, 2008.
-         https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
-    """
-    updated_state = _update_running_covariance(
-        state, new_sample, self.event_ndims, self.dtype, axis)
-    return state._replace(**updated_state._asdict())
-
-  def finalize(self, state, ddof=0):
-    """Finalizes running covariance computation for the `state`.
-
-    Args:
-      state: `RunningCovarianceState` that represents the current state of
-        running statistics.
-      ddof: Requested dynamic degrees of freedom for the covariance calculation.
-        For example, use `ddof=0` for population covariance and `ddof=1` for
-        sample covariance. Defaults to the population covariance.
-
-    Returns:
-      covariance: An estimate of the covariance.
-    """
-    return state.sum_squared_residuals / (state.num_samples - ddof)
+def _float_dtype_like(dtype):
+  if dtype is tf.int64:
+    return tf.float64
+  if dtype.is_integer:
+    return tf.float32
+  return dtype
 
 
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
 class RunningVariance(RunningCovariance):
-  """Holds metadata for and facilitates variance computation.
+  """A running variance computation.
 
-  `RunningVariance` objects do not hold state information. That information,
-  which includes intermediate calculations, are held in a
-  `RunningCovarianceState` as returned via `initialize` and `update` method
-  calls.
+  This is just an alias for `RunningCovariance`, with the `event_ndims` set to 0
+  to compute variances.
 
   `RunningVariance` is meant to serve general streaming variance needs.
   For a specialized version that fits streaming over MCMC samples, see
   `VarianceReducer` in `tfp.experimental.mcmc`.
   """
 
-  def __init__(self, shape=(), dtype=tf.float32):
-    """A `RunningVariance` object holds metadata for variance computation.
-
-    This is a special case of `RunningCovariance` with `event_ndims=0`,
-    provided for convenience.
+  @classmethod
+  def from_shape(cls, shape=(), dtype=tf.float32):
+    """Starts a `RunningVariance` from shape and dtype metadata.
 
     Args:
-      shape: Python `Tuple` or `TensorShape` representing the shape of
-        incoming samples. By default, the shape is assumed to be scalar.
+      shape: Python `Tuple` or `TensorShape` representing the shape of incoming
+        samples.  This is useful to supply if the `RunningVariance` will be
+        carried by a `tf.while_loop`, so that broadcasting does not change the
+        shape across loop iterations.
       dtype: Dtype of incoming samples and the resulting statistics.
         By default, the dtype is `tf.float32`. Any integer dtypes will be
         cast to corresponding floats (i.e. `tf.int32` will be cast to
         `tf.float32`), as intermediate calculations should be performing
         floating-point division.
+
+    Returns:
+      var: An empty `RunningCovariance`, ready for incoming samples.
     """
-    super(RunningVariance, self).__init__(shape, event_ndims=0, dtype=dtype)
+    return super().from_shape(shape, dtype, event_ndims=0)
+
+  @classmethod
+  def from_example(cls, example):
+    """Starts a `RunningVariance` from an example.
+
+    Args:
+      example: A `Tensor`.  The `RunningVariance` will accept samples
+        of the same dtype and broadcast-compatible shape as the example.
+
+    Returns:
+      var: An empty `RunningVariance`, ready for incoming samples.  Note
+        that by convention, the supplied example is used only for
+        initialization, but not counted as a sample.
+    """
+    return super().from_example(example, event_ndims=0)
+
+  def variance(self, ddof=0):
+    """Returns the variance accumulated so far.
+
+    Args:
+      ddof: Requested dynamic degrees of freedom for the variance calculation.
+        For example, use `ddof=0` for population variance and `ddof=1` for
+        sample variance. Defaults to the population variance.
+
+    Returns:
+      variance: An estimate of the variance.
+    """
+    return self.covariance(ddof)
+
+  @classmethod
+  def from_stats(cls, num_samples, mean, variance):
+    """Initialize a `RunningVariance` object with given stats.
+
+    This allows the user to initialize knowing the mean, variance, and number
+    of samples seen so far.
+
+    Args:
+      num_samples: Scalar `float` `Tensor`, for number of examples already seen.
+      mean: `float` `Tensor`, for starting mean of estimate.
+      variance: `float` `Tensor`, for starting estimate of the variance.
+
+    Returns:
+      `RunningVariance` object, with given mean and variance estimate.
+    """
+    # TODO(b/173736911): Add this to RunningCovariance
+    num_samples = tf.convert_to_tensor(num_samples, name='num_samples')
+    mean = tf.convert_to_tensor(mean, name='mean')
+    variance = tf.convert_to_tensor(variance, name='variance')
+    return cls(num_samples=num_samples,
+               mean=mean,
+               sum_squared_residuals=num_samples * variance,
+               event_ndims=0)
+
+  def __repr__(self):
+    return (
+        'RunningVariance(\n'
+        f'    num_samples={self.num_samples!r},\n'
+        f'    mean={self.mean!r},\n'
+        f'    sum_sqared_residuals={self.sum_squared_residuals!r})')
 
 
-RunningMeanState = collections.namedtuple(
-    'RunningMeanState', 'num_samples, mean')
-
-
-class RunningMean(object):
-  """Holds metadata for and computes a running mean.
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
+class RunningMean(auto_composite_tensor.AutoCompositeTensor):
+  """Computes a running mean.
 
   In computation, samples can be provided individually or in chunks. A
   "chunk" of size M implies incorporating M samples into a single expectation
-  computation at once, which is more efficient than one by one. If more than one
-  sample is accepted and chunking is enabled, the chunked `axis` will define
-  chunking semantics for all samples.
-
-  `RunningMean` objects do not hold state information. That information,
-  which includes intermediate calculations, are held in a
-  `RunningMeanState` as returned via `initialize` and `update` method
-  calls.
+  computation at once, which is more efficient than one by one.
 
   `RunningMean` is meant to serve general streaming expectations.
   For a specialized version that fits streaming over MCMC samples, see
   `ExpectationsReducer` in `tfp.experimental.mcmc`.
   """
 
-  def __init__(self, shape, dtype=tf.float32):
-    """Instantiates this object.
+  def __init__(self, num_samples, mean):
+    """Instantiates a `RunningMean`.
+
+    Support batch accumulation of multiple independent running means.
+
+    Args:
+      num_samples: A `Tensor` counting the number of samples
+        accumulated so far.
+      mean: A `Tensor` broadcast-compatible with `num_samples` giving the
+        current mean.
+    """
+    self.num_samples = num_samples
+    self.mean = mean
+
+  @classmethod
+  def from_shape(cls, shape, dtype=tf.float32):
+    """Initialize an empty `RunningMean`.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
@@ -327,26 +432,32 @@ class RunningMean(object):
         cast to corresponding floats (i.e. `tf.int32` will be cast to
         `tf.float32`), as intermediate calculations should be performing
         floating-point division.
-    """
-    self.shape = shape
-    if dtype is tf.int64:
-      dtype = tf.float64
-    elif dtype.is_integer:
-      dtype = tf.float32
-    self.dtype = dtype
-
-  def initialize(self):
-    """Initializes an empty `RunningMeanState`.
 
     Returns:
-      state: `RunningMeanState` representing a stream of no inputs.
+      state: `RunningMean` representing a stream of no inputs.
     """
-    return RunningMeanState(
-        num_samples=tf.zeros((), dtype=self.dtype),
-        mean=tf.zeros(self.shape, self.dtype))
+    dtype = _float_dtype_like(dtype)
+    return cls(
+        num_samples=tf.zeros((), dtype=dtype),
+        mean=tf.zeros(shape, dtype))
 
-  def update(self, state, new_sample, axis=None):
-    """Update the `RunningMeanState` with a new sample.
+  @classmethod
+  def from_example(cls, example):
+    """Initialize an empty `RunningMean`.
+
+    Args:
+      example: A `Tensor`.  The `RunningMean` will accept samples
+        of the same dtype and broadcast-compatible shape as the example.
+
+    Returns:
+      state: `RunningMean` representing a stream of no inputs.  Note
+        that by convention, the supplied example is used only for
+        initialization, but not counted as a sample.
+    """
+    return cls.from_shape(ps.shape(example), example.dtype)
+
+  def update(self, new_sample, axis=None):
+    """Update the `RunningMean` with a new sample.
 
     The update formula is from Philippe Pebay (2008) [1] and is identical to
     that used to calculate the intermediate mean in
@@ -354,16 +465,14 @@ class RunningMean(object):
     `tfp.experimental.stats.RunningVariance`.
 
     Args:
-      state: `RunningMeanState` that represents the current state of
-        running statistics.
       new_sample: Incoming `Tensor` sample with shape and dtype compatible with
-        those used to form the `RunningMeanState`.
+        those used to form the `RunningMean`.
       axis: If chunking is desired, this is an integer that specifies the axis
         with chunked samples. For individual samples, set this to `None`. By
         default, samples are not chunked (`axis` is None).
 
     Returns:
-      state: `RunningMeanState` with updated calculations.
+      mean: `RunningMean` updated to the new sample.
 
     #### References
     [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
@@ -371,43 +480,30 @@ class RunningMean(object):
          SAND2008-6212_, 2008.
          https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
     """
+    dtype = self.mean.dtype
     new_sample = tf.nest.map_structure(
-        lambda new_sample: tf.cast(new_sample, dtype=self.dtype),
+        lambda new_sample: tf.cast(new_sample, dtype=dtype),
         new_sample)
     if axis is None:
-      chunk_n = tf.cast(1, dtype=self.dtype)
+      chunk_n = tf.constant(1, dtype=dtype)
       chunk_mean = new_sample
     else:
-      chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=self.dtype)
+      chunk_n = tf.cast(ps.shape(new_sample)[axis], dtype=dtype)
       chunk_mean = tf.math.reduce_mean(new_sample, axis=axis)
-    new_n = state.num_samples + chunk_n
-    delta_mean = chunk_mean - state.mean
-    new_mean = state.mean + chunk_n * delta_mean / new_n
-    return RunningMeanState(new_n, new_mean)
+    new_n = self.num_samples + chunk_n
+    delta_mean = chunk_mean - self.mean
+    new_mean = self.mean + chunk_n * delta_mean / new_n
+    return RunningMean(new_n, new_mean)
 
-  def finalize(self, state):
-    """Finalizes expectation computation for the `state`.
-
-    If the `finalized` method is invoked on a running state of no inputs,
-    `RunningMean` will return a corresponding structure of `tf.zeros`.
-
-    Args:
-      state: `RunningMeanState` that represents the current state of
-        running statistics.
-
-    Returns:
-      mean: An estimate of the mean.
-    """
-    return state.mean
+  def __repr__(self):
+    return ('RunningMean(\n'
+            f'    num_samples={self.num_samples!r},\n'
+            f'    mean={self.mean!r})')
 
 
-RunningCentralMomentsState = collections.namedtuple(
-    'RunningCentralMomentsState',
-    'mean_state, sum_exponentiated_residuals')
-
-
-class RunningCentralMoments(object):
-  """Holds metadata for and computes running central moments.
+@auto_composite_tensor.auto_composite_tensor
+class RunningCentralMoments(auto_composite_tensor.AutoCompositeTensor):
+  """Computes running central moments.
 
   `RunningCentralMoments` will compute arbitrary central moments in
   streaming fashion following the formula proposed by Philippe Pebay
@@ -420,11 +516,6 @@ class RunningCentralMoments(object):
   `RunningCentralMoments` cannot guarantee numerical stability for all
   moments.
 
-  `RunningCentralMoments` objects do not hold state information. That
-  information, which includes intermediate calculations, are held in a
-  `RunningCentralMomentsState` as returned via `initialize` and `update`
-  method calls.
-
   #### References
   [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
         Covariances and Arbitrary-Order Statistical Moments. _Technical Report
@@ -432,8 +523,28 @@ class RunningCentralMoments(object):
         https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
   """
 
-  def __init__(self, shape, moment, dtype=tf.float32):
-    """Instantiates this object.
+  def __init__(self, mean_state, exponentiated_residuals, desired_moments):
+    """Constructs a `RunningCentralMoments`.
+
+    All moments up to the maximum of the desired moments will be computed.
+
+    Args:
+      mean_state:  A `RunningMean` carrying the running mean estimate.
+      exponentiated_residuals: A `Tensor` representing the sum of exponentiated
+        residuals. This is a `Tensor` of shape `[max_moment - 1] +
+        mean_state.mean.shape`, which contains the sum of the residuals raised
+        to the kth power, for all `2 <= k <= max_moment`.
+      desired_moments: A Python list of integers giving the moments to return.
+        The maximum element of this list gives the number of moments that
+        will be computed.
+    """
+    self.mean_state = mean_state
+    self.exponentiated_residuals = exponentiated_residuals
+    self.desired_moments = desired_moments
+
+  @classmethod
+  def from_shape(cls, shape, moment, dtype=tf.float32):
+    """Returns an empty `RunningCentralMoments`.
 
     Args:
       shape: Python `Tuple` or `TensorShape` representing the shape of
@@ -445,125 +556,131 @@ class RunningCentralMoments(object):
         cast to corresponding floats (i.e. `tf.int32` will be cast to
         `tf.float32`), as intermediate calculations should be performing
         floating-point division.
+
+    Returns:
+      state: `RunningCentralMoments` representing a stream of no
+        inputs.
     """
-    self.shape = shape
     if isinstance(moment, (tuple, list, np.ndarray)):
       # we want to support numpy arrays too, but must convert to a list to not
       # confuse `tf.nest.map_structure` in `finalize`
-      self.moment = list(moment)
-      self.max_moment = max(self.moment)
+      desired_moments = list(moment)
+      max_moment = max(desired_moments)
     else:
-      self.moment = moment
-      self.max_moment = moment
-    if dtype is tf.int64:
-      dtype = tf.float64
-    elif dtype.is_integer:
-      dtype = tf.float32
-    self.dtype = dtype
-    self.mean_stream = RunningMean(
-        self.shape, self.dtype
-    )
+      desired_moments = [moment]
+      max_moment = moment
+    dtype = _float_dtype_like(dtype)
+    return cls(
+        mean_state=RunningMean.from_shape(shape, dtype),
+        exponentiated_residuals=tf.zeros(
+            ps.concat([(max_moment - 1,), shape], axis=0), dtype),
+        desired_moments=desired_moments)
 
-  def initialize(self):
-    """Initializes an empty `RunningCentralMomentsState`.
-
-    The `RunningCentralMomentsState` contains a `RunningMeanState` and
-    a `Tensor` representing the sum of exponentiated residuals. The sum
-    of exponentiated residuals is a `Tensor` of shape
-    (`self.max_moment - 1`, `self.shape`), which contains the sum of
-    residuals raised to the nth power, for all `2 <= n <= self.max_moment`.
-
-    Returns:
-      state: `RunningCentralMomentsState` representing a stream of no
-        inputs.
-    """
-    return RunningCentralMomentsState(
-        mean_state=self.mean_stream.initialize(),
-        sum_exponentiated_residuals=tf.zeros(
-            (self.max_moment - 1,) + self.shape, self.dtype),
-    )
-
-  def update(self, state, new_sample):
-    """Update the `RunningCentralMomentsState` with a new sample.
+  @classmethod
+  def from_example(cls, example, moment):
+    """Initialize an empty `RunningCentralMoments`.
 
     Args:
-      state: `RunningCentralMomentsState` that represents the current
-        state of running statistics.
-      new_sample: Incoming `Tensor` sample with shape and dtype compatible with
-        those used to form the `RunningCentralMomentsState`.
+      example: A `Tensor`.  The `RunningCentralMoments` will accept
+        samples of the same dtype and broadcast-compatible shape as
+        the example.
+      moment: Integer or iterable of integers that represent the
+        desired moments to return.
 
     Returns:
-      state: `RunningCentralMomentsState` with updated calculations.
+      state: `RunningCentralMoments` representing a stream of no
+        inputs.  Note that by convention, the supplied example is used
+        only for initialization, but not counted as a sample.
     """
+    return cls.from_shape(ps.shape(example), moment, example.dtype)
+
+  def update(self, new_sample):
+    """Update with a new sample.
+
+    Args:
+      new_sample: Incoming `Tensor` sample with shape and dtype compatible with
+        those used to form the `RunningCentralMoments`.
+
+    Returns:
+      state: `RunningCentralMoments` updated to include the new sample.
+    """
+    shape = self.mean_state.mean.shape
+    dtype = self.mean_state.mean.dtype
     n_2 = 1
-    n_1 = state.mean_state.num_samples
-    n = tf.cast(n_1 + n_2, dtype=self.dtype)
-    delta_mean = new_sample - state.mean_state.mean
-    new_mean_state = self.mean_stream.update(state.mean_state, new_sample)
-    old_res = tf.concat([
-        tf.zeros((1,) + self.shape, self.dtype),
-        state.sum_exponentiated_residuals], axis=0)
-    # the sum of exponentiated residuals can be thought of as an estimation
-    # of the central moment before diving through by the number of samples.
+    n_1 = self.mean_state.num_samples
+    n = tf.cast(n_1 + n_2, dtype=dtype)
+    delta_mean = new_sample - self.mean_state.mean
+    new_mean_state = self.mean_state.update(new_sample)
+    # The sum of exponentiated residuals can be thought of as an estimation
+    # of the central moment before dividing through by the number of samples.
     # Since the first central moment is always 0, it simplifies update
     # logic to prepend an appropriate structure of zeros.
-    new_sum_exponentiated_residuals = [tf.zeros(self.shape, self.dtype)]
+    old_res = tf.concat([
+        tf.zeros(ps.concat([(1,), shape], axis=0), dtype),
+        self.exponentiated_residuals], axis=0)
+    # Not storing said zeros in the carried state, though
+    new_exponentiated_residuals = []
 
     # the following two nested for loops calculate equation 2.9 in Pebay's
     # 2008 paper from smallest moment to highest.
-    for p in range(2, self.max_moment + 1):
-      summation = tf.zeros(self.shape, self.dtype)
+    max_moment = max(self.desired_moments)
+    for p in range(2, max_moment + 1):
+      summation = tf.zeros(shape, dtype)
       for k in range(1, p - 1):
         adjusted_old_res = ((-delta_mean / n) ** k) * old_res[p - k - 1]
-        summation += self._n_choose_k(p, k) * adjusted_old_res
+        summation += _n_choose_k(p, k) * adjusted_old_res
       # the `adj_term` refers to the final term in equation 2.9 and is not
       # transcribed exactly; rather, it's simplified to avoid having a
       # `(n - 1)` denominator.
       adj_term = (((delta_mean / n) ** p) * (n - 1) *
                   ((n - 1) ** (p - 1) + (-1) ** p))
-      new_sum_pth_residual = old_res[p - 1] + summation + adj_term
-      new_sum_exponentiated_residuals.append(new_sum_pth_residual)
+      new_pth_residual = old_res[p - 1] + summation + adj_term
+      new_exponentiated_residuals.append(new_pth_residual)
 
-    return RunningCentralMomentsState(
+    return RunningCentralMoments(
         new_mean_state,
-        sum_exponentiated_residuals=tf.convert_to_tensor(
-            new_sum_exponentiated_residuals[1:], dtype=self.dtype
-        )
-    )
+        # The cast is needed in case new_exponentiated_residuals is the empty
+        # list, which will happen if the user requested only the first moment.
+        exponentiated_residuals=tf.cast(
+            tf.stack(new_exponentiated_residuals, axis=0), dtype=dtype),
+        desired_moments=self.desired_moments)
 
-  def finalize(self, state):
-    """Finalizes streaming computation for all central moments.
-
-    Args:
-      state: `RunningCentralMomentsState` that represents the current state
-        of running statistics.
+  def moments(self):
+    """Returns the central moments represented by this `RunningCentralMoments`.
 
     Returns:
       all_moments: A `Tensor` representing estimates of the requested central
         moments. Its leading dimension indexes the moment, in order of those
-        requested (i.e. in order of `self.moment`).
+        requested (i.e. in order of `self.desired_moments`).
     """
     # prepend a structure of zeros for the first moment
+    shape = self.mean_state.mean.shape
+    dtype = self.mean_state.mean.dtype
     all_unfinalized_moments = tf.concat([
-        tf.zeros((1,) + self.shape, self.dtype),
-        state.sum_exponentiated_residuals], axis=0)
+        tf.zeros(ps.concat([(1,), shape], axis=0), dtype),
+        self.exponentiated_residuals], axis=0)
     all_moments = all_unfinalized_moments / tf.cast(
-        state.mean_state.num_samples, self.dtype)
-    return tf.convert_to_tensor(tf.nest.map_structure(
-        lambda i: all_moments[i - 1],
-        self.moment), self.dtype)
+        self.mean_state.num_samples, dtype)
+    desired_moment_indices = tf.convert_to_tensor(
+        self.desired_moments, dtype=tf.int32) - 1
+    return tf.gather(all_moments, desired_moment_indices)
 
-  def _n_choose_k(self, n, k):
-    """Computes nCk."""
-    return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
+  def __repr__(self):
+    return (
+        'RunningCentralMoments('
+        f'    mean_state={self.mean_state!r},\n'
+        f'    exponentiated_residuals={self.exponentiated_residuals!r},\n'
+        f'    desired_moments={self.desired_moments!r})')
 
 
-RunningPotentialScaleReductionState = collections.namedtuple(
-    'RunningPotentialScaleReductionState', 'chain_var')
+def _n_choose_k(n, k):
+  """Computes nCk."""
+  return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
 
 
-class RunningPotentialScaleReduction(object):
-  """Holds metadata for and computes a running R-hat diagnostic statistic.
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
+class RunningPotentialScaleReduction(auto_composite_tensor.AutoCompositeTensor):
+  """A running R-hat diagnostic.
 
   `RunningPotentialScaleReduction` uses Gelman and Rubin (1992)'s potential
   scale reduction (also known as R-hat) for chain convergence [1].
@@ -581,14 +698,9 @@ class RunningPotentialScaleReduction(object):
   independent chain dimensions is defined by the `independent_chain_ndims`
   parameter at initialization.
 
-  `RunningPotentialScaleReduction` objects do not hold state information. That
-  information, which includes intermediate calculations, are held in a
-  `RunningPotentialScaleReductionState` as returned via `initialize` and
-  `update` method calls.
-
   `RunningPotentialScaleReduction` is meant to serve general streaming R-hat.
   For a specialized version that fits streaming over MCMC samples, see
-  `RhatReducer` in `tfp.experimental.mcmc`.
+  `PotentialScaleReductionReducer` in `tfp.experimental.mcmc`.
 
   #### References
 
@@ -596,13 +708,32 @@ class RunningPotentialScaleReduction(object):
        Using Multiple Sequences. _Statistical Science_, 7(4):457-472, 1992.
   """
 
-  def __init__(self, shape, independent_chain_ndims, dtype=tf.float32):
-    """Instantiates this object.
+  def __init__(self, chain_variances, independent_chain_ndims):
+    """Construct a `RunningPotentialScaleReduction`.
 
     Args:
-      shape: Python `Tuple` or `TensorShape` representing the shape of
-        incoming samples. Using a collection implies that future samples
-        will mimic that exact structure.
+      chain_variances: A `RunningVariance` or nested structure of
+        `RunningVariance`s, giving the variance estimates for the variables of
+        interest.
+      independent_chain_ndims: A Python `int` or structure of Python `ints`
+        parallel to `chain_variances` giving the number of leading dimensions in
+        `chain_variances` that index the independent chains over which the
+        potential scale reduction factor should be computed.  Must be at least
+        1.
+    """
+    self.chain_variances = chain_variances
+    self.independent_chain_ndims = independent_chain_ndims
+
+  @classmethod
+  def from_shape(cls, shape=(), independent_chain_ndims=1, dtype=tf.float32):
+    """Starts an empty `RunningPotentialScaleReduction` from metadata.
+
+    Args:
+      shape: Python `Tuple` or `TensorShape` representing the shape of incoming
+        samples. Using a collection implies that future samples will mimic that
+        exact structure. This is useful to supply if the
+        `RunningPotentialScaleReduction` will be carried by a `tf.while_loop`,
+        so that broadcasting does not change the shape across loop iterations.
       independent_chain_ndims: Integer or Integer type `Tensor` with value
         `>= 1` giving the number of leading dimensions holding independent
         chain results to be tested for convergence. Using a collection
@@ -612,111 +743,108 @@ class RunningPotentialScaleReduction(object):
         cast to corresponding floats (i.e. `tf.int32` will be cast to
         `tf.float32`), as intermediate calculations should be performing
         floating-point division.
-    """
-    self.shape = shape
-    self.independent_chain_ndims = independent_chain_ndims
-    def _cast_dtype(dtype):
-      if dtype_util.as_numpy_dtype(dtype) is np.int64:
-        return tf.float64
-      elif dtype_util.is_integer(dtype):
-        return tf.float32
-      return dtype
-    self.dtype = tf.nest.map_structure(_cast_dtype, dtype)
-
-  def initialize(self):
-    """Initializes an empty `RunningPotentialScaleReductionState`.
 
     Returns:
-      state: `RunningPotentialScaleReductionState` representing a stream
+      state: `RunningPotentialScaleReduction` representing a stream
         of no inputs.
     """
-    def _initialize_for_one_state(shape, dtype):
-      """Initializes a running variance state for one group of Markov chains."""
-      var_stream = RunningVariance(shape, dtype=dtype)
-      return var_stream.initialize()
-    broadcasted_dtype = nest_util.broadcast_structure(
-        self.independent_chain_ndims, self.dtype)
-    chain_var = nest.map_structure_up_to(
-        self.independent_chain_ndims,
-        _initialize_for_one_state,
-        self.shape,
-        broadcasted_dtype,
-        check_types=False
-    )
-    return RunningPotentialScaleReductionState(chain_var)
+    dtype = tf.nest.map_structure(_float_dtype_like, dtype)
 
-  def update(self, state, new_sample):
-    """Update the `RunningPotentialScaleReductionState` with a new sample.
+    dtype = nest_util.broadcast_structure(independent_chain_ndims, dtype)
+    chain_variances = nest.map_structure_up_to(
+        independent_chain_ndims,
+        RunningVariance.from_shape,
+        shape,
+        dtype,
+        check_types=False)
+    return cls(chain_variances, independent_chain_ndims)
+
+  @classmethod
+  def from_example(cls, example, independent_chain_ndims=1):
+    """Starts an empty `RunningPotentialScaleReduction` from metadata.
 
     Args:
-      state: `RunningPotentialScaleReductionState` that represents the
-        current state of running statistics.
-      new_sample: Incoming `Tensor` sample or (possibly nested) collection of
-        `Tensor`s with shape and dtype compatible with those used to form the
-        `RunningPotentialScaleReductionState`.
+      example: A `Tensor`.  The `RunningPotentialScaleReduction` will
+        accept samples of the same dtype and broadcast-compatible
+        shape as the example.
+      independent_chain_ndims: Integer or Integer type `Tensor` with value
+        `>= 1` giving the number of leading dimensions holding independent
+        chain results to be tested for convergence. Using a collection
+        implies that future samples will mimic that exact structure.
 
     Returns:
-      state: `RunningPotentialScaleReductionState` with updated calculations.
+      state: `RunningPotentialScaleReduction` representing a stream of
+        no inputs.  Note that by convention, the supplied example is
+        used only for initialization, but not counted as a sample.
     """
-    def _update_for_one_state(
-        shape, dtype, chain_var, new_sample):
+    return cls.from_shape(
+        shape=ps.shape(example), dtype=example.dtype,
+        independent_chain_ndims=independent_chain_ndims)
+
+  def update(self, new_sample):
+    """Update the `RunningPotentialScaleReduction` with a new sample.
+
+    Args:
+      new_sample: Incoming `Tensor` sample or (possibly nested) collection of
+        `Tensor`s with shape and dtype compatible with those used to form the
+        `RunningPotentialScaleReduction`.
+
+    Returns:
+      state: `RunningPotentialScaleReduction` updated to include the new sample.
+    """
+    def _update_for_one_state(chain_variances, new_sample):
       """Updates the running variance for one group of Markov chains."""
       # TODO(axch): chunking could be reasonably added here by accepting and
       # including the chunked axis to the running variance object
-      var_stream = RunningVariance(shape, dtype=dtype)
-      return var_stream.update(chain_var, new_sample)
-    broadcasted_dtype = nest_util.broadcast_structure(
-        self.independent_chain_ndims, self.dtype)
-    updated_chain_vars = nest.map_structure_up_to(
-        self.independent_chain_ndims,
+      return chain_variances.update(new_sample)
+    updated_chain_variancess = tf.nest.map_structure(
         _update_for_one_state,
-        self.shape,
-        broadcasted_dtype,
-        state.chain_var,
+        self.chain_variances,
         new_sample,
         check_types=False
     )
-    return RunningPotentialScaleReductionState(updated_chain_vars)
+    return type(self)(updated_chain_variancess, self.independent_chain_ndims)
 
-  def finalize(self, state):
-    """Finalizes potential scale reduction computation for the `state`.
-
-    Args:
-      state: `RunningPotentialScaleReductionState` that represents
-        the current state of running statistics.
+  def potential_scale_reduction(self):
+    """Computes the potential scale reduction for samples accumulated so far.
 
     Returns:
       rhat: An estimate of the R-hat.
     """
-    def _finalize_for_one_state(shape, chain_ndims, chain_var):
+    def _finalize_for_one_state(chain_ndims, chain_variances):
       """Calculates R-hat for one group of Markov chains."""
       # using notation from Brooks and Gelman (1998),
       # n := num samples / chain; m := number of chains
-      n = chain_var.num_samples
+      n = chain_variances.num_samples
+      shape = chain_variances.mean.shape
       m = tf.cast(
           functools.reduce((lambda x, y: x * y), (shape[:chain_ndims])),
           n.dtype)
 
       # b/n is the between-chain variance (the variance of the chain means)
       b_div_n = diagnostic._reduce_variance(  # pylint:disable=protected-access
-          tf.convert_to_tensor(chain_var.mean),
+          tf.convert_to_tensor(chain_variances.mean),
           axis=tf.range(chain_ndims),
           biased=False)
 
       # W is the within sequence variance (the mean of the chain variances)
       sum_of_chain_squared_residuals = tf.reduce_sum(
-          chain_var.sum_squared_residuals, axis=tf.range(chain_ndims))
+          chain_variances.sum_squared_residuals, axis=tf.range(chain_ndims))
       w = sum_of_chain_squared_residuals / (m * (n - 1))
 
       # the `true_variance_estimate` is denoted as sigma^2_+ in the 1998 paper
       true_variance_estimate = ((n - 1) / n) * w + b_div_n
       return ((m + 1.) / m) * true_variance_estimate / w - (n - 1.) / (m * n)
 
-    return nest.map_structure_up_to(
-        self.independent_chain_ndims,
+    return tf.nest.map_structure(
         _finalize_for_one_state,
-        self.shape,
         self.independent_chain_ndims,
-        state.chain_var,
+        self.chain_variances,
         check_types=False
     )
+
+  def __repr__(self):
+    return (
+        'RunningPotentialScaleReduction(\n'
+        f'    chain_variances={self.chain_variances!r},\n'
+        f'    independent_chain_ndims={self.independent_chain_ndims!r})')

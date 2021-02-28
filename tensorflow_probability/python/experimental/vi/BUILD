@@ -31,17 +31,8 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":surrogate_posteriors",
+        "//tensorflow_probability/python/experimental/vi/util",
         "//tensorflow_probability/python/internal:all_util",
-    ],
-)
-
-py_library(
-    name = "parameter_constraints",
-    srcs = ["parameter_constraints.py"],
-    srcs_version = "PY3",
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
     ],
 )
 
@@ -50,13 +41,22 @@ py_library(
     srcs = ["surrogate_posteriors.py"],
     srcs_version = "PY3",
     deps = [
-        ":parameter_constraints",
-        # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/internal:nest_util",
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:beta",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution",
+        "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
+        "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
+        "//tensorflow_probability/python/distributions:joint_distribution_util",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/monte_carlo",
+        "//tensorflow_probability/python/util",
     ],
 )
 
@@ -65,7 +65,7 @@ py_test(
     size = "large",
     srcs = ["surrogate_posteriors_test.py"],
     python_version = "PY3",
-    shard_count = 5,
+    shard_count = 4,
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,

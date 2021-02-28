@@ -247,7 +247,6 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
     with ops.name_scope(name, values=graph_parents):
       super(LinearOperatorBlockDiag, self).__init__(
           dtype=dtype,
-          graph_parents=None,
           is_non_singular=is_non_singular,
           is_self_adjoint=is_self_adjoint,
           is_positive_definite=is_positive_definite,
@@ -302,7 +301,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
     # Dummy Tensor of zeros.  Will never be materialized.
     zeros = array_ops.zeros(shape=self.operators[0].batch_shape_tensor())
     for operator in self.operators[1:]:
-      zeros += array_ops.zeros(shape=operator.batch_shape_tensor())
+      zeros = zeros + array_ops.zeros(shape=operator.batch_shape_tensor())
     batch_shape = array_ops.shape(zeros)
 
     return array_ops.concat((batch_shape, matrix_shape), 0)
@@ -389,7 +388,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
 
     result_list = []
     for index, operator in enumerate(self.operators):
-      result_list += [operator.matmul(
+      result_list = result_list + [operator.matmul(
           split_x[index], adjoint=adjoint, adjoint_arg=adjoint_arg)]
 
     if blockwise_arg:
@@ -453,13 +452,13 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
   def _determinant(self):
     result = self.operators[0].determinant()
     for operator in self.operators[1:]:
-      result *= operator.determinant()
+      result = result * operator.determinant()
     return result
 
   def _log_abs_determinant(self):
     result = self.operators[0].log_abs_determinant()
     for operator in self.operators[1:]:
-      result += operator.log_abs_determinant()
+      result = result + operator.log_abs_determinant()
     return result
 
   def solve(self, rhs, adjoint=False, adjoint_arg=False, name="solve"):
@@ -556,7 +555,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
 
       solution_list = []
       for index, operator in enumerate(self.operators):
-        solution_list += [operator.solve(
+        solution_list = solution_list + [operator.solve(
             split_rhs[index], adjoint=adjoint, adjoint_arg=adjoint_arg)]
 
       if blockwise_arg:
@@ -633,7 +632,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
     diag_list = []
     for operator in self.operators:
       # Extend the axis for broadcasting.
-      diag_list += [operator.diag_part()[..., _ops.newaxis]]
+      diag_list = diag_list + [operator.diag_part()[..., _ops.newaxis]]
     diag_list = linear_operator_util.broadcast_matrix_batch_dims(diag_list)
     diagonal = array_ops.concat(diag_list, axis=-2)
     return array_ops.squeeze(diagonal, axis=-1)
@@ -641,7 +640,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
   def _trace(self):
     result = self.operators[0].trace()
     for operator in self.operators[1:]:
-      result += operator.trace()
+      result = result + operator.trace()
     return result
 
   def _to_dense(self):
@@ -657,7 +656,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
           [batch_row_shape, [num_cols]], axis=-1)
       zeros_to_pad_before = array_ops.zeros(
           shape=zeros_to_pad_before_shape, dtype=block.dtype)
-      num_cols += array_ops.shape(block)[-1]
+      num_cols = num_cols + array_ops.shape(block)[-1]
       zeros_to_pad_after_shape = array_ops.concat(
           [batch_row_shape,
            [self.domain_dimension_tensor() - num_cols]], axis=-1)
@@ -687,7 +686,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
     eig_list = []
     for operator in self.operators:
       # Extend the axis for broadcasting.
-      eig_list += [operator.eigvals()[..., _ops.newaxis]]
+      eig_list = eig_list + [operator.eigvals()[..., _ops.newaxis]]
     eig_list = linear_operator_util.broadcast_matrix_batch_dims(eig_list)
     eigs = array_ops.concat(eig_list, axis=-2)
     return array_ops.squeeze(eigs, axis=-1)

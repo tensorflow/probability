@@ -25,11 +25,13 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import exp as exp_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -144,8 +146,19 @@ class GammaGamma(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration=0, mixing_concentration=0, mixing_rate=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        mixing_concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        mixing_rate=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def concentration(self):
@@ -211,6 +224,13 @@ class GammaGamma(distribution.Distribution):
     log_unnormalized_prob = (tf.math.xlogy(concentration - 1., x) -
                              (concentration + mixing_concentration) *
                              tf.math.log(x + mixing_rate))
+    # The formula computes `nan` for `x == +inf`.  However, it shouldn't be too
+    # inaccurate for large finite `x`, because `x` only appears as `log(x)`, and
+    # `log` is effectively discountinuous at `+inf`.
+    log_unnormalized_prob = tf.where(
+        x >= np.inf,
+        tf.constant(-np.inf, dtype=log_unnormalized_prob.dtype),
+        log_unnormalized_prob)
 
     return log_unnormalized_prob - log_normalization
 

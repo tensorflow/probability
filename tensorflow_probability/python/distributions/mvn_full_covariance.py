@@ -19,15 +19,19 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import chain as chain_bijector
+from tensorflow_probability.python.bijectors import cholesky_outer_product as cholesky_outer_product_bijector
+from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-
+from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
-    "MultivariateNormalFullCovariance",
+    'MultivariateNormalFullCovariance',
 ]
 
 
@@ -35,7 +39,7 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
   """The multivariate normal distribution on `R^k`.
 
   The Multivariate Normal distribution is defined over `R^k` and parameterized
-  by a (batch of) length-`k` `loc` vector (aka "mu") and a (batch of) `k x k`
+  by a (batch of) length-`k` `loc` vector (aka 'mu') and a (batch of) `k x k`
   `covariance_matrix` matrices that are the covariance.
   This is different than the other multivariate normals, which are parameterized
   by a matrix more akin to the standard deviation.
@@ -83,17 +87,17 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
       loc=mu,
       covariance_matrix=cov)
 
-  mvn.mean().eval()
+  mvn.mean()
   # ==> [1., 2, 3]
 
   # Covariance agrees with covariance_matrix.
-  mvn.covariance().eval()
+  mvn.covariance()
   # ==> [[ 0.36,  0.12,  0.06],
   #      [ 0.12,  0.29, -0.13],
   #      [ 0.06, -0.13,  0.26]]
 
   # Compute the pdf of an observation in `R^3` ; return a scalar.
-  mvn.prob([-1., 0, 1]).eval()  # shape: []
+  mvn.prob([-1., 0, 1])  # shape: []
 
   # Initialize a 2-batch of 3-variate Gaussians.
   mu = [[1., 2, 3],
@@ -106,24 +110,24 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
   # Compute the pdf of two `R^3` observations; return a length-2 vector.
   x = [[-0.9, 0, 0.1],
        [-10, 0, 9]]     # shape: [2, 3]
-  mvn.prob(x).eval()    # shape: [2]
+  mvn.prob(x)    # shape: [2]
 
   ```
 
   """
 
   @deprecation.deprecated(
-      "2019-12-01",
-      "`MultivariateNormalFullCovariance` is deprecated, use "
-      "`MultivariateNormalTriL(loc=loc, "
-      "scale_tril=tf.linalg.cholesky(covariance_matrix))` instead.",
+      '2019-12-01',
+      '`MultivariateNormalFullCovariance` is deprecated, use '
+      '`MultivariateNormalTriL(loc=loc, '
+      'scale_tril=tf.linalg.cholesky(covariance_matrix))` instead.',
       warn_once=True)
   def __init__(self,
                loc=None,
                covariance_matrix=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="MultivariateNormalFullCovariance"):
+               name='MultivariateNormalFullCovariance'):
     """Construct Multivariate Normal distribution on `R^k`.
 
     The `batch_shape` is the broadcast shape between `loc` and
@@ -153,7 +157,7 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
         performance. When `False` invalid inputs may silently render incorrect
         outputs.
       allow_nan_stats: Python `bool`, default `True`. When `True`,
-        statistics (e.g., mean, mode, variance) use the value "`NaN`" to
+        statistics (e.g., mean, mode, variance) use the value '`NaN`' to
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
@@ -165,21 +169,21 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
 
     # Convert the covariance_matrix up to a scale_tril and call MVNTriL.
     with tf.name_scope(name) as name:
-      with tf.name_scope("init"):
+      with tf.name_scope('init'):
         dtype = dtype_util.common_dtype([loc, covariance_matrix], tf.float32)
         loc = loc if loc is None else tf.convert_to_tensor(
-            loc, name="loc", dtype=dtype)
+            loc, name='loc', dtype=dtype)
         if covariance_matrix is None:
           scale_tril = None
         else:
           covariance_matrix = tf.convert_to_tensor(
-              covariance_matrix, name="covariance_matrix", dtype=dtype)
+              covariance_matrix, name='covariance_matrix', dtype=dtype)
           if validate_args:
             covariance_matrix = distribution_util.with_dependencies([
                 assert_util.assert_near(
                     covariance_matrix,
                     tf.linalg.matrix_transpose(covariance_matrix),
-                    message="Matrix was not symmetric")
+                    message='Matrix was not symmetric')
             ], covariance_matrix)
           # No need to validate that covariance_matrix is non-singular.
           # LinearOperatorLowerTriangular has an assert_non_singular method that
@@ -196,5 +200,19 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
     self._parameters = parameters
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=1, covariance_matrix=2)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        covariance_matrix=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, sample_shape[-1:]], axis=0),
+            default_constraining_bijector_fn=(lambda: chain_bijector.Chain([
+                cholesky_outer_product_bijector.CholeskyOuterProduct(),
+                fill_scale_tril_bijector.FillScaleTriL(
+                    diag_shift=dtype_util.eps(dtype))
+            ]))))
+    # pylint: enable=g-long-lambda
+
+  _composite_tensor_nonshape_params = ('loc', 'covariance_matrix')

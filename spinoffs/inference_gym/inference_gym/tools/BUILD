@@ -23,8 +23,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 # We can't use strict/pytype because `cmdstanpy` is not available internally.
 py_binary(
     name = "get_ground_truth",

@@ -16,23 +16,12 @@
 from oryx.distributions import distribution_extensions
 from tensorflow_probability.substrates import jax as tfp
 
-__all__ = [
-    'distribution_extensions'
-]
-
-
 tfd = tfp.distributions
 
-_distributions = {}
+__all__ = tfd.__all__
 
-for name in dir(tfd):
+for name in __all__:
   dist = getattr(tfd, name)
-  _distributions[name] = dist
+  locals()[name] = dist
 
-
-for key, val in _distributions.items():
-  locals()[key] = val
-
-
-del _distributions
-del distribution_extensions  # Only needed for registration.
+del tfd

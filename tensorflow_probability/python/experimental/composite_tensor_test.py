@@ -93,10 +93,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     # pylint: enable=g-error-prone-assert-raises
 
   def test_basics_assertfails(self):
-    dist = normal_composite(0, 1, validate_args=True)
+    dist = normal_composite(0., 1., validate_args=True)
     flat = tf.nest.flatten(dist, expand_composites=True)
-    flat[1] = tf.constant(-1.)
-    with self.assertRaisesOpError('`scale` must be positive'):
+    flat[1] = tf.constant(2)
+    with self.assertRaises(TypeError):
       unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
       self.evaluate(unflat.log_prob(.5))
 
@@ -140,7 +140,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
       def __init__(self):
         self.loc = tf.Variable([0., 1.])
-        self.scale_adj = tf.Variable(0.)
+        self.scale_adj = tf.Variable([0.], shape=[None])
 
       @tf.function(input_signature=(normal_composite(0, [1, 2])._type_spec,))
       def make_dist(self, d):
@@ -161,11 +161,11 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.evaluate(m2.loc.assign(m2.loc + 2))
     self.evaluate(m2.make_dist(d).sample())
 
-    self.evaluate(m2.scale_adj.assign(-30.))
+    self.evaluate(m2.scale_adj.assign([1., 2., 3.]))
     tf.saved_model.save(m2, os.path.join(path, 'saved_model2'))
     m3 = tf.saved_model.load(os.path.join(path, 'saved_model2'))
     self.evaluate([v.initializer for v in (m3.loc, m3.scale_adj)])
-    with self.assertRaisesOpError('Argument `scale` must be positive'):
+    with self.assertRaisesOpError('compatible shape'):
       self.evaluate(m3.make_dist(d).sample())
 
   def test_import_uncached_class(self):
@@ -279,6 +279,77 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     log_prob_after = self.evaluate(unflat.log_prob(2.))
     self.assertEqual(log_prob_before, log_prob_after)
 
+  def test_multivariate_normal_linear_operator(self):
+    linop = tf.linalg.LinearOperatorIdentity(2)
+    d = tfd.MultivariateNormalLinearOperator(scale=linop)
+    sample = [-2.0, 3.0]
+    log_prob_before = self.evaluate(d.log_prob(sample))
+    dist = tfp.experimental.as_composite(d)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertAllEqual(log_prob_before, log_prob_after)
+
+  def test_multivariate_normal_linear_operator_diag(self):
+    linop = tf.linalg.LinearOperatorDiag([5.0, -6.0])
+    d = tfd.MultivariateNormalLinearOperator(scale=linop)
+    sample = [-2.0, 3.0]
+    log_prob_before = self.evaluate(d.log_prob(sample))
+    dist = tfp.experimental.as_composite(d)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertAllEqual(log_prob_before, log_prob_after)
+
+  def test_multivariate_normal_low_rank_update(self):
+    diag_operator = tf.linalg.LinearOperatorDiag([1., 2., 3.],
+                                                 is_non_singular=True,
+                                                 is_self_adjoint=True,
+                                                 is_positive_definite=True)
+    operator = tf.linalg.LinearOperatorLowRankUpdate(
+        base_operator=diag_operator,
+        u=[[1., 2.], [-1., 3.], [0., 0.]],
+        diag_update=[11., 12.],
+        v=[[1., 2.], [-1., 3.], [10., 10.]])
+    d = tfd.MultivariateNormalLinearOperator(scale=operator)
+    sample = [-2.0, 3.0, -4.0]
+    log_prob_before = self.evaluate(d.log_prob(sample))
+    dist = tfp.experimental.as_composite(d)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertAllEqual(log_prob_before, log_prob_after)
+
+  def test_multivariate_normal_linear_operator_inversion(self):
+    operator = tf.linalg.LinearOperatorFullMatrix([[1., -2.], [-3., 4.]])
+    operator_inv = tf.linalg.LinearOperatorInversion(operator)
+    d = tfd.MultivariateNormalLinearOperator(scale=operator_inv)
+    sample = [-2.0, 3.0]
+    log_prob_before = self.evaluate(d.log_prob(sample))
+    dist = tfp.experimental.as_composite(d)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertAllEqual(log_prob_before, log_prob_after)
+
+  def test_multivariate_normal_tril(self):
+    mu = [1., 2, 3]
+    cov = [[0.36, 0.12, 0.06], [0.12, 0.29, -0.13], [0.06, -0.13, 0.26]]
+    scale = tf.linalg.cholesky(cov)
+    d = tfd.MultivariateNormalTriL(loc=mu, scale_tril=scale)
+    sample = [-2.0, 3.0, -4.0]
+    log_prob_before = self.evaluate(d.log_prob(sample))
+    dist = tfp.experimental.as_composite(d)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertAllEqual(log_prob_before, log_prob_after)
+
   def test_independent(self):
     fd = tfd.Independent(
         distribution=tfd.Normal(loc=[-1., 1], scale=[0.1, 0.5]),
@@ -291,6 +362,32 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.evaluate(unflat.sample())
     log_prob_after = self.evaluate(unflat.log_prob(sample))
     self.assertEqual(log_prob_before, log_prob_after)
+
+  def test_shift_bijector(self):
+    d = tfd.Normal([0., 1.], [2., 3.])
+    bij = tfb.Shift(4.)
+    td = tfd.TransformedDistribution(distribution=d, bijector=bij)
+    sample = [-2.0, 3.0]
+    log_prob_before = self.evaluate(td.log_prob(sample))
+    dist = tfp.experimental.as_composite(td)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertAllEqual(log_prob_before, log_prob_after)
+
+  def test_chain_bijector(self):
+    d = tfd.Normal([1., 2.], [3., 4.])
+    bij = tfb.Chain([tfb.Shift(5.), tfb.Scale(6.)])
+    td = tfd.TransformedDistribution(distribution=d, bijector=bij)
+    sample = [[7., 8.], [9., -1.]]
+    log_prob_before = self.evaluate(td.log_prob(sample))
+    dist = tfp.experimental.as_composite(td)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.evaluate(unflat.sample())
+    log_prob_after = self.evaluate(unflat.log_prob(sample))
+    self.assertAllEqual(log_prob_before, log_prob_after)
 
   def test_transformed_distribution(self):
     fd = tfd.TransformedDistribution(

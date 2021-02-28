@@ -21,8 +21,8 @@ import collections
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow_probability.python.mcmc import TransitionKernel
-from tensorflow_probability.python.util import SeedStream
+from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.mcmc import kernel as kernel_base
 
 __all__ = [
     'SequentialMonteCarlo',
@@ -66,6 +66,7 @@ class SequentialMonteCarloResults(collections.namedtuple(
      # Track both incremental and accumulated likelihoods so that users can get
      # the accumulated likelihood without needing to trace every step.
      'accumulated_log_marginal_likelihood',
+     'seed',
     ])):
   """Auxiliary results from a Sequential Monte Carlo step.
 
@@ -93,11 +94,13 @@ class SequentialMonteCarloResults(collections.namedtuple(
       Note that (by [Jensen's inequality](
       https://en.wikipedia.org/wiki/Jensen%27s_inequality))
       this is *smaller* in expectation than the true log ratio.
+    seed: The seed used in one_step.
 
   In some contexts, results may be stacked across multiple inference steps,
   in which case all `Tensor` shapes will be prefixed by an additional dimension
   of size `num_steps`.
   """
+  __slots__ = ()
 
 
 def _dummy_indices_like(indices):
@@ -123,7 +126,7 @@ def ess_below_threshold(weighted_particles, threshold=0.5):
                       ps.log(threshold))
 
 
-class SequentialMonteCarlo(TransitionKernel):
+class SequentialMonteCarlo(kernel_base.TransitionKernel):
   """Sequential Monte Carlo transition kernel.
 
   Sequential Monte Carlo maintains a population of weighted particles
@@ -137,7 +140,6 @@ class SequentialMonteCarlo(TransitionKernel):
                propose_and_update_log_weights_fn,
                resample_fn=weighted_resampling.resample_systematic,
                resample_criterion_fn=ess_below_threshold,
-               seed=None,
                name=None):
     """Initializes a sequential Monte Carlo transition kernel.
 
@@ -178,13 +180,11 @@ class SequentialMonteCarlo(TransitionKernel):
         default behavior is to resample particles when the effective
         sample size falls below half of the total number of particles.
         Default value: `tfp.experimental.mcmc.ess_below_threshold`.
-      seed: Optional Python integer to seed the random number generator.
       name: Python `str` name for ops created by this kernel.
     """
     self._propose_and_update_log_weights_fn = propose_and_update_log_weights_fn
     self._resample_fn = resample_fn
     self._resample_criterion_fn = resample_criterion_fn
-    self._seed = seed
     self._name = name or 'SequentialMonteCarlo'
 
   @property
@@ -207,10 +207,6 @@ class SequentialMonteCarlo(TransitionKernel):
   def resample_fn(self):
     return self._resample_fn
 
-  @property
-  def seed(self):
-    return self._seed
-
   def one_step(self, state, kernel_results, seed=None):
     """Takes one Sequential Monte Carlo inference step.
 
@@ -224,8 +220,8 @@ class SequentialMonteCarlo(TransitionKernel):
       kernel_results: instance of
         `tfp.experimental.mcmc.SequentialMonteCarloResults` representing results
         from a previous step.
-      seed: Optional Python integer to seed the random number generator.
-        If provided, overrides the class-level seed set in `__init__`.
+      seed: Optional seed for reproducible sampling.
+
     Returns:
       state: instance of `tfp.experimental.mcmc.WeightedParticles` representing
         new particles with (log) weights.
@@ -234,7 +230,8 @@ class SequentialMonteCarlo(TransitionKernel):
     """
     with tf.name_scope(self.name):
       with tf.name_scope('one_step'):
-        seed = SeedStream(seed if seed else self.seed, 'smc_one_step')
+        seed = samplers.sanitize_seed(seed)
+        proposal_seed, resample_seed = samplers.split_seed(seed)
 
         state = WeightedParticles(*state)  # Canonicalize.
         num_particles = ps.size0(state.log_weights)
@@ -246,7 +243,7 @@ class SequentialMonteCarlo(TransitionKernel):
             # Propose state[t] from state[t - 1].
             ps.maximum(0, kernel_results.steps - 1),
             state,
-            seed=seed())
+            seed=proposal_seed)
         is_initial_step = ps.equal(kernel_results.steps, 0)
         # TODO(davmre): this `where` assumes the state size didn't change.
         state = tf.nest.map_structure(
@@ -273,9 +270,9 @@ class SequentialMonteCarlo(TransitionKernel):
             state.particles,
             state.log_weights,
             self.resample_fn,
-            seed=seed)
+            seed=resample_seed)
         uniform_weights = tf.fill(
-            tf.shape(state.log_weights),
+            ps.shape(state.log_weights),
             value=-tf.math.log(tf.cast(num_particles, state.log_weights.dtype)))
         (resampled_particles,
          resample_indices,
@@ -294,7 +291,8 @@ class SequentialMonteCarlo(TransitionKernel):
                       incremental_log_marginal_likelihood),
                   accumulated_log_marginal_likelihood=(
                       kernel_results.accumulated_log_marginal_likelihood +
-                      incremental_log_marginal_likelihood)))
+                      incremental_log_marginal_likelihood),
+                  seed=seed))
 
   def bootstrap_results(self, init_state):
     with tf.name_scope(self.name):
@@ -309,4 +307,5 @@ class SequentialMonteCarlo(TransitionKernel):
             steps=0,
             parent_indices=_dummy_indices_like(init_state.log_weights),
             incremental_log_marginal_likelihood=batch_zeros,
-            accumulated_log_marginal_likelihood=batch_zeros)
+            accumulated_log_marginal_likelihood=batch_zeros,
+            seed=samplers.zeros_seed())

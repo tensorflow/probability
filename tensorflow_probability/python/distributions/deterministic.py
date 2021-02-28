@@ -24,10 +24,12 @@ import abc
 import six
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -153,7 +155,14 @@ class _BaseDeterministic(distribution.Distribution):
                   axis=0))
 
   def _default_event_space_bijector(self):
-    return
+    """The bijector maps a zero-dimensional null Tensor input to `self.loc`."""
+    # The shape of the pulled back null tensor will be `self.loc.shape + (0,)`.
+    # First we pad to a tensor of zeros with shape `self.loc.shape + (1,)`.
+    pad_zero = tfb.Pad([(1, 0)])
+    # Next, we squeeze to a tensor of zeros with shape matching `self.loc`.
+    zeros_squeezed = tfb.Reshape([], event_shape_in=[1])(pad_zero)
+    # Finally, we shift the zeros by `self.loc`.
+    return tfb.Shift(self.loc)(zeros_squeezed)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []
@@ -271,8 +280,17 @@ class Deterministic(_BaseDeterministic):
         name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, atol=0, rtol=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        atol=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,
+            is_preferred=False),
+        rtol=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,
+            is_preferred=False))
 
   def _batch_shape_tensor(self, loc=None):
     return ps.broadcast_shape(
@@ -395,8 +413,19 @@ class VectorDeterministic(_BaseDeterministic):
         name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=1, atol=1, rtol=1)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        atol=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,
+            is_preferred=False),
+        rtol=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,
+            is_preferred=False))
 
   def _batch_shape_tensor(self, loc=None):
     return ps.broadcast_shape(

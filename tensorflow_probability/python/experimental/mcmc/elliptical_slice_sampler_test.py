@@ -122,49 +122,11 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
 
     self.assertAllClose(samples0_[::2], samples1_, atol=1e-5, rtol=1e-5)
 
-  # In order to test Elliptical Slice Sampling, we take
-  # the case where we have a Normal prior and Normal posterior.
-  def testNormalNormalSample(self):
-    tf.compat.v1.enable_control_flow_v2()
-    # Standard normal prior.
-    # Samples are shape [2].
-    normal_prior = tfd.Normal(self.dtype([0., 0.]), self.dtype(1.))
-
-    def normal_sampler(seed):
-      return normal_prior.sample(seed=seed)
-
-    # A single data point at the mode.
-    # The state is expected to be 2 dimensional, so
-    # we reduce sum on the last axis.
-    def normal_log_likelihood(state):
-      return tf.math.reduce_sum(
-          tfd.Normal(state, self.dtype(2.)).log_prob(self.dtype(0.)),
-          axis=-1)
-
-    kernel = tfp.experimental.mcmc.EllipticalSliceSampler(
-        normal_sampler_fn=normal_sampler,
-        log_likelihood_fn=normal_log_likelihood,
-    )
-
-    samples = tf.function(tfp.mcmc.sample_chain)(
-        num_results=int(3e5),
-        current_state=self.dtype(np.random.randn(2)),
-        kernel=kernel,
-        num_burnin_steps=int(1e4),
-        seed=test_util.test_seed(),
-        trace_fn=None
-    )
-
-    # TODO(b/159923910): Retval[0] does not have a value.
-    samples = tf.convert_to_tensor(self.evaluate(samples))
-
-    mean, variance = self.evaluate(tf.nn.moments(samples, axes=[0]))
-    # Computed exactly from the formula in normal-normal posterior.
-    self.assertAllClose([0., 0.], mean, rtol=5e-2, atol=6e-3)
-    self.assertAllClose([4./5, 4./5], variance, rtol=5e-2)
-
   def testNormalNormalSampleMultipleDatapoints(self):
+    if not tf.executing_eagerly():
+      self.skipTest('This test runs only in eager mode to reduce test weight.')
     tf.compat.v1.enable_control_flow_v2()
+
     # Two independent chains, of states of shape [3].
     prior_stddev = self.dtype(np.exp(np.random.rand(2, 3)))
 
@@ -191,10 +153,10 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
     )
 
     samples = tf.function(tfp.mcmc.sample_chain)(
-        num_results=int(3e5),
+        num_results=int(3e4),
         current_state=self.dtype(np.random.randn(2, 3)),
         kernel=kernel,
-        num_burnin_steps=int(1e4),
+        num_burnin_steps=int(1e3),
         seed=test_util.test_seed(),
         trace_fn=None)
 
@@ -208,8 +170,8 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
         likelihood_stddev=likelihood_stddev,
         data=data)
     # Computed exactly from the formula in normal-normal posterior.
-    self.assertAllClose(posterior_mean, mean, rtol=2e-2, atol=6e-3)
-    self.assertAllClose(posterior_variance, variance, rtol=5e-2)
+    self.assertAllClose(posterior_mean, mean, rtol=2e-2, atol=6e-2)
+    self.assertAllClose(posterior_variance, variance, rtol=5e-1)
 
 
 class EllipticalSliceSamplerTestFloat32(_EllipticalSliceSamplerTest):

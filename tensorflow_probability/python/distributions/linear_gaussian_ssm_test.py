@@ -48,8 +48,7 @@ from tensorflow_probability.python.internal import test_util
 tfl = tf.linalg
 
 
-@test_util.test_all_tf_execution_regimes
-class _IIDNormalTest(object):
+class _IIDNormalTest(test_util.TestCase):
 
   def _build_iid_normal_model(self, num_timesteps, latent_size,
                               observation_size, transition_variance,
@@ -80,6 +79,7 @@ class _IIDNormalTest(object):
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=tf.sqrt(transition_variance) *
             tf.ones([latent_size], dtype=self.dtype)),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     return model
@@ -169,25 +169,29 @@ class _IIDNormalTest(object):
 
 
 @test_util.test_all_tf_execution_regimes
-class IIDNormalTestStatic32(_IIDNormalTest, test_util.TestCase):
-  use_static_shape = True
-  dtype = np.float32
-
-
-@test_util.test_all_tf_execution_regimes
-class IIDNormalTestStatic64(_IIDNormalTest, test_util.TestCase):
+class IIDNormalTestDynamic64Parallel(_IIDNormalTest):
   use_static_shape = True
   dtype = np.float64
+  parallelize = True
+
+
+class IIDNormalTestStatic64(_IIDNormalTest):
+  use_static_shape = True
+  dtype = np.float64
+  parallelize = False
 
 
 @test_util.test_all_tf_execution_regimes
-class IIDNormalTestDynamic32(_IIDNormalTest, test_util.TestCase):
+class IIDNormalTestDynamic32(_IIDNormalTest):
   use_static_shape = False
   dtype = np.float32
+  parallelize = False
 
 
-@test_util.test_all_tf_execution_regimes
-class SanityChecks(test_util.TestCase):
+del _IIDNormalTest  # Don't run base class tests.
+
+
+class _SanityChecks(test_util.TestCase):
 
   def test_deterministic_system(self):
 
@@ -208,6 +212,7 @@ class SanityChecks(test_util.TestCase):
             loc=[observation_shift], scale_diag=[0.]),
         initial_state_prior=tfd.MultivariateNormalDiag(
             loc=[prior_mean], scale_diag=[0.]),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     # Manually compute expected output.
@@ -242,6 +247,7 @@ class SanityChecks(test_util.TestCase):
             loc=[0.], scale_diag=[observation_scale]),
         initial_state_prior=tfd.MultivariateNormalDiag(
             loc=[0.], scale_diag=[prior_scale]),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     # Manually compute the marginal variance at each step
@@ -282,6 +288,7 @@ class SanityChecks(test_util.TestCase):
             scale_diag=[observation_noise_scale]),
         initial_state_prior=tfd.MultivariateNormalDiag(
             loc=[prior_mean], scale_diag=[prior_scale]),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     mean_, sample_ = self.evaluate(
@@ -329,6 +336,7 @@ class SanityChecks(test_util.TestCase):
         observation_noise=observation_noise,
         initial_state_prior=tfd.MultivariateNormalDiag(
             loc=[prior_mean], scale_diag=[prior_scale]),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     variance_ = self.evaluate(model.variance())
@@ -359,6 +367,7 @@ class SanityChecks(test_util.TestCase):
             scale_diag=tf.fill([latent_size], tf.square(observation_std))),
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=tf.ones([latent_size])),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     sample_, mean_, variance_ = self.evaluate(
@@ -409,6 +418,7 @@ class SanityChecks(test_util.TestCase):
             scale_diag=observation_noise_scale),
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=initial_state_prior_scale),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     for method in ('batch_shape_tensor', 'event_shape_tensor', 'mean',
@@ -438,7 +448,8 @@ class SanityChecks(test_util.TestCase):
         observation_noise=tfd.MultivariateNormalDiag(
             scale_diag=noise_std**2 * tf.ones([ndims])),
         initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=tf.ones([ndims])))
+            scale_diag=tf.ones([ndims])),
+        experimental_parallelize=self.parallelize)
 
     x = model.sample(5, seed=test_util.test_seed())
     self.evaluate(model.log_prob(x))
@@ -462,7 +473,17 @@ class SanityChecks(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-class BatchTest(test_util.TestCase):
+class SanityChecksSequential(_SanityChecks):
+  parallelize = False
+
+
+class SanityChecksParallel(_SanityChecks):
+  parallelize = True
+
+del _SanityChecks  # Don't run base class tests.
+
+
+class _BatchTest(test_util.TestCase):
   """Test that methods broadcast batch dimensions for each parameter."""
 
   def _build_random_model(self,
@@ -510,6 +531,7 @@ class BatchTest(test_util.TestCase):
             scale_diag=tf.math.softplus(
                 samplers.normal(prior_batch_shape + [latent_size],
                                 seed=stream()))),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
   def _sanity_check_shapes(self, model,
@@ -542,7 +564,9 @@ class BatchTest(test_util.TestCase):
         sample_shape + batch_shape + [num_timesteps, latent_size])
     self.assertEqual(
         tensorshape_util.as_list(posterior_covs.shape),
-        batch_shape + [num_timesteps, latent_size, latent_size])
+        (sample_shape
+         if model.experimental_parallelize else []) + batch_shape + [
+             num_timesteps, latent_size, latent_size])
 
     # Try an argument with no batch shape to ensure we broadcast
     # correctly.
@@ -582,8 +606,9 @@ class BatchTest(test_util.TestCase):
                                      observation_noise_batch_shape=batch_shape)
 
     # check that we get the basic shapes right
-    self.assertEqual(model.latent_size, latent_size)
-    self.assertEqual(model.observation_size, observation_size)
+    self.assertEqual(model.latent_size_tensor(),
+                     latent_size)
+    self.assertEqual(model.observation_size_tensor(), observation_size)
     self._sanity_check_shapes(model, batch_shape, event_shape,
                               num_timesteps, latent_size)
 
@@ -663,7 +688,18 @@ class BatchTest(test_util.TestCase):
     self.assertAllClose(pushforward_covs_, observation_covs_)
 
 
-class MissingObservationsTests(test_util.TestCase):
+@test_util.test_all_tf_execution_regimes
+class BatchTestSequential(_BatchTest):
+  parallelize = False
+
+
+class BatchTestParallel(_BatchTest):
+  parallelize = True
+
+del _BatchTest  # Don't run base class tests.
+
+
+class _MissingObservationsTests(test_util.TestCase):
 
   # One test requires derivative with respect to
   # transition_noise.scale_diag so we allow this to be
@@ -691,6 +727,7 @@ class MissingObservationsTests(test_util.TestCase):
         observation_noise=observation_noise,
         initial_state_prior=initial_state_prior,
         initial_step=0,
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     return (num_timesteps, transition_matrix, transition_noise,
@@ -738,6 +775,7 @@ class MissingObservationsTests(test_util.TestCase):
         observation_noise=observation_noise,
         initial_state_prior=initial_state_prior,
         initial_step=0,
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     (log_likelihoods_, filtered_means_, filtered_covs_, predicted_means_,
@@ -838,6 +876,7 @@ class MissingObservationsTests(test_util.TestCase):
             scale_diag=np.random.randn(*(batch_shape +
                                          [1])).astype(np.float32)),
         initial_step=0,
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     mask = np.random.randn(num_timesteps) > 0
@@ -867,8 +906,7 @@ class MissingObservationsTests(test_util.TestCase):
     # in the observed time series `x`, and covariances with a sample dimension
     # for every sample dimension in the mask.
 
-    (num_timesteps, _, _, _, _,
-     _, model) = self.make_model()
+    (num_timesteps, _, _, _, _, _, model) = self.make_model()
 
     sample_shape = [5, 2]
     mask_sample_shape = [2]
@@ -876,19 +914,18 @@ class MissingObservationsTests(test_util.TestCase):
     mask = np.random.randn(*np.concatenate(
         [mask_sample_shape, [num_timesteps]], axis=0)) > 0
     observed_time_series = np.random.randn(*np.concatenate(
-        [sample_shape, [num_timesteps, 1]], axis=0)).astype(
-            np.float32)
+        [sample_shape, [num_timesteps, 1]], axis=0)).astype(np.float32)
     observed_time_series[:, mask[..., np.newaxis]] = np.inf
 
     (log_likelihoods, filtered_means, filtered_covs, _, _, _,
-     _) = model.forward_filter(
-         x=observed_time_series, mask=mask)
+     _) = model.forward_filter(x=observed_time_series, mask=mask)
     self.assertAllEqual(
         tensorshape_util.as_list(filtered_means.shape),
         sample_shape + [num_timesteps, 1])
     self.assertAllEqual(
         tensorshape_util.as_list(filtered_covs.shape),
-        mask_sample_shape + [num_timesteps, 1, 1])
+        (sample_shape if model.experimental_parallelize
+         else mask_sample_shape) + [num_timesteps, 1, 1])
 
     (log_likelihoods_, filtered_means_, filtered_covs_) = self.evaluate(
         (log_likelihoods, filtered_means, filtered_covs))
@@ -905,10 +942,19 @@ class MissingObservationsTests(test_util.TestCase):
            x=observed_time_series, mask=big_mask)
 
 
-@test_util.test_all_tf_execution_regimes
-class KalmanSmootherTest(test_util.TestCase):
+class MissingObservationsTestsSequential(_MissingObservationsTests):
+  parallelize = False
 
-  def build_kf(self):
+
+class MissingObservationsTestsParallel(_MissingObservationsTests):
+  parallelize = True
+
+del _MissingObservationsTests  # Don't run base class tests.
+
+
+class _KalmanSmootherTest(test_util.TestCase):
+
+  def build_kf(self, validate_args=True):
     # Define a simple model with 3D latents and 2D observations.
 
     self.transition_matrix = np.array(
@@ -936,7 +982,8 @@ class KalmanSmootherTest(test_util.TestCase):
         observation_noise=self.observation_noise,
         initial_state_prior=self.initial_state_prior,
         initial_step=0,
-        validate_args=True)
+        experimental_parallelize=self.parallelize,
+        validate_args=validate_args)
 
   def testKalmanSmoother(self):
     obs = np.array(
@@ -947,9 +994,21 @@ class KalmanSmootherTest(test_util.TestCase):
           [-0.46593086, 0.23341251]]],
         dtype=np.float32)
 
-    kf = self.build_kf()
-    _, filtered_means, filtered_covs, _, _, _, _ = kf.forward_filter(obs)
-    smoothed_means, smoothed_covs = kf.posterior_marginals(obs)
+    kf = self.build_kf(validate_args=not self.compile)
+    def filter_and_smooth():  # Wrap code to optionally test XLA compilation.
+      _, filtered_means, filtered_covs, _, _, _, _ = kf.forward_filter(obs)
+      smoothed_means, smoothed_covs = kf.posterior_marginals(obs)
+      return filtered_means, filtered_covs, smoothed_means, smoothed_covs
+    if self.compile:
+      self.skip_if_no_xla()
+      filter_and_smooth = tf.function(filter_and_smooth, autograph=False,
+                                      jit_compile=True)
+    [
+        filtered_means,
+        filtered_covs,
+        smoothed_means,
+        smoothed_covs
+    ] = filter_and_smooth()
 
     # Numbers are checked against results from well-tested open source package.
     # In order to replicate the numbers below, one could run the following
@@ -980,59 +1039,72 @@ class KalmanSmootherTest(test_util.TestCase):
     # filtered_means, filtered_covs = kf.filter(x)
     # smoothed_means, smoothed_covs = kf.smooth(x)
     # """
+    (filtered_means_,
+     filtered_covs_,
+     smoothed_means_,
+     smoothed_covs_) = self.evaluate((filtered_means,
+                                      filtered_covs,
+                                      smoothed_means,
+                                      smoothed_covs))
+    expected_filtered_means = np.array([
+        [[1.67493705, 0.46825252, 0.02124943],
+         [-0.64631546, 1.00897487, -0.09965568],
+         [-1.01912747, 2.20042742, -0.35873311],
+         [-0.67203603, 0.65843169, -1.13269043],
+         [0.08385944, 0.50706669, -2.05841075]]])
+    self.assertAllClose(filtered_means_, expected_filtered_means, rtol=1e-4)
+    expected_filtered_covs = np.array(
+        [[[0.05451537, -0.00583471, 0.05521206],
+          [-0.00583471, 0.07889925, -0.23913612],
+          [0.05521206, -0.23913612, 0.93451188]],
+         [[0.05475972, -0.00706799, 0.05972831],
+          [-0.00706799, 0.08838377, -0.27438752],
+          [0.05972831, -0.27438752, 1.06529626]],
+         [[0.05507039, -0.00857061, 0.06554467],
+          [-0.00857061, 0.09565483, -0.30253237],
+          [0.06554467, -0.30253237, 1.17423936]],
+         [[0.05534107, -0.00984834, 0.07049446],
+          [-0.00984834, 0.10168645, -0.3258982],
+          [0.07049446, -0.3258982, 1.26475611]],
+         [[0.05556491, -0.01090359, 0.07458252],
+          [-0.01090359, 0.10666106, -0.34516996],
+          [0.07458252, -0.34516996, 1.33941529]]])
+    self.assertAllClose(filtered_covs_,
+                        np.broadcast_to(expected_filtered_covs,
+                                        filtered_covs_.shape))
+    expected_smoothed_means = np.array(
+        [[[1.6779677, 0.85140403, -1.35974017],
+          [-0.56246908, 1.46082297, -1.62395504],
+          [-0.90536, 2.63540628, -1.83427299],
+          [-0.47239553, 0.95851585, -2.01734974],
+          [0.08385944, 0.50706669, -2.05841075]]])
+    self.assertAllClose(smoothed_means_, expected_smoothed_means, rtol=1e-4)
 
-    self.assertAllClose(self.evaluate(filtered_means),
-                        [[[1.67493705, 0.46825252, 0.02124943],
-                          [-0.64631546, 1.00897487, -0.09965568],
-                          [-1.01912747, 2.20042742, -0.35873311],
-                          [-0.67203603, 0.65843169, -1.13269043],
-                          [0.08385944, 0.50706669, -2.05841075]]],
-                        rtol=1e-5)
-    self.assertAllClose(self.evaluate(filtered_covs),
-                        [[[0.05451537, -0.00583471, 0.05521206],
-                          [-0.00583471, 0.07889925, -0.23913612],
-                          [0.05521206, -0.23913612, 0.93451188]],
-                         [[0.05475972, -0.00706799, 0.05972831],
-                          [-0.00706799, 0.08838377, -0.27438752],
-                          [0.05972831, -0.27438752, 1.06529626]],
-                         [[0.05507039, -0.00857061, 0.06554467],
-                          [-0.00857061, 0.09565483, -0.30253237],
-                          [0.06554467, -0.30253237, 1.17423936]],
-                         [[0.05534107, -0.00984834, 0.07049446],
-                          [-0.00984834, 0.10168645, -0.3258982],
-                          [0.07049446, -0.3258982, 1.26475611]],
-                         [[0.05556491, -0.01090359, 0.07458252],
-                          [-0.01090359, 0.10666106, -0.34516996],
-                          [0.07458252, -0.34516996, 1.33941529]]])
-    self.assertAllClose(self.evaluate(smoothed_means),
-                        [[[1.6779677, 0.85140403, -1.35974017],
-                          [-0.56246908, 1.46082297, -1.62395504],
-                          [-0.90536, 2.63540628, -1.83427299],
-                          [-0.47239553, 0.95851585, -2.01734974],
-                          [0.08385944, 0.50706669, -2.05841075]]],
-                        rtol=1e-5)
-    self.assertAllClose(self.evaluate(smoothed_covs),
-                        [[[0.05213916, -0.00658443, 0.05523982],
-                          [-0.00658443, 0.07103678, -0.21066964],
-                          [0.05523982, -0.21066964, 0.82790034]],
-                         [[0.05249696, -0.00812691, 0.06099242],
-                          [-0.00812691, 0.0799351, -0.24409068],
-                          [0.06099242, -0.24409068, 0.95324973]],
-                         [[0.05297552, -0.01009223, 0.06865306],
-                          [-0.01009223, 0.08801685, -0.27559063],
-                          [0.06865306, -0.27559063, 1.07602637]],
-                         [[0.05343939, -0.0120551, 0.07628306],
-                          [-0.0120551, 0.09641572, -0.30821036],
-                          [0.07628306, -0.30821036, 1.20272402]],
-                         [[0.05556491, -0.01090359, 0.07458252],
-                          [-0.01090359, 0.10666106, -0.34516996],
-                          [0.07458252, -0.34516996, 1.33941529]]])
+    expected_smoothed_covs = np.array(
+        [[[0.05213916, -0.00658443, 0.05523982],
+          [-0.00658443, 0.07103678, -0.21066964],
+          [0.05523982, -0.21066964, 0.82790034]],
+         [[0.05249696, -0.00812691, 0.06099242],
+          [-0.00812691, 0.0799351, -0.24409068],
+          [0.06099242, -0.24409068, 0.95324973]],
+         [[0.05297552, -0.01009223, 0.06865306],
+          [-0.01009223, 0.08801685, -0.27559063],
+          [0.06865306, -0.27559063, 1.07602637]],
+         [[0.05343939, -0.0120551, 0.07628306],
+          [-0.0120551, 0.09641572, -0.30821036],
+          [0.07628306, -0.30821036, 1.20272402]],
+         [[0.05556491, -0.01090359, 0.07458252],
+          [-0.01090359, 0.10666106, -0.34516996],
+          [0.07458252, -0.34516996, 1.33941529]]])
+    self.assertAllClose(smoothed_covs_,
+                        np.broadcast_to(expected_smoothed_covs,
+                                        smoothed_covs_.shape))
 
   @parameterized.named_parameters((
       dict(testcase_name='_{}'.format(sampler_type), sampler_type=sampler_type)
       for sampler_type in ('stateless', 'stateful')))
   def testPosteriorSample(self, sampler_type):
-    kf = self.build_kf()
+    kf = self.build_kf(validate_args=not self.compile)
     obs = np.array(
         [[[1.36560337, 0.28252135],
           [-0.44638565, -0.76692033],
@@ -1048,12 +1120,22 @@ class KalmanSmootherTest(test_util.TestCase):
     self.assertAllEqual(single_posterior_sample.shape, [5, 3])
 
     sample_shape = [8000, 2]
-    posterior_samples = kf.posterior_sample(
-        obs, sample_shape, seed=test_util.test_seed(sampler_type=sampler_type),
-        mask=mask)
+    def sample_and_marginals():  # Wrap code to optionally test XLA compilation.
+      posterior_samples = kf.posterior_sample(
+          obs, sample_shape,
+          seed=test_util.test_seed(sampler_type=sampler_type),
+          mask=mask)
+      posterior_mean, posterior_covs = kf.posterior_marginals(obs, mask=mask)
+      return posterior_samples, posterior_mean, posterior_covs
+    if self.compile:
+      self.skip_if_no_xla()
+      sample_and_marginals = tf.function(sample_and_marginals,
+                                         autograph=False,
+                                         jit_compile=True)
+    posterior_samples, posterior_mean, posterior_covs = sample_and_marginals()
     self.assertAllEqual(posterior_samples.shape,
                         sample_shape + [1, 1, 5, 3])
-    posterior_mean, posterior_covs = kf.posterior_marginals(obs, mask=mask)
+
     empirical_mean = tf.reduce_mean(posterior_samples, axis=[0, 1])
     centered_samples = posterior_samples - posterior_mean
     empirical_covs = tf.einsum(
@@ -1065,6 +1147,24 @@ class KalmanSmootherTest(test_util.TestCase):
          empirical_mean, empirical_covs, posterior_mean, posterior_covs))
     self.assertAllClose(posterior_mean_, empirical_mean_, atol=.03)
     self.assertAllClose(posterior_covs_, empirical_covs_, atol=.04)
+
+
+@test_util.test_all_tf_execution_regimes
+class KalmanSmootherTestSequential(_KalmanSmootherTest):
+  parallelize = False
+  compile = False
+
+
+class KalmanSmootherTestSequentialCompiled(_KalmanSmootherTest):
+  parallelize = False
+  compile = True
+
+
+class KalmanSmootherTestParallel(_KalmanSmootherTest):
+  parallelize = True
+  compile = False
+
+del _KalmanSmootherTest  # Don't run base class tests.
 
 
 @test_util.test_all_tf_execution_regimes
@@ -1414,7 +1514,6 @@ class _KalmanStepsTest(object):
                         np.diag(self.observation_noise_scale_diag**2))
 
 
-@test_util.test_all_tf_execution_regimes
 class KalmanStepsTestStatic(test_util.TestCase, _KalmanStepsTest):
 
   use_static_shape = True
@@ -1484,7 +1583,6 @@ class _AugmentSampleShapeTest(object):
                                 validate_args=True))
 
 
-@test_util.test_all_tf_execution_regimes
 class AugmentSampleShapeTestStatic(test_util.TestCase, _AugmentSampleShapeTest):
 
   def assertRaisesError(self, msg):
@@ -1527,8 +1625,7 @@ class AugmentSampleShapeTestDynamic(test_util.TestCase,
     return self.evaluate(x)
 
 
-@test_util.test_all_tf_execution_regimes
-class LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
+class _LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
 
   @test_util.tf_tape_safety_test
   def testGradientTransitionMatrix(self):
@@ -1543,6 +1640,7 @@ class LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
         observation_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
         num_timesteps=2,
         initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     with tf.GradientTape() as tape:
@@ -1564,6 +1662,7 @@ class LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
           observation_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
           num_timesteps=2,
           initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+          experimental_parallelize=self.parallelize,
           validate_args=True)
       return -d.log_prob(tf.zeros([2, 1]))
 
@@ -1585,6 +1684,7 @@ class LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
         observation_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
         num_timesteps=2,
         initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+        experimental_parallelize=self.parallelize,
         validate_args=True)
 
     with tf.GradientTape() as tape:
@@ -1605,6 +1705,7 @@ class LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
           observation_noise=tfd.MultivariateNormalDiag(scale_diag=[1.]),
           num_timesteps=2,
           initial_state_prior=tfd.MultivariateNormalDiag(scale_diag=[1.]),
+          experimental_parallelize=self.parallelize,
           validate_args=True)
       return -d.log_prob(tf.zeros([2, 1]))
 
@@ -1612,6 +1713,19 @@ class LinearGaussianStateSpaceModelFromVariableTest(test_util.TestCase):
     _, g = tfp.math.value_and_gradient(loss_fn, [observation_matrix])
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
+
+
+@test_util.test_all_tf_execution_regimes
+class LinearGaussianStateSpaceModelFromVariableTestSequential(
+    _LinearGaussianStateSpaceModelFromVariableTest):
+  parallelize = False
+
+
+class LinearGaussianStateSpaceModelFromVariableTestParallel(
+    _LinearGaussianStateSpaceModelFromVariableTest):
+  parallelize = True
+
+del _LinearGaussianStateSpaceModelFromVariableTest  # Don't run base class tests
 
 
 if __name__ == '__main__':

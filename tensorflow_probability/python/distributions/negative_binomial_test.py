@@ -141,6 +141,43 @@ class NegativeBinomialTest(test_util.TestCase):
     self.assertEqual([6], pmf.shape)
     self.assertAllClose(np.exp(expected_log_pmf), self.evaluate(pmf))
 
+  def testCdfBeyondSupport(self):
+    negbinom = tfd.NegativeBinomial(
+        total_count=5., probs=.7, validate_args=False)
+    cdf = self.evaluate(negbinom.cdf(-1.))
+    self.assertEqual(0, cdf)
+
+  def testNegativeBinomialFromMeanDispersion(self):
+    total_count = 5.
+    probs = np.repeat(0.2, 3).astype(np.float32)
+    x = np.array([4., 5., 6.], dtype=np.float32)
+    mu = stats.nbinom.mean(total_count, 1 - probs)
+    negbinom_mean_disp = tfd.NegativeBinomial.experimental_from_mean_dispersion(
+        mu, 1 / total_count, validate_args=True)
+    expected_log_pmf = stats.nbinom.logpmf(x, n=total_count, p=1 - probs)
+    log_pmf = negbinom_mean_disp.log_prob(x)
+    self.assertAllClose(expected_log_pmf, self.evaluate(log_pmf))
+
+  @test_util.jax_disable_test_missing_functionality('GradientTape')
+  @test_util.numpy_disable_gradient_test
+  def testNegativeBinomialFromMeanDispersionTapeSafe(self):
+    total_count = 5.
+    dispersion = np.float32(1 / total_count)
+    p_fail = np.float32(1 - np.repeat(0.2, 3))
+    x = np.array([4., 5., 6.], dtype=np.float32)
+
+    mean = tf.convert_to_tensor(
+        stats.nbinom.mean(total_count, p_fail).astype(np.float32))
+    dispersion = tf.convert_to_tensor(dispersion)
+
+    dist = tfd.NegativeBinomial.experimental_from_mean_dispersion(
+        mean, dispersion, validate_args=True)
+    with tf.GradientTape() as tape:
+      tape.watch((mean, dispersion))
+      lp = dist.log_prob(x)
+    grads = tape.gradient(lp, (mean, dispersion))
+    self.assertAllNotNone(grads)
+
   def testNegativeBinomialLogPmfValidateArgs(self):
     batch_size = 6
     probs = [.9] * batch_size

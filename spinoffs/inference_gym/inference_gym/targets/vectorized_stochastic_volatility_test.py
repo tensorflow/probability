@@ -271,8 +271,7 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
   @test_util.numpy_disable_gradient_test
   def testSP500HMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    if BACKEND == 'backend_jax':
-      self.skipTest('Too slow.')
+    self.skipTest('b/169073800')
     model = (
         vectorized_stochastic_volatility.VectorizedStochasticVolatilitySP500())
 

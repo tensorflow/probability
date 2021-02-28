@@ -25,8 +25,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "optimizer",
     srcs = ["__init__.py"],
@@ -113,6 +111,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["bfgs_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 5,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

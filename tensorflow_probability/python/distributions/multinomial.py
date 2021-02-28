@@ -21,12 +21,14 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import binomial
 from tensorflow_probability.python.distributions import categorical as categorical_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -206,8 +208,17 @@ class Multinomial(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(total_count=0, logits=1, probs=1)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        total_count=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        logits=parameter_properties.ParameterProperties(event_ndims=1),
+        probs=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=softmax_centered_bijector
+            .SoftmaxCentered,
+            is_preferred=False))
 
   @property
   def total_count(self):
@@ -322,8 +333,10 @@ class Multinomial(distribution.Distribution):
     if not self.validate_args:
       return assertions
     if is_init != tensor_util.is_ref(self.total_count):
-      assertions.extend(distribution_util.assert_nonnegative_integer_form(
-          self.total_count))
+      total_count = tf.convert_to_tensor(self.total_count)
+      assertions.append(distribution_util.assert_casting_closed(
+          total_count, target_dtype=tf.int32))
+      assertions.append(assert_util.assert_non_negative(total_count))
     return assertions
 
 
@@ -400,7 +413,7 @@ def _sample_multinomial_as_iterated_binomial(
 
     num_trials = tf.cast(num_trials, probs.dtype)
     # Pre-broadcast with probs
-    num_trials += tf.zeros_like(probs[..., 0])
+    num_trials = num_trials + tf.zeros_like(probs[..., 0])
     # Pre-enlarge for different output samples
     num_trials = _replicate_along_left(num_trials, num_samples)
     i = tf.constant(0)

@@ -91,7 +91,7 @@ class HashableWeakRef(weakref.ref):
   def __init__(self, referrent, callback=None):
     """weakref.ref which makes tf.Tensor and np.array objects hashable.
 
-    Arguments:
+    Args:
       referrent: Object that is being referred to.
       callback: Optional callback to invoke when object is GCed.
     """
@@ -170,7 +170,8 @@ class WeakStructRef(object):
 
   def __call__(self):
     """Unwraps the tensor reference."""
-    return nest.map_structure(lambda x: x(), self._struct)
+    if self.alive:
+      return nest.map_structure(lambda x: x(), self._struct)
 
   def __hash__(self):
     """Returns the cached hash of this structure."""
@@ -188,6 +189,9 @@ class WeakStructRef(object):
     return '{clazz}({referrent})'.format(
         clazz=self.__class__.__name__,
         referrent=self._struct)
+
+  def __bool__(self):
+    return self.alive
 
 
 # This only affects numpy/jax backends, where non-tensor values can be returned.
@@ -323,7 +327,7 @@ class BijectorCache(object):
   def forward(self, x, **kwargs):
     """Invokes the 'forward' transformation, or looks up previous results.
 
-    Arguments:
+    Args:
       x: The singular argument passed to `bijector._forward`.
       **kwargs: Any auxiliary arguments passed to the function.
         These reflect shared context to the function, and are associated
@@ -336,7 +340,7 @@ class BijectorCache(object):
   def inverse(self, y, **kwargs):
     """Invokes the 'inverse' transformation, or looks up previous results.
 
-    Arguments:
+    Args:
       y: The singular argument passed to `bijector._inverse`.
       **kwargs: Any auxiliary arguments passed to the function.
         These reflect shared context to the function, and are associated
@@ -367,7 +371,9 @@ class BijectorCache(object):
       raise ValueError('`direction` must be `"forward"`, `"inverse"`, or '
                        '`None`. Saw: {}'.format(direction))
     out = []
-    for k in self.storage.keys():
+    # Make a copy of the keys, in case one of them gets deleted, so as to avoid
+    # the dict-size changing at runtime error.
+    for k in list(self.storage.keys()):
       bijector_key, bijector_class_key, fn_key, _ = k.subkey
       if (k.alive and (bijector is None or bijector_key == bijector)
           and (bijector_class is None or bijector_class == bijector_class_key)
@@ -425,7 +431,7 @@ class BijectorCache(object):
             == 0)
     ```
 
-    Arguments:
+    Args:
       input: The singular ordered argument passed to the wrapped function.
       fn_name: `str`, name of the directed function to which `input` is an arg
         (typically `'_forward'` or `'_inverse'`).
@@ -463,7 +469,7 @@ class BijectorCache(object):
     assert cache.inverse._lookup(y, '_inverse', '_forward') == (x, attrs)
     ```
 
-    Arguments:
+    Args:
       input: The singular ordered argument passed to the wrapped function.
       forward_name: `str`, the name of the function implementing the bijector's
         forward transformation (typically `'_forward'`).
@@ -481,8 +487,9 @@ class BijectorCache(object):
       raise ValueError('Input must not be None.')
     input_ref, output_ref, attrs, _ = self._get_or_create_edge(
         input, forward_name, kwargs)
-    output = output_ref() if output_ref else None
-    if output is None:
+    if output_ref:
+      output = output_ref()
+    else:
       # Get the output structure, and declare a
       # weakref to clear it from the cache once it gets GCed
       output = nest.map_structure(

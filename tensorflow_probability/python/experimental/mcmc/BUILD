@@ -40,39 +40,285 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     substrates_omit_deps = [
         ":covariance_reducer",
+        ":diagonal_mass_matrix_adaptation",
         ":elliptical_slice_sampler",
         ":expectations_reducer",
+        ":kernel_builder",
+        ":kernel_outputs",
         ":nuts_autobatching",
-        ":particle_filter",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
+        ":preconditioned_nuts",
+        ":progress_bar_reducer",
         ":reducer",
         ":sample",
+        ":step",
         ":sample_discarding_kernel",
         ":sample_fold",
-        ":sequential_monte_carlo_kernel",
+        ":thinning_kernel",
         ":tracing_reducer",
+        ":windowed_sampling",
         ":with_reductions",
     ],
     deps = [
         ":covariance_reducer",
+        ":diagonal_mass_matrix_adaptation",
         ":elliptical_slice_sampler",
         ":expectations_reducer",
+        ":gradient_based_trajectory_length_adaptation",
+        ":initialization",
+        ":kernel_builder",
+        ":kernel_outputs",
         ":nuts_autobatching",
         ":particle_filter",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
+        ":preconditioned_hmc",
+        ":preconditioned_nuts",
+        ":progress_bar_reducer",
         ":reducer",
         ":sample",
         ":sample_discarding_kernel",
         ":sample_fold",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
+        ":step",
+        ":thinning_kernel",
         ":tracing_reducer",
         ":weighted_resampling",
+        ":windowed_sampling",
         ":with_reductions",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:all_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "initialization",
+    srcs = ["initialization.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "initialization_test",
+    srcs = ["initialization_test.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":initialization",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "kernel_builder",
+    srcs = ["kernel_builder.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":kernel_outputs",
+        ":preconditioned_hmc",
+        ":progress_bar_reducer",
+        ":sample_discarding_kernel",
+        ":step",
+        ":tracing_reducer",
+        ":with_reductions",
+        "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:hmc",
+        "//tensorflow_probability/python/mcmc:langevin",
+        "//tensorflow_probability/python/mcmc:nuts",
+        "//tensorflow_probability/python/mcmc:random_walk_metropolis",
+        "//tensorflow_probability/python/mcmc:replica_exchange_mc",
+        "//tensorflow_probability/python/mcmc:simple_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:transformed_kernel",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "kernel_builder_test",
+    size = "small",
+    srcs = ["kernel_builder_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":kernel_builder",
+        ":sample_discarding_kernel",
+        ":with_reductions",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/mcmc:hmc",
+        "//tensorflow_probability/python/mcmc:nuts",
+        "//tensorflow_probability/python/mcmc:simple_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:transformed_kernel",
+    ],
+)
+
+py_library(
+    name = "kernel_outputs",
+    srcs = ["kernel_outputs.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":tracing_reducer",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "kernel_outputs_test",
+    size = "small",
+    srcs = ["kernel_outputs_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":kernel_builder",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "diagonal_mass_matrix_adaptation",
+    srcs = ["diagonal_mass_matrix_adaptation.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/experimental/stats:sample_stats",
+        "//tensorflow_probability/python/internal:broadcast_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "diagonal_mass_matrix_adaptation_test",
+    size = "large",
+    timeout = "long",
+    srcs = ["diagonal_mass_matrix_adaptation_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "preconditioned_nuts",
+    srcs = ["preconditioned_nuts.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/experimental/distributions:mvn_precision_factor_linop",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:broadcast_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/mcmc:nuts",
+        "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "pnuts_test",
+    size = "medium",
+    srcs = ["pnuts_test.py"],
+    python_version = "PY3",
+    shard_count = 10,
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "preconditioned_hmc",
+    srcs = ["preconditioned_hmc.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/mcmc:hmc",
+        "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "preconditioned_hmc_test",
+    size = "large",
+    timeout = "long",
+    srcs = ["preconditioned_hmc_test.py"],
+    disabled_substrates = ["numpy"],
+    python_version = "PY3",
+    shard_count = 10,
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "progress_bar_reducer",
+    srcs = ["progress_bar_reducer.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":reducer",
+        # tensorflow dep,
+        # tqdm dep,
+    ],
+)
+
+py_test(
+    name = "progress_bar_reducer_test",
+    size = "small",
+    srcs = ["progress_bar_reducer_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -115,7 +361,7 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/math",
-        "//tensorflow_probability/python/mcmc",
+        "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/random",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -213,7 +459,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "particle_filter",
     srcs = ["particle_filter.py"],
     srcs_version = "PY3",
@@ -229,10 +475,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "particle_filter_test",
     size = "large",
     srcs = ["particle_filter_test.py"],
+    numpy_tags = ["notap"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
@@ -252,6 +499,10 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:deterministic",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_named",
+        "//tensorflow_probability/python/distributions:joint_distribution_util",
     ],
 )
 
@@ -278,6 +529,7 @@ multi_substrate_py_library(
         ":weighted_resampling",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:broadcast_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc/internal:util",
@@ -302,7 +554,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sequential_monte_carlo_kernel",
     srcs = ["sequential_monte_carlo_kernel.py"],
     srcs_version = "PY3",
@@ -317,7 +569,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sequential_monte_carlo_kernel_test",
     size = "medium",
     srcs = ["sequential_monte_carlo_kernel_test.py"],
@@ -363,8 +615,8 @@ multi_substrate_py_test(
 )
 
 py_library(
-    name = "sample",
-    srcs = ["sample.py"],
+    name = "step",
+    srcs = ["step.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,
@@ -374,9 +626,9 @@ py_library(
 )
 
 py_test(
-    name = "sample_test",
+    name = "step_test",
     size = "small",
-    srcs = ["sample_test.py"],
+    srcs = ["step_test.py"],
     python_version = "PY3",
     shard_count = 5,
     srcs_version = "PY3",
@@ -418,9 +670,10 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":covariance_reducer",
-        ":sample",
+        ":step",
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -450,12 +703,42 @@ py_test(
 )
 
 py_library(
+    name = "sample",
+    srcs = ["sample.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":step",
+        ":tracing_reducer",
+        ":with_reductions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "sample_test",
+    size = "small",
+    srcs = ["sample_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":step",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
     name = "sample_fold",
     srcs = ["sample_fold.py"],
     srcs_version = "PY3",
     deps = [
-        ":sample",
         ":sample_discarding_kernel",
+        ":step",
+        ":thinning_kernel",
         ":tracing_reducer",
         ":with_reductions",
         # numpy dep,
@@ -485,7 +768,7 @@ py_library(
     srcs = ["sample_discarding_kernel.py"],
     srcs_version = "PY3",
     deps = [
-        ":sample",
+        ":step",
         # tensorflow dep,
         "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/mcmc/internal",
@@ -499,6 +782,34 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "thinning_kernel",
+    srcs = ["thinning_kernel.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":step",
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+py_test(
+    name = "thinning_kernel_test",
+    size = "small",
+    srcs = ["thinning_kernel_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":thinning_kernel",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -575,6 +886,80 @@ py_test(
     size = "small",
     srcs = ["potential_scale_reduction_reducer_test.py"],
     python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "gradient_based_trajectory_length_adaptation",
+    srcs = ["gradient_based_trajectory_length_adaptation.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:broadcast_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/math:gradient",
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc:simple_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:transformed_kernel",
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "gradient_based_trajectory_length_adaptation_test",
+    size = "large",
+    srcs = ["gradient_based_trajectory_length_adaptation_test.py"],
+    numpy_tags = ["notap"],  # Mostly gradient-based tests.
+    python_version = "PY3",
+    shard_count = 3,
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "windowed_sampling",
+    srcs = ["windowed_sampling.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":diagonal_mass_matrix_adaptation",
+        ":preconditioned_hmc",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:joint_map",
+        "//tensorflow_probability/python/bijectors:reshape",
+        "//tensorflow_probability/python/bijectors:split",
+        "//tensorflow_probability/python/experimental/stats:sample_stats",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:sample",
+    ],
+)
+
+py_test(
+    name = "windowed_sampling_test",
+    size = "large",
+    srcs = ["windowed_sampling_test.py"],
+    python_version = "PY3",
+    shard_count = 5,
     srcs_version = "PY3",
     deps = [
         # numpy dep,

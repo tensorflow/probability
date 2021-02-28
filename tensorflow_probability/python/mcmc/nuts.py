@@ -38,11 +38,11 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import warnings
 import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
@@ -50,8 +50,6 @@ from tensorflow_probability.python.math.generic import log_add_exp
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 JAX_MODE = False
 
@@ -74,13 +72,6 @@ GENERALIZED_UTURN = True              # Default: True
 __all__ = [
     'NoUTurnSampler',
 ]
-
-
-# Cause all warnings to always be triggered.
-# Not having this means subsequent calls wont trigger the warning.
-warnings.filterwarnings('always',
-                        module='tensorflow_probability.*nuts',
-                        append=True)  # Don't override user-set filters.
 
 
 class NUTSKernelResults(
@@ -207,9 +198,6 @@ class NoUTurnSampler(TransitionKernel):
   _arXiv preprint arXiv:1701.02434_, 2018. https://arxiv.org/abs/1701.02434
   """
 
-  @deprecation.deprecated_args(
-      '2020-09-20', 'The `seed` argument is deprecated (but will work until '
-      'removed). Pass seed to `tfp.mcmc.sample_chain` instead.', 'seed')
   def __init__(self,
                target_log_prob_fn,
                step_size,
@@ -217,7 +205,6 @@ class NoUTurnSampler(TransitionKernel):
                max_energy_diff=1000.,
                unrolled_leapfrog_steps=1,
                parallel_iterations=10,
-               seed=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -243,8 +230,6 @@ class NoUTurnSampler(TransitionKernel):
         trajectory length implied by max_tree_depth. Defaults to 1.
       parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
-      seed: Python integer to seed the random number generator. Deprecated, pass
-        seed to `tfp.mcmc.sample_chain`.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'nuts_kernel').
     """
@@ -287,11 +272,9 @@ class NoUTurnSampler(TransitionKernel):
           max_energy_diff=max_energy_diff,
           unrolled_leapfrog_steps=unrolled_leapfrog_steps,
           parallel_iterations=parallel_iterations,
-          seed=seed,
           name=name,
       )
       self._parallel_iterations = parallel_iterations
-      self._seed_stream = SeedStream(seed, salt='nuts_one_step')
       self._unrolled_leapfrog_steps = unrolled_leapfrog_steps
       self._name = name
       self._max_energy_diff = max_energy_diff
@@ -341,20 +324,19 @@ class NoUTurnSampler(TransitionKernel):
     return True
 
   def one_step(self, current_state, previous_kernel_results, seed=None):
-    # TODO(b/159636942): Clean up after 2020-09-20.
-    if seed is not None:
-      start_trajectory_seed, loop_seed = samplers.split_seed(
-          seed, salt='nuts.one_step')
-    else:
-      if self._seed_stream.original_seed is not None:
-        warnings.warn(mcmc_util.SEED_CTOR_ARG_DEPRECATION_MSG)
-      start_trajectory_seed, loop_seed = samplers.split_seed(
-          self._seed_stream(), salt='nuts.one_step')
+    seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
+    start_trajectory_seed, loop_seed = samplers.split_seed(seed)
 
     with tf.name_scope(self.name + '.one_step'):
-      unwrap_state_list = not tf.nest.is_nested(current_state)
-      if unwrap_state_list:
-        current_state = [current_state]
+      state_structure = current_state
+      current_state = tf.nest.flatten(current_state)
+      if (tf.nest.is_nested(state_structure)
+          and (not mcmc_util.is_list_like(state_structure)
+               or len(current_state) != len(state_structure))):
+        # TODO(b/170865194): Support dictionaries and other non-list-like state.
+        raise TypeError('NUTS does not currently support nested or '
+                        'non-list-like state structures (saw: {}).'.format(
+                            state_structure))
 
       current_target_log_prob = previous_kernel_results.target_log_prob
       [
@@ -453,13 +435,11 @@ class NoUTurnSampler(TransitionKernel):
           reach_max_depth=new_step_metastate.continue_tree,
           has_divergence=~new_step_metastate.not_divergence,
           energy=new_step_metastate.candidate_state.energy,
-          seed=samplers.zeros_seed() if seed is None else seed,
+          seed=seed,
       )
 
-      result_state = new_step_metastate.candidate_state.state
-      if unwrap_state_list:
-        result_state = result_state[0]
-
+      result_state = tf.nest.pack_sequence_as(
+          state_structure, new_step_metastate.candidate_state.state)
       return result_state, kernel_results
 
   def bootstrap_results(self, init_state):
@@ -568,13 +548,11 @@ class NoUTurnSampler(TransitionKernel):
           dtype=tf.bool)
 
       tree_start_states = tf.nest.map_structure(
-          lambda v: tf.where(  # pylint: disable=g-long-lambda
-              mcmc_util.left_justified_expand_dims_like(direction, v[1]),
-              v[1], v[0]),
+          lambda v: bu.where_left_justified_mask(direction, v[1], v[0]),
           initial_step_state)
 
       directions_expanded = [
-          mcmc_util.left_justified_expand_dims_like(direction, state)
+          bu.left_justified_expand_dims_like(direction, state)
           for state in tree_start_states.state
       ]
 
@@ -640,30 +618,23 @@ class NoUTurnSampler(TransitionKernel):
 
       new_candidate_state = TreeDoublingStateCandidate(
           state=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      choose_new_state, s0),
-                  s0, s1)
+              bu.where_left_justified_mask(choose_new_state, s0, s1)
               for s0, s1 in zip(candidate_tree_state.state,
                                 last_candidate_state.state)
           ],
-          target=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  choose_new_state,
-                  candidate_tree_state.target),
-              candidate_tree_state.target, last_candidate_state.target),
+          target=bu.where_left_justified_mask(
+              choose_new_state,
+              candidate_tree_state.target,
+              last_candidate_state.target),
           target_grad_parts=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      choose_new_state, grad0),
-                  grad0, grad1)
+              bu.where_left_justified_mask(choose_new_state, grad0, grad1)
               for grad0, grad1 in zip(candidate_tree_state.target_grad_parts,
                                       last_candidate_state.target_grad_parts)
           ],
-          energy=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  choose_new_state, candidate_tree_state.target),
-              candidate_tree_state.energy, last_candidate_state.energy),
+          energy=bu.where_left_justified_mask(
+              choose_new_state,
+              candidate_tree_state.energy,
+              last_candidate_state.energy),
           weight=weight_sum)
 
       for new_candidate_state_temp, old_candidate_state_temp in zip(
@@ -680,18 +651,13 @@ class NoUTurnSampler(TransitionKernel):
       # Update left right information of the trajectory, and check trajectory
       # level U turn
       tree_otherend_states = tf.nest.map_structure(
-          lambda v: tf.where(  # pylint: disable=g-long-lambda
-              mcmc_util.left_justified_expand_dims_like(direction, v[1]),
-              v[0], v[1]), initial_step_state)
+          lambda v: bu.where_left_justified_mask(direction, v[0], v[1]),
+          initial_step_state)
 
       new_step_state = tf.nest.pack_sequence_as(initial_step_state, [
           tf.stack([  # pylint: disable=g-complex-comprehension
-              tf.where(
-                  mcmc_util.left_justified_expand_dims_like(direction, left),
-                  right, left),
-              tf.where(
-                  mcmc_util.left_justified_expand_dims_like(direction, left),
-                  left, right),
+              bu.where_left_justified_mask(direction, right, left),
+              bu.where_left_justified_mask(direction, left, right),
           ], axis=0)
           for left, right in zip(tf.nest.flatten(tree_final_states),
                                  tf.nest.flatten(tree_otherend_states))
@@ -920,27 +886,20 @@ class NoUTurnSampler(TransitionKernel):
 
       next_candidate_tree_state = TreeDoublingStateCandidate(
           state=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      is_sample_accepted, s0), s0, s1)
+              bu.where_left_justified_mask(is_sample_accepted, s0, s1)
               for s0, s1 in zip(next_state_parts, candidate_tree_state.state)
           ],
-          target=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  is_sample_accepted, next_target),
-              next_target, candidate_tree_state.target),
+          target=bu.where_left_justified_mask(
+              is_sample_accepted, next_target, candidate_tree_state.target),
           target_grad_parts=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      is_sample_accepted, grad0),
-                  grad0, grad1)
+              bu.where_left_justified_mask(is_sample_accepted, grad0, grad1)
               for grad0, grad1 in zip(next_target_grad_parts,
                                       candidate_tree_state.target_grad_parts)
           ],
-          energy=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  is_sample_accepted, next_target),
-              current_energy, candidate_tree_state.energy),
+          energy=bu.where_left_justified_mask(
+              is_sample_accepted,
+              current_energy,
+              candidate_tree_state.energy),
           weight=weight_sum)
 
       continue_tree = not_divergent & continue_tree_previous

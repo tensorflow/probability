@@ -37,9 +37,14 @@ __all__ = [
     'det',
     'diag',
     'diag_part',
+    'eig',
+    'eigh',
+    'eigvals',
+    'eigvalsh',
     'einsum',
     'eye',
     'inv',
+    'logdet',
     'lu',
     'matmul',
     'matvec',
@@ -56,11 +61,8 @@ __all__ = [
     'trace',
     'triangular_solve',
     # 'cross',
-    # 'eigh',
-    # 'eigvalsh',
     # 'expm',
     # 'global_norm',
-    # 'logdet',
     # 'logm',
     # 'lstsq',
     # 'l2_normalize'
@@ -134,6 +136,30 @@ def _eye(num_rows, num_columns=None, batch_shape=None,
   return x
 
 
+def _eig(tensor, name=None):
+  del name
+  tensor = ops.convert_to_tensor(tensor)
+  e, v = np.linalg.eig(tensor)
+  dt = tensor.dtype
+  if dt == np.float32:
+    out_dtype = np.complex64
+  elif dt == np.float64:
+    out_dtype = np.complex128
+  return e.astype(out_dtype), v.astype(out_dtype)
+
+
+def _eigvals(tensor, name=None):
+  del name
+  tensor = ops.convert_to_tensor(tensor)
+  e = np.linalg.eigvals(tensor)
+  dt = tensor.dtype
+  if dt == np.float32:
+    out_dtype = np.complex64
+  elif dt == np.float64:
+    out_dtype = np.complex128
+  return e.astype(out_dtype)
+
+
 def _lu_pivot_to_permutation(swaps, m):
   """Converts the pivot (row swaps) returned by LU to a permutation.
 
@@ -161,9 +187,9 @@ def _lu(input, output_idx_type=np.int32, name=None):  # pylint: disable=redefine
   input = ops.convert_to_tensor(input)
   if JAX_MODE:  # JAX uses XLA, which can do a batched factorization.
     lu_out, pivots = scipy_linalg.lu_factor(input)
-    from jax import lax_linalg  # pylint: disable=g-import-not-at-top
+    from jax import lax  # pylint: disable=g-import-not-at-top
     return Lu(lu_out,
-              lax_linalg.lu_pivots_to_permutation(pivots, lu_out.shape[-1]))
+              lax.linalg.lu_pivots_to_permutation(pivots, lu_out.shape[-1]))
   # Scipy can't batch, so we must do so manually.
   nbatch = int(np.prod(input.shape[:-2]))
   dim = input.shape[-1]
@@ -365,6 +391,18 @@ diag_part = utils.copy_docstring(
     lambda input, name=None: np.diagonal(  # pylint: disable=g-long-lambda
         ops.convert_to_tensor(input), axis1=-2, axis2=-1))
 
+eig = utils.copy_docstring('tf.linalg.eig', _eig)
+
+eigh = utils.copy_docstring(
+    'tf.linalg.eigh',
+    lambda tensor, name=None: np.linalg.eigh(tensor))
+
+eigvals = utils.copy_docstring('tf.linalg.eigvals', _eigvals)
+
+eigvalsh = utils.copy_docstring(
+    'tf.linalg.eigvalsh',
+    lambda tensor, name=None: np.linalg.eigvalsh(tensor))
+
 einsum = utils.copy_docstring(
     'tf.linalg.einsum',
     _einsum)
@@ -376,6 +414,10 @@ eye = utils.copy_docstring(
 inv = utils.copy_docstring(
     'tf.linalg.inv',
     lambda input, name=None: np.linalg.inv(input))
+
+logdet = utils.copy_docstring(
+    'tf.linalg.logdet',
+    lambda matrix, name=None: np.linalg.slogdet(matrix)[1])
 
 lu = utils.copy_docstring(
     'tf.linalg.lu',

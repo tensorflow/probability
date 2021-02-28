@@ -18,18 +18,21 @@ import functools
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import dtype_util
 
 from inference_gym.internal import data
 from inference_gym.targets import bayesian_model
 from inference_gym.targets import model
 from inference_gym.targets.ground_truth import radon_contextual_effects_minnesota
+from inference_gym.targets.ground_truth import radon_contextual_effects_minnesota_halfnormal
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
 __all__ = [
     'RadonContextualEffects',
-    'RadonContextualEffectsMinnesota'
+    'RadonContextualEffectsMinnesota',
+    'RadonContextualEffectsHalfNormalMinnesota'
 ]
 
 
@@ -40,14 +43,22 @@ def affine(x, kernel_diag, bias=None):
   return x * kernel_diag + bias
 
 
-def make_radon_prior(num_counties, dtype):
+def make_radon_prior(num_counties, dtype, prior_scale):
   """Generative process for the radon model with contextual effects."""
+  if prior_scale == 'uniform':
+    county_effect_scale = tfd.Uniform(low=tf.zeros([], dtype=dtype), high=100.)
+    log_radon_scale = tfd.Uniform(low=tf.zeros([], dtype=dtype), high=100.)
+  elif prior_scale == 'halfnormal':
+    county_effect_scale = tfd.HalfNormal(scale=tf.ones([], dtype=dtype))
+    log_radon_scale = tfd.HalfNormal(scale=tf.ones([], dtype=dtype))
+  else:
+    raise ValueError(prior_scale, ' is not a valid value for `prior_scale`')
+
   return tfd.JointDistributionNamed(
       dict(
           county_effect_mean=tfd.Normal(
               loc=tf.zeros([], dtype=dtype), scale=1.),
-          county_effect_scale=tfd.Uniform(
-              low=tf.zeros([], dtype=dtype), high=100.),
+          county_effect_scale=county_effect_scale,
           county_effect=(
               lambda county_effect_scale, county_effect_mean:  # pylint: disable=g-long-lambda
               tfd.Sample(
@@ -56,12 +67,12 @@ def make_radon_prior(num_counties, dtype):
           weight=tfd.Sample(
               tfd.Normal(loc=tf.zeros([], dtype=dtype), scale=1.),
               sample_shape=[3]),
-          log_radon_scale=tfd.Uniform(low=tf.zeros([], dtype=dtype), high=100.),
-          ))
+          log_radon_scale=log_radon_scale,
+      ))
 
 
-def make_radon_observation_dist(
-    params, log_uranium, floor, county, floor_by_county):
+def make_radon_observation_dist(params, log_uranium, floor, county,
+                                floor_by_county):
   """Likelihood of observed data under the contextual effects radon model."""
   floor = tf.cast(floor, dtype=log_uranium.dtype)
   return tfd.Normal(
@@ -101,27 +112,40 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
 
   ```none
 
-  county_effect_mean ~ Normal(loc=0., scale=1.)
-  county_effect_scale ~ Uniform(low=0., high=100.)
-  county_effect ~ Sample(
-      Normal(loc=county_effect_mean, scale=county_effect_scale),
-      sample_shape=[num_counties])
+  county_effect_mean ~ Normal(loc=0, scale=1)
+  county_effect_scale ~ Uniform(low=0, high=100)
+  for i in range(num_counties):
+    county_effect[i] ~ Normal(loc=county_effect_mean,
+                              scale=county_effect_scale)
+  for j in range(3):
+    weight[j] ~ Normal(loc=0, scale=1)
+  log_radon_scale ~ Uniform(low=0, high=100)
 
-  weight ~ Sample(Normal(loc=0., scale=1.), sample_shape=[3])
-  log_radon_scale ~ Uniform(low=0., high=100.)
-
-  log_radon ~ Normal(
-      loc=log_uranium * weight[1]           # effect of soil uranium
-          + floor * weight[2]               # effect of floor
-          + floor_by_county * weight[3]     # effect of mean floor by county
-          + gather(county_effect, county),  # effect of county
-      scale=log_radon_scale)
+  for k in range(num_houses):
+    log_radon[k] ~ Normal(
+        loc=log_uranium * weight[1]           # effect of soil uranium
+            + floor * weight[2]               # effect of floor
+            + floor_by_county * weight[3]     # effect of mean floor by county
+            + county_effect[county[k]],       # effect of county
+        scale=log_radon_scale)
   ```
 
   This model is based on an example from [1] and is the same as the Stan model
   at
   <https://mc-stan.org/users/documentation/case-studies/radon.html
-  #Correlations-among-levels>
+  #Correlations-among-levels>.
+
+  Initializing this model with a `halfnormal` value for `prior_scale` will
+  construct a modified version of this model in which the scales for the prior
+  are constructed with a `HalfNormal` distribution instead of a `Uniform`
+  distribution.
+
+  ```none
+
+  county_effect_scale ~ HalfNormal(scale=1.)
+  log_radon_scale ~ HalfNormal(scale=1.)
+
+  ```
 
   #### References
 
@@ -131,21 +155,21 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
       Reference Manual, Version 2.18.0. http://mc-stan.org
   """
 
-  def __init__(
-      self,
-      num_counties,
-      train_log_uranium,
-      train_floor,
-      train_county,
-      train_floor_by_county,
-      train_log_radon,
-      test_log_uranium=None,
-      test_floor=None,
-      test_county=None,
-      test_floor_by_county=None,
-      test_log_radon=None,
-      name='radon_contextual_effects',
-      pretty_name='Radon Contextual Effects'):
+  def __init__(self,
+               num_counties,
+               train_log_uranium,
+               train_floor,
+               train_county,
+               train_floor_by_county,
+               train_log_radon,
+               test_log_uranium=None,
+               test_floor=None,
+               test_county=None,
+               test_floor_by_county=None,
+               test_log_radon=None,
+               prior_scale='uniform',
+               name='radon_contextual_effects',
+               pretty_name='Radon Contextual Effects'):
     """Construct the hierarchical radon model with contextual effects.
 
     Args:
@@ -182,6 +206,11 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
         Radon measurement for each house (the dependent variable in the model).
         Can be `None`, in which case test-related sample transformations are not
         computed.
+      prior_scale: String value. The default `uniform` value constructs the
+        prior distribution's `county_effect_scale` and `log_radon_scale` with a
+        `Uniform` distribution as in the original Stan model. A `halfnormal`
+        value constructs the prior distribution's `county_effect_scale` and
+        `log_radon_scale` with a `HalfNormal` distribution.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -201,8 +230,8 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
                 *test_data))
 
       dtype = train_log_radon.dtype
-      self._prior_dist = make_radon_prior(num_counties, dtype=dtype)
-
+      self._prior_dist = make_radon_prior(
+          num_counties, dtype=dtype, prior_scale=prior_scale)
       self._train_log_likelihood_fn = functools.partial(
           radon_log_likelihood_fn,
           log_uranium=train_log_uranium,
@@ -249,16 +278,22 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
       self._test_county = test_county
       self._test_floor_by_county = test_floor_by_county
       self._num_counties = num_counties
+      self._prior_scale = prior_scale
 
     super(RadonContextualEffects, self).__init__(
         default_event_space_bijector={
-            'county_effect_mean': tfb.Identity(),
-            'county_effect_scale': tfb.Sigmoid(
-                low=tf.zeros([], dtype=dtype), high=100.),
-            'county_effect': tfb.Identity(),
-            'weight': tfb.Identity(),
-            'log_radon_scale': tfb.Sigmoid(
-                low=tf.zeros([], dtype=dtype), high=100.)
+            'county_effect_mean':
+                tfb.Identity(),
+            'county_effect_scale':
+                tfb.Sigmoid(low=tf.zeros([], dtype=dtype), high=100.)
+                if self._prior_scale == 'uniform' else tfb.Softplus(),
+            'county_effect':
+                tfb.Identity(),
+            'weight':
+                tfb.Identity(),
+            'log_radon_scale':
+                tfb.Sigmoid(low=tf.zeros([], dtype=dtype), high=100.)
+                if self._prior_scale == 'uniform' else tfb.Softplus()
         },
         event_shape=self._prior_dist.event_shape,
         dtype=self._prior_dist.dtype,
@@ -313,12 +348,44 @@ class RadonContextualEffectsMinnesota(RadonContextualEffects):
 
   GROUND_TRUTH_MODULE = radon_contextual_effects_minnesota
 
-  def __init__(self):
+  def __init__(self, dtype=tf.float64):
     dataset = data.radon(state='MN')
     for key in list(dataset.keys()):
       if key.startswith('test_'):
         del dataset[key]
+      elif dtype_util.is_floating(dataset[key].dtype):
+        dataset[key] = tf.cast(dataset[key], dtype)
     super(RadonContextualEffectsMinnesota, self).__init__(
         name='radon_contextual_effects_minnesota',
         pretty_name='Radon Contextual Effects Minnesota',
+        **dataset)
+
+
+class RadonContextualEffectsHalfNormalMinnesota(RadonContextualEffects):
+  """Bayesian hierarchical model to predict radon measurements in houses.
+
+  This model uses the Radon data set that accompanies the example in [1],
+  filtered to include only houses in Minnesota. It uses the form of the model
+  with a `HalfNormal` prior on the scale parameters.
+
+  #### References
+
+  [1] Gelman, A., & Hill, J. (2007). Data Analysis Using Regression and
+      Multilevel/Hierarchical Models (1st ed.). Cambridge University Press.
+      http://www.stat.columbia.edu/~gelman/arm/examples/radon/
+  """
+
+  GROUND_TRUTH_MODULE = radon_contextual_effects_minnesota_halfnormal
+
+  def __init__(self, dtype=tf.float64):
+    dataset = data.radon(state='MN')
+    for key in list(dataset.keys()):
+      if key.startswith('test_'):
+        del dataset[key]
+      elif dtype_util.is_floating(dataset[key].dtype):
+        dataset[key] = tf.cast(dataset[key], dtype)
+    super(RadonContextualEffectsHalfNormalMinnesota, self).__init__(
+        name='radon_contextual_effects_halfnormal_minnesota',
+        pretty_name='Radon Contextual Effects HalfNormal Minnesota',
+        prior_scale='halfnormal',
         **dataset)

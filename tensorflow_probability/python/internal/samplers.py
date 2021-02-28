@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import hashlib
+import warnings
 
 # Dependency imports
 
@@ -30,8 +31,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import prefer_static as ps
 
 
+# ** See PRNGS.md for more detailed discussion about this packge. **
+
 __all__ = [
     'categorical',
+    'fold_in',
     'gamma',
     'is_stateful_seed',
     'normal',
@@ -42,7 +46,6 @@ __all__ = [
     'uniform',
     'zeros_seed',
 ]
-
 
 JAX_MODE = False
 
@@ -68,6 +71,13 @@ def sanitize_seed(seed, salt=None, name=None):
       if JAX_MODE:
         raise ValueError(
             'TFP-on-JAX requires a `jax.random.PRNGKey` `seed` arg.')
+      elif (tf.distribute.get_replica_context() is not None and
+            tf.distribute.get_replica_context().num_replicas_in_sync > 1):
+        warnings.warn(
+            'Using stateful random seeds in replicated context can yield '
+            'unreproducible results. For more details, see '
+            'https://github.com/tensorflow/probability/blob/master/PRNGS.md')
+
       # TODO(b/147874898): Deprecate `int` seeds, migrate ints to stateless?
       if salt is not None:
         # Prefer to incorporate salt as a constant.
@@ -87,14 +97,22 @@ def sanitize_seed(seed, salt=None, name=None):
 
     if salt is not None:
       salt = int(hashlib.sha512(str(salt).encode('utf-8')).hexdigest(), 16)
-      if JAX_MODE:
-        from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
-        seed = jaxrand.fold_in(seed, salt & (2**32 - 1))
-      else:
-        seed = tf.bitwise.bitwise_xor(
-            seed, np.uint64([salt & (2**64 - 1)]).view(np.int32))
+      seed = fold_in(seed, salt)
 
     return tf.convert_to_tensor(seed, dtype=SEED_DTYPE, name='seed')
+
+
+def fold_in(seed, salt):
+  """Folds salt into seed to form a new seed."""
+  if JAX_MODE:
+    from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
+    return jaxrand.fold_in(seed, salt & (2**32 - 1))
+  if isinstance(salt, (six.integer_types)):
+    seed = tf.bitwise.bitwise_xor(
+        seed, np.uint64([salt & (2**64 - 1)]).view(np.int32))
+  else:
+    seed = tf.random.experimental.stateless_fold_in(seed, salt)
+  return seed
 
 
 def split_seed(seed, n=2, salt=None, name=None):

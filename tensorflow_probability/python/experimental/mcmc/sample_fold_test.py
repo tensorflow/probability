@@ -44,15 +44,58 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
-        reducer=fake_reducer,
-    )
+        reducer=fake_reducer)
     reduction_rslt, last_sample, kernel_results = self.evaluate([
-        reduction_rslt, last_sample, kr
-    ])
+        reduction_rslt, last_sample, kr])
     self.assertEqual(3, reduction_rslt)
     self.assertEqual(5, last_sample)
     self.assertEqual(5, kernel_results.counter_1)
     self.assertEqual(10, kernel_results.counter_2)
+
+    # Warm-restart the underlying kernel but not the reduction
+    reduction_rslt_2, last_sample_2, kr_2 = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=last_sample,
+        kernel=fake_kernel,
+        reducer=fake_reducer,
+        previous_kernel_results=kernel_results)
+    reduction_rslt_2, last_sample_2, kernel_results_2 = self.evaluate([
+        reduction_rslt_2, last_sample_2, kr_2])
+    self.assertEqual(8, reduction_rslt_2)
+    self.assertEqual(10, last_sample_2)
+    self.assertEqual(10, kernel_results_2.counter_1)
+    self.assertEqual(20, kernel_results_2.counter_2)
+
+  def test_reducer_warm_restart(self):
+    fake_kernel = test_fixtures.TestTransitionKernel()
+    fake_reducer = test_fixtures.NaiveMeanReducer()
+    red_res, last_sample, kr, red_states = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=0.,
+        kernel=fake_kernel,
+        reducer=fake_reducer,
+        return_final_reducer_states=True)
+    red_res, last_sample, kernel_results, red_states = self.evaluate([
+        red_res, last_sample, kr, red_states])
+    self.assertEqual(3, red_res)
+    self.assertEqual(5, last_sample)
+    self.assertEqual(5, kernel_results.counter_1)
+    self.assertEqual(10, kernel_results.counter_2)
+
+    # Warm-restart the underlying kernel and the reduction
+    reduction_rslt_2, last_sample_2, kr_2 = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=last_sample,
+        previous_kernel_results=kernel_results,
+        kernel=fake_kernel,
+        reducer=fake_reducer,
+        previous_reducer_state=red_states)
+    reduction_rslt_2, last_sample_2, kernel_results_2 = self.evaluate([
+        reduction_rslt_2, last_sample_2, kr_2])
+    self.assertEqual(5.5, reduction_rslt_2)
+    self.assertEqual(10, last_sample_2)
+    self.assertEqual(10, kernel_results_2.counter_1)
+    self.assertEqual(20, kernel_results_2.counter_2)
 
   @parameterized.parameters(1., 2.)
   def test_current_state(self, curr_state):
@@ -62,14 +105,32 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=5,
         current_state=curr_state,
         kernel=fake_kernel,
-        reducer=fake_reducer,
-    )
+        reducer=fake_reducer)
     reduction_rslt, last_sample, kernel_results = self.evaluate([
-        reduction_rslt, last_sample, kr
-    ])
+        reduction_rslt, last_sample, kr])
     self.assertEqual(
         np.mean(np.arange(curr_state + 1, curr_state + 6)), reduction_rslt)
     self.assertEqual(curr_state + 5, last_sample)
+    self.assertEqual(5, kernel_results.counter_1)
+    self.assertEqual(10, kernel_results.counter_2)
+
+  def test_reducing_kernel_results(self):
+    kernel = test_fixtures.TestTransitionKernel()
+    def reduction_target(current_state, kernel_results):
+      del current_state
+      assert isinstance(
+          kernel_results, test_fixtures.TestTransitionKernelResults)
+      return kernel_results.counter_2
+    reduction = tfp.experimental.mcmc.ExpectationsReducer(reduction_target)
+    reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
+        num_steps=5,
+        current_state=0.,
+        kernel=kernel,
+        reducer=reduction)
+    reduction_rslt, last_sample, kernel_results = self.evaluate([
+        reduction_rslt, last_sample, kr])
+    self.assertEqual(np.mean(np.arange(2, 12, 2)), reduction_rslt)
+    self.assertEqual(5, last_sample)
     self.assertEqual(5, kernel_results.counter_1)
     self.assertEqual(10, kernel_results.counter_2)
 
@@ -78,17 +139,14 @@ class SampleFoldTest(test_util.TestCase):
     fake_reducers = [
         [test_fixtures.NaiveMeanReducer(),
          tfp.experimental.mcmc.CovarianceReducer()],
-        [test_fixtures.NaiveMeanReducer()]
-    ]
+        [test_fixtures.NaiveMeanReducer()]]
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
-        reducer=fake_reducers,
-    )
+        reducer=fake_reducers)
     reduction_rslt, last_sample, kernel_results = self.evaluate([
-        reduction_rslt, last_sample, kr
-    ])
+        reduction_rslt, last_sample, kr])
     self.assertEqual(2, len(reduction_rslt))
     self.assertEqual(2, len(reduction_rslt[0]))
     self.assertEqual(1, len(reduction_rslt[1]))
@@ -123,8 +181,7 @@ class SampleFoldTest(test_util.TestCase):
         current_state=tf.convert_to_tensor(
             [[0., 0., 0.], [0., 0., 0.]]),
         kernel=fake_kernel,
-        reducer=cov_reducer,
-    )
+        reducer=cov_reducer)
     reduction_rslt = self.evaluate(reduction_rslt)
     self.assertEqual((2, 3, 3), reduction_rslt.shape)
     self.assertAllEqual(np.ones(reduction_rslt.shape) * 2, reduction_rslt)
@@ -139,18 +196,15 @@ class SampleFoldTest(test_util.TestCase):
         current_state=0.,
         kernel=fake_kernel,
         reducer=fake_reducer,
-        seed=seed
-    )
+        seed=seed)
     second_reduction_rslt, _, _ = tfp.experimental.mcmc.sample_fold(
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
         reducer=fake_reducer,
-        seed=seed
-    )
+        seed=seed)
     first_reduction_rslt, second_reduction_rslt = self.evaluate([
-        first_reduction_rslt, second_reduction_rslt
-    ])
+        first_reduction_rslt, second_reduction_rslt])
     self.assertEqual(first_reduction_rslt, second_reduction_rslt)
 
   def test_thinning_and_burnin(self):
@@ -162,13 +216,11 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=fake_reducer,
         num_burnin_steps=10,
-        num_steps_between_results=1,
-    )
+        num_steps_between_results=1)
     reduction_rslt, last_sample, kernel_results = self.evaluate([
         reduction_rslt,
         last_sample,
-        kr
-    ])
+        kr])
     self.assertEqual(16, reduction_rslt)
     self.assertEqual(20, last_sample)
     self.assertEqual(
@@ -185,13 +237,11 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=fake_reducer,
         num_burnin_steps=tf.convert_to_tensor(10),
-        num_steps_between_results=tf.convert_to_tensor(1),
-    )
+        num_steps_between_results=tf.convert_to_tensor(1))
     reduction_rslt, last_sample, kernel_results = self.evaluate([
         reduction_rslt,
         last_sample,
-        kr
-    ])
+        kr])
     self.assertEqual(16, reduction_rslt)
     self.assertEqual(20, last_sample)
     self.assertEqual(
@@ -207,11 +257,9 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=None,
         num_burnin_steps=10,
-        num_steps_between_results=1,
-    )
+        num_steps_between_results=1)
     last_sample, kernel_results = self.evaluate([
-        last_sample, kr
-    ])
+        last_sample, kr])
     self.assertIsNone(reduction_rslt)
     self.assertEqual(20, last_sample)
     self.assertEqual(20, kernel_results.counter_1)
@@ -225,11 +273,9 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=[],
         num_burnin_steps=10,
-        num_steps_between_results=1,
-    )
+        num_steps_between_results=1)
     last_sample, kernel_results = self.evaluate([
-        last_sample, kr
-    ])
+        last_sample, kr])
     self.assertEqual([], reduction_rslt)
     self.assertEqual(20, last_sample)
     self.assertEqual(20, kernel_results.counter_1)
@@ -246,186 +292,93 @@ class SampleChainTest(test_util.TestCase):
 
   def test_basic_operation(self):
     kernel = test_fixtures.TestTransitionKernel()
-    samples, kernel_results = tfp.experimental.mcmc.sample_chain(
+    result = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=2,
         current_state=0.,
         kernel=kernel,
         seed=test_util.test_seed())
+    samples = result.trace
+    kernel_results = result.final_kernel_results
     self.assertAllClose(
         [2], tensorshape_util.as_list(samples.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([1, 2], samples)
-    self.assertAllClose([1, 2], kernel_results.counter_1)
-    self.assertAllClose([2, 4], kernel_results.counter_2)
+    self.assertAllClose(2, kernel_results.counter_1)
+    self.assertAllClose(4, kernel_results.counter_2)
 
-  def test_basic_operation_legacy(self):
-    kernel = test_fixtures.TestTransitionKernel(accepts_seed=False)
-    samples, kernel_results = tfp.experimental.mcmc.sample_chain(
+    # Warm-restart the underlying kernel.  The Trace does not support warm
+    # restart.
+    result_2 = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=2,
-        current_state=0.,
-        kernel=kernel)
-
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(samples.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
-
-    samples, kernel_results = self.evaluate([samples, kernel_results])
-    self.assertAllClose([1, 2], samples)
-    self.assertAllClose([1, 2], kernel_results.counter_1)
-    self.assertAllClose([2, 4], kernel_results.counter_2)
+        **result.resume_kwargs)
+    samples_2, kernel_results_2 = self.evaluate(
+        [result_2.trace, result_2.final_kernel_results])
+    self.assertAllClose([3, 4], samples_2)
+    self.assertAllClose(4, kernel_results_2.counter_1)
+    self.assertAllClose(8, kernel_results_2.counter_2)
 
   def test_burn_in(self):
     kernel = test_fixtures.TestTransitionKernel()
-    samples, kernel_results = tfp.experimental.mcmc.sample_chain(
+    result = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=2,
         current_state=0.,
         kernel=kernel,
         num_burnin_steps=1,
         seed=test_util.test_seed())
+    samples = result.trace
+    kernel_results = result.final_kernel_results
 
     self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([2, 3], samples)
-    self.assertAllClose([2, 3], kernel_results.counter_1)
-    self.assertAllClose([4, 6], kernel_results.counter_2)
+    self.assertAllClose(3, kernel_results.counter_1)
+    self.assertAllClose(6, kernel_results.counter_2)
 
   def test_thinning(self):
     kernel = test_fixtures.TestTransitionKernel()
-    samples, kernel_results = tfp.experimental.mcmc.sample_chain(
+    result = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=2,
         current_state=0.,
         kernel=kernel,
         num_steps_between_results=2,
         seed=test_util.test_seed())
+    samples = result.trace
+    kernel_results = result.final_kernel_results
 
     self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_1.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(kernel_results.counter_2.shape))
 
     samples, kernel_results = self.evaluate([samples, kernel_results])
     self.assertAllClose([3, 6], samples)
-    self.assertAllClose([3, 6], kernel_results.counter_1)
-    self.assertAllClose([6, 12], kernel_results.counter_2)
-
-  def test_default_trace_named_tuple(self):
-    kernel = test_fixtures.TestTransitionKernel()
-    res = tfp.experimental.mcmc.sample_chain(
-        num_results=2,
-        current_state=0.,
-        kernel=kernel,
-        seed=test_util.test_seed())
-
-    self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(res.trace.counter_1.shape))
-    self.assertAllClose(
-        [2], tensorshape_util.as_list(res.trace.counter_2.shape))
-
-    res = self.evaluate(res)
-    self.assertAllClose([1, 2], res.all_states)
-    self.assertAllClose([1, 2], res.trace.counter_1)
-    self.assertAllClose([2, 4], res.trace.counter_2)
-
-  def test_no_trace_fn(self):
-    kernel = test_fixtures.TestTransitionKernel()
-    samples = tfp.experimental.mcmc.sample_chain(
-        num_results=2,
-        current_state=0.,
-        kernel=kernel,
-        trace_fn=None,
-        seed=test_util.test_seed())
-    self.assertAllClose([2], tensorshape_util.as_list(samples.shape))
-    samples = self.evaluate(samples)
-    self.assertAllClose([1, 2], samples)
+    self.assertAllClose(6, kernel_results.counter_1)
+    self.assertAllClose(12, kernel_results.counter_2)
 
   def test_custom_trace(self):
     kernel = test_fixtures.TestTransitionKernel()
-    res = tfp.experimental.mcmc.sample_chain(
+    res = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=2,
         current_state=0.,
         kernel=kernel,
         trace_fn=lambda *args: args,
         seed=test_util.test_seed())
+    trace = res.trace
 
-    self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
-    self.assertAllClose([2], tensorshape_util.as_list(res.trace[0].shape))
+    self.assertAllClose([2], tensorshape_util.as_list(trace[0].shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(res.trace[1].counter_1.shape))
+        [2], tensorshape_util.as_list(trace[1].counter_1.shape))
     self.assertAllClose(
-        [2], tensorshape_util.as_list(res.trace[1].counter_2.shape))
+        [2], tensorshape_util.as_list(trace[1].counter_2.shape))
 
-    res = self.evaluate(res)
-    self.assertAllClose([1, 2], res.all_states)
-    self.assertAllClose([1, 2], res.trace[0])
-    self.assertAllClose([1, 2], res.trace[1].counter_1)
-    self.assertAllClose([2, 4], res.trace[1].counter_2)
-
-  def test_checkpointing(self):
-    kernel = test_fixtures.TestTransitionKernel()
-    res = tfp.experimental.mcmc.sample_chain(
-        num_results=2,
-        current_state=0.,
-        kernel=kernel,
-        trace_fn=None,
-        return_final_kernel_results=True,
-        seed=test_util.test_seed())
-
-    self.assertAllClose([2], tensorshape_util.as_list(res.all_states.shape))
-    self.assertEqual((), res.trace)
-    self.assertAllClose(
-        [], tensorshape_util.as_list(res.final_kernel_results.counter_1.shape))
-    self.assertAllClose(
-        [], tensorshape_util.as_list(res.final_kernel_results.counter_2.shape))
-
-    res = self.evaluate(res)
-    self.assertAllClose([1, 2], res.all_states)
-    self.assertAllClose(2, res.final_kernel_results.counter_1)
-    self.assertAllClose(4, res.final_kernel_results.counter_2)
-
-  def test_warnings_default(self):
-    with warnings.catch_warnings(record=True) as triggered:
-      kernel = test_fixtures.TestTransitionKernel()
-      tfp.experimental.mcmc.sample_chain(
-          num_results=2,
-          current_state=0.,
-          kernel=kernel,
-          seed=test_util.test_seed())
-    self.assertTrue(
-        any('Tracing all kernel results by default is deprecated' in str(
-            warning.message) for warning in triggered))
-
-  def test_no_warnings_explicit(self):
-    with warnings.catch_warnings(record=True) as triggered:
-      kernel = test_fixtures.TestTransitionKernel()
-      tfp.experimental.mcmc.sample_chain(
-          num_results=2,
-          current_state=0.,
-          kernel=kernel,
-          trace_fn=lambda current_state, kernel_results: kernel_results,
-          seed=test_util.test_seed())
-    self.assertFalse(
-        any('Tracing all kernel results by default is deprecated' in str(
-            warning.message) for warning in triggered))
+    trace = self.evaluate(trace)
+    self.assertAllClose([1, 2], trace[0])
+    self.assertAllClose([1, 2], trace[1].counter_1)
+    self.assertAllClose([2, 4], trace[1].counter_2)
 
   def test_is_calibrated(self):
     with warnings.catch_warnings(record=True) as triggered:
       kernel = test_fixtures.TestTransitionKernel(is_calibrated=False)
-      tfp.experimental.mcmc.sample_chain(
+      tfp.experimental.mcmc.sample_chain_with_burnin(
           num_results=2,
           current_state=0.,
           kernel=kernel,
@@ -448,12 +401,12 @@ class SampleChainTest(test_util.TestCase):
           target_log_prob_fn=log_prob,
           num_leapfrog_steps=3,
           step_size=1e-3)
-      return tfp.experimental.mcmc.sample_chain(
+      results = tfp.experimental.mcmc.sample_chain_with_burnin(
           num_results=5,
           num_burnin_steps=4,
           current_state=initial_state,
-          kernel=kernel,
-          trace_fn=None)
+          kernel=kernel)
+      return results.trace
 
     # Checking that shape inference doesn't fail.
     sample(2)
@@ -461,24 +414,21 @@ class SampleChainTest(test_util.TestCase):
   def test_seed_reproducibility(self):
     first_fake_kernel = test_fixtures.RandomTransitionKernel()
     second_fake_kernel = test_fixtures.RandomTransitionKernel()
-    seed = samplers.sanitize_seed(test_util.test_seed())
-    first_final_state = tfp.experimental.mcmc.sample_chain(
+    seed = test_util.test_seed(sampler_type='stateless')
+    first_trace = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=5,
         current_state=0.,
         kernel=first_fake_kernel,
-        seed=seed,
-    )
-    second_final_state = tfp.experimental.mcmc.sample_chain(
+        seed=seed).trace
+    second_trace = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=5,
         current_state=1.,  # difference should be irrelevant
         kernel=second_fake_kernel,
-        seed=seed,
-    )
-    first_final_state, second_final_state = self.evaluate([
-        first_final_state, second_final_state
-    ])
+        seed=seed).trace
+    first_trace, second_trace = self.evaluate([
+        first_trace, second_trace])
     self.assertAllCloseNested(
-        first_final_state, second_final_state, rtol=1e-6)
+        first_trace, second_trace, rtol=1e-6)
 
 
 @test_util.test_graph_mode_only
@@ -502,7 +452,7 @@ class SampleChainGraphTest(test_util.TestCase):
       z = tf.linalg.triangular_solve(true_cov_chol, z[..., tf.newaxis])[..., 0]
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
-    states = tfp.experimental.mcmc.sample_chain(
+    states = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
         kernel=tfp.mcmc.HamiltonianMonteCarlo(
@@ -511,8 +461,7 @@ class SampleChainGraphTest(test_util.TestCase):
             num_leapfrog_steps=2),
         num_burnin_steps=20,
         num_steps_between_results=1,
-        trace_fn=None,
-        seed=test_util.test_seed())
+        seed=test_util.test_seed()).trace
 
     self.assertAllEqual(dict(target_calls=1), counter)
     states = tf.stack(states, axis=-1)

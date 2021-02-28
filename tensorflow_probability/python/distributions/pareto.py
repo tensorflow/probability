@@ -31,6 +31,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -102,8 +103,16 @@ class Pareto(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(concentration=0, scale=0)
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+    # pylint: enable=g-long-lambda
 
   @property
   def scale(self):
@@ -135,8 +144,13 @@ class Pareto(distribution.Distribution):
          self._batch_shape_tensor(concentration=concentration, scale=scale)],
         axis=0)
     sampled = samplers.uniform(shape, maxval=1., seed=seed, dtype=self.dtype)
-    log_sample = tf.math.log(scale) - tf.math.log1p(-sampled) / concentration
-    return tf.exp(log_sample)
+    log_std_sample = -tf.math.log1p(-sampled) / concentration
+    std_sample = tf.math.exp(log_std_sample)
+    return tf.where(
+        std_sample > 0.,
+        # This expression is more accurate when std_sample doesn't underflow.
+        scale * std_sample,
+        tf.math.exp(tf.math.log(scale) + log_std_sample))
 
   def _log_prob(self, x):
     concentration = tf.convert_to_tensor(self.concentration)
@@ -147,9 +161,11 @@ class Pareto(distribution.Distribution):
     ] if self.validate_args else []):
 
       def log_prob_on_support(z):
-        return (tf.math.log(concentration) +
-                concentration * tf.math.log(scale) -
-                (concentration + 1.) * tf.math.log(z))
+        # This can also be written as log(c) + c * log(s) - (c + 1) * log(z).
+        # However, when c >> 1 and s and z are of the same magnitude, this can
+        # lead to loss of precision (log(c) vs. log(c) - log(z)).
+        return (tf.math.log(concentration / z) +
+                concentration * tf.math.log(scale / z))
 
       return self._extend_support(
           x, scale, log_prob_on_support, alt=-np.inf)

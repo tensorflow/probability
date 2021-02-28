@@ -302,6 +302,10 @@ class BetaTest(test_util.TestCase):
     self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
     self.assertAllClose(sp_stats.beta.cdf(x, a, b), actual, rtol=rtol, atol=0)
 
+  def testBetaCdfBeyondSupport(self):
+    cdf = tfd.Beta(2., 3., validate_args=False).cdf([-3.7, 1.03])
+    self.assertAllEqual([0., 1.], self.evaluate(cdf))
+
   @parameterized.parameters((np.float32, 5e-3), (np.float64, 1e-4))
   def testBetaLogCdf(self, dt, rtol):
     shape = (30, 40, 50)
@@ -421,7 +425,7 @@ class BetaTest(test_util.TestCase):
     dist = tfd.Beta(a, b, validate_args=True)
     eps = 1e-6
     x = np.array([-2.3, -eps, 1. + eps, 1.4])
-    bijector_inverse_x = dist._experimental_default_event_space_bijector(
+    bijector_inverse_x = dist.experimental_default_event_space_bijector(
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 
