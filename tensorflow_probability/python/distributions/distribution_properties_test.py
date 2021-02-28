@@ -47,8 +47,6 @@ from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
 
 
-<<<<<<< HEAD
-=======
 WORKING_PRECISION_TEST_BLOCK_LIST = (
     # The difficulty concerns Mixtures of component distributions whose samples
     # have different dtypes.
@@ -88,7 +86,6 @@ NANS_EVEN_IN_SAMPLE_LIST = (
     'Mixture',  # b/169847344.  Not a nan, but can't always sample from Mixture
     'TransformedDistribution',  # Bijectors may introduce nans
 )
->>>>>>> f7fb32575bc5fad85191af88fd7c48dcabb6d310
 
 # Batch slicing requires implementing `_params_event_ndims`.  Generic
 # instantiation (per `instantiable_base_dists`, below) also requires

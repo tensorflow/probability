@@ -113,11 +113,8 @@ from tensorflow_probability.python.distributions.relaxed_onehot_categorical impo
 from tensorflow_probability.python.distributions.sample import Sample
 from tensorflow_probability.python.distributions.sigmoid_beta import SigmoidBeta
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
-<<<<<<< HEAD
 from tensorflow_probability.python.distributions.skew_generalized_normal import SkewGeneralizedNormal
-=======
 from tensorflow_probability.python.distributions.skellam import Skellam
->>>>>>> f7fb32575bc5fad85191af88fd7c48dcabb6d310
 from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
 from tensorflow_probability.python.distributions.stopping_ratio_logistic import StoppingRatioLogistic
 from tensorflow_probability.python.distributions.student_t import StudentT
@@ -232,11 +229,8 @@ __all__ = [
     'Sample',
     'SigmoidBeta',
     'SinhArcsinh',
-<<<<<<< HEAD
     'SkewGeneralizedNormal',
-=======
     'Skellam',
->>>>>>> f7fb32575bc5fad85191af88fd7c48dcabb6d310
     'SphericalUniform',
     'StoppingRatioLogistic',
     'StudentT',
