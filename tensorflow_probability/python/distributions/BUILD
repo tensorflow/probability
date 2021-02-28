@@ -1863,6 +1863,7 @@ multi_substrate_py_library(
     ],
 )
 
+multi_substrate_py_library(
     name = "skellam",
     srcs = ["skellam.py"],
     deps = [
