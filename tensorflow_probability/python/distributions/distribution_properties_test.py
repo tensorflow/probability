@@ -93,6 +93,7 @@ NANS_EVEN_IN_SAMPLE_LIST = (
 # without that.  Of those, this variable lists the ones that do not support
 # batch slicing.
 INSTANTIABLE_BUT_NOT_SLICABLE = (
+    'BatchBroadcast',
     'BatchReshape',
     'Mixture',
     'QuantizedDistribution',
@@ -102,7 +103,6 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 EVENT_SPACE_BIJECTOR_IS_BROKEN = [
     'InverseGamma',  # TODO(b/143090143): Enable this when the bug is fixed.
                      # (Reciprocal(Softplus(x)) -> inf for small x)
-    'Sample',  # TODO(b/168139745): Needs transpose before calling underlying.
 ]
 
 SLICING_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-5)
@@ -256,10 +256,9 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
         # domain. This is the shape of `y` in R**n, such that
         # x = event_space_bijector(y) has the event shape of the distribution.
         data.draw(tfp_hps.broadcasting_shapes(
-            tensorshape_util.concatenate(
-                dist.batch_shape,
-                event_space_bijector.inverse_event_shape(
-                    dist.event_shape)), n=1))[0])
+            event_space_bijector.inverse_event_shape(
+                tensorshape_util.concatenate(
+                    dist.batch_shape, dist.event_shape)), n=1))[0])
 
     y = data.draw(
         tfp_hps.constrained_tensors(

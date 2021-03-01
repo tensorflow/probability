@@ -440,6 +440,7 @@ convert_to_shape_tensor = _prefer_static(
 cumprod = _prefer_static(tf.math.cumprod, nptf.math.cumprod)
 cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)
+not_equal = _prefer_static(tf.not_equal, nptf.not_equal)
 expm1 = _prefer_static(tf.math.expm1, nptf.math.expm1)
 floor = _prefer_static(tf.math.floor, nptf.math.floor)
 fill = _prefer_static(tf.fill, nptf.fill)

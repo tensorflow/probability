@@ -21,6 +21,7 @@ from __future__ import print_function
 
 # Distributions:
 from tensorflow_probability.python.distributions.autoregressive import Autoregressive
+from tensorflow_probability.python.distributions.batch_broadcast import BatchBroadcast
 from tensorflow_probability.python.distributions.batch_concat import BatchConcat
 from tensorflow_probability.python.distributions.batch_reshape import BatchReshape
 from tensorflow_probability.python.distributions.bates import Bates
@@ -164,6 +165,7 @@ __all__ = [
     'ReparameterizationType',
     'Distribution',
     'Autoregressive',
+    'BatchBroadcast',
     'BatchReshape',
     'Bates',
     'Bernoulli',

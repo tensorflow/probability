@@ -127,6 +127,7 @@ TF2_FRIENDLY_DISTS = (
 # `_instantiable_base_dists`, below.
 SPECIAL_DISTS = (
     'Autoregressive',
+    'BatchBroadcast',  # (has strategy)
     'BatchReshape',  # (has strategy)
     'Blockwise',
     'Distribution',  # Base class; not a distribution at all
@@ -489,6 +490,7 @@ del _instantiable_base_dists
 
 
 INSTANTIABLE_META_DISTS = (
+    'BatchBroadcast',
     'BatchReshape',
     'Independent',
     'Mixture',
@@ -863,6 +865,75 @@ def spherical_uniforms(
 
   result_dist = tfd.SphericalUniform(
       dimension=event_dim, batch_shape=batch_shape, validate_args=validate_args)
+  return result_dist
+
+
+@hps.composite
+def batch_broadcasts(
+    draw, batch_shape=None, event_dim=None,
+    enable_vars=False, depth=None,
+    eligibility_filter=lambda name: True, validate_args=True):
+  """Strategy for drawing `BatchBroadcast` distributions.
+
+  The underlying distribution is drawn from the `distributions` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      `BatchBroadcast` distribution.  Note that the underlying distribution will
+      in general have a different batch shape, to make the broadcast
+      non-trivial.  Hypothesis will pick one if omitted.
+    event_dim: Optional Python int giving the size of each of the underlying
+      distribution's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
+      `tfp.util.TransformedVariable`}
+    depth: Python `int` giving maximum nesting depth of compound Distributions.
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
+
+  Returns:
+    dists: A strategy for drawing `BatchBroadcast` distributions with the
+      specified `batch_shape` (or an arbitrary one if omitted).
+  """
+  if depth is None:
+    depth = draw(depths())
+
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes(min_ndims=1, max_side=13))
+
+  arg_name = draw(hps.sampled_from(['to_shape', 'with_shape']))
+  underlying_batch_shape, broadcast_with = draw(
+      tfp_hps.broadcasting_shapes(batch_shape, 2))
+  if arg_name == 'to_shape':
+    kwargs = dict(to_shape=batch_shape)
+  else:
+    kwargs = dict(with_shape=broadcast_with)
+
+  # Cannot put a BatchReshape into a BatchBroadcast, because the former
+  # doesn't support broadcasting, and the latter relies on it.  b/161984806.
+  def nested_eligibility_filter(dist_name):
+    if dist_name == 'BatchReshape':
+      return False
+    return eligibility_filter(dist_name)
+
+  underlying = draw(
+      distributions(
+          batch_shape=underlying_batch_shape,
+          event_dim=event_dim,
+          enable_vars=enable_vars,
+          depth=depth - 1,
+          eligibility_filter=nested_eligibility_filter,
+          validate_args=validate_args))
+  hp.note('Forming BatchBroadcast with underlying dist {}; '
+          'parameters {}; kwargs {}'.format(
+              underlying, params_used(underlying), kwargs))
+  result_dist = tfd.BatchBroadcast(underlying, validate_args=validate_args,
+                                   **kwargs)
   return result_dist
 
 
@@ -1456,7 +1527,7 @@ def distributions(draw,
 
   if dist_name is None and depth > 0:
     bases = hps.just(None)
-    candidates = ['BatchReshape', 'Independent',
+    candidates = ['BatchBroadcast', 'BatchReshape', 'Independent',
                   'MixtureSameFamily', 'TransformedDistribution']
     names = [name for name in candidates if eligibility_filter(name)]
     compounds = hps.one_of(map(hps.just, names))
@@ -1472,6 +1543,10 @@ def distributions(draw,
         enable_vars=enable_vars,
         eligibility_filter=eligibility_filter,
         validate_args=validate_args))
+  if dist_name == 'BatchBroadcast':
+    return draw(batch_broadcasts(
+        batch_shape, event_dim, enable_vars, depth,
+        eligibility_filter, validate_args))
   if dist_name == 'BatchReshape':
     return draw(batch_reshapes(
         batch_shape, event_dim, enable_vars, depth,

@@ -41,6 +41,7 @@ multi_substrate_py_library(
     ],
     deps = [
         ":autoregressive",
+        ":batch_broadcast",
         ":batch_concat",
         ":batch_reshape",
         ":bates",
@@ -169,6 +170,18 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "batch_broadcast",
+    srcs = ["batch_broadcast.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -2220,6 +2233,20 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "batch_broadcast_test",
+    size = "medium",
+    srcs = ["batch_broadcast_test.py"],
+    deps = [
+        ":hypothesis_testlib",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
