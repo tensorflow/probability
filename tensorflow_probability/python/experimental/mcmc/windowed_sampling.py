@@ -30,6 +30,8 @@ from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.experimental.mcmc import diagonal_mass_matrix_adaptation as dmma
 from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
 from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts as pnuts
+from tensorflow_probability.python.experimental.mcmc import progress_bar_reducer
+from tensorflow_probability.python.experimental.mcmc import with_reductions
 from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -222,24 +224,49 @@ def _setup_mcmc(model, n_chains, seed, **pins):
   return target_log_prob_fn, initial_transformed_position, bijector
 
 
-def _make_base_kernel(*, kind, proposal_kernel_kwargs):
+def _make_base_kernel(*, kind, proposal_kernel_kwargs, progress_bar_kwargs):
   """Construct internal sampling kernel."""
+  progress_bar_kwargs.setdefault('comment', f'{kind} sampling')
+
   if kind == 'nuts':
-    return pnuts.PreconditionedNoUTurnSampler(**proposal_kernel_kwargs)
+    kernel = pnuts.PreconditionedNoUTurnSampler(**proposal_kernel_kwargs)
   elif kind == 'hmc':
-    return phmc.PreconditionedHamiltonianMonteCarlo(**proposal_kernel_kwargs)
+    kernel = phmc.PreconditionedHamiltonianMonteCarlo(**proposal_kernel_kwargs)
   else:
     raise TypeError(
         '`kind` must be "nuts" or "hmc" (got {kind})'.format(kind=kind))
+  if progress_bar_kwargs['display']:
+    progress_bar_kwargs.pop('display')
+
+    def tqdm_progress_bar_fn(num_steps):
+      try:
+        from fastprogress.fastprogress import progress_bar
+      except ImportError:
+        raise ImportError('Please install fastprogress via `pip install fastprogress`')
+      pbar = progress_bar(range(num_steps))
+      pbar.comment = progress_bar_kwargs.get('comment', '')
+      return iter(pbar)
+
+    kernel = with_reductions.WithReductions(
+      kernel,
+      progress_bar_reducer.ProgressBarReducer(
+        progress_bar_kwargs['num_draws'],
+        progress_bar_fn=tqdm_progress_bar_fn)
+    )
+  return kernel
 
 
 def make_fast_adapt_kernel(*,
                            kind,
                            proposal_kernel_kwargs,
-                           dual_averaging_kwargs):
+                           dual_averaging_kwargs,
+                           progress_bar_kwargs):
+  progress_bar_kwargs.setdefault('comment', 'Adapting step size...')
   return dassa.DualAveragingStepSizeAdaptation(
       _make_base_kernel(
-          kind=kind, proposal_kernel_kwargs=proposal_kernel_kwargs),
+          kind=kind,
+          proposal_kernel_kwargs=proposal_kernel_kwargs,
+          progress_bar_kwargs=progress_bar_kwargs),
       **dual_averaging_kwargs)
 
 
@@ -247,12 +274,15 @@ def make_slow_adapt_kernel(*,
                            kind,
                            proposal_kernel_kwargs,
                            dual_averaging_kwargs,
+                           progress_bar_kwargs,
                            initial_running_variance):
+  progress_bar_kwargs.setdefault('comment', 'Adapting diagonal mass matrix and step size...')
   return dmma.DiagonalMassMatrixAdaptation(
       make_fast_adapt_kernel(
           kind=kind,
           proposal_kernel_kwargs=proposal_kernel_kwargs,
-          dual_averaging_kwargs=dual_averaging_kwargs),
+          dual_averaging_kwargs=dual_averaging_kwargs,
+          progress_bar_kwargs=progress_bar_kwargs),
       initial_running_variance=initial_running_variance)
 
 
@@ -260,6 +290,7 @@ def _fast_window(*,
                  kind,
                  proposal_kernel_kwargs,
                  dual_averaging_kwargs,
+                 progress_bar_kwargs,
                  num_draws,
                  initial_position,
                  bijector,
@@ -267,10 +298,12 @@ def _fast_window(*,
                  seed):
   """Sample using just step size adaptation."""
   dual_averaging_kwargs.update({'num_adaptation_steps': num_draws})
+  progress_bar_kwargs.update({'num_draws': num_draws})
   kernel = make_fast_adapt_kernel(
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
-      dual_averaging_kwargs=dual_averaging_kwargs)
+      dual_averaging_kwargs=dual_averaging_kwargs,
+      progress_bar_kwargs=progress_bar_kwargs)
   with warnings.catch_warnings():
     warnings.simplefilter('ignore')
     draws, trace, fkr = sample.sample_chain(
@@ -305,6 +338,7 @@ def _slow_window(*,
                  kind,
                  proposal_kernel_kwargs,
                  dual_averaging_kwargs,
+                 progress_bar_kwargs,
                  num_draws,
                  initial_position,
                  initial_running_variance,
@@ -313,10 +347,12 @@ def _slow_window(*,
                  seed):
   """Sample using both step size and mass matrix adaptation."""
   dual_averaging_kwargs.setdefault('num_adaptation_steps', num_draws)
+  progress_bar_kwargs.update({'num_draws': num_draws})
   kernel = make_slow_adapt_kernel(
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       dual_averaging_kwargs=dual_averaging_kwargs,
+      progress_bar_kwargs=progress_bar_kwargs,
       initial_running_variance=initial_running_variance)
   with warnings.catch_warnings():
     warnings.simplefilter('ignore')
@@ -354,6 +390,7 @@ def _slow_window(*,
 def _do_sampling(*,
                  kind,
                  proposal_kernel_kwargs,
+                 progress_bar_kwargs,
                  num_draws,
                  initial_position,
                  trace_fn,
@@ -361,9 +398,11 @@ def _do_sampling(*,
                  return_final_kernel_results,
                  seed):
   """Sample from base HMC kernel."""
+  progress_bar_kwargs.update({'num_draws': num_draws})
   kernel = _make_base_kernel(
       kind=kind,
-      proposal_kernel_kwargs=proposal_kernel_kwargs)
+      proposal_kernel_kwargs=proposal_kernel_kwargs,
+      progress_bar_kwargs=progress_bar_kwargs)
   return sample.sample_chain(
       num_draws,
       initial_position,
@@ -426,6 +465,7 @@ def windowed_adaptive_nuts(n_draws,
                            max_energy_diff=500.,
                            unrolled_leapfrog_steps=1,
                            parallel_iterations=10,
+                           display_progress_bar=False,
                            trace_fn=_default_nuts_trace_fn,
                            return_final_kernel_results=False,
                            discard_tuning=True,
@@ -462,6 +502,9 @@ def windowed_adaptive_nuts(n_draws,
       trajectory length implied by max_tree_depth. Defaults to 1.
     parallel_iterations: The number of iterations allowed to run in parallel.
       It must be a positive integer. See `tf.while_loop` for more details.
+    display_progress_bar: bool
+      Whether to display an interactive progressbar during adaptation and
+      sampling.
     trace_fn: Optional callable
       The trace function should accept the arguments
       `(state, bijector, is_adapting, phmc_kernel_results)`,  where the `state`
@@ -507,6 +550,7 @@ def windowed_adaptive_nuts(n_draws,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       num_adaptation_steps=num_adaptation_steps,
       dual_averaging_kwargs=dual_averaging_kwargs,
+      progress_bar_kwargs={'display': display_progress_bar},
       trace_fn=trace_fn,
       return_final_kernel_results=return_final_kernel_results,
       discard_tuning=discard_tuning,
@@ -521,6 +565,7 @@ def windowed_adaptive_hmc(n_draws,
                           n_chains=64,
                           num_adaptation_steps=525,
                           dual_averaging_kwargs=None,
+                          display_progress_bar=False,
                           trace_fn=_default_hmc_trace_fn,
                           return_final_kernel_results=False,
                           discard_tuning=True,
@@ -547,6 +592,9 @@ def windowed_adaptive_hmc(n_draws,
       Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
       By default, a `target_accept_prob` of 0.75 is set, and the class defaults
       are used otherwise.
+    display_progress_bar: bool
+      Whether to display an interactive progressbar during adaptation and
+      sampling.
     trace_fn: Optional callable
       The trace function should accept the arguments
       `(state, bijector, is_adapting, phmc_kernel_results)`,  where the `state`
@@ -590,6 +638,7 @@ def windowed_adaptive_hmc(n_draws,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       num_adaptation_steps=num_adaptation_steps,
       dual_averaging_kwargs=dual_averaging_kwargs,
+      progress_bar_kwargs={'display': display_progress_bar},
       trace_fn=trace_fn,
       return_final_kernel_results=return_final_kernel_results,
       discard_tuning=discard_tuning,
@@ -605,6 +654,7 @@ def _windowed_adaptive_impl(n_draws,
                             proposal_kernel_kwargs,
                             num_adaptation_steps,
                             dual_averaging_kwargs,
+                            progress_bar_kwargs,
                             trace_fn,
                             return_final_kernel_results,
                             discard_tuning,
@@ -645,6 +695,7 @@ def _windowed_adaptive_impl(n_draws,
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       dual_averaging_kwargs=dual_averaging_kwargs,
+      progress_bar_kwargs=progress_bar_kwargs.copy(),
       num_draws=first_window_size,
       initial_position=initial_transformed_position,
       bijector=bijector,
@@ -663,6 +714,7 @@ def _windowed_adaptive_impl(n_draws,
         kind=kind,
         proposal_kernel_kwargs=proposal_kernel_kwargs,
         dual_averaging_kwargs=dual_averaging_kwargs,
+        progress_bar_kwargs=progress_bar_kwargs.copy(),
         num_draws=window_size,
         initial_position=draws[-1],
         initial_running_variance=running_variance,
@@ -680,6 +732,7 @@ def _windowed_adaptive_impl(n_draws,
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       dual_averaging_kwargs=dual_averaging_kwargs,
+      progress_bar_kwargs=progress_bar_kwargs.copy(),
       num_draws=last_window_size,
       initial_position=draws[-1],
       bijector=bijector,
@@ -692,6 +745,7 @@ def _windowed_adaptive_impl(n_draws,
   ret = _do_sampling(
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
+      progress_bar_kwargs=progress_bar_kwargs.copy(),
       num_draws=n_draws,
       initial_position=draws[-1],
       bijector=bijector,
