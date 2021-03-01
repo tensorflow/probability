@@ -329,6 +329,7 @@ class RunningCentralMomentsTest(test_util.TestCase):
     self.assertAllClose(
         stats.moment(np.arange(5), moment=np.arange(15) + 1),
         moments,
+        atol=5e-5,
         rtol=1e-6)
 
   def test_higher_rank_samples(self):

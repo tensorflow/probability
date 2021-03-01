@@ -24,7 +24,6 @@ import math
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -40,9 +39,25 @@ __all__ = [
     'RunningVariance',
 ]
 
+JAX_MODE = False
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
-class RunningCovariance(auto_composite_tensor.AutoCompositeTensor):
+if JAX_MODE:
+  ac_decorator = lambda **kwargs: lambda cls: cls
+  ACClass = object
+else:
+  from tensorflow_probability.python.internal import auto_composite_tensor  # pylint: disable=g-import-not-at-top
+
+  def ac_decorator(**kwargs):
+
+    def _decorator(cls):
+      return auto_composite_tensor.auto_composite_tensor(**kwargs)(cls)
+
+    return _decorator
+  ACClass = auto_composite_tensor.AutoCompositeTensor
+
+
+@ac_decorator(omit_kwargs='name')
+class RunningCovariance(ACClass):
   """A running covariance computation.
 
   The running covariance computation supports batching. The `event_ndims`
@@ -78,6 +93,16 @@ class RunningCovariance(auto_composite_tensor.AutoCompositeTensor):
           sum_squared_residuals, dtype=dtype)
       self.event_ndims = event_ndims
       self.name = name
+
+  def tree_flatten(self):
+    return (self.num_samples, self.mean, self.sum_squared_residuals), (
+        self.event_ndims,
+        self.name,
+    )
+
+  @classmethod
+  def tree_unflatten(cls, metadata, tensors):
+    return cls(*tensors, *metadata)
 
   @classmethod
   def from_shape(cls, shape=(), dtype=tf.float32, event_ndims=None,
@@ -296,12 +321,12 @@ def _batch_outer_product(target, event_ndims):
 def _float_dtype_like(dtype):
   if dtype is tf.int64:
     return tf.float64
-  if dtype.is_integer:
+  if dtype_util.is_integer(dtype):
     return tf.float32
   return dtype
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
+@ac_decorator(omit_kwargs='name')
 class RunningVariance(RunningCovariance):
   """A running variance computation.
 
@@ -393,8 +418,8 @@ class RunningVariance(RunningCovariance):
         f'    sum_sqared_residuals={self.sum_squared_residuals!r})')
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
-class RunningMean(auto_composite_tensor.AutoCompositeTensor):
+@ac_decorator(omit_kwargs='name')
+class RunningMean(ACClass):
   """Computes a running mean.
 
   In computation, samples can be provided individually or in chunks. A
@@ -419,6 +444,13 @@ class RunningMean(auto_composite_tensor.AutoCompositeTensor):
     """
     self.num_samples = num_samples
     self.mean = mean
+
+  def tree_flatten(self):
+    return (self.num_samples, self.mean), ()
+
+  @classmethod
+  def tree_unflatten(cls, _, tensors):
+    return cls(*tensors)
 
   @classmethod
   def from_shape(cls, shape, dtype=tf.float32):
@@ -501,8 +533,8 @@ class RunningMean(auto_composite_tensor.AutoCompositeTensor):
             f'    mean={self.mean!r})')
 
 
-@auto_composite_tensor.auto_composite_tensor
-class RunningCentralMoments(auto_composite_tensor.AutoCompositeTensor):
+@ac_decorator()
+class RunningCentralMoments(ACClass):
   """Computes running central moments.
 
   `RunningCentralMoments` will compute arbitrary central moments in
@@ -541,6 +573,14 @@ class RunningCentralMoments(auto_composite_tensor.AutoCompositeTensor):
     self.mean_state = mean_state
     self.exponentiated_residuals = exponentiated_residuals
     self.desired_moments = desired_moments
+
+  def tree_flatten(self):
+    return (self.mean_state,
+            self.exponentiated_residuals), (self.desired_moments,)
+
+  @classmethod
+  def tree_unflatten(cls, metadata, tensors):
+    return cls(*tensors, *metadata)
 
   @classmethod
   def from_shape(cls, shape, moment, dtype=tf.float32):
@@ -678,8 +718,8 @@ def _n_choose_k(n, k):
   return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs='name')
-class RunningPotentialScaleReduction(auto_composite_tensor.AutoCompositeTensor):
+@ac_decorator(omit_kwargs='name')
+class RunningPotentialScaleReduction(ACClass):
   """A running R-hat diagnostic.
 
   `RunningPotentialScaleReduction` uses Gelman and Rubin (1992)'s potential
@@ -723,6 +763,13 @@ class RunningPotentialScaleReduction(auto_composite_tensor.AutoCompositeTensor):
     """
     self.chain_variances = chain_variances
     self.independent_chain_ndims = independent_chain_ndims
+
+  def tree_flatten(self):
+    return (self.chain_variances,), (self.independent_chain_ndims,)
+
+  @classmethod
+  def tree_unflatten(cls, metadata, tensors):
+    return cls(*tensors, *metadata)
 
   @classmethod
   def from_shape(cls, shape=(), independent_chain_ndims=1, dtype=tf.float32):
@@ -848,3 +895,12 @@ class RunningPotentialScaleReduction(auto_composite_tensor.AutoCompositeTensor):
         'RunningPotentialScaleReduction(\n'
         f'    chain_variances={self.chain_variances!r},\n'
         f'    independent_chain_ndims={self.independent_chain_ndims!r})')
+
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top
+  tree_util.register_pytree_node_class(RunningCentralMoments)
+  tree_util.register_pytree_node_class(RunningCovariance)
+  tree_util.register_pytree_node_class(RunningVariance)
+  tree_util.register_pytree_node_class(RunningMean)
+  tree_util.register_pytree_node_class(RunningPotentialScaleReduction)
