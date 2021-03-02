@@ -231,6 +231,32 @@ class _GaussianProcessTest(object):
             index_points=np.ones([10, 1], dtype=np.float32)),
         tfd.MultivariateNormalLinearOperator)
 
+  def testCustomMarginalFn(self):
+    def test_marginal_fn(
+        loc,
+        covariance,
+        validate_args=False,
+        allow_nan_stats=False,
+        name="custom_marginal"):
+      return tfd.MultivariateNormalDiag(
+          loc=loc,
+          scale_diag=tf.math.sqrt(tf.linalg.diag_part(covariance)),
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          name=name)
+
+    index_points = np.expand_dims(np.random.uniform(-1., 1., 10), -1)
+
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=index_points,
+        marginal_fn=test_marginal_fn,
+        validate_args=True)
+
+    self.assertAllClose(
+        np.eye(10),
+        gp.get_marginal_distribution().covariance())
+
 
 @test_util.test_all_tf_execution_regimes
 class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):

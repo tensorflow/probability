@@ -35,16 +35,53 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'GaussianProcess',
+    'make_cholesky_factored_marginal_fn'
 ]
 
 
 def _add_diagonal_shift(matrix, shift):
   return tf.linalg.set_diag(
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
+
+
+def make_cholesky_factored_marginal_fn(jitter):
+  """Construct a `marginal_fn` for use with `tfd.GaussianProcess`.
+
+  The returned function computes the Cholesky factorization of the input
+  covariance plus a diagonal jitter, and uses that for the `scale` of a
+  `tfd.MultivariateNormalLinearOperator`.
+
+  Args:
+    jitter: `float` scalar `Tensor` added to the diagonal of the covariance
+      matrix to ensure positive definiteness of the covariance matrix.
+
+  Returns:
+    marginal_fn: A Python function that takes a location, covariance matrix,
+      optional `validate_args`, `allow_nan_stats` and `name` arguments, and
+      returns a `tfd.MultivariateNormalLinearOperator`.
+  """
+  def marginal_fn(
+      loc,
+      covariance,
+      validate_args=False,
+      allow_nan_stats=False,
+      name='marginal_distribution'):
+    scale = tf.linalg.LinearOperatorLowerTriangular(
+        tf.linalg.cholesky(_add_diagonal_shift(covariance, jitter)),
+        is_non_singular=True,
+        name='GaussianProcessScaleLinearOperator')
+    return mvn_linear_operator.MultivariateNormalLinearOperator(
+        loc=loc,
+        scale=scale,
+        validate_args=validate_args,
+        allow_nan_stats=allow_nan_stats,
+        name=name)
+
+  return marginal_fn
 
 
 class GaussianProcess(distribution.Distribution):
@@ -115,7 +152,7 @@ class GaussianProcess(distribution.Distribution):
   ```none
   pdf(x; index_points, mean_fn, kernel) = exp(-0.5 * y) / Z
   K = (kernel.matrix(index_points, index_points) +
-       (observation_noise_variance + jitter) * eye(N))
+       observation_noise_variance * eye(N))
   y = (x - mean_fn(index_points))^T @ K @ (x - mean_fn(index_points))
   Z = (2 * pi)**(.5 * N) |det(K)|**(.5)
   ```
@@ -127,8 +164,6 @@ class GaussianProcess(distribution.Distribution):
   * `kernel` is `PositiveSemidefiniteKernel`-like and represents the covariance
     function of the GP,
   * `observation_noise_variance` represents (optional) observation noise.
-  * `jitter` is added to the diagonal to ensure positive definiteness up to
-     machine precision (otherwise Cholesky-decomposition is prone to failure),
   * `eye(N)` is an N-by-N identity matrix.
 
   #### Examples
@@ -205,11 +240,16 @@ class GaussianProcess(distribution.Distribution):
 
   """
 
+  @deprecation.deprecated_args(
+      '2021-05-10',
+      '`jitter` is deprecated; please use `marginal_fn` directly.',
+      'jitter')
   def __init__(self,
                kernel,
                index_points=None,
                mean_fn=None,
                observation_noise_variance=0.,
+               marginal_fn=None,
                jitter=1e-6,
                validate_args=False,
                allow_nan_stats=False,
@@ -238,8 +278,15 @@ class GaussianProcess(distribution.Distribution):
         broadcastable with the shapes of all other batched parameters
         (`kernel.batch_shape`, `index_points`, etc.).
         Default value: `0.`
+      marginal_fn: A Python callable that takes a location, covariance matrix,
+        optional `validate_args`, `allow_nan_stats` and `name` arguments, and
+        returns a multivariate normal subclass of `tfd.Distribution`.
+        Default value: `None`, in which case a Cholesky-factorizing function is
+        is created using `make_cholesky_factorizing_marginal_fn` and the
+        `jitter` argument.
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
-        matrix to ensure positive definiteness of the covariance matrix.
+        matrix to ensure positive definiteness of the covariance matrix, when
+        `marginal_fn` is None.
         Default value: `1e-6`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
@@ -282,6 +329,10 @@ class GaussianProcess(distribution.Distribution):
       self._mean_fn = mean_fn
       self._observation_noise_variance = observation_noise_variance
       self._jitter = jitter
+      if marginal_fn is None:
+        self._marginal_fn = make_cholesky_factored_marginal_fn(jitter)
+      else:
+        self._marginal_fn = marginal_fn
 
       with tf.name_scope('init'):
         super(GaussianProcess, self).__init__(
@@ -375,13 +426,9 @@ class GaussianProcess(distribution.Distribution):
             allow_nan_stats=self._allow_nan_stats,
             name='marginal_distribution')
       else:
-        scale = tf.linalg.LinearOperatorLowerTriangular(
-            tf.linalg.cholesky(_add_diagonal_shift(covariance, self.jitter)),
-            is_non_singular=True,
-            name='GaussianProcessScaleLinearOperator')
-        return mvn_linear_operator.MultivariateNormalLinearOperator(
+        return self._marginal_fn(
             loc=loc,
-            scale=scale,
+            covariance=covariance,
             validate_args=self._validate_args,
             allow_nan_stats=self._allow_nan_stats,
             name='marginal_distribution')
@@ -403,6 +450,14 @@ class GaussianProcess(distribution.Distribution):
     return self._observation_noise_variance
 
   @property
+  def marginal_fn(self):
+    return self._marginal_fn
+
+  @property
+  @deprecation.deprecated(
+      '2022-02-04',
+      'the `jitter` property of `tfd.GaussianProcess` is deprecated; use the '
+      '`marginal_fn` property instead.')
   def jitter(self):
     return self._jitter
 
