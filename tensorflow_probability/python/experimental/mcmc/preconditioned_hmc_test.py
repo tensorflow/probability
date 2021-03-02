@@ -471,8 +471,7 @@ class PreconditionedHMCTest(test_util.TestCase):
         1, kernel=kernel, current_state=tf.ones([], tf.float64),
         num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
 
-  # TODO(b/175787154): Enable this test
-  def DISABLED_test_f64_multichain(self, use_default):
+  def test_f64_multichain(self, use_default):
     if use_default:
       momentum_distribution = None
     else:
@@ -485,6 +484,25 @@ class PreconditionedHMCTest(test_util.TestCase):
     nchains = 7
     self.evaluate(tfp.mcmc.sample_chain(
         1, kernel=kernel, current_state=tf.ones([nchains], tf.float64),
+        num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
+
+  def test_f64_multichain_multipart(self, use_default):
+    if use_default:
+      momentum_distribution = None
+    else:
+      momentum_distribution = _make_composite_tensor(
+          tfd.JointDistributionSequential([
+              tfd.Normal(0., tf.constant(.5, dtype=tf.float64)),
+              tfd.Normal(0., tf.constant(.25, dtype=tf.float64))]))
+    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+        lambda x, y: -x**2 - y**2, step_size=.5, num_leapfrog_steps=2,
+        momentum_distribution=momentum_distribution)
+    kernel = tfp.mcmc.SimpleStepSizeAdaptation(kernel, num_adaptation_steps=3)
+    nchains = 7
+    self.evaluate(tfp.mcmc.sample_chain(
+        1, kernel=kernel,
+        current_state=(tf.ones([nchains], tf.float64),
+                       tf.ones([nchains], tf.float64)),
         num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
 
   def test_diag(self, use_default):

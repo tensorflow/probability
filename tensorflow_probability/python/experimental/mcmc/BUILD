@@ -267,9 +267,11 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:batch_broadcast",
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:joint_distribution_sequential",
         "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
