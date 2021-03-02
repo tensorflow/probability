@@ -97,6 +97,7 @@ from tensorflow_probability.python.distributions.mvn_linear_operator import Mult
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
 from tensorflow_probability.python.distributions.negative_binomial import NegativeBinomial
 from tensorflow_probability.python.distributions.normal import Normal
+from tensorflow_probability.python.distributions.normal_inverse_gaussian import NormalInverseGaussian
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
 from tensorflow_probability.python.distributions.ordered_logistic import OrderedLogistic
 from tensorflow_probability.python.distributions.pareto import Pareto
@@ -226,6 +227,7 @@ __all__ = [
     'Moyal',
     'NegativeBinomial',
     'Normal',
+    'NormalInverseGaussian',
     'PixelCNN',
     'Poisson',
     'PoissonLogNormalQuadratureCompound',

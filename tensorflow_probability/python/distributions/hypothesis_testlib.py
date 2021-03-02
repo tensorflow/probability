@@ -92,6 +92,7 @@ TF2_FRIENDLY_DISTS = (
     'Moyal',
     'Multinomial',
     'NegativeBinomial',
+    'NormalInverseGaussian',
     'OneHotCategorical',
     'OrderedLogistic',
     'Pareto',
@@ -215,6 +216,12 @@ def fix_finite_discrete(d):
 
 def fix_lkj(d):
   return dict(d, concentration=d['concentration'] + 1, dimension=3)
+
+
+def fix_normal_inverse_gaussian(d):
+  tailweight = ensure_high_gt_low(tf.math.abs(d['skewness']), d['tailweight'])
+  # Make sure that |skewness| < tailweight
+  return dict(d, tailweight=(tailweight + 1.))
 
 
 def fix_spherical_uniform(d):
@@ -388,6 +395,8 @@ CONSTRAINTS = {
         # Prevent large low-rank perturbations from creating numerically
         # singular matrices.
         tf.math.tanh,
+    'NormalInverseGaussian':
+        fix_normal_inverse_gaussian,
     'PERT':
         fix_pert,
     'Triangular':

@@ -120,6 +120,7 @@ multi_substrate_py_library(
         ":negative_binomial",
         ":normal",
         ":normal_conjugate_posteriors",
+        ":normal_inverse_gaussian",
         ":onehot_categorical",
         ":ordered_logistic",
         ":pareto",
@@ -1534,6 +1535,28 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "normal_inverse_gaussian",
+    srcs = ["normal_inverse_gaussian.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -3335,6 +3358,22 @@ multi_substrate_py_test(
     name = "normal_test",
     srcs = ["normal_test.py"],
     numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "normal_inverse_gaussian_test",
+    size = "medium",
+    srcs = ["normal_inverse_gaussian_test.py"],
+    jax_tags = ["notap"],
+    shard_count = 2,
+    tags = ["tf1-broken"],
     deps = [
         # numpy dep,
         # scipy dep,

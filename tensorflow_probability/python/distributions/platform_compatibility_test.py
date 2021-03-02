@@ -55,6 +55,7 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'LogNormal',
     # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
     'NegativeBinomial',
+    'NormalInverseGaussian',  # log_probs can be very far off.
     # TODO(b/137956955): Add support for hypothesis testing
     'PoissonLogNormalQuadratureCompound',
     # TODO(b/159999573): XLA / non-XLA computation seems to have
@@ -98,6 +99,7 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'BetaQuotient',
     'ExponentiallyModifiedGaussian',  # b/174778704
+    'NormalInverseGaussian',
     'Skellam',
     'TruncatedNormal',  # Numerical problem: b/150811273
     'Wishart',  # Actually works, but disabled because log_prob of sample is

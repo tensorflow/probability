@@ -83,11 +83,13 @@ JVP_SAMPLE_BLOCKLIST = ()
 JVP_LOGPROB_SAMPLE_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
+    'NormalInverseGaussian',  # http://b/171079052
     'Skellam',  # http://b/171079052
 )
 JVP_LOGPROB_PARAM_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'Skellam',  # http://b/171079052
+    'NormalInverseGaussian',  # http://b/171079052
     'VonMisesFisher',  # http://b/171079052
 )
 
@@ -95,10 +97,12 @@ VJP_SAMPLE_BLOCKLIST = ()
 VJP_LOGPROB_SAMPLE_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
+    'NormalInverseGaussian',  # http://b/171079052
     'Skellam',  # http://b/171079052
 )
 VJP_LOGPROB_PARAM_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
+    'NormalInverseGaussian',  # http://b/171079052
     'Skellam',  # http://b/171079052
     'VonMisesFisher',  # http://b/171079052
 )

@@ -309,9 +309,10 @@ class ParameterBijectorsTest(test_util.TestCase):
 
     # TODO(b/169874884): Implement `width` parameters to work around the need
     # for a high > low` joint constraint.
-    high_gt_low_constraint_dists = ('Bates', 'PERT', 'Triangular',
-                                    'TruncatedCauchy', 'TruncatedNormal',
-                                    'Uniform')
+    # NormalInverseGaussian needs |skewness| < tailweight
+    high_gt_low_constraint_dists = ('Bates', 'NormalInverseGaussian', 'PERT',
+                                    'Triangular', 'TruncatedCauchy',
+                                    'TruncatedNormal', 'Uniform')
     not_annotated_dists = ('Empirical|event_ndims=0', 'Empirical|event_ndims=1',
                            'Empirical|event_ndims=2', 'FiniteDiscrete',
                            'MultivariateStudentTLinearOperator',
