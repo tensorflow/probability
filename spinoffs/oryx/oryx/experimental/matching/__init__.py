@@ -14,3 +14,4 @@
 # ============================================================================
 """Library for pattern matching and rewriting."""
 from oryx.experimental.matching import matcher
+from oryx.experimental.matching import rules

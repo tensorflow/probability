@@ -25,7 +25,10 @@ py_library(
     name = "matching",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
-    deps = [":matcher"],
+    deps = [
+        ":matcher",
+        ":rules",
+    ],
 )
 
 # pytype_strict
@@ -38,6 +41,14 @@ py_library(
     ],
 )
 
+# pytype_strict
+py_library(
+    name = "rules",
+    srcs = ["rules.py"],
+    srcs_version = "PY3",
+    deps = [":matcher"],
+)
+
 # py_strict
 py_test(
     name = "matcher_test",
@@ -46,6 +57,20 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":matcher",
+        # absl/testing:absltest dep,
+        "//oryx/internal:test_util",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "rules_test",
+    srcs = ["rules_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":matcher",
+        ":rules",
         # absl/testing:absltest dep,
         "//oryx/internal:test_util",
     ],
