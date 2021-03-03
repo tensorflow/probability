@@ -23,10 +23,14 @@ import collections
 import functools
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import util as tfp_util
-from tensorflow_probability.python.bijectors import identity as identity_bijector
-from tensorflow_probability.python.bijectors import softplus as softplus_lib
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import restructure
+from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import half_normal
 from tensorflow_probability.python.distributions import independent
@@ -93,7 +97,7 @@ def build_trainable_location_scale_distribution(initial_loc,
 
     loc = tf.Variable(initial_value=initial_loc, name='loc')
     scale = tfp_util.TransformedVariable(
-        initial_scale, softplus_lib.Softplus(), name='scale')
+        initial_scale, softplus.Softplus(), name='scale')
     posterior_dist = distribution_fn(loc=loc, scale=scale,
                                      validate_args=validate_args)
 
@@ -122,7 +126,8 @@ def _get_event_shape_shallow_structure(event_shape):
 _sample_uniform_initial_loc = functools.partial(
     tf.random.uniform, minval=-2., maxval=2., dtype=tf.float32)
 _build_trainable_normal_dist = functools.partial(
-    build_trainable_location_scale_distribution, distribution_fn=normal.Normal)
+    build_trainable_location_scale_distribution,
+    distribution_fn=normal.Normal)
 
 
 @deprecation.deprecated_args(
@@ -276,14 +281,15 @@ def build_factored_surrogate_posterior(
 
     if nest.is_nested(bijector):
       bijector = nest.map_structure(
-          lambda b: identity_bijector.Identity() if b is None else b,
+          lambda b: identity.Identity() if b is None else b,
           bijector)
 
       # Support mismatched nested structures for backwards compatibility (e.g.
       # non-nested `event_shape` and a single-element list of `bijector`s).
       bijector = nest.pack_sequence_as(event_shape, nest.flatten(bijector))
 
-      event_space_bijector = tfb.JointMap(bijector, validate_args=validate_args)
+      event_space_bijector = joint_map.JointMap(
+          bijector, validate_args=validate_args)
     else:
       event_space_bijector = bijector
 
@@ -339,8 +345,8 @@ def _as_trainable_family(distribution):
           low=0.,
           high=distribution.scale * 10.)
     elif isinstance(distribution, uniform.Uniform):
-      return tfb.Shift(distribution.low)(
-          tfb.Scale(distribution.high - distribution.low)(beta.Beta(
+      return shift.Shift(distribution.low)(
+          scale_lib.Scale(distribution.high - distribution.low)(beta.Beta(
               concentration0=tf.ones(
                   distribution.event_shape_tensor(), dtype=distribution.dtype),
               concentration1=1.)))
@@ -392,7 +398,7 @@ def _make_asvi_trainable_variables(prior,
           bijector = parameter_properties[
               param].default_constraining_bijector_fn()
         except NotImplementedError:
-          bijector = tfb.Identity()
+          bijector = identity.Identity()
 
         if mean_field:
           prior_weight = None
@@ -407,7 +413,7 @@ def _make_asvi_trainable_variables(prior,
 
           prior_weight = tfp_util.TransformedVariable(
               initial_prior_weight * unconstrained_ones,
-              bijector=tfb.Sigmoid(),
+              bijector=sigmoid.Sigmoid(),
               name='prior_weight/{}/{}'.format(dist.name, param))
 
         # If the prior distribution was a tfd.Sample wrapping a base
@@ -438,7 +444,7 @@ def _make_asvi_trainable_variables(prior,
 
 
 # TODO(kateslin): Add support for models with prior+likelihood written as
-#  a single JointDistribution.
+# a single JointDistribution.
 def build_asvi_surrogate_posterior(prior,
                                    mean_field=False,
                                    initial_prior_weight=0.5,
@@ -615,17 +621,15 @@ def build_asvi_surrogate_posterior(prior,
 
     # Ensure that the surrogate posterior structure matches that of the prior
     try:
-      tf.nest.assert_same_structure(prior.dtype, surrogate_posterior.dtype)
+      nest.assert_same_structure(prior.dtype, surrogate_posterior.dtype)
     except TypeError:
       tokenize = lambda jd: jd._model_unflatten(  # pylint: disable=protected-access, g-long-lambda
           range(len(jd._model_flatten(jd.dtype)))  # pylint: disable=protected-access
       )
-      surrogate_posterior = tfb.Restructure(
+      surrogate_posterior = restructure.Restructure(
           output_structure=tokenize(prior),
           input_structure=tokenize(surrogate_posterior))(
               surrogate_posterior)
 
     surrogate_posterior.also_track = param_dicts
     return surrogate_posterior
-
-

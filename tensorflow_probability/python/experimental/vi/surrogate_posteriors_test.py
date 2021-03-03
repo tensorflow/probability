@@ -43,19 +43,21 @@ class TrainableLocationScale(test_util.TestCase):
        'event_shape': [],
        'batch_shape': [],
        'distribution_fn': tfd.Laplace,
-       'dtype': np.float64},
+       'dtype': np.float64,
+       'is_static': True},
       {'testcase_name': 'VectorNormal',
        'event_shape': [2],
        'batch_shape': [3, 1],
        'distribution_fn': tfd.Normal,
-       'dtype': np.float32},)
+       'dtype': np.float32,
+       'is_static': False},)
   def test_has_correct_ndims_and_gradients(
-      self, event_shape, batch_shape, distribution_fn, dtype):
+      self, event_shape, batch_shape, distribution_fn, dtype, is_static):
 
     initial_loc = np.ones(batch_shape + event_shape)
     dist = tfp.experimental.vi.build_trainable_location_scale_distribution(
-        initial_loc=_build_tensor(initial_loc, dtype=dtype,
-                                  use_static_shape=True),
+        initial_loc=self.maybe_static(np.array(initial_loc, dtype=dtype),
+                                      is_static=is_static),
         initial_scale=1e-6,
         event_ndims=len(event_shape),
         distribution_fn=distribution_fn,
@@ -64,10 +66,12 @@ class TrainableLocationScale(test_util.TestCase):
     self.assertAllClose(self.evaluate(dist.sample()),
                         initial_loc,
                         atol=1e-4)  # Much larger than initial_scale.
-    self.assertAllEqual(dist.event_shape.as_list(), event_shape)
-    self.assertAllEqual(dist.batch_shape.as_list(), batch_shape)
+    self.assertAllEqual(
+        self.evaluate(dist.event_shape_tensor()), event_shape)
+    self.assertAllEqual(
+        self.evaluate(dist.batch_shape_tensor()), batch_shape)
     for v in dist.trainable_variables:
-      self.assertAllEqual(v.shape.as_list(), batch_shape + event_shape)
+      self.assertAllEqual(ps.shape(v), batch_shape + event_shape)
 
     # Test that gradients are available wrt the variational parameters.
     self.assertNotEmpty(dist.trainable_variables)
@@ -85,33 +89,36 @@ class FactoredSurrogatePosterior(test_util.TestCase):
       {'testcase_name': 'TensorEvent',
        'event_shape': tf.TensorShape([4]),
        'bijector': [tfb.Sigmoid()],
-       'dtype': np.float64, 'use_static_shape': True},
+       'dtype': np.float64,
+       'is_static': True},
       {'testcase_name': 'ListEvent',
        'event_shape': [tf.TensorShape([3]),
                        tf.TensorShape([]),
                        tf.TensorShape([2, 2])],
        'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
-       'dtype': np.float32, 'use_static_shape': False},
+       'dtype': np.float32,
+       'is_static': False},
       {'testcase_name': 'DictEvent',
        'event_shape': {'x': tf.TensorShape([1]), 'y': tf.TensorShape([])},
        'bijector': None,
-       'dtype': np.float64, 'use_static_shape': True},
+       'dtype': np.float64,
+       'is_static': True},
       {'testcase_name': 'NestedEvent',
        'event_shape': {'x': [tf.TensorShape([1]), tf.TensorShape([1, 2])],
                        'y': tf.TensorShape([])},
        'bijector': {
            'x': [tfb.Identity(), tfb.Softplus()], 'y': tfb.Sigmoid()},
-       'dtype': np.float32, 'use_static_shape': True},
+       'dtype': np.float32,
+       'is_static': True},
   )
   def test_specifying_event_shape(
-      self, event_shape, bijector, dtype, use_static_shape):
+      self, event_shape, bijector, dtype, is_static):
     seed = test_util.test_seed_stream()
     surrogate_posterior = (
         tfp.experimental.vi.build_factored_surrogate_posterior(
             event_shape=tf.nest.map_structure(
-                functools.partial(_build_tensor,
-                                  dtype=np.int32,
-                                  use_static_shape=use_static_shape),
+                lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
+                    np.array(s, dtype=np.int32), is_static=is_static),
                 event_shape),
             bijector=bijector,
             initial_unconstrained_loc=functools.partial(
@@ -127,8 +134,7 @@ class FactoredSurrogatePosterior(test_util.TestCase):
         surrogate_posterior.event_shape_tensor())
 
     # Test that the posterior has the specified event shape(s).
-    tf.nest.map_structure(
-        self.assertAllEqual, event_shape, posterior_event_shape)
+    self.assertAllEqualNested(event_shape, posterior_event_shape)
 
     # Test that all sample Tensors have the expected shapes.
     check_shape = lambda s, x: self.assertAllEqual(s, x.shape)
@@ -150,7 +156,8 @@ class FactoredSurrogatePosterior(test_util.TestCase):
        'initial_loc': np.array([[[0.9, 0.1, 0.5, 0.7]]]),
        'implicit_batch_shape': [1, 1],
        'bijector': tfb.Sigmoid(),
-       'dtype': np.float32, 'use_static_shape': False},
+       'dtype': np.float32,
+       'is_static': False},
       {'testcase_name': 'ListEvent',
        'event_shape': [[3], [], [2, 2]],
        'initial_loc': [np.array([0.1, 7., 3.]),
@@ -158,21 +165,23 @@ class FactoredSurrogatePosterior(test_util.TestCase):
                        np.array([[1., 0], [-4., 2.]])],
        'implicit_batch_shape': [],
        'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
-       'dtype': np.float64, 'use_static_shape': True},
+       'dtype': np.float64,
+       'is_static': True},
       {'testcase_name': 'DictEvent',
        'event_shape': {'x': [2], 'y': []},
        'initial_loc': {'x': np.array([[0.9, 1.2]]),
                        'y': np.array([-4.1])},
        'implicit_batch_shape': [1],
        'bijector': None,
-       'dtype': np.float32, 'use_static_shape': False},
+       'dtype': np.float32,
+       'is_static': False},
   )
-  def test_specifying_initial_loc(self, event_shape, initial_loc,
-                                  implicit_batch_shape, bijector,
-                                  dtype, use_static_shape):
+  def test_specifying_initial_loc(
+      self, event_shape, initial_loc, implicit_batch_shape, bijector, dtype,
+      is_static):
     initial_loc = tf.nest.map_structure(
-        lambda s: _build_tensor(s, dtype=dtype,  # pylint: disable=g-long-lambda
-                                use_static_shape=use_static_shape),
+        lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
+            np.array(s, dtype=dtype), is_static=is_static),
         initial_loc)
 
     if bijector is not None:
@@ -200,9 +209,7 @@ class FactoredSurrogatePosterior(test_util.TestCase):
 
     # Check that the samples have the correct structure and that the sampled
     # values are close to the initial locs.
-    tf.nest.map_structure(functools.partial(self.assertAllClose, atol=1e-4),
-                          self.evaluate(initial_loc),
-                          posterior_sample_)
+    self.assertAllCloseNested(initial_loc, posterior_sample_, atol=1e-4)
 
   def test_that_gamma_fitting_example_runs(self):
 
@@ -282,13 +289,6 @@ class FactoredSurrogatePosterior(test_util.TestCase):
     # Test that logprob is scalar, finite, and not NaN.
     self.assertEmpty(posterior_logprob_.shape)
     self.assertAllFinite(posterior_logprob_)
-
-
-def _build_tensor(ndarray, dtype, use_static_shape):
-  # Enforce parameterized dtype and static/dynamic testing.
-  ndarray = np.asarray(ndarray).astype(dtype)
-  return tf1.placeholder_with_default(
-      input=ndarray, shape=ndarray.shape if use_static_shape else None)
 
 
 @test_util.test_all_tf_execution_regimes

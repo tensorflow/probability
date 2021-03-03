@@ -42,7 +42,12 @@ py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:joint_map",
+        "//tensorflow_probability/python/bijectors:restructure",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:shift",
+        "//tensorflow_probability/python/bijectors:sigmoid",
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/distributions:beta",
         "//tensorflow_probability/python/distributions:independent",
