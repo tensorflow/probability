@@ -42,8 +42,6 @@ PRECONDITIONING_FAILS_DISTS = (
     'Laplace',  # CDF gradient incorrect at 0.
     'SigmoidBeta',  # inverse CDF numerical precision issues for large x
     'StudentT',  # CDF gradient incorrect at 0 (and unstable near zero).
-    'TruncatedCauchy',  # b/175630511
-    'TruncatedNormal',  # b/175630511
     )
 
 if JAX_MODE:
