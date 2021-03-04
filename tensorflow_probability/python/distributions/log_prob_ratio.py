@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import inspect
 
+import tensorflow.compat.v2 as tf
+
 
 __all__ = [
     'log_prob_ratio',
@@ -30,7 +32,7 @@ __all__ = [
 _log_prob_ratio_registry = {}
 
 
-def log_prob_ratio(p, x, q, y, **kwargs):
+def log_prob_ratio(p, x, q, y, name=None, **kwargs):
   """Computes `p.log_prob(x) - q.log_prob(y)`, numerically stably.
 
   Args:
@@ -38,6 +40,7 @@ def log_prob_ratio(p, x, q, y, **kwargs):
     x: A tensor from the support of `p`.
     q: A distribution instance in the same family as `p`, with matching shape.
     y: A tensor from the support of `q`.
+    name: Optional name for ops in this scope.
     **kwargs: Passed to the distribution's `log_prob_ratio` implementation.
 
   Returns:
@@ -48,8 +51,9 @@ def log_prob_ratio(p, x, q, y, **kwargs):
   assert type(p) == type(q)  # pylint: disable=unidiomatic-typecheck
   for cls in inspect.getmro(type(p)):
     if cls in _log_prob_ratio_registry:
-      return _log_prob_ratio_registry[cls](p, x, q, y, **kwargs)
-  return p.log_prob(x) - q.log_prob(y)
+      return _log_prob_ratio_registry[cls](p, x, q, y, name=name, **kwargs)
+  with tf.name_scope(name or 'log_prob_ratio'):
+    return p.log_prob(x) - q.log_prob(y)
 
 
 class RegisterLogProbRatio(object):

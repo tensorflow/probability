@@ -561,15 +561,17 @@ def _kl_sample(a, b, name='kl_sample'):
 
 
 @log_prob_ratio.RegisterLogProbRatio(Sample)
-def _sample_log_prob_ratio(p, x, q, y):
-  checks = []
-  if p.validate_args or q.validate_args:
-    checks.append(tf.debugging.assert_equal(p.sample_shape, q.sample_shape))
-  with tf.control_dependencies(checks):
-    # pylint: disable=protected-access
-    x, aux = p._prepare_for_underlying(x)
-    y, _ = q._prepare_for_underlying(y)
-    return p._finish_log_prob(
-        log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
-        aux)
-    # pylint: enable=protected-access
+def _sample_log_prob_ratio(p, x, q, y, name=None):
+  """Implements `log_prob_ratio` for tfd.Sample."""
+  with tf.name_scope(name or 'sample_log_prob_ratio'):
+    checks = []
+    if p.validate_args or q.validate_args:
+      checks.append(tf.debugging.assert_equal(p.sample_shape, q.sample_shape))
+    with tf.control_dependencies(checks):
+      # pylint: disable=protected-access
+      x, aux = p._prepare_for_underlying(x)
+      y, _ = q._prepare_for_underlying(y)
+      return p._finish_log_prob(
+          log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
+          aux)
+      # pylint: enable=protected-access

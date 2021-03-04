@@ -816,12 +816,14 @@ class _DefaultJointBijector(composition.Composition):
 
 
 @log_prob_ratio.RegisterLogProbRatio(JointDistribution)
-def _jd_log_prob_ratio(p, x, q, y):
-  tf.nest.assert_same_structure(x, y)
-  ps, _ = p.sample_distributions(value=x, seed=dummy_seed())
-  qs, _ = q.sample_distributions(value=y, seed=dummy_seed())
-  tf.nest.assert_same_structure(ps, qs)
-  parts = []
-  for p_, x_, q_, y_ in zip(ps, x, qs, y):
-    parts.append(log_prob_ratio.log_prob_ratio(p_, x_, q_, y_))
-  return tf.add_n(parts)
+def _jd_log_prob_ratio(p, x, q, y, name=None):
+  """Implements `log_prob_ratio` for tfd.JointDistribution*."""
+  with tf.name_scope(name or 'jd_log_prob_ratio'):
+    tf.nest.assert_same_structure(x, y)
+    ps, _ = p.sample_distributions(value=x, seed=dummy_seed())
+    qs, _ = q.sample_distributions(value=y, seed=dummy_seed())
+    tf.nest.assert_same_structure(ps, qs)
+    parts = []
+    for p_, x_, q_, y_ in zip(ps, x, qs, y):
+      parts.append(log_prob_ratio.log_prob_ratio(p_, x_, q_, y_))
+    return tf.add_n(parts)
