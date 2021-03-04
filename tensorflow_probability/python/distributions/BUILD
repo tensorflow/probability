@@ -2581,6 +2581,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["dpp_test.py"],
     shard_count = 5,
+    tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
