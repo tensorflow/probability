@@ -315,6 +315,35 @@ class IgammainvTest(test_util.TestCase):
         lambda x: tfp.math.igammacinv(x, p), [a], delta=1e-4)
     self.assertLess(err, 2e-5)
 
+  @test_util.numpy_disable_gradient_test
+  def testIgammainvSecondDerivativeNotNaN(self):
+    a = tf.constant(np.linspace(2., 5., 11)[..., np.newaxis])
+    # Avoid the end points where the gradient can veer off to infinity.
+    p = tf.constant(np.linspace(0.1, 0.7, 23))
+
+    def igammainv_first_der(a, p):
+      return tfp.math.value_and_gradient(
+          lambda z: tfp.math.igammainv(a, z), p)[1]
+    err = self.compute_max_gradient_error(
+        lambda x: igammainv_first_der(a, x), [p], delta=1e-4)
+    self.assertLess(err, 1e-3)
+
+    err = self.compute_max_gradient_error(
+        lambda y: igammainv_first_der(y, p), [a], delta=1e-4)
+    self.assertLess(err, 1e-3)
+
+    def igammacinv_first_der(a, p):
+      return tfp.math.value_and_gradient(
+          lambda z: tfp.math.igammacinv(a, z), p)[1]
+
+    err = self.compute_max_gradient_error(
+        lambda x: igammacinv_first_der(a, x), [p], delta=1e-4)
+    self.assertLess(err, 2e-3)
+
+    err = self.compute_max_gradient_error(
+        lambda y: igammacinv_first_der(y, p), [a], delta=1e-4)
+    self.assertLess(err, 2e-3)
+
 
 class OwensTTest(test_util.TestCase):
 

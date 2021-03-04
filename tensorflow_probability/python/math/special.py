@@ -194,19 +194,19 @@ def _dawsn_naive(x):
 
 
 def _dawsn_fwd(x):
-  """Compute output, aux (collaborates with _igammainv_bwd)."""
+  """Compute output, aux (collaborates with _dawsn_bwd)."""
   output = _dawsn_naive(x)
   return output, (x, output)
 
 
 def _dawsn_bwd(aux, g):
-  """Reverse mode impl for igammainv."""
+  """Reverse mode impl for dawsn."""
   x, y = aux
   return g * (1. - 2 * x * y)
 
 
 def _dawsn_jvp(primals, tangents):
-  """Computes JVP for igammainv (supports JAX custom derivative)."""
+  """Computes JVP for dawsn (supports JAX custom derivative)."""
   x, = primals
   dx, = tangents
 
@@ -707,13 +707,21 @@ def _shared_igammainv_computation(a, p, is_igammainv=True):
 def _igammainv_fwd(a, p):
   """Compute output, aux (collaborates with _igammainv_bwd)."""
   output = _shared_igammainv_computation(a, p, is_igammainv=True)
-  return output, (a, p, output)
+  return output, (a, p)
 
 
 def _igammainv_partials(a, x):
   """Compute partial derivatives of `igammainv(a, x)`."""
   # Partials for igamma.
-  igamma_partial_a = tf.raw_ops.IgammaGradA(a=a, x=x)
+
+  # This function does not have gradients in TF, and thus using
+  # `stop_gradient` does not change behavior in TF.
+  # Ideally, it would be nice to throw an exception when taking gradients of
+  # this function in JAX mode, but this is not possible at the moment with
+  # `custom_jvp`. See https://github.com/google/jax/issues/5913 for details.
+  # TODO(https://github.com/google/jax/issues/5913): remove stop_gradients.
+  igamma_partial_a = tf.raw_ops.IgammaGradA(
+      a=tf.stop_gradient(a), x=tf.stop_gradient(x))
   igamma_partial_x = tf.math.exp(
       -x + tf.math.xlogy(a - 1., x) - tf.math.lgamma(a))
 
@@ -726,7 +734,8 @@ def _igammainv_partials(a, x):
 
 def _igammainv_bwd(aux, g):
   """Reverse mode impl for igammainv."""
-  a, p, x = aux
+  a, p = aux
+  x = _igammainv_custom_gradient(a, p)
   # Use the fact that igamma and igammainv are inverses to compute the gradient.
   pa, pp = _igammainv_partials(a, x)
   return _fix_gradient_for_broadcasting(a, p, pa * g, pp * g)
@@ -742,7 +751,7 @@ def _igammainv_jvp(primals, tangents):
   da = tf.broadcast_to(da, bc_shp)
   dp = tf.broadcast_to(dp, bc_shp)
 
-  x = _shared_igammainv_computation(a, p, is_igammainv=True)
+  x = _igammainv_custom_gradient(a, p)
   pa, pp = _igammainv_partials(a, x)
 
   return x, pa * da + pp * dp
@@ -786,12 +795,13 @@ def igammainv(a, p, name=None):
 def _igammacinv_fwd(a, p):
   """Compute output, aux (collaborates with _igammacinv_bwd)."""
   output = _shared_igammainv_computation(a, p, is_igammainv=False)
-  return output, (a, p, output)
+  return output, (a, p)
 
 
 def _igammacinv_bwd(aux, g):
   """Reverse mode impl for igammacinv."""
-  a, p, x = aux
+  a, p = aux
+  x = _igammacinv_custom_gradient(a, p)
   pa, pp = _igammainv_partials(a, x)
   pp = -pp
   return _fix_gradient_for_broadcasting(a, p, pa * g, pp * g)
@@ -807,7 +817,7 @@ def _igammacinv_jvp(primals, tangents):
   da = tf.broadcast_to(da, bc_shp)
   dp = tf.broadcast_to(dp, bc_shp)
 
-  x = _shared_igammainv_computation(a, p, is_igammainv=False)
+  x = _igammacinv_custom_gradient(a, p)
   pa, pp = _igammainv_partials(a, x)
   pp = -pp
 
