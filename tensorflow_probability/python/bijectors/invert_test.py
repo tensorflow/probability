@@ -104,6 +104,16 @@ class InvertBijectorTest(test_util.TestCase):
       self.assertIs(inv.forward(y), x)
       self.assertIs(inv.inverse(x), y)
 
+  def testNoReductionWhenEventNdimsIsOmitted(self):
+    x = np.array([0.5, 2.]).astype(np.float32)
+    bij = tfb.Invert(tfb.Exp())
+    self.assertAllClose(
+        -np.log(x),
+        self.evaluate(bij.forward_log_det_jacobian(x)))
+    self.assertAllClose(
+        x,
+        self.evaluate(bij.inverse_log_det_jacobian(x)))
+
 
 if __name__ == "__main__":
   tf.test.main()
