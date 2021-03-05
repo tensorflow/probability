@@ -129,8 +129,6 @@ class BesselIvRatioTest(test_util.TestCase):
     self.VerifyBesselIvRatio(v, z, rtol=1e-6)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   def testBesselIvRatioGradient(self):
     v = tf.constant([0.5, 1., 10., 20.])[..., tf.newaxis]
     x = tf.constant([0.1, 0.5, 0.9, 1., 12., 14., 22.])
@@ -302,8 +300,6 @@ class BesselIveTest(test_util.TestCase):
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   @parameterized.named_parameters(
       ("float32", np.float32),
       ("float64", np.float64))
@@ -316,8 +312,6 @@ class BesselIveTest(test_util.TestCase):
     self.assertLess(err, 2e-4)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   @parameterized.named_parameters(
       ("float32", np.float32),
       ("float64", np.float64))
@@ -330,8 +324,6 @@ class BesselIveTest(test_util.TestCase):
     self.assertLess(err, 2e-4)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   @parameterized.named_parameters(
       ("float32", np.float32, 1e-3),
       ("float64", np.float64, 1e-4))
@@ -484,8 +476,6 @@ class BesselKveTest(test_util.TestCase):
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   @parameterized.named_parameters(
       ("float32", np.float32),
       ("float64", np.float64),

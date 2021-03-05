@@ -45,8 +45,6 @@ JIT_SAMPLE_BLOCKLIST = (
     'Bates',
     'Independent',  # http://b/164415821
     'Multinomial',
-    'Skellam',  # http://b/171079052
-    'VonMisesFisher',  # http://b/171079052
 )
 JIT_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
@@ -54,8 +52,6 @@ JIT_LOGPROB_BLOCKLIST = (
     'Independent',  # http://b/164415821
     'MixtureSameFamily',  # http://b/164415821
     'NegativeBinomial',  # http://b/170871051
-    'Skellam',  # http://b/171079052
-    'VonMisesFisher',  # http://b/171079052
 )
 
 VMAP_SAMPLE_BLOCKLIST = (
@@ -83,28 +79,18 @@ JVP_SAMPLE_BLOCKLIST = ()
 JVP_LOGPROB_SAMPLE_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
-    'NormalInverseGaussian',  # http://b/171079052
-    'Skellam',  # http://b/171079052
 )
 JVP_LOGPROB_PARAM_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
-    'Skellam',  # http://b/171079052
-    'NormalInverseGaussian',  # http://b/171079052
-    'VonMisesFisher',  # http://b/171079052
 )
 
 VJP_SAMPLE_BLOCKLIST = ()
 VJP_LOGPROB_SAMPLE_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
-    'NormalInverseGaussian',  # http://b/171079052
-    'Skellam',  # http://b/171079052
 )
 VJP_LOGPROB_PARAM_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
-    'NormalInverseGaussian',  # http://b/171079052
-    'Skellam',  # http://b/171079052
-    'VonMisesFisher',  # http://b/171079052
 )
 
 PYTREE_BLOCKLIST = (
