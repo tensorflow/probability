@@ -196,12 +196,13 @@ def _dawsn_naive(x):
 def _dawsn_fwd(x):
   """Compute output, aux (collaborates with _dawsn_bwd)."""
   output = _dawsn_naive(x)
-  return output, (x, output)
+  return output, (x,)
 
 
 def _dawsn_bwd(aux, g):
   """Reverse mode impl for dawsn."""
-  x, y = aux
+  x, = aux
+  y = _dawsn_custom_gradient(x)
   return g * (1. - 2 * x * y)
 
 
@@ -210,7 +211,7 @@ def _dawsn_jvp(primals, tangents):
   x, = primals
   dx, = tangents
 
-  y = _dawsn_naive(x)
+  y = _dawsn_custom_gradient(x)
   return y, dx * (1. - 2 * x * y)
 
 
@@ -328,13 +329,14 @@ def _erfcx_naive(x):
 
 
 def _erfcx_fwd(x):
-  """Compute output, aux (collaborates with _owens_t_bwd)."""
+  """Compute output, aux (collaborates with _erfcx_bwd)."""
   output = _erfcx_naive(x)
-  return output, (x, output)
+  return output, (x,)
 
 
 def _erfcx_bwd(aux, g):
-  x, y = aux
+  x, = aux
+  y = _erfcx_custom_gradient(x)
   numpy_dtype = dtype_util.as_numpy_dtype(
       dtype_util.common_dtype([x], tf.float32))
   px = 2. * x * y - numpy_dtype(2. / np.sqrt(np.pi))
@@ -346,7 +348,7 @@ def _erfcx_jvp(primals, tangents):
   x, = primals
   dx, = tangents
 
-  y = _erfcx_naive(x)
+  y = _erfcx_custom_gradient(x)
   numpy_dtype = dtype_util.as_numpy_dtype(
       dtype_util.common_dtype([x], tf.float32))
   px = 2. * x * y - numpy_dtype(2. / np.sqrt(np.pi))
@@ -998,7 +1000,46 @@ def _lambertw_principal_branch(z, name=None):
     return tf.cast(z0, dtype=z.dtype)
 
 
-@tf.custom_gradient
+def _lambert_fwd(z):
+  """Compute output, aux (collaborates with _lambert_bwd)."""
+  wz = _lambertw_principal_branch(z)
+  return wz, (z,)
+
+
+def _lambert_bwd(aux, g):
+  """Reverse mode impl for lambert."""
+  z, = aux
+  wz = _lambert_custom_gradient(z)
+  # At z = 0 the analytic expressions for the gradient results in a 0/0
+  # expression.  However, the continuous expansion (l'Hospital rule) gives a
+  # derivative of 1.0 at z = 0.  This case has to be handled separately with
+  # a where clause.
+  return g * tf.where(
+      tf.equal(z, 0.), tf.ones([], wz.dtype), wz / (z * (1. + wz)))
+
+
+def _lambert_jvp(primals, tangents):
+  """Computes JVP for lambert (supports JAX custom derivative)."""
+  z, = primals
+  dz, = tangents
+  wz = _lambert_custom_gradient(z)
+
+  # At z = 0 the analytic expressions for the gradient results in a 0/0
+  # expression.  However, the continuous expansion (l'Hospital rule) gives a
+  # derivative of 1.0 at z = 0.  This case has to be handled separately with
+  # a where clause.
+  pz = tf.where(tf.equal(z, 0.), tf.ones([], wz.dtype), wz / (z * (1. + wz)))
+  return wz, pz * dz
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_lambert_fwd,
+    vjp_bwd=_lambert_bwd,
+    jvp_fn=_lambert_jvp)
+def _lambert_custom_gradient(z):
+  return _lambertw_principal_branch(z)
+
+
 def lambertw(z, name=None):
   """Computes Lambert W of `z` element-wise.
 
@@ -1029,31 +1070,7 @@ def lambertw(z, name=None):
   """
   with tf.name_scope(name or 'lambertw'):
     z = tf.convert_to_tensor(z)
-    wz = _lambertw_principal_branch(z, name)
-
-    def grad(dy):
-      """Computes the derivative of Lambert W of `z` element-wise.
-
-      The first derivative W'(z) can be computed from W(z) as it holds
-
-        W'(z) = W(z) / (z * (1 + W(z)))
-
-      Args:
-        dy: A Tensor with type `float32` or `float64`.
-
-      Returns:
-        A Tensor with same shape and dtype as `z`.
-      """
-      # At z = 0 the analytic expressions for the gradient results in a 0/0
-      # expression.  However, the continuous expansion (l'Hospital rule) gives a
-      # derivative of 1.0 at z = 0.  This case has to be handled separately with
-      # a where clause.
-      grad_wz = (dy * tf.where(tf.equal(z, 0.0),
-                               tf.ones_like(wz),
-                               wz / (z * (1. + wz))))
-      return grad_wz
-
-    return wz, grad
+    return _lambert_custom_gradient(z)
 
 
 def log_gamma_correction(x, name=None):

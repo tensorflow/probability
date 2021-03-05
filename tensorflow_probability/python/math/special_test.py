@@ -213,6 +213,13 @@ class DawsnTest(test_util.TestCase):
     err = self.compute_max_gradient_error(tfp.math.dawsn, [x])
     self.assertLess(err, 2e-5)
 
+  @test_util.numpy_disable_gradient_test
+  def testDawsnSecondDerivative(self):
+    x = np.linspace(0.1, 100., 50)
+    err = self.compute_max_gradient_error(
+        lambda z: tfp.math.value_and_gradient(tfp.math.dawsn, z)[1], [x])
+    self.assertLess(err, 2e-5)
+
 
 class IgammainvTest(test_util.TestCase):
 
@@ -605,6 +612,13 @@ class SpecialTest(test_util.TestCase):
     err = self.compute_max_gradient_error(tfp.math.erfcx, [x])
     self.assertLess(err, 2.1e-4)
 
+  @test_util.numpy_disable_gradient_test
+  def testErfcxSecondDerivative(self):
+    x = np.linspace(-1., 3., 20).astype(np.float32)
+    err = self.compute_max_gradient_error(
+        lambda z: tfp.math.value_and_gradient(tfp.math.erfcx, z)[1], [x])
+    self.assertLess(err, 1e-3)
+
   @parameterized.parameters(tf.float32, tf.float64)
   def testLogErfc(self, dtype):
     x = tf.random.uniform(
@@ -691,7 +705,7 @@ class SpecialTest(test_util.TestCase):
       ("5", 5.),
       ("10", 10.),
       ("100", 100.))
-  def testLambertWApproxmiation(self, value):
+  def testLambertWApproximation(self, value):
     """Tests the approximation of the LambertW function."""
     exact = _w0(value)
     value = tf.convert_to_tensor(value)
