@@ -95,6 +95,7 @@ NANS_EVEN_IN_SAMPLE_LIST = (
 INSTANTIABLE_BUT_NOT_SLICABLE = (
     'BatchBroadcast',
     'BatchReshape',
+    'Masked',
     'Mixture',
     'QuantizedDistribution',
 )

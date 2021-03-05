@@ -141,6 +141,7 @@ SPECIAL_DISTS = (
     'JointDistributionSequential',
     'JointDistributionSequentialAutoBatched',
     'Independent',  # (has strategy)
+    'Masked',  # (has strategy)
     'Mixture',  # (has strategy)
     'MixtureSameFamily',  # (has strategy)
     'MultivariateNormalDiagPlusLowRank',  # Some batch shapes fail (b/177958275)
@@ -502,6 +503,7 @@ INSTANTIABLE_META_DISTS = (
     'BatchBroadcast',
     'BatchReshape',
     'Independent',
+    'Masked',
     'Mixture',
     'MixtureSameFamily',
     'Sample',
@@ -677,10 +679,10 @@ def base_distribution_unconstrained_params(draw,
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}.
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     param_strategy_fn: Optional callable with signature
       `strategy = param_strategy_fn(shape, dtype, constraint_fn)`. If provided,
       overrides the default strategy for generating float-valued parameters.
@@ -786,10 +788,10 @@ def base_distributions(draw,
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}.
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn at the top level.
     params: An optional set of Distribution parameters. If params are not
@@ -864,7 +866,7 @@ def spherical_uniforms(
     validate_args: Python `bool`; whether to enable runtime assertions.
 
   Returns:
-    dists: A strategy for drawing `UniformSphere` distributions with the
+    dists: A strategy for drawing `SphericalUniform` distributions with the
       specified `batch_shape` (or an arbitrary one if omitted).
   """
   if batch_shape is None:
@@ -896,10 +898,10 @@ def batch_broadcasts(
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
     eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
@@ -965,10 +967,10 @@ def batch_reshapes(
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
     eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
@@ -1022,10 +1024,10 @@ def independents(
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
     eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
@@ -1090,10 +1092,10 @@ def samples(
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
     eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
@@ -1162,10 +1164,10 @@ def transformed_distributions(draw,
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
     eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
@@ -1232,9 +1234,10 @@ def quantized_distributions(draw,
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all Tensors, never Variables or DeferredTensor.
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
     validate_args: Python `bool`; whether to enable runtime assertions.
@@ -1315,6 +1318,77 @@ def quantized_distributions(draw,
 
 
 @hps.composite
+def masked_distributions(draw,
+                         batch_shape=None,
+                         event_dim=None,
+                         enable_vars=False,
+                         depth=None,
+                         eligibility_filter=lambda name: True,
+                         validate_args=True):
+  """Strategy for drawing `Masked` distributions.
+
+  The underlying distribution is drawn from the `distributions` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      `MixtureSameFamily` distribution.  The component distribution will have a
+      batch shape of 1 rank higher (for the components being mixed).  Hypothesis
+      will pick a batch shape if omitted.
+    event_dim: Optional Python int giving the size of each of the component
+      distribution's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
+    depth: Python `int` giving maximum nesting depth of compound Distributions.
+    eligibility_filter: Optional Python callable.  Blocks some Distribution
+      class names so they will not be drawn.
+    validate_args: Python `bool`; whether to enable runtime assertions.
+
+  Returns:
+    dists: A strategy for drawing `Masked` distributions with the
+      specified `batch_shape` (or an arbitrary one if omitted).
+  """
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes(min_ndims=0, max_side=4))
+  if event_dim is None:
+    event_dim = draw(hps.integers(min_value=1, max_value=10))
+
+  mask_shape, underlying_batch_shape = draw(
+      tfp_hps.broadcasting_shapes(batch_shape, 2))
+  validity_mask = draw(
+      tfp_hps.maybe_variable(
+          tfp_hps.constrained_tensors(
+              lambda x: x, mask_shape.as_list(), np.bool),
+          enable_vars=enable_vars,
+          name='validity_mask'))
+
+  # Cannot put a BatchReshape into a Masked.  b/161984806.
+  def nested_eligibility_filter(dist_name):
+    if dist_name == 'BatchReshape':
+      return False
+    return eligibility_filter(dist_name)
+
+  underlying = draw(
+      distributions(
+          batch_shape=underlying_batch_shape,
+          event_dim=event_dim,
+          enable_vars=enable_vars,
+          eligibility_filter=nested_eligibility_filter,
+          depth=depth - 1,
+          validate_args=validate_args))
+  hp.note(f'Drawing Masked with underlying {underlying}, '
+          f'parameters {params_used(underlying)}; validity_mask shape '
+          f'{validity_mask.shape}.')
+  result_dist = tfd.Masked(underlying, validity_mask=validity_mask,
+                           validate_args=validate_args)
+  return result_dist
+
+
+@hps.composite
 def mixtures_same_family(draw,
                          batch_shape=None,
                          event_dim=None,
@@ -1340,10 +1414,10 @@ def mixtures_same_family(draw,
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
     eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
@@ -1426,10 +1500,10 @@ def mixtures(draw,
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
     eligibility_filter: Optional Python callable.  Blocks some Distribution
       class names so they will not be drawn.
@@ -1512,10 +1586,10 @@ def distributions(draw,
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
       scale Tensors, etc. If omitted, Hypothesis will choose one.
-    enable_vars: TODO(bjp): Make this `True` all the time and put variable
-      initialization in slicing_test.  If `False`, the returned parameters are
-      all `tf.Tensor`s and not {`tf.Variable`, `tfp.util.DeferredTensor`
-      `tfp.util.TransformedVariable`}.
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
     depth: Python `int` giving maximum nesting depth of compound Distributions.
       If `None`, Hypothesis will bias choose one, with a bias towards shallow
       nests.
@@ -1566,6 +1640,10 @@ def distributions(draw,
         eligibility_filter, validate_args))
   if dist_name == 'Sample':
     return draw(samples(
+        batch_shape, event_dim, enable_vars, depth,
+        eligibility_filter, validate_args))
+  if dist_name == 'Masked':
+    return draw(masked_distributions(
         batch_shape, event_dim, enable_vars, depth,
         eligibility_filter, validate_args))
   if dist_name == 'MixtureSameFamily':
