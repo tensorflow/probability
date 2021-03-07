@@ -379,28 +379,31 @@ class GibbsKernel(mcmc.TransitionKernel):
     def bootstrap_results(self, current_state):
 
         if mcmc_util.is_list_like(current_state):
-            current_state = list(current_state)
+            state_parts = list(current_state)
         else:
-            current_state = [tf.convert_to_tensor(current_state)]
-        current_state = [
-            tf.convert_to_tensor(s, name="current_state") for s in current_state
+            state_parts = [tf.convert_to_tensor(current_state)]
+        state_parts = [
+            tf.convert_to_tensor(s, name="current_state") for s in state_parts
         ]
 
         inner_results = []
         untransformed_target_log_prob = 0.0
         for state_part_idx, kernel_fn in self.kernel_list:
 
-            def target_log_prob_fn(_):
-                return self.target_log_prob_fn(*current_state)
+            def target_log_prob_fn(state_part):
+                state_parts[
+                    state_part_idx  # pylint: disable=cell-var-from-loop
+                    ] = state_part
+                return self.target_log_prob_fn(*state_parts)
 
             kernel = kernel_fn(target_log_prob_fn, current_state)
             kernel_results = kernel.bootstrap_results(
-                current_state[state_part_idx]
+                state_parts[state_part_idx]
             )
             inner_results.append(kernel_results)
             untransformed_target_log_prob = _maybe_transform_value(
                 tlp=_get_target_log_prob(kernel_results),
-                state=current_state[state_part_idx],
+                state=state_parts[state_part_idx],
                 kernel=kernel,
                 direction="forward",
             )
