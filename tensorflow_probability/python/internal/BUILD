@@ -329,6 +329,30 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "numerics_testing",
+    srcs = ["numerics_testing.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":dtype_util",
+        # absl/logging dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "numerics_testing_test",
+    size = "small",
+    srcs = ["numerics_testing_test.py"],
+    deps = [
+        ":numerics_testing",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "parameter_properties",
     srcs = ["parameter_properties.py"],
     deps = ["//tensorflow_probability/python/bijectors:identity"],
