@@ -1600,26 +1600,5 @@ class VariationalGaussianProcessEndToEnd(test_util.TestCase):
     self.assertEqual(dtype, vgp.dtype)
 
 
-@test_util.test_graph_and_eager_modes
-class JointDistributionLayer(test_util.TestCase):
-
-  def test_works(self):
-    x = tf.keras.Input(shape=())
-    y = tfp.layers.VariableLayer(shape=[2, 4, 3], dtype=tf.float32)(x)
-    y = tf.keras.layers.Dense(5, use_bias=False)(y)
-    y = tfp.layers.DistributionLambda(
-        lambda t: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
-            tfd.Gamma(t[..., 0], t[..., 1]),
-            tfd.Normal(t[..., 2], 1),
-            lambda m, s: tfd.Normal(loc=m, scale=s),
-        ]),
-    )(y)
-    m = tf.keras.Model(x, y)
-    dist = m(0.)
-    self.assertIsInstance(dist, tfd.JointDistributionSequential)
-    # Check the weights.
-    self.assertEqual(2, len(m.weights))
-
-
 if __name__ == '__main__':
   tf.test.main()
