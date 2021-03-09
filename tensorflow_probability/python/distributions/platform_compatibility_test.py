@@ -136,7 +136,7 @@ XLA_LOGPROB_ATOL.update({
     'BetaBinomial': 5e-6,
     'BetaQuotient': 1e-4,
     'Binomial': 5e-6,
-    'Categorical': 5e-6,  # sparse_softmax_cross_entropy_with_logits
+    'Categorical': 7e-6,  # sparse_softmax_cross_entropy_with_logits
     'DeterminantalPointProcess': 1e-5,
     'DirichletMultinomial': 1e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
