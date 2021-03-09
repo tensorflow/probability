@@ -24,10 +24,14 @@ import functools
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import reshape
 from tensorflow_probability.python.bijectors import restructure
 from tensorflow_probability.python.bijectors import scale as scale_lib
+from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.bijectors import sigmoid
 from tensorflow_probability.python.bijectors import softplus
@@ -43,6 +47,7 @@ from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import truncated_normal
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.experimental.vi.util import trainable_linear_operators
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -633,3 +638,203 @@ def build_asvi_surrogate_posterior(prior,
 
     surrogate_posterior.also_track = param_dicts
     return surrogate_posterior
+
+
+def build_affine_surrogate_posterior_from_base_distribution(
+    base_distribution,
+    operators='diag',
+    bijector=None,
+    validate_args=False,
+    name=None):
+  """Builds a variational posterior by linearly transforming base distributions.
+
+  This function builds a surrogate posterior by applying a trainable
+  transformation to a base distribution (typically a `tfd.JointDistribution`) or
+  nested structure of base distributions, and constraining the samples with
+  `bijector`. Note that the distributions must have event shapes corresponding
+  to the *pretransformed* surrogate posterior -- that is, if `bijector` contains
+  a shape-changing bijector, then the corresponding base distribution event
+  shape is the inverse event shape of the bijector applied to the desired
+  surrogate posterior shape. The surrogate posterior is constucted as follows:
+
+  1. Flatten the base distribution event shapes to vectors, and pack the base
+     distributions into a `tfd.JointDistribution`.
+  2. Apply a trainable blockwise LinearOperator bijector to the joint base
+     distribution.
+  3. Apply the constraining bijectors and return the resulting trainable
+     `tfd.TransformedDistribution` instance.
+
+  Args:
+    base_distribution: `tfd.Distribution` instance (typically a
+      `tfd.JointDistribution`), or a nested structure of `tfd.Distribution`
+      instances.
+    operators: Either a string or a list/tuple containing `LinearOperator`
+      subclasses, `LinearOperator` instances, or callables returning
+      `LinearOperator` instances. Supported string values are "diag" (to create
+      a mean-field surrogate posterior) and "tril" (to create a full-covariance
+      surrogate posterior). A list/tuple may be passed to induce other
+      posterior covariance structures. If the list is flat, a
+      `tf.linalg.LinearOperatorBlockDiag` instance will be created and applied
+      to the base distribution. Otherwise the list must be singly-nested and
+      have a first element of length 1, second element of length 2, etc.; the
+      elements of the outer list are interpreted as rows of a lower-triangular
+      block structure, and a `tf.linalg.LinearOperatorBlockLowerTriangular`
+      instance is created. For complete documentation and examples, see
+      `tfp.experimental.vi.util.build_trainable_linear_operator_block`, which
+      receives the `operators` arg if it is list-like.
+      Default value: `"diag"`.
+    bijector: `tfb.Bijector` instance, or nested structure of `tfb.Bijector`
+      instances, that maps (nested) values in R^n to the support of the
+      posterior. (This can be the `experimental_default_event_space_bijector` of
+      the distribution over the prior latent variables.)
+      Default value: `None` (i.e., the posterior is over R^n).
+    validate_args: Python `bool`. Whether to validate input with asserts. This
+      imposes a runtime cost. If `validate_args` is `False`, and the inputs are
+      invalid, correct behavior is not guaranteed.
+      Default value: `False`.
+    name: Python `str` name prefixed to ops created by this function.
+      Default value: `None` (i.e.,
+      'build_affine_surrogate_posterior_from_base_distribution').
+  Returns:
+    surrogate_distribution: Trainable `tfd.JointDistribution` instance.
+  Raises:
+    NotImplementedError: Base distributions with mixed dtypes are not supported.
+
+  #### Examples
+  ```python
+  tfd = tfp.distributions
+  tfb = tfp.bijectors
+
+  # Fit a multivariate Normal surrogate posterior on the Eight Schools model
+  # [1].
+
+  treatment_effects = [28., 8., -3., 7., -1., 1., 18., 12.]
+  treatment_stddevs = [15., 10., 16., 11., 9., 11., 10., 18.]
+
+  def model_fn():
+    avg_effect = yield tfd.Normal(loc=0., scale=10., name='avg_effect')
+    log_stddev = yield tfd.Normal(loc=5., scale=1., name='log_stddev')
+    school_effects = yield tfd.Sample(
+        tfd.Normal(loc=avg_effect, scale=tf.exp(log_stddev)),
+        sample_shape=[8],
+        name='school_effects')
+    treatment_effects = yield tfd.Independent(
+        tfd.Normal(loc=school_effects, scale=treatment_stddevs),
+        reinterpreted_batch_ndims=1,
+        name='treatment_effects')
+  model = tfd.JointDistributionCoroutineAutoBatched(model_fn)
+
+  # Pin the observed values in the model.
+  target_model = model.experimental_pin(treatment_effects=treatment_effects)
+
+  # Define a lower triangular structure of `LinearOperator` subclasses that
+  # models full covariance among latent variables except for the 8 dimensions
+  # of `school_effect`, which are modeled as independent (using
+  # `LinearOperatorDiag`).
+  operators = [
+    [tf.linalg.LinearOperatorLowerTriangular],
+    [tf.linalg.LinearOperatorFullMatrix, LinearOperatorLowerTriangular],
+    [tf.linalg.LinearOperatorFullMatrix, LinearOperatorFullMatrix,
+     tf.linalg.LinearOperatorDiag]]
+
+
+  # Constrain the posterior values to the support of the prior.
+  bijector = target_model.experimental_default_event_space_bijector()
+
+  # Build a full-covariance surrogate posterior.
+  surrogate_posterior = (
+    tfp.experimental.vi.build_affine_surrogate_posterior_from_base_distribution(
+        base_distribution=base_distribution,
+        operators=operators,
+        bijector=bijector))
+
+  # Fit the model.
+  losses = tfp.vi.fit_surrogate_posterior(
+      target_model.unnormalized_log_prob,
+      surrogate_posterior,
+      num_steps=100,
+      optimizer=tf.optimizers.Adam(0.1),
+      sample_size=10)
+  ```
+
+  #### References
+
+  [1] Andrew Gelman, John Carlin, Hal Stern, David Dunson, Aki Vehtari, and
+      Donald Rubin. Bayesian Data Analysis, Third Edition.
+      Chapman and Hall/CRC, 2013.
+
+  """
+  with tf.name_scope(
+      name or 'build_affine_surrogate_posterior_from_base_distribution'):
+
+    if nest.is_nested(base_distribution):
+      base_distribution = (
+          joint_distribution_util.independent_joint_distribution_from_structure(
+              base_distribution, validate_args=validate_args))
+
+    if nest.is_nested(bijector):
+      bijector = joint_map.JointMap(
+          nest.map_structure(
+              lambda b: identity.Identity() if b is None else b, bijector),
+          validate_args=validate_args)
+
+    event_shape = base_distribution.event_shape_tensor()
+    flat_event_size = nest.flatten(
+        nest.map_structure(ps.reduce_prod, event_shape))
+
+    base_dtypes = set(nest.flatten(base_distribution.dtype))
+    if len(base_dtypes) > 1:
+      raise NotImplementedError(
+          'Base distributions with mixed dtype are not supported. Saw '
+          'components of dtype {}'.format(base_dtypes))
+    base_dtype = list(base_dtypes)[0]
+
+    num_components = len(flat_event_size)
+    if operators == 'diag':
+      operators = [tf.linalg.LinearOperatorDiag] * num_components
+    elif operators == 'tril':
+      operators = [
+          [tf.linalg.LinearOperatorFullMatrix] * i
+          + [tf.linalg.LinearOperatorLowerTriangular]
+          for i in range(num_components)]
+    elif isinstance(operators, str):
+      raise ValueError(
+          'Unrecognized operator type {}. Valid operators are "diag", "tril", '
+          'or a structure that can be passed to '
+          '`tfp.experimental.vi.util.build_trainable_linear_operator_block` as '
+          'the `operators` arg.'.format(operators))
+
+    if nest.is_nested(operators):
+      operators = (
+          trainable_linear_operators.build_trainable_linear_operator_block(
+              operators, block_dims=flat_event_size, dtype=base_dtype))
+
+    linop_bijector = (
+        scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
+            scale=operators, validate_args=validate_args))
+    loc_bijector = joint_map.JointMap(
+        tf.nest.map_structure(
+            lambda s: shift.Shift(tf.Variable(tf.zeros(s, dtype=base_dtype))),
+            flat_event_size),
+        validate_args=validate_args)
+
+    unflatten_and_reshape = chain.Chain(
+        [joint_map.JointMap(
+            nest.map_structure(reshape.Reshape, event_shape),
+            validate_args=validate_args),
+         restructure.Restructure(
+             nest.pack_sequence_as(event_shape, range(num_components)))],
+        validate_args=validate_args)
+
+    bijectors = [] if bijector is None else [bijector]
+    bijectors.extend(
+        [unflatten_and_reshape,
+         loc_bijector,  # Allow the mean of the standard dist to shift from 0.
+         linop_bijector])  # Apply LinOp to scale the standard dist.
+    bijector = chain.Chain(bijectors, validate_args=validate_args)
+
+    flat_base_distribution = invert.Invert(
+        unflatten_and_reshape)(base_distribution)
+
+    return transformed_distribution.TransformedDistribution(
+        flat_base_distribution, bijector=bijector, validate_args=validate_args)
