@@ -89,56 +89,118 @@ class ShardedDistributionTest(test_lib.DistributedTest):
     self.evaluate(
         self.per_replica_to_tensor(self.strategy_run(lp_grad, (samps,))))
 
-  def test_log_prob_ratio_sample(self):
-    dist = tfd.Sample(tfd.Normal(0., 1.), 8)
+  def test_log_prob(self):
 
-    x0 = 0.
-    x1 = 1.
-
-    oracle_value = tfde.log_prob_ratio(dist, x0, dist, x1)
-
-    dist_sharded = tfp_dist.ShardedSample(
-        tfd.Normal(0., 1.), 8, shard_axis_name=self.axis_name)
     @tf.function
-    def test():
-      return (tfde.log_prob_ratio(dist_sharded, x0, dist_sharded, x1),
-              dist_sharded.log_prob(x0) - dist_sharded.log_prob(x1))
+    def lp_grad(x):
+      lp1, g1 = tfp.math.value_and_gradient(
+          tfp_dist.ShardedSample(
+              tfd.Normal(0., 1.), [test_lib.NUM_DEVICES],
+              shard_axis_name=self.axis_name).log_prob, (x,))
+      lp2, g2 = tfp.math.value_and_gradient(
+          tfp_dist.ShardedIndependent(
+              tfd.Normal(tf.zeros([1]), 1.),
+              1,
+              shard_axis_name=self.axis_name).log_prob, (x,))
+      return lp1, g1, lp2, g2
 
-    lp1, lp2 = self.strategy_run(test, in_axes=None)
-    sharded_ratio = self.per_replica_to_tensor(lp1)
-    sharded_subtraction = self.per_replica_to_tensor(lp2)
+    def true_lp_grad(x):
+      lp1, g1 = tfp.math.value_and_gradient(
+          tfd.Sample(tfd.Normal(0., 1.), [test_lib.NUM_DEVICES]).log_prob, (x,))
+      lp2, g2 = tfp.math.value_and_gradient(
+          tfd.Independent(tfd.Normal(tf.zeros([test_lib.NUM_DEVICES]), 1.),
+                          1).log_prob, (x,))
+      return lp1, g1, lp2, g2
 
-    self.assertAllClose(oracle_value + tf.zeros_like(sharded_ratio),
-                        sharded_ratio)
-    self.assertAllClose(oracle_value + tf.zeros_like(sharded_subtraction),
-                        sharded_subtraction)
+    x = tf.ones([test_lib.NUM_DEVICES])
+    sharded_x = self.shard_values(x)
+
+    lp1, g1, lp2, g2 = self.evaluate(
+        self.per_replica_to_tensor(self.strategy_run(lp_grad, (sharded_x,))))
+    true_lp1, true_g1, true_lp2, true_g2 = self.evaluate(true_lp_grad(x))
+
+    self.assertAllClose(true_lp1, lp1[0])
+    self.assertAllClose(true_g1, g1)
+    self.assertAllClose(true_lp2, lp2[0])
+    self.assertAllClose(true_g2, g2)
+
+  def test_log_prob_ratio_sample(self):
+    dist1 = tfd.Sample(tfd.Normal(0., 4.), test_lib.NUM_DEVICES)
+    dist2 = tfd.Sample(tfd.Normal(0., 2.), test_lib.NUM_DEVICES)
+
+    x0 = tf.zeros([test_lib.NUM_DEVICES])
+    x1 = tf.ones([test_lib.NUM_DEVICES])
+
+    sharded_x0 = self.shard_values(x0)
+    sharded_x1 = self.shard_values(x1)
+
+    true_diff, (true_g1, true_g2) = tfp.math.value_and_gradient(
+        lambda x0, x1: tfde.log_prob_ratio(dist1, x0, dist2, x1), (x0, x1))
+
+    @tf.function
+    def test(x0, x1):
+      dist_sharded1 = tfp_dist.ShardedSample(
+          tfd.Normal(0., 4.),
+          test_lib.NUM_DEVICES,
+          shard_axis_name=self.axis_name)
+      dist_sharded2 = tfp_dist.ShardedSample(
+          tfd.Normal(0., 2.),
+          test_lib.NUM_DEVICES,
+          shard_axis_name=self.axis_name)
+      return (
+          tfp.math.value_and_gradient(
+              lambda x0, x1: tfde.log_prob_ratio(  # pylint: disable=g-long-lambda
+                  dist_sharded1,
+                  x0,
+                  dist_sharded2,
+                  x1),
+              (x0, x1)),
+          dist_sharded1.log_prob(x0) - dist_sharded2.log_prob(x1))
+
+    (diff1, (g1, g2)), diff2 = self.per_replica_to_tensor(
+        self.strategy_run(test, (sharded_x0, sharded_x1)))
+
+    self.assertAllClose(true_diff, diff1[0])
+    self.assertAllClose(true_diff, diff2[0])
+    self.assertAllClose(true_g1, g1)
+    self.assertAllClose(true_g2, g2)
 
   def test_log_prob_ratio_independent(self):
-    dist = tfd.Independent(tfd.Normal(tf.zeros([2 * test_lib.NUM_DEVICES]), 1.),
-                           reinterpreted_batch_ndims=1)
+    dist1 = tfd.Independent(tfd.Normal(tf.zeros([test_lib.NUM_DEVICES]), 2.), 1)
+    dist2 = tfd.Independent(tfd.Normal(tf.zeros([test_lib.NUM_DEVICES]), 4.), 1)
 
-    x0 = 0.
-    x1 = 1.
+    x0 = tf.zeros([test_lib.NUM_DEVICES])
+    x1 = tf.ones([test_lib.NUM_DEVICES])
 
-    oracle_value = tfde.log_prob_ratio(dist, x0, dist, x1)
+    sharded_x0 = self.shard_values(x0)
+    sharded_x1 = self.shard_values(x1)
 
-    dist_sharded = tfp_dist.ShardedIndependent(
-        tfd.Normal(tf.zeros([2]), 1.),
-        reinterpreted_batch_ndims=1,
-        shard_axis_name=self.axis_name)
+    true_diff, (true_g1, true_g2) = tfp.math.value_and_gradient(
+        lambda x0, x1: tfde.log_prob_ratio(dist1, x0, dist2, x1), (x0, x1))
+
     @tf.function
-    def test():
-      return (tfde.log_prob_ratio(dist_sharded, x0, dist_sharded, x1),
-              dist_sharded.log_prob(x0) - dist_sharded.log_prob(x1))
+    def test(x0, x1):
+      dist_sharded1 = tfp_dist.ShardedIndependent(
+          tfd.Normal(tf.zeros([1]), 2.), 1, shard_axis_name=self.axis_name)
+      dist_sharded2 = tfp_dist.ShardedIndependent(
+          tfd.Normal(tf.zeros([1]), 4.), 1, shard_axis_name=self.axis_name)
+      return (
+          tfp.math.value_and_gradient(
+              lambda x0, x1: tfde.log_prob_ratio(  # pylint: disable=g-long-lambda
+                  dist_sharded1,
+                  x0,
+                  dist_sharded2,
+                  x1),
+              (x0, x1)),
+          dist_sharded1.log_prob(x0) - dist_sharded2.log_prob(x1))
 
-    lp1, lp2 = self.strategy_run(test, in_axes=None)
-    sharded_ratio = self.per_replica_to_tensor(lp1)
-    sharded_subtraction = self.per_replica_to_tensor(lp2)
+    (diff1, (g1, g2)), diff2 = self.per_replica_to_tensor(
+        self.strategy_run(test, (sharded_x0, sharded_x1)))
 
-    self.assertAllClose(oracle_value + tf.zeros_like(sharded_ratio),
-                        sharded_ratio)
-    self.assertAllClose(oracle_value + tf.zeros_like(sharded_subtraction),
-                        sharded_subtraction)
+    self.assertAllClose(true_diff, diff1[0])
+    self.assertAllClose(true_diff, diff2[0])
+    self.assertAllClose(true_g1, g1)
+    self.assertAllClose(true_g2, g2)
 
 
 if __name__ == '__main__':

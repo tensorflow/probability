@@ -116,10 +116,15 @@ class ShardedSample(sample_lib.Sample):
     return super(ShardedSample, self)._sample_n(n, seed, **kwargs)
 
   def _log_prob(self, value, reduce_over_shards=True, **kwargs):
-    out_log_prob = super(ShardedSample, self)._log_prob(value, **kwargs)
+
+    def log_prob_fn(value):
+      return super(ShardedSample, self)._log_prob(value, **kwargs)
+
     if reduce_over_shards:
-      return distribute_lib.psum(out_log_prob, axis_name=self.shard_axis_name)
-    return out_log_prob
+      return distribute_lib.make_sharded_log_prob_parts(
+          log_prob_fn, is_sharded=True, axis_name=self.shard_axis_name)(
+              value)
+    return log_prob_fn(value)
 
   def _parameter_control_dependencies(self, is_init=False):
     if not self.validate_args:
@@ -136,10 +141,21 @@ def _sharded_sample_log_prob_ratio(p, x, q, y, name=None,
     if p.shard_axis_name != q.shard_axis_name:
       raise ValueError('Mismatched axis names '
                        f'"{p.shard_axis_name}" vs "{q.shard_axis_name}"')
-    underlying = sample_lib._sample_log_prob_ratio(p, x, q, y)  # pylint: disable=protected-access
+
+    def log_prob_ratio_fn(x_y):
+      return sample_lib._sample_log_prob_ratio(p, x_y[0], q, x_y[1])  # pylint: disable=protected-access
+
     if reduce_over_shards:
-      return distribute_lib.psum(underlying, axis_name=p.shard_axis_name)
-    return underlying
+      return distribute_lib.make_sharded_log_prob_parts(
+          # Stack, because make_sharded_log_prob_parts expects inputs/outputs to
+          # be 1 to 1. TODO(b/175084455): revisit this after the distributed
+          # bijectors are done, as it is likely that make_sharded_log_prob_parts
+          # will be adjusted then to not have this limitation.
+          log_prob_ratio_fn,
+          is_sharded=True,
+          axis_name=p.shard_axis_name)(
+              tf.stack([x, y], axis=0))
+    return log_prob_ratio_fn([x, y])
 
 
 class ShardedIndependent(independent_lib.Independent):
@@ -197,10 +213,15 @@ class ShardedIndependent(independent_lib.Independent):
     return self._shard_axis_name
 
   def _log_prob(self, value, reduce_over_shards=True, **kwargs):
-    out_log_prob = super(ShardedIndependent, self)._log_prob(value, **kwargs)
+
+    def log_prob_fn(value):
+      return super(ShardedIndependent, self)._log_prob(value, **kwargs)
+
     if reduce_over_shards:
-      return distribute_lib.psum(out_log_prob, axis_name=self.shard_axis_name)
-    return out_log_prob
+      return distribute_lib.make_sharded_log_prob_parts(
+          log_prob_fn, is_sharded=True, axis_name=self.shard_axis_name)(
+              value)
+    return log_prob_fn(value)
 
   @property
   def replica_id(self):
@@ -230,7 +251,18 @@ def _sharded_independent_log_prob_ratio(p, x, q, y, name=None,
     if p.shard_axis_name != q.shard_axis_name:
       raise ValueError('Mismatched axis names '
                        f'"{p.shard_axis_name}" vs "{q.shard_axis_name}"')
-    underlying = independent_lib._independent_log_prob_ratio(p, x, q, y)  # pylint: disable=protected-access
+
+    def log_prob_ratio_fn(x_y):
+      return independent_lib._independent_log_prob_ratio(p, x_y[0], q, x_y[1])  # pylint: disable=protected-access
+
     if reduce_over_shards:
-      return distribute_lib.psum(underlying, axis_name=p.shard_axis_name)
-    return underlying
+      return distribute_lib.make_sharded_log_prob_parts(
+          # Stack, because make_sharded_log_prob_parts expects inputs/outputs to
+          # be 1 to 1. TODO(b/175084455): revisit this after the distributed
+          # bijectors are done, as it is likely that make_sharded_log_prob_parts
+          # will be adjusted then to not have this limitation.
+          log_prob_ratio_fn,
+          is_sharded=True,
+          axis_name=p.shard_axis_name)(
+              tf.stack([x, y], axis=0))
+    return log_prob_ratio_fn([x, y])

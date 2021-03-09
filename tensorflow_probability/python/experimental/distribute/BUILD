@@ -88,6 +88,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "sharded_test",
+    size = "medium",
     srcs = ["sharded_test.py"],
     disabled_substrates = ["numpy"],
     python_version = "PY3",
