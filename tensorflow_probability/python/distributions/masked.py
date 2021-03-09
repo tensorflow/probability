@@ -235,6 +235,10 @@ class Masked(distribution_lib.Distribution):
   def safe_sample_fn(self):
     return self._safe_sample_fn
 
+  @property
+  def experimental_is_sharded(self):
+    return self.distribution.experimental_is_sharded
+
   def _batch_shape(self):
     return tf.broadcast_static_shape(
         self.distribution.batch_shape, self.validity_mask.shape)

@@ -176,6 +176,10 @@ class BatchReshape(distribution_lib.Distribution):
   def distribution(self):
     return self._distribution
 
+  @property
+  def experimental_is_sharded(self):
+    return self.distribution.experimental_is_sharded
+
   def _batch_shape_tensor(self):
     expanded_new_shape, _ = self._calculate_new_shape()
     return expanded_new_shape

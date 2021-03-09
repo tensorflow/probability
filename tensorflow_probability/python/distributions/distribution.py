@@ -798,6 +798,11 @@ class Distribution(_BaseDistribution):
     """Python `bool` indicating possibly expensive checks are enabled."""
     return self._validate_args
 
+  @property
+  def experimental_is_sharded(self):
+    """`True` for distributions which parallel-sum `log_prob` across devices."""
+    return False
+
   def copy(self, **override_parameters_kwargs):
     """Creates a deep copy of the distribution.
 

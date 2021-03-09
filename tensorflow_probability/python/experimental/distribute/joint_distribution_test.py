@@ -85,24 +85,24 @@ class JointDistributionTest(test_lib.DistributedTest):
 
   @test_util.disable_test_for_backend(
       disable_jax=True,
-      reason='Cannot call `get_sharded_distributions` outside of pmap.')
-  def test_get_sharded_distribution_coroutine(self):
+      reason='Cannot call `experimental_is_sharded` outside of pmap.')
+  def test_experimental_is_sharded_coroutine(self):
     dist = distributions[0][1](self.axis_name)
-    self.assertTupleEqual(dist.get_sharded_distributions(), (False, True, True))
+    self.assertTupleEqual(dist.experimental_is_sharded, (False, True, True))
 
   @test_util.disable_test_for_backend(
       disable_jax=True,
-      reason='Cannot call `get_sharded_distributions` outside of pmap.')
-  def test_get_sharded_distribution_sequential(self):
+      reason='Cannot call `experimental_is_sharded` outside of pmap.')
+  def test_experimental_is_sharded_sequential(self):
     dist = distributions[1][1](self.axis_name)
-    self.assertListEqual(dist.get_sharded_distributions(), [False, True, True])
+    self.assertListEqual(dist.experimental_is_sharded, [False, True, True])
 
   @test_util.disable_test_for_backend(
       disable_jax=True,
-      reason='Cannot call `get_sharded_distributions` outside of pmap.')
-  def test_get_sharded_distribution_named(self):
+      reason='Cannot call `experimental_is_sharded` outside of pmap.')
+  def test_experimental_is_sharded_named(self):
     dist = distributions[2][1](self.axis_name)
-    self.assertDictEqual(dist.get_sharded_distributions(),
+    self.assertDictEqual(dist.experimental_is_sharded,
                          dict(w=False, x=True, data=True))
 
   @parameterized.named_parameters(*distributions)

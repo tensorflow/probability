@@ -237,6 +237,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     return self._bijector
 
   @property
+  def experimental_is_sharded(self):
+    raise NotImplementedError  # TODO(b/175084455): Handle bijector sharding.
+
+  @property
   def _composite_tensor_nonshape_params(self):
     if type(self).__init__ is not TransformedDistribution.__init__:
       # Handles subclasses of TransformedDistribution

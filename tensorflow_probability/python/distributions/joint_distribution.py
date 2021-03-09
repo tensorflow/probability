@@ -230,6 +230,13 @@ class JointDistribution(distribution_lib.Distribution):
         for d in self._get_single_sample_distributions()])
 
   @property
+  def experimental_is_sharded(self):
+    """Indicates whether part distributions are sharded."""
+    return self._model_unflatten([
+        d.experimental_is_sharded
+        for d in self._get_single_sample_distributions()])
+
+  @property
   def batch_shape(self):
     """Shape of a single sample from a single event index as a `TensorShape`.
 

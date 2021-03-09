@@ -231,6 +231,16 @@ class Blockwise(distribution_lib.Distribution):
   def distributions(self):
     return self._distributions
 
+  @property
+  def experimental_is_sharded(self):
+    any_is_sharded = any(
+        d.experimental_is_sharded for d in self.distributions)
+    all_are_sharded = all(
+        d.experimental_is_sharded for d in self.distributions)
+    if any_is_sharded and not all_are_sharded:
+      raise ValueError('`Blockwise.distributions` sharding must match.')
+    return all_are_sharded
+
   def _batch_shape(self):
     return functools.reduce(tensorshape_util.merge_with,
                             tf.nest.flatten(self._cached_batch_shape),

@@ -78,7 +78,7 @@ class ShardedSample(sample_lib.Sample):
           name=name)
       self._parameters = parameters
 
-  is_sharded = True
+  experimental_is_sharded = True
 
   @property
   def sample_shape(self):
@@ -206,7 +206,7 @@ class ShardedIndependent(independent_lib.Independent):
           name=name)
       self._parameters = parameters
 
-  is_sharded = True
+  experimental_is_sharded = True
 
   @property
   def shard_axis_name(self):

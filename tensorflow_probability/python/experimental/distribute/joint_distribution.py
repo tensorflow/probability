@@ -31,11 +31,6 @@ from tensorflow_probability.python.experimental.distribute import distribute_lib
 class JointDistributionDistributedMixin(object):
   """A JDMixin that shards the log_prob calculation."""
 
-  def get_sharded_distributions(self):
-    """Indicates for each part distribution whether or not it is sharded."""
-    ds = self._get_single_sample_distributions()
-    return self._model_unflatten(getattr(d, 'is_sharded', False) for d in ds)
-
   @property
   def shard_axis_name(self):
     return self._parameters['shard_axis_name']
@@ -44,7 +39,7 @@ class JointDistributionDistributedMixin(object):
     """Override the default implementation to shard its log_prob calculation."""
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
-    if attr == 'log_prob' and any(self.get_sharded_distributions()):
+    if attr == 'log_prob' and any(self.experimental_is_sharded):
 
       def inner_log_prob_parts(flat_value):
         unflat_value = self._model_unflatten(flat_value)
@@ -52,7 +47,7 @@ class JointDistributionDistributedMixin(object):
             value=unflat_value, seed=jd_lib.dummy_seed())
         # For sharded distributions, we need to make sure not to do an
         # all-reduce.
-        flat_sharded = self._model_flatten(self.get_sharded_distributions())
+        flat_sharded = self._model_flatten(self.experimental_is_sharded)
         log_prob_fns = [
             functools.partial(d.log_prob, reduce_over_shards=False)
             if s else d.log_prob for d, s in zip(ds, flat_sharded)]
@@ -64,7 +59,7 @@ class JointDistributionDistributedMixin(object):
 
       flat_value = self._model_flatten(value)
       flat_sharded_distributions = self._model_flatten(
-          self.get_sharded_distributions())
+          self.experimental_is_sharded)
       flat_xs = distribute_lib.make_sharded_log_prob_parts(
           inner_log_prob_parts,
           flat_sharded_distributions,
@@ -186,11 +181,12 @@ def _dist_jd_log_prob_ratio(p, x, q, y, name=None):
           'p and q must have the same shard_axis_name. '
           f'Saw: p: {p}, {p.shard_axis_name}, q: {q}, {q.shard_axis_name}')
 
-    is_sharded = p.get_sharded_distributions()
-    if is_sharded != q.get_sharded_distributions():
+    is_sharded = p.experimental_is_sharded
+    q_sharded = q.experimental_is_sharded
+    if is_sharded != q_sharded:
       raise ValueError(
           'p and q must use the same sharding. '
-          f'Saw: p: {p}, {is_sharded}, q: {q}, {q.get_sharded_distributions()}')
+          f'Saw: p: {p}, {is_sharded}, q: {q}, {q_sharded}')
 
     def log_prob_ratio_parts_fn(x_y):
       x = tf.nest.map_structure(lambda part: part[0], x_y)
@@ -212,6 +208,6 @@ def _dist_jd_log_prob_ratio(p, x, q, y, name=None):
                 # after the distributed bijectors are done, as it is likely that
                 # make_sharded_log_prob_parts will be adjusted then to not have
                 # this limitation.
-                p.get_sharded_distributions(),
+                is_sharded,
                 axis_name=p.shard_axis_name)(tf.nest.map_structure(
                     lambda x, y: tf.stack([x, y], axis=0), x, y))))

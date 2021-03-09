@@ -175,6 +175,10 @@ class Sample(distribution_lib.Distribution):
   def sample_shape(self):
     return self._sample_shape
 
+  @property
+  def experimental_is_sharded(self):
+    return self.distribution.experimental_is_sharded
+
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing
     # for instances of MSF, not subclasses thereof.
