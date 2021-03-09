@@ -106,7 +106,9 @@ def fold_in(seed, salt):
   """Folds salt into seed to form a new seed."""
   if JAX_MODE:
     from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
-    return jaxrand.fold_in(seed, salt & (2**32 - 1))
+    import jax.numpy as jnp  # pylint: disable=g-import-not-at-top
+    return jaxrand.fold_in(seed,
+                           jnp.asarray(salt & (2**32 - 1), dtype=SEED_DTYPE))
   if isinstance(salt, (six.integer_types)):
     seed = tf.bitwise.bitwise_xor(
         seed, np.uint64([salt & (2**64 - 1)]).view(np.int32))
