@@ -104,10 +104,10 @@ def _extract_type_spec_recursively(value):
     spec: the `TypeSpec` or collection of `TypeSpec`s corresponding to `value`
     or `value`, if no `Tensor`s are found.
   """
-  if tf.is_tensor(value):
-    return tf.TensorSpec.from_tensor(value)
   if isinstance(value, composite_tensor.CompositeTensor):
     return value._type_spec  # pylint: disable=protected-access
+  if tf.is_tensor(value):
+    return tf.TensorSpec(value.shape, value.dtype)
   if isinstance(value, (list, tuple)):
     specs = [_extract_type_spec_recursively(v) for v in value]
     has_tensors = any(a is not b for a, b in zip(value, specs))
