@@ -260,11 +260,19 @@ def fix_bates(d):
   return dict(d, total_count=total_count, high=high)
 
 
+def fix_dirichlet_concentration(x):
+  x = tfp_hps.softplus_plus_eps()(x)
+  hp.assume(x.shape[-1] >= 2)
+  return x
+
+
 CONSTRAINTS = {
     'atol':
         tf.math.softplus,
     'rtol':
         tf.math.softplus,
+    'Dirichlet.concentration':
+        fix_dirichlet_concentration,
     'concentration':
         tfp_hps.softplus_plus_eps(),
     'GeneralizedPareto.concentration':  # Permits +ve and -ve concentrations.
@@ -1332,9 +1340,9 @@ def masked_distributions(draw,
   Args:
     draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
-      `MixtureSameFamily` distribution.  The component distribution will have a
-      batch shape of 1 rank higher (for the components being mixed).  Hypothesis
-      will pick a batch shape if omitted.
+      `Masked` distribution.  The component distribution will have a batch
+      shape of 1 rank higher (for the components being mixed).  Hypothesis will
+      pick a batch shape if omitted.
     event_dim: Optional Python int giving the size of each of the component
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
