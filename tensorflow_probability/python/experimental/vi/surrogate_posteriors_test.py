@@ -407,6 +407,57 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
     self._test_gradients(surrogate_posterior, seed=seed())
     self._test_dtype(surrogate_posterior, dtype, seed())
 
+  @parameterized.named_parameters(
+      {'testcase_name': 'TensorEvent',
+       'event_shape': [3],
+       'operators': [tf.linalg.LinearOperatorDiag],
+       'bijector': tfb.Exp(),
+       'dtype': np.float32,
+       'is_static': True},
+      {'testcase_name': 'ListEvent',
+       'event_shape': [tf.TensorShape([3]),
+                       tf.TensorShape([]),
+                       tf.TensorShape([2, 2])],
+       'operators': 'diag',
+       'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
+       'dtype': np.float32,
+       'is_static': False},
+      {'testcase_name': 'DictEvent',
+       'event_shape': {'x': tf.TensorShape([3]), 'y': tf.TensorShape([])},
+       'operators': [[tf.linalg.LinearOperatorDiag],
+                     [tf.linalg.LinearOperatorFullMatrix,
+                      tf.linalg.LinearOperatorLowerTriangular]],
+       'bijector': None,
+       'dtype': np.float64,
+       'is_static': True},
+  )
+  def test_constrained_affine_from_event_shape(
+      self, event_shape, operators, bijector, dtype, is_static):
+    if not tf.executing_eagerly() and not is_static:
+      self.skipTest('tfb.Reshape requires statically known shapes in graph'
+                    ' mode.')
+    surrogate_posterior = (
+        tfp.experimental.vi.
+        build_affine_surrogate_posterior(
+            event_shape=tf.nest.map_structure(
+                lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
+                    np.array(s, dtype=np.int32), is_static=is_static),
+                event_shape),
+            operators=operators,
+            bijector=bijector,
+            dtype=dtype,
+            validate_args=True))
+
+    self.evaluate(
+        [v.initializer for v in surrogate_posterior.trainable_variables])
+
+    seed = test_util.test_seed_stream()
+    self._test_shapes(
+        surrogate_posterior, batch_shape=[], event_shape=event_shape,
+        seed=seed())
+    self._test_gradients(surrogate_posterior, seed=seed())
+    self._test_dtype(surrogate_posterior, dtype, seed())
+
   def test_constrained_affine_from_joint_inputs(self):
     base_distribution = tfd.JointDistributionSequential(
         [tfd.Sample(tfd.Normal(0., 1.), sample_shape=[3, 2]),
@@ -453,13 +504,13 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
     model = self._make_gamma_model()
     surrogate_posterior = (
         tfp.experimental.
-        vi.build_affine_surrogate_posterior_from_base_distribution(
-            [tfd.Normal(tf.zeros([], dtype=tf.float32), scale=1.),
-             tfd.Logistic(tf.zeros([], dtype=tf.float32), scale=1.)],
+        vi.build_affine_surrogate_posterior(
+            model.event_shape_tensor()[:-1],
             operators=[
                 [tf.linalg.LinearOperatorLowerTriangular],
                 [None, tf.linalg.LinearOperatorDiag]],
             bijector=[tfb.Softplus(), tfb.Softplus()],
+            base_distribution=tfd.Logistic,
             validate_args=True))
     self._test_fitting(model, surrogate_posterior)
 
