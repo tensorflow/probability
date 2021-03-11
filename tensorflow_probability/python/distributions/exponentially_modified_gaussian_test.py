@@ -157,7 +157,7 @@ class _ExponentiallyModifiedGaussianTest(object):
     self.assertAllClose(
         np.exp(expected_log_pdf), pdf_values, atol=1e-5, rtol=1e-5)
 
-  def testExponentiallyModifiedGaussianCDF(self):
+  def testExponentiallyModifiedGaussianLogCDF(self):
     batch_size = 50
     mu = self._rng.randn(batch_size)
     sigma = self._rng.rand(batch_size) + 1.0
@@ -166,7 +166,7 @@ class _ExponentiallyModifiedGaussianTest(object):
 
     exgaussian = tfd.ExponentiallyModifiedGaussian(
         loc=mu, scale=sigma, rate=rate, validate_args=True)
-    cdf = exgaussian.cdf(x)
+    cdf = exgaussian.log_cdf(x)
     self.assertAllEqual(
         self.evaluate(exgaussian.batch_shape_tensor()), cdf.shape)
     self.assertAllEqual(
@@ -175,7 +175,7 @@ class _ExponentiallyModifiedGaussianTest(object):
     self.assertAllEqual(exgaussian.batch_shape, cdf.shape)
     self.assertAllEqual(exgaussian.batch_shape, self.evaluate(cdf).shape)
     expected_cdf = sp_stats.exponnorm(
-        1. / (rate * sigma), loc=mu, scale=sigma).cdf(x)
+        1. / (rate * sigma), loc=mu, scale=sigma).logcdf(x)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0)
 
   @test_util.numpy_disable_gradient_test
