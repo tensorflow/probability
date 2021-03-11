@@ -285,7 +285,7 @@ class WindowedSamplingTest(test_util.TestCase):
       final_scaling = 1. / trace['variance_scaling'][0][-1, 0, :]
       return final_scaling, true_var
     final_scaling, true_var = do_sample()
-    self.assertAllClose(true_var, final_scaling, rtol=0.05)
+    self.assertAllClose(true_var, final_scaling, rtol=0.1)
 
 
 if __name__ == '__main__':
