@@ -22,6 +22,7 @@ from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import fill_scale_tril
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -31,6 +32,7 @@ def build_trainable_linear_operator_block(
     block_dims=None,
     batch_shape=(),
     dtype=None,
+    seed=None,
     name=None):
   """Builds a trainable blockwise `tf.linalg.LinearOperator`.
 
@@ -85,15 +87,17 @@ def build_trainable_linear_operator_block(
       first element of length 1, second element of length 2, etc.; the
       elements of the outer list are interpreted as rows of a lower-triangular
       block structure, and a `tf.linalg.LinearOperatorBlockLowerTriangular`
-      instance is returned. Callables contained in the lists must take two
+      instance is returned. Callables contained in the lists must take three
       arguments -- `shape`, the shape of the `tf.Variable` instantiating the
-      `LinearOperator`, and `dtype`, the `tf.dtype` of the `LinearOperator`.
+      `LinearOperator`, `dtype`, the `tf.dtype` of the `LinearOperator`, and
+      `seed`, a seed for generating random values.
     block_dims: List or tuple of integers, representing the sizes of the blocks
       along one dimension of the (square) blockwise `LinearOperator`. If
       `operators` contains only `LinearOperator` instances, `block_dims` may be
       `None` and the dimensions are inferred.
     batch_shape: Batch shape of the `LinearOperator`.
     dtype: `tf.dtype` of the `LinearOperator`.
+    seed: Python integer to seed the random number generator.
     name: str, name for `tf.name_scope`.
 
   Returns:
@@ -115,21 +119,28 @@ def build_trainable_linear_operator_block(
     if dtype is None:
       dtype = dtype_util.common_dtype(operator_instances)
 
-    def convert_operator(path, op):
+    def convert_operator(path, op, seed):
       if isinstance(op, tf.linalg.LinearOperator):
         return op
       builder = _OPERATOR_BUILDERS.get(op, op)
       if len(set(path)) == 1:  # for operators on the diagonal
         return builder(
             ps.concat([batch_shape, [block_dims[path[0]]]], axis=0),
-            dtype=dtype)
+            dtype=dtype,
+            seed=seed)
       return builder(
           ps.concat([batch_shape, [block_dims[path[0]], block_dims[path[1]]]],
                     axis=0),
-          dtype=dtype)
+          dtype=dtype,
+          seed=seed)
 
     operator_blocks = nest.map_structure_with_tuple_paths(
-        convert_operator, operators)
+        convert_operator,
+        operators,
+        tf.nest.pack_sequence_as(
+            operators,
+            samplers.split_seed(
+                seed, n=len(tf.nest.flatten(operators)))))
     paths = nest.yield_flat_paths(operators)
     if all(len(p) == 1 for p in paths):
       return tf.linalg.LinearOperatorBlockDiag(
@@ -147,6 +158,7 @@ def build_trainable_linear_operator_tril(
     scale_initializer=1e-2,
     diag_bijector=None,
     dtype=None,
+    seed=None,
     name=None):
   """Build a trainable `LinearOperatorLowerTriangular` instance.
 
@@ -157,6 +169,7 @@ def build_trainable_linear_operator_tril(
       `Normal(0, scale_initializer)`.
     diag_bijector: Bijector to apply to the diagonal of the operator.
     dtype: `tf.dtype` of the `LinearOperator`.
+    seed: Python integer to seed the random number generator.
     name: str, name for `tf.name_scope`.
 
   Returns:
@@ -173,10 +186,11 @@ def build_trainable_linear_operator_tril(
 
     scale_tril_bijector = fill_scale_tril.FillScaleTriL(
         diag_bijector, diag_shift=tf.zeros([], dtype=dtype))
-    flat_initial_scale = tf.random.normal(
+    flat_initial_scale = samplers.normal(
         mean=0.,
         stddev=scale_initializer,
         shape=ps.concat([batch_shape, dim * (dim + 1) // 2], axis=0),
+        seed=seed,
         dtype=dtype)
     return tf.linalg.LinearOperatorLowerTriangular(
         tril=tfp_util.TransformedVariable(
@@ -191,6 +205,7 @@ def build_trainable_linear_operator_diag(
     scale_initializer=1e-2,
     diag_bijector=None,
     dtype=None,
+    seed=None,
     name=None):
   """Build a trainable `LinearOperatorDiag` instance.
 
@@ -201,6 +216,7 @@ def build_trainable_linear_operator_diag(
       `Normal(0, scale_initializer)`.
     diag_bijector: Bijector to apply to the diagonal of the operator.
     dtype: `tf.dtype` of the `LinearOperator`.
+    seed: Python integer to seed the random number generator.
     name: str, name for `tf.name_scope`.
 
   Returns:
@@ -213,11 +229,12 @@ def build_trainable_linear_operator_diag(
     scale_initializer = tf.convert_to_tensor(scale_initializer, dtype=dtype)
 
     diag_bijector = diag_bijector or _DefaultScaleDiagonal()
-    initial_scale_diag = tf.random.normal(
+    initial_scale_diag = samplers.normal(
         mean=0.,
         stddev=scale_initializer,
         shape=shape,
-        dtype=dtype)
+        dtype=dtype,
+        seed=seed)
     return tf.linalg.LinearOperatorDiag(
         tfp_util.TransformedVariable(
             diag_bijector.forward(initial_scale_diag),
@@ -230,6 +247,7 @@ def build_trainable_linear_operator_full_matrix(
     shape,
     scale_initializer=1e-2,
     dtype=None,
+    seed=None,
     name=None):
   """Build a trainable `LinearOperatorFullMatrix` instance.
 
@@ -240,6 +258,7 @@ def build_trainable_linear_operator_full_matrix(
     scale_initializer: Variables are initialized with samples from
       `Normal(0, scale_initializer)`.
     dtype: `tf.dtype` of the `LinearOperator`.
+    seed: Python integer to seed the random number generator.
     name: str, name for `tf.name_scope`.
 
   Returns:
@@ -251,8 +270,8 @@ def build_trainable_linear_operator_full_matrix(
                                       dtype_hint=tf.float32)
     scale_initializer = tf.convert_to_tensor(scale_initializer, dtype)
 
-    initial_scale_matrix = tf.random.normal(
-        mean=0., stddev=scale_initializer, shape=shape, dtype=dtype)
+    initial_scale_matrix = samplers.normal(
+        mean=0., stddev=scale_initializer, shape=shape, dtype=dtype, seed=seed)
     return tf.linalg.LinearOperatorFullMatrix(
         matrix=tf.Variable(initial_scale_matrix, name='full_matrix'))
 
@@ -260,6 +279,7 @@ def build_trainable_linear_operator_full_matrix(
 def build_linear_operator_zeros(
     shape,
     dtype=None,
+    seed=None,
     name=None):
   """Build an instance of `LinearOperatorZeros`.
 
@@ -268,11 +288,13 @@ def build_linear_operator_zeros(
       `b0...bn` are batch dimensions `h` and `w` are the height and width of the
       matrix represented by the `LinearOperator`.
     dtype: `tf.dtype` of the `LinearOperator`.
+    seed: Python integer to seed the random number generator.
     name: str, name for `tf.name_scope`.
 
   Returns:
     operator: Instance of `tf.linalg.LinearOperatorZeros`.
   """
+  del seed  # Unused.
   with tf.name_scope(name or 'build_linear_operator_zeros'):
     batch_shape, rows, cols = ps.split(
         shape, num_or_size_splits=[-1, 1, 1])
