@@ -1826,6 +1826,7 @@ multi_substrate_py_test(
         ":bijector_test_util",
         ":bijectors",
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

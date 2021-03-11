@@ -183,22 +183,22 @@ class Restructure(bijector.Bijector):
 
   ### Shape/ndims/etc transformations do the same thing as forward/inverse.
 
-  def _forward_event_shape(self, x_shape, **kwargs):
+  def forward_event_shape(self, x_shape, **kwargs):
     return self._forward(x_shape)
 
-  def _inverse_event_shape(self, y_shape, **kwargs):
+  def inverse_event_shape(self, y_shape, **kwargs):
     return self._inverse(y_shape)
 
-  def _forward_event_shape_tensor(self, x_shape, **kwargs):
+  def forward_event_shape_tensor(self, x_shape, **kwargs):
     return self._forward(x_shape)
 
-  def _inverse_event_shape_tensor(self, y_shape, **kwargs):
+  def inverse_event_shape_tensor(self, y_shape, **kwargs):
     return self._inverse(y_shape)
 
-  def _forward_dtype(self, x_dtype, **kwargs):
+  def forward_dtype(self, x_dtype, **kwargs):
     return self._forward(x_dtype)
 
-  def _inverse_dtype(self, y_dtype, **kwargs):
+  def inverse_dtype(self, y_dtype, **kwargs):
     return self._inverse(y_dtype)
 
   def forward_event_ndims(self, x_ndims, **kwargs):
