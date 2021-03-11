@@ -266,6 +266,11 @@ def fix_dirichlet_concentration(x):
   return x
 
 
+def fix_power_spherical_mean_direction(x):
+  hp.assume(x.shape[-1] >= 2)
+  return tf.math.l2_normalize(tf.math.sigmoid(x) + 1e-6, -1)
+
+
 CONSTRAINTS = {
     'atol':
         tf.math.softplus,
@@ -302,7 +307,7 @@ CONSTRAINTS = {
     'JohnsonSU.tailweight':
         tfp_hps.softplus_plus_eps(),
     'PowerSpherical.mean_direction':
-        lambda x: tf.math.l2_normalize(tf.math.sigmoid(x) + 1e-6, -1),
+        fix_power_spherical_mean_direction,
     'VonMisesFisher.mean_direction':  # max ndims is 3 to avoid instability.
         lambda x: tf.math.l2_normalize(tf.math.sigmoid(x[..., :3]) + 1e-6, -1),
     'Categorical.probs':
