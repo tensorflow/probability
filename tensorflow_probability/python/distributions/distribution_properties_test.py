@@ -48,6 +48,7 @@ from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as
 
 
 WORKING_PRECISION_TEST_BLOCK_LIST = (
+    'Masked',  # b/182313283
     # The difficulty concerns Mixtures of component distributions whose samples
     # have different dtypes.
     'Mixture',
