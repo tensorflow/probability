@@ -500,6 +500,24 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        build_affine_surrogate_posterior_from_base_distribution(
            base_distribution, operators=operators, validate_args=True))
 
+  def test_deterministic_initialization_from_seed(self):
+    initial_samples = []
+    for _ in range(2):
+      surrogate_posterior = (
+          tfp.experimental.vi.build_affine_surrogate_posterior(
+              event_shape={'x': tf.TensorShape([3]), 'y': tf.TensorShape([])},
+              operators='tril',
+              bijector=None,
+              dtype=tf.float32,
+              seed=test_util.test_seed(sampler_type='stateless'),
+              validate_args=True))
+      self.evaluate(
+          [v.initializer for v in surrogate_posterior.trainable_variables])
+      initial_samples.append(
+          surrogate_posterior.sample(
+              [5], seed=test_util.test_seed(sampler_type='stateless')))
+    self.assertAllEqualNested(initial_samples[0], initial_samples[1])
+
   def test_that_gamma_fitting_example_runs(self):
     model = self._make_gamma_model()
     surrogate_posterior = (

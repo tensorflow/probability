@@ -51,6 +51,7 @@ from tensorflow_probability.python.experimental.vi.util import trainable_linear_
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -129,7 +130,7 @@ def _get_event_shape_shallow_structure(event_shape):
 
 # Default constructors for `build_factored_surrogate_posterior`.
 _sample_uniform_initial_loc = functools.partial(
-    tf.random.uniform, minval=-2., maxval=2., dtype=tf.float32)
+    samplers.uniform, minval=-2., maxval=2., dtype=tf.float32)
 _build_trainable_normal_dist = functools.partial(
     build_trainable_location_scale_distribution,
     distribution_fn=normal.Normal)
@@ -180,7 +181,7 @@ def build_factored_surrogate_posterior(
       must have structure matching `event_shape` and shapes determined by the
       inverse image of `event_shape` under `bijector`, which may optionally be
       prefixed with a common batch shape.
-      Default value: `functools.partial(tf.random.uniform,
+      Default value: `functools.partial(tf.random.stateless_uniform,
         minval=-2., maxval=2., dtype=tf.float32)`.
     initial_unconstrained_scale: Optional scalar float `Tensor` initial
       scale for the unconstrained distributions, or a nested structure of
@@ -650,6 +651,7 @@ def build_affine_surrogate_posterior(
     bijector=None,
     base_distribution=normal.Normal,
     dtype=tf.float32,
+    seed=None,
     validate_args=False,
     name=None):
   """Builds a joint variational posterior with a given `event_shape`.
@@ -693,6 +695,8 @@ def build_affine_surrogate_posterior(
       Default value: `tfd.Normal`.
     dtype: The `dtype` of the surrogate posterior.
       Default value: `tf.float32`.
+    seed: Python integer to seed the random number generator for initial values.
+      Default value: `None`.
     validate_args: Python `bool`. Whether to validate input with asserts. This
       imposes a runtime cost. If `validate_args` is `False`, and the inputs are
       invalid, correct behavior is not guaranteed.
@@ -778,6 +782,7 @@ def build_affine_surrogate_posterior(
         standard_base_distribution,
         operators=operators,
         bijector=bijector,
+        seed=seed,
         validate_args=validate_args)
 
 
@@ -785,6 +790,8 @@ def build_affine_surrogate_posterior_from_base_distribution(
     base_distribution,
     operators='diag',
     bijector=None,
+    initial_unconstrained_loc_fn=_sample_uniform_initial_loc,
+    seed=None,
     validate_args=False,
     name=None):
   """Builds a variational posterior by linearly transforming base distributions.
@@ -829,6 +836,14 @@ def build_affine_surrogate_posterior_from_base_distribution(
       posterior. (This can be the `experimental_default_event_space_bijector` of
       the distribution over the prior latent variables.)
       Default value: `None` (i.e., the posterior is over R^n).
+    initial_unconstrained_loc_fn: Optional Python `callable` with signature
+      `initial_loc = initial_unconstrained_loc_fn(shape, dtype, seed)` used to
+      sample real-valued initializations for the unconstrained location of
+      each variable.
+      Default value: `functools.partial(tf.random.stateless_uniform,
+        minval=-2., maxval=2., dtype=tf.float32)`.
+    seed: Python integer to seed the random number generator for initial values.
+      Default value: `None`.
     validate_args: Python `bool`. Whether to validate input with asserts. This
       imposes a runtime cost. If `validate_args` is `False`, and the inputs are
       invalid, correct behavior is not guaranteed.
@@ -946,17 +961,25 @@ def build_affine_surrogate_posterior_from_base_distribution(
           'the `operators` arg.'.format(operators))
 
     if nest.is_nested(operators):
+      seed, operators_seed = samplers.split_seed(seed)
       operators = (
           trainable_linear_operators.build_trainable_linear_operator_block(
-              operators, block_dims=flat_event_size, dtype=base_dtype))
+              operators,
+              block_dims=flat_event_size,
+              dtype=base_dtype,
+              seed=operators_seed))
 
     linop_bijector = (
         scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
             scale=operators, validate_args=validate_args))
     loc_bijector = joint_map.JointMap(
         tf.nest.map_structure(
-            lambda s: shift.Shift(tf.Variable(tf.zeros(s, dtype=base_dtype))),
-            flat_event_size),
+            lambda s, seed: shift.Shift(  # pylint: disable=g-long-lambda
+                tf.Variable(
+                    initial_unconstrained_loc_fn(
+                        [s], dtype=base_dtype, seed=seed))),
+            flat_event_size,
+            samplers.split_seed(seed, n=len(flat_event_size))),
         validate_args=validate_args)
 
     unflatten_and_reshape = chain.Chain(
