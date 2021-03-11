@@ -575,6 +575,12 @@ class ParametersTest(test_util.TestCase):
                     self.evaluate(normal_differential_entropy(scale)),
                     err=1e-5)
 
+  def testParameterPropertiesNotInherited(self):
+    class MyNormal(tfd.Normal):
+      pass
+    with self.assertRaises(NotImplementedError):
+      MyNormal.parameter_properties()
+
 
 @test_util.test_all_tf_execution_regimes
 class TfModuleTest(test_util.TestCase):
