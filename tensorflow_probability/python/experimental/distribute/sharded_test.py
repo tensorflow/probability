@@ -29,15 +29,14 @@ tfp_dist = tfp.experimental.distribute
 
 
 @test_util.test_all_tf_execution_regimes
-class ShardedDistributionTest(test_lib.DistributedTest):
+class ShardTest(test_lib.DistributedTest):
 
   def test_sharded_sample_samples_differently_across_shards(self):
 
     @tf.function(autograph=False)
     def run(key):
-      return sharded.ShardedSample(
-          tfd.Normal(0., 1.),
-          test_lib.NUM_DEVICES,
+      return sharded.Sharded(
+          tfd.Sample(tfd.Normal(0., 1.), 1),
           shard_axis_name=self.axis_name).sample(seed=key)
 
     sample = self.evaluate(
@@ -53,9 +52,8 @@ class ShardedDistributionTest(test_lib.DistributedTest):
 
     @tf.function(autograph=False)
     def run(key):
-      return sharded.ShardedIndependent(
-          tfd.Normal(tf.zeros(1), tf.ones(1)),
-          1,
+      return tfp_dist.Sharded(
+          tfd.Independent(tfd.Normal(tf.zeros(1), tf.ones(1)), 1),
           shard_axis_name=self.axis_name).sample(seed=key)
 
     sample = self.evaluate(
@@ -68,19 +66,24 @@ class ShardedDistributionTest(test_lib.DistributedTest):
         self.assertNotEqual(sample[i], sample[j])
 
   def test_kahan_custom_grad(self):
+
     def model_fn():
       root = tfp.experimental.distribute.JointDistributionCoroutine.Root
-      _ = yield root(tfp.experimental.distribute.ShardedIndependent(
-          tfd.Normal(0, tf.ones([7])),
-          reinterpreted_batch_ndims=1,
-          experimental_use_kahan_sum=True,
-          shard_axis_name=self.axis_name))
+      _ = yield root(
+          sharded.Sharded(
+              tfd.Independent(
+                  tfd.Normal(0, tf.ones([7])),
+                  reinterpreted_batch_ndims=1,
+                  experimental_use_kahan_sum=True),
+              shard_axis_name=self.axis_name))
+
     model = tfp.experimental.distribute.JointDistributionCoroutine(
         model_fn, shard_axis_name=self.axis_name)
 
-    samps = self.strategy_run(lambda seed: model.sample(seed=seed),
-                              (test_util.test_seed(sampler_type='stateless'),),
-                              in_axes=None)
+    samps = self.strategy_run(
+        lambda seed: model.sample(seed=seed),
+        (test_util.test_seed(sampler_type='stateless'),),
+        in_axes=None)
 
     @tf.function(jit_compile=True)
     def lp_grad(x):
@@ -94,19 +97,18 @@ class ShardedDistributionTest(test_lib.DistributedTest):
     @tf.function
     def lp_grad(x):
       lp1, g1 = tfp.math.value_and_gradient(
-          tfp_dist.ShardedSample(
-              tfd.Normal(0., 1.), [test_lib.NUM_DEVICES],
+          tfp_dist.Sharded(
+              tfd.Sample(tfd.Normal(0., 1.), 1),
               shard_axis_name=self.axis_name).log_prob, (x,))
       lp2, g2 = tfp.math.value_and_gradient(
-          tfp_dist.ShardedIndependent(
-              tfd.Normal(tf.zeros([1]), 1.),
-              1,
+          tfp_dist.Sharded(
+              tfd.Independent(tfd.Normal(tf.zeros([1]), 1.), 1),
               shard_axis_name=self.axis_name).log_prob, (x,))
       return lp1, g1, lp2, g2
 
     def true_lp_grad(x):
       lp1, g1 = tfp.math.value_and_gradient(
-          tfd.Sample(tfd.Normal(0., 1.), [test_lib.NUM_DEVICES]).log_prob, (x,))
+          tfd.Sample(tfd.Normal(0., 1.), test_lib.NUM_DEVICES).log_prob, (x,))
       lp2, g2 = tfp.math.value_and_gradient(
           tfd.Independent(tfd.Normal(tf.zeros([test_lib.NUM_DEVICES]), 1.),
                           1).log_prob, (x,))
@@ -139,21 +141,16 @@ class ShardedDistributionTest(test_lib.DistributedTest):
 
     @tf.function
     def test(x0, x1):
-      dist_sharded1 = tfp_dist.ShardedSample(
-          tfd.Normal(0., 4.),
-          test_lib.NUM_DEVICES,
+      dist_sharded1 = tfp_dist.Sharded(
+          tfd.Sample(tfd.Normal(0., 4.), 1),
           shard_axis_name=self.axis_name)
-      dist_sharded2 = tfp_dist.ShardedSample(
-          tfd.Normal(0., 2.),
-          test_lib.NUM_DEVICES,
+      dist_sharded2 = tfp_dist.Sharded(
+          tfd.Sample(tfd.Normal(0., 2.), 1),
           shard_axis_name=self.axis_name)
       return (
           tfp.math.value_and_gradient(
               lambda x0, x1: tfde.log_prob_ratio(  # pylint: disable=g-long-lambda
-                  dist_sharded1,
-                  x0,
-                  dist_sharded2,
-                  x1),
+                  dist_sharded1, x0, dist_sharded2, x1),
               (x0, x1)),
           dist_sharded1.log_prob(x0) - dist_sharded2.log_prob(x1))
 
@@ -180,17 +177,16 @@ class ShardedDistributionTest(test_lib.DistributedTest):
 
     @tf.function
     def test(x0, x1):
-      dist_sharded1 = tfp_dist.ShardedIndependent(
-          tfd.Normal(tf.zeros([1]), 2.), 1, shard_axis_name=self.axis_name)
-      dist_sharded2 = tfp_dist.ShardedIndependent(
-          tfd.Normal(tf.zeros([1]), 4.), 1, shard_axis_name=self.axis_name)
+      dist_sharded1 = tfp_dist.Sharded(
+          tfd.Independent(tfd.Normal(tf.zeros([1]), 2.), 1),
+          shard_axis_name=self.axis_name)
+      dist_sharded2 = tfp_dist.Sharded(
+          tfd.Independent(tfd.Normal(tf.zeros([1]), 4.), 1),
+          shard_axis_name=self.axis_name)
       return (
           tfp.math.value_and_gradient(
               lambda x0, x1: tfde.log_prob_ratio(  # pylint: disable=g-long-lambda
-                  dist_sharded1,
-                  x0,
-                  dist_sharded2,
-                  x1),
+                  dist_sharded1, x0, dist_sharded2, x1),
               (x0, x1)),
           dist_sharded1.log_prob(x0) - dist_sharded2.log_prob(x1))
 

@@ -38,10 +38,11 @@ def true_log_prob_fn(w, x, data):
 def make_jd_sequential(axis_name):
   return jd.JointDistributionSequential([
       tfd.Normal(0., 1.),
-      lambda w: sharded.ShardedSample(  # pylint: disable=g-long-lambda
-          tfd.Normal(w, 1.), test_lib.NUM_DEVICES, shard_axis_name=axis_name),
-      lambda x: sharded.ShardedIndependent(  # pylint: disable=g-long-lambda
-          tfd.Normal(x, 1.), 1, shard_axis_name=axis_name),
+      lambda w: sharded.Sharded(  # pylint: disable=g-long-lambda
+          tfd.Sample(tfd.Normal(w, 1.), 1),
+          shard_axis_name=axis_name),
+      lambda x: sharded.Sharded(  # pylint: disable=g-long-lambda
+          tfd.Independent(tfd.Normal(x, 1.), 1), shard_axis_name=axis_name),
   ], shard_axis_name=axis_name)
 
 
@@ -49,13 +50,11 @@ def make_jd_named(axis_name):
   return jd.JointDistributionNamed(  # pylint: disable=g-long-lambda
       dict(
           w=tfd.Normal(0., 1.),
-          x=lambda w: sharded.ShardedSample(  # pylint: disable=g-long-lambda
-              tfd.Normal(w, 1.),
-              test_lib.NUM_DEVICES,
+          x=lambda w: sharded.Sharded(  # pylint: disable=g-long-lambda
+              tfd.Sample(tfd.Normal(w, 1.), 1),
               shard_axis_name=axis_name),
-          data=lambda x: sharded.ShardedIndependent(  # pylint: disable=g-long-lambda
-              tfd.Normal(x, 1.),
-              1,
+          data=lambda x: sharded.Sharded(  # pylint: disable=g-long-lambda
+              tfd.Independent(tfd.Normal(x, 1.), 1),
               shard_axis_name=axis_name),
       ), shard_axis_name=axis_name)
 
@@ -64,10 +63,10 @@ def make_jd_coroutine(axis_name):
 
   def model_coroutine():
     w = yield tfd.JointDistributionCoroutine.Root(tfd.Normal(0., 1.))
-    x = yield sharded.ShardedSample(
-        tfd.Normal(w, 1.), test_lib.NUM_DEVICES, shard_axis_name=axis_name)
-    yield sharded.ShardedIndependent(
-        tfd.Normal(x, 1.), 1, shard_axis_name=axis_name)
+    x = yield sharded.Sharded(
+        tfd.Sample(tfd.Normal(w, 1.), 1), shard_axis_name=axis_name)
+    yield sharded.Sharded(
+        tfd.Independent(tfd.Normal(x, 1.), 1), shard_axis_name=axis_name)
 
   return jd.JointDistributionCoroutine(
       model_coroutine, shard_axis_name=axis_name)
@@ -182,7 +181,7 @@ class JointDistributionTest(test_lib.DistributedTest):
     lp_diff = log_probs[0] - log_probs[1]
 
     self.assertAllClose(self.evaluate(true_lp_diff), self.evaluate(lp_diff),
-                        rtol=2e-6)  # relaxed tol for fp32 in JAX
+                        rtol=7e-6)  # relaxed tol for fp32 in JAX
     self.assertAllClose(
         self.evaluate(true_lp_diff), self.evaluate(dist_lp_diff[0]))
 
