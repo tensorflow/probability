@@ -185,6 +185,47 @@ class LaplaceApproximationTest(test_util.TestCase):
     # need slightly higher tolerance for this test
     self.assertAllClose(approx_covariance, covariance, atol=2 * ATOL)
 
+  def testBijectorChoice(self):
+    a = tfd.LogNormal(loc=np.array(0.), scale=1.)
+    b = tfd.Gamma(concentration=np.array(2.), rate=10.)
+
+    joint_dist = tfd.JointDistributionSequential([a, b])
+
+    initial_values = [np.linspace(0.01, 5., 10)] * 2
+
+    e_approx = tfde.laplace_approximation(
+        joint_dist,
+        bijectors=[tfb.Exp()] * 2,
+        initial_values=initial_values)
+
+    s_approx = tfde.laplace_approximation(
+        joint_dist,
+        bijectors=[tfb.Softplus()] * 2,
+        initial_values=initial_values)
+
+    # both solutions find the mode in the constrained space correctly
+    e_mode = e_approx.bijector(e_approx.distribution.mode())
+    s_mode = s_approx.bijector(s_approx.distribution.mode())
+
+    a1, b1 = self.evaluate(e_mode)
+    a2, b2 = self.evaluate(s_mode)
+    a_mode, b_mode = self.evaluate([a.mode(), b.mode()])
+
+    self.assertAllClose(a1, a_mode, atol=ATOL)
+    self.assertAllClose(a2, a_mode, atol=ATOL)
+    self.assertAllClose(b1, b_mode, atol=ATOL)
+    self.assertAllClose(b2, b_mode, atol=ATOL)
+
+    # we find the (constrained) means via sampling, which are quite different
+    num_samples = int(1e4)
+    e_samples, s_samples = self.evaluate([
+        e_approx.sample(num_samples), s_approx.sample(num_samples)])
+
+    mean_ratio = np.mean(np.array(e_samples) / s_samples, axis=-1)
+
+    self.assertGreater(mean_ratio[0], 2.)
+    self.assertGreater(mean_ratio[1], 2.)
+
 
 if __name__ == '__main__':
   tf.test.main()
