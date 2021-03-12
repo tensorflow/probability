@@ -61,7 +61,45 @@ def is_stateful_seed(seed):
 
 
 def sanitize_seed(seed, salt=None, name=None):
-  """Map various types to a seed `Tensor`."""
+  """Map various PRNG seed flavors to a seed `Tensor`.
+
+  This function implements TFP's standard PRNG seeding semantics.
+  See https://github.com/tensorflow/probability/blob/master/PRNGS.md
+  for details.
+
+  Operationally, `sanitize_seed` maps any seed flavor to a
+  "stateless-compatible" seed, namely a `int32[2]` Tensor.  To wit:
+  - If the `seed` argument is an `int` or `None`, we use `tf.random.uniform`
+    to _statefully_ draw a pair of unbounded `int32`s and wrap them into a
+    Tensor.
+  - If the `seed` argument is a stateless-compatible seed already, we
+    just cast it to an `int32[2]` Tensor.
+
+  This, any function that accepts a `seed` argument can be written in
+  stateless-seed style internally, and acquires TFP's
+  seed-type-directed stateless/stateful switching behavior by just
+  running the input seed through `sanitize_seed` on entry.
+
+  The `sanitize_seed` function also allows salting the seed: if a user
+  accidentally passes the same stateful seed to two different calls to
+  `sanitize_seed` with different salts, they will get independent
+  randomness.  We may micro-optimize by removing salting from
+  `sanitize_seed` of already-stateless seeds in the future, as using a
+  stateless seed already requires seed uniqueness discipline.
+
+  Args:
+    seed: An `int32[2]` Tensor or a Python list of 2 `ints`, which
+      will be treated as stateless seeds; or a Python `int` or `None`,
+      which will be treated as stateful seeds.
+    salt: An optional Python string.
+    name: An optional Python string, name to add to TF ops created by
+      this function.
+
+  Returns:
+    seed: An `int32[2]` Tensor suitable for use as a stateless PRNG
+      seed.
+
+  """
   if callable(seed):  # e.g. SeedStream.
     seed = seed()
   if salt is not None and not isinstance(salt, str):
@@ -119,6 +157,9 @@ def fold_in(seed, salt):
 
 def split_seed(seed, n=2, salt=None, name=None):
   """Splits a seed into `n` derived seeds.
+
+  See https://github.com/tensorflow/probability/blob/master/PRNGS.md
+  for details.
 
   Args:
     seed: The seed to split; may be an `int`, an `(int, int) tuple`, or a
