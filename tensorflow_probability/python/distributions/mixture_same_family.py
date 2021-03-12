@@ -210,6 +210,15 @@ class MixtureSameFamily(distribution.Distribution):
   def components_distribution(self):
     return self._components_distribution
 
+  @property
+  def experimental_is_sharded(self):
+    sharded = self.components_distribution.experimental_is_sharded
+    if self.mixture_distribution.experimental_is_sharded != sharded:
+      raise ValueError(
+          '`MixtureSameFamily.mixture_distribution` sharding must match '
+          '`MixtureSameFamily.components_distribution`.')
+    return sharded
+
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing
     # for instances of MSF, not subclasses thereof.

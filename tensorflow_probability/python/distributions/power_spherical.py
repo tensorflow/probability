@@ -23,7 +23,6 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
@@ -42,24 +41,10 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.random import random_ops
 
 
 __all__ = ['PowerSpherical']
-
-
-def _uniform_unit_norm(dimension, shape, dtype, seed):
-  """Returns a batch of points chosen uniformly from the unit hypersphere."""
-  # This works because the Gaussian distribution is spherically symmetric.
-  # raw shape: shape + [dimension]
-  static_dimension = tf.get_static_value(dimension)
-  if static_dimension is not None and static_dimension == 1:
-    return tfp_random.rademacher(
-        ps.concat([shape, [1]], axis=0), dtype=dtype, seed=seed)
-
-  raw = samplers.normal(
-      shape=ps.concat([shape, [dimension]], axis=0), seed=seed, dtype=dtype)
-  unit_norm = raw / tf.norm(raw, ord=2, axis=-1)[..., tf.newaxis]
-  return unit_norm
 
 
 class PowerSpherical(distribution.Distribution):
@@ -322,9 +307,9 @@ class PowerSpherical(distribution.Distribution):
     u_shape = ps.concat([[n], self._batch_shape_tensor(
         mean_direction=mean_direction, concentration=concentration)], axis=0)
 
-    spherical_samples = _uniform_unit_norm(
-        dimension=event_size_int - 1,
+    spherical_samples = random_ops.spherical_uniform(
         shape=u_shape,
+        dimension=event_size_int - 1,
         dtype=self.dtype,
         seed=uniform_seed)
 

@@ -50,6 +50,7 @@ __all__ = [
     'reverse',
     'repeat',
     'roll',
+    'sequence_mask',
     'searchsorted',
     'shape',
     'size',
@@ -278,6 +279,13 @@ def _reverse(tensor, axis, name=None):  # pylint: disable=unused-argument
   return tensor
 
 
+def _sequence_mask(lengths, maxlen=None, dtype=np.bool, name=None):  # pylint: disable=unused-argument
+  lengths = np.array(lengths, dtype=np.int32)
+  if maxlen is None:
+    maxlen = np.max(lengths).astype(lengths.dtype)
+  return (np.arange(maxlen) < lengths[..., np.newaxis]).astype(dtype)
+
+
 if JAX_MODE:
   _searchsorted_vmap_sides = {
       side: jax.vmap(functools.partial(jax.numpy.searchsorted, side=side))
@@ -450,6 +458,10 @@ reshape = utils.copy_docstring(
 roll = utils.copy_docstring(
     'tf.roll',
     lambda input, shift, axis: np.roll(input, shift, axis))  # pylint: disable=unnecessary-lambda
+
+sequence_mask = utils.copy_docstring(
+    'tf.sequence_mask',
+    _sequence_mask)
 
 searchsorted = utils.copy_docstring(
     'tf.searchsorted',

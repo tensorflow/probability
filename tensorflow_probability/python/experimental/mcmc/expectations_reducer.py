@@ -102,10 +102,8 @@ class ExpectationsReducer(reducer_base.Reducer):
       initial_fn_results = tf.nest.map_structure(
           lambda fn: fn(initial_chain_state, initial_kernel_results),
           self.transform_fn)
-      def from_example(res):
-        return sample_stats.RunningMean.from_shape(res.shape, res.dtype)
       return ExpectationsReducerState(tf.nest.map_structure(
-          from_example, initial_fn_results))
+          sample_stats.RunningMean.from_example, initial_fn_results))
 
   def one_step(
       self,

@@ -42,10 +42,9 @@ __all__ = [
 class HiddenMarkovModel(distribution.Distribution):
   """Hidden Markov model distribution.
 
-  The `HiddenMarkovModel` distribution implements a (batch of) hidden
+  The `HiddenMarkovModel` distribution implements a (batch of) discrete hidden
   Markov models where the initial states, transition probabilities
   and observed states are all given by user-provided distributions.
-  This model assumes that the transition matrices are fixed over time.
 
   In this model, there is a sequence of integer-valued hidden states:
   `z[0], z[1], ..., z[num_steps - 1]` and a sequence of observed states:
@@ -183,7 +182,8 @@ class HiddenMarkovModel(distribution.Distribution):
     # pylint: disable=protected-access
     with tf.name_scope(name) as name:
 
-      self._num_steps = tensor_util.convert_nonref_to_tensor(num_steps)
+      self._num_steps = tensor_util.convert_nonref_to_tensor(
+          num_steps, as_shape_tensor=True)
       self._initial_distribution = initial_distribution
       self._observation_distribution = observation_distribution
       self._transition_distribution = transition_distribution
@@ -351,17 +351,24 @@ class HiddenMarkovModel(distribution.Distribution):
 
     def _scan_multiple_steps():
       """Take multiple steps with tf.scan."""
-      step = tf.range(self._num_steps - 1, dtype=tf.int32)
+      step = ps.range(self._num_steps - 1, dtype=tf.int32)
       hidden_states, _ = tf.scan(generate_step, step,
                                  initializer=(init_state, scan_seed))
 
       # TODO(b/115618503): add/use prepend_initializer to tf.scan
       return tf.concat([[init_state],
                         hidden_states], axis=0)
+
+    def _scan_one_step():
+      multiples = ps.concat([[self.num_steps],
+                             ps.ones(ps.rank(init_state), tf.int32)],
+                            axis=0)
+      return tf.tile(init_state[tf.newaxis, ...], multiples)
+
     hidden_states = ps.cond(
         self._num_steps > 1,
         _scan_multiple_steps,
-        lambda: init_state[tf.newaxis, ...])
+        _scan_one_step)
 
     hidden_one_hot = tf.one_hot(hidden_states, num_states,
                                 dtype=self._observation_distribution.dtype)
@@ -371,7 +378,7 @@ class HiddenMarkovModel(distribution.Distribution):
     # the required batch size so as with the initial and
     # transition distributions we generate more samples and
     # reshape.
-    observation_repeat = tf.maximum(
+    observation_repeat = ps.maximum(
         batch_size // ps.reduce_prod(
             self._observation_distribution.batch_shape_tensor()[:-1]),
         1)
@@ -435,8 +442,8 @@ class HiddenMarkovModel(distribution.Distribution):
     observation_batch_shape = observation_tensor_shape[
         :-1 - underlying_event_rank]
     # value :: observation_batch_shape num_steps observation_event_shape
-    batch_shape = tf.broadcast_dynamic_shape(observation_batch_shape,
-                                             self.batch_shape_tensor())
+    batch_shape = ps.broadcast_shape(observation_batch_shape,
+                                     self.batch_shape_tensor())
     num_states = self.transition_distribution.batch_shape_tensor()[-1]
     log_init = _extract_log_probs(num_states,
                                   self.initial_distribution,
@@ -692,12 +699,12 @@ class HiddenMarkovModel(distribution.Distribution):
       mask_tensor_shape = ps.shape(mask)
       mask_batch_shape = mask_tensor_shape[:-1]
 
-    batch_shape = tf.broadcast_dynamic_shape(observation_batch_shape,
-                                             self.batch_shape_tensor())
+    batch_shape = ps.broadcast_shape(observation_batch_shape,
+                                     self.batch_shape_tensor())
 
     if mask is not None:
-      batch_shape = tf.broadcast_dynamic_shape(batch_shape,
-                                               mask_batch_shape)
+      batch_shape = ps.broadcast_shape(batch_shape,
+                                       mask_batch_shape)
     observations = tf.broadcast_to(observations,
                                    ps.concat([batch_shape,
                                               observation_event_shape],
@@ -904,10 +911,16 @@ class HiddenMarkovModel(distribution.Distribution):
                                     name='forward_log_probs')
       return ps.concat([[log_prob], forward_log_probs], axis=0)
 
+    def _scan_one_step_forwards():
+      multiples = ps.concat([[self.num_steps],
+                             ps.ones(ps.rank(log_prob), tf.int32)],
+                            axis=0)
+      return tf.tile(log_prob[tf.newaxis], multiples)
+
     forward_log_probs = ps.cond(
         self._num_steps > 1,
         _scan_multiple_steps_forwards,
-        lambda: tf.convert_to_tensor([log_prob]))
+        _scan_one_step_forwards)
     return forward_log_probs, observation_log_probs
 
   def _backward_pass(self, observation_log_probs, log_transition=None):
@@ -970,10 +983,16 @@ class HiddenMarkovModel(distribution.Distribution):
       return tf.concat([backward_log_adjoint_probs,
                         [log_adjoint_prob]], axis=0)
 
+    def _scan_one_step_backwards():
+      multiples = ps.concat([[self.num_steps],
+                             ps.ones(ps.rank(log_adjoint_prob), tf.int32)],
+                            axis=0)
+      return tf.tile(log_adjoint_prob[tf.newaxis], multiples)
+
     backward_log_adjoint_probs = ps.cond(
         self._num_steps > 1,
         _scan_multiple_steps_backwards,
-        lambda: tf.convert_to_tensor([log_adjoint_prob]))
+        _scan_one_step_backwards)
     return backward_log_adjoint_probs
 
   def posterior_mode(self, observations, mask=None, name='posterior_mode'):
@@ -1159,10 +1178,16 @@ class HiddenMarkovModel(distribution.Distribution):
                                             axis=0)
           return distribution_util.move_dimension(
               most_likely_sequences, 0, -1)
-        return ps.cond(
-            self.num_steps > 1,
-            _reduce_multiple_steps,
-            lambda: tf.argmax(log_prob, axis=-1)[..., tf.newaxis])
+
+        def _reduce_one_step():
+          multiples = ps.concat(
+              [ps.ones(ps.rank(log_prob) - 1, tf.int32), [self.num_steps]],
+              axis=0)
+          return tf.tile(
+              tf.argmax(log_prob, axis=-1)[..., tf.newaxis], multiples)
+
+        return ps.cond(self.num_steps > 1, _reduce_multiple_steps,
+                       _reduce_one_step)
 
   # pylint: disable=protected-access
   def _default_event_space_bijector(self):

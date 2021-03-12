@@ -117,10 +117,10 @@ class Bates(distribution.Distribution):
   Compute some values for the pdf.
 
   ```python
-  dist.probs(50.)    # shape: [3]
+  dist.prob(50.)    # shape: [3]
   x = [[50., 50., 50.],
        [5., 10., 20.]]      # shape: [2, 3]
-  dist.probs(x)      # shape: [2]
+  dist.prob(x)      # shape: [2, 3]
   ```
   """
 
@@ -489,6 +489,9 @@ def _segmented_range(limits):
   Returns:
     segments: 1D `Tensor` of segment ranges.
   """
+  # To cope with [0]-shaped limits, which disagrees with the sensibilities of
+  # tf.repeat, we left-pad, then slice the output.
+  limits = tf.pad(limits, [[1, 0]], constant_values=0)
   return (tf.range(tf.reduce_sum(limits)) -
           tf.repeat(tf.concat([[0], tf.cumsum(limits[:-1])], axis=0), limits))
 

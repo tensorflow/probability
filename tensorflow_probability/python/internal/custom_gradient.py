@@ -26,6 +26,7 @@ from tensorflow.python.ops import array_ops  # pylint: disable=g-direct-tensorfl
 JAX_MODE = False
 
 if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
   from jax import custom_jvp  # pylint: disable=g-import-not-at-top
 
 
@@ -129,3 +130,9 @@ if JAX_MODE:
 
   def prevent_gradient(x, message='', name=None):  # pylint: disable=unused-argument,function-redefined
     return _prevent_gradient_helper({message: x})[message]
+
+
+def is_valid_gradient(grad):
+  if JAX_MODE:
+    return grad.dtype != jax.float0
+  return grad is not None

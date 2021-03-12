@@ -222,7 +222,10 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
       log_t = tf.where(equal_zero, -z,
                        -tf.math.log1p(z * safe_conc) / safe_conc)
 
-      return (conc + 1) * log_t - tf.exp(log_t) - tf.math.log(scale)
+      result = (conc + 1) * log_t - tf.exp(log_t) - tf.math.log(scale)
+      return tf.where(z * safe_conc <= -1.0,
+                      tf.constant(-np.inf, dtype=result.dtype),
+                      result)
 
   def _mean(self):
     conc = tf.convert_to_tensor(self.concentration)

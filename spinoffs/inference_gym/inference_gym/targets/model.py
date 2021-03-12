@@ -195,8 +195,7 @@ class Model:
           sample_transformations, module=self.GROUND_TRUTH_MODULE)
     self._sample_transformations = sample_transformations
 
-  # PyLint is confused, this is a new-style class.
-  class SampleTransformation(  # pylint: disable=slots-on-old-class
+  class SampleTransformation(
       collections.namedtuple('SampleTransformation', [
           'fn',
           'pretty_name',

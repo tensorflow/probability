@@ -175,6 +175,10 @@ class Sample(distribution_lib.Distribution):
   def sample_shape(self):
     return self._sample_shape
 
+  @property
+  def experimental_is_sharded(self):
+    return self.distribution.experimental_is_sharded
+
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing
     # for instances of MSF, not subclasses thereof.
@@ -304,8 +308,11 @@ class Sample(distribution_lib.Distribution):
     # TODO(b/170405182): In scenarios where we can statically prove that it has
     #   no batch part, avoid the transposes by directly using
     #   `self.distribution.experimental_default_event_space_bijector()`.
+    bijector = self.distribution.experimental_default_event_space_bijector()
+    if bijector is None:
+      return None
     return _DefaultSampleBijector(self.distribution, self.sample_shape,
-                                  self._sum_fn())
+                                  self._sum_fn(), bijector=bijector)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []
@@ -558,15 +565,17 @@ def _kl_sample(a, b, name='kl_sample'):
 
 
 @log_prob_ratio.RegisterLogProbRatio(Sample)
-def _sample_log_prob_ratio(p, x, q, y):
-  checks = []
-  if p.validate_args or q.validate_args:
-    checks.append(tf.debugging.assert_equal(p.sample_shape, q.sample_shape))
-  with tf.control_dependencies(checks):
-    # pylint: disable=protected-access
-    x, aux = p._prepare_for_underlying(x)
-    y, _ = q._prepare_for_underlying(y)
-    return p._finish_log_prob(
-        log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
-        aux)
-    # pylint: enable=protected-access
+def _sample_log_prob_ratio(p, x, q, y, name=None):
+  """Implements `log_prob_ratio` for tfd.Sample."""
+  with tf.name_scope(name or 'sample_log_prob_ratio'):
+    checks = []
+    if p.validate_args or q.validate_args:
+      checks.append(tf.debugging.assert_equal(p.sample_shape, q.sample_shape))
+    with tf.control_dependencies(checks):
+      # pylint: disable=protected-access
+      x, aux = p._prepare_for_underlying(x)
+      y, _ = q._prepare_for_underlying(y)
+      return p._finish_log_prob(
+          log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
+          aux)
+      # pylint: enable=protected-access

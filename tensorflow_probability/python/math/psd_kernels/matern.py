@@ -235,7 +235,7 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
   The kernel has the following form:
 
   ```none
-    k(x, y) = amplitude**2  * exp(-||x - y|| / length_scale)
+    k(x, y) = amplitude ** 2  * exp(-||x - y|| / length_scale)
   ```
 
   where the double-bars represent vector length (i.e. Euclidean, or L2 Norm).
@@ -302,7 +302,7 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
 
   ```none
     z = sqrt(3) * ||x - y|| / length_scale
-    k(x, y) = (1 + z) * exp(-z)
+    k(x, y) = amplitude ** 2 * (1 + z) * exp(-z)
   ```
 
   where the double-bars represent vector length (i.e. Euclidean, or L2 Norm).
@@ -370,7 +370,7 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
 
   ```none
     z = sqrt(5) * ||x - y|| / length_scale
-    k(x, y) = (1 + z + (z ** 2) / 3) * exp(-z)
+    k(x, y) = amplitude ** 2 * (1 + z + (z ** 2) / 3) * exp(-z)
   ```
 
   where the double-bars represent vector length (i.e. Euclidean, or L2 Norm).

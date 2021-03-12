@@ -19,11 +19,18 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import test_util
+
+try:  # May not be available, not a core dep for TFP.
+  import wrapt  # pylint: disable=g-import-not-at-top
+except ImportError:
+  wrapt = None
+
 # pylint: disable=protected-access
 
 _DIVERGENCES = kullback_leibler._DIVERGENCES
@@ -47,6 +54,20 @@ class KLTest(test_util.TestCase):
 
     a = MyDist(loc=0.0, scale=1.0)
     self.assertEqual("OK", kullback_leibler.kl_divergence(a, a, name="OK"))
+
+    # Check that everything still works for an object `d` for which
+    # `d.__class__` is a registered type but `type(d)` is not registered.
+    w_a = getattr(wrapt, "ObjectProxy", lambda x: x)(a)
+    self.assertTrue(wrapt is None or type(w_a) != type(a))  # pylint: disable=unidiomatic-typecheck
+    self.assertEqual(a.__class__, w_a.__class__)
+    self.assertEqual("OK", kullback_leibler.kl_divergence(a, w_a, name="OK"))
+    self.assertEqual("OK", kullback_leibler.kl_divergence(w_a, a, name="OK"))
+    self.assertEqual("OK", kullback_leibler.kl_divergence(w_a, w_a, name="OK"))
+    # NOTE: `Distribution.kl_divergence(other, name)` does not pass the name
+    # through to `kullback_leibler.kl_divergence`
+    self.assertEqual("KullbackLeibler", a.kl_divergence(w_a, name="OK"))
+    self.assertEqual("KullbackLeibler", w_a.kl_divergence(a, name="OK"))
+    self.assertEqual("KullbackLeibler", w_a.kl_divergence(w_a, name="OK"))
 
   def testDomainErrorExceptions(self):
 

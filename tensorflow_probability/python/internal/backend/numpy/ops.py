@@ -86,6 +86,9 @@ class _NullContext(object):
 
 def _broadcast_static_shape(shape_x, shape_y):
   """Reimplements `tf.broadcast_static_shape` in JAX/NumPy."""
+  if (tensor_shape.TensorShape(shape_x).ndims is None or
+      tensor_shape.TensorShape(shape_y).ndims is None):
+    return tensor_shape.TensorShape(None)
   shape_x = tuple(tensor_shape.TensorShape(shape_x).as_list())
   shape_y = tuple(tensor_shape.TensorShape(shape_y).as_list())
   try:

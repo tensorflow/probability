@@ -92,8 +92,6 @@ class _SkellamTest(object):
         stats.skellam.pmf(x, rate1, rate2))
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      'Need BesselIve gradients on JAX.')
   def testSkellamLogPmfGradient(self):
     batch_size = 6
     rate1 = tf.constant([3.] * batch_size, dtype=self.dtype)
@@ -103,16 +101,14 @@ class _SkellamTest(object):
     err = self.compute_max_gradient_error(
         lambda lam: self._make_skellam(  # pylint:disable=g-long-lambda
             rate1=lam, rate2=rate2).log_prob(x), [rate1])
-    self.assertLess(err, 5e-4)
+    self.assertLess(err, 7e-4)
 
     err = self.compute_max_gradient_error(
         lambda lam: self._make_skellam(  # pylint:disable=g-long-lambda
             rate1=rate1, rate2=lam).log_prob(x), [rate2])
-    self.assertLess(err, 5e-4)
+    self.assertLess(err, 7e-4)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      'Need BesselIve gradients on JAX.')
   def testSkellamLogPmfGradientAtZeroPmf(self):
     # Check that the derivative wrt parameter at the zero-prob points is zero.
     batch_size = 6

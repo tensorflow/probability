@@ -258,7 +258,7 @@ class CholeskyLKJ(distribution.Distribution):
       logpi = np.log(np.pi)
       ans = tf.zeros_like(concentration)
       for k in range(1, self.dimension):
-        ans = ans + logpi * (k / 2.)
+        ans = ans + tf.constant(logpi * k / 2., concentration.dtype)
         effective_concentration = concentration + (self.dimension - 1 - k) / 2.
         ans = ans + tfp_math.log_gamma_difference(
             k / 2., effective_concentration)

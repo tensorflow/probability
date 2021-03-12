@@ -44,8 +44,9 @@ class PixelCNN(distribution.Distribution):
   data, parameterized by a neural network. It builds on Pixel CNN and
   Conditional Pixel CNN, as originally proposed by [(van den Oord et al.,
   2016)][2, 3]. The model expresses the joint distribution over pixels as
-  the product of conditional distributions: `p(x|h) = prod{ p(x[i] | x[0:i], h)
-  : i=0, ..., d }`, in which `p(x[i] | x[0:i], h) : i=0, ..., d` is the
+  the product of conditional distributions:
+  `p(x|h) = prod{ p(x[i] | x[0:i], h) : i=0, ..., d }`,
+  in which `p(x[i] | x[0:i], h) : i=0, ..., d` is the
   probability of the `i`-th pixel conditional on the pixels that preceded it in
   raster order (color channels in RGB order, then left to right, then top to
   bottom). `h` is optional additional data on which to condition the image
@@ -61,7 +62,7 @@ class PixelCNN(distribution.Distribution):
 
   Color intensity `v` of each pixel is modeled as:
 
-  `v ~ sum{q[i] * quantized_logistic(loc[i], scale[i]) : i = 0, ..., k },
+  `v ~ sum{q[i] * quantized_logistic(loc[i], scale[i]) : i = 0, ..., k }`,
 
   in which `k` is the number of mixture components and the `q[i]` are the
   Categorical probabilities over the components.

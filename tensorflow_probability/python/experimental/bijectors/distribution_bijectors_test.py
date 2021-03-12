@@ -34,16 +34,14 @@ tfd = tfp.distributions
 
 PRECONDITIONING_FAILS_DISTS = (
     'Bates',  # CDF seems pretty crazy.
-    'ContinuousBernoulli',  # Sigmoid doesn't work too well (b/178017349)
     'Deterministic',  # Inverse image is the empty set.
     'ExpRelaxedOneHotCategorical',  #  Bijector ldj error (maybe b/175354524).
     'GammaGamma',  #  Incorrect log prob (maybe b/175354524).
     'GeneralizedNormal',  # CDF gradient incorrect at 0.
     'HalfStudentT',  # Uses StudentT CDF.
     'Laplace',  # CDF gradient incorrect at 0.
+    'SigmoidBeta',  # inverse CDF numerical precision issues for large x
     'StudentT',  # CDF gradient incorrect at 0 (and unstable near zero).
-    'TruncatedCauchy',  # b/175630511
-    'TruncatedNormal',  # b/175630511
     )
 
 if JAX_MODE:

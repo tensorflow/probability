@@ -93,6 +93,18 @@ class LogNormal(transformed_distribution.TransformedDistribution):
     """Distribution parameter for the pre-transformed standard deviation."""
     return self.distribution.scale
 
+  def _log_prob(self, x):
+    answer = super(LogNormal, self)._log_prob(x)
+    # The formula inherited from TransformedDistribution computes `nan` for `x
+    # == 0`.  However, there's hope that it's not too inaccurate for small
+    # finite `x`, because `x` only appears as `log(x)`, and `log` is effectively
+    # discontinuous at 0.  Furthermore, the result should be dominated by the
+    # `log(x)**2` term, with no higher-order term that needs to be cancelled
+    # numerically.
+    return tf.where(tf.equal(x, 0.0),
+                    tf.constant(-np.inf, dtype=answer.dtype),
+                    answer)
+
   def _mean(self):
     return tf.exp(self.distribution.mean() + 0.5 * self.distribution.variance())
 

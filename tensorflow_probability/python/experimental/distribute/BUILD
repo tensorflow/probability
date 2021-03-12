@@ -45,6 +45,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
@@ -53,10 +54,10 @@ multi_substrate_py_library(
     name = "sharded",
     srcs = ["sharded.py"],
     deps = [
+        ":distribute_lib",
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:independent",
-        "//tensorflow_probability/python/distributions:sample",
-        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:log_prob_ratio",
         "//tensorflow_probability/python/internal:samplers",
     ],
 )
@@ -69,6 +70,7 @@ multi_substrate_py_library(
         ":sharded",
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/distributions:log_prob_ratio",
     ],
 )
 
@@ -86,6 +88,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "sharded_test",
+    size = "medium",
     srcs = ["sharded_test.py"],
     disabled_substrates = ["numpy"],
     python_version = "PY3",
@@ -102,6 +105,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "joint_distribution_test",
+    size = "medium",
     srcs = ["joint_distribution_test.py"],
     disabled_substrates = ["numpy"],
     python_version = "PY3",

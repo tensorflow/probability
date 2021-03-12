@@ -29,15 +29,218 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
+    'atan_difference',
+    'dawsn',
     'erfcinv',
+    'erfcx',
+    'igammainv',
+    'igammacinv',
     'round_exponential_bump_function',
     'lambertw',
     'lambertw_winitzki_approx',
+    'logerfc',
+    'logerfcx',
     'log_gamma_correction',
     'log_gamma_difference',
     'lbeta',
     'owens_t',
 ]
+
+
+def atan_difference(x, y, name=None):
+  """Difference of arctan(x) and arctan(y).
+
+  Computes arctan(x) - arctan(y) avoiding catastrophic cancellation. This is
+  by resorting to the identity:
+
+  ```none
+  arctan(x) - arctan(y) = arctan((x - y) / (1 + x * y)) +
+                          pi * sign(x) * 1_{x * y < -1)
+  ```
+
+  where `1_A` is the indicator function on the set `A`.
+
+  For a derivation of this fact, see [1].
+
+
+  #### References
+  [1] De Stefano, Sum of Arctangents
+      https://sites.google.com/site/micdestefano/mathematics/trigonometry/sum-of-arctangents
+
+  Args:
+    x: Floating-point Tensor. Should be broadcastable with `y`.
+    y: Floating-point Tensor. Should be broadcastable with `x`.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    z: Tensor of same shape and dtype as `x` and `y`.
+  """
+  with tf.name_scope(name or 'atan_difference'):
+    dtype = dtype_util.common_dtype([x, y], tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    y = tf.convert_to_tensor(y, dtype=dtype)
+
+    difference = tf.math.atan((x - y) / (1 + x * y))
+    difference = difference + tf.where(
+        x * y < - 1., np.pi * tf.math.sign(x), 0.)
+    difference = tf.where(
+        tf.math.equal(x * y, -1.), np.pi * tf.math.sign(x) / 2., difference)
+
+    return difference
+
+
+def _dawsn_naive(x):
+  """Returns the Dawson Integral computed at x elementwise."""
+  dtype = dtype_util.common_dtype([x], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  x = tf.convert_to_tensor(x, dtype=dtype)
+
+  n1 = [
+      1.13681498971755972054E-11,
+      8.49262267667473811108E-10,
+      1.94434204175553054283E-8,
+      9.53151741254484363489E-7,
+      3.07828309874913200438E-6,
+      3.52513368520288738649E-4,
+      -8.50149846724410912031E-4,
+      4.22618223005546594270E-2,
+      -9.17480371773452345351E-2,
+      9.99999999999999994612E-1]
+
+  d1 = [
+      2.40372073066762605484E-11,
+      1.48864681368493396752E-9,
+      5.21265281010541664570E-8,
+      1.27258478273186970203E-6,
+      2.32490249820789513991E-5,
+      3.25524741826057911661E-4,
+      3.48805814657162590916E-3,
+      2.79448531198828973716E-2,
+      1.58874241960120565368E-1,
+      5.74918629489320327824E-1,
+      1.00000000000000000539E0]
+
+  n2 = [
+      5.08955156417900903354E-1,
+      -2.44754418142697847934E-1,
+      9.41512335303534411857E-2,
+      -2.18711255142039025206E-2,
+      3.66207612329569181322E-3,
+      -4.23209114460388756528E-4,
+      3.59641304793896631888E-5,
+      -2.14640351719968974225E-6,
+      9.10010780076391431042E-8,
+      -2.40274520828250956942E-9,
+      3.59233385440928410398E-11]
+
+  d2 = [
+      1.00000000000000000000E0,
+      -6.31839869873368190192E-1,
+      2.36706788228248691528E-1,
+      -5.31806367003223277662E-2,
+      8.48041718586295374409E-3,
+      -9.47996768486665330168E-4,
+      7.81025592944552338085E-5,
+      -4.55875153252442634831E-6,
+      1.89100358111421846170E-7,
+      -4.91324691331920606875E-9,
+      7.18466403235734541950E-11]
+
+  n3 = [
+      -5.90592860534773254987E-1,
+      6.29235242724368800674E-1,
+      -1.72858975380388136411E-1,
+      1.64837047825189632310E-2,
+      -4.86827613020462700845E-4]
+
+  d3 = [
+      1.00000000000000000000E0,
+      -2.69820057197544900361E0,
+      1.73270799045947845857E0,
+      -3.93708582281939493482E-1,
+      3.44278924041233391079E-2,
+      -9.73655226040941223894E-4]
+
+  n1, d1, n2, d2, n3, d3 = [
+      [numpy_dtype(c) for c in lst] for lst in (n1, d1, n2, d2, n3, d3)]
+
+  abs_x = tf.math.abs(x)
+
+  result_small = abs_x * tf.math.polyval(
+      n1, tf.math.square(x)) / tf.math.polyval(d1, tf.math.square(x))
+  result_small = tf.math.sign(x) * result_small
+
+  inv_xsq = tf.math.reciprocal(tf.math.square(x))
+  result_medium = tf.math.reciprocal(abs_x) + inv_xsq * (
+      tf.math.polyval(n2, inv_xsq) / (abs_x * tf.math.polyval(d2, inv_xsq)))
+  result_medium = 0.5 * tf.math.sign(x) * result_medium
+
+  result_very_large = 0.5 * tf.math.sign(x) * tf.math.reciprocal(abs_x)
+
+  result_large = tf.math.reciprocal(abs_x) + inv_xsq * (
+      tf.math.polyval(n3, inv_xsq) / (abs_x * tf.math.polyval(d3, inv_xsq)))
+  result_large = 0.5 * tf.math.sign(x) * result_large
+
+  return tf.where(
+      abs_x < 3.25,
+      result_small,
+      tf.where(
+          abs_x < 6.25,
+          result_medium,
+          tf.where(
+              abs_x > 1e9,
+              result_very_large,
+              result_large)))
+
+
+def _dawsn_fwd(x):
+  """Compute output, aux (collaborates with _dawsn_bwd)."""
+  output = _dawsn_naive(x)
+  return output, (x,)
+
+
+def _dawsn_bwd(aux, g):
+  """Reverse mode impl for dawsn."""
+  x, = aux
+  y = _dawsn_custom_gradient(x)
+  return g * (1. - 2 * x * y)
+
+
+def _dawsn_jvp(primals, tangents):
+  """Computes JVP for dawsn (supports JAX custom derivative)."""
+  x, = primals
+  dx, = tangents
+
+  y = _dawsn_custom_gradient(x)
+  return y, dx * (1. - 2 * x * y)
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_dawsn_fwd,
+    vjp_bwd=_dawsn_bwd,
+    jvp_fn=_dawsn_jvp)
+def _dawsn_custom_gradient(x):
+  return _dawsn_naive(x)
+
+
+def dawsn(x, name=None):
+  """Computes Dawson's integral element-wise.
+
+  Dawson's integral is defined as `exp(-x**2) * int_0^x exp(t**2)`
+  with the domain of definition all real numbers.
+
+  This implementation is based on the Cephes math library.
+
+  Args:
+    x: A Tensor with type `float32` or `float64`.
+    name: A name for the operation (optional).
+
+  Returns:
+    dawsn: dawsn evaluated at `x`. A Tensor with the same shape and same
+      dtype as `x`.
+  """
+  with tf.name_scope(name or 'dawsn'):
+    return _dawsn_custom_gradient(x)
 
 
 def erfcinv(z, name=None):
@@ -57,6 +260,606 @@ def erfcinv(z, name=None):
   with tf.name_scope(name or 'erfcinv'):
     z = tf.convert_to_tensor(z)
     return -tf.math.ndtri(0.5 * z) * np.sqrt(0.5)
+
+
+def _erfcx_naive(x):
+  """Compute erfcx using a Chebyshev expansion."""
+  # The implementation is based on
+  # [1] M. Shepherd and J. Laframboise,
+  #     Chebyshev approximation of (1 + 2 * x) * exp(x**2) * erfc(x)
+  #     https://www.ams.org/journals/mcom/1981-36-153/S0025-5718-1981-0595058-X/
+
+  dtype = dtype_util.common_dtype([x], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  x = tf.convert_to_tensor(x, dtype=dtype)
+  x_abs = tf.math.abs(x)
+  # TODO(b/180390310): The approximation quality can be made better by sweeping
+  # the shift parameter '3.75'.
+  y = (x_abs - 3.75) / (x_abs + 3.75)
+
+  # The list of coefficients is taken from [1].
+  coeff = [
+      3e-21,
+      9.7e-20,
+      2.7e-20,
+      -2.187e-18,
+      -2.237e-18,
+      5.0681e-17,
+      7.4182e-17,
+      -1.250795e-15,
+      -1.864563e-15,
+      3.33478119e-14,
+      3.2525481e-14,
+      -9.65469675e-13,
+      1.94558685e-13,
+      2.8687950109e-11,
+      -6.3180883409e-11,
+      -7.75440020883e-10,
+      4.521959811218e-09,
+      1.0764999465671e-08,
+      -2.18864010492344e-07,
+      7.74038306619849e-07,
+      4.139027986073010e-06,
+      -6.9169733025012064e-05,
+      4.90775836525808632e-04,
+      -2.413163540417608191e-03,
+      9.074997670705265094e-03,
+      -2.6658668435305752277e-02,
+      5.9209939998191890498e-02,
+      -8.4249133366517915584e-02,
+      -4.590054580646477331e-03,
+      1.177578934567401754080,
+  ]
+
+  result = -4e-21
+  previous_result = 0.
+  for i in range(len(coeff) - 1):
+    result, previous_result = (
+        2 * y * result - previous_result + coeff[i], result)
+  result = y * result - previous_result + coeff[len(coeff) - 1]
+
+  result = result / (1. + 2. * x_abs)
+
+  # The approximation is only valid for positive x, so flip the integral.
+  # TODO(b/180390310): Improve this approximation for negative values.
+  result = tf.where(
+      x < 0., 2. * tf.math.exp(tf.math.square(x)) - result, result)
+  result = tf.where(tf.math.equal(x, np.inf), numpy_dtype(1.), result)
+  return result
+
+
+def _erfcx_fwd(x):
+  """Compute output, aux (collaborates with _erfcx_bwd)."""
+  output = _erfcx_naive(x)
+  return output, (x,)
+
+
+def _erfcx_bwd(aux, g):
+  x, = aux
+  y = _erfcx_custom_gradient(x)
+  numpy_dtype = dtype_util.as_numpy_dtype(
+      dtype_util.common_dtype([x], tf.float32))
+  px = 2. * x * y - numpy_dtype(2. / np.sqrt(np.pi))
+  return [px * g]
+
+
+def _erfcx_jvp(primals, tangents):
+  """Computes JVP for erfcx (supports JAX custom derivative)."""
+  x, = primals
+  dx, = tangents
+
+  y = _erfcx_custom_gradient(x)
+  numpy_dtype = dtype_util.as_numpy_dtype(
+      dtype_util.common_dtype([x], tf.float32))
+  px = 2. * x * y - numpy_dtype(2. / np.sqrt(np.pi))
+  return y, px * dx
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_erfcx_fwd,
+    vjp_bwd=_erfcx_bwd,
+    jvp_fn=_erfcx_jvp)
+def _erfcx_custom_gradient(x):
+  """Computes Erfcx(x) with correct custom gradient."""
+  return _erfcx_naive(x)
+
+
+def erfcx(x, name=None):
+  """Computes the scaled complementary error function exp(x**) * erfc(x).
+
+  # References
+  [1] M. Shepherd and J. Laframboise,
+      Chebyshev approximation of (1 + 2 * x) * exp(x**2) * erfc(x)
+      https://www.ams.org/journals/mcom/1981-36-153/S0025-5718-1981-0595058-X/
+
+  Args:
+    x: A Tensor with type `float32` or `float64`.
+    name: A name for the operation (optional).
+
+  Returns:
+    erfcx: erfcx(x) evaluated at `x`. A Tensor with the same shape and same
+      dtype as `x`.
+  """
+  with tf.name_scope(name or 'logerfc'):
+    dtype = dtype_util.common_dtype([x], tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    return _erfcx_custom_gradient(x)
+
+
+def logerfc(x, name=None):
+  """Computes the logarithm of `tf.math.erfc` of `x` element-wise.
+
+  NOTE: This is mathematically equivalent to computing `log(erfc(x))`
+  however is more numerically stable.
+
+  Args:
+    x: A Tensor with type `float32` or `float64`.
+    name: A name for the operation (optional).
+
+  Returns:
+    logerfc: log(erfc(x)) evaluated at `x`. A Tensor with the same shape and
+      same dtype as `x`.
+  """
+  with tf.name_scope(name or 'logerfc'):
+    dtype = dtype_util.common_dtype([x], tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    safe_positive_x = tf.where(x > 0., x, 1.)
+    safe_negative_x = tf.where(x < 0., x, -1.)
+    return tf.where(
+        x < 0.,
+        tf.math.log(tf.math.erfc(safe_negative_x)),
+        # erfcx saturates to zero much slower than erfc.
+        tf.math.log(erfcx(safe_positive_x)) - tf.math.square(safe_positive_x))
+
+
+def logerfcx(x, name=None):
+  """Computes the logarithm of `tfp.math.erfcx` of `x` element-wise.
+
+  NOTE: This is mathematically equivalent to computing `log(erfcx(x))`
+  however is more numerically stable.
+
+  Args:
+    x: A Tensor with type `float32` or `float64`.
+    name: A name for the operation (optional).
+
+  Returns:
+    logerfcx: log(erfcx(x)) evaluated at `x`. A Tensor with the same shape and
+      same dtype as `x`.
+  """
+  with tf.name_scope(name or 'logerfc'):
+    dtype = dtype_util.common_dtype([x], tf.float32)
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    safe_positive_x = tf.where(x > 0., x, 1.)
+    safe_negative_x = tf.where(x < 0., x, -1.)
+    return tf.where(
+        x < 0.,
+        # erfcx goes to infinity fast in the left tail.
+        tf.math.log(
+            tf.math.erfc(safe_negative_x)) + tf.math.square(safe_negative_x),
+        tf.math.log(erfcx(safe_positive_x)))
+
+
+# Implementation of Inverse Incomplete Gamma based on
+# A. Didonato and A. Morris,
+# Computation of the Incomplete Gamma Function Ratios and their Inverse
+# https://dl.acm.org/doi/10.1145/22721.23109
+
+
+def _didonato_eq_twenty_three(log_b, v, a):
+  return -log_b + tf.math.xlogy(a - 1., v) - tf.math.log1p((1. - a) / (1. + v))
+
+
+def _didonato_eq_thirty_two(p, q):
+  """Compute Equation 32 from Didonato's paper."""
+  dtype = dtype_util.common_dtype([p, q], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  numerator_coeffs = [
+      0.213623493715853, 4.28342155967104, 11.6616720288968, 3.31125922108741]
+  numerator_coeffs = [numpy_dtype(c) for c in numerator_coeffs]
+  denominator_coeffs = [
+      0.36117081018842e-1, 1.27364489782223, 6.40691597760039,
+      6.61053765625462, 1.]
+  denominator_coeffs = [numpy_dtype(c) for c in denominator_coeffs]
+  t = tf.where(
+      p < 0.5,
+      tf.math.sqrt(-2 * tf.math.log(p)),
+      tf.math.sqrt(-2. * tf.math.log(q)))
+  result = (t - tf.math.polyval(numerator_coeffs, t) / tf.math.polyval(
+      denominator_coeffs, t))
+  return tf.where(p < 0.5, -result, result)
+
+
+def _didonato_eq_thirty_four(a, x):
+  """Compute Equation 34 from Didonato's paper."""
+  # This function computes `S_n` in equation thirty four.
+  dtype = dtype_util.common_dtype([a, x], tf.float32)
+
+  # TODO(b/178793508): Change this tolerance to be dtype dependent.
+  tolerance = 1e-4
+
+  def _taylor_series(should_stop, index, partial, series_sum):
+    partial = partial * x / (a + index)
+    series_sum = tf.where(should_stop, series_sum, series_sum + partial)
+    # TODO(b/178793508): Change the number of iterations to be dtype dependent.
+    should_stop = (partial < tolerance) | (index > 100)
+    return should_stop, index + 1, partial, series_sum
+
+  _, _, _, series_sum = tf.while_loop(
+      cond=lambda stop, *_: tf.reduce_any(~stop),
+      body=_taylor_series,
+      loop_vars=(
+          tf.zeros_like(a + x, dtype=tf.bool),
+          tf.cast(1., dtype=dtype),
+          tf.ones_like(a + x, dtype=dtype),
+          tf.ones_like(a + x, dtype=dtype)))
+  return series_sum
+
+
+def _didonato_eq_twenty_five(a, y):
+  """Compute Equation 25 from Didonato's paper."""
+  c1 = tf.math.xlogy(a - 1., y)
+  c1_sq = tf.math.square(c1)
+  c1_cub = c1_sq * c1
+  c1_fourth = tf.math.square(c1_sq)
+  a_sq = tf.math.square(a)
+  a_cub = a_sq * a
+  c2 = (a - 1.) * (1. + c1)
+  c3 = (a - 1.) * ((3. * a - 5.) / 2. + c1 * (a - 2. - c1 / 2.))
+  c4 = (a - 1.) * (
+      (c1_cub / 3.) - (3. * a - 5.) * c1_sq / 2. +
+      (a_sq - 6. * a + 7.) * c1 + (11. * a_sq - 46. * a + 47.) / 6.)
+  c5 = ((a - 1.) * (-c1_fourth / 4. +
+                    (11. * a - 17.) * c1_cub / 6 +
+                    (-3. * a_sq + 13. * a - 13.) * c1_sq +
+                    (2. * a_cub - 25. * a_sq + 72. * a - 61.) * c1 / 2. +
+                    (25. * a_cub - 195. * a_sq + 477 * a - 379) / 12.))
+  return y + c1 + (((c5 / y + c4) / y + c3 / y) + c2) / y
+
+
+def _inverse_igamma_initial_approx(a, p, q, use_p_for_logq=True):
+  """Compute an initial guess for `igammainv(a, p)`.
+
+  Compute an initial estimate of `igammainv(a, p)`. This will be further
+  refined by Newton-Halley iterations.
+
+  Args:
+    a: A positive `float` `Tensor`. Must be broadcastable with `p`.
+    p: A `float` `Tensor` whose entries lie in `[0, 1]`.
+       Must be broadcastable with `a`. This is `1 - q`.
+    q: A `float` `Tensor` whose entries lie in `[0, 1]`.
+       Must be broadcastable with `a`. This is `1 - p`.
+    use_p_for_logq: `bool` describing whether to compute
+      `log(q)` by using `log(1 - p)` or `log(q)`.
+      Default value: `True`.
+
+  Returns:
+    igamma_approx: Approximation to `igammainv(a, p)`.
+  """
+
+  dtype = dtype_util.common_dtype([a, p, q], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  a = tf.convert_to_tensor(a, dtype=dtype)
+  p = tf.convert_to_tensor(p, dtype=dtype)
+  q = tf.convert_to_tensor(q, dtype=dtype)
+
+  lgamma_a = tf.math.lgamma(a)
+
+  # This ensures that computing log(1 - p) avoids roundoff errors. This is
+  # needed since igammacinv and igammainv both use this codepath,
+  if use_p_for_logq:
+    log_q = tf.math.log1p(-p)
+  else:
+    log_q = tf.math.log(q)
+
+  log_b = log_q + lgamma_a
+
+  result = _didonato_eq_twenty_five(a, -log_b)
+
+  # The code below is for when a < 1.
+
+  v = -log_b - (1. - a) * tf.math.log(-log_b)
+  v_sq = tf.math.square(v)
+
+  # This is Equation 24.
+  result = tf.where(
+      log_b > np.log(0.01),
+      -log_b - (1. - a) * tf.math.log(v) - tf.math.log(
+          (v_sq + 2. * (3. - a) * v + (2. - a) * (3 - a)) /
+          (v_sq + (5. - a) * v + 2.)),
+      result)
+
+  result = tf.where(
+      log_b >= np.log(0.15),
+      _didonato_eq_twenty_three(log_b, v, a),
+      result)
+
+  t = tf.math.exp(-np.euler_gamma - tf.math.exp(log_b))
+  u = t * tf.math.exp(t)
+  result = tf.where(
+      (a < 0.3) & (log_b >= np.log(0.35)),
+      t * tf.math.exp(u),
+      result)
+
+  # These are hand tuned constants to compute (p * Gamma(a + 1)) ** (1 / a)
+  # TODO(b/178793508): Change these bounds / computation to be dtype dependent.
+  # This is Equation 21.
+  u = tf.where((tf.math.exp(log_b) * q > 1e-8) & (q > 1e-5),
+               tf.math.pow(p * tf.math.exp(lgamma_a) * a,
+                           tf.math.reciprocal(a)),
+               # When (1 - p) * Gamma(a) or (1 - p) is small,
+               # we can taylor expand Gamma(a + 1) ** 1 / a to get
+               # exp(-euler_gamma for the zeroth order term.
+               # Also p ** 1 / a = exp(log(p) / a) = exp(log(1 - q) / a)
+               # ~= exp(-q / a) resulting in the following expression.
+               tf.math.exp((-q / a) - np.euler_gamma))
+
+  result = tf.where(
+      (log_b > np.log(0.6)) | ((log_b >= np.log(0.45)) & (a >= 0.3)),
+      u / (1. - (u / (a + 1.))),
+      result)
+
+  # The code below is for when a < 1.
+
+  sqrt_a = tf.math.sqrt(a)
+  s = _didonato_eq_thirty_two(p, q)
+  s_sq = tf.math.square(s)
+  s_cub = s_sq * s
+  s_fourth = tf.math.square(s_sq)
+  s_fifth = s_fourth * s
+
+  # This is the Cornish-Fisher 6 term expansion for x (by viewing igammainv as
+  # the quantile function for the Gamma distribution). This is equation (31).
+  w = a + s * sqrt_a + (s_sq - 1.) / 3.
+  w = w + (s_cub - 7. * s) / (36. * sqrt_a)
+  w = w - (3. * s_fourth + 7. * s_sq - 16.) / (810 * a)
+  w = w + (9. * s_fifth + 256. * s_cub - 433. * s) / (38880 * a * sqrt_a)
+
+  # The code below is for when a > 1. and p > 0.5.
+  d = tf.math.maximum(numpy_dtype(2.), a * (a - 1.))
+  result_a_large_p_large = tf.where(
+      log_b <= -d * np.log(10.),
+      _didonato_eq_twenty_five(a, -log_b),
+      _didonato_eq_twenty_three(
+          log_b, _didonato_eq_twenty_three(log_b, w, a), a))
+  result_a_large_p_large = tf.where(w < 3. * a, w, result_a_large_p_large)
+  # TODO(b/178793508): Change these bounds / computation to be dtype dependent.
+  result_a_large_p_large = tf.where(
+      (a >= 500.) & (tf.math.abs(1. - w / a) < 1e-6),
+      w, result_a_large_p_large)
+
+  # The code below is for when a > 1. and p <= 0.5.
+  z = w
+  v = tf.math.log(p) + tf.math.lgamma(a + 1.)
+
+  # The code below follows Equation 35 which involves multiple evaluations of
+  # F_i.
+  modified_z = tf.math.exp((v + w) / a)
+  for _ in range(2):
+    s = tf.math.log1p(
+        modified_z / (a + 1.) * (
+            1. + modified_z / (a + 2.)))
+    modified_z = tf.math.exp(
+        (v + modified_z - s) / a)
+
+  s = tf.math.log1p(
+      modified_z / (a + 1.) * (1. + modified_z / (a + 2.) * (
+          1. + modified_z / (a + 3.))))
+  modified_z = tf.math.exp((v + modified_z - s) / a)
+  z = tf.where(w <= 0.15 * (a + 1.), modified_z, z)
+
+  ls = tf.math.log(_didonato_eq_thirty_four(a, z))
+  medium_z = tf.math.exp((v + z - ls) / a)
+  result_a_large_p_small = tf.where(
+      (z <= 0.01 * (a + 1.)) | (z > 0.7 * (a + 1.)),
+      z,
+      medium_z * (
+          1. - (
+              a * tf.math.log(medium_z) - medium_z - v + ls) / (a - medium_z)))
+
+  result_a_large = tf.where(
+      p <= 0.5, result_a_large_p_small, result_a_large_p_large)
+  result = tf.where(a < 1., result, result_a_large)
+
+  # This ensures that computing log(1 - p) avoids roundoff errors. This is
+  # needed since igammacinv and igammainv both use this codepath,
+  # switching p and q.
+  result = tf.where(tf.math.equal(a, 1.), -log_q, result)
+  return result
+
+
+def _shared_igammainv_computation(a, p, is_igammainv=True):
+  """Shared computation for the igammainv/igammacinv."""
+
+  dtype = dtype_util.common_dtype([a, p], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+
+  if is_igammainv:
+    q = 1. - p
+  else:
+    q = p
+    p = 1. - q
+
+  x = _inverse_igamma_initial_approx(a, p, q, use_p_for_logq=is_igammainv)
+
+  # Run 3 steps of Newton-Halley method.
+  for _ in range(3):
+    factorial = tf.math.exp(a * tf.math.log(x) - x - tf.math.lgamma(a))
+
+    f_over_der = tf.where(
+        ((p <= 0.9) & is_igammainv) | ((q > 0.9) & (not is_igammainv)),
+        (tf.math.igamma(a, x) - p) * x / factorial,
+        -(tf.math.igammac(a, x) - q) * x / factorial)
+    second_der_over_der = -1. + (a - 1.) / x
+    modified_x = tf.where(
+        tf.math.is_inf(second_der_over_der),
+        # Use Newton's method if the second derivative is not available.
+        x - f_over_der,
+        # Use Halley's method otherwise. Halley's method is:
+        # x_{n+1} = x_n - f(x_n) / f'(x_n) * (
+        #    1 - f(x_n) / f'(x_n) * 0.5 f''(x_n) / f'(x_n))
+        x - f_over_der / (1. - 0.5 * f_over_der * second_der_over_der))
+    x = tf.where(tf.math.equal(factorial, 0.), x, modified_x)
+  x = tf.where((a < 0.) | (p < 0.) | (p > 1.), numpy_dtype(np.nan), x)
+  x = tf.where(tf.math.equal(p, 0.), numpy_dtype(0.), x)
+  x = tf.where(tf.math.equal(p, 1.), numpy_dtype(np.inf), x)
+
+  return x
+
+
+def _igammainv_fwd(a, p):
+  """Compute output, aux (collaborates with _igammainv_bwd)."""
+  output = _shared_igammainv_computation(a, p, is_igammainv=True)
+  return output, (a, p)
+
+
+def _igammainv_partials(a, x):
+  """Compute partial derivatives of `igammainv(a, x)`."""
+  # Partials for igamma.
+
+  # This function does not have gradients in TF, and thus using
+  # `stop_gradient` does not change behavior in TF.
+  # Ideally, it would be nice to throw an exception when taking gradients of
+  # this function in JAX mode, but this is not possible at the moment with
+  # `custom_jvp`. See https://github.com/google/jax/issues/5913 for details.
+  # TODO(https://github.com/google/jax/issues/5913): remove stop_gradients.
+  igamma_partial_a = tf.raw_ops.IgammaGradA(
+      a=tf.stop_gradient(a), x=tf.stop_gradient(x))
+  igamma_partial_x = tf.math.exp(
+      -x + tf.math.xlogy(a - 1., x) - tf.math.lgamma(a))
+
+  # Use the fact that igamma and igammainv are inverses of each other to compute
+  # the gradients.
+  igammainv_partial_a = -igamma_partial_a / igamma_partial_x
+  igammainv_partial_x = tf.math.reciprocal(igamma_partial_x)
+  return igammainv_partial_a, igammainv_partial_x
+
+
+def _igammainv_bwd(aux, g):
+  """Reverse mode impl for igammainv."""
+  a, p = aux
+  x = _igammainv_custom_gradient(a, p)
+  # Use the fact that igamma and igammainv are inverses to compute the gradient.
+  pa, pp = _igammainv_partials(a, x)
+  return _fix_gradient_for_broadcasting(a, p, pa * g, pp * g)
+
+
+def _igammainv_jvp(primals, tangents):
+  """Computes JVP for igammainv (supports JAX custom derivative)."""
+  a, p = primals
+  da, dp = tangents
+  # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
+  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(da),
+                                         prefer_static.shape(dp))
+  da = tf.broadcast_to(da, bc_shp)
+  dp = tf.broadcast_to(dp, bc_shp)
+
+  x = _igammainv_custom_gradient(a, p)
+  pa, pp = _igammainv_partials(a, x)
+
+  return x, pa * da + pp * dp
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_igammainv_fwd,
+    vjp_bwd=_igammainv_bwd,
+    jvp_fn=_igammainv_jvp)
+def _igammainv_custom_gradient(a, p):
+  return _shared_igammainv_computation(a, p, is_igammainv=True)
+
+
+def igammainv(a, p, name=None):
+  """Computes the inverse to `tf.math.igamma` with respect to `p`.
+
+  This function is defined as the solution `x` to the equation
+  `p = tf.math.igamma(a, x)`.
+
+  # References
+  [1] A. Didonato and A. Morris,
+      Computation of the Incomplete Gamma Function Ratios and their Inverse
+      https://dl.acm.org/doi/10.1145/22721.23109
+
+  Args:
+    a: A positive `float` `Tensor`. Must be broadcastable with `p`.
+    p: A `float` `Tensor` whose entries lie in `[0, 1]`.
+       Must be broadcastable with `a`.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    igammainv: igammainv(a, p). Has same type as `a`.
+  """
+  with tf.name_scope(name or 'igammainv'):
+    dtype = dtype_util.common_dtype([a, p], tf.float32)
+    a = tf.convert_to_tensor(a, dtype=dtype)
+    p = tf.convert_to_tensor(p, dtype=dtype)
+    return _igammainv_custom_gradient(a, p)
+
+
+def _igammacinv_fwd(a, p):
+  """Compute output, aux (collaborates with _igammacinv_bwd)."""
+  output = _shared_igammainv_computation(a, p, is_igammainv=False)
+  return output, (a, p)
+
+
+def _igammacinv_bwd(aux, g):
+  """Reverse mode impl for igammacinv."""
+  a, p = aux
+  x = _igammacinv_custom_gradient(a, p)
+  pa, pp = _igammainv_partials(a, x)
+  pp = -pp
+  return _fix_gradient_for_broadcasting(a, p, pa * g, pp * g)
+
+
+def _igammacinv_jvp(primals, tangents):
+  """Computes JVP for igammacinv (supports JAX custom derivative)."""
+  a, p = primals
+  da, dp = tangents
+  # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
+  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(da),
+                                         prefer_static.shape(dp))
+  da = tf.broadcast_to(da, bc_shp)
+  dp = tf.broadcast_to(dp, bc_shp)
+
+  x = _igammacinv_custom_gradient(a, p)
+  pa, pp = _igammainv_partials(a, x)
+  pp = -pp
+
+  return x, pa * da + pp * dp
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_igammacinv_fwd,
+    vjp_bwd=_igammacinv_bwd,
+    jvp_fn=_igammacinv_jvp)
+def _igammacinv_custom_gradient(a, p):
+  return _shared_igammainv_computation(a, p, is_igammainv=False)
+
+
+def igammacinv(a, p, name=None):
+  """Computes the inverse to `tf.math.igammac` with respect to `p`.
+
+  This function is defined as the solution `x` to the equation
+  `p = tf.math.igammac(a, x)`.
+
+  # References
+  [1] A. Didonato and A. Morris,
+      Computation of the Incomplete Gamma Function Ratios and their Inverse
+      https://dl.acm.org/doi/10.1145/22721.23109
+
+  Args:
+    a: A positive `float` `Tensor`. Must be broadcastable with `p`.
+    p: A `float` `Tensor` whose entries lie in `[0, 1]`.
+       Must be broadcastable with `a`.
+    name: Optional Python `str` naming the operation.
+
+  Returns:
+    igammacinv: igammacinv(a, p). Has same type as `a`.
+  """
+
+  with tf.name_scope(name or 'igammacinv'):
+    dtype = dtype_util.common_dtype([a, p], tf.float32)
+    a = tf.convert_to_tensor(a, dtype=dtype)
+    p = tf.convert_to_tensor(p, dtype=dtype)
+    return _igammacinv_custom_gradient(a, p)
 
 
 def round_exponential_bump_function(x, name=None):
@@ -197,7 +1000,46 @@ def _lambertw_principal_branch(z, name=None):
     return tf.cast(z0, dtype=z.dtype)
 
 
-@tf.custom_gradient
+def _lambert_fwd(z):
+  """Compute output, aux (collaborates with _lambert_bwd)."""
+  wz = _lambertw_principal_branch(z)
+  return wz, (z,)
+
+
+def _lambert_bwd(aux, g):
+  """Reverse mode impl for lambert."""
+  z, = aux
+  wz = _lambert_custom_gradient(z)
+  # At z = 0 the analytic expressions for the gradient results in a 0/0
+  # expression.  However, the continuous expansion (l'Hospital rule) gives a
+  # derivative of 1.0 at z = 0.  This case has to be handled separately with
+  # a where clause.
+  return g * tf.where(
+      tf.equal(z, 0.), tf.ones([], wz.dtype), wz / (z * (1. + wz)))
+
+
+def _lambert_jvp(primals, tangents):
+  """Computes JVP for lambert (supports JAX custom derivative)."""
+  z, = primals
+  dz, = tangents
+  wz = _lambert_custom_gradient(z)
+
+  # At z = 0 the analytic expressions for the gradient results in a 0/0
+  # expression.  However, the continuous expansion (l'Hospital rule) gives a
+  # derivative of 1.0 at z = 0.  This case has to be handled separately with
+  # a where clause.
+  pz = tf.where(tf.equal(z, 0.), tf.ones([], wz.dtype), wz / (z * (1. + wz)))
+  return wz, pz * dz
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_lambert_fwd,
+    vjp_bwd=_lambert_bwd,
+    jvp_fn=_lambert_jvp)
+def _lambert_custom_gradient(z):
+  return _lambertw_principal_branch(z)
+
+
 def lambertw(z, name=None):
   """Computes Lambert W of `z` element-wise.
 
@@ -228,31 +1070,7 @@ def lambertw(z, name=None):
   """
   with tf.name_scope(name or 'lambertw'):
     z = tf.convert_to_tensor(z)
-    wz = _lambertw_principal_branch(z, name)
-
-    def grad(dy):
-      """Computes the derivative of Lambert W of `z` element-wise.
-
-      The first derivative W'(z) can be computed from W(z) as it holds
-
-        W'(z) = W(z) / (z * (1 + W(z)))
-
-      Args:
-        dy: A Tensor with type `float32` or `float64`.
-
-      Returns:
-        A Tensor with same shape and dtype as `z`.
-      """
-      # At z = 0 the analytic expressions for the gradient results in a 0/0
-      # expression.  However, the continuous expansion (l'Hospital rule) gives a
-      # derivative of 1.0 at z = 0.  This case has to be handled separately with
-      # a where clause.
-      grad_wz = (dy * tf.where(tf.equal(z, 0.0),
-                               tf.ones_like(wz),
-                               wz / (z * (1. + wz))))
-      return grad_wz
-
-    return wz, grad
+    return _lambert_custom_gradient(z)
 
 
 def log_gamma_correction(x, name=None):
@@ -990,6 +1808,7 @@ def _owens_t_custom_gradient(h, a):
 
 
 def owens_t(h, a, name=None):
+  # pylint: disable=line-too-long
   """Computes Owen's T function of `h` and `a` element-wise.
 
   Owen's T function is defined as the combined probability of the event `X > h`
@@ -1000,12 +1819,39 @@ def owens_t(h, a, name=None):
   `exp(-0.5 * h ** 2 * (1 + x ** 2)) / (1 + x ** 2)` from `0` to `a`.
   `h` and `a` can be any real number
 
-  The Owen's T implementation below is based on [1]
+  The Owen's T implementation below is based on
+  ([Patefield and Tandy, 2000][1]).
 
+  The Owen's T function has several notable properties which
+  we list here for convenience. ([Owen, 1980][2], page 414)
 
-  # References
-  [1] Patefield M., Tandy D., Fast and Accurate Calcuation of Owen's T-Function
-      Journal of Statistical Software http://www.jstatsoft.org/v05/i05/paper
+  - P2.1  `T( h, 0)   =  0`
+  - P2.2  `T( 0, a)   =  arctan(a) / (2 pi)`
+  - P2.3  `T( h, 1)   =  Phi(h) (1 - Phi(h)) / 2`
+  - P2.4  `T( h, inf) =  (1 - Phi(|h|)) / 2`
+  - P2.5  `T(-h, a)   =  T(h, a)`
+  - P2.6  `T( h,-a)   = -T(h, a)`
+  - P2.7  `T( h, a) + T(a h, 1 / a) = Phi(h)/2 + Phi(ah)/2 - Phi(h) Phi(ah) - [a<0]/2`
+  - P2.8  `T( h, a)   =  arctan(a)/(2 pi) - 1/(2 pi) int_0^h int_0^{ax}` exp(-(x**2 + y**2)/2) dy dx`
+  - P2.9  `T( h, a)   =  arctan(a)/(2 pi) - int_0**h phi(x) Phi(a x) dx + Phi(h)/2 - 1/4`
+
+  `[a<0]` uses Iverson bracket notation, i.e., `[a<0] = {1 if a<0 and 0 otherwise`.
+
+  Let us also define P2.10 as:
+  - P2.10  `T(inf, a) = 0`
+  - Proof
+
+    Note that result #10,010.6 ([Owen, 1980][2], pg 403) states that:
+    `int_0^inf phi(x) Phi(a+bx) dx = Phi(a/rho)/2 + T(a/rho,b) where rho = sqrt(1+b**2).`
+    Using `a=0`, this result is:
+    `int_0^inf phi(x) Phi(bx) dx = 1/4 + T(0,b) = 1/4 + arctan(b) / (2 pi)`
+    Combining this with P2.9 implies
+    ```none
+    T(inf, a)
+     =  arctan(a)/(2 pi) - [ 1/4 + arctan(a) / (2 pi)]  + Phi(inf)/2 - 1/4
+     = -1/4 + 1/2 -1/4 = 0.
+    ```
+    QED
 
   Args:
     h: A `float` `Tensor` defined as in `P({X > h, 0 < Y < a X})`. Must be
@@ -1013,11 +1859,22 @@ def owens_t(h, a, name=None):
     a: A `float` `Tensor` defined as in `P({X > h, 0 < Y < a X})`. Must be
        broadcastable with `h`.
     name: A name for the operation (optional).
+
   Returns:
     owens_t: A `Tensor` with the same type as `h` and `a`,
+
+  #### References
+
+  [1]: Patefield, Mike, and D. A. V. I. D. Tandy. "Fast and accurate calculation
+       of Owen’s T function." Journal of Statistical Software 5.5 (2000): 1-25.
+       http://www.jstatsoft.org/v05/i05/paper
+  [2]: Owen, Donald Bruce. "A table of normal integrals: A table."
+       Communications in Statistics-Simulation and Computation 9.4 (1980):
+       389-419.
   """
+  # pylint: enable=line-too-long
   with tf.name_scope(name or 'owens_t'):
     dtype = dtype_util.common_dtype([h, a], tf.float32)
-    h = tf.convert_to_tensor(h, dtype=dtype)
-    a = tf.convert_to_tensor(a, dtype=dtype)
+    h = tf.convert_to_tensor(h, dtype=dtype, name='h')
+    a = tf.convert_to_tensor(a, dtype=dtype, name='a')
     return _owens_t_custom_gradient(h, a)

@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
@@ -59,7 +60,7 @@ class ExpGamma(distribution.Distribution):
   `tfb.Log()(tfd.Gamma(..))`):
 
   ```none
-  pdf(x; alpha, beta > 0) = exp(x)**(alpha - 1) exp(-exp(x) beta) / Z + x
+  pdf(x; alpha, beta > 0) = exp(x)**(alpha) exp(-exp(x) beta) / Z
   Z = Gamma(alpha) beta**(-alpha)
   ```
 
@@ -258,6 +259,12 @@ class ExpGamma(distribution.Distribution):
       y = tf.math.exp(x) * self.rate
     return tf.math.igamma(self.concentration, y)
 
+  def _quantile(self, p):
+    y = tfp_math.igammainv(self.concentration, p)
+    if self.rate is None:
+      return tf.math.log(y) - self.log_rate
+    return tf.math.log(y / self.rate)
+
   def _mean(self):
     return tf.math.digamma(self.concentration) - self._log_rate_parameter()
 
@@ -302,7 +309,7 @@ class ExpInverseGamma(transformed_distribution.TransformedDistribution):
   The probability density function (pdf) is very similar to ExpGamma,
 
   ```none
-  pdf(x; alpha, beta > 0) = exp(-x)**(alpha - 1) exp(-exp(-x) beta) / Z - x
+  pdf(x; alpha, beta > 0) = exp(-x)**(alpha) exp(-exp(-x) beta) / Z
   Z = Gamma(alpha) beta**(-alpha)
   ```
 

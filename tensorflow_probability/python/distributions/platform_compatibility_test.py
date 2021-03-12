@@ -55,6 +55,8 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'LogNormal',
     # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
     'NegativeBinomial',
+    'NormalInverseGaussian',  # log_probs can be very far off.
+    'Skellam',  # Fails in TF1.
     # TODO(b/137956955): Add support for hypothesis testing
     'PoissonLogNormalQuadratureCompound',
     # TODO(b/159999573): XLA / non-XLA computation seems to have
@@ -62,14 +64,10 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'Poisson',
     # TODO(b/137956955): Add support for hypothesis testing
     'SinhArcsinh',
-    # TruncatedCauchy has log_probs that are very far off.
-    'TruncatedCauchy',
     # TODO(b/159997353): StatelessTruncatedNormal missing in XLA.
     'TruncatedNormal',
     'Weibull',
     'WishartTriL',  # log_probs are very far off.
-    # TODO(b/159997700) No XLA Zeta
-    'Zipf',
 ])
 
 NO_SAMPLE_PARAM_GRADS = {
@@ -94,20 +92,15 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'DirichletMultinomial',  # Times out. (b/164143676)
     'Multinomial',  # TensorListConcatV2 fallback broken: b/166658748
-    'PlackettLuce',  # No converter for TopKV2
-    'Skellam',
     # 'TruncatedNormal',  # No converter for ParameterizedTruncatedNormal
 ]
 
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'BetaQuotient',
-    'ExponentiallyModifiedGaussian',  # b/174778704
-    'HalfStudentT',  # Numerical problem: b/149785284
-    'Skellam',
-    'StudentT',  # Numerical problem: b/149785284
+    'NormalInverseGaussian',  # Fails in TF1.
+    'Skellam',  # Fails in TF1.
     'TruncatedNormal',  # Numerical problem: b/150811273
-    'VonMisesFisher',  # No converter for CheckNumerics
     'Wishart',  # Actually works, but disabled because log_prob of sample is
                 # ill-conditioned for reasons unrelated to pfor.
     'WishartTriL',  # Same as Wishart.
@@ -143,7 +136,7 @@ XLA_LOGPROB_ATOL.update({
     'BetaBinomial': 5e-6,
     'BetaQuotient': 1e-4,
     'Binomial': 5e-6,
-    'Categorical': 5e-6,  # sparse_softmax_cross_entropy_with_logits
+    'Categorical': 7e-6,  # sparse_softmax_cross_entropy_with_logits
     'DeterminantalPointProcess': 1e-5,
     'DirichletMultinomial': 1e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
@@ -152,10 +145,11 @@ XLA_LOGPROB_ATOL.update({
     'FiniteDiscrete': 6e-6,  # sparse_softmax_cross_entropy_with_logits
     'HalfCauchy': 2e-6,
     'InverseGamma': 1e-4,
-    'Kumaraswamy': 3e-6,
+    'Kumaraswamy': 4e-5,
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
     'PowerSpherical': 2e-5,
+    'SigmoidBeta': 5e-4,
     'Skellam': 1e-4
 })
 
@@ -183,11 +177,12 @@ XLA_LOGPROB_RTOL.update({
     'LKJ': .07,
     'Multinomial': 3e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
-    'Pareto': 2e-2,  # TODO(b/159997708)
     'PERT': 5e-4,
     'Poisson': 3e-2,  # TODO(b/159999573)
     'PowerSpherical': .003,
     'RelaxedBernoulli': 3e-3,
+    'SigmoidBeta': 5e-4,
+    'TruncatedCauchy': 2e-5,
     'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
     'WishartTriL': 1e-5,

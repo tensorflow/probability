@@ -219,7 +219,7 @@ class ScaleMatvecLinearOperatorBlockDiagTest(
     seed = test_util.test_seed()
     return tf.linalg.LinearOperatorBlockDiag(
         [tf.linalg.LinearOperatorDiag(
-            tf.random.normal((2, 4), dtype=tf.float32, seed=seed)),
+            tf.random.normal((2, 3, 4), dtype=tf.float32, seed=seed)),
          tf.linalg.LinearOperatorIdentity(3)], is_non_singular=True)
 
 

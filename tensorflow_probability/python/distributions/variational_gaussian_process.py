@@ -882,6 +882,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
           mean_fn=mean_fn,
           index_points=inducing_index_points)
 
+      self._predictive_noise_variance = predictive_noise_variance
       self._vgp_observation_noise_variance = observation_noise_variance
 
       variational_kernel = _VariationalKernel(

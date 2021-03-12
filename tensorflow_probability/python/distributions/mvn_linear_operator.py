@@ -253,12 +253,7 @@ class MultivariateNormalLinearOperator(
     if self.loc is None:
       return tf.zeros(shape, self.dtype)
 
-    if has_static_shape and shape == self.loc.shape:
-      return tf.identity(self.loc)
-
-    # Add dummy tensor of zeros to broadcast.  This is only necessary if shape
-    # != self.loc.shape, but we could not determine if this is the case.
-    return tf.identity(self.loc) + tf.zeros(shape, self.dtype)
+    return tf.broadcast_to(self.loc, shape)
 
   def _covariance(self):
     if distribution_util.is_diagonal_scale(self.scale):
@@ -323,6 +318,8 @@ class MultivariateNormalLinearOperator(
   def _parameter_control_dependencies(self, is_init):
     # Nothing to do here.
     return []
+
+  _composite_tensor_nonshape_params = ('loc', 'scale')
 
 
 @kullback_leibler.RegisterKL(MultivariateNormalLinearOperator,

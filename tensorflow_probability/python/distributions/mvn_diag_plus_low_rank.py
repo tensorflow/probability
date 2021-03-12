@@ -301,3 +301,6 @@ class MultivariateNormalDiagPlusLowRank(
             is_preferred=False,
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+
+  _composite_tensor_nonshape_params = (
+      'loc', 'scale_diag', 'scale_perturb_factor', 'scale_perturb_diag')

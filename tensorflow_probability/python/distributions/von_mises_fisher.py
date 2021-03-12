@@ -339,7 +339,9 @@ class VonMisesFisher(distribution.Distribution):
     basis = tf.concat([[1.], tf.zeros([event_dim - 1], dtype=self.dtype)],
                       axis=0)
     u = tf.math.l2_normalize(basis - mean_direction, axis=-1)
-    return samples - 2 * tf.reduce_sum(samples * u, axis=-1, keepdims=True) * u
+    return tf.math.l2_normalize(
+        samples - 2 * tf.reduce_sum(samples * u, axis=-1, keepdims=True) * u,
+        axis=-1)
 
   def _sample_3d(self, n, mean_direction, concentration, seed=None):
     """Specialized inversion sampler for 3D."""

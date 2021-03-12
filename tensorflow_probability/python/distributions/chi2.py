@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
@@ -144,6 +145,9 @@ class Chi2(distribution.Distribution):
 
   def _cdf(self, x):
     return tf.math.igamma(0.5 * self.df, 0.5 * x)
+
+  def _quantile(self, p):
+    return 2. * tfp_math.igammainv(0.5 * self.df, p)
 
   def _entropy(self):
     concentration = 0.5 * self.df

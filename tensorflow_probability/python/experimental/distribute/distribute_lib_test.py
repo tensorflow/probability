@@ -386,5 +386,40 @@ class LogProbPartsTest(test_lib.DistributedTest):
     self.assertAllEqualNested(self.evaluate(out_grads),
                               self.evaluate(true_grad))
 
+  def test_correct_gradient_for_local_integer_variable(self):
+
+    @tf.function(autograph=False)
+    def run(x, data):
+
+      def log_prob_parts(value):
+        x, data = value
+        return [
+            tfd.Normal(0., 1.).log_prob(x),
+            tfd.Bernoulli(logits=x).log_prob(data)
+        ]
+
+      def log_prob(x):
+        sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
+            log_prob_parts, [True, True], axis_name=self.axis_name)
+        parts = sharded_log_prob_parts([x, data])
+        return tf.add_n(parts)
+
+      return tfp.math.value_and_gradient(log_prob, x)[1]
+
+    x = tf.range(4.)
+    sharded_x = self.shard_values(x)
+    data = tf.ones(4, tf.int32)
+    sharded_data = self.shard_values(data)
+    out_grads = self.per_replica_to_tensor(
+        self.strategy_run(run, (sharded_x, sharded_data)))
+
+    def true_log_prob(x):
+      return (tf.reduce_sum(tfd.Normal(0., 1.).log_prob(x)) +
+              tf.reduce_sum(tfd.Bernoulli(logits=x).log_prob(data)))
+
+    true_grad = self.evaluate(tfp.math.value_and_gradient(true_log_prob, x)[1])
+
+    self.assertAllEqualNested(self.evaluate(out_grads), true_grad)
+
 if __name__ == '__main__':
   tf.test.main()

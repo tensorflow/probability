@@ -132,6 +132,24 @@ class ExpGammaTest(test_util.TestCase):
     self.assertAllClose(cdf, expected_cdf)
     self.assertAllClose(d_lr.cdf(x), expected_cdf)
 
+  def testQuantile(self):
+    batch_size = 6
+    concentration = np.linspace(
+        1., 12., batch_size).astype(np.float32)[..., np.newaxis]
+    rate = np.linspace(3., 18., batch_size).astype(np.float32)[..., np.newaxis]
+    x = np.linspace(0., 1., 13).astype(np.float32)
+    d = tfd.ExpGamma(
+        concentration=concentration, rate=rate, validate_args=True)
+    d_lr = tfd.ExpGamma(
+        concentration=concentration, log_rate=tf.math.log(rate),
+        validate_args=True)
+    quantile = d.quantile(x)
+    self.assertEqual(quantile.shape, (6, 13))
+    expected_quantile = tfb.Log()(tfd.Gamma(concentration=concentration,
+                                            rate=rate)).quantile(x)
+    self.assertAllClose(quantile, expected_quantile)
+    self.assertAllClose(d_lr.quantile(x), expected_quantile)
+
   def testMean(self):
     concentration_v = np.array([1.0, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])

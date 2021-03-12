@@ -21,6 +21,8 @@ from __future__ import print_function
 
 # Distributions:
 from tensorflow_probability.python.distributions.autoregressive import Autoregressive
+from tensorflow_probability.python.distributions.batch_broadcast import BatchBroadcast
+from tensorflow_probability.python.distributions.batch_concat import BatchConcat
 from tensorflow_probability.python.distributions.batch_reshape import BatchReshape
 from tensorflow_probability.python.distributions.bates import Bates
 from tensorflow_probability.python.distributions.bernoulli import Bernoulli
@@ -81,6 +83,7 @@ from tensorflow_probability.python.distributions.logistic import Logistic
 from tensorflow_probability.python.distributions.loglogistic import LogLogistic
 from tensorflow_probability.python.distributions.lognormal import LogNormal
 from tensorflow_probability.python.distributions.logitnormal import LogitNormal
+from tensorflow_probability.python.distributions.masked import Masked
 from tensorflow_probability.python.distributions.matrix_normal_linear_operator import MatrixNormalLinearOperator
 from tensorflow_probability.python.distributions.matrix_t_linear_operator import MatrixTLinearOperator
 from tensorflow_probability.python.distributions.mixture import Mixture
@@ -95,6 +98,7 @@ from tensorflow_probability.python.distributions.mvn_linear_operator import Mult
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
 from tensorflow_probability.python.distributions.negative_binomial import NegativeBinomial
 from tensorflow_probability.python.distributions.normal import Normal
+from tensorflow_probability.python.distributions.normal_inverse_gaussian import NormalInverseGaussian
 from tensorflow_probability.python.distributions.onehot_categorical import OneHotCategorical
 from tensorflow_probability.python.distributions.ordered_logistic import OrderedLogistic
 from tensorflow_probability.python.distributions.pareto import Pareto
@@ -110,6 +114,7 @@ from tensorflow_probability.python.distributions.relaxed_bernoulli import Relaxe
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import ExpRelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.relaxed_onehot_categorical import RelaxedOneHotCategorical
 from tensorflow_probability.python.distributions.sample import Sample
+from tensorflow_probability.python.distributions.sigmoid_beta import SigmoidBeta
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.skellam import Skellam
 from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
@@ -162,6 +167,7 @@ __all__ = [
     'ReparameterizationType',
     'Distribution',
     'Autoregressive',
+    'BatchBroadcast',
     'BatchReshape',
     'Bates',
     'Bernoulli',
@@ -222,11 +228,13 @@ __all__ = [
     'Moyal',
     'NegativeBinomial',
     'Normal',
+    'NormalInverseGaussian',
     'PixelCNN',
     'Poisson',
     'PoissonLogNormalQuadratureCompound',
     'ProbitBernoulli',
     'Sample',
+    'SigmoidBeta',
     'SinhArcsinh',
     'Skellam',
     'SphericalUniform',
@@ -237,6 +245,7 @@ __all__ = [
     'TruncatedCauchy',
     'TruncatedNormal',
     'Uniform',
+    'Masked',
     'MatrixNormalLinearOperator',
     'MatrixTLinearOperator',
     'MultivariateNormalDiag',

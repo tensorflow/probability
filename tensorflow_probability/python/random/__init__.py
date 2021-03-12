@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.internal import all_util
+from tensorflow_probability.python.internal.samplers import sanitize_seed
 from tensorflow_probability.python.internal.samplers import split_seed
 from tensorflow_probability.python.random.random_ops import rademacher
 from tensorflow_probability.python.random.random_ops import rayleigh
@@ -28,6 +29,7 @@ _allowed_symbols = [
     'rademacher',
     'rayleigh',
     'spherical_uniform',
+    'sanitize_seed',
     'split_seed',
 ]
 

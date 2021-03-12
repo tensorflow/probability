@@ -21,6 +21,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -91,8 +92,9 @@ class TrainableLinearOperators(test_util.TestCase):
       ((2, 4), (3,),
        ((tf.linalg.LinearOperatorLowerTriangular,),
         (tf.linalg.LinearOperatorZeros,
-         lambda s, dtype: tf.linalg.LinearOperatorDiag(  # pylint: disable=g-long-lambda
-             tf.Variable(tf.random.uniform(s, maxval=2., dtype=dtype)),
+         lambda s, dtype, seed: tf.linalg.LinearOperatorDiag(  # pylint: disable=g-long-lambda
+             tf.Variable(
+                 samplers.uniform(s, maxval=2., dtype=dtype, seed=seed)),
              is_non_singular=True))),
        tf.float64,
        False),
@@ -124,7 +126,7 @@ class TrainableLinearOperators(test_util.TestCase):
        True),
       ((3, 2), (2, 2),
        (tf.linalg.LinearOperatorDiag,
-        lambda s, dtype: tf.linalg.LinearOperatorScaledIdentity(  # pylint: disable=g-long-lambda
+        lambda s, dtype, seed: tf.linalg.LinearOperatorScaledIdentity(  # pylint: disable=g-long-lambda
             num_rows=s[-1], multiplier=tf.Variable(1., dtype=dtype))),
        tf.float32,
        False)
@@ -144,6 +146,25 @@ class TrainableLinearOperators(test_util.TestCase):
 
     # Test that bijector builds.
     tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
+
+  def test_deterministic_initialization_from_seed(self):
+    op = tfp.experimental.vi.util.build_trainable_linear_operator_block(
+        operators=(tf.linalg.LinearOperatorDiag,
+                   tf.linalg.LinearOperatorLowerTriangular),
+        block_dims=(2, 3),
+        batch_shape=[3],
+        dtype=tf.float32,
+        seed=test_util.test_seed(sampler_type='stateless'))
+    self.evaluate([v.initializer for v in op.trainable_variables])
+    op2 = tfp.experimental.vi.util.build_trainable_linear_operator_block(
+        operators=(tf.linalg.LinearOperatorDiag,
+                   tf.linalg.LinearOperatorLowerTriangular),
+        block_dims=(2, 3),
+        batch_shape=[3],
+        dtype=tf.float32,
+        seed=test_util.test_seed(sampler_type='stateless'))
+    self.evaluate([v.initializer for v in op2.trainable_variables])
+    self.assertAllEqual(op.to_dense(), op2.to_dense())
 
   def test_undefined_block_dims_raises(self):
     op = (

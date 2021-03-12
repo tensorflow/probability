@@ -538,7 +538,7 @@ def segment_ids(draw, n):
   while rsum < n:
     lengths.append(draw(hps.integers(1, n-rsum)))
     rsum += lengths[-1]
-  return np.repeat(np.arange(len(lengths)), lengths)
+  return np.repeat(np.arange(len(lengths)), np.array(lengths))
 
 
 @hps.composite
@@ -661,6 +661,13 @@ def qr_params(draw):
 def _qr_post_process(qr):
   """Values of q corresponding to zero values of r may have arbitrary values."""
   return np.matmul(qr.q, qr.r), np.float32(qr.q.shape), np.float32(qr.r.shape)
+
+
+def _eig_post_process(vals):
+  if not isinstance(vals, tuple):
+    return np.sort(vals, axis=-1)
+  e, v = vals
+  return np.einsum('...ab,...b,...bc->...ac', v, e, v.swapaxes(-1, -2))
 
 
 # __Currently untested:__
@@ -798,6 +805,13 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
     TestCase('linalg.matmul', [matmul_compatible_pairs()]),
+    TestCase('linalg.eig', [pd_matrices()], post_processor=_eig_post_process,
+             xla_disabled=True),
+    TestCase('linalg.eigh', [pd_matrices()], post_processor=_eig_post_process),
+    TestCase('linalg.eigvals', [pd_matrices()],
+             post_processor=_eig_post_process, xla_disabled=True),
+    TestCase('linalg.eigvalsh', [pd_matrices()],
+             post_processor=_eig_post_process),
     TestCase('linalg.det', [nonsingular_matrices()],
              xla_disabled=True),  # TODO(b/162937268): missing kernel.
 

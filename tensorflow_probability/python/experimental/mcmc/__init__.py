@@ -65,6 +65,8 @@ from tensorflow_probability.python.experimental.mcmc.weighted_resampling import 
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_independent
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_stratified
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_systematic
+from tensorflow_probability.python.experimental.mcmc.windowed_sampling import windowed_adaptive_hmc
+from tensorflow_probability.python.experimental.mcmc.windowed_sampling import windowed_adaptive_nuts
 from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductions
 from tensorflow_probability.python.experimental.mcmc.with_reductions import WithReductionsKernelResults
 
@@ -116,6 +118,8 @@ __all__ = [
     'sample_chain',
     'sample_chain_with_burnin',
     'sample_fold',
+    'windowed_adaptive_hmc',
+    'windowed_adaptive_nuts',
     'sample_sequential_monte_carlo',
     'SampleDiscardingKernel',
     'SequentialMonteCarlo',

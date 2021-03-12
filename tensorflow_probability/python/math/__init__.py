@@ -41,6 +41,7 @@ from tensorflow_probability.python.math.generic import smootherstep
 from tensorflow_probability.python.math.generic import soft_sorting_matrix
 from tensorflow_probability.python.math.generic import soft_threshold
 from tensorflow_probability.python.math.generic import softplus_inverse
+from tensorflow_probability.python.math.generic import sqrt1pm1
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.gram_schmidt import gram_schmidt
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
@@ -66,12 +67,19 @@ from tensorflow_probability.python.math.root_search import find_root_secant
 from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
+from tensorflow_probability.python.math.special import atan_difference
+from tensorflow_probability.python.math.special import dawsn
 from tensorflow_probability.python.math.special import erfcinv
+from tensorflow_probability.python.math.special import erfcx
+from tensorflow_probability.python.math.special import igammacinv
+from tensorflow_probability.python.math.special import igammainv
 from tensorflow_probability.python.math.special import lambertw
 from tensorflow_probability.python.math.special import lambertw_winitzki_approx
 from tensorflow_probability.python.math.special import lbeta
 from tensorflow_probability.python.math.special import log_gamma_correction
 from tensorflow_probability.python.math.special import log_gamma_difference
+from tensorflow_probability.python.math.special import logerfc
+from tensorflow_probability.python.math.special import logerfcx
 from tensorflow_probability.python.math.special import owens_t
 from tensorflow_probability.python.math.special import round_exponential_bump_function
 from tensorflow_probability.python.random import rademacher as random_rademacher
@@ -85,7 +93,7 @@ random_rayleigh = deprecation.deprecated(
     '2020-09-20', 'Use tfp.random.rayleigh')(random_rayleigh)
 
 _allowed_symbols = [
-    'round_exponential_bump_function',
+    'atan_difference',
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
     'bessel_iv_ratio',
@@ -96,9 +104,13 @@ _allowed_symbols = [
     'cholesky_update',
     'clip_by_value_preserve_gradient',
     'custom_gradient',
+    'dawsn',
     'dense_to_sparse',
     'diag_jacobian',
     'erfcinv',
+    'erfcx',
+    'igammacinv',
+    'igammainv',
     'find_root_chandrupatla',
     'find_root_secant',
     'fill_triangular',
@@ -115,6 +127,8 @@ _allowed_symbols = [
     'log_combinations',
     'log_cosh',
     'log_cumsum_exp',
+    'logerfc',
+    'logerfcx',
     'log_gamma_correction',
     'log_gamma_difference',
     'log_sub_exp',
@@ -133,6 +147,7 @@ _allowed_symbols = [
     'reduce_log_harmonic_mean_exp',
     'reduce_logmeanexp',
     'reduce_weighted_logsumexp',
+    'round_exponential_bump_function',
     'scan_associative',
     'secant_root',
     'smootherstep',
@@ -141,6 +156,7 @@ _allowed_symbols = [
     'softplus_inverse',
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
+    'sqrt1pm1',
     'value_and_gradient',
 ]
 

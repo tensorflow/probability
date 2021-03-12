@@ -42,6 +42,9 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/bijectors:fill_scale_tril",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
     ],
 )
 

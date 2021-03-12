@@ -197,11 +197,18 @@ class GeneralizedExtremeValueCDF(bijector.Bijector):
     concentration = (
         tf.convert_to_tensor(self.concentration) if concentration is None else
         concentration)
+    # We intentionally compute the boundary with (1.0 / concentration) * scale
+    # instead of just scale / concentration.
+    # Why?  The sampler returns loc + (foo / concentration) * scale,
+    # and at high-ish values of concentration, foo has a decent
+    # probability of being numerically exactly -1.  We therefore mimic
+    # the pattern of round-off that occurs in the sampler to make sure
+    # that samples emitted from this distribution will pass its own
+    # validations.  This is sometimes necessary: in TF's float32,
+    #   0.69314826 / 37.50019 < (1.0 / 37.50019) * 0.69314826
+    boundary = loc - (1.0 / concentration) * scale
     # The support of this bijector depends on the sign of concentration.
-    is_in_bounds = tf.where(
-        concentration > 0.,
-        x >= loc - scale / concentration,
-        x <= loc - scale / concentration)
+    is_in_bounds = tf.where(concentration > 0., x >= boundary, x <= boundary)
     # For concentration 0, the domain is the whole line.
     is_in_bounds = is_in_bounds | tf.math.equal(concentration, 0.)
 

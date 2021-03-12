@@ -22,9 +22,10 @@ import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
 from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc import hmc
@@ -45,6 +46,9 @@ class UncalibratedPreconditionedHamiltonianMonteCarloKernelResults(
         ('momentum_distribution',))):
   """Internal state and diagnostics for Uncalibrated HMC."""
   __slots__ = ()
+
+
+DefaultStandardNormal = collections.namedtuple('DefaultStandardNormal', [])
 
 
 class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
@@ -328,7 +332,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
 
       if (not self._store_parameters_in_results or
           self.momentum_distribution is None):
-        momentum_distribution = []
+        momentum_distribution = DefaultStandardNormal()
       else:
         momentum_distribution = self.momentum_distribution
       result = UncalibratedPreconditionedHamiltonianMonteCarloKernelResults(
@@ -452,16 +456,14 @@ def _prepare_args(target_log_prob_fn,
       step_size, dtype=target_log_prob.dtype, name='step_size')
 
   # Default momentum distribution is None, but if `store_parameters_in_results`
-  # is true, then `momentum_distribution` defaults to an empty list.
-  # In any other case, `momentum_distribution` must be a single distribution,
-  # so we do not have to check that the list is actually empty.
-  if momentum_distribution is None or isinstance(momentum_distribution, list):
+  # is true, then `momentum_distribution` defaults to DefaultStandardNormal().
+  if (momentum_distribution is None or
+      isinstance(momentum_distribution, DefaultStandardNormal)):
     batch_rank = ps.rank(target_log_prob)
     def _batched_isotropic_normal_like(state_part):
-      event_ndims = ps.rank(state_part) - batch_rank
-      return independent.Independent(
-          normal.Normal(ps.zeros_like(state_part), 1.),
-          reinterpreted_batch_ndims=event_ndims)
+      return sample.Sample(
+          normal.Normal(ps.zeros([], dtype=state_part.dtype), 1.),
+          ps.shape(state_part)[batch_rank:])
 
     momentum_distribution = jds.JointDistributionSequential(
         [_batched_isotropic_normal_like(state_part)
@@ -473,6 +475,16 @@ def _prepare_args(target_log_prob_fn,
   if not mcmc_util.is_list_like(momentum_distribution.dtype):
     momentum_distribution = jds.JointDistributionSequential(
         [momentum_distribution])
+
+  # If all underlying distributions are independent, we can offer some help.
+  # This code will also trigger for the output of the two blocks above.
+  if (isinstance(momentum_distribution, jds.JointDistributionSequential) and
+      not any(callable(dist_fn) for dist_fn in momentum_distribution.model)):
+    batch_shape = ps.shape(target_log_prob)
+    momentum_distribution = momentum_distribution.copy(model=[
+        batch_broadcast.BatchBroadcast(md, to_shape=batch_shape)
+        for md in momentum_distribution.model
+    ])
 
   if len(step_sizes) == 1:
     step_sizes *= len(state_parts)

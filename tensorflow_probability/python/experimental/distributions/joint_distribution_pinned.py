@@ -173,8 +173,8 @@ class JointDistributionPinned(object):
 
   ```python
   jd = tfd.JointDistributionNamed(dict(
-    loc = yield tfd.Normal(0., 1.),
-    scale = yield tfd.Gamma(1., 1.),
+    loc = tfd.Normal(0., 1.),
+    scale = tfd.Gamma(1., 1.),
     obs = lambda loc, scale: tfd.Normal(loc, scale),
   ))
   ```
@@ -220,6 +220,7 @@ class JointDistributionPinned(object):
   tfde = tfp.experimental.distributions
 
   n = 75
+  dim = 3
   joint = tfd.JointDistributionNamed(dict(
     upper = tfd.Uniform(.4, 1.5),
     concentration = tfd.Gamma(1., .5),
@@ -251,7 +252,8 @@ class JointDistributionPinned(object):
   def one_step():
     with tf.GradientTape() as tape:
       lp = pinned.unnormalized_log_prob(bij.forward(vars))
-    opt.apply_gradients(tape.gradient(lp, vars))
+    gradients = tape.gradient(lp, vars)
+    opt.apply_gradients(zip(gradients.values(), vars.values()))
 
   for _ in range(100):
     one_step()

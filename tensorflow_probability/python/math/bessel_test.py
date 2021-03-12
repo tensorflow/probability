@@ -81,13 +81,23 @@ class BesselIvRatioTest(test_util.TestCase):
     # the computation become numerically unstable.
     # Anecdotally (when comparing to mpmath) the computation is more often
     # 'right' compared to the naive ratio.
-    self.VerifyBesselIvRatio(v, z, rtol=3e-4)
+
+    bessel_iv_ratio, v, z = self.evaluate([
+        tfp.math.bessel_iv_ratio(v, z), v, z])
+    scipy_ratio = scipy_special.ive(v, z) / scipy_special.ive(v - 1., z)
+
+    safe_scipy_values = np.where(
+        ~np.isnan(scipy_ratio) & (scipy_ratio != 0.))
+
+    self.assertAllClose(
+        bessel_iv_ratio[safe_scipy_values],
+        scipy_ratio[safe_scipy_values], rtol=3e-4, atol=1e-6)
 
   def testBesselIvRatioVAndZMedium(self):
     seed_stream = test_util.test_seed_stream()
     z = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
     v = tf.random.uniform([int(1e5)], 1., 10., seed=seed_stream())
-    self.VerifyBesselIvRatio(v, z, rtol=1e-6)
+    self.VerifyBesselIvRatio(v, z, rtol=7e-6)
 
   def testBesselIvRatioVAndZLarge(self):
     seed_stream = test_util.test_seed_stream()
@@ -112,7 +122,7 @@ class BesselIvRatioTest(test_util.TestCase):
         scipy_ratio[safe_scipy_values],
         # We need to set a high rtol as the scipy computation is numerically
         # unstable.
-        rtol=1e-5)
+        rtol=1e-6)
 
   def testBesselIvRatioVLessThanZ(self):
     seed_stream = test_util.test_seed_stream()
@@ -129,8 +139,6 @@ class BesselIvRatioTest(test_util.TestCase):
     self.VerifyBesselIvRatio(v, z, rtol=1e-6)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   def testBesselIvRatioGradient(self):
     v = tf.constant([0.5, 1., 10., 20.])[..., tf.newaxis]
     x = tf.constant([0.1, 0.5, 0.9, 1., 12., 14., 22.])
@@ -142,11 +150,11 @@ class BesselIvRatioTest(test_util.TestCase):
 
 class BesselIveTest(test_util.TestCase):
 
-  def VerifyBesselIve(self, v, z, rtol):
+  def VerifyBesselIve(self, v, z, rtol, atol=1e-7):
     bessel_ive, v, z = self.evaluate([
         tfp.math.bessel_ive(v, z), v, z])
     scipy_ive = scipy_special.ive(v, z)
-    self.assertAllClose(bessel_ive, scipy_ive, rtol=rtol)
+    self.assertAllClose(bessel_ive, scipy_ive, rtol=rtol, atol=atol)
 
   @parameterized.named_parameters(
       ("float32", np.float32),
@@ -203,7 +211,7 @@ class BesselIveTest(test_util.TestCase):
     self.assertAllClose(bessel_ive, scipy_ive, rtol=rtol)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 1e-6),
+      ("float32", np.float32, 1.5e-6),
       ("float64", np.float64, 1e-6),
   )
   def testBesselIveVAndZSmall(self, dtype, rtol):
@@ -213,8 +221,19 @@ class BesselIveTest(test_util.TestCase):
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 1e-6),
+      ("float32", np.float32, 3e-6),
       ("float64", np.float64, 1e-6),
+  )
+  def testBesselIveZTiny(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    z = tf.random.uniform(
+        [int(1e5)], 1e-13, 1e-6, seed=seed_stream(), dtype=dtype)
+    v = tf.random.uniform([int(1e5)], 0., 10., seed=seed_stream(), dtype=dtype)
+    self.VerifyBesselIve(v, z, rtol=rtol, atol=1e-7)
+
+  @parameterized.named_parameters(
+      ("float32", np.float32, 7e-6),
+      ("float64", np.float64, 6e-6),
   )
   def testBesselIveVAndZMedium(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
@@ -245,8 +264,8 @@ class BesselIveTest(test_util.TestCase):
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 1e-6),
-      ("float64", np.float64, 1e-6),
+      ("float32", np.float32, 7e-6),
+      ("float64", np.float64, 7e-6),
   )
   def testBesselIveVLessThanZ(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
@@ -270,7 +289,7 @@ class BesselIveTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       ("float32", np.float32, 1e-4),
-      ("float64", np.float64, 1e-6),
+      ("float64", np.float64, 7e-6),
   )
   def testBesselIveVNegative(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
@@ -302,8 +321,6 @@ class BesselIveTest(test_util.TestCase):
     self.VerifyBesselIve(v, z, rtol=rtol)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   @parameterized.named_parameters(
       ("float32", np.float32),
       ("float64", np.float64))
@@ -316,8 +333,6 @@ class BesselIveTest(test_util.TestCase):
     self.assertLess(err, 2e-4)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   @parameterized.named_parameters(
       ("float32", np.float32),
       ("float64", np.float64))
@@ -329,9 +344,33 @@ class BesselIveTest(test_util.TestCase):
         functools.partial(tfp_math.bessel_ive, v), [z])
     self.assertLess(err, 2e-4)
 
+  @parameterized.named_parameters(
+      ("float32", np.float32, 1e-6),
+      ("float64", np.float64, 1e-6),
+  )
+  def testLogBesselIveCorrect(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    v = tf.random.uniform(
+        [int(1e5)], minval=0.1, maxval=0.5, seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform(
+        [int(1e5)], minval=1., maxval=10., seed=seed_stream(), dtype=dtype)
+    _, _, log_bessel_ive_expected_, log_bessel_ive_actual_ = self.evaluate([
+        v,
+        z,
+        tf.math.log(tfp.math.bessel_ive(v, z)),
+        tfp.math.log_bessel_ive(v, z)])
+    self.assertAllClose(
+        log_bessel_ive_expected_, log_bessel_ive_actual_, rtol=rtol)
+
+  def testLogBesselIveTestNonInf(self):
+    # Test that log_bessel_ive(v, z) has more resolution than simply computing
+    # log(bessel_ive(v, z)). The inputs below will return -inf in naive float64
+    # computation.
+    v = np.array([10., 12., 30., 50.], np.float32)
+    z = np.logspace(-10., -1., 20).reshape((20, 1)).astype(np.float32)
+    self.assertAllFinite(self.evaluate(tfp.math.log_bessel_ive(v, z)))
+
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   @parameterized.named_parameters(
       ("float32", np.float32, 1e-3),
       ("float64", np.float64, 1e-4))
@@ -407,8 +446,8 @@ class BesselKveTest(test_util.TestCase):
     self.assertAllClose(bessel_kve, scipy_kve, rtol=rtol)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 3e-5),
-      ("float64", np.float64, 3e-5),
+      ("float32", np.float32, 1.5e-6),
+      ("float64", np.float64, 1e-6),
   )
   def testBesselKveVAndZSmall(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
@@ -417,8 +456,8 @@ class BesselKveTest(test_util.TestCase):
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 1.5e-5),
-      ("float64", np.float64, 1.2e-5),
+      ("float32", np.float32, 4e-6),
+      ("float64", np.float64, 1e-6),
   )
   def testBesselKveVAndZMedium(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
@@ -427,7 +466,7 @@ class BesselKveTest(test_util.TestCase):
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 2e-6),
+      ("float32", np.float32, 3e-6),
       ("float64", np.float64, 1e-6),
   )
   def testBesselKveVAndZLarge(self, dtype, rtol):
@@ -437,8 +476,8 @@ class BesselKveTest(test_util.TestCase):
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 1.5e-5),
-      ("float64", np.float64, 1.5e-5),
+      ("float32", np.float32, 7e-6),
+      ("float64", np.float64, 7e-6),
   )
   def testBesselKveVLessThanZ(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
@@ -449,8 +488,8 @@ class BesselKveTest(test_util.TestCase):
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 3e-6),
-      ("float64", np.float64, 3e-6),
+      ("float32", np.float32, 2e-6),
+      ("float64", np.float64, 1e-6),
   )
   def testBesselKveVGreaterThanZ(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
@@ -461,8 +500,8 @@ class BesselKveTest(test_util.TestCase):
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 1.5e-5),
-      ("float64", np.float64, 1.5e-5),
+      ("float32", np.float32, 4e-6),
+      ("float64", np.float64, 1e-6),
   )
   def testBesselKveVNegative(self, dtype, rtol):
     seed_stream = test_util.test_seed_stream()
@@ -484,8 +523,6 @@ class BesselKveTest(test_util.TestCase):
     self.VerifyBesselKve(v, z, rtol=rtol)
 
   @test_util.numpy_disable_gradient_test
-  @test_util.jax_disable_test_missing_functionality(
-      "Relies on Tensorflow gradient_checker")
   @parameterized.named_parameters(
       ("float32", np.float32),
       ("float64", np.float64),
@@ -496,7 +533,7 @@ class BesselKveTest(test_util.TestCase):
 
     err = self.compute_max_gradient_error(
         functools.partial(tfp_math.bessel_kve, v), [z])
-    self.assertLess(err, 2e-4)
+    self.assertLess(err, 3e-4)
 
 
 if __name__ == "__main__":

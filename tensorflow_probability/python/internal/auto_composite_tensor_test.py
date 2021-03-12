@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
 
@@ -51,20 +52,24 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
       def __init__(self, x, y, name=None):
         with tf.name_scope(name or 'Adder') as name:
-          self._x = tf.convert_to_tensor(x)
-          self._y = tf.convert_to_tensor(y)
+          self._x = tensor_util.convert_nonref_to_tensor(x)
+          self._y = tensor_util.convert_nonref_to_tensor(y)
           self._name = name
 
       def xpy(self):
         return self._x + self._y
 
+    x = 1.
+    y = tf.Variable(1.)
+    self.evaluate(y.initializer)
+
     def body(obj):
-      return Adder(obj.xpy(), 1.),
+      return Adder(obj.xpy(), y),
 
     result, = tf.while_loop(
         cond=lambda _: True,
         body=body,
-        loop_vars=(Adder(1., 1.),),
+        loop_vars=(Adder(x, y),),
         maximum_iterations=3)
     self.assertAllClose(5., result.xpy())
 

@@ -30,6 +30,9 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 
+JAX_MODE = False
+
+
 @test_util.test_all_tf_execution_regimes
 class _HiddenMarkovModelTest(
     test_util.VectorDistributionTestHelpers,
@@ -2008,6 +2011,38 @@ class _HiddenMarkovModelAssertionTest(
           time_varying_observation_distribution=True,
           validate_args=True)
       self.evaluate(model.mean())
+
+
+class HiddenMarkovModelJaxTest(test_util.TestCase):
+
+  def test_jit(self):
+    if not JAX_MODE:
+      self.skipTest('JAX-only test')
+
+    import jax  # pylint: disable=g-import-not-at-top
+
+    @jax.jit
+    def test(data):
+      p_c = tf.constant([0.1, 0.2])
+      p_e = tf.constant([0.2, 0.3])
+      one = tf.ones_like(p_c)
+      zero = tf.zeros_like(p_c)
+
+      dist = tfd.HiddenMarkovModel(
+          initial_distribution=tfd.Bernoulli(probs=0.),
+          transition_distribution=tfd.Bernoulli(probs=tf.stack([p_c, one], -1)),
+          observation_distribution=tfd.Bernoulli(
+              probs=tf.stack([p_e, zero], -1)),
+          num_steps=data.shape[-1])
+      lp = dist.log_prob(data)
+      pom = dist.posterior_mode(data)
+      s = dist.sample(seed=jax.random.PRNGKey(0))
+      prm = dist.prior_marginals()
+      pom2 = dist.posterior_marginals(data)
+      return lp, pom, s, prm, pom2
+
+    data = tf.ones(5)
+    test(data)
 
 
 if __name__ == '__main__':

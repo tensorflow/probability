@@ -521,6 +521,18 @@ class Log1mexpTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
+class Sqrt1pm1Test(test_util.TestCase):
+
+  def testSqrt1pm1(self):
+    self.assertAllClose(-1., self.evaluate(tfp.math.sqrt1pm1(-1.)))
+    self.assertAllClose(np.inf, self.evaluate(tfp.math.sqrt1pm1(np.inf)))
+
+    x = np.linspace(0.1, 20, 100)
+    self.assertAllClose(
+        np.sqrt(x + 1.) - 1., self.evaluate(tfp.math.sqrt1pm1(x)))
+
+
+@test_util.test_all_tf_execution_regimes
 class LogCoshTest(test_util.TestCase):
 
   def testLogCoshNonNegative(self):

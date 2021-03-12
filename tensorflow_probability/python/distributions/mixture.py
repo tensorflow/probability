@@ -218,6 +218,14 @@ class Mixture(distribution.Distribution):
   def num_components(self):
     return self._num_components
 
+  @property
+  def experimental_is_sharded(self):
+    sharded = self.cat.experimental_is_sharded
+    if sharded != self.components.experimental_is_sharded:
+      raise ValueError(
+          '`Mixture.cat` sharding must match `Mixture.components`.')
+    return sharded
+
   def _batch_shape_tensor(self):
     return self._cat.batch_shape_tensor()
 

@@ -55,13 +55,13 @@ class BetaQuotient(distribution.Distribution):
   ```none
   X ~ Beta(a0, b0)
   Y ~ Beta(a1, b1)
-  X / Y ~ BetaQuotient(a0, a1, b0, b1)
+  X / Y ~ BetaQuotient(a0, b0, a1, b1)
   ```
 
   The distribution is defined over the positive reals, by four parameters
   `concentration0_numerator`, `concentration1_numerator`,
   `concentration0_denominator` and `concentration1_denominator`
-  (aka `alpha` and `beta` of the numerator and denominator Beta distribution
+  (aka `beta` and `alpha` of the numerator and denominator Beta distribution
   respectively).
 
   Distribution parameters are automatically broadcast in all functions; see

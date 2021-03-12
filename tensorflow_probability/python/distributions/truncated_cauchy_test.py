@@ -126,16 +126,49 @@ class TruncatedCauchyTest(test_util.TestCase):
       (-2., 0.2, -1.5, -0.5))
   def testQuantile(self, loc, scale, low, high):
     tc = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=True)
-    c = tfd.Cauchy(loc, scale)
+    c = tfd.Cauchy(np.float64(loc), scale)
 
-    p = tf.range(0.025, 1., delta=0.025)
-    self.assertAllClose(p, tc.cdf(tc.quantile(p)))
+    p = np.arange(0.025, 1., step=0.025)
+    self.assertAllClose(p, tc.cdf(tc.quantile(p.astype(np.float32))))
 
     self.assertAllClose(
         c.quantile(p * (c.cdf(high) - c.cdf(low)) + c.cdf(low)),
-        tc.quantile(p))
+        tc.quantile(p.astype(np.float32)))
 
     self.assertAllClose([low, high], tc.quantile([0., 1.]))
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testSampleMean(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    loc = tf.random.normal([20], dtype=dtype, seed=seed_stream())
+    scale = tf.random.uniform(
+        [20], minval=0.5, maxval=2., dtype=dtype, seed=seed_stream())
+    low = tf.random.uniform(
+        [20], minval=-50., maxval=50., dtype=dtype, seed=seed_stream())
+    high = tf.random.uniform(
+        [20], minval=-50., maxval=50., dtype=dtype, seed=seed_stream())
+    low, high = tf.math.minimum(low, high), tf.math.maximum(low, high)
+    tc = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=True)
+    samples_, mean_ = self.evaluate([
+        tc.sample(int(1e6), seed=seed_stream()), tc.mean()])
+    self.assertAllClose(mean_, np.mean(samples_, axis=0), rtol=0.08)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testSampleVariance(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    loc = tf.random.normal([20], dtype=dtype, seed=seed_stream())
+    scale = tf.random.uniform(
+        [20], minval=0.5, maxval=2., dtype=dtype, seed=seed_stream())
+    low = tf.random.uniform(
+        [20], minval=-50., maxval=50., dtype=dtype, seed=seed_stream())
+    high = tf.random.uniform(
+        [20], minval=-50., maxval=50., dtype=dtype, seed=seed_stream())
+    low, high = tf.math.minimum(low, high), tf.math.maximum(low, high)
+    tc = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=True)
+    samples_, variance_ = self.evaluate([
+        tc.sample(int(1e6), seed=seed_stream()), tc.variance()])
+    self.assertAllClose(
+        variance_, np.var(samples_, axis=0), rtol=0.1, atol=0.1)
 
   def testNegativeScaleFails(self):
     with self.assertRaisesOpError('`scale` must be positive'):

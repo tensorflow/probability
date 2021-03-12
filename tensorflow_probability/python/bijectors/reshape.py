@@ -213,6 +213,7 @@ class Reshape(bijector.Bijector):
     output_shape, output_tensorshape = _replace_event_shape_in_shape_tensor(
         ps.shape(x), self._event_shape_in, self._event_shape_out,
         self.validate_args)
+
     y = tf.reshape(x, output_shape)
     tensorshape_util.set_shape(y, output_tensorshape)
     return y
@@ -291,10 +292,10 @@ def _replace_event_shape_in_shape_tensor(
     return output_shape, output_tensorshape
 
   event_shape_in_ndims = (
-      tf.size(event_shape_in)
+      ps.size(event_shape_in)
       if tensorshape_util.num_elements(event_shape_in.shape) is None else
       tensorshape_util.num_elements(event_shape_in.shape))
-  input_non_event_shape, input_event_shape = tf.split(
+  input_non_event_shape, input_event_shape = ps.split(
       input_shape, num_or_size_splits=[-1, event_shape_in_ndims])
 
   additional_assertions = []
@@ -318,7 +319,7 @@ def _replace_event_shape_in_shape_tensor(
     # already makes this assertion.
 
   with tf.control_dependencies(additional_assertions):
-    output_shape = tf.concat([input_non_event_shape, event_shape_out], axis=0,
+    output_shape = ps.concat([input_non_event_shape, event_shape_out], axis=0,
                              name='output_shape')
 
   return output_shape, output_tensorshape
@@ -389,7 +390,6 @@ def _replace_event_shape_in_tensorshape(
   else:
     output_tensorshape = tensorshape_util.concatenate(
         input_non_event_tensorshape, event_tensorshape_out)
-
   return output_tensorshape, is_validated
 
 

@@ -237,6 +237,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     return self._bijector
 
   @property
+  def experimental_is_sharded(self):
+    raise NotImplementedError  # TODO(b/175084455): Handle bijector sharding.
+
+  @property
   def _composite_tensor_nonshape_params(self):
     if type(self).__init__ is not TransformedDistribution.__init__:
       # Handles subclasses of TransformedDistribution
@@ -574,19 +578,20 @@ def _kl_transformed_transformed(a, b, name=None):
 
 
 @log_prob_ratio.RegisterLogProbRatio(TransformedDistribution)
-def _transformed_log_prob_ratio(p, x, q, y):
+def _transformed_log_prob_ratio(p, x, q, y, name=None):
   """Computes p.log_prob(x) - q.log_prob(y) for p and q both TDs."""
-  x_ = p.bijector.inverse(x)
-  y_ = q.bijector.inverse(y)
+  with tf.name_scope(name or 'transformed_log_prob_ratio'):
+    x_ = p.bijector.inverse(x)
+    y_ = q.bijector.inverse(y)
 
-  base_log_prob_ratio = log_prob_ratio.log_prob_ratio(
-      p.distribution, x_, q.distribution, y_)
+    base_log_prob_ratio = log_prob_ratio.log_prob_ratio(
+        p.distribution, x_, q.distribution, y_)
 
-  event_ndims = tf.nest.map_structure(
-      ps.rank_from_shape,
-      p.event_shape_tensor,
-      tf.nest.map_structure(tensorshape_util.merge_with,
-                            p.event_shape, q.event_shape))
-  ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
-      p.bijector, x, q.bijector, y, event_ndims)
-  return base_log_prob_ratio + tf.cast(ildj_ratio, base_log_prob_ratio.dtype)
+    event_ndims = tf.nest.map_structure(
+        ps.rank_from_shape,
+        p.event_shape_tensor,
+        tf.nest.map_structure(tensorshape_util.merge_with,
+                              p.event_shape, q.event_shape))
+    ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
+        p.bijector, x, q.bijector, y, event_ndims)
+    return base_log_prob_ratio + tf.cast(ildj_ratio, base_log_prob_ratio.dtype)

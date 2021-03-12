@@ -168,6 +168,10 @@ class Independent(distribution_lib.Distribution):
   def reinterpreted_batch_ndims(self):
     return self._reinterpreted_batch_ndims
 
+  @property
+  def experimental_is_sharded(self):
+    return self.distribution.experimental_is_sharded
+
   def _get_reinterpreted_batch_ndims(self,
                                      distribution_batch_shape_tensor=None):
     if self._static_reinterpreted_batch_ndims is not None:
@@ -383,18 +387,19 @@ def _kl_independent(a, b, name='kl_independent'):
 
 
 @log_prob_ratio.RegisterLogProbRatio(Independent)
-def _independent_log_prob_ratio(p, x, q, y):
+def _independent_log_prob_ratio(p, x, q, y, name=None):
   """Sum-of-diffs log(p(x)/q(y)) for `Independent`s."""
-  checks = []
-  if p.validate_args or q.validate_args:
-    checks.append(tf.debugging.assert_equal(
-        p.reinterpreted_batch_ndims, q.reinterpreted_batch_ndims))
-  if p._experimental_use_kahan_sum or q._experimental_use_kahan_sum:  # pylint: disable=protected-access
-    sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
-  else:
-    sum_fn = tf.reduce_sum
-  with tf.control_dependencies(checks):
-    return sum_fn(
-        log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
-        axis=-1 - ps.range(p.reinterpreted_batch_ndims))
+  with tf.name_scope(name or 'independent_log_prob_ratio'):
+    checks = []
+    if p.validate_args or q.validate_args:
+      checks.append(tf.debugging.assert_equal(
+          p.reinterpreted_batch_ndims, q.reinterpreted_batch_ndims))
+    if p._experimental_use_kahan_sum or q._experimental_use_kahan_sum:  # pylint: disable=protected-access
+      sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
+    else:
+      sum_fn = tf.reduce_sum
+    with tf.control_dependencies(checks):
+      return sum_fn(
+          log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
+          axis=-1 - ps.range(p.reinterpreted_batch_ndims))
 

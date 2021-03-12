@@ -41,6 +41,8 @@ multi_substrate_py_library(
     ],
     deps = [
         ":autoregressive",
+        ":batch_broadcast",
+        ":batch_concat",
         ":batch_reshape",
         ":bates",
         ":bernoulli",
@@ -103,6 +105,7 @@ multi_substrate_py_library(
         ":logitnormal",
         ":loglogistic",
         ":lognormal",
+        ":masked",
         ":matrix_normal_linear_operator",
         ":matrix_t_linear_operator",
         ":mixture",
@@ -118,6 +121,7 @@ multi_substrate_py_library(
         ":negative_binomial",
         ":normal",
         ":normal_conjugate_posteriors",
+        ":normal_inverse_gaussian",
         ":onehot_categorical",
         ":ordered_logistic",
         ":pareto",
@@ -132,6 +136,7 @@ multi_substrate_py_library(
         ":relaxed_bernoulli",
         ":relaxed_onehot_categorical",
         ":sample",
+        ":sigmoid_beta",
         ":sinh_arcsinh",
         ":skellam",
         ":spherical_uniform",
@@ -167,6 +172,18 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "batch_broadcast",
+    srcs = ["batch_broadcast.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -1315,6 +1332,24 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "masked",
+    srcs = ["masked.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/util:seed_stream",
+    ],
+)
+
+multi_substrate_py_library(
     name = "mixture",
     srcs = ["mixture.py"],
     deps = [
@@ -1519,6 +1554,28 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:special_math",
         "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "normal_inverse_gaussian",
+    srcs = ["normal_inverse_gaussian.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 
@@ -1811,6 +1868,22 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "sigmoid_beta",
+    srcs = ["sigmoid_beta.py"],
+    deps = [
+        ":gamma",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -2207,6 +2280,20 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "batch_broadcast_test",
+    size = "medium",
+    srcs = ["batch_broadcast_test.py"],
+    deps = [
+        ":hypothesis_testlib",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "batch_reshape_test",
     size = "medium",
     srcs = ["batch_reshape_test.py"],
@@ -2230,6 +2317,7 @@ multi_substrate_py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -2512,6 +2600,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["dpp_test.py"],
     shard_count = 5,
+    tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -2865,6 +2954,7 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:test_util",
+        # wrapt dep,
     ],
 )
 
@@ -2888,6 +2978,7 @@ multi_substrate_py_test(
     srcs = ["joint_distribution_auto_batched_test.py"],
     numpy_tags = ["notap"],
     shard_count = 7,
+    tags = ["tf1-broken"],  # b/179305897
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -3004,7 +3095,7 @@ multi_substrate_py_test(
     jax_size = "large",
     numpy_tags = ["notap"],
     shard_count = 5,
-    tags = ["tf1-broken"],  # Test with `--define=tf-api-version=1` runs out of memory.
+    tags = ["tf1-broken"],  # Test with `--define=tf_api_version=1` runs out of memory.
     deps = [
         ":linear_gaussian_ssm",
         # numpy dep,
@@ -3102,6 +3193,19 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["matrix_t_linear_operator_test.py"],
     numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "masked_test",
+    srcs = ["masked_test.py"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3287,6 +3391,22 @@ multi_substrate_py_test(
     name = "normal_test",
     srcs = ["normal_test.py"],
     numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "normal_inverse_gaussian_test",
+    size = "medium",
+    srcs = ["normal_inverse_gaussian_test.py"],
+    jax_tags = ["notap"],
+    shard_count = 2,
+    tags = ["tf1-broken"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3715,6 +3835,27 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "sigmoid_beta_test",
+    size = "medium",
+    srcs = ["sigmoid_beta_test.py"],
+    jax_size = "large",
+    numpy_tags = ["notap"],
+    shard_count = 2,
+    deps = [
+        ":sigmoid_beta",
+        # numpy dep,
+        # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions/internal:statistical_testing",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_test(
     name = "spherical_uniform_test",
     srcs = ["spherical_uniform_test.py"],
     jax_size = "medium",
@@ -3961,5 +4102,36 @@ py_binary(
         # absl:app dep,
         # absl/logging dep,
         "//tensorflow_probability/python/distributions:hypothesis_testlib",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "batch_concat_test",
+    srcs = ["batch_concat_test.py"],
+    jax_size = "large",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":batch_concat",
+        ":distributions",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "batch_concat",
+    srcs = ["batch_concat.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )

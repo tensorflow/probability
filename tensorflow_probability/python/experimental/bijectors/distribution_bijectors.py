@@ -220,7 +220,6 @@ def make_distribution_bijector(distribution, name='make_distribution_bijector'):
       implements_quantile = True
     except NotImplementedError:
       pass
-
     if implements_cdf and implements_quantile:
       # This path will only trigger for scalar distributions, since multivariate
       # distributions have non-invertible CDF and so cannot define a `quantile`.

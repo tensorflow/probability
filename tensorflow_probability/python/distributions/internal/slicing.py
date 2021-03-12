@@ -138,7 +138,7 @@ def _slice_params_to_dict(dist, params_event_ndims, slices):
       warnings.warn('Unable to find property getter for parameter Tensor {} '
                     'on {}, falling back to Distribution.dtype {}'.format(
                         param_name, dist, dtype))
-    param = tf.convert_to_tensor(value=param, dtype=dtype)
+    param = tf.convert_to_tensor(param, dtype=dtype)
     dist_batch_shape = dist.batch_shape
     if not tensorshape_util.is_fully_defined(dist_batch_shape):
       dist_batch_shape = dist.batch_shape_tensor()

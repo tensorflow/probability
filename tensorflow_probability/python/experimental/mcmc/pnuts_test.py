@@ -804,9 +804,9 @@ class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
   @parameterized.named_parameters(
       dict(testcase_name='_' + str(scheme), precondition_scheme=scheme)
       for scheme in PRECONDITION_SCHEMES)
-  def test_correctness_with_200d_mvn_tril(self, precondition_scheme):
+  def test_correctness_with_20d_mvn_tril(self, precondition_scheme):
     # This is an almost complete check of the Gaussian case.
-    dims = 200
+    dims = 20
     scale_wishart = tfd.WishartLinearOperator(
         # Important that df is just slightly bigger than dims. This makes the
         # scale_wishart ill condtioned. The result is that tests fail if we do

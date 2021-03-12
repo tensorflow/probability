@@ -38,6 +38,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         ":calibration",
+        ":kendalls_tau",
         ":leave_one_out",
         ":moving_stats",
         ":quantiles",
@@ -215,10 +216,34 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "kendalls_tau",
+    srcs = ["kendalls_tau.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "kendalls_tau_test",
+    srcs = ["kendalls_tau_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        ":kendalls_tau",
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 exports_files(
     [
         "__init__.py",
         "calibration.py",
+        "kendalls_tau.py",
         "leave_one_out.py",
         "moving_stats.py",
         "quantiles.py",

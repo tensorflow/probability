@@ -425,7 +425,9 @@ def gev_constraint(loc, scale, conc):
   """Maps `s` to support based on `loc`, `scale` and `conc`."""
   def constrain(x):
     c = tf.convert_to_tensor(conc)
-    endpoint = loc - scale / c
+    # We intentionally compute the endpoint with (1.0 / concentration) * scale,
+    # for the same reason as in GeneralizedExtremeValueCDF._maybe_assert_valid_x
+    endpoint = loc - (1.0 / c) * scale
     return tf.where(c > 0.,
                     tf.math.softplus(x) + endpoint,
                     tf.where(

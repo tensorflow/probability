@@ -164,6 +164,61 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(dynamic_dist.log_prob(in_)),
                         static_dist.log_prob(in_))
 
+  @test_combinations.generate(
+      test_combinations.combine(
+          batch_shape=[(), (2,)],
+          dtype=[np.float32, np.float64],
+      ),
+  )
+  def test_mean_and_mode(self, batch_shape, dtype):
+    event_size = 3
+    cov = self._random_constant_spd_linop(
+        event_size, batch_shape=batch_shape, dtype=dtype)
+    precision_factor = cov.inverse().cholesky()
+
+    # Make sure to evaluate here, else you'll have a random loc vector!
+    loc = self.evaluate(
+        tf.random.normal(
+            batch_shape + (event_size,),
+            dtype=dtype,
+            seed=test_util.test_seed()))
+
+    mvn_precision = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+        loc=loc,
+        precision_factor=precision_factor)
+    self.assertAllClose(mvn_precision.mean(), loc)
+    self.assertAllClose(mvn_precision.mode(), loc)
+
+  @test_combinations.generate(
+      test_combinations.combine(
+          batch_shape=[(), (2,)],
+          use_precision=[True, False],
+          dtype=[np.float32, np.float64],
+      ),
+  )
+  def test_cov_var_stddev(self, batch_shape, use_precision, dtype):
+    event_size = 3
+    cov = self._random_constant_spd_linop(
+        event_size, batch_shape=batch_shape, dtype=dtype)
+    precision = cov.inverse()
+    precision_factor = precision.cholesky()
+
+    # Make sure to evaluate here, else you'll have a random loc vector!
+    loc = self.evaluate(
+        tf.random.normal(
+            batch_shape + (event_size,),
+            dtype=dtype,
+            seed=test_util.test_seed()))
+
+    mvn_precision = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+        loc=loc,
+        precision_factor=precision_factor,
+        precision=precision if use_precision else None)
+    self.assertAllClose(mvn_precision.covariance(), cov.to_dense(), atol=1e-4)
+    self.assertAllClose(mvn_precision.variance(), cov.diag_part(), atol=1e-4)
+    self.assertAllClose(mvn_precision.stddev(), tf.sqrt(cov.diag_part()),
+                        atol=1e-5)
+
 
 if __name__ == '__main__':
   tf.test.main()

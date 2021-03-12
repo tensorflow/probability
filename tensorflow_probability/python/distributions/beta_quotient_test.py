@@ -148,7 +148,9 @@ class _BetaQuotientTest(object):
         shape=[1, 1, 1, 7],
         minval=1., maxval=5., seed=test_util.test_seed(), dtype=self.dtype)
     beta_quotient = tfd.BetaQuotient(a, b, c, d, validate_args=True)
-    n = int(3e5)
+    # TODO(b/179283344): Increase this to 3e5 when CPU-only gamma sampler is
+    # fixed.
+    n = int(3e4)
     samples = beta_quotient.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (n, 2, 3, 5, 7))

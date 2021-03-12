@@ -48,7 +48,6 @@ multi_substrate_py_library(
         ":nuts_autobatching",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
-        ":preconditioned_hmc",
         ":preconditioned_nuts",
         ":progress_bar_reducer",
         ":reducer",
@@ -58,6 +57,7 @@ multi_substrate_py_library(
         ":sample_fold",
         ":thinning_kernel",
         ":tracing_reducer",
+        ":windowed_sampling",
         ":with_reductions",
     ],
     deps = [
@@ -86,6 +86,7 @@ multi_substrate_py_library(
         ":thinning_kernel",
         ":tracing_reducer",
         ":weighted_resampling",
+        ":windowed_sampling",
         ":with_reductions",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:all_util",
@@ -242,10 +243,10 @@ py_library(
 
 py_test(
     name = "pnuts_test",
-    size = "large",
-    timeout = "long",
+    size = "medium",
     srcs = ["pnuts_test.py"],
     python_version = "PY3",
+    shard_count = 10,
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
@@ -260,15 +261,17 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "preconditioned_hmc",
     srcs = ["preconditioned_hmc.py"],
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:batch_broadcast",
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:joint_distribution_sequential",
         "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
@@ -278,11 +281,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "preconditioned_hmc_test",
     size = "large",
     timeout = "long",
     srcs = ["preconditioned_hmc_test.py"],
+    disabled_substrates = ["numpy"],
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
@@ -923,6 +927,43 @@ multi_substrate_py_test(
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "windowed_sampling",
+    srcs = ["windowed_sampling.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":diagonal_mass_matrix_adaptation",
+        ":preconditioned_hmc",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:joint_map",
+        "//tensorflow_probability/python/bijectors:reshape",
+        "//tensorflow_probability/python/bijectors:split",
+        "//tensorflow_probability/python/experimental/stats:sample_stats",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:sample",
+    ],
+)
+
+py_test(
+    name = "windowed_sampling_test",
+    size = "large",
+    srcs = ["windowed_sampling_test.py"],
+    python_version = "PY3",
+    shard_count = 5,
+    srcs_version = "PY3",
+    deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
