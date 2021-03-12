@@ -27,6 +27,7 @@ from tensorflow_probability.python.bijectors import joint_map
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math import value_and_gradient
 from tensorflow_probability.python.optimizer import bfgs_utils
 from tensorflow_probability.python.optimizer import bfgs
@@ -65,6 +66,7 @@ def _bfgs_minimize(
     initial_values,
     initial_inverse_hessian_estimate,
     validate_convergence,
+    add_log_det_jacobian,
 ):
   """Minimize the negative log prob of a joint distribution using BFGS."""
 
@@ -72,7 +74,13 @@ def _bfgs_minimize(
 
   def loss(unconstrained_values):
     constrained_values = bijector.forward(unconstrained_values)
-    return -_log_prob(joint_dist, **dict(zip(names, constrained_values)))
+    lp = _log_prob(joint_dist, **dict(zip(names, constrained_values)))
+    if not add_log_det_jacobian:
+      return -lp
+    lp_rank = ps.rank(lp)
+    event_ndims = ps.rank(unconstrained_values) - lp_rank
+    ldj = bijector.forward_log_det_jacobian(unconstrained_values, event_ndims)
+    return -(lp + ldj)
 
   @tf.function(autograph=False)
   def loss_and_gradient(unconstrained_values):
@@ -137,6 +145,7 @@ def laplace_approximation(
     initial_values=None,
     initial_inverse_hessian_estimate=None,
     validate_convergence=True,
+    add_log_det_jacobian=False,
 ):
   """A Laplace approximation over a joint distribution.
 
@@ -152,6 +161,8 @@ def laplace_approximation(
     initial_inverse_hessian_estimate:
 
     validate_convergence:
+
+    add_log_det_jacobian:
 
   Returns:
 
@@ -176,7 +187,8 @@ def laplace_approximation(
       bijector=bijector,
       initial_values=initial_values,
       initial_inverse_hessian_estimate=initial_inverse_hessian_estimate,
-      validate_convergence=validate_convergence)
+      validate_convergence=validate_convergence,
+      add_log_det_jacobian=add_log_det_jacobian)
 
   # there is also the option of using multiple solutions and returning a batch
   # of distributions. For example we could use all the solutions which have
