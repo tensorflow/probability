@@ -43,13 +43,14 @@ _AUTO_COMPOSITE_TENSOR_VERSION = 2
 def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
                          prefer_static_value=()):
   """Extract constructor kwargs to reconstruct `obj`."""
-  argspec = tf_inspect.getfullargspec(obj.__init__)
-  if argspec.varargs or argspec.varkw:
+  sig = tf_inspect.signature(obj.__init__)
+  if any(v.kind in (tf_inspect.Parameter.VAR_KEYWORD,
+                    tf_inspect.Parameter.VAR_POSITIONAL)
+         for v in sig.parameters.values()):
     raise ValueError(
-        '*args and **kwargs are not supported. Found `{}`'.format(argspec))
+        '*args and **kwargs are not supported. Found `{}`'.format(sig))
 
-  params = argspec.args + argspec.kwonlyargs
-  keys = [p for p in params if p != 'self' and p not in omit_kwargs]
+  keys = [p for p in sig.parameters if p != 'self' and p not in omit_kwargs]
   if limit_to is not None:
     keys = [k for k in keys if k in limit_to]
 
