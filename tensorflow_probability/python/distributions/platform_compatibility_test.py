@@ -56,6 +56,7 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
     'NegativeBinomial',
     'NormalInverseGaussian',  # log_probs can be very far off.
+    'Skellam',  # Fails in TF1.
     # TODO(b/137956955): Add support for hypothesis testing
     'PoissonLogNormalQuadratureCompound',
     # TODO(b/159999573): XLA / non-XLA computation seems to have
