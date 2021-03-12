@@ -231,13 +231,6 @@ class _DistributionMeta(abc.ABCMeta):
     if not baseclasses:  # Nothing to be done for Distribution
       raise TypeError('Expected non-empty baseclass. Does Distribution '
                       'not subclass _BaseDistribution?')
-
-    # Subclasses shouldn't inherit their parents' parameter properties,
-    # since (in general) they'll have different parameters.
-    if '_parameter_properties' not in attrs:
-      # Fall back to base class method to raise `NotImplementedError`.
-      attrs['_parameter_properties'] = Distribution._parameter_properties
-
     which_base = [
         base for base in baseclasses
         if base == _BaseDistribution or issubclass(base, Distribution)]
@@ -598,9 +591,7 @@ class Distribution(_BaseDistribution):
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     raise NotImplementedError(
-        '_parameter_properties` is not implemented: {}. '
-        'Note that parent class implementations are not inherited; an explicit '
-        'implementation is required for each subclass.'.format(cls.__name__))
+        '_parameter_properties` is not implemented: {}'.format(cls.__name__))
 
   @classmethod
   def parameter_properties(cls, dtype=tf.float32, num_classes=None):

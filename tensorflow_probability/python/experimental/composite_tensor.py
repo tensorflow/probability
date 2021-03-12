@@ -94,13 +94,6 @@ def _make_convertible(cls):
   class _CompositeTensorDist(cls, CompositeTensor):
     """A per-`cls` subclass of `CompositeTensor`."""
 
-    @classmethod
-    def _parameter_properties(class_, dtype, num_classes=None):
-      # DistributionMeta prevents automatic inheritance of
-      # `_parameter_properties`, so do it manually.
-      del class_  # Unused.
-      return cls._parameter_properties(dtype=dtype, num_classes=num_classes)
-
     def _parameter_control_dependencies(self, is_init):
       # We are forced by the CompositeTensor contract (no graph operations in
       # `_to_components`, `_from_components`) to defer the

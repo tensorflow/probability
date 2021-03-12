@@ -359,13 +359,6 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
     def _type_spec(self):
       return _GeneratedCTTypeSpec.from_instance(self, omit_kwargs)
 
-    @classmethod
-    def _parameter_properties(class_, dtype, num_classes=None):
-      # DistributionMeta prevents automatic inheritance of
-      # `_parameter_properties`, so do it manually.
-      del class_  # Unused.
-      return cls._parameter_properties(dtype=dtype, num_classes=num_classes)
-
   _AutoCompositeTensor.__name__ = '{}_AutoCompositeTensor'.format(cls.__name__)
   _registry[clsid] = _AutoCompositeTensor
   return _AutoCompositeTensor
