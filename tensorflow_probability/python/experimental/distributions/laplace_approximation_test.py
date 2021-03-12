@@ -142,6 +142,49 @@ class LaplaceApproximationTest(test_util.TestCase):
     self.assertEqual(c.shape, (3,))
     self.assertEqual(d.shape, (4, 4))
 
+  def testCovarianceMatrixNormalSum(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def joint_dist():
+      a = yield tfd.Normal(loc=1., scale=2., name="a")
+      yield tfd.Normal(loc=3. + a, scale=4., name="b")
+
+    # Cov(A, B) = E(A * B) - E(A) * E(B)
+    #           = E(E(A * B | A)) - E(A) * E(B)
+    #           = E(A * E(B | A)) - E(A) * E(B)
+    #           = E(A * (A + 3)) - E(A) * E(B)
+    #           = E(A**2) + 3 * E(A)- E(A) * E(B)
+    #           = 5 + 3 - 1 * 4
+    #           = 4
+    #
+    # Since:
+    # E(A**2) = V(A) + E(A)**2
+    # E(B) = E(E(B | A)) = E(3 + A)
+
+    approx = tfde.laplace_approximation(joint_dist)
+    covariance = self.evaluate(approx.distribution.covariance())
+
+    self.assertAllClose(covariance, [[4., 4.], [4., 20.]], atol=ATOL)
+
+  def testCovarianceMatrixNormalAndMultivariateNormal(self):
+    covariance = [[4., 0.,  0.,  0.],
+                  [0., 1.,  0.1, 0.2],
+                  [0., 0.1, 2.,  0.3],
+                  [0., 0.2, 0.3, 3.]]
+
+    @tfd.JointDistributionCoroutineAutoBatched
+    def joint_dist():
+      yield tfd.Normal(loc=1., scale=2., name="a")
+      yield tfd.MultivariateNormalTriL(
+          loc=[3., 4., 5.],
+          scale_tril=tf.linalg.cholesky(covariance)[1:, 1:],
+          name="b")
+
+    approx = tfde.laplace_approximation(joint_dist)
+    approx_covariance = self.evaluate(approx.distribution.covariance())
+
+    # need slightly higher tolerance for this test
+    self.assertAllClose(approx_covariance, covariance, atol=2 * ATOL)
+
 
 if __name__ == '__main__':
   tf.test.main()
