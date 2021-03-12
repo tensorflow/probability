@@ -1763,11 +1763,11 @@ def ldj_reduction_shape(shape_structure,
           parameter_batch_in_ldj_shape_ = parameter_batch_shape_
         else:
           parameter_batch_in_ldj_shape_ = parameter_batch_shape_[
-              -reduce_ndims_:]
+              ps.rank_from_shape(parameter_batch_shape_) - reduce_ndims_:]
         broadcasted_shape_ = tf.broadcast_static_shape(
             tf.TensorShape(parameter_batch_in_ldj_shape_),
             tf.TensorShape(ldj_reduce_shape_))
-        if not np.all(ldj_reduce_shape_ == broadcasted_shape_):
+        if not np.array_equal(ldj_reduce_shape_, broadcasted_shape_):
           raise ValueError('Broadcasting with bijector parameters changes the '
                            'LDJ reduction shape from {} to {}.'.format(
                                ldj_reduce_shape_, broadcasted_shape_))
