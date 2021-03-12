@@ -19,6 +19,7 @@ from tensorflow_probability.python.experimental.vi.surrogate_posteriors import b
 from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_affine_surrogate_posterior_from_base_distribution
 from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_asvi_surrogate_posterior
 from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_factored_surrogate_posterior
+from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_split_flow_surrogate_posterior
 from tensorflow_probability.python.experimental.vi.surrogate_posteriors import build_trainable_location_scale_distribution
 from tensorflow_probability.python.internal import all_util
 
@@ -28,6 +29,7 @@ _allowed_symbols = [
     'build_affine_surrogate_posterior_from_base_distribution',
     'build_asvi_surrogate_posterior',
     'build_factored_surrogate_posterior',
+    'build_split_flow_surrogate_posterior',
     'build_trainable_location_scale_distribution',
     'util',
 ]

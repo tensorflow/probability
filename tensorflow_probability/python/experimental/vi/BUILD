@@ -53,6 +53,7 @@ py_library(
         "//tensorflow_probability/python/bijectors:shift",
         "//tensorflow_probability/python/bijectors:sigmoid",
         "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/bijectors:split",
         "//tensorflow_probability/python/distributions:beta",
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:joint_distribution",

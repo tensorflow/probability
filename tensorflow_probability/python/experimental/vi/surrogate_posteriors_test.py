@@ -534,6 +534,66 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 
 
 @test_util.test_all_tf_execution_regimes
+class SplitFlowSurrogatePosterior(
+    test_util.TestCase, _SurrogatePosterior):
+
+  @parameterized.named_parameters(
+      {'testcase_name': 'TensorEvent',
+       'event_shape': [6],
+       'constraining_bijector': tfb.Softplus(),
+       'batch_shape': [2],
+       'dtype': np.float32,
+       'is_static': True},
+      {'testcase_name': 'ListEvent',
+       'event_shape': [tf.TensorShape([3]),
+                       tf.TensorShape([]),
+                       tf.TensorShape([2, 2])],
+       'constraining_bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
+       'batch_shape': tf.TensorShape([2, 2]),
+       'dtype': np.float32,
+       'is_static': False},
+      {'testcase_name': 'DictEvent',
+       'event_shape': {'x': tf.TensorShape([3]), 'y': tf.TensorShape([])},
+       'constraining_bijector': None,
+       'batch_shape': tf.TensorShape([]),
+       'dtype': np.float64,
+       'is_static': True},
+  )
+  def test_shapes_and_gradients(
+      self, event_shape, constraining_bijector, batch_shape, dtype, is_static):
+    if not tf.executing_eagerly() and not is_static:
+      self.skipTest('tfb.Reshape requires statically known shapes in graph'
+                    ' mode.')
+    net = tfb.AutoregressiveNetwork(2, hidden_units=[4, 4], dtype=dtype)
+    maf = tfb.MaskedAutoregressiveFlow(
+        shift_and_log_scale_fn=net, validate_args=True)
+
+    seed = test_util.test_seed_stream()
+    surrogate_posterior = (
+        tfp.experimental.vi.build_split_flow_surrogate_posterior(
+            event_shape=tf.nest.map_structure(
+                lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
+                    np.array(s, dtype=np.int32), is_static=is_static),
+                event_shape),
+            constraining_bijector=constraining_bijector,
+            batch_shape=batch_shape,
+            trainable_bijector=maf,
+            dtype=dtype,
+            validate_args=True))
+
+    # Add an op to the graph so tf.Variables get created in graph mode.
+    _ = surrogate_posterior.sample(seed=seed())
+    self.evaluate(
+        [v.initializer for v in surrogate_posterior.trainable_variables])
+
+    self._test_shapes(
+        surrogate_posterior, batch_shape=batch_shape, event_shape=event_shape,
+        seed=seed())
+    self._test_gradients(surrogate_posterior, seed=seed())
+    self._test_dtype(surrogate_posterior, dtype, seed())
+
+
+@test_util.test_all_tf_execution_regimes
 class _TrainableASVISurrogate(object):
 
   def test_dims_and_gradients(self):
