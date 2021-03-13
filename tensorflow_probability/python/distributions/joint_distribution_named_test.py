@@ -26,6 +26,7 @@ import warnings
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
@@ -371,6 +372,21 @@ class JointDistributionNamedTest(test_util.TestCase):
         ValueError, 'Must pass probs or logits, but not both.'):
       tfd.JointDistributionNamed(dict(logits=tfd.Normal(0., 1.),
                                       x=tfd.Bernoulli))
+
+  def test_dist_fn_takes_kwargs(self):
+    dist = tfd.JointDistributionNamed(
+        {'positive': tfd.Exponential(rate=1.),
+         'negative': tfb.Scale(-1.)(tfd.Exponential(rate=1.)),
+         'b': lambda **kwargs: tfd.Normal(loc=kwargs['negative'],  # pylint: disable=g-long-lambda
+                                          scale=kwargs['positive'],
+                                          validate_args=True),
+         'a': lambda **kwargs: tfb.Scale(kwargs['b'])(  # pylint: disable=g-long-lambda
+             tfd.Gamma(concentration=-kwargs['negative'],
+                       rate=kwargs['positive'],
+                       validate_args=True))
+         }, validate_args=True)
+    lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
+    self.assertAllEqual(lp.shape, [5])
 
   def test_graph_resolution(self):
     # pylint: disable=bad-whitespace

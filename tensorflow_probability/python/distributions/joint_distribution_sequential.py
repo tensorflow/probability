@@ -526,7 +526,7 @@ def _unify_call_signature(i, dist_fn):
     raise TypeError('{} must be either `tfd.Distribution`-like or '
                     '`callable`.'.format(dist_fn))
 
-  args = _get_required_args(dist_fn)
+  args = _get_required_args(dist_fn, previous_args=range(i))
   if not args:
     return (lambda *_: dist_fn()), ()
 
@@ -606,10 +606,12 @@ def _resolve_distribution_names(dist_fn_args,
   return tuple(dist_names)
 
 
-def _get_required_args(fn):
+def _get_required_args(fn, previous_args=()):
   """Returns the distribution's required args."""
   argspec = tf_inspect.getfullargspec(fn)
   args = argspec.args
+  if argspec.varargs or argspec.varkw:
+    args = args + list(previous_args)
   if tf_inspect.isclass(fn):
     args = args[1:]  # Remove the `self` arg.
   if argspec.defaults:

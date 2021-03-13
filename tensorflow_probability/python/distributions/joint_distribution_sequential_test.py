@@ -342,6 +342,18 @@ class JointDistributionSequentialTest(test_util.TestCase):
     lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
     self.assertAllEqual(self.evaluate(lp).shape, [5])
 
+  def test_dist_fn_takes_varargs(self):
+    dist = tfd.JointDistributionSequential(
+        [
+            tfb.Scale(-1.)(tfd.Exponential(1.)),  # Negative.
+            lambda *args: tfd.Exponential(tf.exp(args[0])),  # Positive.
+            lambda *args: tfd.Normal(loc=args[1],  # pylint: disable=g-long-lambda
+                                     scale=args[0],  # Must be positive.
+                                     validate_args=True)
+        ], validate_args=True)
+    lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
+    self.assertAllEqual(lp.shape, [5])
+
   @parameterized.named_parameters(
       ('basic', basic_model_fn),
       ('nested_lists', nested_lists_model_fn))
