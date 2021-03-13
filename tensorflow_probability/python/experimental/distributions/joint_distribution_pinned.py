@@ -270,7 +270,7 @@ class JointDistributionPinned(object):
   ```
   """
 
-  def __init__(self, distribution, *pins, **named_pins):
+  def __init__(self, distribution, *pins, name=None, **named_pins):
     """Constructs a `JointDistributionPinned`.
 
     ### Examples:
@@ -322,6 +322,9 @@ class JointDistributionPinned(object):
         use an unordered sequence of pins with an unordered model, e.g. a
         `tfp.distributions.JointDistributionNamed` constructed with a `dict`
         model (`collections.OrderedDict` is allowed).
+      name: Python `str` name for this distribution. If `None`, defaults to
+        'Pinned{distribution.name}'.
+        Default value: `None`.
       **named_pins: Named elements to pin. The names given must align with the
         part names defined by `distribution._flat_resolve_names()`, i.e. either
         the explicitly named parts of `tfp.distributions.JointDistributionNamed`
@@ -330,14 +333,23 @@ class JointDistributionPinned(object):
     """
     if bool(pins) == bool(named_pins):
       raise ValueError('Exactly one of *pins or **named_pins should be set.')
+
+    if name is None:
+      name = 'Pinned{}'.format(distribution.name)
+
     self._distribution = distribution
-    self._name = named_pins.pop('name', 'Pinned{}'.format(distribution.name))
+    self._name = name
     self._pins = _to_pins(distribution, *pins, **named_pins)
 
   @property
   def distribution(self):
     """The underlying distribution being partially pinned."""
     return self._distribution
+
+  @property
+  def name(self):
+    """Name of this pinned distribution."""
+    return self._name
 
   @property
   def pins(self):
