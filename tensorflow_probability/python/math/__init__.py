@@ -25,6 +25,7 @@ from tensorflow_probability.python.math.bessel import bessel_iv_ratio
 from tensorflow_probability.python.math.bessel import bessel_ive
 from tensorflow_probability.python.math.bessel import bessel_kve
 from tensorflow_probability.python.math.bessel import log_bessel_ive
+from tensorflow_probability.python.math.bessel import log_bessel_kve
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.generic import log1mexp
@@ -121,6 +122,7 @@ _allowed_symbols = [
     'lambertw_winitzki_approx',
     'lbeta',
     'log_bessel_ive',
+    'log_bessel_kve',
     'log1mexp',
     'log1psquare',
     'log_add_exp',

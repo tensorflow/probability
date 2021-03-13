@@ -261,9 +261,8 @@ class NormalInverseGaussian(distribution.Distribution):
     w = tailweight * tf.math.exp(0.5 * tf.math.log1p(
         -tf.math.square(skewness / tailweight)))
     log_unnormalized_prob = (
-        tf.math.log(
-            tfp_math.bessel_kve(
-                numpy_dtype(1.), tailweight * scale * tf.math.exp(0.5 * z))) -
+        tfp_math.log_bessel_kve(
+            numpy_dtype(1.), tailweight * scale * tf.math.exp(0.5 * z)) -
         0.5 * z - tailweight * scale * tf.math.exp(0.5 * z))
     log_unnormalized_prob = log_unnormalized_prob + scale * skewness * y
     log_normalization = np.log(np.pi) - scale * w - tf.math.log(tailweight)

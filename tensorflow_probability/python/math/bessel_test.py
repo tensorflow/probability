@@ -535,6 +535,44 @@ class BesselKveTest(test_util.TestCase):
         functools.partial(tfp_math.bessel_kve, v), [z])
     self.assertLess(err, 3e-4)
 
+  @parameterized.named_parameters(
+      ("float32", np.float32, 1e-6),
+      ("float64", np.float64, 1e-6),
+  )
+  def testLogBesselKveCorrect(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    v = tf.random.uniform(
+        [int(1e5)], minval=0.1, maxval=0.5, seed=seed_stream(), dtype=dtype)
+    z = tf.random.uniform(
+        [int(1e5)], minval=1., maxval=10., seed=seed_stream(), dtype=dtype)
+    _, _, log_bessel_kve_expected_, log_bessel_kve_actual_ = self.evaluate([
+        v,
+        z,
+        tf.math.log(tfp.math.bessel_kve(v, z)),
+        tfp.math.log_bessel_kve(v, z)])
+    self.assertAllClose(
+        log_bessel_kve_expected_, log_bessel_kve_actual_, rtol=rtol)
+
+  def testLogBesselTestNonInf(self):
+    # Test that log_bessel_kve(v, z) has more resolution than simply computing
+    # log(bessel_ive(v, z)). The inputs below will return inf in naive float64
+    # computation.
+    v = np.array([10., 12., 30., 50.], np.float32)
+    z = np.logspace(-10., -1., 20).reshape((20, 1)).astype(np.float32)
+    self.assertAllFinite(self.evaluate(tfp.math.log_bessel_kve(v, z)))
+
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(
+      ("float32", np.float32, 1e-3),
+      ("float64", np.float64, 1e-4))
+  def testLogBesselKveGradient(self, dtype, tol):
+    v = tf.constant([-0.2, -1., 1., 0.5, 2.], dtype=dtype)[..., tf.newaxis]
+    z = tf.constant([0.3, 0.5, 0.9, 1., 12., 22.], dtype=dtype)
+
+    err = self.compute_max_gradient_error(
+        functools.partial(tfp_math.log_bessel_kve, v), [z])
+    self.assertLess(err, tol)
+
 
 if __name__ == "__main__":
   tf.test.main()
