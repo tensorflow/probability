@@ -260,24 +260,13 @@ def fix_bates(d):
   return dict(d, total_count=total_count, high=high)
 
 
-def fix_dirichlet_concentration(x):
-  x = tfp_hps.softplus_plus_eps()(x)
-  hp.assume(x.shape[-1] >= 2)
-  return x
-
-
-def fix_power_spherical_mean_direction(x):
-  hp.assume(x.shape[-1] >= 2)
-  return tf.math.l2_normalize(tf.math.sigmoid(x) + 1e-6, -1)
-
-
 CONSTRAINTS = {
     'atol':
         tf.math.softplus,
     'rtol':
         tf.math.softplus,
     'Dirichlet.concentration':
-        fix_dirichlet_concentration,
+        tfp_hps.softplus_plus_eps(),
     'concentration':
         tfp_hps.softplus_plus_eps(),
     'GeneralizedPareto.concentration':  # Permits +ve and -ve concentrations.
@@ -307,7 +296,7 @@ CONSTRAINTS = {
     'JohnsonSU.tailweight':
         tfp_hps.softplus_plus_eps(),
     'PowerSpherical.mean_direction':
-        fix_power_spherical_mean_direction,
+        lambda x: tf.math.l2_normalize(tf.math.sigmoid(x) + 1e-6, -1),
     'VonMisesFisher.mean_direction':  # max ndims is 3 to avoid instability.
         lambda x: tf.math.l2_normalize(tf.math.sigmoid(x[..., :3]) + 1e-6, -1),
     'Categorical.probs':
@@ -1368,7 +1357,7 @@ def masked_distributions(draw,
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes(min_ndims=0, max_side=4))
   if event_dim is None:
-    event_dim = draw(hps.integers(min_value=1, max_value=10))
+    event_dim = draw(hps.integers(min_value=2, max_value=10))
 
   mask_shape, underlying_batch_shape = draw(
       tfp_hps.broadcasting_shapes(batch_shape, 2))
