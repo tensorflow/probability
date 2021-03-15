@@ -46,6 +46,7 @@ multi_substrate_py_library(
         ":gradient",
         ":gram_schmidt",
         ":hypergeometric",
+        ":integration",
         ":interpolation",
         ":linalg",
         ":minimize",
@@ -223,6 +224,32 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:hypergeometric",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "integration",
+    srcs = [
+        "integration.py",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "integration_test",
+    srcs = ["integration_test.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:hypothesis_testlib",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

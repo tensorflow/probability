@@ -45,6 +45,7 @@ from tensorflow_probability.python.math.generic import softplus_inverse
 from tensorflow_probability.python.math.generic import sqrt1pm1
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.gram_schmidt import gram_schmidt
+from tensorflow_probability.python.math.integration import trapz
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_nd_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
@@ -159,6 +160,7 @@ _allowed_symbols = [
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
     'sqrt1pm1',
+    'trapz',
     'value_and_gradient',
 ]
 
