@@ -38,7 +38,6 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Beta',
@@ -212,17 +211,6 @@ class Beta(distribution.Distribution):
   def concentration0(self):
     """Concentration parameter associated with a `0` outcome."""
     return self._concentration0
-
-  @property
-  @deprecation.deprecated(
-      '2019-10-01',
-      ('The `total_concentration` property is deprecated; instead use '
-       '`dist.concentration1 + dist.concentration0`.'),
-      warn_once=True)
-  def total_concentration(self):
-    """Sum of concentration parameters."""
-    with self._name_and_control_scope('total_concentration'):
-      return self.concentration1 + self.concentration0
 
   def _batch_shape_tensor(self, concentration1=None, concentration0=None):
     return ps.broadcast_shape(

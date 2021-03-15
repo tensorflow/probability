@@ -34,7 +34,6 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 # Cause all warnings to always be triggered.
@@ -80,16 +79,11 @@ class Mixture(distribution.Distribution):
 
   """
 
-  @deprecation.deprecated_args(
-      '2021-01-14', 'The `use_static_graph` argument is deprecated.'
-      ' Mixture behaves equivalently to `use_static_graph=True`,'
-      ' and the flag is ignored.', 'use_static_graph')
   def __init__(self,
                cat,
                components,
                validate_args=False,
                allow_nan_stats=True,
-               use_static_graph=True,
                name='Mixture'):
     """Initialize a Mixture distribution.
 
@@ -119,7 +113,6 @@ class Mixture(distribution.Distribution):
        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
         batch member. If `True`, batch members with valid parameters leading to
         undefined statistics will return NaN for this statistic.
-      use_static_graph: Deprecated and ignored.
       name: A name for this distribution (optional).
 
     Raises:
