@@ -710,7 +710,11 @@ class Distribution(_BaseDistribution):
           k: v for k, v in p.items()
           if not k.startswith('__') and v is not self})
       self._parameters_sanitized = True
-    return dict(self._parameters)
+    # In some situations, the Distribution metaclass logic defers the evaluation
+    # of parameters, but at this point we actually want to evaluate the
+    # parameters.
+    return dict(
+        self._parameters() if callable(self._parameters) else self._parameters)
 
   @classmethod
   def _params_event_ndims(cls):
