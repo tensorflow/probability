@@ -18,7 +18,6 @@ from jax import tree_util
 from jax import util as jax_util
 import jax.numpy as np
 
-from six.moves import zip
 from oryx.core import primitive
 from oryx.core.interpreters import inverse
 from oryx.core.interpreters.inverse import slice as slc
@@ -38,51 +37,6 @@ InverseAndILDJ = inverse.core.InverseAndILDJ
 NDSlice = slc.NDSlice
 
 
-class _JaxBijectorTypeSpec(object):
-  """TypeSpec for flattening/unflattening bijectors."""
-
-  __slots__ = ('_clsid', '_kwargs', '_param_specs')
-
-  def __init__(self, clsid, param_specs, kwargs):
-    self._clsid = clsid
-    self._kwargs = kwargs
-    self._param_specs = param_specs
-
-  @property
-  def value_type(self):
-    return _registry[self._clsid]
-
-  def _to_components(self, obj):
-    components = {
-        'args': obj._args  # pylint: disable=protected-access
-    }
-    for k, v in sorted(obj._kwargs.items()):  # pylint: disable=protected-access
-      if k in self._param_specs:  # pylint: disable=protected-access
-        components[k] = v
-    return components
-
-  def _from_components(self, components):
-    kwargs = dict(self._kwargs)  # pylint: disable=protected-access
-    kwargs.update(components)
-    args = kwargs.pop('args')
-    return self.value_type(*args, **kwargs)  # pylint: disable=not-callable
-
-  @property
-  def _component_specs(self):
-    return self._param_specs
-
-  def _serialize(self):
-    # Include default version 1 for now
-    return 1, self._clsid, self._param_specs, self._kwargs
-
-  @classmethod
-  def _deserialize(cls, encoded):
-    version, clsid, param_specs, kwargs = encoded
-    if version != 1: raise ValueError
-    if clsid not in _registry: raise ValueError(clsid)
-    return cls(clsid, param_specs, kwargs)
-
-
 bijector_p = primitive.InitialStylePrimitive('bijector')
 
 
@@ -94,17 +48,18 @@ class _CellProxy:
 
 
 def bijector_ildj_rule(incells, outcells, *, in_tree, num_consts, direction,
-                       **_):
+                       num_bijector, **_):
   """Inverse/ILDJ rule for bijectors."""
   const_incells, flat_incells = jax_util.split_list(incells, [num_consts])
-  flat_inproxies = safe_map(_CellProxy, flat_incells)
-  bijector_proxies, inproxy = tree_util.tree_unflatten(in_tree,
-                                                       flat_inproxies)
-  flat_bijector_cells = [proxy.cell for proxy
-                         in tree_util.tree_leaves(bijector_proxies)]
+  flat_bijector_cells, arg_incells = jax_util.split_list(
+      flat_incells, [num_bijector])
   if any(not cell.top() for cell in flat_bijector_cells):
     return (const_incells + flat_incells, outcells, None)
-  bijector = tree_util.tree_multimap(lambda x: x.cell.val, bijector_proxies)
+  flat_inproxies = safe_map(_CellProxy, flat_incells)
+  _, inproxy = tree_util.tree_unflatten(in_tree, flat_inproxies)
+  bijector_vals = [cell.val for cell in flat_bijector_cells]
+  bijector, _ = tree_util.tree_unflatten(
+      in_tree, bijector_vals + [None] * len(arg_incells))
   if direction == 'forward':
     forward_func = bijector.forward
     inv_func = bijector.inverse
@@ -114,8 +69,7 @@ def bijector_ildj_rule(incells, outcells, *, in_tree, num_consts, direction,
     inv_func = bijector.forward
     ildj_func = bijector.forward_log_det_jacobian
   else:
-    raise ValueError('Bijector direction must be '
-                     '"forward" or "inverse".')
+    raise ValueError('Bijector direction must be ' '"forward" or "inverse".')
 
   outcell, = outcells
   incell = inproxy.cell
@@ -123,14 +77,14 @@ def bijector_ildj_rule(incells, outcells, *, in_tree, num_consts, direction,
     val, ildj = outcell.val, outcell.ildj
     inildj = ildj + ildj_func(val, np.ndim(val))
     ndslice = NDSlice.new(inv_func(val), inildj)
-    flat_incells = [
-        InverseAndILDJ(incell.aval, [ndslice])
-    ]
+    flat_incells = [InverseAndILDJ(incell.aval, [ndslice])]
     new_outcells = outcells
   elif outcell.is_unknown() and not incell.is_unknown():
     new_outcells = [InverseAndILDJ.new(forward_func(incell.val))]
   new_incells = flat_bijector_cells + flat_incells
   return (const_incells + new_incells, new_outcells, None)
+
+
 inverse.core.ildj_registry[bijector_p] = bijector_ildj_rule
 
 
@@ -141,9 +95,11 @@ def make_wrapper_type(cls):
 
   def bijector_bind(bijector, x, **kwargs):
     return primitive.initial_style_bind(
-        bijector_p, direction=kwargs['direction'],
-        bijector_name=bijector.__class__.__name__)(_bijector)(
-            bijector, x, **kwargs)
+        bijector_p,
+        direction=kwargs['direction'],
+        num_bijector=len(tree_util.tree_leaves(bijector)),
+        bijector_name=bijector.__class__.__name__)(_bijector)(bijector, x,
+                                                              **kwargs)
 
   def _bijector(bij, x, **kwargs):
     direction = kwargs.pop('direction', 'forward')
@@ -155,6 +111,7 @@ def make_wrapper_type(cls):
       raise ValueError('Bijector direction must be "forward" or "inverse".')
 
   if clsid not in _registry:
+
     class _WrapperType(cls):
       """Oryx bijector wrapper type."""
 
@@ -165,14 +122,12 @@ def make_wrapper_type(cls):
 
       def forward(self, x, **kwargs):
         if self.use_primitive:
-          return bijector_bind(self, x, direction='forward',
-                               **kwargs)
+          return bijector_bind(self, x, direction='forward', **kwargs)
         return cls.forward(self, x, **kwargs)
 
       def inverse(self, x, **kwargs):
         if self.use_primitive:
-          return bijector_bind(self, x, direction='inverse',
-                               **kwargs)
+          return bijector_bind(self, x, direction='inverse', **kwargs)
         return cls.inverse(self, x, **kwargs)
 
       def _get_instance(self):
@@ -189,26 +144,6 @@ def make_wrapper_type(cls):
       def parameters(self):
         return self._get_instance().parameters
 
-      @property
-      def _type_spec(self):
-        kwargs = dict(self._kwargs)
-        param_specs = {}
-        event_ndims = {}
-        for k in event_ndims:
-          if k in kwargs and kwargs[k] is not None:
-            elem = kwargs.pop(k)
-            if type(elem) == object:  # pylint: disable=unidiomatic-typecheck
-              param_specs[k] = object
-            elif tf.is_tensor(elem):
-              param_specs[k] = (elem.shape, elem.dtype)
-            else:
-              param_specs[k] = type(elem)
-        for k, v in list(kwargs.items()):
-          if isinstance(v, tfb.Bijector):
-            param_specs[k] = kwargs.pop(k)
-        return _JaxBijectorTypeSpec(
-            clsid, param_specs, kwargs)
-
       def __str__(self):
         return repr(self)
 
@@ -216,24 +151,6 @@ def make_wrapper_type(cls):
         return '{}()'.format(self.__class__.__name__)
 
     _WrapperType.__name__ = cls.__name__ + 'Wrapper'
-
-    def to_tree(obj):
-      type_spec = obj._type_spec  # pylint: disable=protected-access
-      components = type_spec._to_components(obj)  # pylint: disable=protected-access
-      keys, values = list(zip(*sorted(components.items())))
-      return values, (keys, type_spec)
-
-    def from_tree(info, xs):
-      keys, type_spec = info
-      components = dict(list(zip(keys, xs)))
-      return type_spec._from_components(components)  # pylint: disable=protected-access
-
-    tree_util.register_pytree_node(
-        _WrapperType,
-        to_tree,
-        from_tree
-    )
-
     _registry[clsid] = _WrapperType
   return _registry[clsid]
 
