@@ -68,11 +68,10 @@ def _tile_last_written_value(trace_array, last_written_idx):
 _trace_loss = lambda traceable_quantities: traceable_quantities.loss
 
 
-def _make_optimizer_step_fn(
-    loss_fn, optimizer, trainable_variables, jit_compile):
+def _make_optimizer_step_fn(loss_fn, optimizer, trainable_variables):
   """Construct a single optimization step."""
 
-  @tf.function(autograph=False, jit_compile=jit_compile)
+  @tf.function(autograph=False)
   def optimizer_step():
     """Run a single optimization step."""
     with tf.GradientTape(
@@ -144,7 +143,7 @@ def minimize(loss_fn,
              trainable_variables=None,
              trace_fn=_trace_loss,
              return_full_length_trace=True,
-             jit_compile=None,
+             jit_compile=False,
              name='minimize'):
   """Minimize a loss function using a provided optimizer.
 
@@ -195,11 +194,11 @@ def minimize(loss_fn,
       optimization step. This enables use in contexts such as XLA that require
       shapes to be known statically.
       Default value: `True`.
-    jit_compile: If True, compiles the loss function and gradient update using
+    jit_compile: If True, compiles the minimization loop using
       XLA. XLA performs compiler optimizations, such as fusion, and attempts to
       emit more efficient code. This may drastically improve the performance.
       See the docs for `tf.function`. (In JAX, this will apply `jax.jit`).
-      Default value: `None`.
+      Default value: `False`.
     name: Python `str` name prefixed to ops created by this function.
       Default value: 'minimize'.
 
@@ -299,6 +298,16 @@ def minimize(loss_fn,
 
   """
 
+  if jit_compile:
+    # Run the entire minimization inside a jit-compiled function. This is
+    # typically faster than jit-compiling the individual steps.
+    parameters = dict(locals())
+    parameters['jit_compile'] = False
+    @tf.function(autograph=False, jit_compile=True)
+    def run_jitted_minimize():
+      return minimize(**parameters)
+    return run_jitted_minimize()
+
   def convergence_detected(step, trace_arrays,
                            has_converged=None,
                            convergence_criterion_state=None):
@@ -318,8 +327,7 @@ def minimize(loss_fn,
     # then reused inside the training loop (i.e., it is only traced once).
     optimizer_step_fn = _make_optimizer_step_fn(
         loss_fn=loss_fn, optimizer=optimizer,
-        trainable_variables=trainable_variables,
-        jit_compile=jit_compile)
+        trainable_variables=trainable_variables)
     initial_loss, initial_grads, initial_parameters = optimizer_step_fn()
     has_converged = None
     initial_convergence_criterion_state = None
