@@ -236,7 +236,7 @@ class LinearRegression(StructuralTimeSeries):
                               num_timesteps,
                               param_map,
                               initial_state_prior=None,
-                              initial_step=0):
+                              **linear_gaussian_ssm_kwargs):
 
     weights = param_map['weights']  # shape: [B, num_features]
     predicted_timeseries = self.design_matrix.matmul(weights[..., tf.newaxis])
@@ -259,7 +259,7 @@ class LinearRegression(StructuralTimeSeries):
         observation_matrix=tf.zeros([1, 0], dtype=dtype),
         observation_noise=_observe_timeseries_fn(predicted_timeseries),
         initial_state_prior=initial_state_prior,
-        initial_step=initial_step)
+        **linear_gaussian_ssm_kwargs)
 
 
 class SparseLinearRegression(StructuralTimeSeries):
@@ -497,7 +497,7 @@ class SparseLinearRegression(StructuralTimeSeries):
                               num_timesteps,
                               param_map,
                               initial_state_prior=None,
-                              initial_step=0):
+                              **linear_gaussian_ssm_kwargs):
 
     weights = self.params_to_weights(**param_map)
     predicted_timeseries = self.design_matrix.matmul(weights[..., tf.newaxis])
@@ -520,4 +520,4 @@ class SparseLinearRegression(StructuralTimeSeries):
         observation_matrix=tf.zeros([1, 0], dtype=dtype),
         observation_noise=_observe_timeseries_fn(predicted_timeseries),
         initial_state_prior=initial_state_prior,
-        initial_step=initial_step)
+        **linear_gaussian_ssm_kwargs)
