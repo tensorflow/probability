@@ -63,10 +63,12 @@ def iid_sample(sample_fn, sample_shape):
   sample_shape = distribution_util.expand_to_vector(
       ps.cast(sample_shape, np.int32), tensor_name='sample_shape')
   n = ps.cast(ps.reduce_prod(sample_shape), dtype=np.int32)
+  static_n = tf.get_static_value(tf.convert_to_tensor(n))
 
   def unflatten(x):
+    sample_dims = 0 if static_n == 1 else 1
     unflattened_shape = ps.cast(
-        ps.concat([sample_shape, ps.shape(x)[1:]], axis=0),
+        ps.concat([sample_shape, ps.shape(x)[sample_dims:]], axis=0),
         dtype=np.int32)
     return tf.reshape(x, unflattened_shape)
 
@@ -98,7 +100,10 @@ def iid_sample(sample_fn, sample_shape):
           with tf.name_scope('iid_sample_fn_stateless_body'):
             return sample_fn(*args, seed=tf.gather(seed, i), **kwargs)
 
-      draws = parallel_for.pfor(pfor_loop_body, n)
+      if static_n == 1:
+        draws = pfor_loop_body(0)
+      else:
+        draws = parallel_for.pfor(pfor_loop_body, n)
       return tf.nest.map_structure(unflatten, draws, expand_composites=True)
 
   return iid_sample_fn
