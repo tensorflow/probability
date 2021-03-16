@@ -25,6 +25,8 @@ import warnings
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
+from tensorflow_probability.python.distributions import joint_distribution_coroutine
+
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import samplers
@@ -253,8 +255,12 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
 
   def _model_coroutine(self):
     xs = []
-    for dist_fn in self._dist_fn_wrapped:
-      x = yield dist_fn(*xs)
+    for dist_fn, args in zip(self._dist_fn_wrapped, self._dist_fn_args):
+      dist = dist_fn(*xs)
+      if not args:
+        dist = joint_distribution_coroutine.JointDistributionCoroutine.Root(
+            dist)
+      x = yield dist
       xs.append(x)
 
   def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):

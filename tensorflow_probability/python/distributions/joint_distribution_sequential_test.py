@@ -724,6 +724,28 @@ class JointDistributionSequentialTest(test_util.TestCase):
         ValueError, r'Supplied both `value` and keyword arguments .*'):
       joint.sample(seed=seed, a=1., value=[1., None, None])
 
+  def test_creates_valid_coroutine(self):
+    joint = tfd.JointDistributionSequential(
+        [
+            tfd.Poisson(rate=100.),
+            tfd.Dirichlet(concentration=[1., 1.]),
+            lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),
+            lambda z: tfd.Independent(  # pylint: disable=g-long-lambda
+                tfd.Multinomial(total_count=z, logits=[[0., 1., 2.],
+                                                       [3., 4., 5.]]),
+                reinterpreted_batch_ndims=1),
+        ],
+        validate_args=True)
+    sample_shapes = [
+        x.shape for x in joint._model_flatten(
+            joint.sample([5], seed=test_util.test_seed()))]
+
+    jdc = tfd.JointDistributionCoroutine(joint._model_coroutine)
+    jdc_sample_shapes = [
+        x.shape for x in jdc._model_flatten(
+            jdc.sample([5], seed=test_util.test_seed()))]
+    self.assertAllEqualNested(sample_shapes, jdc_sample_shapes)
+
 
 class ResolveDistributionNamesTest(test_util.TestCase):
 

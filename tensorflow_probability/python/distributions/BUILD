@@ -1078,6 +1078,7 @@ multi_substrate_py_library(
         ":joint_distribution",
         ":kullback_leibler",
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
