@@ -171,7 +171,7 @@ to PRNGs. Here we will discuss the functions provided, and their behaviors.
 
 Import: `from tensorflow_probability.python.internal import samplers`
 
-*   `samplers.sanitize_seed(seed, salt=None, name=None)`
+*   `samplers.sanitize_seed(seed, salt=None, name=None)` (also in `tfp.random`)
 
     This function ensures that a seed of any flavor becomes a
     "stateless-compatible" seed, i.e. an `int32[2]` `Tensor`. (In JAX, it
@@ -190,7 +190,7 @@ Import: `from tensorflow_probability.python.internal import samplers`
     discipline of splitting, which ensures no two downstream consumer functions
     receive the same seed value.
 
-*   `samplers.split_seed(seed, n=2, salt=None, name=None)`
+*   `samplers.split_seed(seed, n=2, salt=None, name=None)` (also in `tfp.random`)
 
     This function splits a single seed into `n` stateless-compatible seeds. The
     input seed will first be passed to `sanitize_seed`, which avoids
