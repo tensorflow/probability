@@ -304,6 +304,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                observation_noise,
                initial_state_prior,
                initial_step=0,
+               mask=None,
                experimental_parallelize=False,  # TODO(b/169178065) Set to True.
                validate_args=False,
                allow_nan_stats=True,
@@ -341,6 +342,12 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         modeled timestep.  This is added as an offset when passing
         timesteps `t` to (optional) callables specifying
         timestep-specific transition and observation models.
+      mask: Optional default missingness mask used for density and posterior
+        inference calculations (any method that takes a `mask` argument).
+        Bool-type `Tensor` with rightmost dimension
+        `[num_timesteps]`; `True` values specify that the value of `x`
+        at that timestep is masked, i.e., not conditioned on.
+        Default value: `None`.
       experimental_parallelize: If `True`, use parallel message passing
         algorithms from `tfp.experimental.parallel_filter` to perform operations
         in `O(log num_timesteps)` sequential steps. The overall FLOP and memory
@@ -373,6 +380,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       self._transition_matrix = transition_matrix
       self._transition_noise = transition_noise
       self._observation_noise = observation_noise
+      self._mask = tensor_util.convert_nonref_to_tensor(
+          mask, dtype_hint=tf.bool, name='mask')
       self._experimental_parallelize = experimental_parallelize
 
       # TODO(b/78475680): Friendly dtype inference.
@@ -439,6 +448,10 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
           name=name)
+
+  @property
+  def mask(self):
+    return self._mask
 
   @property
   def num_timesteps(self):
@@ -635,6 +648,13 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         [self._num_timesteps,
          self._observation_size_tensor_no_checks()])
 
+  def _get_mask(self, mask):
+    """Falls back to `self.mask` if the passed-in mask is None."""
+    mask = self.mask if mask is None else mask
+    if mask is not None:
+      return tf.convert_to_tensor(mask, dtype_hint=tf.bool, name='mask')
+    return mask
+
   def _get_time_varying_kwargs(self, idx):
     """Extracts model parameters at the given timestep."""
     t = idx + self.initial_step
@@ -777,7 +797,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       'at that timestep is masked, i.e., not conditioned on. Additional '
       'dimensions must match or be broadcastable to `self.batch_shape`; any '
       'further dimensions must match or be broadcastable to the sample '
-      'shape of `x`. Default value: `None`.'})
+      'shape of `x`. Default value: `None` (falls back to `self.mask`).'})
   def _prob(self, x, mask=None):
     return tf.exp(self._log_prob(x, mask=mask))
 
@@ -790,10 +810,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       'at that timestep is masked, i.e., not conditioned on. Additional '
       'dimensions must match or be broadcastable to `self.batch_shape`; any '
       'further dimensions must match or be broadcastable to the sample '
-      'shape of `x`. Default value: `None`.'})
+      'shape of `x`. Default value: `None`  (falls back to `self.mask`).'})
   def _log_prob(self, x, mask=None):
-    if mask is not None:
-      mask = tf.convert_to_tensor(mask, name='mask', dtype_hint=tf.bool)
+    mask = self._get_mask(mask)
     log_likelihoods, _, _, _, _, _, _ = self._forward_filter(x, mask=mask)
 
     # Sum over timesteps to compute the log marginal likelihood.
@@ -823,7 +842,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         dimensions must match or be broadcastable to `self.batch_shape`; any
         further dimensions must match or be broadcastable to the sample
         shape of `x`.
-        Default value: `None`.
+        Default value: `None`  (falls back to `self.mask`).
 
     Returns:
       log_likelihoods: Per-timestep log marginal likelihoods `log
@@ -860,13 +879,12 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
          Tensor whose shape omits the initial `sample_shape(x)`.
     """
     x = tf.convert_to_tensor(x, name='x')
-    if mask is not None:
-      mask = tf.convert_to_tensor(mask, name='mask', dtype_hint=tf.bool)
-
+    mask = self._get_mask(mask)
     with self._name_and_control_scope('forward_filter', x, {'mask': mask}):
       return self._forward_filter(x, mask=mask)
 
   def _forward_filter(self, x, mask=None):
+    mask = self._get_mask(mask)
     if self.experimental_parallelize:
       filter_results = parallel_filter.kalman_filter(
           y=distribution_util.move_dimension(x, -2, 0),
@@ -882,6 +900,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
   def _forward_filter_sequential(self, x, mask=None):
     with tf.name_scope('forward_filter_sequential'):
+      mask = self._get_mask(mask)
       # Get the full output sample_shape + batch shape. Usually
       # this will just be x[:-2], i.e. the input shape excluding
       # event shape. But users can specify inputs that broadcast
@@ -1037,7 +1056,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         dimensions must match or be broadcastable to `self.batch_shape`; any
         further dimensions must match or be broadcastable to the sample
         shape of `x`.
-        Default value: `None`.
+        Default value: `None`  (falls back to `self.mask`).
 
     Returns:
       smoothed_means: Means of the per-timestep smoothed
@@ -1052,8 +1071,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
          dimensions than `filtered_means`.
     """
     x = tf.convert_to_tensor(x, name='x')
-    if mask is not None:
-      mask = tf.convert_to_tensor(mask, name='mask', dtype_hint=tf.bool)
+    mask = self._get_mask(mask)
 
     with self._name_and_control_scope('smooth', x, {'mask': mask}):
       (_, filtered_means, filtered_covs,
@@ -1066,7 +1084,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
 
       return (smoothed_means, smoothed_covs)
 
-  def posterior_sample(self, x, sample_shape, mask=None, seed=None, name=None):
+  def posterior_sample(self, x, sample_shape=(), mask=None, seed=None,
+                       name=None):
     """Draws samples from the posterior over latent trajectories.
 
     This method uses Durbin-Koopman sampling [1], an efficient algorithm to
@@ -1089,12 +1108,13 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         `self.event_shape`. Additional dimensions must match or be
         broadcastable with `self.batch_shape`.
       sample_shape: `int` `Tensor` shape of samples to draw.
+        Default value: `()`.
       mask: optional bool-type `Tensor` with rightmost dimension
         `[num_timesteps]`; `True` values specify that the value of `x`
         at that timestep is masked, i.e., not conditioned on. Additional
         dimensions must match or be broadcastable with `self.batch_shape` and
         `x.shape[:-2]`.
-        Default value: `None`.
+        Default value: `None`  (falls back to `self.mask`).
       seed: Python `int` random seed.
       name: Python `str` name for ops generated by this method.
     Returns:
@@ -1105,10 +1125,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         the posterior over latent states given the observed value `x`.
     """
     x = tf.convert_to_tensor(x, name='x')
-    sample_shape = ps.convert_to_shape_tensor(
-        sample_shape, dtype_hint=tf.int32)
-    if mask is not None:
-      mask = tf.convert_to_tensor(mask, name='mask', dtype_hint=tf.bool)
+    sample_shape = ps.convert_to_shape_tensor(sample_shape, dtype_hint=tf.int32)
+    mask = self._get_mask(mask)
 
     with self._name_and_control_scope(
         name or 'posterior_sample', x, {'mask': mask}):
@@ -1332,6 +1350,8 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
             self.event_shape,
             self.event_shape_tensor(),
             validate_args=self.validate_args))
+
+    mask = self._get_mask(mask)
     if mask is not None:
       if (tensorshape_util.rank(mask.shape) is None or
           tensorshape_util.rank(x.shape) is None):

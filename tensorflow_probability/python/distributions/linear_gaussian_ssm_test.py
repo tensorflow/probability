@@ -704,7 +704,7 @@ class _MissingObservationsTests(test_util.TestCase):
   # One test requires derivative with respect to
   # transition_noise.scale_diag so we allow this to be
   # passed in as an argument if needed.
-  def make_model(self, scale_diag=None):
+  def make_model(self, scale_diag=None, **kwargs):
     if scale_diag is None:
       scale_diag = np.array([1.], dtype=np.float32)
 
@@ -728,7 +728,8 @@ class _MissingObservationsTests(test_util.TestCase):
         initial_state_prior=initial_state_prior,
         initial_step=0,
         experimental_parallelize=self.parallelize,
-        validate_args=True)
+        validate_args=True,
+        **kwargs)
 
     return (num_timesteps, transition_matrix, transition_noise,
             observation_matrix, observation_noise,
@@ -940,6 +941,36 @@ class _MissingObservationsTests(test_util.TestCase):
       (log_likelihoods, filtered_means, filtered_covs, _, _, _,
        _) = model.forward_filter(
            x=observed_time_series, mask=big_mask)
+
+  def testInitSetsDefaultMask(self):
+
+    observed_time_series = np.arange(8, dtype=np.float32)[..., np.newaxis]
+    observation_mask = np.array(
+        [False, False, True, False, True, True, False, True]).astype(np.bool)
+
+    _, _, _, _, _, _, model = self.make_model()
+    _, _, _, _, _, _, model_with_mask = self.make_model(mask=observation_mask)
+
+    self.assertAllEqual(
+        model_with_mask.log_prob(observed_time_series),
+        model.log_prob(observed_time_series, mask=observation_mask))
+    self.assertAllEqual(
+        model_with_mask.prob(observed_time_series),
+        model.prob(observed_time_series, mask=observation_mask))
+    self.assertAllEqualNested(
+        model_with_mask.forward_filter(observed_time_series),
+        model.forward_filter(observed_time_series, mask=observation_mask))
+    self.assertAllEqualNested(
+        model_with_mask.posterior_marginals(observed_time_series),
+        model.posterior_marginals(observed_time_series, mask=observation_mask))
+    self.assertAllEqual(
+        model_with_mask.posterior_sample(
+            observed_time_series,
+            seed=test_util.test_seed(sampler_type='stateless')),
+        model.posterior_sample(
+            observed_time_series,
+            mask=observation_mask,
+            seed=test_util.test_seed(sampler_type='stateless')))
 
 
 class MissingObservationsTestsSequential(_MissingObservationsTests):
