@@ -27,6 +27,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'assert_same_shallow_tree',
     'block_until_ready',
+    'get_shallow_tree',
     'flatten_tree',
     'inverse_fn',
     'make_tensor_seed',
@@ -59,6 +60,11 @@ def unflatten_tree(tree, xs):
 def map_tree_up_to(shallow, fn, tree, *rest):
   """`map_tree` with recursion depth defined by depth of `shallow`."""
   return nest.map_structure_up_to(shallow, fn, tree, *rest)
+
+
+def get_shallow_tree(is_leaf, tree):
+  """Returns a shallow tree, expanding only when is_leaf(subtree) is False."""
+  return nest.get_traverse_shallow_structure(lambda t: not is_leaf(t), tree)
 
 
 def assert_same_shallow_tree(shallow, tree):

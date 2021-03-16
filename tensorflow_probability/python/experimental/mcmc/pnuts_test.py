@@ -425,7 +425,7 @@ class NutsTest(test_util.TestCase):
         n_total_tests - num_test_failed, np.round(n_total_tests * .05))
 
   @parameterized.parameters(
-      (7, 5, 3, None),
+      # (7, 5, 3, None),  TODO(b/182886159): Re-enable this test.
       (7, 5, 1, tf.TensorShape([None, 1])),
   )
   def testDynamicShape(self, nsample, batch_size, nd, dynamic_shape):
