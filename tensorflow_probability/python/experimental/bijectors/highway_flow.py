@@ -30,15 +30,13 @@ class TriResNet(tfb.Bijector):
         self.d = tf.Variable(np.random.normal(0, 0.01, (self.width,)), trainable=True, dtype=tf.float32)
 
         # lambda before sigmoid
-        self.pre_l = tf.Variable(np.random.normal(0, 0.1, (1,)), trainable=True, dtype=tf.float32)
+        self.residual_fraction = tfp.util.TransformedVariable(initial_value=np.random.normal(0, 0.1, (1,)),
+                                                              bijector=tfb.Sigmoid())
 
         self.activation = activation
 
         self.masku = tfe.numpy.tril(tf.ones((self.width, self.width)), -1)
         self.maskl = tfe.numpy.triu(tf.ones((self.width, self.width)), 1)
-
-    def get_l(self):
-        return tf.nn.sigmoid(self.pre_l)
 
     def get_L(self):
         return self.W * self.maskl + tf.eye(self.width)
@@ -48,28 +46,26 @@ class TriResNet(tfb.Bijector):
 
     def df(self, x):
         # derivative of activation
-        l = self.get_l()
-        return l + (1 - l) * tf.math.sigmoid(x) * (1 - tf.math.sigmoid(x))
+        return self.residual_fraction + (1 - self.residual_fraction) * tf.math.sigmoid(x) * (1 - tf.math.sigmoid(x))
 
     def cu(self, M):
         # convex update
         # same as doing as in the paper, but I guess easier to invert
         I = tf.eye(self.width)
-        l = self.get_l()
-        return l * I + (1 - l) * M
+        return self.residual_fraction * I + (1 - self.residual_fraction) * M
 
     def inv_f(self, y, N=20):
         # inverse with Newton iteration
         x = tf.ones(y.shape)
         for _ in range(N):
-            x = x - (self.get_l() * x + (1 - self.get_l()) * tf.math.softplus(x) - y) / (self.df(x))
+            x = x - (self.residual_fraction * x + (1 - self.residual_fraction) * tf.math.softplus(x) - y) / (self.df(x))
         return x
 
     def _forward(self, x):
         x = tf.linalg.matvec(x, self.cu(self.get_L()))
         x = tf.linalg.matvec(x, self.cu(self.get_U())) + self.b  # in the implementation there was only one bias
         if self.activation:
-            x = self.get_l() * x + (1 - self.get_l()) * tf.math.softplus(x)
+            x = self.residual_fraction * x + (1 - self.residual_fraction) * tf.math.softplus(x)
         return x
 
     def _inverse(self, y):
@@ -81,7 +77,8 @@ class TriResNet(tfb.Bijector):
         return y
 
     def _forward_log_det_jacobian(self, x):
-        J = tf.reduce_sum(tf.math.log(self.get_l() + (1 - self.get_l()) * tf.math.softplus(self.d)))  # Ju
+        J = tf.reduce_sum(
+            tf.math.log(self.residual_fraction + (1 - self.residual_fraction) * tf.math.softplus(self.d)))  # Ju
         # Jl is 0
         if self.activation:  # else Ja is 0
             J += tf.reduce_sum(tf.math.log(self.df(x)))  # Ja
