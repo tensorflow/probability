@@ -80,9 +80,6 @@ class TriResNet(tfb.Bijector):
         y = tf.linalg.matvec(y, tf.linalg.inv(self.cu(self.get_L())))
         return y
 
-    def _inverse_log_det_jacobian(self, y):
-        return self._forward_log_det_jacobian(y)  # TODO: is this correct?
-
     def _forward_log_det_jacobian(self, x):
         J = tf.reduce_sum(tf.math.log(self.get_l() + (1 - self.get_l()) * tf.math.softplus(self.d)))  # Ju
         # Jl is 0
