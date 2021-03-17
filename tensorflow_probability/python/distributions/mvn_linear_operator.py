@@ -233,6 +233,8 @@ class MultivariateNormalLinearOperator(
     """The `scale` `LinearOperator` in `Y = scale @ X + loc`."""
     return self._scale
 
+  experimental_is_sharded = False
+
   @distribution_util.AppendDocstring(_mvn_sample_note)
   def _log_prob(self, x):
     return super(MultivariateNormalLinearOperator, self)._log_prob(x)

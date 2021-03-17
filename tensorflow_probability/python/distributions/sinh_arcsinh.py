@@ -212,6 +212,8 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
     """Controls the skewness.  `Skewness > 0` means right skew."""
     return self._skewness
 
+  experimental_is_sharded = False
+
   def _batch_shape(self):
     params = [self.skewness, self.tailweight, self.loc, self.scale]
     s_shape = params[0].shape

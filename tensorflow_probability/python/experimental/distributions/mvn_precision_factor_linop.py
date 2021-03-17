@@ -231,6 +231,8 @@ class MultivariateNormalPrecisionFactorLinearOperator(
   def precision(self):
     return self._precision
 
+  experimental_is_sharded = False
+
   def _mean(self):
     shape = tensorshape_util.concatenate(self.batch_shape, self.event_shape)
     has_static_shape = tensorshape_util.is_fully_defined(shape)

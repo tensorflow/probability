@@ -173,6 +173,8 @@ class Weibull(transformed_distribution.TransformedDistribution):
     """Distribution parameter for scale."""
     return self._weibull_bijector.scale
 
+  experimental_is_sharded = False
+
   def _entropy(self):
     one = tf.constant(1., dtype=self.dtype)
     concentration = tf.convert_to_tensor(self.concentration)

@@ -160,6 +160,8 @@ class LambertWDistribution(transformed_distribution.TransformedDistribution):
     """Distribution parameter for the tail parameter delta."""
     return self._tailweight
 
+  experimental_is_sharded = False
+
   def _batch_shape_tensor(self, shift=None, scale=None, tailweight=None):
     """Returns the batch shape of tensor parameter broadcasting."""
     return ps.shape(
