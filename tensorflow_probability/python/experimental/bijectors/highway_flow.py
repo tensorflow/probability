@@ -66,8 +66,8 @@ class TriResNet(tfb.Bijector):
         return x
 
     def _forward(self, x):
-        x = tf.linalg.matmul(x, self.cu(self.get_L()))
-        x = tf.linalg.matmul(x, self.cu(self.get_U())) + self.b  # in the implementation there was only one bias
+        x = tf.linalg.matvec(x, self.cu(self.get_L()))
+        x = tf.linalg.matvec(x, self.cu(self.get_U())) + self.b  # in the implementation there was only one bias
         if self.activation:
             x = self.get_l() * x + (1 - self.get_l()) * tf.math.softplus(x)
         return x
@@ -76,8 +76,8 @@ class TriResNet(tfb.Bijector):
         if self.activation:
             y = self.inv_f(y)
 
-        y = tf.linalg.matmul(y - self.b, tf.linalg.inv(self.cu(self.get_U())))
-        y = tf.linalg.matmul(y, tf.linalg.inv(self.cu(self.get_L())))
+        y = tf.linalg.matvec(y - self.b, tf.linalg.inv(self.cu(self.get_U())))
+        y = tf.linalg.matvec(y, tf.linalg.inv(self.cu(self.get_L())))
         return y
 
     def _inverse_log_det_jacobian(self, y):
