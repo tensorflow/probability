@@ -35,16 +35,10 @@ tfd = tfp.distributions
 @test_util.test_all_tf_execution_regimes
 class _TrainableASVISurrogate(object):
 
-  def test_dims_and_gradients(self):
-
-    prior_dist = self.make_prior_dist()
-
-    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
-        prior=prior_dist)
-
-    # Test that the correct number of trainable variables are being tracked
+  def _expected_num_trainable_variables(self, prior_dist):
+    """Infers the expected number of trainable variables for a non-nested JD."""
     prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
-    expected_num_trainable_vars = 0
+    expected_num_trainable_variables = 0
     for original_dist in prior_dists:
       try:
         original_dist = original_dist.distribution
@@ -55,50 +49,59 @@ class _TrainableASVISurrogate(object):
       for param, value in dist_params.items():
         if (param not in automatic_structured_vi._NON_STATISTICAL_PARAMS
             and value is not None and param not in ('low', 'high')):
-          expected_num_trainable_vars += 2  # prior_weight, mean_field_parameter
+          # One variable each for prior_weight, mean_field_parameter.
+          expected_num_trainable_variables += 2
+    return expected_num_trainable_variables
 
+  def test_dims_and_gradients(self):
+
+    prior_dist = self.make_prior_dist()
+
+    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
+        prior=prior_dist)
+
+    # Test that the correct number of trainable variables are being tracked
     self.assertLen(surrogate_posterior.trainable_variables,
-                   expected_num_trainable_vars)
+                   self._expected_num_trainable_variables(prior_dist))
 
     # Test that the sample shape is correct
-    three_posterior_samples = surrogate_posterior.sample(3)
-    three_prior_samples = prior_dist.sample(3)
+    three_posterior_samples = surrogate_posterior.sample(
+        3, seed=test_util.test_seed(sampler_type='stateless'))
+    three_prior_samples = prior_dist.sample(
+        3, seed=test_util.test_seed(sampler_type='stateless'))
     self.assertAllEqualNested(
         [s.shape for s in tf.nest.flatten(three_prior_samples)],
         [s.shape for s in tf.nest.flatten(three_posterior_samples)])
 
     # Test that gradients are available wrt the variational parameters.
-    posterior_sample = surrogate_posterior.sample()
+    posterior_sample = surrogate_posterior.sample(
+        seed=test_util.test_seed(sampler_type='stateless'))
     with tf.GradientTape() as tape:
       posterior_logprob = surrogate_posterior.log_prob(posterior_sample)
     grad = tape.gradient(posterior_logprob,
                          surrogate_posterior.trainable_variables)
     self.assertTrue(all(g is not None for g in grad))
 
-  def test_make_asvi_trainable_variables(self):
+  def test_initialization_is_deterministic_following_seed(self):
     prior_dist = self.make_prior_dist()
-    trained_vars = automatic_structured_vi._make_asvi_trainable_variables(
-        prior=prior_dist)
 
-    # Confirm that there is one dictionary per distribution.
-    prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
-    self.assertEqual(len(trained_vars), len(prior_dists))
+    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
+        prior=prior_dist,
+        seed=test_util.test_seed(sampler_type='stateless'))
+    self.evaluate(
+        [v.initializer for v in surrogate_posterior.trainable_variables])
+    posterior_sample = surrogate_posterior.sample(
+        seed=test_util.test_seed(sampler_type='stateless'))
 
-    # Confirm that there exists correct number of trainable variables.
-    for (prior_distribution, trained_vars_dict) in zip(prior_dists,
-                                                       trained_vars):
-      substituted_dist = automatic_structured_vi._as_trainable_family(
-          prior_distribution)
-      try:
-        posterior_distribution = substituted_dist.distribution
-      except AttributeError:
-        posterior_distribution = substituted_dist
+    surrogate_posterior2 = tfp.experimental.vi.build_asvi_surrogate_posterior(
+        prior=prior_dist,
+        seed=test_util.test_seed(sampler_type='stateless'))
+    self.evaluate(
+        [v.initializer for v in surrogate_posterior2.trainable_variables])
+    posterior_sample2 = surrogate_posterior2.sample(
+        seed=test_util.test_seed(sampler_type='stateless'))
 
-      for param_name, prior_value in posterior_distribution.parameters.items():
-        if (param_name not in automatic_structured_vi._NON_STATISTICAL_PARAMS
-            and prior_value is not None and param_name not in ('low', 'high')):
-          self.assertIsInstance(trained_vars_dict[param_name],
-                                automatic_structured_vi.ASVIParameters)
+    self.assertAllEqualNested(posterior_sample, posterior_sample2)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -244,6 +247,41 @@ class ASVISurrogatePosteriorTestDiscreteLatent(
                        scale=1., name='b')
 
     return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
+
+
+@test_util.test_all_tf_execution_regimes
+class ASVISurrogatePosteriorTestNesting(test_util.TestCase,
+                                        _TrainableASVISurrogate):
+
+  def _expected_num_trainable_variables(self, _):
+    return 18  # From nested distributions: total of 9 params * 2 vars each.
+
+  def make_prior_dist(self):
+
+    def nested_model():
+      a = yield tfd.Sample(
+          tfd.Sample(
+              tfd.Normal(0., 1.),
+              sample_shape=4),
+          sample_shape=[2],
+          name='a')
+      b = yield tfb.Sigmoid()(
+          tfb.Square()(
+              tfd.Exponential(rate=tf.exp(a))),
+          name='b')
+      # pylint: disable=g-long-lambda
+      yield tfd.JointDistributionSequential(
+          [tfd.Laplace(loc=a, scale=b),
+           lambda c1: tfd.Independent(
+               tfd.Beta(concentration1=1.,
+                        concentration0=tf.nn.softplus(c1)),
+               reinterpreted_batch_ndims=1),
+           lambda c1, c2: tfd.JointDistributionNamed({
+               'x': tfd.Gamma(concentration=tf.nn.softplus(c1), rate=c2)})
+           ], name='c')
+      # pylint: enable=g-long-lambda
+
+    return tfd.JointDistributionCoroutineAutoBatched(nested_model)
 
 
 # TODO(kateslin): Add an ASVI surrogate posterior test for gamma distributions.
