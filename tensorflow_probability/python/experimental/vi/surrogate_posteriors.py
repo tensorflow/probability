@@ -33,6 +33,7 @@ from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.bijectors import split
+from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_util
 from tensorflow_probability.python.distributions import normal
@@ -329,6 +330,7 @@ def build_affine_surrogate_posterior(
     bijector=None,
     base_distribution=normal.Normal,
     dtype=tf.float32,
+    batch_shape=(),
     seed=None,
     validate_args=False,
     name=None):
@@ -373,6 +375,9 @@ def build_affine_surrogate_posterior(
       Default value: `tfd.Normal`.
     dtype: The `dtype` of the surrogate posterior.
       Default value: `tf.float32`.
+    batch_shape: Batch shape (Python tuple, list, or int) of the surrogate
+      posterior, to enable parallel optimization from multiple initializations.
+      Default value: `()`.
     seed: Python integer to seed the random number generator for initial values.
       Default value: `None`.
     validate_args: Python `bool`. Whether to validate input with asserts. This
@@ -456,6 +461,11 @@ def build_affine_surrogate_posterior(
             base_distribution(loc=tf.zeros([], dtype=dtype), scale=1.),
             sample_shape=s, validate_args=validate_args),
         unconstrained_event_shape)
+    if batch_shape:
+      standard_base_distribution = nest.map_structure(
+          lambda d: batch_broadcast.BatchBroadcast(  # pylint: disable=g-long-lambda
+              d, to_shape=batch_shape, validate_args=validate_args),
+          standard_base_distribution)
 
     return build_affine_surrogate_posterior_from_base_distribution(
         standard_base_distribution,
@@ -614,6 +624,10 @@ def build_affine_surrogate_posterior_from_base_distribution(
               lambda b: identity.Identity() if b is None else b, bijector),
           validate_args=validate_args)
 
+    batch_shape = base_distribution.batch_shape_tensor()
+    if tf.nest.is_nested(batch_shape):  # Base is a classic JointDistribution.
+      batch_shape = functools.reduce(ps.broadcast_shape,
+                                     tf.nest.flatten(batch_shape))
     event_shape = base_distribution.event_shape_tensor()
     flat_event_size = nest.flatten(
         nest.map_structure(ps.reduce_prod, event_shape))
@@ -647,6 +661,7 @@ def build_affine_surrogate_posterior_from_base_distribution(
               operators,
               block_dims=flat_event_size,
               dtype=base_dtype,
+              batch_shape=batch_shape,
               seed=operators_seed))
 
     linop_bijector = (
@@ -657,7 +672,9 @@ def build_affine_surrogate_posterior_from_base_distribution(
             lambda s, seed: shift.Shift(  # pylint: disable=g-long-lambda
                 tf.Variable(
                     initial_unconstrained_loc_fn(
-                        [s], dtype=base_dtype, seed=seed))),
+                        ps.concat([batch_shape, [s]], axis=0),
+                        dtype=base_dtype,
+                        seed=seed))),
             flat_event_size,
             samplers.split_seed(seed, n=len(flat_event_size))),
         validate_args=validate_args)

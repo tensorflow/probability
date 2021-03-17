@@ -410,6 +410,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
       {'testcase_name': 'TensorEvent',
        'event_shape': [3],
        'operators': [tf.linalg.LinearOperatorDiag],
+       'batch_shape': (),
        'bijector': tfb.Exp(),
        'dtype': np.float32,
        'is_static': True},
@@ -418,6 +419,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
                        tf.TensorShape([]),
                        tf.TensorShape([2, 2])],
        'operators': 'diag',
+       'batch_shape': (),
        'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
        'dtype': np.float32,
        'is_static': False},
@@ -426,12 +428,20 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'operators': [[tf.linalg.LinearOperatorDiag],
                      [tf.linalg.LinearOperatorFullMatrix,
                       tf.linalg.LinearOperatorLowerTriangular]],
+       'batch_shape': (),
        'bijector': None,
        'dtype': np.float64,
        'is_static': True},
+      {'testcase_name': 'BatchShape',
+       'event_shape': [tf.TensorShape([3]), tf.TensorShape([])],
+       'operators': 'tril',
+       'batch_shape': (2, 1),
+       'bijector': [tfb.Softplus(), None,],
+       'dtype': np.float32,
+       'is_static': True},
   )
   def test_constrained_affine_from_event_shape(
-      self, event_shape, operators, bijector, dtype, is_static):
+      self, event_shape, operators, bijector, batch_shape, dtype, is_static):
     if not tf.executing_eagerly() and not is_static:
       self.skipTest('tfb.Reshape requires statically known shapes in graph'
                     ' mode.')
@@ -444,6 +454,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
                 event_shape),
             operators=operators,
             bijector=bijector,
+            batch_shape=batch_shape,
             dtype=dtype,
             validate_args=True))
 
@@ -452,7 +463,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 
     seed = test_util.test_seed_stream()
     self._test_shapes(
-        surrogate_posterior, batch_shape=[], event_shape=event_shape,
+        surrogate_posterior, batch_shape=batch_shape, event_shape=event_shape,
         seed=seed())
     self._test_gradients(surrogate_posterior, seed=seed())
     self._test_dtype(surrogate_posterior, dtype, seed())
