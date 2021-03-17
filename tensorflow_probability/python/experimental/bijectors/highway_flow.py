@@ -29,9 +29,10 @@ class TriResNet(tfb.Bijector):
         # positive diagonal for U
         self.d = tf.Variable(np.random.normal(0, 0.01, (self.width,)), trainable=True, dtype=tf.float32)
 
-        # lambda before sigmoid
-        self.residual_fraction = tfp.util.TransformedVariable(initial_value=np.random.normal(0, 0.1, (1,)),
-                                                              bijector=tfb.Sigmoid())
+        # fixme: does TransformedVariable need trainable=True?
+        self.residual_fraction = tfp.util.TransformedVariable(
+            initial_value=tf.math.sigmoid(np.random.normal(0, 0.1, (1,))),
+            bijector=tfb.Sigmoid(), trainable=True)
 
         self.activation = activation
 
