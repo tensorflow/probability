@@ -29,116 +29,116 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 CALLING_CONVENTION_DESCRIPTION = """
-    The methods of `JointDistributionPinned` (`unnormalized_log_prob`,
-    `sample_weighted`, etc.) can be called by passing a single structure
-    of tensors, a sequence of tensor arguments, or using named args for each
-    part. For example:
+The methods of `JointDistributionPinned` (`unnormalized_log_prob`,
+`sample_and_log_weight`, etc.) can be called by passing a single structure
+of tensors, a sequence of tensor arguments, or using named args for each
+part. For example:
 
-    ```python
-    tfde = tfp.experimental.distributions
+```python
+tfde = tfp.experimental.distributions
 
-    # Given the following joint distribution:
-    jd = tfd.JointDistributionSequential([
-        tfd.Normal(0., 1., name='z'),
-        tfd.Normal(0., 1., name='y'),
-        lambda y, z: tfd.Normal(y + z, 1., name='x')
-    ], validate_args=True)
+# Given the following joint distribution:
+jd = tfd.JointDistributionSequential([
+    tfd.Normal(0., 1., name='z'),
+    tfd.Normal(0., 1., name='y'),
+    lambda y, z: tfd.Normal(y + z, 1., name='x')
+], validate_args=True)
 
-    # The following `__init__` styles are all permissible and produce
-    # `JointDistributionPinned` objects behaving identically.
-    PartialXY = collections.namedtuple('PartialXY', 'x,y')
-    PartialX = collections.namedtuple('PartialX', 'x')
-    OrderedDict = collections.OrderedDict
-    assert (tfde.JointDistributionPinned(jd, x=2.).pins ==
-            tfde.JointDistributionPinned(jd, x=2., z=None).pins ==
-            tfde.JointDistributionPinned(jd, dict(x=2.)).pins ==
-            tfde.JointDistributionPinned(jd, dict(x=2., y=None)).pins ==
-            tfde.JointDistributionPinned(jd, OrderedDict(x=2.)).pins ==
-            tfde.JointDistributionPinned(jd, OrderedDict(x=2., y=None)).pins ==
-            tfde.JointDistributionPinned(jd, PartialXY(x=2., y=None)).pins ==
-            tfde.JointDistributionPinned(jd, PartialX(x=2.)).pins ==
-            tfde.JointDistributionPinned(jd, None, None, 2.).pins ==
-            tfde.JointDistributionPinned(jd, [None, None, 2.]).pins)
-    # (Notice that the `pins` attribute is always resolved to a `dict`.)
+# The following `__init__` styles are all permissible and produce
+# `JointDistributionPinned` objects behaving identically.
+PartialXY = collections.namedtuple('PartialXY', 'x,y')
+PartialX = collections.namedtuple('PartialX', 'x')
+OrderedDict = collections.OrderedDict
+assert (tfde.JointDistributionPinned(jd, x=2.).pins ==
+        tfde.JointDistributionPinned(jd, x=2., z=None).pins ==
+        tfde.JointDistributionPinned(jd, dict(x=2.)).pins ==
+        tfde.JointDistributionPinned(jd, dict(x=2., y=None)).pins ==
+        tfde.JointDistributionPinned(jd, OrderedDict(x=2.)).pins ==
+        tfde.JointDistributionPinned(jd, OrderedDict(x=2., y=None)).pins ==
+        tfde.JointDistributionPinned(jd, PartialXY(x=2., y=None)).pins ==
+        tfde.JointDistributionPinned(jd, PartialX(x=2.)).pins ==
+        tfde.JointDistributionPinned(jd, None, None, 2.).pins ==
+        tfde.JointDistributionPinned(jd, [None, None, 2.]).pins)
+# (Notice that the `pins` attribute is always resolved to a `dict`.)
 
-    pinned = tfde.JointDistributionPinned(jd, x=2.)
-    pinned.dtype
-    # ==> [tf.float32, tf.float32]
-    z, y = sample = pinned.sample_unpinned()
+pinned = tfde.JointDistributionPinned(jd, x=2.)
+pinned.dtype
+# ==> [tf.float32, tf.float32]
+z, y = sample = pinned.sample_unpinned()
 
-    # The following calling styles are all permissable and produce the exactly
-    # the same output.
-    PartialZY = collections.namedtuple('PartialZY', 'z,y')
-    assert (pinned.{method}(sample) ==
-            pinned.{method}(z, y) ==
-            pinned.{method}(z=z, y=y) ==
-            pinned.{method}(PartialZY(z=z, y=y)))
+# The following calling styles are all permissable and produce the exactly
+# the same output.
+PartialZY = collections.namedtuple('PartialZY', 'z,y')
+assert (pinned.{method}(sample) ==
+        pinned.{method}(z, y) ==
+        pinned.{method}(z=z, y=y) ==
+        pinned.{method}(PartialZY(z=z, y=y)))
 
-    # These calling possibilities also imply that one can also use `*`
-    # expansion, if `sample` is a sequence:
-    pinned.{method}(*sample)
-    # and similarly, if `sample` is a map, one can use `**` expansion:
-    pinned.{method}(**sample)
-    ```
+# These calling possibilities also imply that one can also use `*`
+# expansion, if `sample` is a sequence:
+pinned.{method}(*sample)
+# and similarly, if `sample` is a map, one can use `**` expansion:
+pinned.{method}(**sample)
+```
 
-    Component distributions' names are resolved via `jd._flat_resolve_names()`,
-    which is implemented by each `JointDistribution` subclass (see subclass
-    documentation for details). Generally, for components where a name was
-    provided---either explicitly as the `name` argument to a distribution or as
-    a key in a dict-valued JointDistribution, or implicitly, e.g., by the
-    argument name of a `JointDistributionSequential` distribution-making
-    function---the provided name will be used. Otherwise the component will
-    receive a dummy name; these may change without warning and should not be
-    relied upon.
+Component distributions' names are resolved via `jd._flat_resolve_names()`,
+which is implemented by each `JointDistribution` subclass (see subclass
+documentation for details). Generally, for components where a name was
+provided---either explicitly as the `name` argument to a distribution or as
+a key in a dict-valued JointDistribution, or implicitly, e.g., by the
+argument name of a `JointDistributionSequential` distribution-making
+function---the provided name will be used. Otherwise the component will
+receive a dummy name; these may change without warning and should not be
+relied upon.
 
-    In general, return types of part-wise methods/properties are determined by
-    those of the underlying `JointDistribution`'s model type:
+In general, return types of part-wise methods/properties are determined by
+those of the underlying `JointDistribution`'s model type:
 
-    - `StructTuple` for `JointDistributionCoroutine`, and for
-      `JointDistributionNamed` with `namedtuple` model type.
-    - `collections.OrderedDict` for `JointDistributionNamed` with `OrderedDict`
-      model type.
-    - `dict` for `JointDistributionNamed` with `dict` model type.
-    - `tuple` or `list` for `JointDistributionSequential`.
+- `StructTuple` for `JointDistributionCoroutine`, and for
+  `JointDistributionNamed` with `namedtuple` model type.
+- `collections.OrderedDict` for `JointDistributionNamed` with `OrderedDict`
+  model type.
+- `dict` for `JointDistributionNamed` with `dict` model type.
+- `tuple` or `list` for `JointDistributionSequential`.
 
-    Note: not all `JointDistribution` subclasses support all calling styles;
-    for example, `JointDistributionNamed` does not support positional arguments
-    (aka "unnamed arguments") unless the provided model specifies an ordering of
-    variables (i.e., is an `collections.OrderedDict` or `collections.namedtuple`
-    rather than a plain `dict`). In the same way, JointDistributionPinned does
-    not accept unnamed pins for unordered `JointDistributionNamed` models.
+Note: not all `JointDistribution` subclasses support all calling styles;
+for example, `JointDistributionNamed` does not support positional arguments
+(aka "unnamed arguments") unless the provided model specifies an ordering of
+variables (i.e., is an `collections.OrderedDict` or `collections.namedtuple`
+rather than a plain `dict`). In the same way, JointDistributionPinned does
+not accept unnamed pins for unordered `JointDistributionNamed` models.
 
-    Note: care is taken to resolve any potential ambiguity---this is generally
-    possible by inspecting the structure of the provided argument and "aligning"
-    it to the joint distribution output structure (defined by `jd.dtype`). For
-    example,
+Note: care is taken to resolve any potential ambiguity---this is generally
+possible by inspecting the structure of the provided argument and "aligning"
+it to the joint distribution output structure (defined by `jd.dtype`). For
+example,
 
-    ```python
-    pinned = tfde.JointDistributionPinned(
-        tfd.JointDistributionSequential(
-            [tfd.Exponential(1.), lambda s: tfd.Normal(0., s)]),
-            None, 1.2)
-    pinned.dtype  # => [tf.float32]
-    pinned.{method}([4.])
-    # ==> Tensor with shape `[]`.
-    {method_abbr} = pinned.{method}(4.)
-    # ==> Tensor with shape `[]`.
-    ```
+```python
+pinned = tfde.JointDistributionPinned(
+    tfd.JointDistributionSequential(
+        [tfd.Exponential(1.), lambda s: tfd.Normal(0., s)]),
+        None, 1.2)
+pinned.dtype  # => [tf.float32]
+pinned.{method}([4.])
+# ==> Tensor with shape `[]`.
+{method_abbr} = pinned.{method}(4.)
+# ==> Tensor with shape `[]`.
+```
 
-    Notice that in the first call, `[4.]` is interpreted as a list of one
-    scalar while in the second call the input is a scalar. Hence both inputs
-    result in identical scalar outputs. If we wanted to pass an explicit
-    vector to the `Exponential` component---creating a vector-shaped batch
-    of `{method}`s---we could instead write
-    `pinned.{method}(np.array([4]))`.
+Notice that in the first call, `[4.]` is interpreted as a list of one
+scalar while in the second call the input is a scalar. Hence both inputs
+result in identical scalar outputs. If we wanted to pass an explicit
+vector to the `Exponential` component---creating a vector-shaped batch
+of `{method}`s---we could instead write
+`pinned.{method}(np.array([4]))`.
 
-    Args:
-      *args: Positional arguments: a value structure or component values
-        (see above).
-      **kwargs: Keyword arguments: a value structure or component values
-        (see above). May also include `name`, specifying a Python string name
-        for ops generated by this method.
-  """
+Args:
+  *args: Positional arguments: a value structure or component values
+    (see above).
+  **kwargs: Keyword arguments: a value structure or component values
+    (see above). May also include `name`, specifying a Python string name
+    for ops generated by this method.
+"""
 
 UnnormalizedLogProbParts = collections.namedtuple(
     'UnnormalizedLogProbParts', ('pinned', 'unpinned'))
@@ -161,7 +161,7 @@ class JointDistributionPinned(object):
   methods. In their place, it provides:
 
   * `unnormalized_log_prob`, `unnormalized_log_prob_parts`
-  * `sample_unpinned`, `sample_weighted`
+  * `sample_unpinned`, `sample_and_log_weight`
 
   Mathematically speaking, the object represents a joint probability density,
   `p(x, y)` where the `x` are pinned and the `y` are unpinned. Accordingly, it
