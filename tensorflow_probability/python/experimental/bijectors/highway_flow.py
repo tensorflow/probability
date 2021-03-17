@@ -19,7 +19,7 @@ class TriResNet(tfb.Bijector):
     def __init__(self, width, activation=True, validate_args=False, name='tri_res_net'):
         super(TriResNet, self).__init__(
             validate_args=validate_args,
-            forward_min_event_ndims=0,
+            forward_min_event_ndims=1,
             name=name)
 
         self.width = width
