@@ -7,40 +7,55 @@ tfd = tfp.distributions
 tfb = tfp.bijectors
 tfe = tf.experimental
 
-'''
-This initial implementation is based on the PyTorch implementation at
-https://github.com/LucaAmbrogioni/CascadingFlow/blob/main/modules/networks.py
-'''
+
+def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activation_fn=None):
+    # FIXME: should everything be in float32 or float64?
+    # TODO: add control that residual_fraction_initial_value is between 0 and 1
+    return TriResNet(
+        width=width,
+        residual_fraction=tfp.util.TransformedVariable(
+            initial_value=np.asarray(residual_fraction_initial_value, dtype='float32'),
+            bijector=tfb.Sigmoid()),
+        activation_fn=activation_fn,
+        bias=tf.Variable(np.random.normal(0, 0.01, (width,)), dtype=tf.float32),
+        upper_diagonal_weights_matrix=tfp.util.TransformedVariable(
+            initial_value=np.random.uniform(0., 1., (width, width)).astype('float32'),
+            bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None)),
+        lower_diagonal_weights_matrix=None
+    )
 
 
+# FIXME: should I rename to HighwayFlow?
 class TriResNet(tfb.Bijector):
 
-    def __init__(self, width, residual_fraction_initial_value=0.5, activation_fn=None, validate_args=False,
+    def __init__(self, width, residual_fraction, activation_fn, bias, upper_diagonal_weights_matrix,
+                 lower_diagonal_weights_matrix, validate_args=False,
                  name='tri_res_net'):
         super(TriResNet, self).__init__(
             validate_args=validate_args,
-            forward_min_event_ndims=1,
+            forward_min_event_ndims=1,  # FIXME: should this also be an argument of TriResNet __init__?
             name=name)
 
         self.width = width
-        self.weights = tf.Variable(np.random.normal(0, 0.01, (self.width, self.width)), trainable=True,
-                                   dtype=tf.float32)
-        self.bias = tf.Variable(np.random.normal(0, 0.01, (self.width,)), trainable=True, dtype=tf.float32)
 
-        # Fixme: should everything be in float32 or float64?
-        # TODO: add control that residual_fraction_initial_value is between 0 and 1
-        self.residual_fraction = tfp.util.TransformedVariable(
-            initial_value=np.asarray(residual_fraction_initial_value, dtype='float32'),
-            bijector=tfb.Sigmoid())
+        ###########################################
+        # once we find a way to define L matrix as TransformedVariable, these two lines should be removed
+        self.weights = tf.Variable(np.random.normal(0, 0.01, (width, width)),
+                                   dtype=tf.float32)
+        self.maskl = tfe.numpy.triu(tf.ones((self.width, self.width)), 1)
+        ###########################################
+
+        self.bias = bias
+
+        self.residual_fraction = residual_fraction
 
         # still lower triangular, transposed is done in matvec.
-        self.upper_diagonal_weights_matrix = tfp.util.TransformedVariable(
-            initial_value=np.random.uniform(0., 1., (self.width, self.width)).astype('float32'),
-            bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None))
+        self.upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
+
+        # TODO: Not implemented yet
+        self.lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
 
         self.activation_fn = activation_fn
-
-        self.maskl = tfe.numpy.triu(tf.ones((self.width, self.width)), 1)
 
     def get_L(self):
         return self.weights * self.maskl + tf.eye(self.width)
@@ -84,7 +99,7 @@ class TriResNet(tfb.Bijector):
             tf.math.log(self.residual_fraction + (1 - self.residual_fraction) * tf.linalg.diag_part(
                 self.upper_diagonal_weights_matrix)))  # jacobian from upper matrix
         # jacobian from lower matrix is 0
-        # Fixme: need to compute jacobian depending on selected activation
+        # FIXME: need to compute jacobian depending on selected activation
         if self.activation_fn:  # else activation jacobian is 0
             jacobian += tf.reduce_sum(tf.math.log(self.df(x)))  # Ja
         return jacobian
