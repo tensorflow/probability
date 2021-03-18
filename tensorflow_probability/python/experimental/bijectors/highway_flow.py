@@ -15,8 +15,8 @@ https://github.com/LucaAmbrogioni/CascadingFlow/blob/main/modules/networks.py
 
 class TriResNet(tfb.Bijector):
 
-
-    def __init__(self, width, residual_fraction_initial_value=0.5, activation_fn=None, validate_args=False, name='tri_res_net'):
+    def __init__(self, width, residual_fraction_initial_value=0.5, activation_fn=None, validate_args=False,
+                 name='tri_res_net'):
         super(TriResNet, self).__init__(
             validate_args=validate_args,
             forward_min_event_ndims=1,
@@ -34,6 +34,11 @@ class TriResNet(tfb.Bijector):
             initial_value=residual_fraction_initial_value,
             bijector=tfb.Sigmoid())
 
+        # still lower triangular, transposed is done in matvec.
+        self.upper_diagonal_weights_matrix = tfp.util.TransformedVariable(
+            initial_value=np.random.uniform(0., 1., (self.width, self.width)),
+            bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None))
+
         if activation_fn:
             self.activation_fn = activation_fn
 
@@ -42,9 +47,6 @@ class TriResNet(tfb.Bijector):
 
     def get_L(self):
         return self.W * self.maskl + tf.eye(self.width)
-
-    def get_U(self):
-        return self.W * self.masku + tf.linalg.diag(tf.math.softplus(self.d))
 
     def df(self, x):
         # derivative of activation
@@ -64,8 +66,8 @@ class TriResNet(tfb.Bijector):
         return x
 
     def _forward(self, x):
-        x = tf.linalg.matvec(x, self.cu(self.get_L()))
-        x = tf.linalg.matvec(x, self.cu(self.get_U())) + self.b  # in the implementation there was only one bias
+        x = tf.linalg.matvec(self.cu(self.get_L()), x)
+        x = tf.linalg.matvec(self.cu(self.upper_diagonal_weights_matrix),x, transpose_a=True) + self.b  # in the implementation there was only one bias
         if self.activation:
             x = self.residual_fraction * x + (1 - self.residual_fraction) * tf.math.softplus(x)
         return x
@@ -74,8 +76,8 @@ class TriResNet(tfb.Bijector):
         if self.activation:
             y = self.inv_f(y)
 
-        y = tf.linalg.matvec(y - self.b, tf.linalg.inv(self.cu(self.get_U())))
-        y = tf.linalg.matvec(y, tf.linalg.inv(self.cu(self.get_L())))
+        y = tf.linalg.matvec(tf.linalg.inv(self.cu(self.upper_diagonal_weights_matrix)), y - self.b, transpose_a=True)
+        y = tf.linalg.matvec(tf.linalg.inv(self.cu(self.get_L())), y)
         return y
 
     def _forward_log_det_jacobian(self, x):
