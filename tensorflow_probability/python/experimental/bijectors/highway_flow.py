@@ -23,16 +23,14 @@ class TriResNet(tfb.Bijector):
             name=name)
 
         self.width = width
-        self.W = tf.Variable(np.random.normal(0, 0.01, (self.width, self.width)), trainable=True, dtype=tf.float32)
-        self.b = tf.Variable(np.random.normal(0, 0.01, (self.width,)), trainable=True, dtype=tf.float32)  # bias
-
-        # positive diagonal for U
-        self.d = tf.Variable(np.random.normal(0, 0.01, (self.width,)), trainable=True, dtype=tf.float32)
+        self.weights = tf.Variable(np.random.normal(0, 0.01, (self.width, self.width)), trainable=True,
+                                   dtype=tf.float32)
+        self.bias = tf.Variable(np.random.normal(0, 0.01, (self.width,)), trainable=True, dtype=tf.float32)
 
         # Fixme: should everything be in float32 or float64?
         # TODO: add control that residual_fraction_initial_value is between 0 and 1
         self.residual_fraction = tfp.util.TransformedVariable(
-            initial_value=np.asarray(residual_fraction_initial_value,dtype='float32'),
+            initial_value=np.asarray(residual_fraction_initial_value, dtype='float32'),
             bijector=tfb.Sigmoid())
 
         # still lower triangular, transposed is done in matvec.
@@ -42,21 +40,20 @@ class TriResNet(tfb.Bijector):
 
         self.activation_fn = activation_fn
 
-        self.masku = tfe.numpy.tril(tf.ones((self.width, self.width)), -1)
         self.maskl = tfe.numpy.triu(tf.ones((self.width, self.width)), 1)
 
     def get_L(self):
-        return self.W * self.maskl + tf.eye(self.width)
+        return self.weights * self.maskl + tf.eye(self.width)
 
     def df(self, x):
         # derivative of activation
         return self.residual_fraction + (1 - self.residual_fraction) * tf.math.sigmoid(x) * (1 - tf.math.sigmoid(x))
 
-    def cu(self, M):
+    def convex_update(self, weights_matrix):
         # convex update
         # same as in the paper, but probably easier to invert
-        I = tf.eye(self.width)
-        return self.residual_fraction * I + (1 - self.residual_fraction) * M
+        identity_matrix = tf.eye(self.width)
+        return self.residual_fraction * identity_matrix + (1 - self.residual_fraction) * weights_matrix
 
     def inv_f(self, y, N=20):
         # inverse with Newton iteration
@@ -66,8 +63,9 @@ class TriResNet(tfb.Bijector):
         return x
 
     def _forward(self, x):
-        x = tf.linalg.matvec(self.cu(self.get_L()), x)
-        x = tf.linalg.matvec(self.cu(self.upper_diagonal_weights_matrix),x, transpose_a=True) + self.b  # in the implementation there was only one bias
+        x = tf.linalg.matvec(self.convex_update(self.get_L()), x)
+        x = tf.linalg.matvec(self.convex_update(self.upper_diagonal_weights_matrix), x,
+                             transpose_a=True) + self.bias  # in the implementation there was only one bias
         if self.activation_fn:
             x = self.residual_fraction * x + (1 - self.residual_fraction) * self.activation_fn(x)
         return x
@@ -76,14 +74,17 @@ class TriResNet(tfb.Bijector):
         if self.activation_fn:
             y = self.inv_f(y)
 
-        y = tf.linalg.matvec(tf.linalg.inv(self.cu(self.upper_diagonal_weights_matrix)), y - self.b, transpose_a=True)
-        y = tf.linalg.matvec(tf.linalg.inv(self.cu(self.get_L())), y)
+        y = tf.linalg.matvec(tf.linalg.inv(self.convex_update(self.upper_diagonal_weights_matrix)), y - self.bias,
+                             transpose_a=True)
+        y = tf.linalg.matvec(tf.linalg.inv(self.convex_update(self.get_L())), y)
         return y
 
     def _forward_log_det_jacobian(self, x):
-        J = tf.reduce_sum(
-            tf.math.log(self.residual_fraction + (1 - self.residual_fraction) * tf.math.softplus(self.d)))  # Ju
-        # Jl is 0
-        if self.activation_fn:  # else Ja is 0
-            J += tf.reduce_sum(tf.math.log(self.df(x)))  # Ja
-        return J
+        jacobian = tf.reduce_sum(
+            tf.math.log(self.residual_fraction + (1 - self.residual_fraction) * tf.linalg.diag_part(
+                self.upper_diagonal_weights_matrix)))  # jacobian from upper matrix
+        # jacobian from lower matrix is 0
+        # Fixme: need to compute jacobian depending on selected activation
+        if self.activation_fn:  # else activation jacobian is 0
+            jacobian += tf.reduce_sum(tf.math.log(self.df(x)))  # Ja
+        return jacobian
