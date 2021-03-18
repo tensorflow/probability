@@ -11,7 +11,7 @@ tfe = tf.experimental
 def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activation_fn=None):
     # FIXME: should everything be in float32 or float64?
     # TODO: add control that residual_fraction_initial_value is between 0 and 1
-    return TriResNet(
+    return HighwayFlow(
         width=width,
         residual_fraction=tfp.util.TransformedVariable(
             initial_value=np.asarray(residual_fraction_initial_value, dtype='float32'),
@@ -25,15 +25,14 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
     )
 
 
-# FIXME: should I rename to HighwayFlow?
-class TriResNet(tfb.Bijector):
+class HighwayFlow(tfb.Bijector):
 
     def __init__(self, width, residual_fraction, activation_fn, bias, upper_diagonal_weights_matrix,
                  lower_diagonal_weights_matrix, validate_args=False,
-                 name='tri_res_net'):
-        super(TriResNet, self).__init__(
+                 name='highway_flow'):
+        super(HighwayFlow, self).__init__(
             validate_args=validate_args,
-            forward_min_event_ndims=1,  # FIXME: should this also be an argument of TriResNet __init__?
+            forward_min_event_ndims=1,  # FIXME: should this also be an argument of HighwayFlow __init__?
             name=name)
 
         self.width = width
@@ -90,7 +89,8 @@ class TriResNet(tfb.Bijector):
             y = self.inv_f(y)
 
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
-        y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)), tf.linalg.matrix_transpose(y - self.bias), lower=False)
+        y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
+                                       tf.linalg.matrix_transpose(y - self.bias), lower=False)
         y = tf.linalg.triangular_solve(self._convex_update(self.get_L()), y)
         return tf.linalg.matrix_transpose(y)
 
