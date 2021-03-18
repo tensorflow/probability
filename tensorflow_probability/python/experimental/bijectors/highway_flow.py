@@ -29,18 +29,18 @@ class TriResNet(tfb.Bijector):
         # positive diagonal for U
         self.d = tf.Variable(np.random.normal(0, 0.01, (self.width,)), trainable=True, dtype=tf.float32)
 
+        # Fixme: should everything be in float32 or float64?
         # TODO: add control that residual_fraction_initial_value is between 0 and 1
         self.residual_fraction = tfp.util.TransformedVariable(
-            initial_value=residual_fraction_initial_value,
+            initial_value=np.asarray(residual_fraction_initial_value,dtype='float32'),
             bijector=tfb.Sigmoid())
 
         # still lower triangular, transposed is done in matvec.
         self.upper_diagonal_weights_matrix = tfp.util.TransformedVariable(
-            initial_value=np.random.uniform(0., 1., (self.width, self.width)),
+            initial_value=np.random.uniform(0., 1., (self.width, self.width)).astype('float32'),
             bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None))
 
-        if activation_fn:
-            self.activation_fn = activation_fn
+        self.activation_fn = activation_fn
 
         self.masku = tfe.numpy.tril(tf.ones((self.width, self.width)), -1)
         self.maskl = tfe.numpy.triu(tf.ones((self.width, self.width)), 1)
@@ -54,7 +54,7 @@ class TriResNet(tfb.Bijector):
 
     def cu(self, M):
         # convex update
-        # same as doing as in the paper, but I guess easier to invert
+        # same as in the paper, but probably easier to invert
         I = tf.eye(self.width)
         return self.residual_fraction * I + (1 - self.residual_fraction) * M
 
@@ -68,12 +68,12 @@ class TriResNet(tfb.Bijector):
     def _forward(self, x):
         x = tf.linalg.matvec(self.cu(self.get_L()), x)
         x = tf.linalg.matvec(self.cu(self.upper_diagonal_weights_matrix),x, transpose_a=True) + self.b  # in the implementation there was only one bias
-        if self.activation:
-            x = self.residual_fraction * x + (1 - self.residual_fraction) * tf.math.softplus(x)
+        if self.activation_fn:
+            x = self.residual_fraction * x + (1 - self.residual_fraction) * self.activation_fn(x)
         return x
 
     def _inverse(self, y):
-        if self.activation:
+        if self.activation_fn:
             y = self.inv_f(y)
 
         y = tf.linalg.matvec(tf.linalg.inv(self.cu(self.upper_diagonal_weights_matrix)), y - self.b, transpose_a=True)
@@ -84,6 +84,6 @@ class TriResNet(tfb.Bijector):
         J = tf.reduce_sum(
             tf.math.log(self.residual_fraction + (1 - self.residual_fraction) * tf.math.softplus(self.d)))  # Ju
         # Jl is 0
-        if self.activation:  # else Ja is 0
+        if self.activation_fn:  # else Ja is 0
             J += tf.reduce_sum(tf.math.log(self.df(x)))  # Ja
         return J
