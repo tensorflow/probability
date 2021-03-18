@@ -15,8 +15,8 @@ https://github.com/LucaAmbrogioni/CascadingFlow/blob/main/modules/networks.py
 
 class TriResNet(tfb.Bijector):
 
-    # set activation=False for last block
-    def __init__(self, width, activation=True, validate_args=False, name='tri_res_net'):
+
+    def __init__(self, width, residual_fraction_initial_value=0.5, activation_fn=None, validate_args=False, name='tri_res_net'):
         super(TriResNet, self).__init__(
             validate_args=validate_args,
             forward_min_event_ndims=1,
@@ -29,12 +29,13 @@ class TriResNet(tfb.Bijector):
         # positive diagonal for U
         self.d = tf.Variable(np.random.normal(0, 0.01, (self.width,)), trainable=True, dtype=tf.float32)
 
-        # fixme: does TransformedVariable need trainable=True?
+        # TODO: add control that residual_fraction_initial_value is between 0 and 1
         self.residual_fraction = tfp.util.TransformedVariable(
-            initial_value=tf.math.sigmoid(np.random.normal(0, 0.1, (1,))),
-            bijector=tfb.Sigmoid(), trainable=True)
+            initial_value=residual_fraction_initial_value,
+            bijector=tfb.Sigmoid())
 
-        self.activation = activation
+        if activation_fn:
+            self.activation_fn = activation_fn
 
         self.masku = tfe.numpy.tril(tf.ones((self.width, self.width)), -1)
         self.maskl = tfe.numpy.triu(tf.ones((self.width, self.width)), 1)
