@@ -64,7 +64,7 @@ class TriResNet(tfb.Bijector):
         # derivative of activation
         return self.residual_fraction + (1 - self.residual_fraction) * tf.math.sigmoid(x) * (1 - tf.math.sigmoid(x))
 
-    def convex_update(self, weights_matrix):
+    def _convex_update(self, weights_matrix):
         # convex update
         # same as in the paper, but probably easier to invert
         identity_matrix = tf.eye(self.width)
@@ -78,8 +78,8 @@ class TriResNet(tfb.Bijector):
         return x
 
     def _forward(self, x):
-        x = tf.linalg.matvec(self.convex_update(self.get_L()), x)
-        x = tf.linalg.matvec(self.convex_update(self.upper_diagonal_weights_matrix), x,
+        x = tf.linalg.matvec(self._convex_update(self.get_L()), x)
+        x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix), x,
                              transpose_a=True) + self.bias  # in the implementation there was only one bias
         if self.activation_fn:
             x = self.residual_fraction * x + (1 - self.residual_fraction) * self.activation_fn(x)
@@ -90,8 +90,8 @@ class TriResNet(tfb.Bijector):
             y = self.inv_f(y)
 
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
-        y = tf.linalg.triangular_solve(tf.transpose(self.convex_update(self.upper_diagonal_weights_matrix)), tf.linalg.matrix_transpose(y - self.bias), lower=False)
-        y = tf.linalg.triangular_solve(self.convex_update(self.get_L()), y)
+        y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)), tf.linalg.matrix_transpose(y - self.bias), lower=False)
+        y = tf.linalg.triangular_solve(self._convex_update(self.get_L()), y)
         return tf.linalg.matrix_transpose(y)
 
     def _forward_log_det_jacobian(self, x):
