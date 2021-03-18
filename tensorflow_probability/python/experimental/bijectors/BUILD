@@ -102,3 +102,28 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
+
+multi_substrate_py_library(
+    name = "highway_flow",
+    srcs = ["highway_flow.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "highway_flow_test",
+    size = "medium",
+    srcs = ["distribution_bijectors_test.py"],
+    jax_size = "medium",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
