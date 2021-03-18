@@ -17,7 +17,7 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
             initial_value=np.asarray(residual_fraction_initial_value, dtype='float32'),
             bijector=tfb.Sigmoid()),
         activation_fn=activation_fn,
-        bias=tf.Variable(np.random.normal(0, 0.01, (width,)), dtype=tf.float32),
+        bias=tf.Variable(np.random.normal(0., 0.01, (width,)), dtype=tf.float32),
         upper_diagonal_weights_matrix=tfp.util.TransformedVariable(
             initial_value=np.random.uniform(0., 1., (width, width)).astype('float32'),
             bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None)),
@@ -39,7 +39,7 @@ class HighwayFlow(tfb.Bijector):
 
         ###########################################
         # once we find a way to define L matrix as TransformedVariable, these two lines should be removed
-        self.weights = tf.Variable(np.random.normal(0, 0.01, (width, width)),
+        self.weights = tf.Variable(np.random.normal(0., 0.01, (width, width)),
                                    dtype=tf.float32)
         self.maskl = tfe.numpy.triu(tf.ones((self.width, self.width)), 1)
         ###########################################
@@ -61,19 +61,19 @@ class HighwayFlow(tfb.Bijector):
 
     def df(self, x):
         # derivative of activation
-        return self.residual_fraction + (1 - self.residual_fraction) * tf.math.sigmoid(x) * (1 - tf.math.sigmoid(x))
+        return self.residual_fraction + (1. - self.residual_fraction) * tf.math.sigmoid(x) * (1. - tf.math.sigmoid(x))
 
     def _convex_update(self, weights_matrix):
         # convex update
         # same as in the paper, but probably easier to invert
         identity_matrix = tf.eye(self.width)
-        return self.residual_fraction * identity_matrix + (1 - self.residual_fraction) * weights_matrix
+        return self.residual_fraction * identity_matrix + (1. - self.residual_fraction) * weights_matrix
 
     def inv_f(self, y, N=20):
         # inverse with Newton iteration
         x = tf.ones(y.shape)
         for _ in range(N):
-            x = x - (self.residual_fraction * x + (1 - self.residual_fraction) * tf.math.softplus(x) - y) / (self.df(x))
+            x = x - (self.residual_fraction * x + (1. - self.residual_fraction) * tf.math.softplus(x) - y) / (self.df(x))
         return x
 
     def _forward(self, x):
@@ -81,7 +81,7 @@ class HighwayFlow(tfb.Bijector):
         x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix), x,
                              transpose_a=True) + self.bias  # in the implementation there was only one bias
         if self.activation_fn:
-            x = self.residual_fraction * x + (1 - self.residual_fraction) * self.activation_fn(x)
+            x = self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x)
         return x
 
     def _inverse(self, y):
@@ -96,7 +96,7 @@ class HighwayFlow(tfb.Bijector):
 
     def _forward_log_det_jacobian(self, x):
         jacobian = tf.reduce_sum(
-            tf.math.log(self.residual_fraction + (1 - self.residual_fraction) * tf.linalg.diag_part(
+            tf.math.log(self.residual_fraction + (1. - self.residual_fraction) * tf.linalg.diag_part(
                 self.upper_diagonal_weights_matrix)))  # jacobian from upper matrix
         # jacobian from lower matrix is 0
         # FIXME: need to compute jacobian depending on selected activation
