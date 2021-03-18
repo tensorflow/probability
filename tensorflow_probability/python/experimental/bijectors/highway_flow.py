@@ -89,10 +89,10 @@ class TriResNet(tfb.Bijector):
         if self.activation_fn:
             y = self.inv_f(y)
 
-        y = tf.linalg.matvec(tf.linalg.inv(self.convex_update(self.upper_diagonal_weights_matrix)), y - self.bias,
-                             transpose_a=True)
-        y = tf.linalg.matvec(tf.linalg.inv(self.convex_update(self.get_L())), y)
-        return y
+        # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
+        y = tf.linalg.triangular_solve(tf.transpose(self.convex_update(self.upper_diagonal_weights_matrix)), tf.linalg.matrix_transpose(y - self.bias), lower=False)
+        y = tf.linalg.triangular_solve(self.convex_update(self.get_L()), y)
+        return tf.linalg.matrix_transpose(y)
 
     def _forward_log_det_jacobian(self, x):
         jacobian = tf.reduce_sum(
