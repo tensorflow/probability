@@ -38,7 +38,6 @@ from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensor
 
 
 __all__ = [
-    'dummy_seed',
     'JointDistribution',
 ]
 
@@ -123,12 +122,6 @@ Args:
 FORBIDDEN_COMPONENT_NAMES = ('value', 'name')
 
 
-def dummy_seed():
-  """Returns a fixed constant seed, for cases needing samples without a seed."""
-  # TODO(b/147874898): After 20 Dec 2020, drop the 42 and inline the zeros_seed.
-  return samplers.zeros_seed() if JAX_MODE else 42
-
-
 @six.add_metaclass(abc.ABCMeta)
 class JointDistribution(distribution_lib.Distribution):
   """Joint distribution over one or more component distributions.
@@ -185,7 +178,7 @@ class JointDistribution(distribution_lib.Distribution):
         ds = candidate_dists
       else:
         ds = self._flat_sample_distributions(  # Constant seed for CSE.
-            seed=dummy_seed())[0]
+            seed=samplers.zeros_seed())[0]
       self._single_sample_distributions[graph_id] = ds
     return ds
 
@@ -450,7 +443,7 @@ class JointDistribution(distribution_lib.Distribution):
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
     ds, xs = self._call_flat_sample_distributions(
-        value=value, seed=dummy_seed())
+        value=value, seed=samplers.zeros_seed())
     return (getattr(d, attr)(x) for d, x in zip(ds, xs))
 
   def _map_attr_over_dists(self, attr, dists=None):
@@ -827,8 +820,8 @@ def _jd_log_prob_ratio(p, x, q, y, name=None):
   """Implements `log_prob_ratio` for tfd.JointDistribution*."""
   with tf.name_scope(name or 'jd_log_prob_ratio'):
     tf.nest.assert_same_structure(x, y)
-    ps, _ = p.sample_distributions(value=x, seed=dummy_seed())
-    qs, _ = q.sample_distributions(value=y, seed=dummy_seed())
+    ps, _ = p.sample_distributions(value=x, seed=samplers.zeros_seed())
+    qs, _ = q.sample_distributions(value=y, seed=samplers.zeros_seed())
     tf.nest.assert_same_structure(ps, qs)
     parts = []
     for p_, x_, q_, y_ in zip(ps, x, qs, y):

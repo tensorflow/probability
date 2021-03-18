@@ -22,10 +22,9 @@ import functools
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as distribution_lib
-from tensorflow_probability.python.distributions import joint_distribution as jd_lib
 from tensorflow_probability.python.distributions import log_prob_ratio as lp_ratio
-
 from tensorflow_probability.python.experimental.distribute import distribute_lib
+from tensorflow_probability.python.internal import samplers
 
 
 class JointDistributionDistributedMixin(object):
@@ -44,7 +43,7 @@ class JointDistributionDistributedMixin(object):
       def inner_log_prob_parts(flat_value):
         unflat_value = self._model_unflatten(flat_value)
         ds, xs = self._call_flat_sample_distributions(
-            value=unflat_value, seed=jd_lib.dummy_seed())
+            value=unflat_value, seed=samplers.zeros_seed())
         # For sharded distributions, we need to make sure not to do an
         # all-reduce.
         flat_sharded = self._model_flatten(self.experimental_is_sharded)
@@ -67,7 +66,7 @@ class JointDistributionDistributedMixin(object):
               flat_value)
       return iter(flat_xs)
     ds, xs = self._call_flat_sample_distributions(
-        value=value, seed=jd_lib.dummy_seed())
+        value=value, seed=samplers.zeros_seed())
     return (getattr(d, attr)(x) for d, x in zip(ds, xs))
 
 
@@ -191,8 +190,8 @@ def _dist_jd_log_prob_ratio(p, x, q, y, name=None):
     def log_prob_ratio_parts_fn(x_y):
       x = tf.nest.map_structure(lambda part: part[0], x_y)
       y = tf.nest.map_structure(lambda part: part[1], x_y)
-      p_dists = p.sample_distributions(value=x, seed=jd_lib.dummy_seed())[0]
-      q_dists = q.sample_distributions(value=y, seed=jd_lib.dummy_seed())[0]
+      p_dists = p.sample_distributions(value=x, seed=samplers.zeros_seed())[0]
+      q_dists = q.sample_distributions(value=y, seed=samplers.zeros_seed())[0]
       # Ensure sharded distributions defer reductions.
       kwds = lambda s: {'reduce_over_shards': False} if s else {}
       return tf.nest.map_structure(

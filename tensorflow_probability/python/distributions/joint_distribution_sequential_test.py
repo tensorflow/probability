@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import warnings
 
 # Dependency imports
 from absl.testing import parameterized
@@ -30,7 +29,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import joint_distribution_sequential
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -807,60 +805,6 @@ class ResolveDistributionNamesTest(test_util.TestCase):
           dist_names=None,
           leaf_name='y',
           instance_names=['z', None])
-
-  @test_util.jax_disable_test_missing_functionality('stateful samplers')
-  @test_util.numpy_disable_test_missing_functionality('stateful samplers')
-  def test_legacy_dists(self):
-
-    class StatefulNormal(tfd.Normal):
-
-      def _sample_n(self, n, seed=None):
-        return self.loc + self.scale * tf.random.normal(
-            tf.concat([[n], self.batch_shape_tensor()], axis=0),
-            seed=seed)
-
-    d = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-            StatefulNormal(loc=0, scale=2.),
-            tfd.Normal,  # Or, `lambda loc, scale: tfd.Normal(loc, scale)`.
-            lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12),
-        ],
-        validate_args=True)
-
-    warnings.simplefilter('always')
-    with warnings.catch_warnings(record=True) as w:
-      d.sample(seed=test_util.test_seed())
-    self.assertRegexpMatches(
-        str(w[0].message),
-        r'Falling back to stateful sampling for distribution #2.*of type.*'
-        r'StatefulNormal.*component name "loc" and `dist.name` "Normal"',
-        msg=w)
-
-  @test_util.jax_disable_test_missing_functionality('stateful samplers')
-  @test_util.numpy_disable_test_missing_functionality('stateful samplers')
-  def test_legacy_dists_stateless_seed_raises(self):
-
-    class StatefulNormal(tfd.Normal):
-
-      def _sample_n(self, n, seed=None):
-        return self.loc + self.scale * tf.random.normal(
-            tf.concat([[n], self.batch_shape_tensor()], axis=0),
-            seed=seed)
-
-    d = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-            StatefulNormal(loc=0, scale=2.),
-            tfd.Normal,  # Or, `lambda loc, scale: tfd.Normal(loc, scale)`.
-            lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12),
-        ],
-        validate_args=True)
-
-    with self.assertRaisesRegexp(TypeError, r'Expected int for argument'):
-      d.sample(seed=samplers.zeros_seed())
 
 
 if __name__ == '__main__':
