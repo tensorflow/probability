@@ -53,9 +53,6 @@ class HighwayFlow(tfb.Bijector):
 
         self.activation_fn = activation_fn
 
-    def get_L(self):
-        return self.weights * self.maskl + tf.eye(self.width)
-
     def df(self, x):
         # derivative of activation
         return self.residual_fraction + (1. - self.residual_fraction) * tf.math.sigmoid(x) * (1. - tf.math.sigmoid(x))
