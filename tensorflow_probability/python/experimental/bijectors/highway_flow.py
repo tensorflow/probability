@@ -19,13 +19,14 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
         activation_fn=activation_fn,
         bias=tf.Variable(np.random.normal(0., 0.01, (width,)), dtype=tf.float32),
         upper_diagonal_weights_matrix=tfp.util.TransformedVariable(
-            initial_value=np.random.uniform(0., 1., (width, width)).astype('float32'),
+            initial_value=np.tril(np.random.normal(0., 1., (width, width)), -1) + np.diag(
+                np.random.uniform(size=width)).astype('float32'),
             bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None)),
         lower_diagonal_weights_matrix=tfp.util.TransformedVariable(
             initial_value=np.random.normal(0., 1., (width, width)).astype('float32'),
             bijector=tfb.Chain([tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
-                                          tfb.Pad(paddings=[(1, 0), (0, 1)]),
-                                          tfb.FillTriangular()]))
+                                tfb.Pad(paddings=[(1, 0), (0, 1)]),
+                                tfb.FillTriangular()]))
     )
 
 
@@ -69,7 +70,8 @@ class HighwayFlow(tfb.Bijector):
         # inverse with Newton iteration
         x = tf.ones(y.shape)
         for _ in range(N):
-            x = x - (self.residual_fraction * x + (1. - self.residual_fraction) * tf.math.softplus(x) - y) / (self.df(x))
+            x = x - (self.residual_fraction * x + (1. - self.residual_fraction) * tf.math.softplus(x) - y) / (
+                self.df(x))
         return x
 
     def _forward(self, x):
