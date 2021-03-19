@@ -124,6 +124,7 @@ multi_substrate_py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # numpy dep
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
