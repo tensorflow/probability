@@ -70,21 +70,33 @@ class HighwayFlow(tfb.Bijector):
                 self.df(x))
         return x
 
-    def _forward(self, x):
+    def _augmented_forward(self, x):
+
+        # upper mmatrix jacobian
+        fldj = tf.reduce_sum(
+            tf.math.log(self.residual_fraction + (1. - self.residual_fraction) * tf.linalg.diag_part(
+                self.upper_diagonal_weights_matrix)))  # jacobian from upper matrix
+        # jacobian from lower matrix is 0
+
         x = tf.linalg.matvec(self._convex_update(self.lower_diagonal_weights_matrix), x)
         x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix), x,
                              transpose_a=True) + self.bias  # in the implementation there was only one bias
         if self.activation_fn:
             activation_layer = tfe.bijectors.ScalarFunctionWithInferredInverse(
                 lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
+            fldj += activation_layer.forward_log_det_jacobian(x, self.forward_min_event_ndims)
             x = activation_layer.forward(x)
-        return x
+        return x, {'ildj': -fldj, 'fldj': fldj}
+
+    def _forward(self, x):
+        y, _ = self._augmented_forward(x)
+        return y
 
     def _inverse(self, y):
         if self.activation_fn:
             y = self.inv_f(y)
 
-            # this way of using inverse activation does not work because residual_fraction is a variable
+            # FIXME: this way of using inverse activation does not seem to work because residual_fraction is a variable
             # activation_layer = tfe.bijectors.ScalarFunctionWithInferredInverse(
                 #lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
             # y = activation_layer.inverse(y)
@@ -96,11 +108,9 @@ class HighwayFlow(tfb.Bijector):
         return tf.linalg.matrix_transpose(y)
 
     def _forward_log_det_jacobian(self, x):
-        jacobian = tf.reduce_sum(
-            tf.math.log(self.residual_fraction + (1. - self.residual_fraction) * tf.linalg.diag_part(
-                self.upper_diagonal_weights_matrix)))  # jacobian from upper matrix
-        # jacobian from lower matrix is 0
-        # FIXME: need to compute jacobian depending on selected activation
-        if self.activation_fn:  # else activation jacobian is 0
-            jacobian += tf.reduce_sum(tf.math.log(self.df(x)))  # Ja
-        return jacobian
+        cached = self._cache.forward_attributes(x)
+        # If LDJ isn't in the cache, call forward once.
+        if 'fldj' not in cached:
+            _, attrs = self._augmented_forward(x)
+            cached.update(attrs)
+        return cached['fldj']
