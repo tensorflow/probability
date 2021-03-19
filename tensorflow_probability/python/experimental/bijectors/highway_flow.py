@@ -19,7 +19,7 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
         activation_fn=activation_fn,
         bias=tf.Variable(np.random.normal(0., 0.01, (width,)), dtype=tf.float32),
         upper_diagonal_weights_matrix=tfp.util.TransformedVariable(
-            initial_value=np.tril(np.random.normal(0., 1., (width, width)), -1) + np.diag(
+            initial_value=np.tril(np.random.normal(0., 1., (width, width)), -1).astype('float32') + np.diag(
                 np.random.uniform(size=width)).astype('float32'),
             bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None)),
         lower_diagonal_weights_matrix=tfp.util.TransformedVariable(
@@ -72,7 +72,7 @@ class HighwayFlow(tfb.Bijector):
         return x
 
     def _forward(self, x):
-        x = tf.linalg.matvec(self._convex_update(self.get_L()), x)
+        x = tf.linalg.matvec(self._convex_update(self.lower_diagonal_weights_matrix), x)
         x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix), x,
                              transpose_a=True) + self.bias  # in the implementation there was only one bias
         if self.activation_fn:
@@ -86,7 +86,7 @@ class HighwayFlow(tfb.Bijector):
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
         y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
                                        tf.linalg.matrix_transpose(y - self.bias), lower=False)
-        y = tf.linalg.triangular_solve(self._convex_update(self.get_L()), y)
+        y = tf.linalg.triangular_solve(self._convex_update(self.lower_diagonal_weights_matrix), y)
         return tf.linalg.matrix_transpose(y)
 
     def _forward_log_det_jacobian(self, x):
