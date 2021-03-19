@@ -5,8 +5,7 @@ import tensorflow_probability as tfp
 
 tfd = tfp.distributions
 tfb = tfp.bijectors
-tfe = tf.experimental
-
+tfe = tfp.experimental
 
 def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activation_fn=None):
     # FIXME: should everything be in float32 or float64?
@@ -76,12 +75,19 @@ class HighwayFlow(tfb.Bijector):
         x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix), x,
                              transpose_a=True) + self.bias  # in the implementation there was only one bias
         if self.activation_fn:
-            x = self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x)
+            activation_layer = tfe.bijectors.ScalarFunctionWithInferredInverse(
+                lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
+            x = activation_layer.forward(x)
         return x
 
     def _inverse(self, y):
         if self.activation_fn:
             y = self.inv_f(y)
+
+            # this way of using inverse activation does not work because residual_fraction is a variable
+            # activation_layer = tfe.bijectors.ScalarFunctionWithInferredInverse(
+                #lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
+            # y = activation_layer.inverse(y)
 
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
         y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
