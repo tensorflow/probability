@@ -21,7 +21,11 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
         upper_diagonal_weights_matrix=tfp.util.TransformedVariable(
             initial_value=np.random.uniform(0., 1., (width, width)).astype('float32'),
             bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None)),
-        lower_diagonal_weights_matrix=None
+        lower_diagonal_weights_matrix=tfp.util.TransformedVariable(
+            initial_value=np.random.normal(0., 1., (width, width)).astype('float32'),
+            bijector=tfb.Chain([tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
+                                          tfb.Pad(paddings=[(1, 0), (0, 1)]),
+                                          tfb.FillTriangular()]))
     )
 
 
@@ -37,13 +41,6 @@ class HighwayFlow(tfb.Bijector):
 
         self.width = width
 
-        ###########################################
-        # once we find a way to define L matrix as TransformedVariable, these two lines should be removed
-        self.weights = tf.Variable(np.random.normal(0., 0.01, (width, width)),
-                                   dtype=tf.float32)
-        self.maskl = tfe.numpy.triu(tf.ones((self.width, self.width)), 1)
-        ###########################################
-
         self.bias = bias
 
         self.residual_fraction = residual_fraction
@@ -51,7 +48,6 @@ class HighwayFlow(tfb.Bijector):
         # still lower triangular, transposed is done in matvec.
         self.upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
 
-        # TODO: Not implemented yet
         self.lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
 
         self.activation_fn = activation_fn
