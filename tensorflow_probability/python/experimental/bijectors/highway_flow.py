@@ -1,27 +1,25 @@
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
-tfd = tfp.distributions
-tfb = tfp.bijectors
-tfe = tfp.experimental
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import util
+from tensorflow_probability.python.experimental.bijectors import scalar_function_with_inferred_inverse
 
 def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activation_fn=None):
     # FIXME: should everything be in float32 or float64?
     # TODO: add control that residual_fraction_initial_value is between 0 and 1
     return HighwayFlow(
         width=width,
-        residual_fraction=tfp.util.TransformedVariable(
+        residual_fraction=util.TransformedVariable(
             initial_value=np.asarray(residual_fraction_initial_value, dtype='float32'),
             bijector=tfb.Sigmoid()),
         activation_fn=activation_fn,
         bias=tf.Variable(np.random.normal(0., 0.01, (width,)), dtype=tf.float32),
-        upper_diagonal_weights_matrix=tfp.util.TransformedVariable(
+        upper_diagonal_weights_matrix=util.TransformedVariable(
             initial_value=np.tril(np.random.normal(0., 1., (width, width)), -1).astype('float32') + np.diag(
                 np.random.uniform(size=width)).astype('float32'),
             bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None)),
-        lower_diagonal_weights_matrix=tfp.util.TransformedVariable(
+        lower_diagonal_weights_matrix=util.TransformedVariable(
             initial_value=np.random.normal(0., 1., (width, width)).astype('float32'),
             bijector=tfb.Chain([tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
                                 tfb.Pad(paddings=[(1, 0), (0, 1)]),
@@ -82,7 +80,7 @@ class HighwayFlow(tfb.Bijector):
         x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix), x,
                              transpose_a=True) + self.bias  # in the implementation there was only one bias
         if self.activation_fn:
-            activation_layer = tfe.bijectors.ScalarFunctionWithInferredInverse(
+            activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
                 lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
             fldj += activation_layer.forward_log_det_jacobian(x, self.forward_min_event_ndims)
             x = activation_layer.forward(x)
@@ -97,8 +95,8 @@ class HighwayFlow(tfb.Bijector):
             y = self.inv_f(y)
 
             # FIXME: this way of using inverse activation does not seem to work because residual_fraction is a variable
-            # activation_layer = tfe.bijectors.ScalarFunctionWithInferredInverse(
-                #lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
+            # activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
+            # lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
             # y = activation_layer.inverse(y)
 
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes

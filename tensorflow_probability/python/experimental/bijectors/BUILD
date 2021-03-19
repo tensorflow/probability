@@ -108,9 +108,11 @@ multi_substrate_py_library(
     srcs = ["highway_flow.py"],
     srcs_version = "PY3",
     deps = [
+        ":scalar_function_with_inferred_inverse",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/util",
     ],
 )
 
