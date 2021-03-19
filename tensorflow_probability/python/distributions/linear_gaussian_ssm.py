@@ -812,13 +812,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       'further dimensions must match or be broadcastable to the sample '
       'shape of `x`. Default value: `None`  (falls back to `self.mask`).'})
   def _log_prob(self, x, mask=None):
-    mask = self._get_mask(mask)
-    log_likelihoods, _, _, _, _, _, _ = self._forward_filter(x, mask=mask)
+    log_likelihood, _, _, _, _, _, _ = self._forward_filter(
+        x, mask=mask, final_step_only=True)
+    return log_likelihood
 
-    # Sum over timesteps to compute the log marginal likelihood.
-    return tf.reduce_sum(log_likelihoods, axis=-1)
-
-  def forward_filter(self, x, mask=None):
+  def forward_filter(self, x, mask=None, final_step_only=False):
     """Run a Kalman filter over a provided sequence of outputs.
 
     Note that the returned values `filtered_means`, `predicted_means`, and
@@ -843,11 +841,20 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
         further dimensions must match or be broadcastable to the sample
         shape of `x`.
         Default value: `None`  (falls back to `self.mask`).
+      final_step_only: optional Python `bool`. If `True`, the `num_timesteps`
+        dimension is omitted from all return values and only the value from the
+        final timestep is returned (in this case, `log_likelihoods` will
+        be the *cumulative* log marginal likelihood). This may be significantly
+        more efficient than returning all values (although note that no
+        efficiency gain is expected when `self.experimental_parallelize=True`).
+        Default value: `False`.
 
     Returns:
       log_likelihoods: Per-timestep log marginal likelihoods `log
         p(x[t] | x[:t-1])` evaluated at the input `x`, as a `Tensor`
         of shape `sample_shape(x) + batch_shape + [num_timesteps].`
+        If `final_step_only` is `True`, this will instead be the
+        *cumulative* log marginal likelihood at the final step.
       filtered_means: Means of the per-timestep filtered marginal
          distributions p(z[t] | x[:t]), as a Tensor of shape
         `sample_shape(x) + batch_shape + [num_timesteps, latent_size]`.
@@ -881,9 +888,9 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     x = tf.convert_to_tensor(x, name='x')
     mask = self._get_mask(mask)
     with self._name_and_control_scope('forward_filter', x, {'mask': mask}):
-      return self._forward_filter(x, mask=mask)
+      return self._forward_filter(x, mask=mask, final_step_only=final_step_only)
 
-  def _forward_filter(self, x, mask=None):
+  def _forward_filter(self, x, mask=None, final_step_only=False):
     mask = self._get_mask(mask)
     if self.experimental_parallelize:
       filter_results = parallel_filter.kalman_filter(
@@ -892,13 +899,22 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
                 else distribution_util.move_dimension(mask, -1, 0)),
           **self._build_model_spec_kwargs_for_parallel_fns(
               pass_covariance=True))
+      if final_step_only:
+        # Not clear if/how we can efficiently get *just* the final step from
+        # parallel filtering, so just do the naive thing for now.
+        return tf.nest.map_structure(
+            lambda x: x[-1],
+            filter_results._replace(
+                log_likelihoods=tf.cumsum(filter_results.log_likelihoods,
+                                          axis=0)))
       return tf.nest.map_structure(
           lambda x, r: distribution_util.move_dimension(x, 0, -r),
           filter_results,
           type(filter_results)(1, 2, 3, 2, 3, 2, 3))
-    return self._forward_filter_sequential(x, mask=mask)
+    return self._forward_filter_sequential(
+        x, mask=mask, final_step_only=final_step_only)
 
-  def _forward_filter_sequential(self, x, mask=None):
+  def _forward_filter_sequential(self, x, mask=None, final_step_only=False):
     with tf.name_scope('forward_filter_sequential'):
       mask = self._get_mask(mask)
       # Get the full output sample_shape + batch shape. Usually
@@ -982,26 +998,32 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
           self.get_observation_matrix_for_timestep,
           self.get_observation_noise_for_timestep)
 
-      filter_states = tf.scan(update_step_fn,
-                              elems=x if mask is None else (x, mask),
-                              initializer=initial_state)
+      if final_step_only:
+        # If we don't need intermediate states, then we can use a `while_loop`
+        # in place of `scan`.
+        filter_states = tf.while_loop(
+            cond=lambda *_: True,
+            body=_build_accumulating_loop_body(
+                update_step_fn, x=x, mask=mask,
+                initial_step=initial_state.timestep),
+            loop_vars=initial_state,
+            maximum_iterations=ps.size0(x))
+      else:
+        filter_states = tf.nest.map_structure(
+            # Move the time dimension back into the event shape(s).
+            lambda x, d: distribution_util.move_dimension(x, 0, -(d + 1)),
+            tf.scan(update_step_fn,
+                    elems=x if mask is None else (x, mask),
+                    initializer=initial_state),
+            KalmanFilterState(
+                # Event ranks of each filter state part. Note that means are
+                # still [D, 1] matrices here (the dummy dimension is stripped
+                # below).
+                predicted_mean=2, predicted_cov=2,
+                filtered_mean=2, filtered_cov=2,
+                observation_mean=2, observation_cov=2,
+                log_marginal_likelihood=0, timestep=0))
 
-      log_likelihoods = distribution_util.move_dimension(
-          filter_states.log_marginal_likelihood, 0, -1)
-
-      # Move the time dimension back into the event shape.
-      filtered_means = distribution_util.move_dimension(
-          filter_states.filtered_mean[..., 0], 0, -2)
-      filtered_covs = distribution_util.move_dimension(
-          filter_states.filtered_cov, 0, -3)
-      predicted_means = distribution_util.move_dimension(
-          filter_states.predicted_mean[..., 0], 0, -2)
-      predicted_covs = distribution_util.move_dimension(
-          filter_states.predicted_cov, 0, -3)
-      observation_means = distribution_util.move_dimension(
-          filter_states.observation_mean[..., 0], 0, -2)
-      observation_covs = distribution_util.move_dimension(
-          filter_states.observation_cov, 0, -3)
       # We could directly construct the batch Distributions
       # filtered_marginals = tfd.MultivariateNormalFullCovariance(
       #      filtered_means, filtered_covs)
@@ -1011,11 +1033,11 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
       # saves computation in Eager mode (avoiding an immediate
       # Cholesky factorization that the user may not want) and aids
       # debugging of numerical issues.
-
-      return (log_likelihoods,
-              filtered_means, filtered_covs,
-              predicted_means, predicted_covs,
-              observation_means, observation_covs)
+      return (
+          filter_states.log_marginal_likelihood,
+          filter_states.filtered_mean[..., 0], filter_states.filtered_cov,
+          filter_states.predicted_mean[..., 0], filter_states.predicted_cov,
+          filter_states.observation_mean[..., 0], filter_states.observation_cov)
 
   def posterior_marginals(self, x, mask=None):
     """Run a Kalman smoother to return posterior mean and cov.
@@ -1678,6 +1700,23 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
         state.timestep+1)
 
   return kalman_filter_step
+
+
+def _build_accumulating_loop_body(kalman_filter_step_fn, x, mask, initial_step):
+  """Wraps a Kalman filter step to accumulate the marginal likelihood."""
+
+  def accumulating_loop_body(*kalman_filter_state_parts):
+    previous_filter_state = KalmanFilterState(*kalman_filter_state_parts)
+    new_filter_state = kalman_filter_step_fn(
+        state=previous_filter_state,
+        elems_t=tf.nest.map_structure(  # Get observations for this timestep.
+            lambda v: tf.gather(  # pylint: disable=g-long-lambda
+                v, previous_filter_state.timestep - initial_step),
+            x if mask is None else (x, mask)))
+    return new_filter_state._replace(log_marginal_likelihood=(
+        previous_filter_state.log_marginal_likelihood +  # Total accumulated.
+        new_filter_state.log_marginal_likelihood))  # Increment from this step.
+  return accumulating_loop_body
 
 
 def linear_gaussian_update(
