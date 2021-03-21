@@ -187,7 +187,7 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   `proposal_state = current_state + perturb` by a random
   perturbation, followed by Metropolis-Hastings accept/reject step. For more
   details see [Section 2.1 of Roberts and Rosenthal (2004)](
-  http://emis.ams.org/journals/PS/images/getdoc510c.pdf?id=35&article=15&mode=pdf).
+  http://dx.doi.org/10.1214/154957804100000024).
 
   Current class implements RWM for normal and uniform proposals. Alternatively,
   the user can supply any custom proposal generating function.
