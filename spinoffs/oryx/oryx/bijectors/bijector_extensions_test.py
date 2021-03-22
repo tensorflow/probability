@@ -24,52 +24,50 @@ from oryx import bijectors as bb
 from oryx import core
 from oryx.internal import test_util
 
-
 BIJECTORS = [
-    ('exp', bb.Exp, (), {}, 1., []),
-    ('affine_scalar', bb.AffineScalar, (1., 2.), {}, 1., [1., 2.]),
-    ('transform_diagonal', bb.TransformDiagonal,
-     (bb.Exp(),), {}, onp.eye(2).astype(onp.float32), []),
-    ('invert', bb.Invert, (bb.Exp(),), {}, 1., []),
+    ('exp', lambda: bb.Exp(), 1., []),  # pylint: disable=unnecessary-lambda
+    ('affine_scalar', lambda: bb.AffineScalar(1., 2.), 1., [2., 1.]),
+    ('transform_diagonal', lambda: bb.TransformDiagonal(bb.Exp()),
+     onp.eye(2).astype(onp.float32), []),
+    ('invert', lambda: bb.Invert(bb.Exp()), 1., []),
 ]
 
 
 class BijectorsExtensionsTest(test_util.TestCase):
 
   @parameterized.named_parameters(BIJECTORS)
-  def test_forward(self, bij, args, kwargs, inp, flat):
+  def test_forward(self, bij, inp, flat):
     del flat
-    b = bij(*args, **kwargs)
+    b = bij()
     b.forward(inp)
 
   @parameterized.named_parameters(BIJECTORS)
-  def test_inverse(self, bij, args, kwargs, inp, flat):
+  def test_inverse(self, bij, inp, flat):
     del flat
-    b = bij(*args, **kwargs)
+    b = bij()
     b.inverse(inp)
 
   @parameterized.named_parameters(BIJECTORS)
-  def test_flatten(self, bij, args, kwargs, inp, flat):
+  def test_flatten(self, bij, inp, flat):
     del inp
-    b = bij(*args, **kwargs)
+    b = bij()
     flat_p, _ = jax.tree_flatten(b)
     for e1, e2 in zip(flat_p, flat):
       onp.testing.assert_allclose(e1, e2)
 
   @parameterized.named_parameters(BIJECTORS)
-  def test_inverse_transformation(self, bij, args, kwargs, inp, flat):
+  def test_inverse_transformation(self, bij, inp, flat):
     del flat
-    b = bij(*args, **kwargs)
-    onp.testing.assert_allclose(core.inverse(b, inp)(inp),
-                                b.inverse(inp))
+    b = bij()
+    onp.testing.assert_allclose(core.inverse(b, inp)(inp), b.inverse(inp))
 
   @parameterized.named_parameters(BIJECTORS)
-  def test_ildj_transformation(self, bij, args, kwargs, inp, flat):
+  def test_ildj_transformation(self, bij, inp, flat):
     del flat
-    b = bij(*args, **kwargs)
-    onp.testing.assert_allclose(core.ildj(b, inp)(inp),
-                                b.inverse_log_det_jacobian(
-                                    inp, onp.ndim(inp)))
+    b = bij()
+    onp.testing.assert_allclose(
+        core.ildj(b, inp)(inp), b.inverse_log_det_jacobian(inp, onp.ndim(inp)))
+
 
 if __name__ == '__main__':
   absltest.main()

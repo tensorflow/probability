@@ -311,8 +311,10 @@ def forecast(model,
         tf.shape(observed_time_series))[-2]
     observed_data_ssm = model.make_state_space_model(
         num_timesteps=num_observed_steps, param_vals=parameter_samples)
-    (_, _, _, predictive_means, predictive_covs, _, _
-    ) = observed_data_ssm.forward_filter(observed_time_series, mask=mask)
+    (_, _, _, predictive_mean, predictive_cov, _, _
+    ) = observed_data_ssm.forward_filter(observed_time_series,
+                                         mask=mask,
+                                         final_step_only=True)
 
     # Build a batch of state-space models over the forecast period. Because
     # we'll use MixtureSameFamily to mix over the posterior draws, we need to
@@ -327,9 +329,8 @@ def forecast(model,
             0, -(1 + _prefer_static_event_ndims(param.prior)))
         for param in model.parameters}
     forecast_prior = tfd.MultivariateNormalFullCovariance(
-        loc=dist_util.move_dimension(predictive_means[..., -1, :], 0, -2),
-        covariance_matrix=dist_util.move_dimension(
-            predictive_covs[..., -1, :, :], 0, -3))
+        loc=dist_util.move_dimension(predictive_mean, 0, -2),
+        covariance_matrix=dist_util.move_dimension(predictive_cov, 0, -3))
 
     # Ugly hack: because we moved `num_posterior_draws` to the trailing (rather
     # than leading) dimension of parameters, the parameter batch shapes no

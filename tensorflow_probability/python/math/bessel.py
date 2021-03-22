@@ -34,6 +34,7 @@ __all__ = [
     'bessel_ive',
     'bessel_kve',
     'log_bessel_ive',
+    'log_bessel_kve',
 ]
 
 
@@ -1028,7 +1029,7 @@ def bessel_ive(v, z, name=None):
     return _bessel_ive_custom_gradient(v, z)
 
 
-def _bessel_kve_naive(v, z):
+def _bessel_kve_shared(v, z, output_log_space=False):
   """Compute bessel_kve(v, z)."""
   dtype = dtype_util.common_dtype([v, z], tf.float32)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
@@ -1043,13 +1044,20 @@ def _bessel_kve_naive(v, z):
   small_v = tf.where(v < 50., v, numpy_dtype(0.1))
   large_v = tf.where(v >= 50., v, numpy_dtype(1000.))
 
-  _, olver_kve = _olver_asymptotic_uniform(large_v, z_abs)
-  temme_kve = _temme_expansion(small_v, z_abs)[1]
+  _, olver_kve = _olver_asymptotic_uniform(
+      large_v, z_abs, output_log_space=output_log_space)
+  temme_kve = _temme_expansion(
+      small_v, z_abs, output_log_space=output_log_space)[1]
   kve = tf.where(v >= 50., olver_kve, temme_kve)
 
   # Handle when z is zero.
   kve = tf.where(tf.math.equal(z, 0.), numpy_dtype(np.inf), kve)
   return tf.where(z < 0., numpy_dtype(np.nan), kve)
+
+
+def _bessel_kve_naive(v, z):
+  """Compute bessel_kve(v, z)."""
+  return _bessel_kve_shared(v, z, output_log_space=False)
 
 
 def _bessel_kve_fwd(v, z):
@@ -1202,8 +1210,9 @@ def _log_bessel_ive_custom_gradient(v, z):
 def log_bessel_ive(v, z, name=None):
   """Computes `log(tfp.math.bessel_ive(v, z))`.
 
-  This function is the same as `log(tfp.math.bessel_ive(v, z))` except
-  uses a more numerically stable gradient computation.
+  This function is a more numerically stable version of
+  `log(tfp.math.bessel_ive(v, z))`, along with more numerically stable
+  gradients.
 
   Warning: Gradients with respect to the first parameter `v` are currently not
   defined.
@@ -1225,6 +1234,111 @@ def log_bessel_ive(v, z, name=None):
     v = tf.convert_to_tensor(v, dtype=dtype)
     z = tf.convert_to_tensor(z, dtype=dtype)
     return _log_bessel_ive_custom_gradient(v, z)
+
+
+def _log_bessel_kve_naive(v, z):
+  """Compute log(bessel_kve(v, z))_."""
+  return _bessel_kve_shared(v, z, output_log_space=True)
+
+
+def _log_bessel_kve_fwd(v, z):
+  """Compute output, aux (collaborates with _log_bessel_kve_bwd)."""
+  output = _log_bessel_kve_naive(v, z)
+  return output, (v, z)
+
+
+def _log_bessel_kve_bwd(aux, g):
+  """Reverse mode impl for bessel_kve."""
+  v, z = aux
+
+  dtype = dtype_util.common_dtype([v, z], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+
+  log_kve = _log_bessel_kve_custom_gradient(v, z)
+  grad_z = tfp_math.log_add_exp(
+      _log_bessel_kve_custom_gradient(v - 1., z),
+      _log_bessel_kve_custom_gradient(v + 1., z)) - numpy_dtype(
+          np.log(2.)) - log_kve
+  grad_z = g * -tf.math.expm1(grad_z)
+  _, grad_z = _fix_gradient_for_broadcasting(
+      v, z, tf.ones_like(grad_z), grad_z)
+
+  # No gradient for this at the moment. This is a complicated expression
+  # The gradient with respect to the parameter doesn't have an easy closed
+  # form. More work will need to be done to ensure good numerics for the
+  # gradient.
+  # TODO(b/169357627): Implement gradients of modified bessel functions with
+  # respect to parameters.
+  grad_v = None
+
+  return grad_v, grad_z
+
+
+def _log_bessel_kve_jvp(primals, tangents):
+  """Computes JVP for bessel_kve (supports JAX custom derivative)."""
+  v, z = primals
+  dv, dz = tangents
+
+  dtype = dtype_util.common_dtype([v, z], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+
+  # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
+  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dv),
+                                         prefer_static.shape(dz))
+  dv = tf.broadcast_to(dv, bc_shp)
+  dz = tf.broadcast_to(dz, bc_shp)
+
+  log_kve = _log_bessel_kve_custom_gradient(v, z)
+  pz = tfp_math.log_add_exp(
+      _log_bessel_kve_custom_gradient(v - 1., z),
+      _log_bessel_kve_custom_gradient(v + 1., z)) - numpy_dtype(
+          np.log(2.)) - log_kve
+  pz = -tf.math.expm1(pz)
+
+  # `bessel_kve` does not have gradients with respect to `v`, and thus
+  # this `JVP` rule matches TF.
+  # Ideally, it would be nice to throw an exception when taking gradients of
+  # in JAX mode, but this is not possible at the moment with `custom_jvp`.
+  # See https://github.com/google/jax/issues/5913 for details.
+  # TODO(https://github.com/google/jax/issues/5913): Define vjp for v.
+
+  return log_kve, pz * dz
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_log_bessel_kve_fwd,
+    vjp_bwd=_log_bessel_kve_bwd,
+    jvp_fn=_log_bessel_kve_jvp)
+def _log_bessel_kve_custom_gradient(v, z):
+  return _log_bessel_kve_naive(v, z)
+
+
+def log_bessel_kve(v, z, name=None):
+  """Computes `log(tfp.math.bessel_kve(v, z))`.
+
+  This function is a more numerically stable version of
+  `log(tfp.math.bessel_kve(v, z))`.
+
+  Warning: Gradients with respect to the first parameter `v` are currently not
+  defined.
+
+  Args:
+    v: Floating-point `Tensor` broadcastable with `z` for which `log(Kve(v, z))`
+      should be computed. `v` is expected to be non-negative.
+    z: Floating-point `Tensor` broadcastable with `v` for which `log(Kve(v, z))`
+      should be computed. If `z` is negative, `v` is expected to be an integer.
+    name: A name for the operation (optional).
+      Default value: `None` (i.e., 'log_bessel_kve').
+
+  Returns:
+    log_bessel_kve: Log of Exponentially modified Bessel Function of the second
+      kind.
+  """
+  with tf.name_scope(name or 'log_bessel_kve'):
+    dtype = dtype_util.common_dtype([v, z], tf.float32)
+    v = tf.convert_to_tensor(v, dtype=dtype)
+    z = tf.convert_to_tensor(z, dtype=dtype)
+    return _log_bessel_kve_custom_gradient(v, z)
 
 
 def _fix_gradient_for_broadcasting(a, b, grad_a, grad_b):

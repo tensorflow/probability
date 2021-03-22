@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
@@ -181,6 +183,32 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
     t2 = ts._from_components(components)
     self.assertIsInstance(t2, ThingWithParametersButNoAttrs)
+
+  def test_wrapped_constructor(self):
+    def add_tag(f):
+      @functools.wraps(f)
+      def wrapper(*args, **kwargs):
+        args[0]._tag = 'tagged'
+        return f(*args, **kwargs)
+      return wrapper
+
+    @tfp.experimental.auto_composite_tensor
+    class ThingWithWrappedInit(tfp.experimental.AutoCompositeTensor):
+
+      @add_tag
+      def __init__(self, value):
+        self.value = tf.convert_to_tensor(value)
+
+    init = ThingWithWrappedInit(3)
+    def body(obj):
+      return ThingWithWrappedInit(value=obj.value + 1),
+
+    out, = tf.while_loop(
+        cond=lambda *_: True,
+        body=body,
+        loop_vars=(init,),
+        maximum_iterations=3)
+    self.assertEqual(self.evaluate(out.value), 6)
 
 
 if __name__ == '__main__':

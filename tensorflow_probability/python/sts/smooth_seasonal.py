@@ -155,10 +155,8 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                drift_scale,
                initial_state_prior,
                observation_noise_scale=0.,
-               initial_step=0,
-               validate_args=False,
-               allow_nan_stats=True,
-               name=None):
+               name=None,
+               **linear_gaussian_ssm_kwargs):
     """Build a smooth seasonal state space model.
 
     Args:
@@ -185,22 +183,14 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         treated as batch dimensions) `float` `Tensor` indicating the standard
         deviation of the observation noise.
         Default value: `0.`.
-      initial_step: scalar `int` `Tensor` specifying the starting timestep.
-        Default value: `0`.
-      validate_args: Python `bool`. Whether to validate input with asserts. If
-        `validate_args` is `False`, and the inputs are invalid, correct behavior
-        is not guaranteed.
-        Default value: `False`.
-      allow_nan_stats: Python `bool`. If `False`, raise an
-        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
-        batch member. If `True`, batch members with valid parameters leading to
-        undefined statistics will return NaN for this statistic.
-        Default value: `True`.
       name: Python `str` name prefixed to ops created by this class.
         Default value: 'SmoothSeasonalStateSpaceModel'.
-
+      **linear_gaussian_ssm_kwargs: Optional additional keyword arguments to
+        to the base `tfd.LinearGaussianStateSpaceModel` constructor.
     """
     parameters = dict(locals())
+    parameters.update(linear_gaussian_ssm_kwargs)
+    del parameters['linear_gaussian_ssm_kwargs']
     with tf.name_scope(name or 'SmoothSeasonalStateSpaceModel') as name:
 
       dtype = dtype_util.common_dtype(
@@ -250,10 +240,8 @@ class SmoothSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
               scale_diag=observation_noise_scale[..., tf.newaxis],
               name='observation_noise'),
           initial_state_prior=initial_state_prior,
-          initial_step=initial_step,
-          allow_nan_stats=allow_nan_stats,
-          validate_args=validate_args,
-          name=name)
+          name=name,
+          **linear_gaussian_ssm_kwargs)
       self._parameters = parameters
 
   @property
@@ -474,18 +462,17 @@ class SmoothSeasonal(StructuralTimeSeries):
                               num_timesteps,
                               param_map,
                               initial_state_prior=None,
-                              initial_step=0):
+                              **linear_gaussian_ssm_kwargs):
 
     if initial_state_prior is None:
       initial_state_prior = self.initial_state_prior
 
     if not self.allow_drift:
       param_map['drift_scale'] = 0.
-
+    linear_gaussian_ssm_kwargs.update(param_map)
     return SmoothSeasonalStateSpaceModel(
         num_timesteps=num_timesteps,
         period=self.period,
         frequency_multipliers=self.frequency_multipliers,
         initial_state_prior=initial_state_prior,
-        initial_step=initial_step,
-        **param_map)
+        **linear_gaussian_ssm_kwargs)

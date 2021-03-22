@@ -256,6 +256,8 @@ class JohnsonSU(transformed_distribution.TransformedDistribution):
     """Scaling factors of these Johnson's SU distribution(s)."""
     return self._scale
 
+  experimental_is_sharded = False
+
   def _mean(self):
     skewness, tailweight, scale, loc = (
         [tf.convert_to_tensor(v)

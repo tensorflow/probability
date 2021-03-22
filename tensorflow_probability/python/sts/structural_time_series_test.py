@@ -136,17 +136,23 @@ class _StsTestHarness(object):
         loc=-2. + tf.zeros([model.latent_size]),
         scale_diag=3. * tf.ones([model.latent_size]))
 
+    mask = tf.convert_to_tensor(
+        [False, True, True, False, False, False, False, True, False, False],
+        dtype=tf.bool)
+
     # Verify we build the LGSSM without errors.
     ssm = model.make_state_space_model(
         num_timesteps=10,
         param_vals=dummy_param_vals,
         initial_state_prior=initial_state_prior,
-        initial_step=1)
+        initial_step=1,
+        mask=mask)
 
-    # Verify that the child class passes the initial step and prior arguments
-    # through to the SSM.
+    # Verify that the child class passes the initial step, prior, and mask
+    # arguments through to the SSM.
     self.assertEqual(self.evaluate(ssm.initial_step), 1)
     self.assertEqual(ssm.initial_state_prior, initial_state_prior)
+    self.assertAllEqual(ssm.mask, mask)
 
     # Verify the model has the correct latent size.
     self.assertEqual(

@@ -421,5 +421,33 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
     self.assertAllEqualNested(self.evaluate(out_grads), true_grad)
 
+  def test_correct_gradient_dtype_for_disconnected_variables(self):
+
+    @tf.function(autograph=False)
+    def run(x, y):
+      def log_prob_parts(value):
+        x, y = value
+        return [
+            # These two RV's do not depend on each other.
+            tfd.Normal(0., 1.).log_prob(x),
+            tfd.Normal(0., 1.).log_prob(y),
+        ]
+
+      def log_prob(x, y):
+        sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
+            log_prob_parts, [False, True], axis_name=self.axis_name)
+        parts = sharded_log_prob_parts([x, y])
+        return tf.add_n(parts)
+
+      return tfp.math.value_and_gradient(log_prob, (x, y))[1]
+
+    sharded_x = self.shard_values(tf.range(4.))
+    sharded_y = sharded_x
+    out_grads = self.per_replica_to_tensor(
+        self.strategy_run(run, (sharded_x, sharded_y)))
+    self.assertEqual(tf.float32, out_grads[0].dtype)
+    self.assertEqual(tf.float32, out_grads[1].dtype)
+
+
 if __name__ == '__main__':
   tf.test.main()

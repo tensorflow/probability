@@ -126,6 +126,12 @@ class Sharded(distribution_lib.Distribution):
       return []
     return self.distribution._parameter_control_dependencies(is_init=is_init)  # pylint: disable=protected-access
 
+  def _default_event_space_bijector(self, *args, **kwargs):
+    # TODO(b/175084455): This should likely be wrapped in a `tfb.Sharded`-like
+    # construct.
+    return self.distribution.experimental_default_event_space_bijector(
+        *args, **kwargs)
+
   _composite_tensor_nonshape_params = ('distribution',)
 
 

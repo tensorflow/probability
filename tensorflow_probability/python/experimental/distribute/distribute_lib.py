@@ -177,7 +177,10 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded, axis_name=None):
       def psum_grads(term_grad, term_sharded):
         if term_grad is not None:
           if not value_sharded and term_sharded:
-            term_grad = psum(term_grad, axis_name=axis_name)
+            # TODO(https://github.com/google/jax/issues/6022): This cast
+            # shouldn't be here.
+            term_grad = tf.cast(
+                psum(term_grad, axis_name=axis_name), term_grad.dtype)
         return term_grad
 
       total_grad = tf.nest.map_structure(psum_grads, term_grads,

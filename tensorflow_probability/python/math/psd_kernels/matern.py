@@ -196,8 +196,8 @@ class GeneralizedMatern(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
     log_result = tf.where(
         tf.math.equal(norm, 0.),
         dtype_util.as_numpy_dtype(self.dtype)(0.),
-        df * tf.math.log(safe_norm) + tf.math.log(
-            tfp_math.bessel_kve(df, safe_norm)) - safe_norm)
+        df * tf.math.log(safe_norm) + tfp_math.log_bessel_kve(
+            df, safe_norm) - safe_norm)
 
     log_result = log_result - tf.math.lgamma(df) + (1. - df) * np.log(2.)
 

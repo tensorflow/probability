@@ -22,14 +22,9 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import reshape
-from tensorflow_probability.python.distributions import independent
-from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
-from tensorflow_probability.python.distributions import transformed_distribution
-from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvn_pfl
+
+from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
 from tensorflow_probability.python.experimental.stats import sample_stats
-from tensorflow_probability.python.internal import auto_composite_tensor
-from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import unnest
 from tensorflow_probability.python.mcmc import kernel as kernel_base
@@ -38,23 +33,6 @@ from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 __all__ = [
     'DiagonalMassMatrixAdaptation',
 ]
-
-# Add auto-composite tensors to the global namespace to avoid creating new
-# classes inside functions.
-_CompositeJointDistributionSequential = auto_composite_tensor.auto_composite_tensor(
-    jds.JointDistributionSequential, omit_kwargs=('name',))
-_CompositeLinearOperatorDiag = auto_composite_tensor.auto_composite_tensor(
-    tf.linalg.LinearOperatorDiag, omit_kwargs=('name',))
-_CompositeMultivariateNormalPrecisionFactorLinearOperator = auto_composite_tensor.auto_composite_tensor(
-    mvn_pfl.MultivariateNormalPrecisionFactorLinearOperator,
-    omit_kwargs=('name',))
-_CompositeIndependent = auto_composite_tensor.auto_composite_tensor(
-    independent.Independent, omit_kwargs=('name',))
-_CompositeReshape = auto_composite_tensor.auto_composite_tensor(
-    reshape.Reshape, omit_kwargs=('name',))
-_CompositeTransformedDistribution = auto_composite_tensor.auto_composite_tensor(
-    transformed_distribution.TransformedDistribution,
-    omit_kwargs=('name', 'kwargs_split_fn', 'parameters'))
 
 
 def hmc_like_momentum_distribution_setter_fn(kernel_results, new_distribution):
@@ -179,9 +157,8 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
       batch_ndims = ps.rank(unnest.get_innermost(previous_kernel_results,
                                                  'target_log_prob'))
       state_parts = tf.nest.flatten(current_state)
-      new_momentum_distribution = _make_momentum_distribution(diags,
-                                                              state_parts,
-                                                              batch_ndims)
+      new_momentum_distribution = preconditioning_utils.make_momentum_distribution(
+          state_parts, batch_ndims, diags)
       inner_results = self.momentum_distribution_setter_fn(
           previous_kernel_results.inner_results, new_momentum_distribution)
 
@@ -258,8 +235,8 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
       batch_ndims = ps.rank(unnest.get_innermost(inner_results,
                                                  'target_log_prob'))
       init_state_parts = tf.nest.flatten(init_state)
-      momentum_distribution = _make_momentum_distribution(
-          diags, init_state_parts, batch_ndims)
+      momentum_distribution = preconditioning_utils.make_momentum_distribution(
+          init_state_parts, batch_ndims, diags)
       inner_results = self.momentum_distribution_setter_fn(
           inner_results, momentum_distribution)
       proposed = unnest.get_innermost(inner_results, 'proposed_results',
@@ -276,49 +253,3 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
   @property
   def is_calibrated(self):
     return False
-
-
-def _make_momentum_distribution(running_variance_parts, state_parts,
-                                batch_ndims):
-  """Construct a momentum distribution from the running variance.
-
-  This uses a running variance to construct a momentum distribution with the
-  correct batch_shape and event_shape.
-
-  Args:
-    running_variance_parts: List of `Tensor`, outputs of
-      `tfp.experimental.stats.RunningVariance.variance()`.
-    state_parts: List of `Tensor`.
-    batch_ndims: Scalar, for leading batch dimensions.
-
-  Returns:
-    `tfd.Distribution` where `.sample` has the same structure as `state_parts`,
-    and `.log_prob` of the sample will have the rank of `batch_ndims`
-  """
-  distributions = []
-  for variance_part, state_part in zip(running_variance_parts, state_parts):
-    running_variance_rank = ps.rank(variance_part)
-    state_rank = ps.rank(state_part)
-    event_shape = ps.shape(state_part)[batch_ndims:]
-    nevt = ps.reduce_prod(event_shape)
-    # Pad dimensions and tile by multiplying by tf.ones to add a batch shape
-    ones = tf.ones(ps.shape(state_part)[:-(state_rank - running_variance_rank)],
-                   dtype=variance_part.dtype)
-    ones = bu.left_justified_expand_dims_like(ones, state_part)
-    variance_tiled = ones * variance_part
-    variance_flattened = tf.reshape(
-        variance_tiled,
-        ps.concat([ps.shape(variance_tiled)[:batch_ndims],
-                   [nevt]], axis=0))
-
-    distributions.append(
-        _CompositeTransformedDistribution(
-            bijector=_CompositeReshape(
-                event_shape_out=event_shape, event_shape_in=[nevt]),
-            distribution=(
-                _CompositeMultivariateNormalPrecisionFactorLinearOperator(
-                    precision_factor=_CompositeLinearOperatorDiag(
-                        tf.math.sqrt(variance_flattened)),
-                    precision=_CompositeLinearOperatorDiag(
-                        variance_flattened)))))
-  return _CompositeJointDistributionSequential(distributions)

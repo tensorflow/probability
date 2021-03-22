@@ -105,6 +105,12 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 EVENT_SPACE_BIJECTOR_IS_BROKEN = [
     'InverseGamma',  # TODO(b/143090143): Enable this when the bug is fixed.
                      # (Reciprocal(Softplus(x)) -> inf for small x)
+    'PowerSpherical',  # TODO(b/182609813): Enable when we have a proper
+                       # event space bijector
+    'SphericalUniform',  # TODO(b/182609813): Enable when we have a proper
+                         # event space bijector
+    'VonMisesFisher',  # TODO(b/182609813): Enable when we have a proper
+                       # event space bijector
 ]
 
 SLICING_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-5)

@@ -30,6 +30,7 @@ from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.experimental.mcmc import diagonal_mass_matrix_adaptation as dmma
 from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
 from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts as pnuts
+from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
 from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -410,10 +411,10 @@ def _get_window_sizes(num_adaptation_steps):
 def _init_momentum(initial_transformed_position):
   """Initialize momentum so trace_fn can be concatenated."""
   event_shape = ps.shape(initial_transformed_position)[-1]
-  return dmma._make_momentum_distribution(  # pylint: disable=protected-access
-      running_variance_parts=[ps.ones(event_shape)],
+  return preconditioning_utils.make_momentum_distribution(
       state_parts=tf.nest.flatten(initial_transformed_position),
-      batch_ndims=1)
+      batch_ndims=1,
+      running_variance_parts=[ps.ones(event_shape)])
 
 
 def windowed_adaptive_nuts(n_draws,

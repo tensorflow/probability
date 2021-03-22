@@ -548,6 +548,8 @@ class RelaxedOneHotCategorical(
     """Input argument `logits`."""
     return self.distribution.logits
 
+  experimental_is_sharded = False
+
   def logits_parameter(self, name=None):
     """Logits vec computed from non-`None` input arg (`probs` or `logits`)."""
     return self.distribution.logits_parameter(name)

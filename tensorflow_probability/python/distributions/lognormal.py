@@ -93,6 +93,8 @@ class LogNormal(transformed_distribution.TransformedDistribution):
     """Distribution parameter for the pre-transformed standard deviation."""
     return self.distribution.scale
 
+  experimental_is_sharded = False
+
   def _log_prob(self, x):
     answer = super(LogNormal, self)._log_prob(x)
     # The formula inherited from TransformedDistribution computes `nan` for `x

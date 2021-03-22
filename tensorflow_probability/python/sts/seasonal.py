@@ -55,20 +55,10 @@ seasonal_init_args = """
         in which num_steps_per_season for each season also varies in different
         cycle (e.g., a 4 years cycle with leap day).
         Default value: 1.
-      initial_step: Optional scalar `int` `Tensor` specifying the starting
-        timestep.
-        Default value: 0.
-      validate_args: Python `bool`. Whether to validate input
-        with asserts. If `validate_args` is `False`, and the inputs are
-        invalid, correct behavior is not guaranteed.
-        Default value: `False`.
-      allow_nan_stats: Python `bool`. If `False`, raise an
-        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
-        batch member. If `True`, batch members with valid parameters leading to
-        undefined statistics will return NaN for this statistic.
-        Default value: `True`.
       name: Python `str` name prefixed to ops created by this class.
         Default value: "SeasonalStateSpaceModel".
+      **linear_gaussian_ssm_kwargs: Optional additional keyword arguments to
+        to the base `tfd.LinearGaussianStateSpaceModel` constructor.
 
     Raises:
       ValueError: if `num_steps_per_season` has invalid shape (neither
@@ -199,15 +189,15 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                initial_state_prior,
                observation_noise_scale=0.,
                num_steps_per_season=1,
-               initial_step=0,
-               validate_args=False,
-               allow_nan_stats=True,
-               name=None):  # pylint: disable=g-doc-args
+               name=None,
+               **linear_gaussian_ssm_kwargs):  # pylint: disable=g-doc-args
     """Build a seasonal effect state space model.
 
     {seasonal_init_args}
     """
     parameters = dict(locals())
+    parameters.update(linear_gaussian_ssm_kwargs)
+    del parameters['linear_gaussian_ssm_kwargs']
     with tf.name_scope(name or 'SeasonalStateSpaceModel') as name:
       # The initial state prior determines the dtype of sampled values.
       # Other model parameters must have the same dtype.
@@ -258,10 +248,8 @@ class SeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           observation_noise=tfd.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
           initial_state_prior=initial_state_prior,
-          initial_step=initial_step,
-          allow_nan_stats=allow_nan_stats,
-          validate_args=validate_args,
-          name=name)
+          name=name,
+          **linear_gaussian_ssm_kwargs)
       self._parameters = parameters
 
   @property
@@ -412,15 +400,15 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                initial_state_prior,
                observation_noise_scale=1e-4,  # Avoid degeneracy.
                num_steps_per_season=1,
-               initial_step=0,
-               validate_args=False,
-               allow_nan_stats=True,
-               name=None):  # pylint: disable=g-doc-args
+               name=None,
+               **linear_gaussian_ssm_kwargs):  # pylint: disable=g-doc-args
     """Build a seasonal effect state space model with a zero-sum constraint.
 
     {seasonal_init_args}
     """
     parameters = dict(locals())
+    parameters.update(linear_gaussian_ssm_kwargs)
+    del parameters['linear_gaussian_ssm_kwargs']
     with tf.name_scope(name or 'ConstrainedSeasonalStateSpaceModel') as name:
 
       # The initial state prior determines the dtype of sampled values.
@@ -480,10 +468,8 @@ class ConstrainedSeasonalStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           observation_noise=tfd.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
           initial_state_prior=initial_state_prior,
-          initial_step=initial_step,
-          allow_nan_stats=allow_nan_stats,
-          validate_args=validate_args,
-          name=name)
+          name=name,
+          **linear_gaussian_ssm_kwargs)
       self._parameters = parameters
 
   @property
@@ -920,13 +906,14 @@ class Seasonal(StructuralTimeSeries):
                               num_timesteps,
                               param_map,
                               initial_state_prior=None,
-                              initial_step=0):
+                              **linear_gaussian_ssm_kwargs):
 
     if initial_state_prior is None:
       initial_state_prior = self.initial_state_prior
 
     if not self.allow_drift:
       param_map['drift_scale'] = 0.
+    linear_gaussian_ssm_kwargs.update(param_map)
 
     if self.constrain_mean_effect_to_zero:
       return ConstrainedSeasonalStateSpaceModel(
@@ -934,13 +921,11 @@ class Seasonal(StructuralTimeSeries):
           num_seasons=self.num_seasons,
           num_steps_per_season=self.num_steps_per_season,
           initial_state_prior=initial_state_prior,
-          initial_step=initial_step,
-          **param_map)
+          **linear_gaussian_ssm_kwargs)
     else:
       return SeasonalStateSpaceModel(
           num_timesteps=num_timesteps,
           num_seasons=self.num_seasons,
           num_steps_per_season=self.num_steps_per_season,
           initial_state_prior=initial_state_prior,
-          initial_step=initial_step,
-          **param_map)
+          **linear_gaussian_ssm_kwargs)

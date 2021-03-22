@@ -20,16 +20,15 @@ from __future__ import print_function
 
 import collections
 import functools
-import warnings
 
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
+from tensorflow_probability.python.distributions import joint_distribution_coroutine
+
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import samplers
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -40,14 +39,6 @@ __all__ = [
 
 
 JAX_MODE = False
-
-
-# Cause all warnings to always be triggered.
-# Not having this means subsequent calls wont trigger the warning.
-warnings.filterwarnings(
-    'always',
-    module='tensorflow_probability.*joint_distribution_sequential',
-    append=True)  # Don't override user-set filters.
 
 
 def _make_summary_statistic(attr):
@@ -253,8 +244,12 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
 
   def _model_coroutine(self):
     xs = []
-    for dist_fn in self._dist_fn_wrapped:
-      x = yield dist_fn(*xs)
+    for dist_fn, args in zip(self._dist_fn_wrapped, self._dist_fn_args):
+      dist = dist_fn(*xs)
+      if not args:
+        dist = joint_distribution_coroutine.JointDistributionCoroutine.Root(
+            dist)
+      x = yield dist
       xs.append(x)
 
   def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
@@ -263,15 +258,9 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     #   self._dist_fn_args
     #   self._always_use_specified_sample_shape
     num_dists = len(self._dist_fn_wrapped)
-    if seed is not None and samplers.is_stateful_seed(seed):
-      seed_stream = SeedStream(seed, salt='JointDistributionSequential')
-    else:
-      seed_stream = None
-    if seed is not None:
-      seeds = samplers.split_seed(seed, n=num_dists,
-                                  salt='JointDistributionSequential')
-    else:
-      seeds = [None] * num_dists
+    # Ensures reproducibility even when xs are (partially) set.
+    seeds = samplers.split_seed(seed, n=num_dists,
+                                salt='JointDistributionSequential')
     ds = []
     xs = [None] * num_dists if value is None else list(value)
     if len(xs) != num_dists:
@@ -281,42 +270,13 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
                                             self._dist_fn_args)):
       ds.append(dist_fn(*xs[:i]))  # Chain rule of probability.
 
-      # Ensure reproducibility even when xs are (partially) set.
-      stateful_seed = None if seed_stream is None else seed_stream()
-
       if xs[i] is None:
         # TODO(b/129364796): We should ignore args prefixed with `_`; this
         # would mean we more often identify when to use `sample_shape=()`
         # rather than `sample_shape=sample_shape`.
-        try:  # TODO(b/147874898): Eliminate the stateful fallback 20 Dec 2020.
-          xs[i] = ds[-1].sample(
-              () if args and not self._always_use_specified_sample_shape
-              else sample_shape, seed=seeds[i])
-        except TypeError as e:
-          if ('Expected int for argument' not in str(e) and
-              TENSOR_SEED_MSG_PREFIX not in str(e)) or stateful_seed is None:
-            raise
-
-          if not getattr(self, '_resolving_names', False):  # avoid recursion
-            self._resolving_names = True
-            resolved_names = self._flat_resolve_names()
-            self._resolving_names = False
-            msg = (
-                'Falling back to stateful sampling for distribution #{i} '
-                '(0-based) of type `{dist_cls}` with component name '
-                '"{component_name}" and `dist.name` "{dist_name}". Please '
-                'update to use `tf.random.stateless_*` RNGs. This fallback may '
-                'be removed after 20-Dec-2020. ({exc})')
-            warnings.warn(msg.format(
-                i=i,
-                dist_name=ds[-1].name,
-                component_name=resolved_names[i],
-                dist_cls=type(ds[-1]),
-                exc=str(e)))
-          xs[i] = ds[-1].sample(
-              () if args and not self._always_use_specified_sample_shape
-              else sample_shape, seed=stateful_seed)
-
+        xs[i] = ds[-1].sample(
+            () if args and not self._always_use_specified_sample_shape
+            else sample_shape, seed=seeds[i])
       else:
         # This signature does not allow kwarg names. Applies
         # `convert_to_tensor` on the next value.
@@ -353,7 +313,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     if any(self._dist_fn_args):
       # Const seed for maybe CSE.
       ds, _ = self._flat_sample_distributions(
-          seed=joint_distribution_lib.dummy_seed())
+          seed=samplers.zeros_seed())
     else:
       ds = tuple(d() for d in self._dist_fn_wrapped)
     return (getattr(d, attr)() for d in ds)
@@ -526,7 +486,7 @@ def _unify_call_signature(i, dist_fn):
     raise TypeError('{} must be either `tfd.Distribution`-like or '
                     '`callable`.'.format(dist_fn))
 
-  args = _get_required_args(dist_fn)
+  args = _get_required_args(dist_fn, previous_args=range(i))
   if not args:
     return (lambda *_: dist_fn()), ()
 
@@ -606,10 +566,12 @@ def _resolve_distribution_names(dist_fn_args,
   return tuple(dist_names)
 
 
-def _get_required_args(fn):
+def _get_required_args(fn, previous_args=()):
   """Returns the distribution's required args."""
   argspec = tf_inspect.getfullargspec(fn)
   args = argspec.args
+  if argspec.varargs or argspec.varkw:
+    args = args + list(previous_args)
   if tf_inspect.isclass(fn):
     args = args[1:]  # Remove the `self` arg.
   if argspec.defaults:

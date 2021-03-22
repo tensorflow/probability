@@ -42,11 +42,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions import independent
-from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
-from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mpfl
-from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
 from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -56,19 +52,6 @@ from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as l
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow_probability.python.mcmc.kernel import TransitionKernel
 
-
-# Add auto-composite tensors to the global namespace to avoid creating new
-# classes inside.
-_CompositeIndependent = auto_composite_tensor.auto_composite_tensor(
-    independent.Independent, omit_kwargs=('name',))
-_CompositeNormal = auto_composite_tensor.auto_composite_tensor(
-    normal.Normal, omit_kwargs=('name',))
-_CompositeJointDistributionSequential = auto_composite_tensor.auto_composite_tensor(
-    jds.JointDistributionSequential, omit_kwargs=('name',))
-_CompositeLinearOperatorDiag = auto_composite_tensor.auto_composite_tensor(
-    tf.linalg.LinearOperatorDiag, omit_kwargs=('name',))
-_CompositeMultivariateNormalPrecisionFactorLinearOperator = auto_composite_tensor.auto_composite_tensor(
-    mpfl.MultivariateNormalPrecisionFactorLinearOperator, omit_kwargs=('name',))
 
 JAX_MODE = False
 
@@ -491,11 +474,10 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
           self.target_log_prob_fn, state_parts)
       momentum_distribution = self.momentum_distribution
       if momentum_distribution is None:
-        momentum_distribution = get_default_momentum_distribution(
+        momentum_distribution = preconditioning_utils.make_momentum_distribution(
             state_parts, ps.rank(current_target_log_prob))
-      if not mcmc_util.is_list_like(momentum_distribution.dtype):
-        momentum_distribution = _CompositeJointDistributionSequential(
-            [momentum_distribution])
+      momentum_distribution = preconditioning_utils.maybe_make_list_and_batch_broadcast(
+          momentum_distribution, ps.shape(current_target_log_prob))
       momentum_parts = momentum_distribution.sample()
 
       def _init(shape_and_dtype):
@@ -1101,15 +1083,3 @@ def get_kinetic_energy_fn(momentum_distribution):
   return lambda *args: -momentum_distribution.log_prob(*args)
 
 
-def get_default_momentum_distribution(state_parts, batch_ndims):
-  """Default identity momentum distribution."""
-  distributions = []
-  for state_part in state_parts:
-    state_rank = ps.rank(state_part)
-    reinterpreted_batch_ndims = state_rank - batch_ndims
-    distributions.append(
-        _CompositeIndependent(
-            _CompositeNormal(loc=tf.zeros_like(state_part),
-                             scale=tf.ones_like(state_part)),
-            reinterpreted_batch_ndims=reinterpreted_batch_ndims))
-  return _CompositeJointDistributionSequential(distributions)

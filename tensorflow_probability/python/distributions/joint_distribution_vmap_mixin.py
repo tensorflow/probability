@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import vectorization_util
 
 
@@ -199,7 +200,7 @@ class JointDistributionVmapMixin(object):
       # We always provide a seed, since _flat_sample_distributions will
       # unconditionally split the seed.
       with tf.name_scope('map_measure_fn'):
-        constant_seed = joint_distribution_lib.dummy_seed()
+        constant_seed = samplers.zeros_seed()
         return [getattr(d, attr)(x) for (d, x) in zip(
             *self._flat_sample_distributions(value=value, seed=constant_seed))]
     if self.use_vectorized_map:

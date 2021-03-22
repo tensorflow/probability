@@ -20,27 +20,18 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-
 
 __all__ = [
     'expectation',
 ]
 
 
-@deprecation.deprecated_args(
-    '2020-01-04',
-    'Use `keepdims` instead of `keep_dims`. '
-    'Use `use_reparameterization` instead of `use_reparametrization`.',
-    'keep_dims', 'use_reparametrization')
 def expectation(f,
                 samples,
                 log_prob=None,
                 use_reparameterization=True,
-                use_reparametrization=True,
                 axis=0,
                 keepdims=False,
-                keep_dims=False,
                 name=None):
   """Computes the Monte-Carlo approximation of `E_p[f(X)]`.
 
@@ -151,17 +142,10 @@ def expectation(f,
       `True` or `False`, this arg only affects the gradient of the resulting
       `approx_expectation`.
       Default value: `True`.
-    use_reparametrization: (Deprecated) Python `bool` indicating that the
-      approximation should use the fact that the gradient of samples is
-      unbiased.  Whether `True` or `False`, this arg only affects the gradient
-      of the resulting `approx_expectation`.
-      Default value: `True`.
     axis: The dimensions to average. If `None`, averages all
       dimensions.
       Default value: `0` (the left-most dimension).
     keepdims: If True, retains averaged dimensions using size `1`.
-      Default value: `False`.
-    keep_dims: (Deprecated) If True, retains averaged dimensions using size `1`.
       Default value: `False`.
     name: A `name_scope` for operations created by this function.
       Default value: `None` (which implies "expectation").
@@ -175,10 +159,6 @@ def expectation(f,
     ValueError: if `use_reparameterization=False` and `log_prob` is not a Python
       `callable`.
   """
-  keepdims = keepdims or keep_dims
-  del keep_dims
-  use_reparameterization = use_reparameterization and use_reparametrization
-  del use_reparametrization
   with tf.name_scope(name or 'expectation'):
     if not callable(f):
       raise ValueError('`f` must be a callable function.')

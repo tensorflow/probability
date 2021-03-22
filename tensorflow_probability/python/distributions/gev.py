@@ -204,6 +204,8 @@ class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
     """Distribution parameter for shape."""
     return self._gev_bijector.concentration
 
+  experimental_is_sharded = False
+
   def _entropy(self):
     scale = tf.broadcast_to(self.scale,
                             ps.broadcast_shape(ps.shape(self.scale),

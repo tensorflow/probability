@@ -27,7 +27,6 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.vi import surrogate_posteriors
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
@@ -411,6 +410,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
       {'testcase_name': 'TensorEvent',
        'event_shape': [3],
        'operators': [tf.linalg.LinearOperatorDiag],
+       'batch_shape': (),
        'bijector': tfb.Exp(),
        'dtype': np.float32,
        'is_static': True},
@@ -419,6 +419,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
                        tf.TensorShape([]),
                        tf.TensorShape([2, 2])],
        'operators': 'diag',
+       'batch_shape': (),
        'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
        'dtype': np.float32,
        'is_static': False},
@@ -427,12 +428,20 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'operators': [[tf.linalg.LinearOperatorDiag],
                      [tf.linalg.LinearOperatorFullMatrix,
                       tf.linalg.LinearOperatorLowerTriangular]],
+       'batch_shape': (),
        'bijector': None,
        'dtype': np.float64,
        'is_static': True},
+      {'testcase_name': 'BatchShape',
+       'event_shape': [tf.TensorShape([3]), tf.TensorShape([])],
+       'operators': 'tril',
+       'batch_shape': (2, 1),
+       'bijector': [tfb.Softplus(), None,],
+       'dtype': np.float32,
+       'is_static': True},
   )
   def test_constrained_affine_from_event_shape(
-      self, event_shape, operators, bijector, dtype, is_static):
+      self, event_shape, operators, bijector, batch_shape, dtype, is_static):
     if not tf.executing_eagerly() and not is_static:
       self.skipTest('tfb.Reshape requires statically known shapes in graph'
                     ' mode.')
@@ -445,6 +454,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
                 event_shape),
             operators=operators,
             bijector=bijector,
+            batch_shape=batch_shape,
             dtype=dtype,
             validate_args=True))
 
@@ -453,7 +463,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 
     seed = test_util.test_seed_stream()
     self._test_shapes(
-        surrogate_posterior, batch_shape=[], event_shape=event_shape,
+        surrogate_posterior, batch_shape=batch_shape, event_shape=event_shape,
         seed=seed())
     self._test_gradients(surrogate_posterior, seed=seed())
     self._test_dtype(surrogate_posterior, dtype, seed())
@@ -534,224 +544,63 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 
 
 @test_util.test_all_tf_execution_regimes
-class _TrainableASVISurrogate(object):
+class SplitFlowSurrogatePosterior(
+    test_util.TestCase, _SurrogatePosterior):
 
-  def test_dims_and_gradients(self):
+  @parameterized.named_parameters(
+      {'testcase_name': 'TensorEvent',
+       'event_shape': [6],
+       'constraining_bijector': tfb.Softplus(),
+       'batch_shape': [2],
+       'dtype': np.float32,
+       'is_static': True},
+      {'testcase_name': 'ListEvent',
+       'event_shape': [tf.TensorShape([3]),
+                       tf.TensorShape([]),
+                       tf.TensorShape([2, 2])],
+       'constraining_bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
+       'batch_shape': tf.TensorShape([2, 2]),
+       'dtype': np.float32,
+       'is_static': False},
+      {'testcase_name': 'DictEvent',
+       'event_shape': {'x': tf.TensorShape([3]), 'y': tf.TensorShape([])},
+       'constraining_bijector': None,
+       'batch_shape': tf.TensorShape([]),
+       'dtype': np.float64,
+       'is_static': True},
+  )
+  def test_shapes_and_gradients(
+      self, event_shape, constraining_bijector, batch_shape, dtype, is_static):
+    if not tf.executing_eagerly() and not is_static:
+      self.skipTest('tfb.Reshape requires statically known shapes in graph'
+                    ' mode.')
+    net = tfb.AutoregressiveNetwork(2, hidden_units=[4, 4], dtype=dtype)
+    maf = tfb.MaskedAutoregressiveFlow(
+        shift_and_log_scale_fn=net, validate_args=True)
 
-    prior_dist = self.make_prior_dist()
+    seed = test_util.test_seed_stream()
+    surrogate_posterior = (
+        tfp.experimental.vi.build_split_flow_surrogate_posterior(
+            event_shape=tf.nest.map_structure(
+                lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
+                    np.array(s, dtype=np.int32), is_static=is_static),
+                event_shape),
+            constraining_bijector=constraining_bijector,
+            batch_shape=batch_shape,
+            trainable_bijector=maf,
+            dtype=dtype,
+            validate_args=True))
 
-    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
-        prior=prior_dist)
+    # Add an op to the graph so tf.Variables get created in graph mode.
+    _ = surrogate_posterior.sample(seed=seed())
+    self.evaluate(
+        [v.initializer for v in surrogate_posterior.trainable_variables])
 
-    # Test that the correct number of trainable variables are being tracked
-    prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
-    expected_num_trainable_vars = 0
-    for original_dist in prior_dists:
-      try:
-        original_dist = original_dist.distribution
-      except AttributeError:
-        pass
-      dist = surrogate_posteriors._as_trainable_family(original_dist)
-      dist_params = dist.parameters
-      for param, value in dist_params.items():
-        if (param not in surrogate_posteriors._NON_STATISTICAL_PARAMS
-            and value is not None and param not in ('low', 'high')):
-          expected_num_trainable_vars += 2  # prior_weight, mean_field_parameter
-
-    self.assertLen(surrogate_posterior.trainable_variables,
-                   expected_num_trainable_vars)
-
-    # Test that the sample shape is correct
-    three_posterior_samples = surrogate_posterior.sample(3)
-    three_prior_samples = prior_dist.sample(3)
-    self.assertAllEqualNested(
-        [s.shape for s in tf.nest.flatten(three_prior_samples)],
-        [s.shape for s in tf.nest.flatten(three_posterior_samples)])
-
-    # Test that gradients are available wrt the variational parameters.
-    posterior_sample = surrogate_posterior.sample()
-    with tf.GradientTape() as tape:
-      posterior_logprob = surrogate_posterior.log_prob(posterior_sample)
-    grad = tape.gradient(posterior_logprob,
-                         surrogate_posterior.trainable_variables)
-    self.assertTrue(all(g is not None for g in grad))
-
-  def test_make_asvi_trainable_variables(self):
-    prior_dist = self.make_prior_dist()
-    trained_vars = surrogate_posteriors._make_asvi_trainable_variables(
-        prior=prior_dist)
-
-    # Confirm that there is one dictionary per distribution.
-    prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
-    self.assertEqual(len(trained_vars), len(prior_dists))
-
-    # Confirm that there exists correct number of trainable variables.
-    for (prior_distribution, trained_vars_dict) in zip(prior_dists,
-                                                       trained_vars):
-      substituted_dist = surrogate_posteriors._as_trainable_family(
-          prior_distribution)
-      try:
-        posterior_distribution = substituted_dist.distribution
-      except AttributeError:
-        posterior_distribution = substituted_dist
-
-      for param_name, prior_value in posterior_distribution.parameters.items():
-        if (param_name not in surrogate_posteriors._NON_STATISTICAL_PARAMS
-            and prior_value is not None and param_name not in ('low', 'high')):
-          self.assertIsInstance(trained_vars_dict[param_name],
-                                surrogate_posteriors.ASVIParameters)
-
-
-@test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
-                                               _TrainableASVISurrogate):
-
-  def make_prior_dist(self):
-
-    def _prior_model_fn():
-      innovation_noise = 0.1
-      prior_loc = 0.
-      new = yield tfd.Normal(loc=prior_loc, scale=innovation_noise)
-      for _ in range(4):
-        new = yield tfd.Normal(loc=new, scale=innovation_noise)
-
-    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
-
-  def make_likelihood_model(self, x, observation_noise):
-
-    def _likelihood_model():
-      for i in range(5):
-        yield tfd.Normal(loc=x[i], scale=observation_noise)
-
-    return tfd.JointDistributionCoroutineAutoBatched(_likelihood_model)
-
-  def get_observations(self, prior_dist):
-    observation_noise = 0.15
-    ground_truth = prior_dist.sample()
-    likelihood = self.make_likelihood_model(
-        x=ground_truth, observation_noise=observation_noise)
-    return likelihood.sample(1)
-
-  def get_target_log_prob(self, observations, prior_dist):
-
-    def target_log_prob(*x):
-      observation_noise = 0.15
-      likelihood_dist = self.make_likelihood_model(
-          x=x, observation_noise=observation_noise)
-      return likelihood_dist.log_prob(observations) + prior_dist.log_prob(x)
-
-    return target_log_prob
-
-  def test_fitting_surrogate_posterior(self):
-
-    prior_dist = self.make_prior_dist()
-    observations = self.get_observations(prior_dist)
-    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
-        prior=prior_dist)
-    target_log_prob = self.get_target_log_prob(observations, prior_dist)
-
-    # Test vi fit surrogate posterior works
-    losses = tfp.vi.fit_surrogate_posterior(
-        target_log_prob,
-        surrogate_posterior,
-        num_steps=5,  # Don't optimize to completion.
-        optimizer=tf.optimizers.Adam(0.1),
-        sample_size=10)
-
-    # Compute posterior statistics.
-    with tf.control_dependencies([losses]):
-      posterior_samples = surrogate_posterior.sample(100)
-      posterior_mean = tf.nest.map_structure(tf.reduce_mean, posterior_samples)
-      posterior_stddev = tf.nest.map_structure(tf.math.reduce_std,
-                                               posterior_samples)
-
-    self.evaluate(tf1.global_variables_initializer())
-    _ = self.evaluate(losses)
-    _ = self.evaluate(posterior_mean)
-    _ = self.evaluate(posterior_stddev)
-
-
-@test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestEightSchools(test_util.TestCase,
-                                             _TrainableASVISurrogate):
-
-  def make_prior_dist(self):
-    treatment_effects = tf.constant([28, 8, -3, 7, -1, 1, 18, 12],
-                                    dtype=tf.float32)
-    num_schools = ps.shape(treatment_effects)[-1]
-
-    return tfd.JointDistributionNamed({
-        'avg_effect':
-            tfd.Normal(loc=0., scale=10., name='avg_effect'),
-        'log_stddev':
-            tfd.Normal(loc=5., scale=1., name='log_stddev'),
-        'school_effects':
-            lambda log_stddev, avg_effect: (  # pylint: disable=g-long-lambda
-                tfd.Independent(
-                    tfd.Normal(
-                        loc=avg_effect[..., None] * tf.ones(num_schools),
-                        scale=tf.exp(log_stddev[..., None]) * tf.ones(
-                            num_schools),
-                        name='school_effects'),
-                    reinterpreted_batch_ndims=1))
-    })
-
-
-@test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestEightSchoolsSample(test_util.TestCase,
-                                                   _TrainableASVISurrogate):
-
-  def make_prior_dist(self):
-
-    return tfd.JointDistributionNamed({
-        'avg_effect':
-            tfd.Normal(loc=0., scale=10., name='avg_effect'),
-        'log_stddev':
-            tfd.Normal(loc=5., scale=1., name='log_stddev'),
-        'school_effects':
-            lambda log_stddev, avg_effect: (  # pylint: disable=g-long-lambda
-                tfd.Sample(
-                    tfd.Normal(
-                        loc=avg_effect[..., None],
-                        scale=tf.exp(log_stddev[..., None]),
-                        name='school_effects'),
-                    sample_shape=[8]))
-    })
-
-
-@test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestHalfNormal(test_util.TestCase,
-                                           _TrainableASVISurrogate):
-
-  def make_prior_dist(self):
-
-    def _prior_model_fn():
-      innovation_noise = 1.
-      yield tfd.HalfNormal(
-          scale=innovation_noise, validate_args=True, allow_nan_stats=False)
-
-    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
-
-
-@test_util.test_all_tf_execution_regimes
-class ASVISurrogatePosteriorTestDiscreteLatent(
-    test_util.TestCase, _TrainableASVISurrogate):
-
-  def make_prior_dist(self):
-
-    def _prior_model_fn():
-      a = yield tfd.Bernoulli(logits=0.5, name='a')
-      yield tfd.Normal(loc=2. * tf.cast(a, tf.float32) - 1.,
-                       scale=1., name='b')
-
-    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
-
-
-# TODO(kateslin): Add an ASVI surrogate posterior test for gamma distributions.
-# TODO(kateslin): Add an ASVI surrogate posterior test with for a model with
-#  missing observations.
-# TODO(kateslin): Add an ASVI surrogate posterior test for Uniform distribution
-# to check that Beta substitution works properly
+    self._test_shapes(
+        surrogate_posterior, batch_shape=batch_shape, event_shape=event_shape,
+        seed=seed())
+    self._test_gradients(surrogate_posterior, seed=seed())
+    self._test_dtype(surrogate_posterior, dtype, seed())
 
 if __name__ == '__main__':
   tf.test.main()
