@@ -444,7 +444,12 @@ class JointDistribution(distribution_lib.Distribution):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
     ds, xs = self._call_flat_sample_distributions(
         value=value, seed=samplers.zeros_seed())
-    return (getattr(d, attr)(x) for d, x in zip(ds, xs))
+
+    if not callable(attr):
+      attr_name = attr
+      attr = lambda d, x: getattr(d, attr_name)(x)
+
+    return (attr(d, x) for d, x in zip(ds, xs))
 
   def _map_attr_over_dists(self, attr, dists=None):
     dists = (self._get_single_sample_distributions()
