@@ -113,6 +113,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/util",
+        "//tensorflow_probability/python/internal:samplers",
     ],
 )
 

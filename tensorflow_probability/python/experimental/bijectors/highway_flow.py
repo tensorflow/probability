@@ -4,13 +4,18 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import util
 from tensorflow_probability.python.experimental.bijectors import scalar_function_with_inferred_inverse
+from tensorflow_probability.python.internal import samplers
 
-def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activation_fn=None):
+
+def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activation_fn=None, seed=None):
     # TODO: add control that residual_fraction_initial_value is between 0 and 1
     residual_fraction_initial_value = tf.convert_to_tensor(residual_fraction_initial_value,
                                                            dtype_hint=tf.float32,
                                                            name='residual_fraction_initial_value')
     dtype = residual_fraction_initial_value.dtype
+
+    bias_seed, upper_seed, lower_seed, diagonal_seed = samplers.split_seed(seed, n=4)
+
     return HighwayFlow(
         width=width,
         residual_fraction=util.TransformedVariable(
@@ -18,14 +23,14 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
             bijector=tfb.Sigmoid(),
             dtype=dtype),
         activation_fn=activation_fn,
-        bias=tf.Variable(np.random.normal(0., 0.01, (width,)), dtype=dtype),
+        bias=tf.Variable(samplers.normal((width,), 0., 0.01, seed=bias_seed), dtype=dtype),
         upper_diagonal_weights_matrix=util.TransformedVariable(
-            initial_value=np.tril(np.random.normal(0., 1., (width, width)), -1) + np.diag(
-                np.random.uniform(size=width)),
+            initial_value=np.tril(samplers.normal((width, width), 0., 1., seed=upper_seed), -1) + np.diag(
+                samplers.uniform((width,), minval=0., maxval=1., seed=diagonal_seed)),
             bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None),
             dtype=dtype),
         lower_diagonal_weights_matrix=util.TransformedVariable(
-            initial_value=np.random.normal(0., 1., (width, width)),
+            initial_value=samplers.normal((width, width), 0., 1., seed=lower_seed),
             bijector=tfb.Chain([tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
                                 tfb.Pad(paddings=[(1, 0), (0, 1)]),
                                 tfb.FillTriangular()]),
