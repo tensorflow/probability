@@ -41,6 +41,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import experimental as tfe
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import numerics_testing as nt
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -88,6 +89,36 @@ NANS_EVEN_IN_SAMPLE_LIST = (
     'TransformedDistribution',  # Bijectors may introduce nans
 )
 
+LOG_PROB_ACCURACY_BLOCK_LIST = (
+    # TODO(axch): Understand why each of these has 20+ bad bits; fix
+    # or file good bugs.
+    'Beta',  # Hypothesis filters too much in 4/100 runs; this is odd.
+    'BetaBinomial',
+    'BetaQuotient',  # Filters too much in 46/100 runs (nan samples too easy?)
+    'Binomial',
+    'Categorical',
+    'ContinuousBernoulli',
+    'Dirichlet',  # Filters too much in 1/100 runs
+    'ExponentiallyModifiedGaussian',
+    'FiniteDiscrete',
+    'GeneralizedExtremeValue',
+    'JohnsonSU',
+    'Kumaraswamy',
+    'LogitNormal',  # Filters too much in 6/100 runs (nan samples too easy?)
+    'MultivariateNormalDiag',
+    'MultivariateNormalTriL',
+    'NegativeBinomial',
+    'OneHotCategorical',
+    'PlackettLuce',
+    'Skellam',
+    'StoppingRatioLogistic',  # Filters too much in 61/100 runs; this is odd.
+    # TODO(axch): Fix numerics of _cauchy_cdf(x + delta) - _cauchy_cdf(x)
+    'TruncatedCauchy',
+    # TODO(axch): Is this the same problem as the NoNansTest exclusion?
+    'TruncatedNormal',
+    'WishartTriL',
+)
+
 # Batch slicing requires implementing `_params_event_ndims`.  Generic
 # instantiation (per `instantiable_base_dists`, below) also requires
 # `_params_event_ndims`, but some special distributions can be instantiated
@@ -124,13 +155,6 @@ SLICING_LOGPROB_RTOL.update({
 })
 
 
-def tensor_to_f64(x):
-  if tf.is_tensor(x) and x.dtype.is_floating:
-    return tf.cast(x, dtype=tf.float64)
-  else:
-    return x
-
-
 @test_util.test_all_tf_execution_regimes
 class LogProbConsistentPrecisionTest(test_util.TestCase):
 
@@ -160,9 +184,11 @@ class LogProbConsistentPrecisionTest(test_util.TestCase):
       return dist.log_prob(x)
 
     dist64 = tf.nest.map_structure(
-        tensor_to_f64, tfe.as_composite(dist), expand_composites=True)
+        nt.floating_tensor_to_f64,
+        tfe.as_composite(dist),
+        expand_composites=True)
     with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
-      result64 = log_prob_function(dist64, tensor_to_f64(samples))
+      result64 = log_prob_function(dist64, nt.floating_tensor_to_f64(samples))
     self.assertEqual(result64.dtype, tf.float64)
 
 
@@ -246,6 +272,57 @@ class NoNansTest(test_util.TestCase, dhps.TestCase):
       samples = self.evaluate(dist.sample(20, seed=seed))
     self.assertAllEqual(np.zeros_like(samples), np.isnan(samples))
     return samples
+
+
+# TODO(axch): Testing only in Eager mode because Graph mode barfs on a
+# weird tf.constant error inside value_and_gradients.
+# @test_util.test_all_tf_execution_regimes
+class DistributionAccuracyTest(test_util.TestCase):
+
+  def skip_if_tf1(self):
+    # This is a hack to check whether we're running under TF1, which
+    # seems to have a less-accurate implementation of some special
+    # function.
+    # pylint: disable=g-import-not-at-top
+    import tensorflow
+    if hasattr(tensorflow, 'Session'):
+      self.skipTest('TODO(axch): TF1 seems to have an inaccurate base function')
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(set(dhps.INSTANTIABLE_BASE_DISTS.keys()) -
+                               set(LOG_PROB_ACCURACY_BLOCK_LIST))))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testLogProbAccuracy(self, dist_name, data):
+    self.skip_if_tf1()
+    dist = tfe.as_composite(data.draw(dhps.distributions(
+        dist_name=dist_name,
+        # Accuracy tools can't handle batches (yet?)
+        batch_shape=(),
+        # Variables presumably do not affect the numerics
+        enable_vars=False,
+        # Checking that samples pass validations (including in 64-bit
+        # arithmetic) is left for another test
+        validate_args=False)))
+    seed = test_util.test_seed(sampler_type='stateless')
+    with tfp_hps.no_tf_rank_errors():
+      sample = dist.sample(seed=seed)
+    if sample.dtype.is_floating:
+      hp.assume(self.evaluate(tf.reduce_all(~tf.math.is_nan(sample))))
+    hp.note('Testing on sample {}'.format(sample))
+
+    as_tensors = tf.nest.flatten(dist, expand_composites=True)
+    def log_prob_function(tensors, x):
+      dist_ = tf.nest.pack_sequence_as(dist, tensors, expand_composites=True)
+      return dist_.log_prob(x)
+
+    with tfp_hps.finite_ground_truth_only():
+      badness = nt.excess_wrong_bits(log_prob_function, as_tensors, sample)
+    # TODO(axch): Lower the acceptable badness to 4, which corresponds
+    # to slightly better accuracy than 1e-6 relative error for
+    # well-conditioned functions.
+    self.assertAllLess(badness, 20)
 
 
 @test_util.test_all_tf_execution_regimes
