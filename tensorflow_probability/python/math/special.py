@@ -1748,7 +1748,7 @@ def _owens_t_naive_gradient(h, a):
        tf.math.erfc(modified_h / np.sqrt(2.))), result)
 
   # When a = 0, we should return 0.
-  result = tf.where(tf.math.equal(modified_a, 0.), 0., result)
+  result = tf.where(tf.math.equal(modified_a, 0.), numpy_dtype(0.), result)
 
   normh = tf.math.erfc(h / np.sqrt(2.))
   normah = tf.math.erfc(abs_a * h / np.sqrt(2.))
@@ -1764,7 +1764,9 @@ def _owens_t_naive_gradient(h, a):
 
   result = tf.math.sign(a) * result
 
-  result = tf.where(tf.math.is_nan(a) | tf.math.is_nan(h), np.nan, result)
+  result = tf.where(tf.math.is_nan(a) | tf.math.is_nan(h),
+                    numpy_dtype(np.nan),
+                    result)
   return result
 
 
