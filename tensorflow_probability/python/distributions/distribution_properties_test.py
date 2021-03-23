@@ -48,6 +48,15 @@ from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
 
 
+STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST = (
+    'BatchReshape',  # b/183405889
+    'Independent',  # b/183405889
+    'Mixture',  # b/183405889
+    'Sample',  # b/183405889
+    'TransformedDistribution',  # b/183405889
+)
+
+
 WORKING_PRECISION_TEST_BLOCK_LIST = (
     'Masked',  # b/182313283
     # The difficulty concerns Mixtures of component distributions whose samples
@@ -153,6 +162,60 @@ SLICING_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-5)
 SLICING_LOGPROB_RTOL.update({
     'Weibull': 3e-5,
 })
+
+
+@test_util.test_all_tf_execution_regimes
+class StatisticConsistentShapesTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())
+                          + list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    if dist_name in STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST:
+      self.skipTest('{} is blocked'.format(dist_name))
+    def eligibility_filter(name):
+      return name not in STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST
+    dist = data.draw(dhps.distributions(
+        dist_name=dist_name, eligibility_filter=eligibility_filter,
+        enable_vars=False, validate_args=False))
+    hp.note('Trying distribution {}'.format(
+        self.evaluate_dict(dist.parameters)))
+
+    for statistic in ['mean', 'mode', 'stddev', 'variance']:
+      hp.note('Testing {}.{}'.format(dist_name, statistic))
+      self.check_statistic(
+          dist, statistic,
+          dist.batch_shape + dist.event_shape,
+          tf.concat([dist.batch_shape_tensor(),
+                     dist.event_shape_tensor()], axis=0))
+    hp.note('Testing {}.covariance'.format(dist_name))
+    self.check_statistic(
+        dist, 'covariance',
+        dist.batch_shape + dist.event_shape + dist.event_shape,
+        tf.concat([dist.batch_shape_tensor(),
+                   dist.event_shape_tensor(),
+                   dist.event_shape_tensor()], axis=0))
+    hp.note('Testing {}.entropy'.format(dist_name))
+    self.check_statistic(
+        dist, 'entropy', dist.batch_shape, dist.batch_shape_tensor())
+
+  def check_statistic(
+      self, dist, statistic, expected_static_shape, expected_dynamic_shape):
+    try:
+      with tfp_hps.no_tf_rank_errors():
+        result = getattr(dist, statistic)()
+      msg = 'Shape {} not compatible with expected {}.'.format(
+          result.shape, expected_static_shape)
+      self.assertTrue(expected_static_shape.is_compatible_with(
+          tf.broadcast_static_shape(result.shape, expected_static_shape)), msg)
+      self.assertAllEqual(self.evaluate(expected_dynamic_shape),
+                          self.evaluate(tf.broadcast_dynamic_shape(
+                              tf.shape(result), expected_dynamic_shape)))
+    except NotImplementedError:
+      pass
 
 
 @test_util.test_all_tf_execution_regimes
