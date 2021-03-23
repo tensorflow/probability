@@ -6,24 +6,30 @@ from tensorflow_probability.python import util
 from tensorflow_probability.python.experimental.bijectors import scalar_function_with_inferred_inverse
 
 def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activation_fn=None):
-    # FIXME: should everything be in float32 or float64?
     # TODO: add control that residual_fraction_initial_value is between 0 and 1
+    residual_fraction_initial_value = tf.convert_to_tensor(residual_fraction_initial_value,
+                                                           dtype_hint=tf.float32,
+                                                           name='residual_fraction_initial_value')
+    dtype = residual_fraction_initial_value.dtype
     return HighwayFlow(
         width=width,
         residual_fraction=util.TransformedVariable(
-            initial_value=np.asarray(residual_fraction_initial_value, dtype='float32'),
-            bijector=tfb.Sigmoid()),
+            initial_value=np.asarray(residual_fraction_initial_value),
+            bijector=tfb.Sigmoid(),
+            dtype=dtype),
         activation_fn=activation_fn,
-        bias=tf.Variable(np.random.normal(0., 0.01, (width,)), dtype=tf.float32),
+        bias=tf.Variable(np.random.normal(0., 0.01, (width,)), dtype=dtype),
         upper_diagonal_weights_matrix=util.TransformedVariable(
-            initial_value=np.tril(np.random.normal(0., 1., (width, width)), -1).astype('float32') + np.diag(
-                np.random.uniform(size=width)).astype('float32'),
-            bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None)),
+            initial_value=np.tril(np.random.normal(0., 1., (width, width)), -1) + np.diag(
+                np.random.uniform(size=width)),
+            bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None),
+            dtype=dtype),
         lower_diagonal_weights_matrix=util.TransformedVariable(
-            initial_value=np.random.normal(0., 1., (width, width)).astype('float32'),
+            initial_value=np.random.normal(0., 1., (width, width)),
             bijector=tfb.Chain([tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
                                 tfb.Pad(paddings=[(1, 0), (0, 1)]),
-                                tfb.FillTriangular()]))
+                                tfb.FillTriangular()]),
+            dtype=dtype)
     )
 
 
