@@ -36,6 +36,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         ":distribution_bijectors",
+        ":highway_flow",
         ":scalar_function_with_inferred_inverse",
         "//tensorflow_probability/python/bijectors:ldj_ratio",
     ],
@@ -120,7 +121,7 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "highway_flow_test",
     size = "medium",
-    srcs = ["distribution_bijectors_test.py"],
+    srcs = ["highway_flow_test.py"],
     jax_size = "medium",
     python_version = "PY3",
     srcs_version = "PY3",
