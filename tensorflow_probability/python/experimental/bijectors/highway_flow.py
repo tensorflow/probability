@@ -92,30 +92,44 @@ class HighwayFlow(tfb.Bijector):
         x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix), x,
                              transpose_a=True) + self.bias  # in the implementation there was only one bias
         if self.activation_fn:
+            #fldj += tf.reduce_sum(tf.math.log(self.df(x)))
+            #x = self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x)
             activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
                 lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
             fldj += activation_layer.forward_log_det_jacobian(x, self.forward_min_event_ndims)
             x = activation_layer.forward(x)
         return x, {'ildj': -fldj, 'fldj': fldj}
 
-    def _forward(self, x):
-        y, _ = self._augmented_forward(x)
-        return y
-
-    def _inverse(self, y):
+    def _augmented_inverse(self, y):
+        ildj = tf.reduce_sum(
+            tf.math.log(self.residual_fraction + (1. - self.residual_fraction) * tf.linalg.diag_part(
+                self.upper_diagonal_weights_matrix)))
         if self.activation_fn:
-            # y = self.inv_f(y)
+            #y = self.inv_f(y)
+            #ildj += tf.reduce_sum(tf.math.log(self.df(y)))
             residual_fraction = tf.identity(self.residual_fraction)
             # FIXME: this way of using inverse activation does not seem to work because residual_fraction is a variable
             activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
                 lambda x: residual_fraction * x + (1. - residual_fraction) * self.activation_fn(x))
             y = activation_layer.inverse(y)
+            ildj += activation_layer.inverse_log_det_jacobian(y, self.forward_min_event_ndims)
 
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
-        y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
-                                       tf.linalg.matrix_transpose(y - self.bias), lower=False)
+        try:
+            y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
+                                    tf.linalg.matrix_transpose(y - self.bias), lower=False)
+        except:
+            print(y)
         y = tf.linalg.triangular_solve(self._convex_update(self.lower_diagonal_weights_matrix), y)
-        return tf.linalg.matrix_transpose(y)
+        return tf.linalg.matrix_transpose(y), {'ildj': ildj, 'fldj': -ildj}
+
+    def _forward(self, x):
+        y, _ = self._augmented_forward(x)
+        return y
+
+    def _inverse(self, y):
+        x, _ = self._augmented_inverse(y)
+        return x
 
     def _forward_log_det_jacobian(self, x):
         cached = self._cache.forward_attributes(x)
@@ -124,3 +138,11 @@ class HighwayFlow(tfb.Bijector):
             _, attrs = self._augmented_forward(x)
             cached.update(attrs)
         return cached['fldj']
+
+    def _inverse_log_det_jacobian(self, y):
+        cached = self._cache.inverse_attributes(y)
+        # If LDJ isn't in the cache, call inverse once.
+        if 'ildj' not in cached:
+            _, attrs = self._augmented_inverse(y)
+            cached.update(attrs)
+        return cached['ildj']
