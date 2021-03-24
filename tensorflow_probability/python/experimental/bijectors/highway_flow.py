@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -19,13 +18,14 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
     return HighwayFlow(
         width=width,
         residual_fraction=util.TransformedVariable(
-            initial_value=np.asarray(residual_fraction_initial_value),
+            initial_value=tf.convert_to_tensor(residual_fraction_initial_value),
             bijector=tfb.Sigmoid(),
             dtype=dtype),
         activation_fn=activation_fn,
         bias=tf.Variable(samplers.normal((width,), 0., 0.01, seed=bias_seed), dtype=dtype),
         upper_diagonal_weights_matrix=util.TransformedVariable(
-            initial_value=np.tril(samplers.normal((width, width), 0., 1., seed=upper_seed), -1) + np.diag(
+            initial_value=tf.experimental.numpy.tril(samplers.normal((width, width), 0., 1., seed=upper_seed),
+                                                     -1) + tf.linalg.diag(
                 samplers.uniform((width,), minval=0., maxval=1., seed=diagonal_seed)),
             bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None),
             dtype=dtype),
@@ -87,6 +87,7 @@ class HighwayFlow(tfb.Bijector):
                 self.upper_diagonal_weights_matrix)))  # jacobian from upper matrix
         # jacobian from lower matrix is 0
 
+        # todo: see how to optimize _convex_update
         x = tf.linalg.matvec(self._convex_update(self.lower_diagonal_weights_matrix), x)
         x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix), x,
                              transpose_a=True) + self.bias  # in the implementation there was only one bias
@@ -103,12 +104,12 @@ class HighwayFlow(tfb.Bijector):
 
     def _inverse(self, y):
         if self.activation_fn:
-            y = self.inv_f(y)
-
+            # y = self.inv_f(y)
+            residual_fraction = tf.identity(self.residual_fraction)
             # FIXME: this way of using inverse activation does not seem to work because residual_fraction is a variable
-            # activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
-            # lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
-            # y = activation_layer.inverse(y)
+            activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
+                lambda x: residual_fraction * x + (1. - residual_fraction) * self.activation_fn(x))
+            y = activation_layer.inverse(y)
 
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
         y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
