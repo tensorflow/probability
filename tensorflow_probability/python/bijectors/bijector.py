@@ -1728,7 +1728,7 @@ def ldj_reduction_shape(shape_structure,
     if reduce_ndims_ is not None:
       if reduce_ndims_ < 0:
         raise ValueError('`event_ndims must be at least {}. Saw: {}.'
-                         .format(event_ndims, min_event_ndims))
+                         .format(min_event_ndims, event_ndims))
     elif validate_args:
       with tf.control_dependencies(assertions):
         assertions.append(
