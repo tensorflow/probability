@@ -42,6 +42,7 @@ def _w0(z):
   return scipy_special.lambertw(z, k=0)
 
 
+@test_util.test_graph_and_eager_modes
 class RoundExponentialBumpFunctionTest(test_util.TestCase):
 
   @parameterized.named_parameters(
@@ -171,6 +172,7 @@ class RoundExponentialBumpFunctionTest(test_util.TestCase):
     self.assertAllEqual(dy_dx_, np.zeros((6,)))
 
 
+@test_util.test_graph_and_eager_modes
 class DawsnTest(test_util.TestCase):
 
   def testDawsnBoundary(self):
@@ -180,7 +182,9 @@ class DawsnTest(test_util.TestCase):
   @parameterized.parameters(np.float32, np.float64)
   def testDawsnOdd(self, dtype):
     seed_stream = test_util.test_seed_stream()
-    x = tf.random.uniform([int(1e4)], 0., 100., dtype=dtype, seed=seed_stream())
+    x = self.evaluate(
+        tf.random.uniform(
+            [int(1e4)], 0., 100., dtype=dtype, seed=seed_stream()))
     self.assertAllClose(
         self.evaluate(tfp.math.dawsn(x)),
         self.evaluate(-tfp.math.dawsn(-x)))
@@ -188,22 +192,25 @@ class DawsnTest(test_util.TestCase):
   @parameterized.parameters(np.float32, np.float64)
   def testDawsnSmall(self, dtype):
     seed_stream = test_util.test_seed_stream()
-    x = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    x = self.evaluate(
+        tf.random.uniform(
+            [int(1e4)], 0., 1., dtype=dtype, seed=seed_stream()))
     self.assertAllClose(
         scipy_special.dawsn(x), self.evaluate(tfp.math.dawsn(x)))
 
   @parameterized.parameters(np.float32, np.float64)
   def testDawsnMedium(self, dtype):
     seed_stream = test_util.test_seed_stream()
-    x = tf.random.uniform([int(1e4)], 1., 10., dtype=dtype, seed=seed_stream())
+    x = self.evaluate(
+        tf.random.uniform([int(1e4)], 1., 10., dtype=dtype, seed=seed_stream()))
     self.assertAllClose(
         scipy_special.dawsn(x), self.evaluate(tfp.math.dawsn(x)))
 
   @parameterized.parameters(np.float32, np.float64)
   def testDawsnLarge(self, dtype):
     seed_stream = test_util.test_seed_stream()
-    x = tf.random.uniform(
-        [int(1e4)], 10., 100., dtype=dtype, seed=seed_stream())
+    x = self.evaluate(tf.random.uniform(
+        [int(1e4)], 10., 100., dtype=dtype, seed=seed_stream()))
     self.assertAllClose(
         scipy_special.dawsn(x), self.evaluate(tfp.math.dawsn(x)))
 
@@ -221,6 +228,7 @@ class DawsnTest(test_util.TestCase):
     self.assertLess(err, 2e-5)
 
 
+@test_util.test_graph_and_eager_modes
 class IgammainvTest(test_util.TestCase):
 
   def test_igammainv_bounds(self):
@@ -352,23 +360,26 @@ class IgammainvTest(test_util.TestCase):
     self.assertLess(err, 2e-3)
 
 
+@test_util.test_graph_and_eager_modes
 class OwensTTest(test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)
   def testOwensTOddEven(self, dtype):
     seed_stream = test_util.test_seed_stream()
-    a = tf.random.uniform(
-        shape=[int(1e3)],
-        minval=0.,
-        maxval=100.,
-        dtype=dtype,
-        seed=seed_stream())
-    h = tf.random.uniform(
-        shape=[int(1e3)],
-        minval=0.,
-        maxval=100.,
-        dtype=dtype,
-        seed=seed_stream())
+    a = self.evaluate(
+        tf.random.uniform(
+            shape=[int(1e3)],
+            minval=0.,
+            maxval=100.,
+            dtype=dtype,
+            seed=seed_stream()))
+    h = self.evaluate(
+        tf.random.uniform(
+            shape=[int(1e3)],
+            minval=0.,
+            maxval=100.,
+            dtype=dtype,
+            seed=seed_stream()))
     # OwensT(h, a) = OwensT(-h, a)
     self.assertAllClose(
         self.evaluate(tfp.math.owens_t(h, a)),
@@ -456,6 +467,7 @@ class OwensTTest(test_util.TestCase):
     self.assertLess(err, 2e-4)
 
 
+@test_util.test_graph_and_eager_modes
 class SpecialTest(test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)
@@ -520,11 +532,12 @@ class SpecialTest(test_util.TestCase):
     self.assertAllClose(np.arctan(x_) - np.arctan(y_), atan_diff_)
 
   def testErfcinv(self):
-    x = tf.random.uniform(
-        shape=[int(1e5)],
-        minval=0.,
-        maxval=1.,
-        seed=test_util.test_seed())
+    x = self.evaluate(
+        tf.random.uniform(
+            shape=[int(1e5)],
+            minval=0.,
+            maxval=1.,
+            seed=test_util.test_seed()))
     erfcinv = tfp.math.erfcinv(x)
     x_prime = tf.math.erfc(erfcinv)
     x_prime, erfcinv = self.evaluate([x_prime, erfcinv])
