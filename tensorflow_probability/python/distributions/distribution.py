@@ -25,7 +25,6 @@ import functools
 import inspect
 import types
 import decorator
-
 import six
 import tensorflow.compat.v2 as tf
 
@@ -283,6 +282,36 @@ class _DistributionMeta(abc.ABCMeta):
       return super(_DistributionMeta, mcs).__new__(
           mcs, classname, baseclasses, attrs)
 
+    # Subclasses shouldn't inherit their parents' `_parameter_properties`,
+    # since (in general) they'll have different parameters. Exceptions (for
+    # convenience) are:
+    #  - Subclasses that don't define their own `__init__` (handled above by
+    #    the short-circuit when `default_init is None`).
+    #  - Subclasses that define a passthrough `__init__(self, *args, **kwargs)`.
+    init_argspec = tf_inspect.getfullargspec(default_init)
+    if ('_parameter_properties' not in attrs
+        # Passthrough exception: may only take `self` and at least one of
+        # `*args` and `**kwargs`.
+        and (len(init_argspec.args) > 1
+             or not (init_argspec.varargs or init_argspec.varkw))):
+      # TODO(b/183457779) remove warning and raise `NotImplementedError`.
+      attrs['_parameter_properties'] = deprecation.deprecated(
+          date='2021-07-01',
+          instructions="""
+Calling `_parameter_properties` on subclass {classname} that redefines the
+parent ({basename}) `__init__` is unsafe and will raise an error in the future.
+Please implement an explicit `_parameter_properties` for the subclass. If the
+subclass `__init__` takes the same parameters as the parent, you may use the
+placeholder implementation:
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return {basename}._parameter_properties(
+        dtype=dtype, num_classes=num_classes)
+
+""".format(classname=classname,
+           basename=base.__name__))(base._parameter_properties)
+
     # pylint: disable=protected-access
     # For a comparison of different methods for wrapping functions, see:
     # https://hynek.me/articles/decorators/
@@ -377,6 +406,12 @@ class Distribution(_BaseDistribution):
   docstring. This is implemented as a simple decorator to avoid python
   linter complaining about missing Args/Returns/Raises sections in the
   partial docstrings.
+
+  Note that subclasses of existing Distributions that redefine `__init__` do
+  *not* automatically inherit
+  `_parameter_properties` annotations from their parent: the subclass must
+  explicitly implement its own `_parameter_properties` method to support the
+  features, such as batch slicing, that this enables.
 
   #### Broadcasting, batching, and shapes
 
@@ -591,7 +626,10 @@ class Distribution(_BaseDistribution):
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     raise NotImplementedError(
-        '_parameter_properties` is not implemented: {}'.format(cls.__name__))
+        '_parameter_properties` is not implemented: {}. '
+        'Note that subclasses that redefine `__init__` are not assumed to '
+        'share parameters with their parent class and must provide a separate '
+        'implementation.'.format(cls.__name__))
 
   @classmethod
   def parameter_properties(cls, dtype=tf.float32, num_classes=None):
