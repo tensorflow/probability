@@ -56,7 +56,7 @@ class PowerSpherical(distribution.Distribution):
   It serves as an alternative to the von Mises-Fisher distribution with a
   simpler (faster) `log_prob` calculation, as well as a reparameterizable
   sampler. In contrast, the Power Spherical distribution does have
-  -`mean_direction` as a point with zero density (and hence a neighborhood
+  `-mean_direction` as a point with zero density (and hence a neighborhood
   around that having arbitrarily small density), in contrast with the
   von Mises-Fisher distribution which has non-zero density everywhere.
 
