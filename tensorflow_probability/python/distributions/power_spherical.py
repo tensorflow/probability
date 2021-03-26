@@ -50,7 +50,7 @@ __all__ = ['PowerSpherical']
 class PowerSpherical(distribution.Distribution):
   r"""The Power Spherical distribution over unit vectors on `S^{n-1}`.
 
-  The Power Spherical distribution is a distribution over vectors
+  The Power Spherical distribution [1] is a distribution over vectors
   on the unit hypersphere `S^{n-1}` embedded in `n` dimensions (`R^n`).
 
   It serves as an alternative to the von Mises-Fisher distribution with a
