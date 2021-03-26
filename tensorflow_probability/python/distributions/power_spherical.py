@@ -111,6 +111,7 @@ class PowerSpherical(distribution.Distribution):
   x = [[0., 0, 1],
        [0., 1, 0]]
   ps.prob(x)
+  ```
 
   #### References
 
