@@ -27,7 +27,7 @@ class HighwayFlowTests(test_util.TestCase):
         width = 5
         bijector = tfp.experimental.bijectors.build_highway_flow_layer(width)
         self.assertStartsWith(bijector.name, 'highway_flow')
-        x = tf.random.uniform(0., 10., (width,))
+        x = tf.ones((1,width))
         self.assertAllClose(x, self.evaluate(bijector.inverse(tf.identity(bijector.forward(x)))))
 
     #def testThatInverseActivationGradientIsCorrect(self):
