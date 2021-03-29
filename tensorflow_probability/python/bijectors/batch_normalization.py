@@ -90,14 +90,13 @@ class BatchNormalization(bijector.Bijector):
   computed at training-time. De-normalization is useful for sampling.
 
   ```python
-
-  dist = tfd.TransformedDistribution(
-      distribution=tfd.Normal()),
+  distribution = tfd.TransformedDistribution(
+      distribution=tfd.Normal(loc=[0.0], scale=[1.0]),
       bijector=tfb.BatchNormalization())
 
-  y = tfd.MultivariateNormalDiag(loc=1., scale=2.).sample(100)  # ~ N(1, 2)
-  x = dist.bijector.inverse(y)  # ~ N(0, 1)
-  y = dist.sample()  # ~ N(1, 2)
+  y = tfd.Normal(loc=[1.0], scale=[2.0]).sample(100)  # ~ N(1, 2)
+  x = distribution.bijector.inverse(y)  # ~ N(0, 1)
+  y_ = distribution.sample(100)  # ~ N(1, 2)
   ```
 
   During training time, `BatchNormalization.inverse` and
