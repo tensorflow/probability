@@ -65,6 +65,7 @@ class HighwayFlow(tfb.Bijector):
         self.residual_fraction = residual_fraction
 
         # still lower triangular, transposed is done in matvec.
+        # TODO: transpose directly here or in the definition of TransformedVariable?
         self.upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
 
         self.lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
@@ -97,10 +98,9 @@ class HighwayFlow(tfb.Bijector):
                 self.upper_diagonal_weights_matrix)))  # jacobian from upper matrix
         # jacobian from lower matrix is 0
 
-        # todo: see how to optimize _convex_update`
+        # todo: see how to optimize _convex_update
         x = tf.linalg.matvec(self._convex_update(self.lower_diagonal_weights_matrix), x)
-        x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix), x,
-                             transpose_a=True) + self.bias  # in the implementation there was only one bias
+        x = tf.linalg.matvec(self._convex_update(tf.transpose(self.upper_diagonal_weights_matrix)), x) + self.bias  # in the implementation there was only one bias
         if self.activation_fn:
             #fldj += tf.reduce_sum(tf.math.log(self.df(x)))
             #x = self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x)
