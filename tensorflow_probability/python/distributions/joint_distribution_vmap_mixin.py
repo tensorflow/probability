@@ -122,10 +122,12 @@ class JointDistributionVmapMixin(object):
     return result
 
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
-                           name='sample_distributions'):
+                           name='sample_distributions', **kwargs):
     with self._name_and_control_scope(name):
 
       value_might_have_sample_dims = False
+      if (value is None) and kwargs:
+        value = self._resolve_value_from_kwargs(**kwargs)
       if value is not None:
         value = _pad_value_to_full_length(value, self.dtype)
         value = tf.nest.map_structure(
@@ -150,6 +152,8 @@ class JointDistributionVmapMixin(object):
   def _sample_n(self, sample_shape, seed, value=None, **kwargs):
 
     value_might_have_sample_dims = False
+    if (value is None) and kwargs:
+      value = self._resolve_value_from_kwargs(**kwargs)
     if value is not None:
       value = _pad_value_to_full_length(value, self.dtype)
       value = tf.nest.map_structure(
@@ -163,7 +167,7 @@ class JointDistributionVmapMixin(object):
         value_might_have_sample_dims):
       # No need to auto-vectorize.
       xs = self._call_flat_sample_distributions(
-          sample_shape=sample_shape, seed=seed, value=value, **kwargs)[1]
+          sample_shape=sample_shape, seed=seed, value=value)[1]
       return self._model_unflatten(xs)
 
     # Set up for autovectorized sampling. To support the `value` arg, we need to

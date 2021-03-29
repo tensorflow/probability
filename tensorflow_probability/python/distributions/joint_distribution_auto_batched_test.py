@@ -353,6 +353,20 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     x2 = self.evaluate(dist.sample(value=x, seed=test_util.test_seed()))
     self.assertAllCloseNested(x, x2)
 
+  def test_sample_with_value_as_kwarg(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def dist():
+      a = yield tfd.Sample(tfd.Normal(0, 1.), 2, name='a')
+      b = yield tfd.Sample(tfd.Normal(0, 1.), 3, name='b')
+      # The following line fails if not autovectorized.
+      yield tfd.Normal(a[tf.newaxis, ...] * b[..., tf.newaxis], 1., name='c')
+
+    x = self.evaluate(dist.sample(4, seed=test_util.test_seed()))
+    x2 = self.evaluate(dist.sample(seed=test_util.test_seed(), a=x.a))
+    self.assertAllClose(x.a, x2.a)
+    self.assertAllEqual(x2.b.shape, [4, 3])
+    self.assertAllEqual(x2.c.shape, [4, 3, 2])
+
   @parameterized.named_parameters(
       dict(testcase_name='stateful', sampler_type='stateful'),
       dict(testcase_name='stateless', sampler_type='stateless'))

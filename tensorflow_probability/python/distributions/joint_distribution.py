@@ -456,27 +456,31 @@ class JointDistribution(distribution_lib.Distribution):
              if dists is None else dists)
     return (getattr(d, attr)() for d in dists)
 
+  def _resolve_value_from_kwargs(self, **kwargs):
+    names = self._flat_resolve_names()
+    kwargs.update({k: kwargs.get(k, None) for k in names})  # In place update
+    value, unmatched_kwargs = _resolve_value_from_args(
+        [],
+        kwargs,
+        dtype=self.dtype,
+        flat_names=names,
+        model_flatten_fn=self._model_flatten,
+        model_unflatten_fn=self._model_unflatten)
+    if unmatched_kwargs:
+      join = lambda args: ', '.join(str(j) for j in args)
+      kwarg_names = join(k for k, v in kwargs.items() if v is not None)
+      dist_name_str = join(names)
+      unmatched_str = join(unmatched_kwargs)
+      raise ValueError(
+          'Found unexpected keyword arguments. Distribution names '
+          'are\n{}\nbut received\n{}\nThese names were '
+          'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
+    return value
+
   def _call_flat_sample_distributions(
       self, sample_shape=(), seed=None, value=None, **kwargs):
     if (value is None) and kwargs:
-      names = self._flat_resolve_names()
-      kwargs.update({k: kwargs.get(k) for k in names})  # In place update
-      value, unmatched_kwargs = _resolve_value_from_args(
-          [],
-          kwargs,
-          dtype=self.dtype,
-          flat_names=names,
-          model_flatten_fn=self._model_flatten,
-          model_unflatten_fn=self._model_unflatten)
-      if unmatched_kwargs:
-        join = lambda args: ', '.join(str(j) for j in args)
-        kwarg_names = join(k for k, v in kwargs.items() if v is not None)
-        dist_name_str = join(names)
-        unmatched_str = join(unmatched_kwargs)
-        raise ValueError(
-            'Found unexpected keyword arguments. Distribution names '
-            'are\n{}\nbut received\n{}\nThese names were '
-            'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
+      value = self._resolve_value_from_kwargs(**kwargs)
     if value is not None:
       value = self._model_flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
