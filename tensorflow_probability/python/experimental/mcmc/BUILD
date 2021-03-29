@@ -962,7 +962,6 @@ py_library(
         "//tensorflow_probability/python/bijectors:joint_map",
         "//tensorflow_probability/python/bijectors:reshape",
         "//tensorflow_probability/python/bijectors:restructure",
-        "//tensorflow_probability/python/bijectors:split",
         "//tensorflow_probability/python/experimental/stats:sample_stats",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
