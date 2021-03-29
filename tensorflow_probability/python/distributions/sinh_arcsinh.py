@@ -24,11 +24,12 @@ from tensorflow_probability.python.bijectors import identity as identity_bijecto
 from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import sinh_arcsinh as sinh_arcsinh_bijector
-
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -191,6 +192,18 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
           validate_args=validate_args,
           name=name)
       self._parameters = parameters
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        skewness=parameter_properties.ParameterProperties(),
+        tailweight=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   @property
   def loc(self):

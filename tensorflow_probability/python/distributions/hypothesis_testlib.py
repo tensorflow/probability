@@ -106,7 +106,7 @@ TF2_FRIENDLY_DISTS = (
     'RelaxedBernoulli',
     'ExpRelaxedOneHotCategorical',
     'SigmoidBeta',
-    # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
+    'SinhArcsinh',
     'Skellam',
     'SphericalUniform',
     'StudentT',
@@ -302,6 +302,8 @@ CONSTRAINTS = {
     'Categorical.probs':
         tf.math.softmax,
     'ExpRelaxedOneHotCategorical.probs':
+        tf.math.softmax,
+    'RelaxedOneHotCategorical.probs':
         tf.math.softmax,
     'FiniteDiscrete.probs':
         tf.math.softmax,

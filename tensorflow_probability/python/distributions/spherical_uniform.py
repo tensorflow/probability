@@ -129,7 +129,7 @@ class SphericalUniform(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
+  def _parameter_properties(cls, dtype, num_classes=None):
     return dict()
 
   @property

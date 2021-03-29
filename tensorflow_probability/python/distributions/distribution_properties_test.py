@@ -69,6 +69,7 @@ NO_NANS_TEST_BLOCK_LIST = (
     'BetaQuotient',  # b/178925774
     'Dirichlet',  # b/169689852
     'ExpRelaxedOneHotCategorical',  # b/169663302
+    'RelaxedOneHotCategorical',  # b/169663302
     # Independent log_prob unavoidably emits `nan` if the underlying
     # distribution yields a +inf on one sample and a -inf on another.
     'Independent',
@@ -88,6 +89,7 @@ NO_NANS_TEST_BLOCK_LIST = (
     # concentration is an example of a distribution that can produce this
     # effect.
     'Sample',
+    'SinhArcsinh',  # b/183670203
     'TransformedDistribution',  # Bijectors may introduce nans
     # TODO(axch): Edit C++ sampler to reject numerically out-of-bounds samples
     'TruncatedNormal',
@@ -95,6 +97,7 @@ NO_NANS_TEST_BLOCK_LIST = (
 
 NANS_EVEN_IN_SAMPLE_LIST = (
     'Mixture',  # b/169847344.  Not a nan, but can't always sample from Mixture
+    'SinhArcsinh',  # b/183670203
     'TransformedDistribution',  # Bijectors may introduce nans
 )
 
@@ -465,7 +468,6 @@ class ParameterBijectorsTest(test_util.TestCase):
                            'Empirical|event_ndims=2', 'FiniteDiscrete',
                            'MultivariateStudentTLinearOperator',
                            'PoissonLogNormalQuadratureCompound',
-                           'SphericalUniform', 'SinhArcsinh',
                            'StoppingRatioLogistic',)
     non_trainable_dists = (
         high_gt_low_constraint_dists + not_annotated_dists +

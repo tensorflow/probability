@@ -139,10 +139,6 @@ class ExponentiallyModifiedGaussian(distribution.Distribution):
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
-  @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, scale=0, rate=0)
-
   @property
   def loc(self):
     """Distribution parameter for the mean of the normal distribution."""
