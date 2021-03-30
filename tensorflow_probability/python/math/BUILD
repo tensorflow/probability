@@ -80,7 +80,7 @@ multi_substrate_py_test(
     name = "bessel_test",
     size = "medium",
     srcs = ["bessel_test.py"],
-    shard_count = 2,
+    shard_count = 7,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
