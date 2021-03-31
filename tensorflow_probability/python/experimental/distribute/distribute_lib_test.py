@@ -25,6 +25,8 @@ from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 
+JAX_MODE = False
+
 
 @test_util.test_all_tf_execution_regimes
 class LogProbPartsTest(test_lib.DistributedTest):
@@ -60,7 +62,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
       ]
 
     sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-        log_prob_parts, [False, True], axis_name=None)
+        log_prob_parts, [None, True])
     self.assertAllEqualNested(
         self.evaluate(sharded_log_prob_parts([tf.constant(0.), data])),
         self.evaluate([
@@ -83,7 +85,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
       ]
 
     sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-        log_prob_parts, [True, True], axis_name=None)
+        log_prob_parts, [True, True])
     self.assertAllEqualNested(
         self.evaluate(sharded_log_prob_parts([tf.ones(4), data])),
         self.evaluate([
@@ -103,7 +105,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         ]
 
       sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-          log_prob_parts, [False, True], axis_name=self.axis_name)
+          log_prob_parts, [None, self.axis_name])
 
       return sharded_log_prob_parts([x, data])
 
@@ -132,7 +134,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         ]
 
       sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-          log_prob_parts, [True, True], axis_name=self.axis_name)
+          log_prob_parts, [self.axis_name, self.axis_name])
 
       return sharded_log_prob_parts([x, data])
 
@@ -163,7 +165,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
         ]
 
       sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-          log_prob_parts, [False, True, True], axis_name=self.axis_name)
+          log_prob_parts, [None, self.axis_name, self.axis_name])
 
       return sharded_log_prob_parts([w, x, data])
 
@@ -197,7 +199,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
       def log_prob(x):
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, [False, True], axis_name=self.axis_name)
+            log_prob_parts, [None, self.axis_name])
         parts = sharded_log_prob_parts([x, data])
         return tf.add_n(parts)
 
@@ -231,7 +233,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
       def log_prob(x):
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, [True, True], axis_name=self.axis_name)
+            log_prob_parts, [self.axis_name, self.axis_name])
         parts = sharded_log_prob_parts([x, data])
         return tf.add_n(parts)
 
@@ -267,7 +269,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob(*value):
         w, x = value
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, [False, True, True], axis_name=self.axis_name)
+            log_prob_parts, [None, self.axis_name, self.axis_name])
         parts = sharded_log_prob_parts([w, x, data])
         return tf.add_n(parts)
 
@@ -311,7 +313,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob(*value):
         w, x = value
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, [False, True, True], axis_name=self.axis_name)
+            log_prob_parts, [None, self.axis_name, self.axis_name])
         parts = sharded_log_prob_parts([w, x, data])
         return tf.add_n(parts)
 
@@ -358,8 +360,8 @@ class LogProbPartsTest(test_lib.DistributedTest):
       def log_prob(*value):
         w, x = value
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, {'w': False, 'x': True, 'data': True},
-            axis_name=self.axis_name)
+            log_prob_parts,
+            {'w': None, 'x': self.axis_name, 'data': self.axis_name})
         parts = sharded_log_prob_parts({'w': w, 'x': x, 'data': data})
         return tf.add_n(tf.nest.flatten(parts))
 
@@ -400,7 +402,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
       def log_prob(x):
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, [True, True], axis_name=self.axis_name)
+            log_prob_parts, [self.axis_name, self.axis_name])
         parts = sharded_log_prob_parts([x, data])
         return tf.add_n(parts)
 
@@ -435,7 +437,7 @@ class LogProbPartsTest(test_lib.DistributedTest):
 
       def log_prob(x, y):
         sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
-            log_prob_parts, [False, True], axis_name=self.axis_name)
+            log_prob_parts, [None, self.axis_name])
         parts = sharded_log_prob_parts([x, y])
         return tf.add_n(parts)
 
@@ -448,6 +450,98 @@ class LogProbPartsTest(test_lib.DistributedTest):
     self.assertEqual(tf.float32, out_grads[0].dtype)
     self.assertEqual(tf.float32, out_grads[1].dtype)
 
+  def test_multiple_shard_axes(self):
+    if not JAX_MODE:
+      self.skipTest('Multiple shard axes not supported in TF.')
+
+    other_axis_name = self.axis_name + '_other'
+
+    def run(x, data1, data2):
+
+      def log_prob_parts(value):
+        x, data1, data2 = value
+        return [
+            tfd.Normal(0., 1.).log_prob(x),
+            tfd.Normal(x, 1.).log_prob(data1),
+            tfd.Normal(x, 1.).log_prob(data2)
+        ]
+
+      def log_prob(x, data1, data2):
+        sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
+            log_prob_parts, [None, self.axis_name, other_axis_name])
+        parts = sharded_log_prob_parts([x, data1, data2])
+        return tf.add_n(parts)
+
+      return tfp.math.value_and_gradient(log_prob, (x, data1, data2))
+
+    x = tf.constant(1.)
+    data1 = 2 * tf.ones(2)
+    data2 = 3 * tf.ones(2)
+
+    def outer_run(x, data1):
+      return self.strategy_run(run, (x, data1, data2), in_axes=(None, None, 0),
+                               axis_name=other_axis_name)
+    out_values, out_grads = self.strategy_run(outer_run, (x, data1),
+                                              in_axes=(None, 0),
+                                              axis_name=self.axis_name)
+
+    def true_log_prob(x, data1, data2):
+      return (tfd.Normal(0., 1.).log_prob(x)
+              + tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data1))
+              + tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data2))
+              )
+
+    true_values, true_grads = self.evaluate(tfp.math.value_and_gradient(
+        true_log_prob, (x, data1, data2)))
+
+    self.assertAllEqualNested(out_values, tf.ones([2, 2]) * true_values)
+    self.assertAllEqualNested(out_grads[0], tf.ones([2, 2]) * true_grads[0])
+    self.assertAllEqualNested(out_grads[1], tf.ones([2, 2]) * true_grads[1])
+    self.assertAllEqualNested(out_grads[2], tf.ones([2, 2]) * true_grads[2])
+
+  def test_nested_shard_axes(self):
+    if not JAX_MODE:
+      self.skipTest('Multiple shard axes not supported in TF.')
+
+    other_axis_name = self.axis_name + '_other'
+
+    def run(x, data):
+
+      def log_prob_parts(value):
+        x, data = value
+        return [
+            tfd.Normal(0., 1.).log_prob(x),
+            tfd.Normal(x, 1.).log_prob(data),
+        ]
+
+      def log_prob(x, data):
+        sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
+            log_prob_parts, [None, {self.axis_name, other_axis_name}])
+        parts = sharded_log_prob_parts([x, data])
+        return tf.add_n(parts)
+
+      return tfp.math.value_and_gradient(log_prob, (x, data))
+
+    x = tf.constant(1.)
+    data = 2 * tf.ones([2, 2])
+
+    def outer_run(x, data):
+      return self.strategy_run(run, (x, data), in_axes=(None, 0),
+                               axis_name=other_axis_name)
+    out_values, out_grads = self.strategy_run(outer_run, (x, data),
+                                              in_axes=(None, 0))
+
+    def true_log_prob(x, data):
+      return (tfd.Normal(0., 1.).log_prob(x)
+              + tf.reduce_sum(tfd.Normal(x, 1.).log_prob(data))
+              )
+
+    true_values, true_grads = self.evaluate(tfp.math.value_and_gradient(
+        true_log_prob, (x, data)))
+
+    self.assertAllEqualNested(out_values, tf.ones([2, 2]) * true_values)
+    self.assertAllEqualNested(out_grads[0], tf.ones([2, 2]) * true_grads[0])
+    self.assertAllEqualNested(out_grads[1], tf.ones([2, 2]) * true_grads[1])
 
 if __name__ == '__main__':
   tf.test.main()

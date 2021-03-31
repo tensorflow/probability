@@ -223,10 +223,10 @@ class JointDistribution(distribution_lib.Distribution):
         for d in self._get_single_sample_distributions()])
 
   @property
-  def experimental_is_sharded(self):
-    """Indicates whether part distributions are sharded."""
+  def experimental_shard_axis_names(self):
+    """Indicates whether part distributions have active shard axis names."""
     return self._model_unflatten([
-        d.experimental_is_sharded
+        d.experimental_shard_axis_names
         for d in self._get_single_sample_distributions()])
 
   @property

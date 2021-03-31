@@ -27,6 +27,8 @@ tfd = tfp.distributions
 tfde = tfp.experimental.distributions
 tfp_dist = tfp.experimental.distribute
 
+JAX_MODE = False
+
 
 @test_util.test_all_tf_execution_regimes
 class ShardTest(test_lib.DistributedTest):
@@ -47,6 +49,45 @@ class ShardTest(test_lib.DistributedTest):
         if i == j:
           continue
         self.assertNotEqual(sample[i], sample[j])
+
+  def test_sharded_samples_differently_with_nested_axes(self):
+    if not JAX_MODE:
+      self.skipTest('Multiple axes only supported in JAX backend.')
+
+    other_axis_name = self.axis_name + '_other'
+
+    def run(key, _):
+      return sharded.Sharded(
+          tfd.Sample(tfd.Normal(0., 1.), 1),
+          shard_axis_name=[self.axis_name, other_axis_name]).sample(seed=key)
+
+    def outer_run(key, x):
+      return self.strategy_run(run, (key, x),
+                               axis_name=other_axis_name,
+                               in_axes=(None, 0))
+    # Pass a dummy ones([2, 2]) to create the right axis sizes
+    sample = self.strategy_run(outer_run, (self.key, tf.ones([2, 2])),
+                               in_axes=(None, 0))
+    for i in range(2):
+      for j in range(2):
+        for k in range(2):
+          for l in range(2):
+            if i == k and j == l:
+              continue
+            self.assertNotEqual(sample[i, j], sample[k, l])
+
+  def test_nested_sharded_maintains_correct_axis_ordering(self):
+    if not JAX_MODE:
+      self.skipTest('Multiple axes only supported in JAX backend.')
+
+    other_axis_name = self.axis_name + '_other'
+
+    dist = sharded.Sharded(
+        sharded.Sharded(tfd.Normal(0., 1.), self.axis_name),
+        other_axis_name)
+
+    self.assertListEqual(
+        dist.experimental_shard_axis_names, [self.axis_name, other_axis_name])
 
   def test_sharded_independent_samples_differently_across_shards(self):
 
@@ -77,8 +118,7 @@ class ShardTest(test_lib.DistributedTest):
                   experimental_use_kahan_sum=True),
               shard_axis_name=self.axis_name))
 
-    model = tfp.experimental.distribute.JointDistributionCoroutine(
-        model_fn, shard_axis_name=self.axis_name)
+    model = tfp.experimental.distribute.JointDistributionCoroutine(model_fn)
 
     samps = self.strategy_run(
         lambda seed: model.sample(seed=seed),
@@ -125,6 +165,44 @@ class ShardTest(test_lib.DistributedTest):
     self.assertAllClose(true_g1, g1)
     self.assertAllClose(true_lp2, lp2[0])
     self.assertAllClose(true_g2, g2)
+
+  def test_log_prob_with_multiple_axes(self):
+    if not JAX_MODE:
+      self.skipTest('Multiple axes only supported in JAX backend.')
+
+    other_axis_name = self.axis_name + '_other'
+
+    @tf.function
+    def lp_grad(x):
+      lp1, g1 = tfp.math.value_and_gradient(
+          tfp_dist.Sharded(
+              tfd.Sample(tfd.Normal(0., 1.), 1),
+              shard_axis_name=[self.axis_name, other_axis_name]).log_prob, (x,))
+      lp2, g2 = tfp.math.value_and_gradient(
+          tfp_dist.Sharded(
+              tfd.Independent(tfd.Normal(tf.zeros([1]), 1.), 1),
+              shard_axis_name=[self.axis_name, other_axis_name]).log_prob, (x,))
+      return lp1, g1, lp2, g2
+
+    def true_lp_grad(x):
+      lp1, g1 = tfp.math.value_and_gradient(
+          tfd.Sample(tfd.Normal(0., 1.), [2, 2]).log_prob, (x,))
+      lp2, g2 = tfp.math.value_and_gradient(
+          tfd.Independent(tfd.Normal(tf.zeros([2, 2]), 1.),
+                          2).log_prob, (x,))
+      return lp1, g1, lp2, g2
+
+    x = tf.ones([2, 2])
+
+    def outer_run(x):
+      return self.strategy_run(lp_grad, (x,), axis_name=other_axis_name)
+    lp1, g1, lp2, g2 = self.strategy_run(outer_run, (x,))
+    true_lp1, true_g1, true_lp2, true_g2 = true_lp_grad(x)
+
+    self.assertAllClose(tf.ones([2, 2]) * true_lp1, lp1)
+    self.assertAllClose(true_g1[0], g1[0])
+    self.assertAllClose(tf.ones([2, 2]) * true_lp2, lp2)
+    self.assertAllClose(true_g2[0], g2[0])
 
   def test_log_prob_ratio_sample(self):
     dist1 = tfd.Sample(tfd.Normal(0., 4.), test_lib.NUM_DEVICES)

@@ -841,9 +841,9 @@ class Distribution(_BaseDistribution):
     return self._validate_args
 
   @property
-  def experimental_is_sharded(self):
-    """`True` for distributions which parallel-sum `log_prob` across devices."""
-    return False
+  def experimental_shard_axis_names(self):
+    """The list or structure of lists of active shard axis names."""
+    return []
 
   def copy(self, **override_parameters_kwargs):
     """Creates a deep copy of the distribution.

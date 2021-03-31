@@ -42,8 +42,9 @@ def make_jd_sequential(axis_name):
           tfd.Sample(tfd.Normal(w, 1.), 1),
           shard_axis_name=axis_name),
       lambda x: sharded.Sharded(  # pylint: disable=g-long-lambda
-          tfd.Independent(tfd.Normal(x, 1.), 1), shard_axis_name=axis_name),
-  ], shard_axis_name=axis_name)
+          tfd.Independent(tfd.Normal(x, 1.), 1),
+          shard_axis_name=axis_name),
+  ])
 
 
 def make_jd_named(axis_name):
@@ -56,7 +57,7 @@ def make_jd_named(axis_name):
           data=lambda x: sharded.Sharded(  # pylint: disable=g-long-lambda
               tfd.Independent(tfd.Normal(x, 1.), 1),
               shard_axis_name=axis_name),
-      ), shard_axis_name=axis_name)
+      ))
 
 
 def make_jd_coroutine(axis_name):
@@ -68,8 +69,7 @@ def make_jd_coroutine(axis_name):
     yield sharded.Sharded(
         tfd.Independent(tfd.Normal(x, 1.), 1), shard_axis_name=axis_name)
 
-  return jd.JointDistributionCoroutine(
-      model_coroutine, shard_axis_name=axis_name)
+  return jd.JointDistributionCoroutine(model_coroutine)
 
 
 distributions = (
@@ -87,22 +87,24 @@ class JointDistributionTest(test_lib.DistributedTest):
       reason='Cannot call `experimental_is_sharded` outside of pmap.')
   def test_experimental_is_sharded_coroutine(self):
     dist = distributions[0][1](self.axis_name)
-    self.assertTupleEqual(dist.experimental_is_sharded, (False, True, True))
+    self.assertTupleEqual(dist.experimental_shard_axis_names,
+                          ([], [self.axis_name], [self.axis_name]))
 
   @test_util.disable_test_for_backend(
       disable_jax=True,
       reason='Cannot call `experimental_is_sharded` outside of pmap.')
   def test_experimental_is_sharded_sequential(self):
     dist = distributions[1][1](self.axis_name)
-    self.assertListEqual(dist.experimental_is_sharded, [False, True, True])
+    self.assertListEqual(dist.experimental_shard_axis_names,
+                         [[], [self.axis_name], [self.axis_name]])
 
   @test_util.disable_test_for_backend(
       disable_jax=True,
       reason='Cannot call `experimental_is_sharded` outside of pmap.')
   def test_experimental_is_sharded_named(self):
     dist = distributions[2][1](self.axis_name)
-    self.assertDictEqual(dist.experimental_is_sharded,
-                         dict(w=False, x=True, data=True))
+    self.assertDictEqual(dist.experimental_shard_axis_names,
+                         dict(w=[], x=[self.axis_name], data=[self.axis_name]))
 
   @parameterized.named_parameters(*distributions)
   def test_jd(self, dist_fn):
@@ -180,8 +182,9 @@ class JointDistributionTest(test_lib.DistributedTest):
     true_lp_diff = true_log_probs[0] - true_log_probs[1]
     lp_diff = log_probs[0] - log_probs[1]
 
-    self.assertAllClose(self.evaluate(true_lp_diff), self.evaluate(lp_diff),
-                        rtol=7e-6)  # relaxed tol for fp32 in JAX
+    self.assertAllClose(
+        self.evaluate(true_lp_diff), self.evaluate(lp_diff),
+        rtol=7e-6)  # relaxed tol for fp32 in JAX
     self.assertAllClose(
         self.evaluate(true_lp_diff), self.evaluate(dist_lp_diff[0]))
 
