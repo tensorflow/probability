@@ -28,13 +28,18 @@ class HighwayFlowTests(test_util.TestCase):
 
     def testBijector(self):
         width = 2
-        bijector = tfp.experimental.bijectors.build_highway_flow_layer(width, activation_fn=tf.nn.softplus)
-        self.evaluate([v.initializer for v in bijector.trainable_variables])
-        self.assertStartsWith(bijector.name, 'highway_flow')
-        x = tf.ones((1, width)) * samplers.uniform((1, width), -1., 1.)
-        self.assertAllClose(x, self.evaluate(bijector.inverse(tf.identity(bijector.forward(x)))))
-        self.assertAllClose(bijector.forward_log_det_jacobian(x, event_ndims=1),
-                            -bijector.inverse_log_det_jacobian(tf.identity(bijector.forward(x)), event_ndims=1))
+        for dim in range(2):
+            if dim == 0:
+                x = tf.ones((5, width)) * samplers.uniform((5, width), -1., 1.)
+            elif dim == 1:
+                x = tf.ones((5, width, width)) * samplers.uniform((5, width, width), -1., 1.)
+
+            bijector = tfp.experimental.bijectors.build_highway_flow_layer(width, activation_fn=tf.nn.softplus)
+            self.evaluate([v.initializer for v in bijector.trainable_variables])
+            self.assertStartsWith(bijector.name, 'highway_flow')
+            self.assertAllClose(x, self.evaluate(bijector.inverse(tf.identity(bijector.forward(x)))))
+            self.assertAllClose(bijector.forward_log_det_jacobian(x, event_ndims=dim+1),
+                                -bijector.inverse_log_det_jacobian(tf.identity(bijector.forward(x)), event_ndims=dim+1))
 
     def testJacobianWithActivation(self):
         activations = ['sigmoid', 'softplus', 'tanh', 'none']
@@ -80,9 +85,6 @@ class HighwayFlowTests(test_util.TestCase):
                 expected_forward_log_det_jacobian,
                 bijector.forward_log_det_jacobian(x, event_ndims=1),
             )
-
-
-
 
 
 if __name__ == '__main__':

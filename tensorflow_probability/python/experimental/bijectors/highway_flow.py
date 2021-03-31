@@ -90,7 +90,7 @@ class HighwayFlow(tfb.Bijector):
 
     def _augmented_forward(self, x):
         # upper mmatrix jacobian
-        fldj = tf.zeros(x.shape[0]) + tf.reduce_sum(
+        fldj = tf.zeros(x.shape[:-1]) + tf.reduce_sum(
             tf.math.log(self.residual_fraction + (1. - self.residual_fraction) * tf.linalg.diag_part(
                 self.upper_diagonal_weights_matrix)))  # jacobian from upper matrix
         # jacobian from lower matrix is 0
@@ -109,7 +109,7 @@ class HighwayFlow(tfb.Bijector):
         return x, {'ildj': -fldj, 'fldj': fldj}
 
     def _augmented_inverse(self, y):
-        ildj = tf.zeros(y.shape[0]) - tf.reduce_sum(
+        ildj = tf.zeros(y.shape[:-1]) - tf.reduce_sum(
             tf.math.log(self.residual_fraction + (1. - self.residual_fraction) * tf.linalg.diag_part(
                 self.upper_diagonal_weights_matrix)))
         if self.activation_fn:
