@@ -23,9 +23,12 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution
+from tensorflow_probability.python.distributions import joint_distribution_vmap_mixin
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import structural_tuple
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import vectorization_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 CALLING_CONVENTION_DESCRIPTION = """
@@ -340,6 +343,9 @@ class JointDistributionPinned(object):
     self._distribution = distribution
     self._name = name
     self._pins = _to_pins(distribution, *pins, **named_pins)
+    self._use_vectorized_map = getattr(distribution,
+                                       'use_vectorized_map',
+                                       False)
 
   @property
   def distribution(self):
@@ -355,6 +361,11 @@ class JointDistributionPinned(object):
   def pins(self):
     """Dictionary of pins resolved to names."""
     return self._pins
+
+  @property
+  def use_vectorized_map(self):
+    """Whether the underlying distribution relies on automatic vectorization."""
+    return self._use_vectorized_map
 
   @property
   def validate_args(self):
@@ -435,8 +446,11 @@ class JointDistributionPinned(object):
   def experimental_default_event_space_bijector(self, *args, **kwargs):
     """A bijector to pull back unpinned values to unconstrained reals."""
     if args or kwargs:
-      return joint_distribution._DefaultJointBijector(
-          self.experimental_pin(*args, **kwargs))
+      return (
+          self.experimental_pin(*args, **kwargs)
+          .experimental_default_event_space_bijector())
+    if self.use_vectorized_map:
+      return _DefaultJointBijectorAutoBatchedWithPins(self)
     return joint_distribution._DefaultJointBijector(self)
 
   def experimental_pin(self, *args, **kwargs):
@@ -648,3 +662,74 @@ def _to_pins(dist, *args, **kwargs):
           len(args), len(names)))
     return {k: convert_to_tensors(v, dtypes_by_name[k])
             for k, v in zip(names, args) if v is not None}
+
+
+class _DefaultJointBijectorAutoBatchedWithPins(
+    joint_distribution_vmap_mixin._DefaultJointBijectorAutoBatched):
+  """Bijector that auto-batches over both its inputs *and* any pinned values."""
+
+  def _vectorize_member_fn(self, member_fn, core_ndims):
+    # Pinned values must be treated as *inputs* to vectorized bijector
+    # members, since the pins can have batch dimensions that coincide
+    # with the other values being transformed. For example, given
+    #
+    # jd = JointDistributionNamedAutoBatched({'
+    #   'a': tfd.LogNormal(0., 1.),
+    #   'b': lambda a: tfd.Uniform(high=a + tf.ones([3]))})
+    # bij = jd.experimental_default_event_space_bijector()
+    # sampled = jd.sample([2])  # ==> shape {'a': [2], 'b': [2, 3]}
+    #
+    # then if we pin a sampled value,
+    #
+    # pinned_jd = jd.experimental_pin(a=sampled['a'])
+    # pinned_bij = pinned_jd.experimental_default_event_space_bijector()
+    #
+    # then we'd expect `pinned_bij.forward({'b': sampled['b']})` to return the
+    # same value for `b` as `bij.forward(sampled)['b']`, in which
+    # each of the two batch elements of `b` is transformed wrt the corresponding
+    # batch element of `a`. If we used a naive _DefaultJointBijectorAutoBatched
+    # instance for `pinned_bij`, we would instead get a shape error when
+    # the pinned value for `a` appears in the model with batch shape `[2]`. The
+    # solution is to ensure that the pinned value(s) are passed as input(s) to
+    # every bijector method that we autovectorize.
+    #
+    # The approach implemented here uses a heavy hammer: calling any bijector
+    # method rebuilds the pinned JD, creates a support bijector for its unpinned
+    # values, and then invokes the requested method on that bijector.
+    # (Re)creating all these Python objects incurs overhead in eager mode and
+    # during `tf.function` tracing, but has no graph side effects, so repeated
+    # execution of the traced function should be efficient.
+    def build_and_invoke_pinned_bijector(pins, *args):
+      bij = joint_distribution._DefaultJointBijector(  # pylint: disable=protected-access
+          self._jd.distribution.experimental_pin(**pins),
+          **self._bijector_kwargs)
+      return member_fn(bij, *args)
+    vectorized_fn_of_pins = vectorization_util.make_rank_polymorphic(
+        build_and_invoke_pinned_bijector,
+        core_ndims=[self._pins_event_ndims] + core_ndims)
+    return lambda *args: vectorized_fn_of_pins(self._jd.pins, *args)
+
+  @property
+  def _pins_event_ndims(self):
+    """Returns a map from names of pinned values to their event ndims."""
+    if not hasattr(self, '__pins_event_ndims'):  # Cache on first run.
+      pinned_event_shape = {}
+      original_jd = self._jd.distribution
+      for name, event_shape in zip(
+          original_jd._flat_resolve_names(),
+          # TODO(davmre): support dynamic rank through `event_shape_tensor`.
+          original_jd._model_flatten(original_jd.event_shape)):
+        if name in self._jd.pins:
+          pinned_event_shape[name] = event_shape
+
+      self.__pins_event_ndims = tf.nest.map_structure(tensorshape_util.rank,
+                                                      pinned_event_shape)
+      if any(nd is None for nd in self.__pins_event_ndims.values()):
+        # No inherent reason this can't support Tensor-valued event ranks, but
+        # it's annoying, so let's punt for now.
+        raise ValueError(
+            'Attempting to construct an autovectorized support bijector, but '
+            'the rank of the underlying model\'s events is not statically '
+            'available. Contact tfprobability@tensorflow.org if you need this '
+            'functionality.')
+    return self.__pins_event_ndims
