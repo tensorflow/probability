@@ -33,6 +33,7 @@ multi_substrate_py_library(
         ":deferred_tensor",
         ":seed_stream",
         "//tensorflow_probability/python/internal:all_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
     ],
 )
 
