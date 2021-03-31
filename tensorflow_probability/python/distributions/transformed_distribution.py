@@ -167,6 +167,8 @@ class TransformedDistribution(distribution_lib.Distribution):
       bijector=tfb.Shift(shift=mean)(tfb.ScaleMatvecTriL(scale_tril=chol_cov)))
   mvn2 = ds.MultivariateNormalTriL(loc=mean, scale_tril=chol_cov)
   # mvn1.log_prob(x) == mvn2.log_prob(x)
+  ```
+
   """
 
   def __init__(self,
