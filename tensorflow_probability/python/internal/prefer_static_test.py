@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
@@ -470,6 +471,16 @@ class SmartWhereTest(test_util.TestCase):
                             tf.constant([True, False]),
                             lambda: tf.ones([]),
                             lambda: tf.zeros([])))
+
+
+@test_util.test_all_tf_execution_regimes
+class DtypeTest(test_util.TestCase):
+
+  def test_ones_like(self):
+    x = tf1.placeholder_with_default(tf.ones([2], dtype=tf.float32),
+                                     shape=None)
+    self.assertEqual(dtype_util.convert_to_dtype(ps.ones_like(x)),
+                     tf.float32)
 
 
 JAX_MODE = False

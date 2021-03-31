@@ -321,7 +321,7 @@ def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-built
   s_ = tf.get_static_value(s)
   if s_ is not None:
     return np.ones(s_, dtype_util.as_numpy_dtype(dtype or input.dtype))
-  return tf.ones(s, dtype or s.dtype, name)
+  return tf.ones(s, dtype or input.dtype, name)
 ones_like = _copy_docstring(tf.ones_like, _ones_like)
 
 
