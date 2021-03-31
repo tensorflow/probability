@@ -98,7 +98,7 @@ class HighwayFlow(tfb.Bijector):
         # todo: see how to optimize _convex_update
         x = tf.linalg.matvec(self._convex_update(self.lower_diagonal_weights_matrix), x)
         x = tf.linalg.matvec(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
-                             x) + self.bias  # in the implementation there was only one bias
+                             x) + (1-self.residual_fraction)*self.bias  # in the implementation there was only one bias
         if self.activation_fn:
             # fldj += tf.reduce_sum(tf.math.log(self.df(x)))
             # x = self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x)
@@ -125,7 +125,7 @@ class HighwayFlow(tfb.Bijector):
 
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
         y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
-                                       tf.linalg.matrix_transpose(y - self.bias), lower=False)
+                                       tf.linalg.matrix_transpose(y - (1-self.residual_fraction)*self.bias), lower=False)
         y = tf.linalg.triangular_solve(self._convex_update(self.lower_diagonal_weights_matrix), y)
         return tf.linalg.matrix_transpose(y), {'ildj': ildj, 'fldj': -ildj}
 
