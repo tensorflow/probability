@@ -592,8 +592,18 @@ class ParametersTest(test_util.TestCase):
         self._not_a_new_parameter = 42
         super(NormalWithPassThroughInit, self).__init__(*args, **kwargs)
 
+    # It's safe for direct subclasses of Distribution to inherit
+    # Distribution._parameter_properties, since it just throws a
+    # NotImplementedError.
+    class MyDistribution(tfd.Distribution):
+
+      def __init__(self, param1, param2):
+        pass
+
     NormalTrivialSubclass.parameter_properties()
     NormalWithPassThroughInit.parameter_properties()
+    with self.assertRaises(NotImplementedError):
+      MyDistribution.parameter_properties()
     self.assertEqual(0, mock_warning.call_count)
 
     class NormalWithExtraParam(tfd.Normal):

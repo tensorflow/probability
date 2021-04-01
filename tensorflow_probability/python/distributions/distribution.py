@@ -288,8 +288,11 @@ class _DistributionMeta(abc.ABCMeta):
     #  - Subclasses that don't define their own `__init__` (handled above by
     #    the short-circuit when `default_init is None`).
     #  - Subclasses that define a passthrough `__init__(self, *args, **kwargs)`.
+    #  - Direct children of `Distribution`, since the inherited method just
+    #    raises a NotImplementedError.
     init_argspec = tf_inspect.getfullargspec(default_init)
     if ('_parameter_properties' not in attrs
+        and base != Distribution
         # Passthrough exception: may only take `self` and at least one of
         # `*args` and `**kwargs`.
         and (len(init_argspec.args) > 1
