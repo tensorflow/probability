@@ -953,6 +953,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":diagonal_mass_matrix_adaptation",
+        ":initialization",
         ":preconditioned_hmc",
         ":preconditioned_nuts",
         ":preconditioning_utils",
@@ -977,12 +978,15 @@ py_test(
     size = "large",
     srcs = ["windowed_sampling_test.py"],
     python_version = "PY3",
-    shard_count = 5,
+    shard_count = 8,
     srcs_version = "PY3",
     deps = [
-        # numpy dep,
+        ":windowed_sampling",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

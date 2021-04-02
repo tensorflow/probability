@@ -27,6 +27,7 @@ from tensorflow_probability.python.bijectors import joint_map
 from tensorflow_probability.python.bijectors import reshape
 from tensorflow_probability.python.bijectors import restructure
 from tensorflow_probability.python.experimental.mcmc import diagonal_mass_matrix_adaptation as dmma
+from tensorflow_probability.python.experimental.mcmc import initialization
 from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
 from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts as pnuts
 from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
@@ -200,24 +201,22 @@ def _setup_mcmc(model, n_chains, seed, **pins):
   """
   pinned_model = model.experimental_pin(**pins)
   bijector = _get_flat_unconstraining_bijector(pinned_model)
-  initial_position = pinned_model.sample_unpinned(n_chains)
-  initial_transformed_position = bijector.forward(initial_position)
 
-  # Jitter init
-  seeds = samplers.split_seed(seed, n=len(initial_transformed_position))
-  unconstrained_unif_init_position = []
-  for p, seed in zip(initial_transformed_position, seeds):
-    unconstrained_unif_init_position.append(
-        samplers.uniform(
-            ps.shape(p), minval=-2., maxval=2., seed=seed, dtype=p.dtype))
+  raw_init_dist = initialization.init_near_unconstrained_zero(pinned_model)
+  unconstrained_unif_init_position = initialization.retry_init(
+      raw_init_dist.sample,
+      target_fn=pinned_model.unnormalized_log_prob,
+      sample_shape=[n_chains],
+      seed=seed)
+  initial_transformed_position = tf.nest.map_structure(
+      tf.identity, bijector.forward(unconstrained_unif_init_position))
 
-  # pylint: disable=g-long-lambda
   def target_log_prob_fn(*args):
     return (pinned_model.unnormalized_log_prob(bijector.inverse(args)) +
             bijector.inverse_log_det_jacobian(
                 args, event_ndims=[1 for _ in initial_transformed_position]))
-  # pylint: enable=g-long-lambda
-  return target_log_prob_fn, unconstrained_unif_init_position, bijector
+
+  return target_log_prob_fn, initial_transformed_position, bijector
 
 
 def _make_base_kernel(*, kind, proposal_kernel_kwargs):

@@ -232,6 +232,25 @@ class WindowedSamplingTest(test_util.TestCase):
       self.assertEqual(first_window, 75)
       self.assertEqual(last_window, 75)
 
+  def test_valid_init(self):
+
+    class _HalfNormal(tfd.HalfNormal):
+
+      def _default_event_space_bijector(self):
+        # This bijector is intentionally mis-specified so that ~50% of
+        # initialiations will fail.
+        return tfb.Identity(validate_args=self.validate_args)
+
+    tough_dist = tfd.JointDistributionSequential(
+        [_HalfNormal(scale=1., name=f'dist_{idx}') for idx in range(4)])
+
+    # Twenty chains with three parameters gives a 1 / 2^60 chance of
+    # initializing with a finite log probability by chance.
+    _, init, _ = windowed_sampling._setup_mcmc(
+        model=tough_dist, n_chains=20, seed=test_util.test_seed(), dist_3=1.)
+
+    self.assertAllGreater(self.evaluate(init), 0.)
+
   def test_hmc_fitting_gaussian(self):
     # See docstring to _gen_gaussian_updating_example
     x_dim = 3
