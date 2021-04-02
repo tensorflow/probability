@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import metropolis_hastings
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -491,6 +492,12 @@ class UncalibratedRandomWalk(kernel_base.TransitionKernel):
 
       seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
       next_state_parts = self.new_state_fn(current_state_parts, seed)  # pylint: disable=not-callable
+
+      # User should be using a new_state_fn that does not alter the state size.
+      # This will fail noisily if that is not the case.
+      for next_part, current_part in zip(next_state_parts, current_state_parts):
+        tensorshape_util.set_shape(next_part, current_part.shape)
+
       # Compute `target_log_prob` so its available to MetropolisHastings.
       next_target_log_prob = self.target_log_prob_fn(*next_state_parts)  # pylint: disable=not-callable
 

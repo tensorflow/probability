@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import unittest
 import warnings
 
 # Dependency imports
@@ -641,7 +640,7 @@ class HMCTest(test_util.TestCase):
 
   def testDynamicStepSizeWorks(self):
     if tf.executing_eagerly() or JAX_MODE:
-      raise unittest.SkipTest(
+      raise self.skipTest(
           'Dynamic step size makes no sense in Eager or JAX modes.')
 
     true_mean = 0.0
