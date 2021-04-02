@@ -289,7 +289,11 @@ class GeneralizedPareto(distribution.Distribution):
     lim = tf.constant(.5, self.dtype)
     valid = concentration < lim
     safe_conc = tf.where(valid, concentration, tf.constant(.25, self.dtype))
-    result = lambda: self.scale**2 / ((1 - safe_conc)**2 * (1 - 2 * safe_conc))
+    def result():
+      answer = self.scale**2 / ((1 - safe_conc)**2 * (1 - 2 * safe_conc))
+      # Force broadcasting with self.loc to get the shape right, even though the
+      # variance doesn't depend on the location.
+      return answer + tf.zeros_like(self.loc)
     if self.allow_nan_stats:
       return tf.where(valid, result(), tf.constant(float('nan'), self.dtype))
     with tf.control_dependencies([
