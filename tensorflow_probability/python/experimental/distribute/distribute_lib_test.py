@@ -27,6 +27,9 @@ tfd = tfp.distributions
 
 JAX_MODE = False
 
+if JAX_MODE:
+  from jax import random  # pylint: disable=g-import-not-at-top
+
 
 @test_util.test_all_tf_execution_regimes
 class LogProbPartsTest(test_lib.DistributedTest):
@@ -542,6 +545,60 @@ class LogProbPartsTest(test_lib.DistributedTest):
     self.assertAllEqualNested(out_values, tf.ones([2, 2]) * true_values)
     self.assertAllEqualNested(out_grads[0], tf.ones([2, 2]) * true_grads[0])
     self.assertAllEqualNested(out_grads[1], tf.ones([2, 2]) * true_grads[1])
+
+  def test_gradient_is_correctly_reduced_with_multiple_axes(self):
+    if not JAX_MODE:
+      self.skipTest('Multiple shard axes not supported in TF.')
+
+    other_axis_name = self.axis_name + '_other'
+
+    def run(x, y, z):
+
+      def log_prob_parts(value):
+        x, y, z = value
+        return [
+            tfd.Normal(0., 1.).log_prob(x),
+            tfd.Normal(0., 1.).log_prob(y),
+            tfd.Normal(x + y, 1.).log_prob(z),
+        ]
+
+      def log_prob(x, y, z):
+        sharded_log_prob_parts = distribute_lib.make_sharded_log_prob_parts(
+            log_prob_parts, [self.axis_name, other_axis_name,
+                             [self.axis_name, other_axis_name]])
+        parts = sharded_log_prob_parts([x, y, z])
+        return tf.add_n(parts)
+
+      return tfp.math.value_and_gradient(log_prob, (x, y, z))
+
+    seed = random.PRNGKey(0)
+    x_seed, y_seed, z_seed = tfp.random.split_seed(seed, n=3)
+    x = tfd.Normal(0., 1).sample(seed=x_seed, sample_shape=2)
+    y = tfd.Normal(0., 1.).sample(seed=y_seed, sample_shape=2)
+    z = tfd.Normal(0., 1.).sample(seed=z_seed, sample_shape=[2, 2])
+
+    def outer_run(x, y, z):
+      return self.strategy_run(run, (x, y, z), in_axes=(None, 0, 0),
+                               axis_name=other_axis_name)
+    out_values, out_grads = self.strategy_run(outer_run, (x, y, z),
+                                              in_axes=(0, None, 0))
+
+    def true_log_prob(x, y, z):
+      return (tf.reduce_sum(tfd.Normal(0., 1.).log_prob(x))
+              + tf.reduce_sum(tfd.Normal(0., 1.).log_prob(y))
+              + tf.reduce_sum(tfd.Normal(x[:, None] + y[None], 1.).log_prob(z)))
+
+    true_values, true_grads = self.evaluate(tfp.math.value_and_gradient(
+        true_log_prob, (x, y, z)))
+
+    self.assertAllClose(out_values, tf.ones([2, 2]) * true_values,
+                        rtol=1e-6, atol=1e-6)
+    self.assertAllEqualNested(
+        out_grads[0], tf.ones([2, 2]) * true_grads[0][:, None])
+    self.assertAllEqualNested(
+        out_grads[1], tf.ones([2, 2]) * true_grads[1][None])
+    self.assertAllEqualNested(out_grads[2], tf.ones([2, 2]) * true_grads[2])
+
 
 if __name__ == '__main__':
   tf.test.main()
