@@ -205,10 +205,7 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, axis_names):
           psum_axes = [axis_name for axis_name in term_axis_names
                        if axis_name not in value_axis_names]
           if psum_axes:
-            # TODO(https://github.com/google/jax/issues/6022): This cast
-            # shouldn't be here.
-            term_grad = tf.cast(
-                psum(term_grad, axis_name=psum_axes), term_grad.dtype)
+            term_grad = psum(term_grad, axis_name=psum_axes)
         return term_grad
 
       total_grad = nest.map_structure_up_to(
