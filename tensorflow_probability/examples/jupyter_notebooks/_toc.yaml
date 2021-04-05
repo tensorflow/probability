@@ -29,6 +29,7 @@ toc:
 - title: Automatically Batched Joint Distributions
   path: /probability/examples/JointDistributionAutoBatched_A_Gentle_Tutorial
   status: new
+- title: Distributed Inference with JAX
   path: /probability/examples/Distributed_Inference_with_JAX
   status: new
 - heading: "Tutorials"
