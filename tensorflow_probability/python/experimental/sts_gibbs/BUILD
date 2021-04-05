@@ -68,7 +68,7 @@ py_test(
     size = "medium",
     srcs = ["gibbs_sampler_test.py"],
     python_version = "PY3",
-    shard_count = 2,
+    shard_count = 4,
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
