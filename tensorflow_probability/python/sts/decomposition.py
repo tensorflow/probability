@@ -22,6 +22,7 @@ import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.experimental import util as tfe_util
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -209,8 +210,10 @@ def decompose_by_component(model, observed_time_series, parameter_samples):
     # posterior on latents.
     num_timesteps = dist_util.prefer_static_value(
         tf.shape(observed_time_series))[-2]
-    ssm = model.make_state_space_model(num_timesteps=num_timesteps,
-                                       param_vals=parameter_samples)
+    ssm = tfe_util.JitPublicMethods(
+        model.make_state_space_model(num_timesteps=num_timesteps,
+                                     param_vals=parameter_samples),
+        trace_only=True)  # Avoid eager overhead w/o introducing XLA dependence.
     posterior_means, posterior_covs = ssm.posterior_marginals(
         observed_time_series, mask=is_missing)
 

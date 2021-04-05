@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.experimental import util as tfe_util
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -158,8 +159,10 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
     # predictive means and variances.
     num_timesteps = dist_util.prefer_static_value(
         tf.shape(observed_time_series))[-2]
-    lgssm = model.make_state_space_model(
-        num_timesteps=num_timesteps, param_vals=parameter_samples)
+    lgssm = tfe_util.JitPublicMethods(
+        model.make_state_space_model(num_timesteps=num_timesteps,
+                                     param_vals=parameter_samples),
+        trace_only=True)  # Avoid eager overhead w/o introducing XLA dependence.
     (_, _, _, _, _, observation_means, observation_covs
     ) = lgssm.forward_filter(observed_time_series, mask=is_missing)
 
@@ -309,8 +312,10 @@ def forecast(model,
     # is yesterday's posterior").
     num_observed_steps = dist_util.prefer_static_value(
         tf.shape(observed_time_series))[-2]
-    observed_data_ssm = model.make_state_space_model(
-        num_timesteps=num_observed_steps, param_vals=parameter_samples)
+    observed_data_ssm = tfe_util.JitPublicMethods(
+        model.make_state_space_model(num_timesteps=num_observed_steps,
+                                     param_vals=parameter_samples),
+        trace_only=True)  # Avoid eager overhead w/o introducing XLA dependence.
     (_, _, _, predictive_mean, predictive_cov, _, _
     ) = observed_data_ssm.forward_filter(observed_time_series,
                                          mask=mask,
@@ -367,6 +372,8 @@ def forecast(model,
         initial_state_prior=forecast_prior,
         initial_step=num_observed_steps,
         **kwargs)
+    # Avoid eager-mode loops when querying the forecast.
+    forecast_ssm = tfe_util.JitPublicMethods(forecast_ssm, trace_only=True)
 
     num_posterior_draws = dist_util.prefer_static_value(
         forecast_ssm.batch_shape_tensor())[-1]
@@ -464,8 +471,10 @@ def impute_missing_values(model,
     # predictive means and variances.
     num_timesteps = dist_util.prefer_static_value(
         tf.shape(observed_time_series))[-2]
-    lgssm = model.make_state_space_model(
-        num_timesteps=num_timesteps, param_vals=parameter_samples)
+    lgssm = tfe_util.JitPublicMethods(
+        model.make_state_space_model(num_timesteps=num_timesteps,
+                                     param_vals=parameter_samples),
+        trace_only=True)  # Avoid eager overhead w/o introducing XLA dependence.
     posterior_means, posterior_covs = lgssm.posterior_marginals(
         observed_time_series, mask=mask)
 
