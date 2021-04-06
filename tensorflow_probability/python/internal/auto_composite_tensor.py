@@ -57,17 +57,10 @@ def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
   kwargs = {}
   not_found = object()
   for k in keys:
-
-    if k in prefer_static_value:
-      srcs = [
-          getattr(obj, 'parameters', {}).get(k, not_found),
-          getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
-      ]
-    else:
-      srcs = [
-          getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
-          getattr(obj, 'parameters', {}).get(k, not_found),
-      ]
+    srcs = [
+        getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
+        getattr(obj, 'parameters', {}).get(k, not_found),
+    ]
     if any(v is not not_found for v in srcs):
       kwargs[k] = [v for v in srcs if v is not not_found][0]
     else:

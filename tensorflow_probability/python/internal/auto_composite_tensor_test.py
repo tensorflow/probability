@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -43,6 +44,8 @@ AutoNormal = tfp.experimental.auto_composite_tensor(
     tfd.Normal, omit_kwargs=('name',))
 AutoIndependent = tfp.experimental.auto_composite_tensor(
     tfd.Independent, omit_kwargs=('name',))
+AutoReshape = tfp.experimental.auto_composite_tensor(
+    tfb.Reshape, omit_kwargs=('name',))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -103,6 +106,15 @@ class AutoCompositeTensorTest(test_util.TestCase):
         (lp, dist),
         maximum_iterations=2)
     self.evaluate(lp)
+
+  def test_prefer_static_shape_params(self):
+    @tf.function
+    def f(b):
+      return b
+    b = AutoReshape(
+        event_shape_out=[2, 3],
+        event_shape_in=[tf.reduce_prod([2, 3])])  # Tensor in a list.
+    f(b)
 
   def test_nested(self):
     lop = AutoBlockDiag([AutoDiag(tf.ones([2]) * 2), AutoIdentity(1)])
