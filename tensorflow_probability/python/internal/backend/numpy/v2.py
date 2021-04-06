@@ -24,6 +24,7 @@ import functools
 import numpy as np
 
 # pylint: disable=unused-import
+from tensorflow_probability.python.internal.backend.numpy import __internal__
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import bitwise
 from tensorflow_probability.python.internal.backend.numpy import config

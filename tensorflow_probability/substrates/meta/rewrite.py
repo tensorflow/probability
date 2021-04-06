@@ -42,6 +42,10 @@ TF_REPLACEMENTS = {
     'import tensorflow_probability as tfp':
         'import tensorflow_probability as tfp; '
         'tfp = tfp.substrates.numpy',
+    ('from tensorflow.python.framework '
+     'import composite_tensor'):
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import composite_tensor'),
     'from tensorflow.python.framework import tensor_shape':
         ('from tensorflow_probability.python.internal.backend.numpy.gen '
          'import tensor_shape'),
@@ -63,6 +67,10 @@ TF_REPLACEMENTS = {
     'from tensorflow.python.ops import control_flow_ops':
         'from tensorflow_probability.python.internal.backend.numpy '
         'import control_flow as control_flow_ops',
+    ('from tensorflow.python.saved_model '
+     'import nested_structure_coder'):
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import nested_structure_coder'),
     'from tensorflow.python.eager import context':
         'from tensorflow_probability.python.internal.backend.numpy '
         'import private',
@@ -81,11 +89,11 @@ DISABLED_BY_PKG = {
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'optimizer', 'random', 'stats', 'util')
-INTERNALS = ('assert_util', 'batched_rejection_sampler', 'broadcast_util',
-             'cache_util', 'callable_util',
-             'custom_gradient', 'distribution_util', 'dtype_util',
-             'hypothesis_testlib', 'implementation_selection', 'monte_carlo',
-             'name_util', 'nest_util', 'numerics_testing',
+INTERNALS = ('assert_util', 'auto_composite_tensor',
+             'batched_rejection_sampler', 'broadcast_util', 'cache_util',
+             'callable_util', 'custom_gradient', 'distribution_util',
+             'dtype_util', 'hypothesis_testlib', 'implementation_selection',
+             'monte_carlo', 'name_util', 'nest_util', 'numerics_testing',
              'parameter_properties', 'prefer_static', 'samplers',
              'special_math', 'structural_tuple', 'tensor_util',
              'tensorshape_util', 'test_combinations', 'test_util', 'unnest',
