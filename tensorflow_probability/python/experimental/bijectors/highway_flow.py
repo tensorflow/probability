@@ -73,7 +73,7 @@ class HighwayFlow(tfb.Bijector):
 
     def df(self, x):
         # derivative of activation
-        return self.residual_fraction + (1. - self.residual_fraction) * tf.math.sigmoid(x) * (1. - tf.math.sigmoid(x))
+        return self.residual_fraction + (1. - self.residual_fraction) * tf.math.sigmoid(x)
 
     def _convex_update(self, weights_matrix):
         # convex update
@@ -100,12 +100,12 @@ class HighwayFlow(tfb.Bijector):
         x = tf.linalg.matvec(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
                              x) + (1-self.residual_fraction)*self.bias  # in the implementation there was only one bias
         if self.activation_fn:
-            # fldj += tf.reduce_sum(tf.math.log(self.df(x)))
-            # x = self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x)
-            activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
+            fldj += tf.reduce_sum(tf.math.log(self.df(x)), -1)
+            x = self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x)
+            '''activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
                 lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
             fldj += activation_layer.forward_log_det_jacobian(x, self.forward_min_event_ndims)
-            x = activation_layer.forward(x)
+            x = activation_layer.forward(x)'''
         return x, {'ildj': -fldj, 'fldj': fldj}
 
     def _augmented_inverse(self, y):
@@ -113,14 +113,13 @@ class HighwayFlow(tfb.Bijector):
             tf.math.log(self.residual_fraction + (1. - self.residual_fraction) * tf.linalg.diag_part(
                 self.upper_diagonal_weights_matrix)))
         if self.activation_fn:
-            # y = self.inv_f(y)
-            # ildj += tf.reduce_sum(tf.math.log(self.df(y)))
-            residual_fraction = tf.identity(self.residual_fraction)
-            # FIXME: this way of using inverse activation does not seem to work because residual_fraction is a variable
-            activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
+            y = self.inv_f(y)
+            ildj -= tf.reduce_sum(tf.math.log(self.df(y)), -1)
+            #residual_fraction = tf.identity(self.residual_fraction)
+            '''activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
                 lambda x: residual_fraction * x + (1. - residual_fraction) * self.activation_fn(x))
             ildj += activation_layer.inverse_log_det_jacobian(y, self.forward_min_event_ndims)
-            y = activation_layer.inverse(y)
+            y = activation_layer.inverse(y)'''
 
 
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
