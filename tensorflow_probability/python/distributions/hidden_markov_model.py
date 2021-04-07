@@ -1196,7 +1196,7 @@ class HiddenMarkovModel(distribution.Distribution):
       if not isinstance(initialisation_step, bool):
           raise TypeError('initialisation_step must be of type bool, but saw: %s' % initialisation_step)
 
-      if(initialisation_step):
+      if (initialisation_step):
           num = self.initial_distribution.log_prob(range(self.num_states_static)) \
                 + self.observation_distribution.log_prob(observation)
       else:
@@ -1204,13 +1204,13 @@ class HiddenMarkovModel(distribution.Distribution):
               raise TypeError('If initialisation_step is False, then current prediction distribution must be provided.'
                               'prediction_distribution must be a Distribution instance, but saw: %s' %
                               prediction_distribution)
-          num = tf.math.log(prediction_distribution) \
+          num = tf.math.log(prediction_distribution.probs) \
                 + self.observation_distribution.log_prob(observation)
 
       filtering_distribution = tf.exp(num - tf.reduce_logsumexp(num))
-      prediction_distribution = tf.tensordot(self.transition_distribution.probs_parameter(),
-                                             filtering_distribution, axes=1)
-      observation_prediction = tf.tensordot(prediction_distribution, self.observation_distribution.mean(), axes=1)
+      prediction_distribution = categorical.Categorical(probs=tf.tensordot(self.transition_distribution.probs_parameter(),
+                                             filtering_distribution, axes=1))
+      observation_prediction = tf.tensordot(prediction_distribution.probs, self.observation_distribution.mean(), axes=1)
 
       return prediction_distribution, observation_prediction
 
