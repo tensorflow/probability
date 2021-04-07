@@ -1189,9 +1189,10 @@ class HiddenMarkovModel(distribution.Distribution):
       distribution is derived from the priors of the hmm (the initial_distribution over the states). In a forecasting
       model that runs on live data, the first step would require initialisation while subsequent steps would use the
       previous step's prediction distribution as input.
-      The prediction distribution is updated and returned from this function.
+      The prediction distribution (categorical distribution with probability of being in each of the hidden states) is
+      updated and returned from this function and can be used as input for the subsequent prediction step.
       """
-      observation = tf.convert_to_tensor(observation, name='observations')
+      observation = tf.convert_to_tensor(observation, name='observation')
 
       if not isinstance(initialisation_step, bool):
           raise TypeError('initialisation_step must be of type bool, but saw: %s' % initialisation_step)
