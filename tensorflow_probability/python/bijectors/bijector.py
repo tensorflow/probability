@@ -27,6 +27,7 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
@@ -557,9 +558,16 @@ class Bijector(tf.Module):
     self._validate_args = validate_args
     self._dtype = dtype
 
-    self._initial_parameter_control_dependencies = tuple(
-        d for d in self._parameter_control_dependencies(is_init=True)
-        if d is not None)
+    self._defer_all_assertions = (
+        auto_composite_tensor.is_deferred_assertion_context())
+
+    if not self._defer_all_assertions:
+      self._initial_parameter_control_dependencies = tuple(
+          d for d in self._parameter_control_dependencies(is_init=True)
+          if d is not None)
+    else:
+      self._initial_parameter_control_dependencies = ()
+
     if self._initial_parameter_control_dependencies:
       self._initial_parameter_control_dependencies = (
           tf.group(*self._initial_parameter_control_dependencies),)
@@ -1416,11 +1424,12 @@ class Bijector(tf.Module):
     """Helper function to standardize op scope."""
     with tf.name_scope(self.name):
       with tf.name_scope(name) as name_scope:
-        deps = tuple(
-            d for d in (  # pylint: disable=g-complex-comprehension
-                tuple(self._initial_parameter_control_dependencies) +
-                tuple(self._parameter_control_dependencies(is_init=False)))
-            if d is not None)
+        deps = []
+        if self._defer_all_assertions:
+          deps.extend(self._parameter_control_dependencies(is_init=True))
+        else:
+          deps.extend(self._initial_parameter_control_dependencies)
+        deps.extend(self._parameter_control_dependencies(is_init=False))
         if not deps:
           yield name_scope
           return

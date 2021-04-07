@@ -222,6 +222,17 @@ class AutoCompositeTensorTest(test_util.TestCase):
         maximum_iterations=3)
     self.assertEqual(self.evaluate(out.value), 6)
 
+  def test_deferred_assertion_context(self):
+    # If `validate_args` assertions in `__init__` are not deferred, a graph
+    # cycle is created when `d._type_spec` calls `__init__` and this test fails.
+    d = AutoNormal(0., 1., validate_args=True)
+
+    @tf.function
+    def f(d):
+      return d
+
+    f(d)
+
 
 if __name__ == '__main__':
   tf.enable_v2_behavior()

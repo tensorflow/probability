@@ -31,6 +31,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
@@ -583,9 +584,16 @@ class Distribution(_BaseDistribution):
     self._parameters = self._no_dependency(parameters)
     self._parameters_sanitized = False
     self._graph_parents = graph_parents
-    self._initial_parameter_control_dependencies = tuple(
-        d for d in self._parameter_control_dependencies(is_init=True)
-        if d is not None)
+    self._defer_all_assertions = (
+        auto_composite_tensor.is_deferred_assertion_context())
+
+    if not self._defer_all_assertions:
+      self._initial_parameter_control_dependencies = tuple(
+          d for d in self._parameter_control_dependencies(is_init=True)
+          if d is not None)
+    else:
+      self._initial_parameter_control_dependencies = ()
+
     if self._initial_parameter_control_dependencies:
       self._initial_parameter_control_dependencies = (
           tf.group(*self._initial_parameter_control_dependencies),)
@@ -1608,7 +1616,10 @@ class Distribution(_BaseDistribution):
     with tf.name_scope(self.name):
       with tf.name_scope(name) as name_scope:
         deps = []
-        deps.extend(self._initial_parameter_control_dependencies)
+        if self._defer_all_assertions:
+          deps.extend(self._parameter_control_dependencies(is_init=True))
+        else:
+          deps.extend(self._initial_parameter_control_dependencies)
         deps.extend(self._parameter_control_dependencies(is_init=False))
         if value is not UNSET_VALUE:
           deps.extend(self._sample_control_dependencies(

@@ -18,7 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
 import functools
+import threading
 
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -30,7 +32,25 @@ from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensor
 __all__ = [
     'auto_composite_tensor',
     'AutoCompositeTensor',
+    'is_deferred_assertion_context',
 ]
+
+_DEFERRED_ASSERTION_CONTEXT = threading.local()
+_DEFERRED_ASSERTION_CONTEXT.is_deferred = False
+
+
+def is_deferred_assertion_context():
+  return getattr(_DEFERRED_ASSERTION_CONTEXT, 'is_deferred', False)
+
+
+@contextlib.contextmanager
+def _deferred_assertion_context(is_deferred=True):
+  was_deferred = getattr(_DEFERRED_ASSERTION_CONTEXT, 'is_deferred', False)
+  _DEFERRED_ASSERTION_CONTEXT.is_deferred = is_deferred
+  try:
+    yield
+  finally:
+    _DEFERRED_ASSERTION_CONTEXT.is_deferred = was_deferred
 
 
 _registry = {}  # Mapping from (python pkg, class name) -> class.
@@ -156,7 +176,8 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
 
   def _from_components(self, components):
     kwargs = dict(self._non_tensor_params, **components)
-    return self.value_type(**kwargs)
+    with _deferred_assertion_context():
+      return self.value_type(**kwargs)
 
   @property
   def _component_specs(self):
