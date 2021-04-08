@@ -353,6 +353,20 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     x2 = self.evaluate(dist.sample(value=x, seed=test_util.test_seed()))
     self.assertAllCloseNested(x, x2)
 
+  def test_sample_with_value_as_kwarg(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def dist():
+      a = yield tfd.Sample(tfd.Normal(0, 1.), 2, name='a')
+      b = yield tfd.Sample(tfd.Normal(0, 1.), 3, name='b')
+      # The following line fails if not autovectorized.
+      yield tfd.Normal(a[tf.newaxis, ...] * b[..., tf.newaxis], 1., name='c')
+
+    x = self.evaluate(dist.sample(4, seed=test_util.test_seed()))
+    x2 = self.evaluate(dist.sample(seed=test_util.test_seed(), a=x.a))
+    self.assertAllClose(x.a, x2.a)
+    self.assertAllEqual(x2.b.shape, [4, 3])
+    self.assertAllEqual(x2.c.shape, [4, 3, 2])
+
   @parameterized.named_parameters(
       dict(testcase_name='stateful', sampler_type='stateful'),
       dict(testcase_name='stateless', sampler_type='stateless'))
@@ -445,6 +459,33 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
                             [value_partial_batch_dim, num_columns])
         self.assertAllEqual(xs[2].shape,
                             [value_partial_batch_dim, num_rows, num_columns])
+
+  def test_unit_sample_shape_avoids_vectorization(self):
+    if not tf.executing_eagerly():
+      self.skipTest('Test relies on eager execution.')
+
+    @tfd.JointDistributionCoroutineAutoBatched
+    def dist():
+      # Because `pfor` operates by tracing its loop body, to ensure we're
+      # not inside of a `pfor` loop body it's sufficient to check that we're
+      # not inside of a tf.function.
+      if not tf.executing_eagerly():
+        raise ValueError('Model is running inside tf.function. This may '
+                         'indicate that auto-vectorization is being '
+                         'triggered unnecessarily.')
+      yield tfd.Normal(0., 1., name='x')
+    self.assertEqual(
+        [1],
+        dist.sample(
+            1, seed=test_util.test_seed(sampler_type='seedless')).x.shape)
+    self.assertEqual(
+        [1],
+        dist.sample([1],
+                    seed=test_util.test_seed(sampler_type='seedless')).x.shape)
+    self.assertEqual(
+        [1, 1],
+        dist.sample([1, 1],
+                    seed=test_util.test_seed(sampler_type='seedless')).x.shape)
 
   def test_sample_dtype_structures_output(self):
 

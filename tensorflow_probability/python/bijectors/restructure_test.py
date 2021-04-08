@@ -24,6 +24,7 @@ import collections
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
 
@@ -136,6 +137,27 @@ class RestructureBijectorTest(test_util.TestCase):
         y_ndims, bij.forward_event_ndims(x_ndims), check_types=True)
     self.assertAllEqualNested(
         x_ndims, bij.inverse_event_ndims(y_ndims), check_types=True)
+
+  def testPartsWithUnusedInternalStructure(self):
+    dist = tfd.JointDistributionSequential([
+        tfd.JointDistributionNamed({'a': tfd.Normal(0., 1.)}),
+        tfd.JointDistributionNamed({'b': tfd.Normal(1000., 1.)}),
+    ])
+    x = dist.sample(  # Shape: [{'a': []}, {'b': []}]
+        seed=test_util.test_seed(sampler_type='stateless'))
+
+    # Test that we can swap the outer list entries, even though they contain
+    # internal structure (i.e., are themselves dicts).
+    swap_elements = tfb.Restructure(input_structure=[1, 0],
+                                    output_structure=[0, 1])
+    self.assertAllEqualNested(swap_elements(x), [x[1], x[0]], check_types=True)
+
+    swapped_dist = swap_elements(dist)
+    self.assertAllEqualNested(swapped_dist.event_shape,
+                              [dist.event_shape[1], dist.event_shape[0]],
+                              check_types=True)
+    self.assertEqual(swapped_dist.dtype,
+                     [dist.dtype[1], dist.dtype[0]])
 
 
 if __name__ == '__main__':

@@ -53,7 +53,37 @@ class Restructure(bijector.Bijector):
     Example Usage:
       ```python
 
-      # What restructure does:
+      # Pack a 3-element list of tensors into a dict. The output structure,
+      # `structure_1`, is defined as a dict in which the values are list
+      # indices.
+      structure_1 = {'a': 1, 'b': 2, 'c': 0}
+      list_to_dict = Restructure(output_structure=structure_1)
+      input_list = [0.01, 0.02, 0.03]
+      assert list_to_dict.forward(input_list) == {
+        'a': 0.02, 'b': 0.03, 'c': 0.01}
+
+      # Now assume that, instead of a list/tuple (the default), the input
+      # structure is another dict. The output structure is the same as
+      # defined above, and consecutive integers are again used to associate
+      # components of the input and output structures.
+      structure_2 = {'c': 2, 'd': 1, 'e': 0}
+      dict_to_dict = Restructure(
+        structure_1, input_structure=structure_2)
+      input_dict = {'c': -3.5, 'd': 96.0, 'e': 12.0}
+      assert dict_to_dict.forward(input_dict) == {
+        'a': 96.0, 'b': -3.5, 'c': 12.0}
+
+      # Restructure a dict to a namedtuple.
+      Example = collections.namedtuple('Example', ['x', 'y', 'z'])
+      structure_3 = Example(2, 0, 1)
+      namedtuple_to_dict = Restructure(structure_3, input_structure=structure_2)
+      assert namedtuple_to_dict(input_dict) == Example(x=-3.5, y=12.0, z=96.0)
+
+      assert namedtuple_to_dict.inverse(Example(x=0.01, y=0.02, z=0.03)) == {
+        'c': 0.01, 'd': 0.03, 'e': 0.02}
+
+      # Restructure can be applied to structures of mixed type and arbitrary
+      # depth:
       restructure = Restructure({
         'foo': [0, 1],
         'bar': [3, 2],
@@ -70,7 +100,7 @@ class Restructure(bijector.Bijector):
           'baz': [16, 32, 64]
       }
 
-      # Where restructure is useful:
+      # Where Restructure is useful:
       complex_bijector = Chain([
         # Apply different transformations to each block.
         JointMap({
@@ -183,22 +213,22 @@ class Restructure(bijector.Bijector):
 
   ### Shape/ndims/etc transformations do the same thing as forward/inverse.
 
-  def _forward_event_shape(self, x_shape, **kwargs):
+  def forward_event_shape(self, x_shape, **kwargs):
     return self._forward(x_shape)
 
-  def _inverse_event_shape(self, y_shape, **kwargs):
+  def inverse_event_shape(self, y_shape, **kwargs):
     return self._inverse(y_shape)
 
-  def _forward_event_shape_tensor(self, x_shape, **kwargs):
+  def forward_event_shape_tensor(self, x_shape, **kwargs):
     return self._forward(x_shape)
 
-  def _inverse_event_shape_tensor(self, y_shape, **kwargs):
+  def inverse_event_shape_tensor(self, y_shape, **kwargs):
     return self._inverse(y_shape)
 
-  def _forward_dtype(self, x_dtype, **kwargs):
+  def forward_dtype(self, x_dtype, **kwargs):
     return self._forward(x_dtype)
 
-  def _inverse_dtype(self, y_dtype, **kwargs):
+  def inverse_dtype(self, y_dtype, **kwargs):
     return self._inverse(y_dtype)
 
   def forward_event_ndims(self, x_ndims, **kwargs):

@@ -29,10 +29,12 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multivariate_student_t
 from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'StudentTProcess',
@@ -42,6 +44,46 @@ __all__ = [
 def _add_diagonal_shift(matrix, shift):
   return tf.linalg.set_diag(
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
+
+
+def make_cholesky_factored_marginal_fn(jitter):
+  """Construct a `marginal_fn` for use with `tfd.StudentTProcess`.
+
+  The returned function computes the Cholesky factorization of the input
+  covariance plus a diagonal jitter, and uses that for the `scale` of a
+  `tfd.MultivariateNormalLinearOperator`.
+
+  Args:
+    jitter: `float` scalar `Tensor` added to the diagonal of the covariance
+      matrix to ensure positive definiteness of the covariance matrix.
+
+  Returns:
+    marginal_fn: A Python function that takes a location, covariance matrix,
+      optional `validate_args`, `allow_nan_stats` and `name` arguments, and
+      returns a `tfd.MultivariateNormalLinearOperator`.
+  """
+  def marginal_fn(
+      df,
+      loc,
+      covariance,
+      validate_args=False,
+      allow_nan_stats=False,
+      name='marginal_distribution'):
+    squared_scale = ((df - 2.) / df)[
+        ..., tf.newaxis, tf.newaxis] * covariance
+    scale = tf.linalg.LinearOperatorLowerTriangular(
+        tf.linalg.cholesky(_add_diagonal_shift(squared_scale, jitter)),
+        is_non_singular=True,
+        name='StudentTProcessScaleLinearOperator')
+    return multivariate_student_t.MultivariateStudentTLinearOperator(
+        df=df,
+        loc=loc,
+        scale=scale,
+        validate_args=validate_args,
+        allow_nan_stats=allow_nan_stats,
+        name=name)
+
+  return marginal_fn
 
 
 class StudentTProcess(distribution.Distribution):
@@ -97,7 +139,7 @@ class StudentTProcess(distribution.Distribution):
   ```none
   pdf(x; df, index_points, mean_fn, kernel) = MultivariateStudentT(df, loc, K)
   K = (df - 2) / df  * (kernel.matrix(index_points, index_points) +
-       jitter * eye(N))
+       observation_noise_variance * eye(N))
   loc = (x - mean_fn(index_points))^T @ K @ (x - mean_fn(index_points))
   ```
 
@@ -108,8 +150,9 @@ class StudentTProcess(distribution.Distribution):
   * `mean_fn` is a callable mapping the index set to the TP's mean values,
   * `kernel` is `PositiveSemidefiniteKernel`-like and represents the covariance
     function of the TP,
-  * `jitter` is added to the diagonal to ensure positive definiteness up to
-     machine precision (otherwise Cholesky-decomposition is prone to failure),
+  * `observation_noise_variance` is a term added to the diagonal of the kernel
+    matrix. In the limit of `df` to `inf`, this represents the observation noise
+    of a gaussian likelihood.
   * `eye(N)` is an N-by-N identity matrix.
 
   #### Examples
@@ -197,11 +240,17 @@ class StudentTProcess(distribution.Distribution):
        https://www.cs.cmu.edu/~andrewgw/tprocess.pdf
   """
 
+  @deprecation.deprecated_args(
+      '2021-06-26',
+      '`jitter` is deprecated; please use `marginal_fn` directly.',
+      'jitter')
   def __init__(self,
                df,
                kernel,
                index_points=None,
                mean_fn=None,
+               observation_noise_variance=0.,
+               marginal_fn=None,
                jitter=1e-6,
                validate_args=False,
                allow_nan_stats=False,
@@ -226,6 +275,18 @@ class StudentTProcess(distribution.Distribution):
         shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
         broadcastable with `[b1, ..., bB]`. Default value: `None` implies
         constant zero function.
+      observation_noise_variance: `float` `Tensor` representing (batch of)
+        scalar variance(s) of the noise in the Normal likelihood
+        distribution of the model. If batched, the batch shape must be
+        broadcastable with the shapes of all other batched parameters
+        (`kernel.batch_shape`, `index_points`, etc.).
+        Default value: `0.`
+      marginal_fn: A Python callable that takes a location, covariance matrix,
+        optional `validate_args`, `allow_nan_stats` and `name` arguments, and
+        returns a multivariate normal subclass of `tfd.Distribution`.
+        Default value: `None`, in which case a Cholesky-factorizing function is
+        is created using `make_cholesky_factorizing_marginal_fn` and the
+        `jitter` argument.
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
@@ -248,8 +309,12 @@ class StudentTProcess(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
-          [df, index_points, jitter], tf.float32)
+          [df, index_points, observation_noise_variance, jitter], tf.float32)
       df = tensor_util.convert_nonref_to_tensor(df, dtype=dtype, name='df')
+      observation_noise_variance = tensor_util.convert_nonref_to_tensor(
+          observation_noise_variance,
+          dtype=dtype,
+          name='observation_noise_variance')
       index_points = tensor_util.convert_nonref_to_tensor(
           index_points, dtype=dtype, name='index_points')
       jitter = tensor_util.convert_nonref_to_tensor(
@@ -265,8 +330,13 @@ class StudentTProcess(distribution.Distribution):
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
       self._df = df
+      self._observation_noise_variance = observation_noise_variance
       self._mean_fn = mean_fn
       self._jitter = jitter
+      if marginal_fn is None:
+        self._marginal_fn = make_cholesky_factored_marginal_fn(jitter)
+      else:
+        self._marginal_fn = marginal_fn
 
       with tf.name_scope('init'):
         super(StudentTProcess, self).__init__(
@@ -305,9 +375,23 @@ class StudentTProcess(distribution.Distribution):
     if self._is_univariate_marginal(index_points):
       # kernel_matrix thus has shape [..., 1, 1]; squeeze off the last dims and
       # tack on the observation noise variance.
-      return tf.squeeze(kernel_matrix, axis=[-2, -1])
+      return (tf.squeeze(kernel_matrix, axis=[-2, -1]) +
+              self.observation_noise_variance)
     else:
-      return kernel_matrix
+      observation_noise_variance = tf.convert_to_tensor(
+          self.observation_noise_variance)
+      # We are compute K + obs_noise_variance * I. The shape of this matrix
+      # is going to be a broadcast of the shapes of K and obs_noise_variance *
+      # I.
+      broadcast_shape = distribution_util.get_broadcast_shape(
+          kernel_matrix,
+          # We pad with two single dimension since this represents a batch of
+          # scaled identity matrices.
+          observation_noise_variance[..., tf.newaxis, tf.newaxis])
+
+      kernel_matrix = tf.broadcast_to(kernel_matrix, broadcast_shape)
+      return _add_diagonal_shift(
+          kernel_matrix, observation_noise_variance[..., tf.newaxis])
 
   def get_marginal_distribution(self, index_points=None):
     """Compute the marginal over function values at `index_points`.
@@ -330,17 +414,14 @@ class StudentTProcess(distribution.Distribution):
     with self._name_and_control_scope('get_marginal_distribution'):
       df = tf.convert_to_tensor(self.df)
       index_points = self._get_index_points(index_points)
-      squared_scale = self._compute_covariance(index_points)
-      if self._is_univariate_marginal(index_points):
-        squared_scale = (df - 2.) / df * squared_scale
-      else:
-        squared_scale = ((df - 2.) / df)[
-            ..., tf.newaxis, tf.newaxis] * squared_scale
+      covariance = self._compute_covariance(index_points)
       loc = self._mean_fn(index_points)
+
       # If we're sure the number of index points is 1, we can just construct a
       # scalar Normal. This has computational benefits and supports things like
       # CDF that aren't otherwise straightforward to provide.
       if self._is_univariate_marginal(index_points):
+        squared_scale = (df - 2.) / df * covariance
         scale = tf.sqrt(squared_scale)
         # `loc` has a trailing 1 in the shape; squeeze it.
         loc = tf.squeeze(loc, axis=-1)
@@ -348,25 +429,25 @@ class StudentTProcess(distribution.Distribution):
             df=df,
             loc=loc,
             scale=scale,
-            validate_args=self._validate_args,
-            allow_nan_stats=self._allow_nan_stats,
+            validate_args=self.validate_args,
+            allow_nan_stats=self.allow_nan_stats,
             name='marginal_distribution')
       else:
-        scale = tf.linalg.LinearOperatorLowerTriangular(
-            tf.linalg.cholesky(_add_diagonal_shift(squared_scale, self.jitter)),
-            is_non_singular=True,
-            name='StudentTProcessScaleLinearOperator')
-        return multivariate_student_t.MultivariateStudentTLinearOperator(
+        return self._marginal_fn(
             df=df,
             loc=loc,
-            scale=scale,
-            validate_args=self._validate_args,
-            allow_nan_stats=self._allow_nan_stats,
+            covariance=covariance,
+            validate_args=self.validate_args,
+            allow_nan_stats=self.allow_nan_stats,
             name='marginal_distribution')
 
   @property
   def df(self):
     return self._df
+
+  @property
+  def observation_noise_variance(self):
+    return self._observation_noise_variance
 
   @property
   def mean_fn(self):
@@ -379,6 +460,10 @@ class StudentTProcess(distribution.Distribution):
   @property
   def index_points(self):
     return self._index_points
+
+  @property
+  def marginal_fn(self):
+    return self._marginal_fn
 
   @property
   def jitter(self):
@@ -414,6 +499,7 @@ class StudentTProcess(distribution.Distribution):
     return functools.reduce(tf.broadcast_dynamic_shape, [
         tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
         self.kernel.batch_shape_tensor(),
+        tf.shape(self.observation_noise_variance),
         tf.shape(self.df)
     ])
 
@@ -424,6 +510,7 @@ class StudentTProcess(distribution.Distribution):
         tf.broadcast_static_shape,
         [index_points.shape[:-(self.kernel.feature_ndims + 1)],
          self.kernel.batch_shape,
+         self.observation_noise_variance.shape,
          self.df.shape])
 
   def _event_shape_tensor(self, index_points=None):
@@ -478,8 +565,15 @@ class StudentTProcess(distribution.Distribution):
 
     kernel_diag = self.kernel.apply(index_points, index_points, example_ndims=1)
     if self._is_univariate_marginal(index_points):
-      return tf.squeeze(kernel_diag, axis=[-1])
-    return kernel_diag
+      return (tf.squeeze(kernel_diag, axis=[-1]) +
+              self.observation_noise_variance)
+    else:
+      # We are computing diag(K + obs_noise_variance * I) = diag(K) +
+      # obs_noise_variance. We pad obs_noise_variance with a dimension in order
+      # to broadcast batch shapes of kernel_diag and obs_noise_variance (since
+      # kernel_diag has an extra dimension corresponding to the number of index
+      # points).
+      return kernel_diag + self.observation_noise_variance[..., tf.newaxis]
 
   def _covariance(self, index_points=None):
     # Using the result of get_marginal_distribution would involve an extra

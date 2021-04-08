@@ -78,10 +78,11 @@ def _make_masked_fn(fn_name, n_event_shapes, safe_value,
               [ps.shape(validity_mask)] +
               [ps.ones_like(self.event_shape_tensor())] * n_event_shapes,
               axis=0))
-    return tf.where(
-        validity_mask,
-        val,
-        safe_val if safe_value == 'safe_sample' else safe_value)
+    if safe_value == 'safe_sample':
+      sentinel = tf.cast(safe_val, val.dtype)
+    else:
+      sentinel = tf.cast(safe_value, val.dtype)
+    return tf.where(validity_mask, val, sentinel)
 
   fn.__name__ = f'_{fn_name}'
   return fn
@@ -234,6 +235,10 @@ class Masked(distribution_lib.Distribution):
   @property
   def safe_sample_fn(self):
     return self._safe_sample_fn
+
+  @property
+  def experimental_is_sharded(self):
+    return self.distribution.experimental_is_sharded
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(

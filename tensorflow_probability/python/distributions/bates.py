@@ -238,7 +238,8 @@ class Bates(distribution.Distribution):
     return _bates_cdf(self.total_count, self.low, self.high, self.dtype, value)
 
   def _mean(self):
-    return (self.low + self.high) / 2.
+    return tf.broadcast_to(
+        (self.low + self.high) / 2., self._batch_shape_tensor())
 
   @distribution_util.AppendDocstring(
       'For `n = 1`, any value in `(low, high)` is a mode; this gives the mean.')

@@ -127,6 +127,8 @@ class LogitNormal(transformed_distribution.TransformedDistribution):
     """Number of `Normal(0, 1).cdf` terms using in `mean_*_approx` functions."""
     return self._num_probit_terms_approx
 
+  experimental_is_sharded = False
+
   def mean_log_prob_approx(self, y=None, name='mean_log_prob_approx'):
     """Approximates `E_Normal(m,s)[ Bernoulli(sigmoid(X)).log_prob(Y) ]`.
 

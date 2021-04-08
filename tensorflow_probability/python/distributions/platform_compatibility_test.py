@@ -55,7 +55,7 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'LogNormal',
     # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
     'NegativeBinomial',
-    'NormalInverseGaussian',  # log_probs can be very far off.
+    'NormalInverseGaussian',  # Fails in TF1.
     # TODO(b/137956955): Add support for hypothesis testing
     'PoissonLogNormalQuadratureCompound',
     # TODO(b/159999573): XLA / non-XLA computation seems to have
@@ -64,6 +64,7 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     # TODO(b/137956955): Add support for hypothesis testing
     'SinhArcsinh',
     # TODO(b/159997353): StatelessTruncatedNormal missing in XLA.
+    'Skellam',  # Fails in TF1.
     'TruncatedNormal',
     'Weibull',
     'WishartTriL',  # log_probs are very far off.
@@ -97,7 +98,6 @@ SAMPLE_AUTOVECTORIZATION_IS_BROKEN = [
 LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
     'Bates',  # tf.repeat and tf.range do not vectorize. (b/157665707)
     'BetaQuotient',
-    'ExponentiallyModifiedGaussian',  # b/174778704
     'NormalInverseGaussian',  # Fails in TF1.
     'Skellam',  # Fails in TF1.
     'TruncatedNormal',  # Numerical problem: b/150811273
@@ -136,7 +136,7 @@ XLA_LOGPROB_ATOL.update({
     'BetaBinomial': 5e-6,
     'BetaQuotient': 1e-4,
     'Binomial': 5e-6,
-    'Categorical': 5e-6,  # sparse_softmax_cross_entropy_with_logits
+    'Categorical': 7e-6,  # sparse_softmax_cross_entropy_with_logits
     'DeterminantalPointProcess': 1e-5,
     'DirichletMultinomial': 1e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)

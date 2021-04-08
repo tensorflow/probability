@@ -29,6 +29,7 @@ import jax.numpy as np
 __all__ = [
     'assert_same_shallow_tree',
     'block_until_ready',
+    'get_shallow_tree',
     'flatten_tree',
     'inverse_fn',
     'make_tensor_seed',
@@ -66,6 +67,11 @@ def map_tree_up_to(shallow, fn, tree, *rest):
     return fn(*rest)
 
   return tree_util.tree_multimap(wrapper, shallow, tree, *rest)
+
+
+def get_shallow_tree(is_leaf, tree):
+  """Returns a shallow tree, expanding only when is_leaf(subtree) is False."""
+  return tree_util.tree_map(is_leaf, tree, is_leaf)
 
 
 def assert_same_shallow_tree(shallow, tree):

@@ -758,6 +758,22 @@ def no_tf_rank_errors():
       raise
 
 
+@contextlib.contextmanager
+def finite_ground_truth_only():
+  # Recognizing the error message from python/internal/numerics_testing.py
+  pat = 'Cannot check accuracy if ground truth or derivatives are not finite'
+  try:
+    yield
+  except tf.errors.InvalidArgumentError as e:
+    msg = str(e)
+    if re.search(pat, msg):
+      # Tried an input regime where the 64-bit computation produced a
+      # non-finite value or gradient
+      hp.assume(False)
+    else:
+      raise
+
+
 # Utility functions for constraining parameters and/or domain/codomain members.
 
 

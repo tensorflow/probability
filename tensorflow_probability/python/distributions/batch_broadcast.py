@@ -185,6 +185,10 @@ class BatchBroadcast(distribution_lib.Distribution):
   def to_shape(self):
     return self._to_shape
 
+  @property
+  def experimental_is_sharded(self):
+    return self.distribution.experimental_is_sharded
+
   def __getitem__(self, slices):
     # Implementing this method would require logic similar to
     # slicing._slice_single_param, but mapped to distribution instances instead

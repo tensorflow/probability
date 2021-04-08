@@ -447,6 +447,8 @@ class ExpInverseGamma(transformed_distribution.TransformedDistribution):
     """Log of scale parameter."""
     return self.distribution.log_rate
 
+  experimental_is_sharded = False
+
   def _log_rate_parameter(self):  # Required by gamma_lib.kl_gamma_gamma.
     return self.distribution._log_rate_parameter()  # pylint: disable=protected-access
 

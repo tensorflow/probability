@@ -165,8 +165,8 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                initial_state_prior=None,
                initial_step=0,
                validate_args=False,
-               allow_nan_stats=True,
-               name=None):
+               name=None,
+               **linear_gaussian_ssm_kwargs):
     """Build a state space model representing the sum of component models.
 
     Args:
@@ -204,18 +204,16 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         with asserts. If `validate_args` is `False`, and the inputs are
         invalid, correct behavior is not guaranteed.
         Default value: `False`.
-      allow_nan_stats: Python `bool`. If `False`, raise an
-        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
-        batch member. If `True`, batch members with valid parameters leading to
-        undefined statistics will return NaN for this statistic.
-        Default value: `True`.
       name: Python `str` name prefixed to ops created by this class.
         Default value: "AdditiveStateSpaceModel".
-
+      **linear_gaussian_ssm_kwargs: Optional additional keyword arguments to
+        to the base `tfd.LinearGaussianStateSpaceModel` constructor.
     Raises:
       ValueError: if components have different `num_timesteps`.
     """
     parameters = dict(locals())
+    parameters.update(linear_gaussian_ssm_kwargs)
+    del parameters['linear_gaussian_ssm_kwargs']
     with tf.name_scope(name or 'AdditiveStateSpaceModel') as name:
       # Check that all components have the same dtype
       dtype = tf.debugging.assert_same_float_dtype(component_ssms)
@@ -331,8 +329,8 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           initial_state_prior=initial_state_prior,
           initial_step=initial_step,
           validate_args=validate_args,
-          allow_nan_stats=allow_nan_stats,
-          name=name)
+          name=name,
+          **linear_gaussian_ssm_kwargs)
       self._parameters = parameters
 
 
@@ -496,16 +494,15 @@ class Sum(StructuralTimeSeries):
   def make_component_state_space_models(self,
                                         num_timesteps,
                                         param_vals,
-                                        initial_step=0):
+                                        **linear_gaussian_ssm_kwargs):
     """Build an ordered list of Distribution instances for component models.
 
     Args:
       num_timesteps: Python `int` number of timesteps to model.
       param_vals: a list of `Tensor` parameter values in order corresponding to
         `self.parameters`, or a dict mapping from parameter names to values.
-      initial_step: optional `int` specifying the initial timestep to model.
-        This is relevant when the model contains time-varying components,
-        e.g., holidays or seasonality.
+      **linear_gaussian_ssm_kwargs: Optional additional keyword arguments to
+        to the base `tfd.LinearGaussianStateSpaceModel` constructors.
 
     Returns:
       component_ssms: a Python list of `LinearGaussianStateSpaceModel`
@@ -532,16 +529,16 @@ class Sum(StructuralTimeSeries):
             component.make_state_space_model(
                 num_timesteps,
                 param_vals=component_param_vals,
-                initial_step=initial_step))
+                **linear_gaussian_ssm_kwargs))
 
     return component_ssms
 
   def _make_state_space_model(self,
                               num_timesteps,
                               param_map,
-                              initial_step=0,
                               initial_state_prior=None,
-                              constant_offset=None):
+                              constant_offset=None,
+                              **linear_gaussian_ssm_kwargs):
 
     # List the model parameters in canonical order
     param_vals_list = [param_map[p.name] for p in self.parameters]
@@ -550,7 +547,7 @@ class Sum(StructuralTimeSeries):
     component_ssms = self.make_component_state_space_models(
         num_timesteps=num_timesteps,
         param_vals=param_map,
-        initial_step=initial_step)
+        **linear_gaussian_ssm_kwargs)
 
     if constant_offset is None:
       constant_offset = self.constant_offset
@@ -560,4 +557,4 @@ class Sum(StructuralTimeSeries):
         constant_offset=constant_offset,
         observation_noise_scale=observation_noise_scale,
         initial_state_prior=initial_state_prior,
-        initial_step=initial_step)
+        **linear_gaussian_ssm_kwargs)

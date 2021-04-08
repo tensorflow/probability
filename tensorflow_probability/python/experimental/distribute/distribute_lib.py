@@ -18,9 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.math import gradient as math_gradient
+
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 JAX_MODE = False
@@ -29,28 +33,44 @@ if JAX_MODE:
   from jax import lax  # pylint: disable=g-import-not-at-top
 
 
+def canonicalize_axis_name(axis_name):
+  """Converts an input into a list of axis strings."""
+  if not axis_name:
+    return []
+  if (isinstance(axis_name, str)
+      or not isinstance(axis_name, collections.Iterable)):
+    return [axis_name]
+  return list(axis_name)
+
+
 def psum(x, axis_name=None):
   if JAX_MODE:
-    return lax.psum(x, axis_name)
+    axis_name = canonicalize_axis_name(axis_name)
+    for name in axis_name:
+      x = lax.psum(x, name)
+    return x
   ctx = tf.distribute.get_replica_context()
   return ctx.all_reduce('sum', x)
 
 
 def pmean(x, axis_name=None):
   if JAX_MODE:
-    return lax.pmean(x, axis_name)
+    axis_name = canonicalize_axis_name(axis_name)
+    for name in axis_name:
+      x = lax.pmean(x, name)
+    return x
   ctx = tf.distribute.get_replica_context()
   return ctx.all_reduce('mean', x)
 
 
-def get_replica_id(axis_name=None):
+def get_axis_index(axis_name=None):
   if JAX_MODE:
     return lax.axis_index(axis_name)
   ctx = tf.distribute.get_replica_context()
   return ctx.replica_id_in_sync_group
 
 
-def get_num_replicas(axis_name=None):
+def get_axis_size(axis_name=None):
   if JAX_MODE:
     return lax.psum(1, axis_name)
   ctx = tf.distribute.get_replica_context()
@@ -79,7 +99,7 @@ if JAX_MODE:
   tree_util.register_pytree_node_class(_DummyGrads)
 
 
-def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded, axis_name=None):
+def make_sharded_log_prob_parts(log_prob_parts_fn, axis_names):
   """Constructs a log prob parts function that all-reduces over terms.
 
   Given a log_prob_parts function, this function will return a new one that
@@ -91,37 +111,43 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded, axis_name=None):
     log_prob_parts_fn: a callable that takes in a structured value and returns a
       structure of log densities for each of the terms, that when summed returns
       a locally correct log-density.
-    is_sharded: a structure of boolean values that matches the input and output
-      of `log_prob_parts_fn`. If a value in `log_prob_parts_fn` has a
-      corresponding `is_sharded` value set to `True`, the returned function will
-      add an all-reduce sum for its term in the log prob calculation. If it is
-      `False`, the returned function will have an all-reduce sum over the
+    axis_names: a structure of values that matches the input and output
+      of `log_prob_parts_fn`. Each value in `axis_names` is either `None,
+      a string name of a mapped axis in the JAX backend or any non-`None` value
+      in TF backend, or an iterable thereof corresponding to multiple sharding
+      axes. If the `axis_name` is not `None`, the returned function will add
+      all-reduce sum(s) for its term in the log prob calculation. If it is
+      `None`, the returned function will have an all-reduce sum over the
       gradient of sharded terms w.r.t. to the unsharded value.
-    axis_name: a `str` used for the axis name in the JAX backend. Unused in the
-      TensorFlow backend.
 
   Returns:
-    A new log prob parts function that can be run inside of strategy.
+    A new log prob parts function that can be run inside of a strategy.
   """
-
   def _sharded_log_prob_parts_fwd(value):
-    tf.nest.assert_same_structure(value, is_sharded)
+    nest.assert_shallow_structure(value, axis_names)
+    map_axes = nest.map_structure_up_to(
+        value, canonicalize_axis_name, axis_names)
     log_prob_parts = log_prob_parts_fn(value)
-    tf.nest.assert_same_structure(log_prob_parts, is_sharded)
+    nest.assert_same_structure(value, log_prob_parts)
+    nest.assert_shallow_structure(log_prob_parts, map_axes)
 
-    total_log_prob_parts = tf.nest.map_structure(
-        lambda log_prob_part, sharded: (  # pylint: disable=g-long-lambda
-            psum(log_prob_part, axis_name=axis_name)
-            if sharded else log_prob_part),
+    total_log_prob_parts = nest.map_structure_up_to(
         log_prob_parts,
-        is_sharded)
+        lambda log_prob_part, axis_name: (  # pylint: disable=g-long-lambda
+            psum(log_prob_part, axis_name=axis_name)
+            if axis_name else log_prob_part),
+        log_prob_parts,
+        map_axes)
 
     return total_log_prob_parts, value
 
   def _sharded_log_prob_parts_bwd(value, gs):
 
+    map_axes = nest.map_structure_up_to(
+        value, canonicalize_axis_name, axis_names)
+
     def flat_log_prob_parts_fn(flat_args):
-      args = tf.nest.pack_sequence_as(is_sharded, flat_args)
+      args = tf.nest.pack_sequence_as(value, flat_args)
       log_prob_parts = log_prob_parts_fn(args)
       return tf.nest.flatten(log_prob_parts)
 
@@ -139,12 +165,12 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded, axis_name=None):
     # Transpose.
     local_grads = list(zip(*local_grads))
     # Repack.
-    local_grads = tf.nest.pack_sequence_as(is_sharded, [
-        _DummyGrads(tf.nest.pack_sequence_as(is_sharded, v))
+    local_grads = tf.nest.pack_sequence_as(value, [
+        _DummyGrads(tf.nest.pack_sequence_as(value, v))
         for v in local_grads
     ])
 
-    def value_grad(v, value_sharded, term_grads):
+    def value_grad(v, value_axis_names, term_grads):
       """Computes reductions of output gradients.
 
       A `log_prob_parts` function takes in a list of values and outputs
@@ -164,8 +190,8 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded, axis_name=None):
       In any of these cases, no all-reduce-sum is necessary.
       Args:
         v: The output term of a `log_prob_part` function.
-        value_sharded: A boolean indicating whether or not the output term is
-          sharded or not.
+        value_axis_names: A list of axis names indicating whether or not the
+          output term is sharded or not, `None` if no sharding.
         term_grads: The gradient of the output term w.r.t. to each of the input
           values to the `log_prob_part` function.
 
@@ -174,21 +200,24 @@ def make_sharded_log_prob_parts(log_prob_parts_fn, is_sharded, axis_name=None):
         `log_prob_parts` function.
       """
       term_grads = term_grads.grads
-      def psum_grads(term_grad, term_sharded):
+      def psum_grads(term_grad, term_axis_names):
         if term_grad is not None:
-          if not value_sharded and term_sharded:
-            term_grad = psum(term_grad, axis_name=axis_name)
+          psum_axes = [axis_name for axis_name in term_axis_names
+                       if axis_name not in value_axis_names]
+          if psum_axes:
+            term_grad = psum(term_grad, axis_name=psum_axes)
         return term_grad
 
-      total_grad = tf.nest.map_structure(psum_grads, term_grads,
-                                         is_sharded)
+      total_grad = nest.map_structure_up_to(
+          term_grads, psum_grads, term_grads, map_axes)
       if all([grad is None for grad in tf.nest.flatten(total_grad)]):
         return None
       return tf.add_n(
           [v for v in tf.nest.flatten(total_grad)
            if tfp_custom_gradient.is_valid_gradient(v)])
 
-    out = tf.nest.map_structure(value_grad, value, is_sharded, local_grads)
+    out = nest.map_structure_up_to(
+        value, value_grad, value, map_axes, local_grads)
     return (out,)
 
   @tfp_custom_gradient.custom_gradient(

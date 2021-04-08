@@ -112,6 +112,8 @@ class Chi(transformed_distribution.TransformedDistribution):
     """Distribution parameter for degrees of freedom."""
     return self._df
 
+  experimental_is_sharded = False
+
   def _mean(self, df=None):
     df = tf.convert_to_tensor(self.df if df is None else df)
     return np.sqrt(2.) * tf.exp(

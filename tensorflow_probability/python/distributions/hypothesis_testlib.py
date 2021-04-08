@@ -106,7 +106,7 @@ TF2_FRIENDLY_DISTS = (
     'RelaxedBernoulli',
     'ExpRelaxedOneHotCategorical',
     'SigmoidBeta',
-    # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
+    'SinhArcsinh',
     'Skellam',
     'SphericalUniform',
     'StudentT',
@@ -265,6 +265,8 @@ CONSTRAINTS = {
         tf.math.softplus,
     'rtol':
         tf.math.softplus,
+    'Dirichlet.concentration':
+        tfp_hps.softplus_plus_eps(),
     'concentration':
         tfp_hps.softplus_plus_eps(),
     'GeneralizedPareto.concentration':  # Permits +ve and -ve concentrations.
@@ -300,6 +302,8 @@ CONSTRAINTS = {
     'Categorical.probs':
         tf.math.softmax,
     'ExpRelaxedOneHotCategorical.probs':
+        tf.math.softmax,
+    'RelaxedOneHotCategorical.probs':
         tf.math.softmax,
     'FiniteDiscrete.probs':
         tf.math.softmax,
@@ -1332,9 +1336,9 @@ def masked_distributions(draw,
   Args:
     draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
-      `MixtureSameFamily` distribution.  The component distribution will have a
-      batch shape of 1 rank higher (for the components being mixed).  Hypothesis
-      will pick a batch shape if omitted.
+      `Masked` distribution.  The component distribution will have a batch
+      shape of 1 rank higher (for the components being mixed).  Hypothesis will
+      pick a batch shape if omitted.
     event_dim: Optional Python int giving the size of each of the component
       distribution's parameters' event dimensions.  This is shared across all
       parameters, permitting square event matrices, compatible location and
@@ -1355,7 +1359,7 @@ def masked_distributions(draw,
   if batch_shape is None:
     batch_shape = draw(tfp_hps.shapes(min_ndims=0, max_side=4))
   if event_dim is None:
-    event_dim = draw(hps.integers(min_value=1, max_value=10))
+    event_dim = draw(hps.integers(min_value=2, max_value=10))
 
   mask_shape, underlying_batch_shape = draw(
       tfp_hps.broadcasting_shapes(batch_shape, 2))

@@ -27,6 +27,7 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
@@ -40,14 +41,51 @@ __all__ = [
     'Bijector',
 ]
 
-
+JAX_MODE = False
 SKIP_DTYPE_CHECKS = False
 
 # Singleton object representing "no value", in cases where "None" is meaningful.
 UNSPECIFIED = object()
 
 
-@six.add_metaclass(abc.ABCMeta)
+class _BijectorMeta(abc.ABCMeta):
+  """Helper metaclass for tfp.Bijector."""
+
+  def __init__(cls, name, bases, dct):
+    super(_BijectorMeta, cls).__init__(name, bases, dct)
+    if not JAX_MODE:
+      return
+    def flatten(bij):
+      param_names = set(bij._composite_tensor_nonshape_params)  # pylint: disable=protected-access
+      components = {param_name: getattr(
+          bij, param_name, value) for param_name, value
+                    in bij.parameters.items() if param_name in param_names}
+      metadata = {param_name: value for param_name, value
+                  in bij.parameters.items() if param_name not in param_names}
+      if components:
+        keys, values = zip(*sorted(components.items()))
+      else:
+        keys, values = (), ()
+      # Mimics the logic in `tfp.experimental.composite_tensor` where we
+      # aggressively try to convert arguments into Tensors.
+      def _maybe_convert_to_tensor(value, name):
+        try:
+          value = tf.convert_to_tensor(value, name=name)
+        except (ValueError, TypeError, AssertionError):
+          pass
+        return value
+      values = tuple([_maybe_convert_to_tensor(value, name) for value, name,
+                      in zip(values, keys)])
+      return values, (keys, metadata)
+    def unflatten(info, xs):
+      keys, metadata = info
+      parameters = dict(list(zip(keys, xs)), **metadata)
+      return cls(**parameters)
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    tree_util.register_pytree_node(cls, flatten, unflatten)
+
+
+@six.add_metaclass(_BijectorMeta)
 class Bijector(tf.Module):
   r"""Interface for transformations of a `Distribution` sample.
 
@@ -520,9 +558,16 @@ class Bijector(tf.Module):
     self._validate_args = validate_args
     self._dtype = dtype
 
-    self._initial_parameter_control_dependencies = tuple(
-        d for d in self._parameter_control_dependencies(is_init=True)
-        if d is not None)
+    self._defer_all_assertions = (
+        auto_composite_tensor.is_deferred_assertion_context())
+
+    if not self._defer_all_assertions:
+      self._initial_parameter_control_dependencies = tuple(
+          d for d in self._parameter_control_dependencies(is_init=True)
+          if d is not None)
+    else:
+      self._initial_parameter_control_dependencies = ()
+
     if self._initial_parameter_control_dependencies:
       self._initial_parameter_control_dependencies = (
           tf.group(*self._initial_parameter_control_dependencies),)
@@ -1379,11 +1424,12 @@ class Bijector(tf.Module):
     """Helper function to standardize op scope."""
     with tf.name_scope(self.name):
       with tf.name_scope(name) as name_scope:
-        deps = tuple(
-            d for d in (  # pylint: disable=g-complex-comprehension
-                tuple(self._initial_parameter_control_dependencies) +
-                tuple(self._parameter_control_dependencies(is_init=False)))
-            if d is not None)
+        deps = []
+        if self._defer_all_assertions:
+          deps.extend(self._parameter_control_dependencies(is_init=True))
+        else:
+          deps.extend(self._initial_parameter_control_dependencies)
+        deps.extend(self._parameter_control_dependencies(is_init=False))
         if not deps:
           yield name_scope
           return
@@ -1691,7 +1737,7 @@ def ldj_reduction_shape(shape_structure,
     if reduce_ndims_ is not None:
       if reduce_ndims_ < 0:
         raise ValueError('`event_ndims must be at least {}. Saw: {}.'
-                         .format(event_ndims, min_event_ndims))
+                         .format(min_event_ndims, event_ndims))
     elif validate_args:
       with tf.control_dependencies(assertions):
         assertions.append(
@@ -1763,11 +1809,11 @@ def ldj_reduction_shape(shape_structure,
           parameter_batch_in_ldj_shape_ = parameter_batch_shape_
         else:
           parameter_batch_in_ldj_shape_ = parameter_batch_shape_[
-              -reduce_ndims_:]
+              ps.rank_from_shape(parameter_batch_shape_) - reduce_ndims_:]
         broadcasted_shape_ = tf.broadcast_static_shape(
             tf.TensorShape(parameter_batch_in_ldj_shape_),
             tf.TensorShape(ldj_reduce_shape_))
-        if not np.all(ldj_reduce_shape_ == broadcasted_shape_):
+        if not np.array_equal(ldj_reduce_shape_, broadcasted_shape_):
           raise ValueError('Broadcasting with bijector parameters changes the '
                            'LDJ reduction shape from {} to {}.'.format(
                                ldj_reduce_shape_, broadcasted_shape_))

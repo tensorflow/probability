@@ -129,6 +129,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:distribution",
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:cache_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
@@ -1826,6 +1827,7 @@ multi_substrate_py_test(
         ":bijector_test_util",
         ":bijectors",
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

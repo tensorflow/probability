@@ -133,9 +133,8 @@ class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                level_scale,
                initial_state_prior,
                observation_noise_scale=0.,
-               initial_step=0,
-               validate_args=False,
-               name=None):
+               name=None,
+               **linear_gaussian_ssm_kwargs):
     """Build a state space model implementing an autoregressive process.
 
     Args:
@@ -155,17 +154,14 @@ class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         treated as batch dimensions) `float` `Tensor` indicating the standard
         deviation of the observation noise.
         Default value: 0.
-      initial_step: Optional scalar `int` `Tensor` specifying the starting
-        timestep.
-        Default value: 0.
-      validate_args: Python `bool`. Whether to validate input
-        with asserts. If `validate_args` is `False`, and the inputs are
-        invalid, correct behavior is not guaranteed.
-        Default value: `False`.
       name: Python `str` name prefixed to ops created by this class.
         Default value: "AutoregressiveStateSpaceModel".
+      **linear_gaussian_ssm_kwargs: Optional additional keyword arguments to
+        to the base `tfd.LinearGaussianStateSpaceModel` constructor.
     """
     parameters = dict(locals())
+    parameters.update(linear_gaussian_ssm_kwargs)
+    del parameters['linear_gaussian_ssm_kwargs']
     with tf.name_scope(name or 'AutoregressiveStateSpaceModel') as name:
 
       # The initial state prior determines the dtype of sampled values.
@@ -202,9 +198,8 @@ class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
           observation_noise=tfd.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
           initial_state_prior=initial_state_prior,
-          initial_step=initial_step,
-          validate_args=validate_args,
-          name=name)
+          name=name,
+          **linear_gaussian_ssm_kwargs)
       self._parameters = parameters
 
   @property
@@ -401,14 +396,16 @@ class Autoregressive(StructuralTimeSeries):
                               num_timesteps,
                               param_map=None,
                               initial_state_prior=None,
-                              initial_step=0):
+                              **linear_gaussian_ssm_kwargs):
 
     if initial_state_prior is None:
       initial_state_prior = self.initial_state_prior
 
+    if param_map:
+      linear_gaussian_ssm_kwargs.update(param_map)
+
     return AutoregressiveStateSpaceModel(
         num_timesteps=num_timesteps,
         initial_state_prior=initial_state_prior,
-        initial_step=initial_step,
         name=self.name,
-        **param_map)
+        **linear_gaussian_ssm_kwargs)

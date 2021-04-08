@@ -21,6 +21,7 @@ from __future__ import print_function
 import os
 
 # Dependency imports
+import numpy as np
 import six
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -388,6 +389,37 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.evaluate(unflat.sample())
     log_prob_after = self.evaluate(unflat.log_prob(sample))
     self.assertAllEqual(log_prob_before, log_prob_after)
+
+  def test_keras_layers(self):
+    # 10-vector to 5-vector
+    def layer_helper(x):
+      loc = tf.split(x, 2, axis=-1)[0]
+      scale = tf.math.exp(tf.split(x, 2, axis=-1)[1])
+      d = tfd.Normal(loc, scale)
+      cd = tfp.experimental.as_composite(d)
+      return cd
+
+    model1 = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(10),
+        tf.keras.layers.Lambda(layer_helper),
+        tf.keras.layers.Lambda(tfd.Distribution.mean),
+        tf.keras.layers.Dense(10),
+    ])
+    model2 = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(10),
+        tfp.layers.DistributionLambda(layer_helper),
+        tf.keras.layers.Dense(10),
+    ])
+
+    model1.compile(optimizer='sgd', loss='mean_squared_error')
+    model2.compile(optimizer='sgd', loss='mean_squared_error')
+    xs = np.array([-1.0, 0.0, 1.0, 2.0, 3.0, 4.0])
+    ys = np.array([-3.0, -1.0, 1.0, 3.0, 5.0, 7.0])
+    model1.fit(xs, ys, epochs=500)
+    model2.fit(xs, ys, epochs=500, steps_per_epoch=5)
+    x_test = np.array([10.0])
+    model1.predict(x_test, steps=1)
+    model2.predict(x_test, steps=1)
 
   def test_transformed_distribution(self):
     fd = tfd.TransformedDistribution(

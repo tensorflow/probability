@@ -25,6 +25,7 @@ from tensorflow_probability.python.math.bessel import bessel_iv_ratio
 from tensorflow_probability.python.math.bessel import bessel_ive
 from tensorflow_probability.python.math.bessel import bessel_kve
 from tensorflow_probability.python.math.bessel import log_bessel_ive
+from tensorflow_probability.python.math.bessel import log_bessel_kve
 from tensorflow_probability.python.math.custom_gradient import custom_gradient
 from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.generic import log1mexp
@@ -44,6 +45,7 @@ from tensorflow_probability.python.math.generic import softplus_inverse
 from tensorflow_probability.python.math.generic import sqrt1pm1
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.gram_schmidt import gram_schmidt
+from tensorflow_probability.python.math.integration import trapz
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_nd_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
@@ -121,6 +123,7 @@ _allowed_symbols = [
     'lambertw_winitzki_approx',
     'lbeta',
     'log_bessel_ive',
+    'log_bessel_kve',
     'log1mexp',
     'log1psquare',
     'log_add_exp',
@@ -157,6 +160,7 @@ _allowed_symbols = [
     'sparse_or_dense_matmul',
     'sparse_or_dense_matvecmul',
     'sqrt1pm1',
+    'trapz',
     'value_and_gradient',
 ]
 

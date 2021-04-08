@@ -242,10 +242,16 @@ class MinimizeTests(test_util.TestCase):
     # whether it is executing in an XLA context.
     using_xla, not_using_xla = 42., -9999.
     def xla_detecting_loss_fn():
-      control_flow_context = tf1.get_default_graph()._control_flow_context
-      if (control_flow_context is not None and
-          control_flow_context.IsXLAContext()):
-        return using_xla + (x - x)  # Refer to `x` to ensure loss is trainable.
+      # Search the graph hierarchy for an XLA context.
+      graph = tf1.get_default_graph()
+      while True:
+        if (graph._control_flow_context is not None and
+            graph._control_flow_context.IsXLAContext()):
+          return using_xla + (x - x)  # Refer to `x` to ensure gradient.
+        try:
+          graph = graph.outer_graph
+        except AttributeError:
+          break
       return not_using_xla + (x - x)
 
     xla_losses = tfp.math.minimize(

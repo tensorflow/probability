@@ -25,13 +25,13 @@ import functools
 import inspect
 import types
 import decorator
-
 import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
@@ -283,6 +283,39 @@ class _DistributionMeta(abc.ABCMeta):
       return super(_DistributionMeta, mcs).__new__(
           mcs, classname, baseclasses, attrs)
 
+    # Subclasses shouldn't inherit their parents' `_parameter_properties`,
+    # since (in general) they'll have different parameters. Exceptions (for
+    # convenience) are:
+    #  - Subclasses that don't define their own `__init__` (handled above by
+    #    the short-circuit when `default_init is None`).
+    #  - Subclasses that define a passthrough `__init__(self, *args, **kwargs)`.
+    #  - Direct children of `Distribution`, since the inherited method just
+    #    raises a NotImplementedError.
+    init_argspec = tf_inspect.getfullargspec(default_init)
+    if ('_parameter_properties' not in attrs
+        and base != Distribution
+        # Passthrough exception: may only take `self` and at least one of
+        # `*args` and `**kwargs`.
+        and (len(init_argspec.args) > 1
+             or not (init_argspec.varargs or init_argspec.varkw))):
+      # TODO(b/183457779) remove warning and raise `NotImplementedError`.
+      attrs['_parameter_properties'] = deprecation.deprecated(
+          date='2021-07-01',
+          instructions="""
+Calling `_parameter_properties` on subclass {classname} that redefines the
+parent ({basename}) `__init__` is unsafe and will raise an error in the future.
+Please implement an explicit `_parameter_properties` for the subclass. If the
+subclass `__init__` takes the same parameters as the parent, you may use the
+placeholder implementation:
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return {basename}._parameter_properties(
+        dtype=dtype, num_classes=num_classes)
+
+""".format(classname=classname,
+           basename=base.__name__))(base._parameter_properties)
+
     # pylint: disable=protected-access
     # For a comparison of different methods for wrapping functions, see:
     # https://hynek.me/articles/decorators/
@@ -377,6 +410,12 @@ class Distribution(_BaseDistribution):
   docstring. This is implemented as a simple decorator to avoid python
   linter complaining about missing Args/Returns/Raises sections in the
   partial docstrings.
+
+  Note that subclasses of existing Distributions that redefine `__init__` do
+  *not* automatically inherit
+  `_parameter_properties` annotations from their parent: the subclass must
+  explicitly implement its own `_parameter_properties` method to support the
+  features, such as batch slicing, that this enables.
 
   #### Broadcasting, batching, and shapes
 
@@ -545,9 +584,16 @@ class Distribution(_BaseDistribution):
     self._parameters = self._no_dependency(parameters)
     self._parameters_sanitized = False
     self._graph_parents = graph_parents
-    self._initial_parameter_control_dependencies = tuple(
-        d for d in self._parameter_control_dependencies(is_init=True)
-        if d is not None)
+    self._defer_all_assertions = (
+        auto_composite_tensor.is_deferred_assertion_context())
+
+    if not self._defer_all_assertions:
+      self._initial_parameter_control_dependencies = tuple(
+          d for d in self._parameter_control_dependencies(is_init=True)
+          if d is not None)
+    else:
+      self._initial_parameter_control_dependencies = ()
+
     if self._initial_parameter_control_dependencies:
       self._initial_parameter_control_dependencies = (
           tf.group(*self._initial_parameter_control_dependencies),)
@@ -591,7 +637,10 @@ class Distribution(_BaseDistribution):
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     raise NotImplementedError(
-        '_parameter_properties` is not implemented: {}'.format(cls.__name__))
+        '_parameter_properties` is not implemented: {}. '
+        'Note that subclasses that redefine `__init__` are not assumed to '
+        'share parameters with their parent class and must provide a separate '
+        'implementation.'.format(cls.__name__))
 
   @classmethod
   def parameter_properties(cls, dtype=tf.float32, num_classes=None):
@@ -710,7 +759,11 @@ class Distribution(_BaseDistribution):
           k: v for k, v in p.items()
           if not k.startswith('__') and v is not self})
       self._parameters_sanitized = True
-    return dict(self._parameters)
+    # In some situations, the Distribution metaclass logic defers the evaluation
+    # of parameters, but at this point we actually want to evaluate the
+    # parameters.
+    return dict(
+        self._parameters() if callable(self._parameters) else self._parameters)
 
   @classmethod
   def _params_event_ndims(cls):
@@ -797,6 +850,11 @@ class Distribution(_BaseDistribution):
   def validate_args(self):
     """Python `bool` indicating possibly expensive checks are enabled."""
     return self._validate_args
+
+  @property
+  def experimental_shard_axis_names(self):
+    """The list or structure of lists of active shard axis names."""
+    return []
 
   def copy(self, **override_parameters_kwargs):
     """Creates a deep copy of the distribution.
@@ -1558,7 +1616,10 @@ class Distribution(_BaseDistribution):
     with tf.name_scope(self.name):
       with tf.name_scope(name) as name_scope:
         deps = []
-        deps.extend(self._initial_parameter_control_dependencies)
+        if self._defer_all_assertions:
+          deps.extend(self._parameter_control_dependencies(is_init=True))
+        else:
+          deps.extend(self._initial_parameter_control_dependencies)
         deps.extend(self._parameter_control_dependencies(is_init=False))
         if value is not UNSET_VALUE:
           deps.extend(self._sample_control_dependencies(

@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import warnings
-
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import categorical
@@ -500,12 +498,6 @@ class HiddenMarkovModel(distribution.Distribution):
         return _log_vector_matrix(log_prev_step,
                                   log_transition) + log_prob_observation
 
-      # TODO(davmre): Delete this warning after Dec 31, 2020.
-      warnings.warn(
-          'HiddenMarkovModel.log_prob in TFP versions < 0.12.0 had a bug in '
-          'which the transition model was applied prior to the initial step. '
-          'This bug has been fixed. You may observe a slight change in '
-          'behavior.')
       fwd_prob = tf.foldl(forward_step, observation_probs[1:],
                           initializer=log_init + observation_probs[0])
     # fwd_prob :: batch_shape num_states

@@ -284,7 +284,7 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
       # Scale", https://arxiv.org/abs/1810.04449.
 
       half_next_momentum_parts = [
-          v + tf.cast(0.5 * eps, v.dtype) * tf.cast(g, v.dtype)
+          v + _multiply(0.5 * eps, g, dtype=v.dtype)
           for v, eps, g
           in zip(momentum_parts, self.step_sizes, target_grad_parts)]
 
@@ -307,7 +307,7 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
           ])
 
       next_momentum_parts = [
-          v - tf.cast(0.5 * eps, v.dtype) * tf.cast(g, v.dtype)  # pylint: disable=g-complex-comprehension
+          v - _multiply(0.5 * eps, g, dtype=v.dtype)  # pylint: disable=g-complex-comprehension
           for v, eps, g
           in zip(next_half_next_momentum_parts,
                  self.step_sizes,
@@ -338,8 +338,7 @@ def _one_step(
     for state_part, eps, velocity_part in zip(
         state_parts, step_sizes, velocity_parts):
       next_state_parts.append(
-          state_part + tf.cast(eps, state_part.dtype) *
-          tf.cast(velocity_part, state_part.dtype))
+          state_part + _multiply(eps, velocity_part, dtype=state_part.dtype))
     [next_target, next_target_grad_parts] = mcmc_util.maybe_call_fn_and_grads(
         target_fn, next_state_parts)
     if any(g is None for g in next_target_grad_parts):
@@ -357,7 +356,7 @@ def _one_step(
       tensorshape_util.set_shape(ng, g.shape)
 
     next_half_next_momentum_parts = [
-        v + tf.cast(eps, v.dtype) * tf.cast(g, v.dtype)  # pylint: disable=g-complex-comprehension
+        v + _multiply(eps, g, dtype=v.dtype)  # pylint: disable=g-complex-comprehension
         for v, eps, g
         in zip(half_next_momentum_parts, step_sizes, next_target_grad_parts)]
 
@@ -392,3 +391,12 @@ def process_args(target_fn, momentum_parts, state_parts,
               g, dtype_hint=tf.float32, name='target_grad_part')
           for g in target_grad_parts]
     return momentum_parts, state_parts, target, target_grad_parts
+
+
+def _multiply(tensor, state_sized_tensor, dtype):
+  """Multiply `tensor` by a "state sized" tensor and preserve shape."""
+  # User should be using a step size that does not alter the state size. This
+  # will fail noisily if that is not the case.
+  result = tf.cast(tensor, dtype) * tf.cast(state_sized_tensor, dtype)
+  tensorshape_util.set_shape(result, state_sized_tensor.shape)
+  return result

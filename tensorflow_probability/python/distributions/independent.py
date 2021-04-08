@@ -168,6 +168,10 @@ class Independent(distribution_lib.Distribution):
   def reinterpreted_batch_ndims(self):
     return self._reinterpreted_batch_ndims
 
+  @property
+  def experimental_is_sharded(self):
+    return self.distribution.experimental_is_sharded
+
   def _get_reinterpreted_batch_ndims(self,
                                      distribution_batch_shape_tensor=None):
     if self._static_reinterpreted_batch_ndims is not None:

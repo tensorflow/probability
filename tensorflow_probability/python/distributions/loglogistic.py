@@ -94,6 +94,8 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     """Distribution parameter of the underlying distribution."""
     return self.distribution.scale
 
+  experimental_is_sharded = False
+
   def _mean(self):
     scale = tf.convert_to_tensor(self.scale)
     with tf.control_dependencies([] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary

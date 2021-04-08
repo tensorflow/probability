@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-import warnings
 
 # Dependency imports
 from absl.testing import parameterized
@@ -30,7 +29,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import joint_distribution_sequential
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -341,6 +339,18 @@ class JointDistributionSequentialTest(test_util.TestCase):
         lambda a: tfd.Normal(a, 1.)], validate_args=True)
     lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
     self.assertAllEqual(self.evaluate(lp).shape, [5])
+
+  def test_dist_fn_takes_varargs(self):
+    dist = tfd.JointDistributionSequential(
+        [
+            tfb.Scale(-1.)(tfd.Exponential(1.)),  # Negative.
+            lambda *args: tfd.Exponential(tf.exp(args[0])),  # Positive.
+            lambda *args: tfd.Normal(loc=args[1],  # pylint: disable=g-long-lambda
+                                     scale=args[0],  # Must be positive.
+                                     validate_args=True)
+        ], validate_args=True)
+    lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
+    self.assertAllEqual(lp.shape, [5])
 
   @parameterized.named_parameters(
       ('basic', basic_model_fn),
@@ -712,6 +722,28 @@ class JointDistributionSequentialTest(test_util.TestCase):
         ValueError, r'Supplied both `value` and keyword arguments .*'):
       joint.sample(seed=seed, a=1., value=[1., None, None])
 
+  def test_creates_valid_coroutine(self):
+    joint = tfd.JointDistributionSequential(
+        [
+            tfd.Poisson(rate=100.),
+            tfd.Dirichlet(concentration=[1., 1.]),
+            lambda theta, n: tfd.Multinomial(total_count=n, probs=theta),
+            lambda z: tfd.Independent(  # pylint: disable=g-long-lambda
+                tfd.Multinomial(total_count=z, logits=[[0., 1., 2.],
+                                                       [3., 4., 5.]]),
+                reinterpreted_batch_ndims=1),
+        ],
+        validate_args=True)
+    sample_shapes = [
+        x.shape for x in joint._model_flatten(
+            joint.sample([5], seed=test_util.test_seed()))]
+
+    jdc = tfd.JointDistributionCoroutine(joint._model_coroutine)
+    jdc_sample_shapes = [
+        x.shape for x in jdc._model_flatten(
+            jdc.sample([5], seed=test_util.test_seed()))]
+    self.assertAllEqualNested(sample_shapes, jdc_sample_shapes)
+
 
 class ResolveDistributionNamesTest(test_util.TestCase):
 
@@ -773,60 +805,6 @@ class ResolveDistributionNamesTest(test_util.TestCase):
           dist_names=None,
           leaf_name='y',
           instance_names=['z', None])
-
-  @test_util.jax_disable_test_missing_functionality('stateful samplers')
-  @test_util.numpy_disable_test_missing_functionality('stateful samplers')
-  def test_legacy_dists(self):
-
-    class StatefulNormal(tfd.Normal):
-
-      def _sample_n(self, n, seed=None):
-        return self.loc + self.scale * tf.random.normal(
-            tf.concat([[n], self.batch_shape_tensor()], axis=0),
-            seed=seed)
-
-    d = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-            StatefulNormal(loc=0, scale=2.),
-            tfd.Normal,  # Or, `lambda loc, scale: tfd.Normal(loc, scale)`.
-            lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12),
-        ],
-        validate_args=True)
-
-    warnings.simplefilter('always')
-    with warnings.catch_warnings(record=True) as w:
-      d.sample(seed=test_util.test_seed())
-    self.assertRegexpMatches(
-        str(w[0].message),
-        r'Falling back to stateful sampling for distribution #2.*of type.*'
-        r'StatefulNormal.*component name "loc" and `dist.name` "Normal"',
-        msg=w)
-
-  @test_util.jax_disable_test_missing_functionality('stateful samplers')
-  @test_util.numpy_disable_test_missing_functionality('stateful samplers')
-  def test_legacy_dists_stateless_seed_raises(self):
-
-    class StatefulNormal(tfd.Normal):
-
-      def _sample_n(self, n, seed=None):
-        return self.loc + self.scale * tf.random.normal(
-            tf.concat([[n], self.batch_shape_tensor()], axis=0),
-            seed=seed)
-
-    d = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-            StatefulNormal(loc=0, scale=2.),
-            tfd.Normal,  # Or, `lambda loc, scale: tfd.Normal(loc, scale)`.
-            lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12),
-        ],
-        validate_args=True)
-
-    with self.assertRaisesRegexp(TypeError, r'Expected int for argument'):
-      d.sample(seed=samplers.zeros_seed())
 
 
 if __name__ == '__main__':

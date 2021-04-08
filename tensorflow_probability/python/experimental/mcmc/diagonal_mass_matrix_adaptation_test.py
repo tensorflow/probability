@@ -203,9 +203,10 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
 
       # sample_distributions returns `[dists], [samples]`, so the 0th
       # distribution corresponds to the 0th, and only, state part
-      # The distribution is an Independent containing the distribution
-      # we want to query, which we access with .distribution
-      momentum_dist = dist.sample_distributions()[0][0].distribution
+      # The distribution is a BatchBroadcast containing a transformed
+      # distribution, so we need to use .distribution.distribution
+      batched_transformed_dist = dist.sample_distributions()[0][0]
+      momentum_dist = batched_transformed_dist.distribution.distribution
       final_precision_factor = tf.linalg.diag_part(
           momentum_dist.precision_factor)[-1]
       # Evaluate here so we can check the value twice later

@@ -386,6 +386,35 @@ class TransformedVariable(DeferredTensor):
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
   tfb = tfp.bijectors
+
+  positive_variable = tfp.util.TransformedVariable(1., bijector=tfb.Exp())
+
+  positive_variable
+  # ==> <TransformedVariable: dtype=float32, shape=[], fn=exp>
+
+  # Note that the initial value corresponds to the transformed output.
+  tf.convert_to_tensor(positive_variable)
+  # ==> 1.
+
+  positive_variable.pretransformed_input
+  # ==> <tf.Variable 'Variable:0' shape=() dtype=float32, numpy=0.0>
+
+  # Operators work with `TransformedVariable`.
+  positive_variable + 1.
+  # ==> 2.
+
+  # It is also possible to assign values to a TransformedVariable
+  with tf.control_dependencies([positive_variable.assign_add(2.)]):
+    positive_variable
+  # ==> 3.
+
+  A common use case for the `TransformedVariable` is to fit constrained
+  parameters. E.g.:
+
+  ```python
+  import tensorflow.compat.v2 as tf
+  import tensorflow_probability as tfp
+  tfb = tfp.bijectors
   tfd = tfp.distributions
 
   trainable_normal = tfd.Normal(
@@ -398,22 +427,11 @@ class TransformedVariable(DeferredTensor):
   trainable_normal.scale
   # ==> <TransformedVariable: dtype=float32, shape=[], fn=exp>
 
-  tf.convert_to_tensor(trainable_normal.scale)
-  # ==> 1.
-
-  # Operators work with `TransformedVariable`.
-  trainable_normal.scale + 1.
-  # ==> 2.
-
   with tf.GradientTape() as tape:
     negloglik = -trainable_normal.log_prob(0.5)
   g = tape.gradient(negloglik, trainable_normal.trainable_variables)
   # ==> (-0.5, 0.75)
-  ```
 
-  Which we could then fit as:
-
-  ```python
   opt = tf.optimizers.Adam(learning_rate=0.05)
   loss = tf.function(lambda: -trainable_normal.log_prob(0.5))
   for _ in range(int(1e3)):
@@ -424,19 +442,6 @@ class TransformedVariable(DeferredTensor):
   # ==> (approximately) 0.0075
   ```
 
-  It is also possible to assign values to a TransformedVariable, e.g.,
-
-  ```python
-  d = tfd.Normal(
-      loc=tf.Variable(0.),
-      scale=tfp.util.TransformedVariable([1., 2.], bijector=tfb.Softplus()))
-  d.stddev()
-  # ==> [1., 2.]
-  with tf.control_dependencies([x.scale.assign_add([0.5, 1.])]):
-    d.stddev()
-    # ==> [1.5, 3.]
-  ```
-
   """
 
   def __init__(self, initial_value, bijector, dtype=None, name=None, **kwargs):
@@ -444,8 +449,10 @@ class TransformedVariable(DeferredTensor):
 
     Args:
       initial_value: A `Tensor`, or Python object convertible to a `Tensor`,
-        which is the initial value for the Variable. Can also be a callable with
-        no argument that returns the initial value when called. Note: if
+        which is the initial value for the `TransformedVariable`. The underlying
+        untransformed `tf.Variable` will be initialized with
+        `bijector.inverse(initial_value)`. Can also be a callable with no
+        argument that returns the initial value when called. Note: if
         `initial_value` is a `TransformedVariable` then the instantiated object
         does not create a new `tf.Variable`, but rather points to the underlying
         `Variable` and chains the `bijector` arg with the underlying bijector as

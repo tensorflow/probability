@@ -211,7 +211,11 @@ class _BatchBroadcastTest(object):
     batch_shape = data.draw(tfp_hps.shapes())
     bcast_arg, dist_batch_shp = data.draw(
         tfp_hps.broadcasting_shapes(batch_shape, 2))
-    underlying = data.draw(tfd_hps.distributions(batch_shape=dist_batch_shp))
+    underlying = data.draw(
+        tfd_hps.distributions(
+            batch_shape=dist_batch_shp,
+            eligibility_filter=(
+                lambda name: name != 'BatchReshape')))  # b/183977243
     if not self.is_static_shape:
       bcast_arg = tf.Variable(bcast_arg)
       self.evaluate(bcast_arg.initializer)

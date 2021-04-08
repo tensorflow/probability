@@ -200,6 +200,8 @@ class Moyal(transformed_distribution.TransformedDistribution):
     """Distribution parameter for scale."""
     return self._moyal_bijector.scale
 
+  experimental_is_sharded = False
+
   def _entropy(self):
     # Use broadcasting rules to calculate the full broadcast sigma.
     scale = self.scale * tf.ones_like(self.loc)

@@ -38,7 +38,6 @@ from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensor
 
 
 __all__ = [
-    'dummy_seed',
     'JointDistribution',
 ]
 
@@ -46,87 +45,81 @@ __all__ = [
 JAX_MODE = False
 
 CALLING_CONVENTION_DESCRIPTION = """
-    The measure methods of `JointDistribution` (`log_prob`, `prob`, etc.)
-    can be called either by passing a single structure of tensors or by using
-    named args for each part of the joint distribution state. For example,
+The measure methods of `JointDistribution` (`log_prob`, `prob`, etc.)
+can be called either by passing a single structure of tensors or by using
+named args for each part of the joint distribution state. For example,
 
-    ```python
-    jd = tfd.JointDistributionSequential([
-        tfd.Normal(0., 1.),
-        lambda z: tfd.Normal(z, 1.)
-    ], validate_args=True)
-    jd.dtype
-    # ==> [tf.float32, tf.float32]
-    z, x = sample = jd.sample()
-    # The following calling styles are all permissable and produce the exactly
-    # the same output.
-    assert (jd.{method}(sample) ==
-            jd.{method}(value=sample) ==
-            jd.{method}(z, x) ==
-            jd.{method}(z=z, x=x) ==
-            jd.{method}(z, x=x))
+```python
+jd = tfd.JointDistributionSequential([
+    tfd.Normal(0., 1.),
+    lambda z: tfd.Normal(z, 1.)
+], validate_args=True)
+jd.dtype
+# ==> [tf.float32, tf.float32]
+z, x = sample = jd.sample()
+# The following calling styles are all permissable and produce the exactly
+# the same output.
+assert (jd.{method}(sample) ==
+        jd.{method}(value=sample) ==
+        jd.{method}(z, x) ==
+        jd.{method}(z=z, x=x) ==
+        jd.{method}(z, x=x))
 
-    # These calling possibilities also imply that one can also use `*`
-    # expansion, if `sample` is a sequence:
-    jd.{method}(*sample)
-    # and similarly, if `sample` is a map, one can use `**` expansion:
-    jd.{method}(**sample)
-    ```
+# These calling possibilities also imply that one can also use `*`
+# expansion, if `sample` is a sequence:
+jd.{method}(*sample)
+# and similarly, if `sample` is a map, one can use `**` expansion:
+jd.{method}(**sample)
+```
 
-    `JointDistribution` component distributions names are resolved via
-    `jd._flat_resolve_names()`, which is implemented by each `JointDistribution`
-    subclass (see subclass documentation for details). Generally, for components
-    where a name was provided---
-    either explicitly as the `name` argument to a distribution or as a key in a
-    dict-valued JointDistribution, or implicitly, e.g., by the argument name of
-    a `JointDistributionSequential` distribution-making function---the provided
-    name will be used. Otherwise the component will receive a dummy name; these
-    may change without warning and should not be relied upon.
+`JointDistribution` component distributions names are resolved via
+`jd._flat_resolve_names()`, which is implemented by each `JointDistribution`
+subclass (see subclass documentation for details). Generally, for components
+where a name was provided---
+either explicitly as the `name` argument to a distribution or as a key in a
+dict-valued JointDistribution, or implicitly, e.g., by the argument name of
+a `JointDistributionSequential` distribution-making function---the provided
+name will be used. Otherwise the component will receive a dummy name; these
+may change without warning and should not be relied upon.
 
-    Note: not all `JointDistribution` subclasses support all calling styles;
-    for example, `JointDistributionNamed` does not support positional arguments
-    (aka "unnamed arguments") unless the provided model specifies an ordering of
-    variables (i.e., is an `collections.OrderedDict` or `collections.namedtuple`
-    rather than a plain `dict`).
+Note: not all `JointDistribution` subclasses support all calling styles;
+for example, `JointDistributionNamed` does not support positional arguments
+(aka "unnamed arguments") unless the provided model specifies an ordering of
+variables (i.e., is an `collections.OrderedDict` or `collections.namedtuple`
+rather than a plain `dict`).
 
-    Note: care is taken to resolve any potential ambiguity---this is generally
-    possible by inspecting the structure of the provided argument and "aligning"
-    it to the joint distribution output structure (defined by `jd.dtype`). For
-    example,
+Note: care is taken to resolve any potential ambiguity---this is generally
+possible by inspecting the structure of the provided argument and "aligning"
+it to the joint distribution output structure (defined by `jd.dtype`). For
+example,
 
-    ```python
-    trivial_jd = tfd.JointDistributionSequential([tfd.Exponential(1.)])
-    trivial_jd.dtype  # => [tf.float32]
-    trivial_jd.{method}([4.])
-    # ==> Tensor with shape `[]`.
-    {method_abbr} = trivial_jd.{method}(4.)
-    # ==> Tensor with shape `[]`.
-    ```
+```python
+trivial_jd = tfd.JointDistributionSequential([tfd.Exponential(1.)])
+trivial_jd.dtype  # => [tf.float32]
+trivial_jd.{method}([4.])
+# ==> Tensor with shape `[]`.
+{method_abbr} = trivial_jd.{method}(4.)
+# ==> Tensor with shape `[]`.
+```
 
-    Notice that in the first call, `[4.]` is interpreted as a list of one
-    scalar while in the second call the input is a scalar. Hence both inputs
-    result in identical scalar outputs. If we wanted to pass an explicit
-    vector to the `Exponential` component---creating a vector-shaped batch
-    of `{method}`s---we could instead write
-    `trivial_jd.{method}(np.array([4]))`.
+Notice that in the first call, `[4.]` is interpreted as a list of one
+scalar while in the second call the input is a scalar. Hence both inputs
+result in identical scalar outputs. If we wanted to pass an explicit
+vector to the `Exponential` component---creating a vector-shaped batch
+of `{method}`s---we could instead write
+`trivial_jd.{method}(np.array([4]))`.
 
-    Args:
-      *args: Positional arguments: a `value` structure or component values
-        (see above).
-      **kwargs: Keyword arguments: a `value` structure or component values
-        (see above). May also include `name`, specifying a Python string name
-        for ops generated by this method.
-  """
+Args:
+  *args: Positional arguments: a `value` structure or component values
+    (see above).
+  **kwargs: Keyword arguments: a `value` structure or component values
+    (see above). May also include `name`, specifying a Python string name
+    for ops generated by this method.
+"""
 
 
 # Avoids name collision with measure function (`log_prob`, `prob`, etc.) args.
 FORBIDDEN_COMPONENT_NAMES = ('value', 'name')
-
-
-def dummy_seed():
-  """Returns a fixed constant seed, for cases needing samples without a seed."""
-  # TODO(b/147874898): After 20 Dec 2020, drop the 42 and inline the zeros_seed.
-  return samplers.zeros_seed() if JAX_MODE else 42
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -185,7 +178,7 @@ class JointDistribution(distribution_lib.Distribution):
         ds = candidate_dists
       else:
         ds = self._flat_sample_distributions(  # Constant seed for CSE.
-            seed=dummy_seed())[0]
+            seed=samplers.zeros_seed())[0]
       self._single_sample_distributions[graph_id] = ds
     return ds
 
@@ -227,6 +220,13 @@ class JointDistribution(distribution_lib.Distribution):
     """
     return self._model_unflatten([
         d.reparameterization_type
+        for d in self._get_single_sample_distributions()])
+
+  @property
+  def experimental_shard_axis_names(self):
+    """Indicates whether part distributions have active shard axis names."""
+    return self._model_unflatten([
+        d.experimental_shard_axis_names
         for d in self._get_single_sample_distributions()])
 
   @property
@@ -443,35 +443,44 @@ class JointDistribution(distribution_lib.Distribution):
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
     ds, xs = self._call_flat_sample_distributions(
-        value=value, seed=dummy_seed())
-    return (getattr(d, attr)(x) for d, x in zip(ds, xs))
+        value=value, seed=samplers.zeros_seed())
+
+    if not callable(attr):
+      attr_name = attr
+      attr = lambda d, x: getattr(d, attr_name)(x)
+
+    return (attr(d, x) for d, x in zip(ds, xs))
 
   def _map_attr_over_dists(self, attr, dists=None):
     dists = (self._get_single_sample_distributions()
              if dists is None else dists)
     return (getattr(d, attr)() for d in dists)
 
+  def _resolve_value_from_kwargs(self, **kwargs):
+    names = self._flat_resolve_names()
+    kwargs.update({k: kwargs.get(k, None) for k in names})  # In place update
+    value, unmatched_kwargs = _resolve_value_from_args(
+        [],
+        kwargs,
+        dtype=self.dtype,
+        flat_names=names,
+        model_flatten_fn=self._model_flatten,
+        model_unflatten_fn=self._model_unflatten)
+    if unmatched_kwargs:
+      join = lambda args: ', '.join(str(j) for j in args)
+      kwarg_names = join(k for k, v in kwargs.items() if v is not None)
+      dist_name_str = join(names)
+      unmatched_str = join(unmatched_kwargs)
+      raise ValueError(
+          'Found unexpected keyword arguments. Distribution names '
+          'are\n{}\nbut received\n{}\nThese names were '
+          'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
+    return value
+
   def _call_flat_sample_distributions(
       self, sample_shape=(), seed=None, value=None, **kwargs):
     if (value is None) and kwargs:
-      names = self._flat_resolve_names()
-      kwargs.update({k: kwargs.get(k) for k in names})  # In place update
-      value, unmatched_kwargs = _resolve_value_from_args(
-          [],
-          kwargs,
-          dtype=self.dtype,
-          flat_names=names,
-          model_flatten_fn=self._model_flatten,
-          model_unflatten_fn=self._model_unflatten)
-      if unmatched_kwargs:
-        join = lambda args: ', '.join(str(j) for j in args)
-        kwarg_names = join(k for k, v in kwargs.items() if v is not None)
-        dist_name_str = join(names)
-        unmatched_str = join(unmatched_kwargs)
-        raise ValueError(
-            'Found unexpected keyword arguments. Distribution names '
-            'are\n{}\nbut received\n{}\nThese names were '
-            'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
+      value = self._resolve_value_from_kwargs(**kwargs)
     if value is not None:
       value = self._model_flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
@@ -820,8 +829,8 @@ def _jd_log_prob_ratio(p, x, q, y, name=None):
   """Implements `log_prob_ratio` for tfd.JointDistribution*."""
   with tf.name_scope(name or 'jd_log_prob_ratio'):
     tf.nest.assert_same_structure(x, y)
-    ps, _ = p.sample_distributions(value=x, seed=dummy_seed())
-    qs, _ = q.sample_distributions(value=y, seed=dummy_seed())
+    ps, _ = p.sample_distributions(value=x, seed=samplers.zeros_seed())
+    qs, _ = q.sample_distributions(value=y, seed=samplers.zeros_seed())
     tf.nest.assert_same_structure(ps, qs)
     parts = []
     for p_, x_, q_, y_ in zip(ps, x, qs, y):

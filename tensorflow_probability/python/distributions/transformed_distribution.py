@@ -167,6 +167,8 @@ class TransformedDistribution(distribution_lib.Distribution):
       bijector=tfb.Shift(shift=mean)(tfb.ScaleMatvecTriL(scale_tril=chol_cov)))
   mvn2 = ds.MultivariateNormalTriL(loc=mean, scale_tril=chol_cov)
   # mvn1.log_prob(x) == mvn2.log_prob(x)
+  ```
+
   """
 
   def __init__(self,
@@ -235,6 +237,10 @@ class TransformedDistribution(distribution_lib.Distribution):
   def bijector(self):
     """Function transforming x => y."""
     return self._bijector
+
+  @property
+  def experimental_is_sharded(self):
+    raise NotImplementedError  # TODO(b/175084455): Handle bijector sharding.
 
   @property
   def _composite_tensor_nonshape_params(self):

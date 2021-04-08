@@ -18,7 +18,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
 import functools
+import threading
 
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -30,7 +32,25 @@ from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensor
 __all__ = [
     'auto_composite_tensor',
     'AutoCompositeTensor',
+    'is_deferred_assertion_context',
 ]
+
+_DEFERRED_ASSERTION_CONTEXT = threading.local()
+_DEFERRED_ASSERTION_CONTEXT.is_deferred = False
+
+
+def is_deferred_assertion_context():
+  return getattr(_DEFERRED_ASSERTION_CONTEXT, 'is_deferred', False)
+
+
+@contextlib.contextmanager
+def _deferred_assertion_context(is_deferred=True):
+  was_deferred = getattr(_DEFERRED_ASSERTION_CONTEXT, 'is_deferred', False)
+  _DEFERRED_ASSERTION_CONTEXT.is_deferred = is_deferred
+  try:
+    yield
+  finally:
+    _DEFERRED_ASSERTION_CONTEXT.is_deferred = was_deferred
 
 
 _registry = {}  # Mapping from (python pkg, class name) -> class.
@@ -43,30 +63,24 @@ _AUTO_COMPOSITE_TENSOR_VERSION = 2
 def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
                          prefer_static_value=()):
   """Extract constructor kwargs to reconstruct `obj`."""
-  argspec = tf_inspect.getfullargspec(obj.__init__)
-  if argspec.varargs or argspec.varkw:
+  sig = tf_inspect.signature(obj.__init__)
+  if any(v.kind in (tf_inspect.Parameter.VAR_KEYWORD,
+                    tf_inspect.Parameter.VAR_POSITIONAL)
+         for v in sig.parameters.values()):
     raise ValueError(
-        '*args and **kwargs are not supported. Found `{}`'.format(argspec))
+        '*args and **kwargs are not supported. Found `{}`'.format(sig))
 
-  params = argspec.args + argspec.kwonlyargs
-  keys = [p for p in params if p != 'self' and p not in omit_kwargs]
+  keys = [p for p in sig.parameters if p != 'self' and p not in omit_kwargs]
   if limit_to is not None:
     keys = [k for k in keys if k in limit_to]
 
   kwargs = {}
   not_found = object()
   for k in keys:
-
-    if k in prefer_static_value:
-      srcs = [
-          getattr(obj, 'parameters', {}).get(k, not_found),
-          getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
-      ]
-    else:
-      srcs = [
-          getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
-          getattr(obj, 'parameters', {}).get(k, not_found),
-      ]
+    srcs = [
+        getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
+        getattr(obj, 'parameters', {}).get(k, not_found),
+    ]
     if any(v is not not_found for v in srcs):
       kwargs[k] = [v for v in srcs if v is not not_found][0]
     else:
@@ -104,10 +118,10 @@ def _extract_type_spec_recursively(value):
     spec: the `TypeSpec` or collection of `TypeSpec`s corresponding to `value`
     or `value`, if no `Tensor`s are found.
   """
-  if tf.is_tensor(value):
-    return tf.TensorSpec.from_tensor(value)
   if isinstance(value, composite_tensor.CompositeTensor):
     return value._type_spec  # pylint: disable=protected-access
+  if tf.is_tensor(value):
+    return tf.TensorSpec(value.shape, value.dtype)
   if isinstance(value, (list, tuple)):
     specs = [_extract_type_spec_recursively(v) for v in value]
     has_tensors = any(a is not b for a, b in zip(value, specs))
@@ -162,7 +176,8 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
 
   def _from_components(self, components):
     kwargs = dict(self._non_tensor_params, **components)
-    return self.value_type(**kwargs)
+    with _deferred_assertion_context():
+      return self.value_type(**kwargs)
 
   @property
   def _component_specs(self):

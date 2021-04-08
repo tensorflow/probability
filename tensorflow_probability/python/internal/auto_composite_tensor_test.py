@@ -18,12 +18,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -40,6 +44,8 @@ AutoNormal = tfp.experimental.auto_composite_tensor(
     tfd.Normal, omit_kwargs=('name',))
 AutoIndependent = tfp.experimental.auto_composite_tensor(
     tfd.Independent, omit_kwargs=('name',))
+AutoReshape = tfp.experimental.auto_composite_tensor(
+    tfb.Reshape, omit_kwargs=('name',))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -51,20 +57,24 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
       def __init__(self, x, y, name=None):
         with tf.name_scope(name or 'Adder') as name:
-          self._x = tf.convert_to_tensor(x)
-          self._y = tf.convert_to_tensor(y)
+          self._x = tensor_util.convert_nonref_to_tensor(x)
+          self._y = tensor_util.convert_nonref_to_tensor(y)
           self._name = name
 
       def xpy(self):
         return self._x + self._y
 
+    x = 1.
+    y = tf.Variable(1.)
+    self.evaluate(y.initializer)
+
     def body(obj):
-      return Adder(obj.xpy(), 1.),
+      return Adder(obj.xpy(), y),
 
     result, = tf.while_loop(
         cond=lambda _: True,
         body=body,
-        loop_vars=(Adder(1., 1.),),
+        loop_vars=(Adder(x, y),),
         maximum_iterations=3)
     self.assertAllClose(5., result.xpy())
 
@@ -96,6 +106,15 @@ class AutoCompositeTensorTest(test_util.TestCase):
         (lp, dist),
         maximum_iterations=2)
     self.evaluate(lp)
+
+  def test_prefer_static_shape_params(self):
+    @tf.function
+    def f(b):
+      return b
+    b = AutoReshape(
+        event_shape_out=[2, 3],
+        event_shape_in=[tf.reduce_prod([2, 3])])  # Tensor in a list.
+    f(b)
 
   def test_nested(self):
     lop = AutoBlockDiag([AutoDiag(tf.ones([2]) * 2), AutoIdentity(1)])
@@ -176,6 +195,43 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
     t2 = ts._from_components(components)
     self.assertIsInstance(t2, ThingWithParametersButNoAttrs)
+
+  def test_wrapped_constructor(self):
+    def add_tag(f):
+      @functools.wraps(f)
+      def wrapper(*args, **kwargs):
+        args[0]._tag = 'tagged'
+        return f(*args, **kwargs)
+      return wrapper
+
+    @tfp.experimental.auto_composite_tensor
+    class ThingWithWrappedInit(tfp.experimental.AutoCompositeTensor):
+
+      @add_tag
+      def __init__(self, value):
+        self.value = tf.convert_to_tensor(value)
+
+    init = ThingWithWrappedInit(3)
+    def body(obj):
+      return ThingWithWrappedInit(value=obj.value + 1),
+
+    out, = tf.while_loop(
+        cond=lambda *_: True,
+        body=body,
+        loop_vars=(init,),
+        maximum_iterations=3)
+    self.assertEqual(self.evaluate(out.value), 6)
+
+  def test_deferred_assertion_context(self):
+    # If `validate_args` assertions in `__init__` are not deferred, a graph
+    # cycle is created when `d._type_spec` calls `__init__` and this test fails.
+    d = AutoNormal(0., 1., validate_args=True)
+
+    @tf.function
+    def f(d):
+      return d
+
+    f(d)
 
 
 if __name__ == '__main__':
