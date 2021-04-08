@@ -583,6 +583,12 @@ class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase):
     self.assertAlmostEqual(
         self.evaluate(tf_dist.variance()), sp_dist.var(), places=3)
 
+  def testQuantile(self, loc, scale, low, high):
+    tf_dist, sp_dist = self.constructDists(loc, scale, low, high)
+    for q in [0.01, 0.1, 0.5, 0.9, 0.99]:
+        self.assertAlmostEqual(
+            self.evaluate(tf_dist.quantile(value=q)), sp_dist.ppf(q=q), places=3)
+
 
 if __name__ == '__main__':
   tf.test.main()

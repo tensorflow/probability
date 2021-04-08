@@ -420,6 +420,19 @@ class TruncatedNormal(distribution.Distribution):
     bc_loc = tf.broadcast_to(loc, shp)
     return tf.clip_by_value(bc_loc, low, high)
 
+  def _quantile(self, p):
+    # TODO: This implementation is analytically correct, but might not
+    #  perform well in all cases. See
+    #  https://en.wikipedia.org/wiki/Truncated_normal_distribution#Generating_values_from_the_truncated_normal_distribution
+    #  for a discussion on alternatives.
+    loc, scale, low, high = self._loc_scale_low_high()
+    alpha = (low - loc) / scale
+    beta = (high - loc) / scale
+    quantile = tf.math.ndtri(
+      special_math.ndtr(alpha) + p * (special_math.ndtr(beta) - special_math.ndtr(alpha))
+    ) * scale + loc
+    return quantile
+
   def _variance(self):
     loc, scale, low, high = self._loc_scale_low_high()
     std_low, std_high = self._standardized_low_and_high(
