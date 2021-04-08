@@ -110,6 +110,13 @@ class ReplicaExchangeMCKernelResults(
             # Count of how many steps have been taken. May be used to determine
             # swaps.
             'step_count',
+
+            # The tempered part of the (possibly unnormalized) log prob,
+            # evaluated at each replica sample.
+            # If the kth replica has density
+            #   p_k(x) = exp(-beta_k * U(x)) * f_k(x),
+            # this is U(x), for every replica's `x`. Shape is [num_replica, ...]
+            'potential_energy',
         ])):
   """Internal state and diagnostics for Replica Exchange MC."""
   __slots__ = ()
@@ -674,7 +681,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       if self.tempered_log_prob_fn is None:
         # Efficient way of re-evaluating target_log_prob_fn on the
         # pre_swap_replica_states.
-        untempered_energy_ignoring_ulp = (
+        untempered_negative_energy_ignoring_ulp = (
             # Since untempered_log_prob_fn is None, we may assume
             # inverse_temperatures > 0 (else the target is improper).
             pre_swap_replica_target_log_prob / inverse_temperatures)
@@ -686,7 +693,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
         # a 1 <--> 2 swap is...
         #   (p_1(x_2) p_2(x_1)) / (p_1(x_1) p_2(x_2))
         # which depends only on f(x), since terms involving g(x) cancel.
-        untempered_energy_ignoring_ulp = self.tempered_log_prob_fn(
+        untempered_negative_energy_ignoring_ulp = self.tempered_log_prob_fn(
             *pre_swap_replica_states)
 
       # Since `swaps` is its own inverse permutation we automatically know the
@@ -703,9 +710,9 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
       # untempered_pre_swap_replica_target_log_prob, and hence does not factor
       # into energy_diff. Why? Because, it cancels out in the acceptance ratio.
       energy_diff = (
-          untempered_energy_ignoring_ulp -
+          untempered_negative_energy_ignoring_ulp -
           mcmc_util.index_remapping_gather(
-              untempered_energy_ignoring_ulp,
+              untempered_negative_energy_ignoring_ulp,
               swaps, name='gather_swap_tlp'))
       swapped_inverse_temperatures = mcmc_util.index_remapping_gather(
           inverse_temperatures, swaps, name='gather_swap_temps')
@@ -789,6 +796,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           swaps=swaps,
           step_count=previous_kernel_results.step_count + 1,
           seed=seed,
+          potential_energy=-untempered_negative_energy_ignoring_ulp,
       )
 
       return states, post_swap_kernel_results
@@ -892,6 +900,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           swaps=swaps,
           step_count=tf.zeros(shape=(), dtype=tf.int32),
           seed=samplers.zeros_seed(),
+          potential_energy=tf.zeros_like(pre_swap_replica_target_log_prob),
       )
 
 
@@ -943,6 +952,7 @@ def _maybe_embed_inverse_temperature_validation(
     using_untempered_log_prob,
 ):
   """Return `inverse_temperatures`, possibly with embedded asserts."""
+
   if not validate_args:
     return inverse_temperatures
 
