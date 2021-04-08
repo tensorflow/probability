@@ -23,10 +23,9 @@ def _activation_log_det_jacobian(x, residual_fraction, activation):
     else:
         return tf.reduce_sum(tf.math.log(residual_fraction + (1 - residual_fraction) * _dx(x, activation)), -1)
 
+
 @test_util.test_all_tf_execution_regimes
 class HighwayFlowTests(test_util.TestCase):
-
-
 
     def testBijector(self):
         width = 2
@@ -88,6 +87,40 @@ class HighwayFlowTests(test_util.TestCase):
                 expected_forward_log_det_jacobian,
                 bijector.forward_log_det_jacobian(x, event_ndims=1),
             )
+
+
+    def testResidualFractionGradientsWithCenteredDifference(self):
+        width = 4
+        batch_size = 3
+        dtype = tf.float32
+        residual_fraction = tf.Variable(0.5)
+        bijector = tfp.experimental.bijectors.HighwayFlow(
+            width=width,
+            residual_fraction=residual_fraction,
+            activation_fn=tf.nn.softplus,
+            bias=tf.Variable(0., dtype=dtype),
+            upper_diagonal_weights_matrix=tf.Variable(tf.eye(width)),
+            lower_diagonal_weights_matrix=tf.Variable(tf.eye(width))
+        )
+        target = tfd.MultivariateNormalDiag(loc=tf.zeros(width), scale_diag=tf.ones(width))
+        x = tf.ones((batch_size, width))
+        with tf.GradientTape() as g:
+            g.watch(bijector.residual_fraction)
+            y = tf.reduce_mean(target.log_prob(bijector.forward(x)))
+        tf_grad = g.gradient(y, bijector.residual_fraction)
+
+        h = 1e-4
+        eps = 1e-6
+
+        bijector.residual_fraction = residual_fraction + h
+        y1 = tf.reduce_mean(target.log_prob(bijector.forward(x)))
+        bijector.residual_fraction = residual_fraction - h
+        y2 = tf.reduce_mean(target.log_prob(bijector.forward(x)))
+
+        manual_grad = (y1 - y2) / (2 * h)
+
+        diff = tf.math.abs(tf_grad - manual_grad) / tf.reduce_max((eps, tf.math.abs(tf_grad) + tf.math.abs(manual_grad)))
+        self.assertGreater(1e-4, diff)
 
 
 if __name__ == '__main__':
