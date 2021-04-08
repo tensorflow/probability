@@ -40,6 +40,42 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
 
 
 class HighwayFlow(tfb.Bijector):
+    """Implements an Highway Flow bijector [1], which interpolates the input X with the transformations at each step of the bjiector.
+    The Highway Flow can be used as building block for a Cascading flow [1] or as a generic normalizig flow.
+
+    The transoformation consists in a convex update between the input X and a linear transformation of X
+    with the form g(AX+b), where g is a differentiable non-decreasing activation function, and A and b are trainable.
+
+    The convex update is regulated by a trainable residual fraction 'l' constrained between 0 and 1, and can be formalized as:
+    Y = l*X + (1-l) * g(AX + b).
+
+    To make this transformation invertible, the bijector is split in three convex updates:
+     - Y1 = l*X + (1-l) * LX, with L lower diagonal matrix with ones on the diagonal;
+     - Y2 = l*Y1 + (1-l) * UY1 + b, with U upper diagonal matrix with positive diagonal;
+     - Y = l*Y2 + (1-l) * g(Y2)
+
+    The function build_highway_flow_layer helps initializing the bijector with the variables respecting the various constraints.
+
+    Args:
+        width: needs to be equal to the size of the matrices U, L and of the bias vector
+        bias: bias parameter
+        residual_fraction: variable used for the convex update, must be between 0 and 1
+        activation_fn: not used yet
+        bias: bias vector
+        upper_diagonal_weights_matrix: Lower diagional matrix of size (width, width) with positive diagonal (is transposed to Upper diagonal within the bijector)
+        lower_diagonal_weights_matrix: Lower diagonal matrix with ones on the main diagional.
+
+    For more details on Highway Flow and Cascading Flows see [1].
+
+    #### Usage example:
+    ```python
+
+    ```
+
+    #### References
+
+    [1]: ADD REFERENCE
+    """
     # todo: update comments?
     # HighWay Flow simultaneously computes `forward` and `fldj` (and `inverse`/`ildj`),
     # so we override the bijector cache to update the LDJ entries of attrs on
