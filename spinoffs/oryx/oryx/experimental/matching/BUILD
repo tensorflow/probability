@@ -26,6 +26,7 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
+        ":jax_rewrite",
         ":matcher",
         ":rules",
     ],
@@ -47,6 +48,21 @@ py_library(
     srcs = ["rules.py"],
     srcs_version = "PY3",
     deps = [":matcher"],
+)
+
+# pytype_strict
+py_library(
+    name = "jax_rewrite",
+    srcs = ["jax_rewrite.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":matcher",
+        ":rules",
+        # dataclasses dep,
+        # jax dep,
+        # numpy dep,
+        "//oryx/core:trace_util",
+    ],
 )
 
 # py_strict
@@ -72,6 +88,22 @@ py_test(
         ":matcher",
         ":rules",
         # absl/testing:absltest dep,
+        "//oryx/internal:test_util",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "jax_rewrite_test",
+    srcs = ["jax_rewrite_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":jax_rewrite",
+        ":matcher",
+        ":rules",
+        # absl/testing:absltest dep,
+        # jax dep,
         "//oryx/internal:test_util",
     ],
 )
