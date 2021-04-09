@@ -25,12 +25,14 @@ import warnings
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multivariate_student_t
 from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -346,6 +348,17 @@ class StudentTProcess(distribution.Distribution):
             allow_nan_stats=allow_nan_stats,
             parameters=parameters,
             name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        df=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        kernel=parameter_properties.BatchedComponentProperties())
 
   def _is_univariate_marginal(self, index_points):
     """True if the given index_points would yield a univariate marginal.

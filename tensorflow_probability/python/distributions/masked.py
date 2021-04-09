@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -223,6 +224,13 @@ class Masked(distribution_lib.Distribution):
     # TODO(b/181859872): This could be implemented with some effort, possibly by
     #     reusing parts of internal/slicing.py
     raise NotImplementedError
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties(),
+        validity_mask=parameter_properties.ParameterProperties(
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED))
 
   @property
   def distribution(self):

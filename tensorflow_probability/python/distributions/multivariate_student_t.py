@@ -24,12 +24,14 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import chi2 as chi2_lib
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -213,6 +215,20 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
       The `df` `Tensor`.
     """
     return self._df
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # Subclasses must implement their own `_parameter_properties`. If they
+    # don't, call the base Distribution version to raise a NotImplementedError.
+    if cls is MultivariateStudentTLinearOperator:
+      return dict(
+          df=parameter_properties.ParameterProperties(
+              default_constraining_bijector_fn=(
+                  lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))
+              ),
+          loc=parameter_properties.ParameterProperties(event_ndims=1),
+          scale=parameter_properties.BatchedComponentProperties())
+    return distribution.Distribution._parameter_properties(dtype=dtype)  # pylint: disable=protected-access
 
   def _batch_shape_tensor(self):
     shape_list = [

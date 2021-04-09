@@ -17,8 +17,9 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-
 # Dependency imports
+
+from absl.testing import parameterized
 
 import numpy as np
 import tensorflow.compat.v1 as tf1
@@ -769,6 +770,54 @@ class ConditionalDistributionTest(test_util.TestCase):
     method = getattr(dist, 'stddev')
     with self.assertRaisesRegexp(ValueError, 'b1.*b2'):
       method(arg1='b1', arg2='b2')
+
+
+@tf_test_util.run_all_in_graph_and_eager_modes
+class BatchShapeInferenceTests(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': '_trivial',
+       'value_fn': lambda: tfd.Normal(loc=0., scale=1.),
+       'expected_batch_shape': []},
+      {'testcase_name': '_simple_tensor_broadcasting',
+       'value_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+           loc=[0., 0.], scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
+       'expected_batch_shape': [2]},
+      {'testcase_name': '_rank_deficient_tensor_broadcasting',
+       'value_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+           loc=0., scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
+       'expected_batch_shape': [2]},
+      {'testcase_name': '_mixture_same_family',
+       'value_fn': lambda: tfd.MixtureSameFamily(  # pylint: disable=g-long-lambda
+           mixture_distribution=tfd.Categorical(
+               logits=[[[1., 2., 3.],
+                        [4., 5., 6.]]]),
+           components_distribution=tfd.Normal(loc=0.,
+                                              scale=[[[1., 2., 3.],
+                                                      [4., 5., 6.]]])),
+       'expected_batch_shape': [1, 2]},
+      {'testcase_name': '_deeply_nested',
+       'value_fn': lambda: tfd.Independent(  # pylint: disable=g-long-lambda
+           tfd.Independent(
+               tfd.Independent(
+                   tfd.Independent(
+                       tfd.Normal(loc=0., scale=[[[[[[[[1.]]]]]]]]),
+                       reinterpreted_batch_ndims=2),
+                   reinterpreted_batch_ndims=0),
+               reinterpreted_batch_ndims=1),
+           reinterpreted_batch_ndims=1),
+       'expected_batch_shape': [1, 1, 1, 1]})
+  def test_batch_shape_inference_is_correct(
+      self, value_fn, expected_batch_shape):
+    value = value_fn()  # Defer construction until we're in the right graph.
+    self.assertAllEqual(
+        expected_batch_shape,
+        value._inferred_batch_shape_tensor())
+
+    batch_shape = value._inferred_batch_shape()
+    self.assertIsInstance(batch_shape, tf.TensorShape)
+    self.assertTrue(
+        batch_shape.is_compatible_with(expected_batch_shape))
 
 
 if __name__ == '__main__':

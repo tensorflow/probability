@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -281,6 +282,11 @@ class QuantizedDistribution(distributions.Distribution):
   def high(self):
     """Highest value that quantization returns."""
     return self._high
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties())
 
   def _batch_shape_tensor(self):
     return self.distribution.batch_shape_tensor()
