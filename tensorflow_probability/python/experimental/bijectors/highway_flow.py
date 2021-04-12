@@ -131,7 +131,8 @@ class HighwayFlow(tfb.Bijector):
             self._width = tf.shape(bias)[-1]
             self._bias = bias
             self._residual_fraction = residual_fraction
-            # still lower triangular, transpose is done in matvec.
+            # The upper matrix is still lower triangular, transpose is done in
+            # _inverse and _forwars metowds, within matvec.
             self._upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
             self._lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
             self._activation_fn = activation_fn
@@ -175,7 +176,7 @@ class HighwayFlow(tfb.Bijector):
                 1. - self.residual_fraction) * weights_matrix
 
     def _inverse_of_sigmoid(self, y, N=20):
-        # inverse with Newton iteration
+        # Inverse of the activation layer with softplus using Newton iteration.
         x = tf.ones(y.shape)
         for _ in range(N):
             x = x - (self.residual_fraction * x + (
@@ -185,14 +186,12 @@ class HighwayFlow(tfb.Bijector):
         return x
 
     def _augmented_forward(self, x):
-        # upper matrix jacobian
+        # Log determinant term from the upper matrix. Note that the log determinant
+        # of the lower matrix is zero.
         fldj = tf.zeros(x.shape[:-1]) + tf.reduce_sum(
             tf.math.log(self.residual_fraction + (
                     1. - self.residual_fraction) * tf.linalg.diag_part(
                 self.upper_diagonal_weights_matrix)))
-        # jacobian from lower matrix is 0
-
-        # todo: see how to optimize _convex_update
         x = tf.linalg.matvec(
             self._convex_update(self.lower_diagonal_weights_matrix), x)
         x = tf.linalg.matvec(tf.transpose(
