@@ -43,7 +43,6 @@ class HighwayFlowTests(test_util.TestCase):
                                 -bijector.inverse_log_det_jacobian(tf.identity(bijector.forward(x)), event_ndims=dim+1))
 
     def testJacobianWithActivation(self):
-        #activations = ['sigmoid', 'softplus', 'tanh', 'none']
         activations = ['softplus']
         batch_size = 3
         width = 4

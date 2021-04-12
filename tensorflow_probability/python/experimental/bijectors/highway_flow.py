@@ -175,10 +175,6 @@ class HighwayFlow(tfb.Bijector):
         if self.activation_fn:
             fldj += tf.reduce_sum(tf.math.log(self.df(x)), -1)
             x = self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x)
-            '''activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
-                lambda x: self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x))
-            fldj += activation_layer.forward_log_det_jacobian(x, self.forward_min_event_ndims)
-            x = activation_layer.forward(x)'''
         return x, {'ildj': -fldj, 'fldj': fldj}
 
     def _augmented_inverse(self, y):
@@ -188,13 +184,7 @@ class HighwayFlow(tfb.Bijector):
         if self.activation_fn:
             y = self.inv_f(y)
             ildj -= tf.reduce_sum(tf.math.log(self.df(y)), -1)
-            # residual_fraction = tf.identity(self.residual_fraction)
-            '''activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
-                lambda x: residual_fraction * x + (1. - residual_fraction) * self.activation_fn(x))
-            ildj += activation_layer.inverse_log_det_jacobian(y, self.forward_min_event_ndims)
-            y = activation_layer.inverse(y)'''
 
-        # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
         y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
                                        tf.linalg.matrix_transpose(y - (1 - self.residual_fraction) * self.bias),
                                        lower=False)
