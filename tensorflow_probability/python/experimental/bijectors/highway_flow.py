@@ -105,19 +105,43 @@ class HighwayFlow(tfb.Bijector):
         '''
         parameters = dict(locals())
         with tf.name_scope(name) as name:
-            self.width = width
-            self.bias = bias
-            self.residual_fraction = residual_fraction
+            self._width = width
+            self._bias = bias
+            self._residual_fraction = residual_fraction
             # still lower triangular, transpose is done in matvec.
-            self.upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
-            self.lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
-            self.activation_fn = activation_fn
+            self._upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
+            self._lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
+            self._activation_fn = activation_fn
 
             super(HighwayFlow, self).__init__(
                 validate_args=validate_args,
                 forward_min_event_ndims=1,
                 parameters=parameters,
                 name=name)
+
+    @property
+    def bias(self):
+        return self._bias
+
+    @property
+    def width(self):
+        return self._width
+
+    @property
+    def residual_fraction(self):
+        return self._residual_fraction
+
+    @property
+    def upper_diagonal_weights_matrix(self):
+        return self._upper_diagonal_weights_matrix
+
+    @property
+    def lower_diagonal_weights_matrix(self):
+        return self._lower_diagonal_weights_matrix
+
+    @property
+    def activation_fn(self):
+        return self._activation_fn
 
     def df(self, x):
         # derivative of activation
