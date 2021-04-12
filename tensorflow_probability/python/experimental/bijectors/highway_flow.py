@@ -1,3 +1,5 @@
+"""Highway Flow bijector."""
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
@@ -51,32 +53,30 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5,
 
 class HighwayFlow(tfb.Bijector):
     """Implements an Highway Flow bijector [1], which interpolates the input
-    X with the transformations at each step
-    of the bjiector.
+    `X` with the transformations at each step of the bjiector.
     The Highway Flow can be used as building block for a Cascading flow [1]
-    or as a generic normalizig flow.
+    or as a generic normalizing flow.
 
-    The transoformation consists in a convex update between the input X and a
-    linear transformation of X with the form g(AX+b), where g is a
-    differentiable non-decreasing activation function, and A and b are
-    trainable.
+    The transformation consists in a convex update between the input `X` and a
+    linear transformation of `X` followed by activation with the form `g(A @
+    X + b)`, where `g(.)` is a differentiable non-decreasing activation
+    function, and `A` and `b` are trainable weights.
 
-    The convex update is regulated by a trainable residual fraction 'l'
+    The convex update is regulated by a trainable residual fraction `l`
     constrained between 0 and 1, and can be
     formalized as:
-    Y = l*X + (1-l) * g(AX + b).
+    `Y = l * X + (1 - l) * g(A @ X + b)`.
 
     To make this transformation invertible, the bijector is split in three
     convex updates:
-     - Y1 = l*X + (1-l) * LX, with L lower diagonal matrix with ones on the
-     diagonal;
-     - Y2 = l*Y1 + (1-l) * UY1 + b, with U upper diagonal matrix with
-     positive diagonal;
-     - Y = l*Y2 + (1-l) * g(Y2)
+     - `Y1 = l * X + (1 - l) * L @ X`, with `L` lower diagonal matrix with ones
+     on the diagonal;
+     - `Y2 = l * Y1 + (1 - l) * (U @ Y1 + b)`, with `U` upper diagonal matrix
+     with positive diagonal;
+     - `Y = l * Y2 + (1 - l) * g(Y2)`
 
-    The function build_highway_flow_layer helps initializing the bijector
-    with the variables respecting the various
-    constraints.
+    The function `build_highway_flow_layer` helps initializing the bijector
+    with the variables respecting the various constraints.
 
     For more details on Highway Flow and Cascading Flows see [1].
 
