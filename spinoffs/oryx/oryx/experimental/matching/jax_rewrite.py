@@ -130,19 +130,80 @@ evaluate(expr, {'a': 0.}) # ==> 1.
 * `BoundExpression` - used to pre-bind some names to values in an expression
   so the names don't have to be bound when calling `evaluate`. For example, this
   is used to encapsulate a JAXpr and any constant values in it.
+
+# Rewriting JAX expressions
+
+Now that we have a set of baseline JAX expressions, we can write patterns using
+`matcher` and rewrite rules using `rules`.
+
+Let's say we want to turn all calls to `exp` into calls to `log`. We first
+will write some convenience functions for constructing patterns and rules.
+
+```python
+Exp = lambda x: Primitive(lax.exp_p, (x,), Params())
+Log = lambda x: Primitive(lax.log_p, (x,), Params())
+```
+
+We can then write our pattern and accompanying rule.
+```python
+exp_pattern = Exp(matcher.Var('x'))
+exp_to_log_rule = rules.make_rule(exp_pattern, lambda x: Log(x))
+```
+
+We can now rewrite an example expression.
+```python
+expr = Exp(Literal(5.))
+new_expr = exp_to_log_rule(expr)
+assert new_expr == Log(Literal(5.))
+```
+
+All of the useful machinery in `matcher` and `rules` work with `JaxExpression`s,
+so we can make complex rewrite rules without too much work. For example, we can
+use `matcher.Segment`s to obtain all of the operands of an expression.
+```python
+Add = lambda *args: Primitive(lax.add_p, args, Params())
+Sub = lambda *args: Primitive(lax.sub_p, args, Params())
+
+add_pattern = Add(matcher.Segment('args'))
+add_to_sub_rule = rules.make_rule(add_pattern, lambda args: Sub(*args))
+```
+
+# Rewriting JAX functions
+
+We provide a JAX function transformation `rewrite` that when provided a set of
+rewrite rules will transform an input function by first converting it into an
+expression, applying the rules to rewrite the expression, then evaluating the
+rewritten expression with the function's inputs.
+
+Example:
+```python
+Exp = lambda x: Primitive(lax.exp_p, (x,), Params())
+Log = lambda x: Primitive(lax.log_p, (x,), Params())
+
+exp_pattern = Exp(matcher.Var('x'))
+exp_to_log_rule = rules.term_rewriter(
+    rules.make_rule(exp_pattern, lambda x: Log(x)))
+
+def f(x):
+  return jnp.exp(x) + 1.
+new_f = rewrite(f, exp_to_log_rule)
+f(1.) # ==> 1. (i.e. log(1.) + 1.)
+```
 """
 import functools
 
-from typing import Any, Dict, Iterator, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, Sequence, Tuple, Union
 
 import dataclasses
 import jax
 from jax import core as jax_core
 from jax import linear_util as lu
+from jax import tree_util
 from jax import util as jax_util
 import jax.numpy as jnp
 import numpy as np
 
+from oryx.core import trace_util
 from oryx.experimental.matching import matcher
 from oryx.experimental.matching import rules
 
@@ -618,3 +679,107 @@ class CallPrimitive(JaxExpression):
   def __hash__(self):
     return hash((self.primitive, self.operands, self.expression, self.params,
                  self.variable_names))
+
+
+custom_expressions = {}
+
+
+def primitive_to_expression(
+    prim: jax_core.Primitive) -> Callable[[Tuple[Any], Params], Primitive]:
+  """Converts a JAX primitive into a `Primitive` expression.
+
+  Args:
+    prim: A `jax.core.Primitive` to be converted into an expression.
+  Returns:
+    A function that returns an expression when provided operands and parameters.
+  """
+
+  def default_expression(operands, params):
+    return Primitive(prim, operands, params)
+
+  return custom_expressions.get(prim, default_expression)
+
+
+def jaxpr_to_expressions(jaxpr: jax_core.Jaxpr) -> Tuple[Expr]:
+  """Converts a JAXpr into a tuple of output `JaxExpression`s.
+
+  Args:
+    jaxpr: a `jax.core.Jaxpr` to be converted into a tuple of `JaxExpression`s.
+  Returns:
+    A tuple of `JaxExpression`s.
+  """
+  env = {}
+
+  def read_env(var: jax_core.Var) -> Any:
+    if isinstance(var, jax_core.Literal):
+      return Literal(var.val)
+    return env[str(var)]
+
+  def write_env(var: jax_core.Var, val: Any) -> None:
+    if isinstance(var, jax_core.Literal):
+      return
+    env[str(var)] = val
+
+  const_patterns = jax_util.safe_map(
+      lambda var: JaxVar(str(var), var.aval.shape, var.aval.dtype),
+      jaxpr.constvars)
+  jax_util.safe_map(write_env, jaxpr.constvars, const_patterns)
+
+  in_patterns = jax_util.safe_map(
+      lambda var: JaxVar(str(var), var.aval.shape, var.aval.dtype),
+      jaxpr.invars)
+  jax_util.safe_map(write_env, jaxpr.invars, in_patterns)
+  for eqn in jaxpr.eqns:
+    operands = tuple(jax_util.safe_map(read_env, eqn.invars))
+
+    call_jaxpr, params = jax_core.extract_call_jaxpr(eqn.primitive, eqn.params)
+    if call_jaxpr:
+      call_expression = BoundExpression(jaxpr_to_expressions(call_jaxpr), {})
+      variable_names = tuple(map(str, call_jaxpr.invars))
+      out = CallPrimitive(eqn.primitive, operands, call_expression,
+                          Params(params), variable_names)
+    else:
+      out = primitive_to_expression(eqn.primitive)(operands, Params(params))
+    if eqn.primitive.multiple_results:
+      out_parts = [Part(out, i) for i in range(len(eqn.outvars))]
+      jax_util.safe_map(write_env, eqn.outvars, out_parts)
+    else:
+      write_env(eqn.outvars[0], out)
+  return tuple(jax_util.safe_map(read_env, jaxpr.outvars))
+
+
+def make_bound_expression(f: Callable[..., Any]) -> Callable[..., Any]:
+  """Returns a function that traces a function to produce an expression."""
+
+  def wrapped(*args, **kwargs):
+    closed_jaxpr, (in_tree, out_tree) = trace_util.stage(
+        f, dynamic=False)(*args, **kwargs)
+    jaxpr, consts = closed_jaxpr.jaxpr, closed_jaxpr.literals
+    expressions = jaxpr_to_expressions(jaxpr)
+    return (BoundExpression(expressions,
+                            dict(zip(map(str, jaxpr.constvars), consts))),
+            tuple(map(str, jaxpr.invars)), (in_tree, out_tree))
+
+  return wrapped
+
+
+def rewrite(f: Callable[..., Any], rule: rules.Rule) -> Callable[..., Any]:
+  """Rewrites a JAX function according to a rewrite rule.
+
+  Args:
+    f: A function to be transformed.
+    rule: A function that transforms a `rules.Expression` into another.
+  Returns:
+    A function that when called with the original arguments to `f` executes the
+    body of `f` rewritten according to the provided `rule`.
+  """
+
+  def wrapped(*args, **kwargs):
+    bound_expression, names, (_, out_tree) = make_bound_expression(f)(*args,
+                                                                      **kwargs)
+    rewritten = rule(bound_expression)
+    flat_args = tree_util.tree_leaves(args)
+    bindings = dict(jax_util.safe_zip(names, flat_args))
+    return tree_util.tree_unflatten(out_tree, evaluate(rewritten, bindings))
+
+  return wrapped

@@ -21,10 +21,13 @@ from jax import lax
 import jax.numpy as jnp
 
 from oryx.experimental.matching import jax_rewrite as jr
+from oryx.experimental.matching import matcher
+from oryx.experimental.matching import rules
 from oryx.internal import test_util
 
 
 Exp = lambda x: jr.Primitive(lax.exp_p, (x,), jr.Params())
+Log = lambda x: jr.Primitive(lax.log_p, (x,), jr.Params())
 
 
 class JaxExpressionTest(test_util.TestCase):
@@ -100,6 +103,108 @@ class JaxExpressionTest(test_util.TestCase):
     self.assertEqual(p1_expr.dtype, jnp.int32)
     self.assertEqual(jr.evaluate(p0_expr, {}), 0.)
     self.assertEqual(jr.evaluate(p1_expr, {}), 1)
+
+
+class MatchingTest(test_util.TestCase):
+
+  def test_can_match_input_to_primitive(self):
+    pattern = Exp(matcher.Var('x'))
+    expr = Exp(Exp(jr.Literal(0.)))
+    self.assertListEqual(
+        list(matcher.match_all(pattern, expr)), [dict(x=Exp(jr.Literal(0.)))])
+
+  def test_can_match_primitive_inside_of_pattern(self):
+    pattern = jr.Primitive(
+        matcher.Var('prim'), (matcher.Segment('args'),), matcher.Var('params'))
+    expr = Exp(jr.Literal(1.))
+    self.assertDictEqual(
+        matcher.match(pattern, expr),
+        dict(prim=lax.exp_p, args=(jr.Literal(1.),), params=jr.Params()))
+
+  def test_can_match_value_inside_params(self):
+    pattern = jr.Primitive(matcher.Dot, (matcher.Segment(name=None),),
+                           jr.Params({'foo': matcher.Var('foo')}))
+    expr = jr.Primitive(lax.iota_p, (), jr.Params(foo='bar'))
+    self.assertDictEqual(matcher.match(pattern, expr), dict(foo='bar'))
+
+  def test_can_match_literal_value(self):
+    pattern = jr.Literal(matcher.Var('x'))
+    expr = jr.Literal(0.)
+    self.assertDictEqual(matcher.match(pattern, expr), dict(x=0.))
+
+  def test_can_match_jax_var_name_shape_and_dtype(self):
+    pattern = jr.JaxVar(
+        matcher.Var('name'), matcher.Var('shape'), matcher.Var('dtype'))
+    expr = jr.JaxVar('a', (1, 2, 3), jnp.int32)
+    self.assertDictEqual(
+        matcher.match(pattern, expr),
+        dict(name='a', shape=(1, 2, 3), dtype=jnp.int32))
+
+  def test_can_match_part_op_and_index(self):
+    pattern = jr.Part((matcher.Segment('args'),), matcher.Var('i'))
+    expr = jr.Part((jr.Literal(0.), jr.Literal(1.)), 1)
+    self.assertDictEqual(
+        matcher.match(pattern, expr),
+        dict(args=(jr.Literal(0.), jr.Literal(1.)), i=1))
+
+  def test_can_match_call_primitive_parts(self):
+    pattern = jr.CallPrimitive(
+        matcher.Var('prim'), matcher.Var('args'), matcher.Var('expression'),
+        matcher.Var('params'), matcher.Var('names'))
+    expr = jr.CallPrimitive(jax.core.call_p, (),
+                            (jr.Literal(0.), jr.Literal(1)), jr.Params(), [])
+    self.assertDictEqual(
+        matcher.match(pattern, expr),
+        dict(
+            prim=jax.core.call_p,
+            args=(),
+            expression=(jr.Literal(0.), jr.Literal(1.)),
+            params=jr.Params(),
+            names=[]))
+
+
+class RewriteTest(test_util.TestCase):
+
+  def test_can_rewrite_simple_jax_expressions(self):
+    pattern = Exp(matcher.Var('x'))
+    rule = rules.make_rule(pattern, Log)
+    expr = Exp(1.)
+
+    self.assertEqual(rule(expr), Log(1.))
+
+  def test_can_rewrite_nested_jax_expressions(self):
+    pattern = Exp(matcher.Var('x'))
+    rule = rules.term_rewriter(rules.make_rule(pattern, Log))
+    expr = Exp(Exp(2.))
+
+    self.assertEqual(rule(expr), Log(Log(2.)))
+
+  def test_can_rewrite_jax_functions(self):
+    pattern = Exp(matcher.Var('x'))
+    rule = rules.term_rewriter(rules.make_rule(pattern, Log))
+
+    def f(x):
+      return jnp.exp(x) + 1.
+    f = jr.rewrite(f, rule)
+    self.assertEqual(f(1.), 1.)
+
+  def test_can_rewrite_jax_functions_with_constants(self):
+    pattern = Exp(matcher.Var('x'))
+    rule = rules.term_rewriter(rules.make_rule(pattern, Log))
+
+    def f(x):
+      return jnp.exp(x) + jnp.ones(x.shape)
+    f = jr.rewrite(f, rule)
+    self.assertTrue((f(jnp.ones(5)) == jnp.ones(5)).all())
+
+  def test_can_rewrite_jax_functions_with_jit(self):
+    pattern = Exp(matcher.Var('x'))
+    rule = rules.term_rewriter(rules.make_rule(pattern, Log))
+
+    def f(x):
+      return jax.jit(jnp.exp)(x) + 1.
+    f = jr.rewrite(f, rule)
+    self.assertEqual(f(1.), 1.)
 
 
 if __name__ == '__main__':
