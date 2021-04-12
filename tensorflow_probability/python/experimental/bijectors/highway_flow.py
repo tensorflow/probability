@@ -103,23 +103,21 @@ class HighwayFlow(tfb.Bijector):
             (is transposed to Upper diagonal within the bijector)
             lower_diagonal_weights_matrix: Lower diagonal matrix with ones on the main diagional.
         '''
-        self.width = width
+        parameters = dict(locals())
+        with tf.name_scope(name) as name:
+            self.width = width
+            self.bias = bias
+            self.residual_fraction = residual_fraction
+            # still lower triangular, transpose is done in matvec.
+            self.upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
+            self.lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
+            self.activation_fn = activation_fn
 
-        self.bias = bias
-
-        self.residual_fraction = residual_fraction
-
-        # still lower triangular, transposed is done in matvec.
-        self.upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
-
-        self.lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
-
-        self.activation_fn = activation_fn
-
-        super(HighwayFlow, self).__init__(
-            validate_args=validate_args,
-            forward_min_event_ndims=1,
-            name=name)
+            super(HighwayFlow, self).__init__(
+                validate_args=validate_args,
+                forward_min_event_ndims=1,
+                parameters=parameters,
+                name=name)
 
     def df(self, x):
         # derivative of activation
