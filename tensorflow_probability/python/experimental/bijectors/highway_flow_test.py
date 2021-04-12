@@ -61,7 +61,7 @@ class HighwayFlowTests(test_util.TestCase):
         batch_size = 3
         width = 4
         dtype = tf.float32
-        residual_fraction = tf.Variable(0.5)
+        residual_fraction = tf.constant(0.5)
         for activation in activations:
 
             if activation == 'sigmoid':
@@ -76,9 +76,9 @@ class HighwayFlowTests(test_util.TestCase):
             bijector = tfp.experimental.bijectors.HighwayFlow(
                 residual_fraction=residual_fraction,
                 activation_fn=activation_fn,
-                bias=tf.Variable(tf.zeros(width), dtype=dtype),
-                upper_diagonal_weights_matrix=tf.Variable(tf.eye(width)),
-                lower_diagonal_weights_matrix=tf.Variable(tf.eye(width))
+                bias=tf.zeros(width),
+                upper_diagonal_weights_matrix=tf.eye(width),
+                lower_diagonal_weights_matrix=tf.eye(width)
             )
 
             self.evaluate([v.initializer for v in bijector.trainable_variables])
@@ -110,14 +110,13 @@ class HighwayFlowTests(test_util.TestCase):
     def testResidualFractionGradientsWithCenteredDifference(self):
         width = 4
         batch_size = 3
-        dtype = tf.float32
-        residual_fraction = tf.Variable(0.5)
+        residual_fraction = tf.constant(0.5)
         bijector = tfp.experimental.bijectors.HighwayFlow(
             residual_fraction=residual_fraction,
             activation_fn=tf.nn.softplus,
-            bias=tf.Variable(tf.zeros(width), dtype=dtype),
-            upper_diagonal_weights_matrix=tf.Variable(tf.eye(width)),
-            lower_diagonal_weights_matrix=tf.Variable(tf.eye(width))
+            bias=tf.zeros(width),
+            upper_diagonal_weights_matrix=tf.eye(width),
+            lower_diagonal_weights_matrix=tf.eye(width)
         )
         target = tfd.MultivariateNormalDiag(loc=tf.zeros(width),
                                             scale_diag=tf.ones(width))
@@ -127,8 +126,7 @@ class HighwayFlowTests(test_util.TestCase):
             y = tf.reduce_mean(target.log_prob(bijector.forward(x)))
         tf_grad = g.gradient(y, bijector.residual_fraction)
 
-        h = 1e-4
-        eps = 1e-6
+        h = 1e-3
 
         bijector._residual_fraction = residual_fraction + h
         y1 = tf.reduce_mean(target.log_prob(bijector.forward(x)))
