@@ -2,7 +2,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import util
-from tensorflow_probability.python.experimental.bijectors import scalar_function_with_inferred_inverse
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import samplers
 
@@ -23,15 +22,16 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
             bijector=tfb.Sigmoid(),
             dtype=dtype),
         activation_fn=activation_fn,
-        bias=tf.Variable(samplers.normal((width,), 0., 0.01, seed=bias_seed), dtype=dtype),
+        bias=tf.Variable(samplers.normal((width,), mean=0., stddev=0.01, seed=bias_seed), dtype=dtype),
         upper_diagonal_weights_matrix=util.TransformedVariable(
-            initial_value=tf.experimental.numpy.tril(samplers.normal((width, width), 0., 1., seed=upper_seed),
-                                                     -1) + tf.linalg.diag(
+            initial_value=tf.experimental.numpy.tril(
+                samplers.normal((width, width), mean=0., stddev=1., seed=upper_seed),
+                k=-1) + tf.linalg.diag(
                 samplers.uniform((width,), minval=0., maxval=1., seed=diagonal_seed)),
             bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(), diag_shift=None),
             dtype=dtype),
         lower_diagonal_weights_matrix=util.TransformedVariable(
-            initial_value=samplers.normal((width, width), 0., 1., seed=lower_seed),
+            initial_value=samplers.normal((width, width), mean=0., stddev=1., seed=lower_seed),
             bijector=tfb.Chain([tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
                                 tfb.Pad(paddings=[(1, 0), (0, 1)]),
                                 tfb.FillTriangular()]),
@@ -40,13 +40,15 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
 
 
 class HighwayFlow(tfb.Bijector):
-    """Implements an Highway Flow bijector [1], which interpolates the input X with the transformations at each step of the bjiector.
+    """Implements an Highway Flow bijector [1], which interpolates the input X with the transformations at each step
+    of the bjiector.
     The Highway Flow can be used as building block for a Cascading flow [1] or as a generic normalizig flow.
 
     The transoformation consists in a convex update between the input X and a linear transformation of X
     with the form g(AX+b), where g is a differentiable non-decreasing activation function, and A and b are trainable.
 
-    The convex update is regulated by a trainable residual fraction 'l' constrained between 0 and 1, and can be formalized as:
+    The convex update is regulated by a trainable residual fraction 'l' constrained between 0 and 1, and can be
+    formalized as:
     Y = l*X + (1-l) * g(AX + b).
 
     To make this transformation invertible, the bijector is split in three convex updates:
@@ -54,27 +56,29 @@ class HighwayFlow(tfb.Bijector):
      - Y2 = l*Y1 + (1-l) * UY1 + b, with U upper diagonal matrix with positive diagonal;
      - Y = l*Y2 + (1-l) * g(Y2)
 
-    The function build_highway_flow_layer helps initializing the bijector with the variables respecting the various constraints.
-
-    Args:
-        width: needs to be equal to the size of the matrices U, L and of the bias vector
-        bias: bias parameter
-        residual_fraction: variable used for the convex update, must be between 0 and 1
-        activation_fn: not used yet
-        bias: bias vector
-        upper_diagonal_weights_matrix: Lower diagional matrix of size (width, width) with positive diagonal (is transposed to Upper diagonal within the bijector)
-        lower_diagonal_weights_matrix: Lower diagonal matrix with ones on the main diagional.
+    The function build_highway_flow_layer helps initializing the bijector with the variables respecting the various
+    constraints.
 
     For more details on Highway Flow and Cascading Flows see [1].
 
     #### Usage example:
     ```python
+    tfd = tfp.distributions
+    tfb = tfp.bijectors
 
+    dim = 4 # last input dimension
+
+    bijector = build_highway_flow_layer(dim, activation_fn=True)
+    y = bijector.forward(x)  # forward mapping
+    x = bijector.inverse(y)  # inverse mapping
+    base = tfd.MultivariateNormalDiag(loc=tf.zeros(dim)) # Base distribution
+    transformed_distribution = tfd.TransformedDistribution(base, bijector)
     ```
 
     #### References
 
-    [1]: ADD REFERENCE
+    [1]: Ambrogioni, Luca, Gianluigi Silvestri, and Marcel van Gerven. "Automatic variational inference with
+    cascading flows." arXiv preprint arXiv:2102.04801 (2021).
     """
     # todo: update comments?
     # HighWay Flow simultaneously computes `forward` and `fldj` (and `inverse`/`ildj`),
@@ -88,6 +92,17 @@ class HighwayFlow(tfb.Bijector):
     def __init__(self, width, residual_fraction, activation_fn, bias, upper_diagonal_weights_matrix,
                  lower_diagonal_weights_matrix, validate_args=False,
                  name='highway_flow'):
+        '''
+        Args:
+            width: needs to be equal to the size of the matrices U, L and of the bias vector
+            bias: bias parameter
+            residual_fraction: variable used for the convex update, must be between 0 and 1
+            activation_fn: not used yet
+            bias: bias vector
+            upper_diagonal_weights_matrix: Lower diagional matrix of size (width, width) with positive diagonal
+            (is transposed to Upper diagonal within the bijector)
+            lower_diagonal_weights_matrix: Lower diagonal matrix with ones on the main diagional.
+        '''
         super(HighwayFlow, self).__init__(
             validate_args=validate_args,
             forward_min_event_ndims=1,  # FIXME: should this also be an argument of HighwayFlow __init__?
@@ -134,7 +149,8 @@ class HighwayFlow(tfb.Bijector):
         # todo: see how to optimize _convex_update
         x = tf.linalg.matvec(self._convex_update(self.lower_diagonal_weights_matrix), x)
         x = tf.linalg.matvec(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
-                             x) + (1-self.residual_fraction)*self.bias  # in the implementation there was only one bias
+                             x) + (
+                    1 - self.residual_fraction) * self.bias  # in the implementation there was only one bias
         if self.activation_fn:
             fldj += tf.reduce_sum(tf.math.log(self.df(x)), -1)
             x = self.residual_fraction * x + (1. - self.residual_fraction) * self.activation_fn(x)
@@ -151,16 +167,16 @@ class HighwayFlow(tfb.Bijector):
         if self.activation_fn:
             y = self.inv_f(y)
             ildj -= tf.reduce_sum(tf.math.log(self.df(y)), -1)
-            #residual_fraction = tf.identity(self.residual_fraction)
+            # residual_fraction = tf.identity(self.residual_fraction)
             '''activation_layer = scalar_function_with_inferred_inverse.ScalarFunctionWithInferredInverse(
                 lambda x: residual_fraction * x + (1. - residual_fraction) * self.activation_fn(x))
             ildj += activation_layer.inverse_log_det_jacobian(y, self.forward_min_event_ndims)
             y = activation_layer.inverse(y)'''
 
-
         # this works with y having shape [BATCH x WIDTH], don't know how well it generalizes
         y = tf.linalg.triangular_solve(tf.transpose(self._convex_update(self.upper_diagonal_weights_matrix)),
-                                       tf.linalg.matrix_transpose(y - (1-self.residual_fraction)*self.bias), lower=False)
+                                       tf.linalg.matrix_transpose(y - (1 - self.residual_fraction) * self.bias),
+                                       lower=False)
         y = tf.linalg.triangular_solve(self._convex_update(self.lower_diagonal_weights_matrix), y)
         return tf.linalg.matrix_transpose(y), {'ildj': ildj, 'fldj': -ildj}
 
