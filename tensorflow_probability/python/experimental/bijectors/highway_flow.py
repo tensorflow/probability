@@ -19,7 +19,7 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activat
     return HighwayFlow(
         width=width,
         residual_fraction=util.TransformedVariable(
-            initial_value=tf.convert_to_tensor(residual_fraction_initial_value),
+            initial_value=residual_fraction_initial_value,
             bijector=tfb.Sigmoid(),
             dtype=dtype),
         activation_fn=activation_fn,
