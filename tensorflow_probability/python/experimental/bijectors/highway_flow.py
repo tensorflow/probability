@@ -117,7 +117,8 @@ class HighwayFlow(tfb.Bijector):
             bias: bias parameter
             residual_fraction: variable used for the convex update, must be
             between 0 and 1
-            activation_fn: not used yet
+            activation_fn: bool to decide whether to use softplus (True)
+            activation or no activation (False)
             bias: bias vector
             upper_diagonal_weights_matrix: Lower diagional matrix of size
             (width, width) with positive diagonal
