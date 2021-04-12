@@ -80,7 +80,7 @@ class HighwayFlow(tfb.Bijector):
     [1]: Ambrogioni, Luca, Gianluigi Silvestri, and Marcel van Gerven. "Automatic variational inference with
     cascading flows." arXiv preprint arXiv:2102.04801 (2021).
     """
-    # todo: update comments?
+
     # HighWay Flow simultaneously computes `forward` and `fldj` (and `inverse`/`ildj`),
     # so we override the bijector cache to update the LDJ entries of attrs on
     # forward/inverse inverse calls (instead of updating them only when the LDJ
@@ -103,11 +103,6 @@ class HighwayFlow(tfb.Bijector):
             (is transposed to Upper diagonal within the bijector)
             lower_diagonal_weights_matrix: Lower diagonal matrix with ones on the main diagional.
         '''
-        super(HighwayFlow, self).__init__(
-            validate_args=validate_args,
-            forward_min_event_ndims=1,  # FIXME: should this also be an argument of HighwayFlow __init__?
-            name=name)
-
         self.width = width
 
         self.bias = bias
@@ -115,12 +110,16 @@ class HighwayFlow(tfb.Bijector):
         self.residual_fraction = residual_fraction
 
         # still lower triangular, transposed is done in matvec.
-        # TODO: transpose directly here or in the definition of TransformedVariable?
         self.upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
 
         self.lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
 
         self.activation_fn = activation_fn
+
+        super(HighwayFlow, self).__init__(
+            validate_args=validate_args,
+            forward_min_event_ndims=1,
+            name=name)
 
     def df(self, x):
         # derivative of activation
