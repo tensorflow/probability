@@ -114,7 +114,8 @@ class HighwayFlow(tfb.Bijector):
                  name='highway_flow'):
         '''
         Args:
-            residual_fraction: variable used for the convex update, must be
+            residual_fraction: scalar `Tensor` used for the convex update,
+            must be
             between 0 and 1
             activation_fn: bool to decide whether to use softplus (True)
             activation or no activation (False)
