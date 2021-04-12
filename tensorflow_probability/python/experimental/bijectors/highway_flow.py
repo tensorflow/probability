@@ -199,7 +199,8 @@ class HighwayFlow(tfb.Bijector):
             x) + (
                     1 - self.residual_fraction) * self.bias
         if self.activation_fn:
-            fldj += tf.reduce_sum(tf.math.log(self._derivative_of_sigmoid(x)), -1)
+            fldj += tf.reduce_sum(tf.math.log(self._derivative_of_sigmoid(x)),
+                                  -1)
             x = self.residual_fraction * x + (
                     1. - self.residual_fraction) * self.activation_fn(x)
         return x, {'ildj': -fldj, 'fldj': fldj}
@@ -211,7 +212,8 @@ class HighwayFlow(tfb.Bijector):
                 self.upper_diagonal_weights_matrix)))
         if self.activation_fn:
             y = self._inverse_of_sigmoid(y)
-            ildj -= tf.reduce_sum(tf.math.log(self._derivative_of_sigmoid(y)), -1)
+            ildj -= tf.reduce_sum(tf.math.log(self._derivative_of_sigmoid(y)),
+                                  -1)
 
         y = tf.linalg.triangular_solve(tf.transpose(
             self._convex_update(self.upper_diagonal_weights_matrix)),
