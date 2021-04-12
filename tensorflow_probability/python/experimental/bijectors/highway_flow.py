@@ -6,7 +6,7 @@ from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import samplers
 
 
-def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activation_fn=None, seed=None):
+def build_highway_flow_layer(width, residual_fraction_initial_value=0.5, activation_fn=False, seed=None):
     # TODO: add control that residual_fraction_initial_value is between 0 and 1
     residual_fraction_initial_value = tf.convert_to_tensor(residual_fraction_initial_value,
                                                            dtype_hint=tf.float32,
