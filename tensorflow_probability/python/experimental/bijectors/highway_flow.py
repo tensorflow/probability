@@ -19,9 +19,7 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5,
 
     bias_seed, upper_seed, lower_seed, diagonal_seed = samplers.split_seed(seed,
                                                                            n=4)
-
     return HighwayFlow(
-        width=width,
         residual_fraction=util.TransformedVariable(
             initial_value=residual_fraction_initial_value,
             bijector=tfb.Sigmoid(),
@@ -110,14 +108,12 @@ class HighwayFlow(tfb.Bijector):
         forward_name='_augmented_forward',
         inverse_name='_augmented_inverse')
 
-    def __init__(self, width, residual_fraction, activation_fn, bias,
+    def __init__(self, residual_fraction, activation_fn, bias,
                  upper_diagonal_weights_matrix,
                  lower_diagonal_weights_matrix, validate_args=False,
                  name='highway_flow'):
         '''
         Args:
-            width: needs to be equal to the size of the matrices U, L and of
-            the bias vector
             bias: bias parameter
             residual_fraction: variable used for the convex update, must be
             between 0 and 1
@@ -131,7 +127,7 @@ class HighwayFlow(tfb.Bijector):
         '''
         parameters = dict(locals())
         with tf.name_scope(name) as name:
-            self._width = width
+            self._width = tf.shape(bias)[-1]
             self._bias = bias
             self._residual_fraction = residual_fraction
             # still lower triangular, transpose is done in matvec.

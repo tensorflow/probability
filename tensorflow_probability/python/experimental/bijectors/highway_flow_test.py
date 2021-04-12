@@ -74,10 +74,9 @@ class HighwayFlowTests(test_util.TestCase):
                 activation_fn = None
 
             bijector = tfp.experimental.bijectors.HighwayFlow(
-                width=width,
                 residual_fraction=residual_fraction,
                 activation_fn=activation_fn,
-                bias=tf.Variable(0., dtype=dtype),
+                bias=tf.Variable(tf.zeros(width), dtype=dtype),
                 upper_diagonal_weights_matrix=tf.Variable(tf.eye(width)),
                 lower_diagonal_weights_matrix=tf.Variable(tf.eye(width))
             )
@@ -114,10 +113,9 @@ class HighwayFlowTests(test_util.TestCase):
         dtype = tf.float32
         residual_fraction = tf.Variable(0.5)
         bijector = tfp.experimental.bijectors.HighwayFlow(
-            width=width,
             residual_fraction=residual_fraction,
             activation_fn=tf.nn.softplus,
-            bias=tf.Variable(0., dtype=dtype),
+            bias=tf.Variable(tf.zeros(width), dtype=dtype),
             upper_diagonal_weights_matrix=tf.Variable(tf.eye(width)),
             lower_diagonal_weights_matrix=tf.Variable(tf.eye(width))
         )
