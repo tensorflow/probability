@@ -137,9 +137,7 @@ class HighwayFlowTests(test_util.TestCase):
 
         manual_grad = (y1 - y2) / (2 * h)
 
-        diff = tf.math.abs(tf_grad - manual_grad) / tf.reduce_max(
-            (eps, tf.math.abs(tf_grad) + tf.math.abs(manual_grad)))
-        self.assertGreater(1e-4, diff)
+        self.assertAllClose(tf_grad, manual_grad, rtol=1e-4)
 
 
 if __name__ == '__main__':
