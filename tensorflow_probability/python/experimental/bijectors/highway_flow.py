@@ -165,29 +165,26 @@ class HighwayFlow(tfb.Bijector):
     def activation_fn(self):
         return self._activation_fn
 
-    def df(self, x):
-        # derivative of activation
+    def _derivative_of_sigmoid(self, x):
         return self.residual_fraction + (
                 1. - self.residual_fraction) * tf.math.sigmoid(x)
 
     def _convex_update(self, weights_matrix):
-        # convex update
-        # same as in the paper, but probably easier to invert
         return self.residual_fraction * tf.eye(self.width) + (
                 1. - self.residual_fraction) * weights_matrix
 
-    def inv_f(self, y, N=20):
+    def _inverse_of_sigmoid(self, y, N=20):
         # inverse with Newton iteration
         x = tf.ones(y.shape)
         for _ in range(N):
             x = x - (self.residual_fraction * x + (
                     1. - self.residual_fraction) * tf.math.softplus(
                 x) - y) / (
-                    self.df(x))
+                    self._derivative_of_sigmoid(x))
         return x
 
     def _augmented_forward(self, x):
-        # upper mmatrix jacobian
+        # upper matrix jacobian
         fldj = tf.zeros(x.shape[:-1]) + tf.reduce_sum(
             tf.math.log(self.residual_fraction + (
                     1. - self.residual_fraction) * tf.linalg.diag_part(
@@ -202,7 +199,7 @@ class HighwayFlow(tfb.Bijector):
             x) + (
                     1 - self.residual_fraction) * self.bias
         if self.activation_fn:
-            fldj += tf.reduce_sum(tf.math.log(self.df(x)), -1)
+            fldj += tf.reduce_sum(tf.math.log(self._derivative_of_sigmoid(x)), -1)
             x = self.residual_fraction * x + (
                     1. - self.residual_fraction) * self.activation_fn(x)
         return x, {'ildj': -fldj, 'fldj': fldj}
@@ -213,8 +210,8 @@ class HighwayFlow(tfb.Bijector):
                     1. - self.residual_fraction) * tf.linalg.diag_part(
                 self.upper_diagonal_weights_matrix)))
         if self.activation_fn:
-            y = self.inv_f(y)
-            ildj -= tf.reduce_sum(tf.math.log(self.df(y)), -1)
+            y = self._inverse_of_sigmoid(y)
+            ildj -= tf.reduce_sum(tf.math.log(self._derivative_of_sigmoid(y)), -1)
 
         y = tf.linalg.triangular_solve(tf.transpose(
             self._convex_update(self.upper_diagonal_weights_matrix)),
