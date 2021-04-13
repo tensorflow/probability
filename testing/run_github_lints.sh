@@ -27,6 +27,7 @@ get_changed_py_files() {
   fi
 }
 
+python -m pip install --upgrade --quiet pip setuptools
 python -m pip install --quiet pylint
 
 # Run lints on added/changed python files.
