@@ -29,6 +29,7 @@ from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -234,6 +235,12 @@ class MultivariateNormalLinearOperator(
     return self._scale
 
   experimental_is_sharded = False
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        scale=parameter_properties.BatchedComponentProperties())
 
   @distribution_util.AppendDocstring(_mvn_sample_note)
   def _log_prob(self, x):

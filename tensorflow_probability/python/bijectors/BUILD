@@ -126,8 +126,6 @@ multi_substrate_py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:distribution",
-        "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:cache_util",
@@ -1087,6 +1085,7 @@ multi_substrate_py_test(
         # mock dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:cache_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:test_util",
@@ -1464,6 +1463,7 @@ multi_substrate_py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -1587,6 +1587,7 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

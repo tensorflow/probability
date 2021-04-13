@@ -59,6 +59,7 @@ from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kern
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
 from tensorflow_probability.python.experimental.mcmc.step import step_kernel
+from tensorflow_probability.python.experimental.mcmc.thermodynamic_integrals import remc_thermodynamic_integrals
 from tensorflow_probability.python.experimental.mcmc.thinning_kernel import ThinningKernel
 from tensorflow_probability.python.experimental.mcmc.tracing_reducer import TracingReducer
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_deterministic_minimum_error
@@ -110,6 +111,7 @@ __all__ = [
     'ProgressBarReducer',
     'reconstruct_trajectories',
     'Reducer',
+    'remc_thermodynamic_integrals',
     'resample_deterministic_minimum_error',
     'resample_independent',
     'resample_stratified',

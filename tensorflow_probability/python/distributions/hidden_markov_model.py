@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -284,6 +285,26 @@ class HiddenMarkovModel(distribution.Distribution):
     """The number of hidden states in the hidden Markov model."""
 
     return self.transition_distribution.batch_shape_tensor()[-1]
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda,protected-access
+    return dict(
+        initial_distribution=(
+            parameter_properties.BatchedComponentProperties()),
+        transition_distribution=(
+            parameter_properties.BatchedComponentProperties(
+                event_ndims=(
+                    lambda self: (2
+                                  if self._time_varying_transition_distribution
+                                  else 1)))),
+        observation_distribution=(
+            parameter_properties.BatchedComponentProperties(
+                event_ndims=(
+                    lambda self: (2
+                                  if self._time_varying_observation_distribution
+                                  else 1)))))
+    # pylint: enable=g-long-lambda,protected-access
 
   def _sample_n(self, n, seed=None):
     init_seed, scan_seed, observation_seed = samplers.split_seed(

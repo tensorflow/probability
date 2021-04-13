@@ -49,6 +49,7 @@ TF2_FRIENDLY_BIJECTORS = (
     'FillScaleTriL',
     'FillTriangular',
     'FrechetCDF',
+    'GeneralizedPareto',
     'GompertzCDF',
     'GumbelCDF',
     'GeneralizedExtremeValueCDF',
@@ -95,6 +96,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'GompertzCDF': dict(concentration=0, rate=0),
     'GumbelCDF': dict(loc=0, scale=0),
     'GeneralizedExtremeValueCDF': dict(loc=0, scale=0, concentration=0),
+    'GeneralizedPareto': dict(loc=0, scale=0, concentration=0),
     'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
     'MoyalCDF': dict(loc=0, scale=0),
     'Power': dict(power=0),
@@ -138,6 +140,7 @@ TRANSFORM_DIAGONAL_ALLOWLIST = {
     'GompertzCDF',
     'GumbelCDF',
     'GeneralizedExtremeValueCDF',
+    'GeneralizedPareto',
     'Identity',
     'Inline',
     'KumaraswamyCDF',
@@ -191,6 +194,10 @@ def is_invert(bijector):
 
 def is_transform_diagonal(bijector):
   return isinstance(bijector, tfb.TransformDiagonal)
+
+
+def is_generalized_pareto(bijector):
+  return isinstance(bijector, tfb.GeneralizedPareto)
 
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
@@ -323,6 +330,13 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   elif bijector_name == 'DiscreteCosineTransform':
     dct_type = hps.integers(min_value=2, max_value=3)
     bijector_params = {'dct_type': draw(dct_type)}
+  elif bijector_name == 'GeneralizedPareto':
+    concentration = hps.floats(min_value=-200., max_value=200)
+    scale = hps.floats(min_value=1e-2, max_value=200)
+    loc = hps.floats(min_value=-200, max_value=200)
+    bijector_params = {'concentration': draw(concentration),
+                       'scale': draw(scale),
+                       'loc': draw(loc)}
   elif bijector_name == 'PowerTransform':
     power = hps.floats(min_value=1e-6, max_value=10.)
     bijector_params = {'power': draw(power)}
@@ -474,7 +488,11 @@ def codomain_tensors(draw, bijector, shape=None):
     shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
   support = bijector_hps.bijector_supports()[bijector_name].inverse
-  constraint_fn = tfp_hps.constrainer(support)
+  if is_generalized_pareto(bijector):
+    constraint_fn = bijector_hps.generalized_pareto_constraint(
+        bijector.loc, bijector.scale, bijector.concentration)
+  else:
+    constraint_fn = tfp_hps.constrainer(support)
   return draw(tfp_hps.constrained_tensors(constraint_fn, shape))
 
 
@@ -509,6 +527,12 @@ def _ldj_tensor_conversions_allowed(bijector, is_forward):
     return _ldj_tensor_conversions_allowed(bijector.bijector, not is_forward)
   elif is_transform_diagonal(bijector):
     return _ldj_tensor_conversions_allowed(bijector.diag_bijector, is_forward)
+  elif is_generalized_pareto(bijector):
+    return max(
+        _ldj_tensor_conversions_allowed(
+            bijector._negative_concentration_bijector(), is_forward),
+        _ldj_tensor_conversions_allowed(
+            bijector._non_negative_concentration_bijector, is_forward))
   elif is_forward:
     return 2 if hasattr(bijector, '_forward_log_det_jacobian') else 4
   else:

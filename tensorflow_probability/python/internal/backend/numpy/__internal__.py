@@ -15,8 +15,10 @@
 # ============================================================================
 """Numpy stub for `tf.__internal__`."""
 
+from tensorflow_probability.python.internal.backend.numpy import composite_tensor
+
+
 __all__ = ['CompositeTensor']
 
 
-class CompositeTensor(object):
-  pass
+CompositeTensor = composite_tensor.CompositeTensor

@@ -452,7 +452,7 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-class ParameterBijectorsTest(test_util.TestCase):
+class ParameterPropertiesTest(test_util.TestCase):
 
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
@@ -531,6 +531,21 @@ class ParameterBijectorsTest(test_util.TestCase):
 
     # Valid parameters should give non-nan samples.
     self.assertAllFalse(np.isnan(x))
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(set(dhps.INSTANTIABLE_META_DISTS))))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testInferredBatchShapeMatchesTrueBatchShape(self, dist_name, data):
+    dist = data.draw(dhps.distributions(dist_name=dist_name))
+    try:
+      self.assertAllEqual(dist.batch_shape_tensor(),
+                          dist._inferred_batch_shape_tensor())
+      self.assertAllEqual(dist.batch_shape,
+                          dist._inferred_batch_shape())
+    except NotImplementedError as e:
+      self.skipTest(str(e))
 
 
 def _all_shapes(thing):

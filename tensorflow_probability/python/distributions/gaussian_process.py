@@ -25,12 +25,14 @@ import warnings
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -460,6 +462,20 @@ class GaussianProcess(distribution.Distribution):
       '`marginal_fn` property instead.')
   def jitter(self):
     return self._jitter
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
+        kernel=parameter_properties.BatchedComponentProperties(),
+        observation_noise_variance=parameter_properties.ParameterProperties(
+            event_ndims=0,
+            shape_fn=lambda sample_shape: sample_shape[:-1],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   def _get_index_points(self, index_points=None):
     """Return `index_points` if not None, else `self._index_points`.

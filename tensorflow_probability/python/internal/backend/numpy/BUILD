@@ -64,6 +64,9 @@ py_library(
 py_library(
     name = "__internal__",
     srcs = ["__internal__.py"],
+    deps = [
+        ":composite_tensor",
+    ],
 )
 
 py_library(

@@ -32,6 +32,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -170,6 +171,11 @@ class Sample(distribution_lib.Distribution):
   @property
   def distribution(self):
     return self._distribution
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties())
 
   @property
   def sample_shape(self):

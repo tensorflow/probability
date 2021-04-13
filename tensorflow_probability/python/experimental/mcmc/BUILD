@@ -87,6 +87,7 @@ multi_substrate_py_library(
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
         ":step",
+        ":thermodynamic_integrals",
         ":thinning_kernel",
         ":tracing_reducer",
         ":weighted_resampling",
@@ -801,6 +802,31 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/mcmc/internal:test_fixtures",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "thermodynamic_integrals",
+    srcs = ["thermodynamic_integrals.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "thermodynamic_integrals_test",
+    size = "small",
+    srcs = ["thermodynamic_integrals_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":thermodynamic_integrals",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

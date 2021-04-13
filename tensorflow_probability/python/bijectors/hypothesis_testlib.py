@@ -158,6 +158,8 @@ def bijector_supports():
           BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
       'GeneralizedExtremeValueCDF':  # The domain is parameter dependent.
           BijectorSupport(Support.OTHER, Support.SCALAR_IN_0_1),
+      'GeneralizedPareto':  # The range is parameter dependent.
+          BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.OTHER),
       'GompertzCDF':
           BijectorSupport(Support.SCALAR_POSITIVE, Support.SCALAR_IN_0_1),
       'GumbelCDF':
@@ -433,4 +435,15 @@ def gev_constraint(loc, scale, conc):
                     tf.where(
                         tf.equal(0., c),
                         x, endpoint - tf.math.softplus(x)))
+  return constrain
+
+
+def generalized_pareto_constraint(loc, scale, conc):
+  """Maps `s` to support based on `loc`, `scale` and `conc`."""
+  def constrain(x):
+    conc_ = tf.convert_to_tensor(conc)
+    loc_ = tf.convert_to_tensor(loc)
+    return tf.where(conc_ >= 0.,
+                    tf.math.softplus(x) + loc_,
+                    loc_ - tf.math.sigmoid(x) * scale / conc_)
   return constrain

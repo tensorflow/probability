@@ -37,10 +37,12 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     substrates_omit_deps = [
         ":deferred_module",
+        ":trainable",
     ],
     deps = [
         ":deferred_module",
         ":jit_public_methods",
+        ":trainable",
     ],
 )
 
@@ -96,5 +98,28 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+py_library(
+    name = "trainable",
+    srcs = ["trainable.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/util:deferred_tensor",
+    ],
+)
+
+py_test(
+    name = "trainable_test",
+    srcs = ["trainable_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

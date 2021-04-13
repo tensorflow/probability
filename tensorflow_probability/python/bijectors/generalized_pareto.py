@@ -106,9 +106,10 @@ class GeneralizedPareto(bijector_lib.Bijector):
   def _negative_concentration_bijector(self):
     # Constructed dynamically so that `loc + scale / concentration` is
     # tape-safe.
-    high = self.loc + tf.math.abs(self.scale / self.concentration)
+    loc = tf.convert_to_tensor(self.loc)
+    high = loc + tf.math.abs(self.scale / self.concentration)
     return sigmoid_bijector.Sigmoid(
-        low=self.loc, high=high, validate_args=self.validate_args)
+        low=loc, high=high, validate_args=self.validate_args)
 
   def _forward(self, x):
     return tf.where(self._concentration < 0.,
