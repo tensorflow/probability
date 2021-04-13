@@ -520,6 +520,45 @@ class DistributionTest(test_util.TestCase):
     with self.assertRaisesRegexp(
         NotImplementedError, 'log_cdf is not implemented'):
       terrible_distribution.log_cdf(1.)
+    with self.assertRaisesRegexp(NotImplementedError,
+                                 'unnormalized_log_prob is not implemented'):
+      terrible_distribution.unnormalized_log_prob(1.)
+
+  def testUnnormalizedProbDerivation(self):
+
+    class DistributionWithProbOnly(tfd.Distribution):
+
+      def __init__(self):
+        super(DistributionWithProbOnly, self).__init__(
+            dtype=tf.float32,
+            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            validate_args=False,
+            allow_nan_stats=False)
+
+      def _prob(self, _):
+        return 2.0
+
+    distribution_with_prob_only = DistributionWithProbOnly()
+    self.assertEqual(
+        self.evaluate(distribution_with_prob_only.unnormalized_log_prob(3.0)),
+        self.evaluate(tf.math.log(2.0)))
+
+    class DistributionWithLogProbOnly(tfd.Distribution):
+
+      def __init__(self):
+        super(DistributionWithLogProbOnly, self).__init__(
+            dtype=tf.float32,
+            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            validate_args=False,
+            allow_nan_stats=False)
+
+      def _log_prob(self, _):
+        return 5.0
+
+    distribution_with_log_prob_only = DistributionWithLogProbOnly()
+    self.assertAllClose(
+        5.0,
+        distribution_with_log_prob_only.unnormalized_log_prob(3.0))
 
   def testNotIterable(self):
     normal = tfd.Normal(loc=0., scale=1.)

@@ -1263,6 +1263,48 @@ class Distribution(_BaseDistribution):
     """
     return self._call_prob(value, name, **kwargs)
 
+  def _call_unnormalized_log_prob(self, value, name, **kwargs):
+    """Wrapper around _unnormalized_log_prob."""
+    value = _cast_structure(value, self.dtype)
+    value = nest_util.convert_to_nested_tensor(
+        value, name='value', dtype_hint=self.dtype, allow_packing=True)
+    with self._name_and_control_scope(name, value, kwargs):
+      if hasattr(self, '_unnormalized_log_prob'):
+        return self._unnormalized_log_prob(value, **kwargs)
+      if hasattr(self, '_unnormalized_prob'):
+        return tf.math.log(self._unnormalized_prob(value, **kwargs))
+      if hasattr(self, '_log_prob'):
+        return self._log_prob(value, **kwargs)
+      if hasattr(self, '_prob'):
+        return tf.math.log(self._prob(value, **kwargs))
+      raise NotImplementedError(
+          'unnormalized_log_prob is not implemented: {}'.format(
+              type(self).__name__))
+
+  def unnormalized_log_prob(self,
+                            value,
+                            name='unnormalized_log_prob',
+                            **kwargs):
+    """Potentially unnormalized log probability density/mass function.
+
+    This function is similar to `log_prob`, but does not require that the
+    return value be normalized.  (Normalization here refers to the total
+    integral of probability being one, as it should be by definition for any
+    probability distribution.)  This is useful, for example, for distributions
+    where the normalization constant is difficult or expensive to compute.  By
+    default, this simply calls `log_prob`.
+
+    Args:
+      value: `float` or `double` `Tensor`.
+      name: Python `str` prepended to names of ops created by this function.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      unnormalized_log_prob: a `Tensor` of shape
+        `sample_shape(x) + self.batch_shape` with values of type `self.dtype`.
+    """
+    return self._call_unnormalized_log_prob(value, name, **kwargs)
+
   def _call_log_cdf(self, value, name, **kwargs):
     """Wrapper around _log_cdf."""
     value = _cast_structure(value, self.dtype)
