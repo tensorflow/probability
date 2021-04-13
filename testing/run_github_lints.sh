@@ -27,13 +27,13 @@ get_changed_py_files() {
   fi
 }
 
-pip install --quiet pylint
+python -m pip install --quiet pylint
 
 # Run lints on added/changed python files.
 changed_py_files=$(get_changed_py_files)
 if [[ -n "${changed_py_files}" ]]; then
   echo "Running pylint on ${changed_py_files}"
-  pylint -j2 --rcfile=testing/pylintrc ${changed_py_files}
+  python -m pylint -j2 --rcfile=testing/pylintrc ${changed_py_files}
 else
   echo "No files to lint."
 fi
