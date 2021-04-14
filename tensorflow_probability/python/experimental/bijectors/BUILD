@@ -86,8 +86,8 @@ multi_substrate_py_test(
     name = "distribution_bijectors_test",
     size = "medium",
     srcs = ["distribution_bijectors_test.py"],
-    jax_size = "large",
     python_version = "PY3",
+    shard_count = 5,
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,

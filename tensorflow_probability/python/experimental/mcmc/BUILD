@@ -559,7 +559,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["sample_sequential_monte_carlo_test.py"],
     disabled_substrates = ["numpy"],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -820,6 +820,7 @@ multi_substrate_py_test(
     name = "thermodynamic_integrals_test",
     size = "small",
     srcs = ["thermodynamic_integrals_test.py"],
+    jax_tags = ["notap"],  # TODO(b/185371290): Re-enable.
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
@@ -960,7 +961,7 @@ multi_substrate_py_test(
     name = "gradient_based_trajectory_length_adaptation_test",
     size = "large",
     srcs = ["gradient_based_trajectory_length_adaptation_test.py"],
-    numpy_tags = ["notap"],  # Mostly gradient-based tests.
+    disabled_substrates = ["numpy"],  # Mostly gradient-based tests.
     python_version = "PY3",
     shard_count = 3,
     srcs_version = "PY3",

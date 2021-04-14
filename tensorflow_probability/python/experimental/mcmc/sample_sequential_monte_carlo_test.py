@@ -170,7 +170,7 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
     n_stage, _ = self.evaluate((n_stage, assert_cdf_equal_sample))
     self.assertLess(n_stage, 15)
 
-  def testSampleEndtoEndXLA(self):
+  def DISABLED_testSampleEndtoEndXLA(self):  # TODO(b/185371290): Re-enable
     """An end-to-end test of sampling using SMC."""
     if tf.executing_eagerly() or tf.config.experimental_functions_run_eagerly():
       self.skipTest('No need to test XLA under all execution regimes.')
