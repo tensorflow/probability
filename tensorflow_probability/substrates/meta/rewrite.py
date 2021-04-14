@@ -244,7 +244,6 @@ def main(argv):
           'tf.test.main()',
           'from jax.config import config; '
           'config.update("jax_enable_x64", True); '
-          'config.enable_omnistaging(); '
           'tf.test.main()')
 
   substrate = 'jax' if FLAGS.numpy_to_jax else 'numpy'
