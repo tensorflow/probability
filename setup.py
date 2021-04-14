@@ -105,7 +105,7 @@ setup(
     ],
     keywords='tensorflow probability statistics bayesian machine learning',
     extras_require={  # e.g. `pip install tfp-nightly[jax]`
-        'jax': ['jax', 'jaxlib'],
+        'jax': ['jax<=0.2.11', 'jaxlib<=0.1.64'],
         'tfds': [TFDS_PACKAGE],
     }
 )
