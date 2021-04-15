@@ -50,13 +50,13 @@ __all__ = ['PowerSpherical']
 class PowerSpherical(distribution.Distribution):
   r"""The Power Spherical distribution over unit vectors on `S^{n-1}`.
 
-  The Power Spherical distribution is a distribution over vectors
+  The Power Spherical distribution [1] is a distribution over vectors
   on the unit hypersphere `S^{n-1}` embedded in `n` dimensions (`R^n`).
 
   It serves as an alternative to the von Mises-Fisher distribution with a
   simpler (faster) `log_prob` calculation, as well as a reparameterizable
   sampler. In contrast, the Power Spherical distribution does have
-  -`mean_direction` as a point with zero density (and hence a neighborhood
+  `-mean_direction` as a point with zero density (and hence a neighborhood
   around that having arbitrarily small density), in contrast with the
   von Mises-Fisher distribution which has non-zero density everywhere.
 
@@ -111,6 +111,7 @@ class PowerSpherical(distribution.Distribution):
   x = [[0., 0, 1],
        [0., 1, 0]]
   ps.prob(x)
+  ```
 
   #### References
 
