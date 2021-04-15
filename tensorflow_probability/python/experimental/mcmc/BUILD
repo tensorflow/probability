@@ -43,7 +43,6 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     substrates_omit_deps = [
         ":covariance_reducer",
-        ":diagonal_mass_matrix_adaptation",
         ":elliptical_slice_sampler",
         ":expectations_reducer",
         ":kernel_builder",
@@ -189,7 +188,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "diagonal_mass_matrix_adaptation",
     srcs = ["diagonal_mass_matrix_adaptation.py"],
     srcs_version = "PY3",
@@ -204,11 +203,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "diagonal_mass_matrix_adaptation_test",
     size = "large",
     timeout = "long",
     srcs = ["diagonal_mass_matrix_adaptation_test.py"],
+    disabled_substrates = ["numpy"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [

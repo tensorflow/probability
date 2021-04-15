@@ -188,29 +188,30 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
         initial_running_variance=initial_running_variance)
 
     @tf.function
-    def do_sample():
+    def do_sample(seed):
 
       def trace_fn(_, pkr):
         return (pkr.running_variance,
                 pkr.inner_results.accepted_results.momentum_distribution)
 
+      sample_seed, chain_seed = tfp.random.split_seed(seed, 2)
       draws, (rv_state, dist) = tfp.mcmc.sample_chain(
           num_results=num_results,
           current_state=tf.zeros(3),
           kernel=kernel,
-          seed=test_util.test_seed(),
+          seed=chain_seed,
           trace_fn=trace_fn)
 
       # sample_distributions returns `[dists], [samples]`, so the 0th
       # distribution corresponds to the 0th, and only, state part
       # The distribution is a BatchBroadcast containing a transformed
       # distribution, so we need to use .distribution.distribution
-      batched_transformed_dist = dist.sample_distributions()[0][0]
+      batched_transformed_dist = dist.sample_distributions(
+          seed=sample_seed)[0][0]
       momentum_dist = batched_transformed_dist.distribution.distribution
-      final_precision_factor = tf.linalg.diag_part(
-          momentum_dist.precision_factor)[-1]
+      final_precision_factor = momentum_dist.precision_factor.diag[-1]
       # Evaluate here so we can check the value twice later
-      final_precision = tf.linalg.diag_part(momentum_dist.precision)[-1]
+      final_precision = momentum_dist.precision.diag[-1]
       final_mean = rv_state[0].mean[-1]
       empirical_mean = tf.reduce_mean(draws, axis=0)
       # The final_precision is taken directly from the momentum distribution,
@@ -224,7 +225,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
                            empirical_variance=empirical_variance,
                            true_mean=mvn.mean(),
                            true_variance=mvn.variance())
-    return self.evaluate(do_sample())
+    return self.evaluate(do_sample(test_util.test_seed()))
 
   def testUpdatesCorrectly(self):
     running_variance = tfp.experimental.stats.RunningVariance.from_shape((3,))
@@ -311,11 +312,11 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
         initial_running_variance=initial_running_variance)
 
     # This number started at `error_factor`. Make sure the mean is now at least
-    # 80% closer.
+    # 75% closer.
     final_mean_diff = tf.abs(results.final_mean - results.true_mean)
     np.testing.assert_array_less(
         self.evaluate(final_mean_diff),
-        self.evaluate(0.2 * error_factor))
+        self.evaluate(0.25 * error_factor))
 
   def testDoesNotGoesInWrongDirection(self):
     # As above, we test a weaker property, which is that the variance and
