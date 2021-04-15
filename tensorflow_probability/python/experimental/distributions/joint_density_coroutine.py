@@ -21,7 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as jd_lib
-from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc_lib
+from tensorflow_probability.python.experimental.distribute import joint_distribution as jdc_lib
 
 
 class JointDensityCoroutine(object):
@@ -107,14 +107,9 @@ class JointDensityCoroutine(object):
         model_flatten_fn=self._joint_distribution_coroutine._model_flatten,
         model_unflatten_fn=self._joint_distribution_coroutine._model_unflatten)
 
-    def call_log_prob(d, value):
-      if hasattr(d, "unnormalized_log_prob"):
-        return d.unnormalized_log_prob(value)
-      return d.log_prob(value)
-
     return sum(
         self._joint_distribution_coroutine._map_measure_over_dists(
-            call_log_prob, value))
+            "unnormalized_log_prob", value))
 
   def sample(self, sample_shape=(), seed=None, name="sample", **kwargs):
     """Generate samples of the specified shape.

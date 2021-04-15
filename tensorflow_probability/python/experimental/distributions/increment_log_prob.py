@@ -155,11 +155,20 @@ class IncrementLogProb(object):
   def _parameter_control_dependencies(cls, *_, **__):
     return []
 
+  @property
+  def experimental_shard_axis_names(self):
+    """The list or structure of lists of active shard axis names."""
+    return []
+
   def sample(self, sample_shape=(), seed=None, name='sample'):  # pylint: disable=unused-argument
     return tf.zeros(
-        ps.concat([
-            sample_shape,
-            self.batch_shape_tensor(),
-            self.event_shape_tensor()
-        ],
-                  axis=0))
+        ps.concat(
+            [
+                # sample_shape might be a scalar
+                ps.reshape(
+                    ps.convert_to_shape_tensor(sample_shape, tf.int32),
+                    shape=[-1]),
+                self.batch_shape_tensor(),
+                self.event_shape_tensor()
+            ],
+            axis=0))

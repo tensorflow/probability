@@ -118,6 +118,21 @@ class Sharded(distribution_lib.Distribution):
           log_prob_fn, self.experimental_shard_axis_names)
     return log_prob_fn(x)
 
+  def unnormalized_log_prob(self, x, reduce_over_shards=True, **kwargs):
+
+    def unnormalized_log_prob_fn(value):
+      new_kwargs = dict(kwargs)
+      if self.distribution.experimental_shard_axis_names:
+        new_kwargs['reduce_over_shards'] = reduce_over_shards
+      if hasattr(self.distribution, 'unnormalized_log_prob'):
+        return self.distribution.unnormalized_log_prob(value, **new_kwargs)
+      return self.distribution.log_prob(value, **new_kwargs)
+
+    if reduce_over_shards:
+      unnormalized_log_prob_fn = distribute_lib.make_sharded_log_prob_parts(
+          unnormalized_log_prob_fn, self.experimental_shard_axis_names)
+    return unnormalized_log_prob_fn(x)
+
   def _batch_shape_tensor(self):
     return self.distribution.batch_shape_tensor()
 

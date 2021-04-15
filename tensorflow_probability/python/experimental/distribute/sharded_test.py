@@ -21,6 +21,8 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.distribute import distribute_test_lib as test_lib
 from tensorflow_probability.python.experimental.distribute import sharded
+from tensorflow_probability.python.experimental.distributions import increment_log_prob
+from tensorflow_probability.python.experimental.distributions import joint_density_coroutine
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
@@ -275,6 +277,61 @@ class ShardTest(test_lib.DistributedTest):
     self.assertAllClose(true_diff, diff2[0])
     self.assertAllClose(true_g1, g1)
     self.assertAllClose(true_g2, g2)
+
+  def test_increment_log_prob(self):
+
+    root = tfd.JointDistributionCoroutine.Root
+    prior_mean = 3.
+    x_size = 100
+
+    def custom_ll(w, x):
+      return tf.reduce_sum(tfd.Normal(w, 1.).log_prob(x))
+
+    def ulp_grad(w, x):
+
+      @joint_density_coroutine.JointDensityCoroutine
+      def sharded_model():
+        w = yield root(tfd.Normal(prior_mean, 1.))
+        yield root(
+            sharded.Sharded(
+                increment_log_prob.IncrementLogProb(custom_ll(w, x)),
+                shard_axis_name=self.axis_name))
+
+      def ulp_fn(w):
+        zeros = tf.zeros([x_size, 0])
+        return sharded_model.unnormalized_log_prob(w, zeros)
+
+      ulp, g = tfp.math.value_and_gradient(ulp_fn, (w,))
+      return ulp, g
+
+    def true_ulp_grad(w, x):
+
+      @joint_density_coroutine.JointDensityCoroutine
+      def model():
+        w = yield root(tfd.Normal(prior_mean, 1.))
+        yield root(increment_log_prob.IncrementLogProb(custom_ll(w, x)))
+
+      def ulp_fn(w):
+        zeros = tf.zeros([x_size, 0])
+        return model.unnormalized_log_prob(w, zeros)
+
+      ulp, g = tfp.math.value_and_gradient(ulp_fn, (w,))
+      return ulp, g
+
+    w = tf.constant(4.)
+    x = tf.zeros([x_size])
+    sharded_x = self.shard_values(tf.reshape(x, [test_lib.NUM_DEVICES, -1]))
+
+    lp, g = self.evaluate(
+        self.per_replica_to_tensor(
+            self.strategy_run(ulp_grad, (
+                w,
+                sharded_x,
+            ), in_axes=(None, 0))))
+    true_lp, true_g = self.evaluate(true_ulp_grad(w, x))
+
+    self.assertAllClose(true_lp, lp[0])
+    self.assertAllClose(true_g[0], g[0][0])
 
 
 if __name__ == '__main__':

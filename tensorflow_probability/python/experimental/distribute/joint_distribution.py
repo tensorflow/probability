@@ -36,7 +36,8 @@ class JointDistributionDistributedMixin(object):
     """Override the default implementation to shard its log_prob calculation."""
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
-    if attr == 'log_prob' and any(self.experimental_shard_axis_names):
+    if (attr in ('log_prob', 'unnormalized_log_prob')) and any(
+        self.experimental_shard_axis_names):
 
       def inner_log_prob_parts(flat_value):
         unflat_value = self._model_unflatten(flat_value)
@@ -46,8 +47,8 @@ class JointDistributionDistributedMixin(object):
         # all-reduce.
         axis_names = self._model_flatten(self.experimental_shard_axis_names)
         log_prob_fns = [
-            functools.partial(d.log_prob, reduce_over_shards=False)
-            if axis_name else d.log_prob
+            functools.partial(getattr(d, attr), reduce_over_shards=False)
+            if axis_name else getattr(d, attr)
             for d, axis_name in zip(ds, axis_names)
         ]
         # We need to flatten and unflatten here to ensure the output structure
