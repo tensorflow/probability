@@ -1005,8 +1005,9 @@ py_test(
     size = "large",
     srcs = ["windowed_sampling_test.py"],
     python_version = "PY3",
-    shard_count = 8,
+    shard_count = 12,
     srcs_version = "PY3",
+    tags = ["requires-mem:16g"],
     deps = [
         ":windowed_sampling",
         # absl/testing:parameterized dep,

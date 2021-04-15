@@ -42,7 +42,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
+from tensorflow_probability.python.experimental.mcmc import preconditioning_utils as pu
 from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -474,9 +474,9 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
           self.target_log_prob_fn, state_parts)
       momentum_distribution = self.momentum_distribution
       if momentum_distribution is None:
-        momentum_distribution = preconditioning_utils.make_momentum_distribution(
-            state_parts, ps.rank(current_target_log_prob))
-      momentum_distribution = preconditioning_utils.maybe_make_list_and_batch_broadcast(
+        momentum_distribution = pu.make_momentum_distribution(
+            state_parts, ps.shape(current_target_log_prob))
+      momentum_distribution = pu.maybe_make_list_and_batch_broadcast(
           momentum_distribution, ps.shape(current_target_log_prob))
       momentum_parts = momentum_distribution.sample()
 

@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import unittest
-
 from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -328,40 +326,31 @@ def _beta_binomial(trials):
   return _beta_binomial_distribution
 
 
-def get_joint_distribution(trials,
-                           mean_prior=tfd.Uniform(0., 1.),
-                           inverse_concentration_prior=tfd.HalfNormal(5.)):
+def get_joint_distribution(
+    trials,
+    mean_prior=lambda: tfd.Uniform(0., 1.),
+    inverse_concentration_prior=lambda: tfd.HalfNormal(5.)):
   """Returns a joint distribution over parameters and successes."""
   param_shape = ps.shape(trials)[:1]
-  mean = tfd.Sample(mean_prior, param_shape)
-  inverse_concentration = tfd.Sample(inverse_concentration_prior, param_shape)
-  return tfd.JointDistributionNamed(dict(
-      mean=mean,
-      inverse_concentration=inverse_concentration,
-      successes=_beta_binomial(trials)))
+  mean = tfd.Sample(mean_prior(), param_shape)
+  inverse_concentration = tfd.Sample(inverse_concentration_prior(), param_shape)
+  return tfd.JointDistributionNamed(
+      dict(mean=mean,
+           inverse_concentration=inverse_concentration,
+           successes=_beta_binomial(trials)),
+      name='jd')
 
 
 class PrecompiledTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()
-    input_signature = [
-        tf.TensorSpec(shape=[None], dtype=tf.float32, name='init')
-    ]
-    self.init = tf.ones([7])
-    self.decorator = tf.function(
-        jit_compile=True, input_signature=input_signature)
-    self.arms = 2
-    self.days = 3
+    arms = 2
+    days = 3
 
-    self.n_chains = 5
-    self.trials = tfd.Poisson(100.).sample([self.arms, self.days])
-    self.dist = get_joint_distribution(self.trials)
-    self.true_values = self.dist.sample(seed=test_util.test_seed())
-
-  def get_model_ready(self, dist, successes):
-    return windowed_sampling._setup_mcmc(
-        dist, self.n_chains, test_util.test_seed(), successes=successes)
+    self.trials = tfd.Poisson(100.).sample([arms, days])
+    dist = get_joint_distribution(self.trials)
+    self.true_values = dist.sample(seed=test_util.test_seed())
 
   def nuts_kwargs(self):
     return {'max_tree_depth': 2}
@@ -369,19 +358,18 @@ class PrecompiledTest(test_util.TestCase):
   def hmc_kwargs(self):
     return {'num_leapfrog_steps': 3, 'store_parameters_in_results': True}
 
-  @unittest.skip('TODO(b/181594438): Re-enable this test.')
   @parameterized.named_parameters(('hmc_jit_sig', 'hmc'),
                                   ('nuts_jit_sig', 'nuts'))
   def test_base_kernel(self, kind):
-    input_signature = (tf.TensorSpec(
-        shape=[None, None], dtype=tf.float32, name='trials'),
-                       tf.TensorSpec(
-                           shape=[None, None],
-                           dtype=tf.float32,
-                           name='successes'))
+    self.skip_if_no_xla()
+
+    input_signature = (
+        tf.TensorSpec(
+            shape=[None, None], dtype=tf.float32, name='trials'),
+        tf.TensorSpec(
+            shape=[None, None], dtype=tf.float32, name='successes'))
     @tf.function(jit_compile=True, input_signature=input_signature)
     def do(trials, successes):
-      dist = get_joint_distribution(trials)
       if kind == 'hmc':
         proposal_kernel_kwargs = self.hmc_kwargs()
       else:
@@ -389,7 +377,7 @@ class PrecompiledTest(test_util.TestCase):
 
       return windowed_sampling._windowed_adaptive_impl(
           n_draws=9,
-          joint_dist=dist,
+          joint_dist=get_joint_distribution(trials),
           kind=kind,
           n_chains=11,
           proposal_kernel_kwargs=proposal_kernel_kwargs,

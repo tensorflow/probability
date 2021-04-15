@@ -378,9 +378,8 @@ def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bu
   if not hasattr(input, 'shape'):
     x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype is np.object else x
-  input_shape = tf.TensorShape(input.shape)
   if tensorshape_util.is_fully_defined(input.shape):
-    return np.array(tensorshape_util.as_list(input_shape)).astype(
+    return np.array(tensorshape_util.as_list(input.shape)).astype(
         _numpy_dtype(out_type))
   # NOTE: tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**, so we
   # pre-emptively convert-to-tensor.

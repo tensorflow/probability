@@ -35,11 +35,15 @@ from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import unnest
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
 from tensorflow_probability.python.mcmc import sample
 
-__all__ = ['windowed_adaptive_hmc', 'windowed_adaptive_nuts']
+__all__ = [
+    'windowed_adaptive_hmc',
+    'windowed_adaptive_nuts'
+]
 
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
@@ -212,9 +216,11 @@ def _setup_mcmc(model, n_chains, seed, **pins):
       tf.identity, bijector.forward(unconstrained_unif_init_position))
 
   def target_log_prob_fn(*args):
-    return (pinned_model.unnormalized_log_prob(bijector.inverse(args)) +
-            bijector.inverse_log_det_jacobian(
-                args, event_ndims=[1 for _ in initial_transformed_position]))
+    lp = pinned_model.unnormalized_log_prob(bijector.inverse(args))
+    tensorshape_util.set_shape(lp, [n_chains])
+    ldj = bijector.inverse_log_det_jacobian(
+        args, event_ndims=[1 for _ in initial_transformed_position])
+    return lp + ldj
 
   return target_log_prob_fn, initial_transformed_position, bijector
 
@@ -407,12 +413,12 @@ def _get_window_sizes(num_adaptation_steps):
   return first_window_size, slow_window_size, last_window_size
 
 
-def _init_momentum(initial_transformed_position):
+def _init_momentum(initial_transformed_position, *, batch_shape):
   """Initialize momentum so trace_fn can be concatenated."""
   variance_parts = [ps.ones_like(p) for p in initial_transformed_position]
   return preconditioning_utils.make_momentum_distribution(
       state_parts=initial_transformed_position,
-      batch_ndims=1,
+      batch_shape=batch_shape,
       running_variance_parts=variance_parts)
 
 
@@ -636,8 +642,9 @@ def _windowed_adaptive_impl(n_draws,
 
   proposal_kernel_kwargs.update({
       'target_log_prob_fn': target_log_prob_fn,
-      'step_size': tf.fill([n_chains, 1], init_step_size),
-      'momentum_distribution': _init_momentum(initial_transformed_position),
+      'step_size': tf.fill([n_chains, 1], init_step_size, name='step_size'),
+      'momentum_distribution': _init_momentum(initial_transformed_position,
+                                              batch_shape=[n_chains]),
   })
   all_traces = []
   draws, trace, step_size, running_variances = _fast_window(

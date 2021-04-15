@@ -27,6 +27,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.experimental.mcmc import preconditioning_utils as pu
 from tensorflow_probability.python.internal import test_util
 
 RunHMCResults = collections.namedtuple('RunHMCResults', [
@@ -340,6 +341,17 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
                             tf.sqrt(results.true_variance))
     np.testing.assert_array_less(self.evaluate(final_std_diff),
                                  self.evaluate(fudge_factor))
+
+  def test_momentum_dists(self):
+    state_parts = [
+        tf.ones([13, 5, 3]), tf.ones([13, 5]), tf.ones([13, 5, 2, 4])]
+    batch_shape = [13, 5]
+    md = pu.make_momentum_distribution(state_parts, batch_shape)
+    md = pu.update_momentum_distribution(
+        md,
+        tf.nest.map_structure(
+            lambda s: tf.reduce_sum(s, (0, 1)), state_parts))
+    self.evaluate(tf.nest.flatten(md, expand_composites=True))
 
 
 if __name__ == '__main__':

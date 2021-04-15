@@ -753,6 +753,5 @@ class PreconditionedHMCTest(test_util.TestCase):
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
-
 if __name__ == '__main__':
   tf.test.main()
