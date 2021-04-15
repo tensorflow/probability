@@ -125,6 +125,7 @@ class _PowerSphericalTest(object):
     samples = self.evaluate(samples)
     log_prob = pspherical.log_prob(samples)
     log_prob = self.evaluate(log_prob)
+
     # Check that the log_prob is not nan or +inf. It can be -inf since
     # if we sample a direction diametrically opposite to the mean direction,
     # we'll get an inner product of -1.
@@ -158,15 +159,15 @@ class _PowerSphericalTest(object):
         sample_shape=[nsamples], seed=test_util.test_seed())
     samples = tf.debugging.check_numerics(samples, 'samples')
     log_prob = pspherical.log_prob(samples)
-    log_prob = self.evaluate(log_prob)
+    log_prob, samples = self.evaluate([log_prob, samples])
     # Check that the log_prob is not nan or +inf. It can be -inf since
     # if we sample a direction diametrically opposite to the mean direction,
     # we'll get an inner product of -1.
     self.assertFalse(np.any(np.isnan(log_prob)))
     self.assertFalse(np.any(np.isposinf(log_prob)))
     log_importance = -log_prob
-    sphere_surface_area_estimate, samples, importance = self.evaluate([
-        tf.reduce_mean(tf.math.exp(log_importance), axis=0), samples,
+    sphere_surface_area_estimate, importance = self.evaluate([
+        tf.reduce_mean(tf.math.exp(log_importance), axis=0),
         tf.exp(log_importance)])
     true_sphere_surface_area = 2 * (np.pi)**(dim / 2) * self.evaluate(
         tf.exp(-tf.math.lgamma(dim / 2)))
@@ -252,6 +253,23 @@ class _PowerSphericalTest(object):
         validate_args=True, allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(pspherical)
     self.VerifyPdfWithNumpy(pspherical, atol=2e-4)
+
+  def testSampleAndPdfForMeanDirNorthPole(self):
+    mean_dir = np.array([1., 0., 0., 0., 0.], dtype=self.dtype)
+    concentration = [[0], [5e-2], [0.1], [1], [4]]
+    pspherical = tfp.distributions.PowerSpherical(
+        mean_direction=mean_dir, concentration=concentration,
+        validate_args=True, allow_nan_stats=False)
+    self.VerifySampleAndPdfConsistency(pspherical)
+    self.VerifyPdfWithNumpy(pspherical, atol=2e-4)
+    self.VerifySampleMean(mean_dir, concentration, [5, 1])
+
+    # Verify the covariance.
+    samples = pspherical.sample(int(7e4), seed=test_util.test_seed())
+    sample_cov = tfp.stats.covariance(samples, sample_axis=0)
+    true_cov, sample_cov = self.evaluate([
+        pspherical.covariance(), sample_cov])
+    self.assertAllClose(true_cov, sample_cov, rtol=0.15, atol=1.5e-3)
 
   def VerifyCovariance(self, dim):
     seed_stream = test_util.test_seed_stream()

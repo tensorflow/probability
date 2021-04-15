@@ -318,13 +318,23 @@ class PowerSpherical(distribution.Distribution):
         t[..., tf.newaxis],
         tf.math.sqrt(1. - tf.math.square(t))[
             ..., tf.newaxis] * spherical_samples], axis=-1)
-    modified_mean = tf.concat(
+
+    u = tf.concat(
         [(1. - mean_direction[..., 0])[..., tf.newaxis],
          -mean_direction[..., 1:]], axis=-1)
-    modified_mean = tf.math.l2_normalize(modified_mean, axis=-1)
-    householder_transform = tf.linalg.LinearOperatorHouseholder(
-        modified_mean)
-    return householder_transform.matvec(y)
+    # Much like `VonMisesFisher`, we use `l2_normalize` which does
+    # nothing if the zero vector is passed in, and thus the householder
+    # reflection will do nothing.
+    # This is consistent with sampling
+    # with `mu = [1, 0, 0, ..., 0]` since samples will be of the
+    # form: [w, sqrt(1 - w**2) * u] = w * mu + sqrt(1 - w**2) * v,
+    # where:
+    #   * `u` is a unit vector sampled from the unit hypersphere.
+    #   * `v` is `[0, u]`.
+    # This form is the same as sampling from the tangent-normal decomposition.
+    u = tf.math.l2_normalize(u, axis=-1)
+    return tf.math.l2_normalize(
+        y - 2. * tf.math.reduce_sum(y * u, axis=-1, keepdims=True) * u, axis=-1)
 
   def _entropy(self, concentration=None, mean_direction=None):
     concentration = (
