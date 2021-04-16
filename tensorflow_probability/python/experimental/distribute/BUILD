@@ -62,6 +62,23 @@ multi_substrate_py_library(
     ],
 )
 
+multi_substrate_py_test(
+    name = "diagonal_mass_matrix_adaptation_test",
+    size = "large",
+    srcs = ["diagonal_mass_matrix_adaptation_test.py"],
+    disabled_substrates = ["numpy"],
+    python_version = "PY3",
+    deps = [
+        ":distribute_test_lib",
+        ":joint_distribution",
+        ":sharded",
+        # absl/testing:parameterized dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 multi_substrate_py_library(
     name = "joint_distribution",
     srcs = ["joint_distribution.py"],
