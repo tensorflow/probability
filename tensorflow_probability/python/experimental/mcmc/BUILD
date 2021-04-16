@@ -820,7 +820,6 @@ multi_substrate_py_test(
     name = "thermodynamic_integrals_test",
     size = "small",
     srcs = ["thermodynamic_integrals_test.py"],
-    jax_tags = ["notap"],  # TODO(b/185371290): Re-enable.
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
