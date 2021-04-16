@@ -268,6 +268,10 @@ class Independent(distribution_lib.Distribution):
     return self._reduce(
         self._sum_fn(), self.distribution.log_prob(x, **kwargs))
 
+  def _unnormalized_log_prob(self, x, **kwargs):
+    return self._reduce(
+        self._sum_fn(), self.distribution.unnormalized_log_prob(x, **kwargs))
+
   def _log_cdf(self, x, **kwargs):
     return self._reduce(self._sum_fn(), self.distribution.log_cdf(x, **kwargs))
 

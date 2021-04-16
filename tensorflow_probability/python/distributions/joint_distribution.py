@@ -412,6 +412,10 @@ class JointDistribution(distribution_lib.Distribution):
     xs = self._map_measure_over_dists('log_prob', value)
     return sum(maybe_check_wont_broadcast(xs, self.validate_args))
 
+  def _unnormalized_log_prob(self, value):
+    xs = self._map_measure_over_dists('unnormalized_log_prob', value)
+    return sum(maybe_check_wont_broadcast(xs, self.validate_args))
+
   @distribution_util.AppendDocstring(kwargs_dict={
       'value': ('`Tensor`s structured like `type(model)` used to parameterize '
                 'other dependent ("downstream") distribution-making functions. '

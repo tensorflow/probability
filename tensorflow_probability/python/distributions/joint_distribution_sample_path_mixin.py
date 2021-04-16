@@ -155,7 +155,7 @@ class JointDistributionSamplePathMixin(object):
     return sum(xs)
 
   def log_prob_parts(self, value, name='log_prob_parts'):
-    """Log probability density/mass function.
+    """Log probability density/mass function, part-wise.
 
     Args:
       value: `list` of `Tensor`s in `distribution_fn` order for which we compute
@@ -174,6 +174,37 @@ class JointDistributionSamplePathMixin(object):
         sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
       xs = self._map_and_reduce_measure_over_dists(
           'log_prob', sum_fn, value)
+      return self._model_unflatten(xs)
+
+  def _unnormalized_log_prob(self, value):
+    if self._experimental_use_kahan_sum:
+      xs = self._map_and_reduce_measure_over_dists(
+          'unnormalized_log_prob', tfp_math.reduce_kahan_sum, value)
+      return sum(xs).total
+    xs = self._map_and_reduce_measure_over_dists(
+        'unnormalized_log_prob', tf.reduce_sum, value)
+    return sum(xs)
+
+  def unnormalized_log_prob_parts(self, value, name=None):
+    """Unnormalized log probability density/mass function, part-wise.
+
+    Args:
+      value: `list` of `Tensor`s in `distribution_fn` order for which we compute
+        the `unnormalized_log_prob_parts` and to parameterize other
+        ("downstream") distributions.
+      name: name prepended to ops created by this function.
+        Default value: `"unnormalized_log_prob_parts"`.
+
+    Returns:
+      log_prob_parts: a `tuple` of `Tensor`s representing the `log_prob` for
+        each `distribution_fn` evaluated at each corresponding `value`.
+    """
+    with self._name_and_control_scope(name or 'unnormalized_log_prob_parts'):
+      sum_fn = tf.reduce_sum
+      if self._experimental_use_kahan_sum:
+        sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
+      xs = self._map_and_reduce_measure_over_dists(
+          'unnormalized_log_prob', sum_fn, value)
       return self._model_unflatten(xs)
 
   def prob_parts(self, value, name='prob_parts'):

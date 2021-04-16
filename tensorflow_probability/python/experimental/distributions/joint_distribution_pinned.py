@@ -557,7 +557,7 @@ class JointDistributionPinned(object):
         `**kwargs`.
     """
     xs = _to_pins(self, *args, **kwargs)
-    return self.distribution.log_prob(self._add_pins(**xs))
+    return self.distribution.unnormalized_log_prob(self._add_pins(**xs))
 
   @docstring_util.expand_docstring(
       calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(

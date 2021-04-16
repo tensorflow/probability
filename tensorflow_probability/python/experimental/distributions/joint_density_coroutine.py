@@ -66,7 +66,7 @@ class JointDensityCoroutine(object):
   ```
   """
 
-  def __init__(self, *args, name="JointDensityCoroutine", **kwargs):
+  def __init__(self, *args, name='JointDensityCoroutine', **kwargs):
     """Construct the `JointDensityCoroutine` density.
 
     See the documentation for JointDistributionCoroutine
@@ -90,14 +90,14 @@ class JointDensityCoroutine(object):
 
     Args:
       *args: Positional arguments forwarded to superclass implementation, which
-        likely include "value" or possibly "name".
+        likely include 'value' or possibly 'name'.
       **kwargs: Named arguments forwarded to superclass implementation.
 
     Returns:
       unnormalized_log_prob: a `Tensor` of shape `sample_shape(x) +
       self.batch_shape` with values of type `self.dtype`.
     """
-    kwargs["name"] = kwargs.get("name", "unnormalized_log_prob")
+    kwargs['name'] = kwargs.get('name', 'unnormalized_log_prob')
     # pylint: disable=protected-access
     value, _ = jd_lib._resolve_value_from_args(
         args,
@@ -109,9 +109,9 @@ class JointDensityCoroutine(object):
 
     return sum(
         self._joint_distribution_coroutine._map_measure_over_dists(
-            "unnormalized_log_prob", value))
+            'unnormalized_log_prob', value))
 
-  def sample(self, sample_shape=(), seed=None, name="sample", **kwargs):
+  def sample(self, sample_shape=(), seed=None, name='sample', **kwargs):
     """Generate samples of the specified shape.
 
     Note that a call to `sample()` without arguments will generate a single
