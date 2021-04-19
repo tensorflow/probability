@@ -25,9 +25,12 @@ import threading
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.saved_model import nested_structure_coder  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
+# pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import composite_tensor
+from tensorflow.python.ops import resource_variable_ops
+from tensorflow.python.saved_model import nested_structure_coder
+from tensorflow.python.util import tf_inspect
+# pylint: enable=g-direct-tensorflow-import
 
 __all__ = [
     'auto_composite_tensor',
@@ -120,6 +123,9 @@ def _extract_type_spec_recursively(value):
   """
   if isinstance(value, composite_tensor.CompositeTensor):
     return value._type_spec  # pylint: disable=protected-access
+  if isinstance(value, tf.Variable):
+    return resource_variable_ops.VariableSpec(
+        value.shape, dtype=value.dtype, trainable=value.trainable)
   if tf.is_tensor(value):
     return tf.TensorSpec(value.shape, value.dtype)
   if isinstance(value, (list, tuple)):

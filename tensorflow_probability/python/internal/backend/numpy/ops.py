@@ -63,6 +63,7 @@ __all__ = [
     'TensorSpec',
     'TypeSpec',
     'Variable',
+    'VariableSpec',
     # 'gradients',
 ]
 
@@ -699,6 +700,10 @@ class TensorSpec(object):
 
 
 class TypeSpec(object):
+  pass
+
+
+class VariableSpec(object):
   pass
 
 

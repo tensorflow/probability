@@ -233,6 +233,24 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
     f(d)
 
+  def test_function_with_variable(self):
+    loc = tf.Variable(3.)
+    dist = AutoIndependent(
+        AutoNormal(loc, scale=tf.ones([3])), reinterpreted_batch_ndims=1)
+
+    new_loc = 32.
+    @tf.function
+    def f(d):
+      d.distribution.loc.assign(new_loc)
+      self.assertLen(d.trainable_variables, 1)
+      return d
+
+    dist_ = f(dist)
+    self.evaluate(loc.initializer)
+    self.assertEqual(self.evaluate(dist_.distribution.loc), new_loc)
+    self.assertEqual(self.evaluate(dist.distribution.loc), new_loc)
+    self.assertLen(dist.trainable_variables, 1)
+
 
 if __name__ == '__main__':
   tf.enable_v2_behavior()
