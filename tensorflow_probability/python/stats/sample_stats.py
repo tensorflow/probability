@@ -35,6 +35,7 @@ __all__ = [
     'cholesky_covariance',
     'correlation',
     'covariance',
+    'cumulative_variance',
     'log_average_probs',
     'stddev',
     'variance',
@@ -640,6 +641,70 @@ def variance(x, sample_axis=0, keepdims=False, name=None):
   with tf.name_scope(name or 'variance'):
     return covariance(
         x, y=None, sample_axis=sample_axis, event_axis=None, keepdims=keepdims)
+
+
+def cumulative_variance(x, sample_axis=0, name=None):
+  """Cumulative estimates of variance.
+
+  Given `N` samples of a scalar-valued random variable `X`, we can compute
+  cumulative variance estimates
+
+    result[i] = variance(x[0:i+1])
+
+  in O(N log(N)) time and O(1) TF kernel invocations.  This
+  implementation also arranges to do so in a numerically accurate
+  manner, i.e., without incurring a subtraction of floating-point
+  numbers of size quadratic in the data `x`.  The underlying algorithm
+  is from [1].
+
+  Args:
+    x:  A numeric `Tensor` holding samples.
+    sample_axis: Scalar `Tensor` designating the axis holding samples.
+      Other axes are treated in batch.  Default value: `0` (leftmost
+      dimension).
+    name: Python `str` name prefixed to Ops created by this function.
+          Default value: `None` (i.e., `'cumulative_variance'`).
+
+  Returns:
+    cum_var: A `Tensor` of same shape and dtype as `x` giving
+      cumulative variance estimates.  The zeroth element is the
+      variance of a size-1 set of samples, so 0.
+
+  #### References
+  [1]: Philippe Pebay. Formulas for Robust, One-Pass Parallel Computation of
+       Covariances and Arbitrary-Order Statistical Moments. _Technical Report
+       SAND2008-6212_, 2008.
+       https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
+
+  """
+  with tf.name_scope(name or 'cumulative_variance'):
+    # At each index, we are interested in
+    # - The count of items up to that index (inclusive and exclusive);
+    # - The sum of items up to that index (exclusive);
+    # - From which we compute the mean of items up to that index (exclusive);
+    # - The residual of items up to that index (inclusive), which is
+    #   the variance scaled by the count of items.
+    #
+    # The contribution from item i to the residual is that item's
+    # squared discrepancy from the mean of all preceding items (i.e.,
+    # the exclusive mean at the present item), adjusted by i-1/i.
+    x = tf.convert_to_tensor(x)
+    size = ps.shape(x)[sample_axis]
+    counts_shp = ps.one_hot(
+        sample_axis, depth=ps.rank(x), on_value=size, off_value=1)
+    excl_counts = tf.reshape(tf.range(size, dtype=x.dtype), shape=counts_shp)
+    incl_counts = excl_counts + 1
+    excl_sums = tf.cumsum(x, axis=sample_axis, exclusive=True)
+    discrepancies = (excl_sums / excl_counts - x)**2
+    discrepancies = tf.where(excl_counts == 0, x**2, discrepancies)
+    adjustments = excl_counts / incl_counts
+    # The zeroth item's residual contribution is 0, because it has no
+    # other items to vary from.  The preceding expressions, however,
+    # compute 0/0 at index 0, so we mask it out here.
+    adjusted = tf.where(
+        ~tf.equal(excl_counts, 0), adjustments * discrepancies, 0)
+    incl_residual = tf.cumsum(adjusted, axis=sample_axis)
+    return incl_residual / incl_counts
 
 
 def log_average_probs(logits, sample_axis=0, event_axis=None, keepdims=False,

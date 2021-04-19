@@ -547,6 +547,19 @@ class VarianceTest(test_util.TestCase):
 
     self.assertAllClose(np.var(x), var)
 
+  def test_independent_uniform_samples_cumulative(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(11, 13, 17)
+
+    var = tfp.stats.cumulative_variance(x, sample_axis=1)
+    self.assertAllEqual((11, 13, 17), var.shape)
+
+    var = self.evaluate(var)
+
+    from_numpy = np.stack([np.var(x[:, 0:i+1, :], axis=1)
+                           for i in range(13)], axis=1)
+    self.assertAllClose(from_numpy, var)
+
 
 @test_util.test_all_tf_execution_regimes
 class StddevTest(test_util.TestCase):
