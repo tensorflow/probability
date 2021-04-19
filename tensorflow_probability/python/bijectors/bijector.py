@@ -1130,7 +1130,7 @@ class Bijector(tf.Module):
           allow_packing=True)
 
       if event_ndims is None:
-        event_ndims = self.forward_min_event_ndims
+        event_ndims = self.inverse_min_event_ndims
 
       reduce_shape, assertions = ldj_reduction_shape(
           nest.map_structure(ps.shape, y),

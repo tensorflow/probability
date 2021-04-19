@@ -551,6 +551,14 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
         np.sum(-np.log(x), axis=-1),
         self.evaluate(bij.inverse_log_det_jacobian(x)))
 
+  def testInverseWithEventDimsOmitted(self):
+    bij = tfb.Split(2)
+
+    self.assertAllEqual(
+        0.0,
+        self.evaluate(bij.inverse_log_det_jacobian(
+            [tf.ones((3, 4, 5)), tf.ones((3, 4, 5))])))
+
   def testReduceEventNdimsForwardRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
