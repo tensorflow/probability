@@ -324,6 +324,15 @@ class Poisson(distribution.Distribution):
     cdf = tf.math.igammac(1. + safe_x, self._rate_parameter_no_checks())
     return tf.where(x < 0., tf.zeros_like(cdf), cdf)
 
+  def _log_survival_function(self, x):
+    return tf.math.log(self.survival_function(x))
+
+  def _survival_function(self, x):
+    safe_x = tf.maximum(
+        tf.floor(x) if self.force_probs_to_zero_outside_support else x, 0.)
+    survival = tf.math.igamma(1. + safe_x, self._rate_parameter_no_checks())
+    return tf.where(x < 0., tf.ones_like(survival), survival)
+
   def _log_normalization(self, log_rate):
     return tf.exp(log_rate)
 

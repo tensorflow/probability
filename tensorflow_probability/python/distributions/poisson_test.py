@@ -183,6 +183,29 @@ class PoissonTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(cdf), stats.poisson.cdf(x, lam_v))
 
   @test_util.jax_disable_test_missing_functionality(
+      '`tf.math.igamma` is unimplemented in JAX backend.')
+  def testPoissonSurvivalFunction(self):
+    batch_size = 12
+    lam = tf.constant([3.0] * batch_size)
+    lam_v = 3.0
+    x = np.array([-3., -0.5, 0., 2., 2.2, 3., 3.1, 4., 5., 5.5, 6., 7.],
+                 dtype=np.float32)
+
+    poisson = self._make_poisson(
+        rate=lam, force_probs_to_zero_outside_support=True, validate_args=False)
+    log_survival = poisson.log_survival_function(x)
+    self.assertEqual(log_survival.shape, (batch_size,))
+    self.assertAllClose(
+        self.evaluate(log_survival), stats.poisson.logsf(x, lam_v))
+
+    survival = poisson.survival_function(x)
+    self.assertEqual(survival.shape, (batch_size,))
+    self.assertAllClose(self.evaluate(survival), stats.poisson.sf(x, lam_v))
+
+    small_prob = tfd.Poisson(rate=0.123).log_survival_function(10)
+    self.assertAllFinite(self.evaluate(small_prob))
+
+  @test_util.jax_disable_test_missing_functionality(
       '`tf.math.igammac` is unimplemented in JAX backend.')
   def testPoissonCdfContinuousRelaxation(self):
     batch_size = 12
