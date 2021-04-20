@@ -44,6 +44,11 @@ def hmc_like_momentum_distribution_setter_fn(kernel_results, new_distribution):
       kernel_results, momentum_distribution=new_distribution)
 
 
+def hmc_like_momentum_distribution_getter_fn(kernel_results):
+  """Getter for `momentum_distribution` so it can be updated."""
+  return unnest.get_innermost(kernel_results, 'momentum_distribution')
+
+
 class DiagonalMassMatrixAdaptationResults(
     mcmc_util.PrettyNamedTupleMixin,
     collections.namedtuple('DiagonalMassMatrixAdaptationResults', [
@@ -86,6 +91,7 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
       inner_kernel,
       initial_running_variance,
       momentum_distribution_setter_fn=hmc_like_momentum_distribution_setter_fn,
+      momentum_distribution_getter_fn=hmc_like_momentum_distribution_getter_fn,
       validate_args=False,
       name=None):
     """Creates the diagonal mass matrix adaptation kernel.
@@ -111,6 +117,14 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
         `hmc_like_momentum_distribution_setter_fn`, presumes HMC-style
         `kernel_results`, and sets the `momentum_distribution` only under the
         `accepted_results` field.
+      momentum_distribution_getter_fn: A callable with the signature
+        `kernel_results -> momentum_distribution`
+        where `kernel_results` are the results of the `inner_kernel` and
+        `momentum_distribution` is a `CompositeTensor` or a nested
+        collection of `CompositeTensor`s. The default,
+        `hmc_like_momentum_distribution_getter_fn`, presumes HMC-style
+        `kernel_results`, and gets the `momentum_distribution` only under the
+        `accepted_results` field.
       validate_args: Python `bool`. When `True` kernel parameters are checked
         for validity. When `False` invalid inputs may silently render incorrect
         outputs.
@@ -122,6 +136,7 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
         inner_kernel=inner_kernel,
         initial_running_variance=initial_running_variance,
         momentum_distribution_setter_fn=momentum_distribution_setter_fn,
+        momentum_distribution_getter_fn=momentum_distribution_getter_fn,
         name=name,
     )
 
@@ -136,6 +151,9 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
   @property
   def initial_running_variance(self):
     return self._parameters['initial_running_variance']
+
+  def momentum_distribution_getter_fn(self, kernel_results):
+    return self._parameters['momentum_distribution_getter_fn'](kernel_results)
 
   def momentum_distribution_setter_fn(self, kernel_results,
                                       new_momentum_distribution):
@@ -153,12 +171,12 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
                             'one_step')):
       variance_parts = previous_kernel_results.running_variance
       diags = [variance_part.variance() for variance_part in variance_parts]
-      # Set the momentum.
-      batch_ndims = ps.rank(unnest.get_innermost(previous_kernel_results,
-                                                 'target_log_prob'))
-      state_parts = tf.nest.flatten(current_state)
-      new_momentum_distribution = preconditioning_utils.make_momentum_distribution(
-          state_parts, batch_ndims, diags)
+      # Update the momentum.
+      prev_momentum_distribution = self.momentum_distribution_getter_fn(
+          previous_kernel_results.inner_results)
+      new_momentum_distribution = (
+          preconditioning_utils.update_momentum_distribution(
+              prev_momentum_distribution, diags))
       inner_results = self.momentum_distribution_setter_fn(
           previous_kernel_results.inner_results, new_momentum_distribution)
 
@@ -232,11 +250,11 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
       # Step inner results.
       inner_results = self.inner_kernel.bootstrap_results(init_state)
       # Set the momentum.
-      batch_ndims = ps.rank(unnest.get_innermost(inner_results,
-                                                 'target_log_prob'))
+      batch_shape = ps.shape(unnest.get_innermost(inner_results,
+                                                  'target_log_prob'))
       init_state_parts = tf.nest.flatten(init_state)
       momentum_distribution = preconditioning_utils.make_momentum_distribution(
-          init_state_parts, batch_ndims, diags)
+          init_state_parts, batch_shape, diags)
       inner_results = self.momentum_distribution_setter_fn(
           inner_results, momentum_distribution)
       proposed = unnest.get_innermost(inner_results, 'proposed_results',

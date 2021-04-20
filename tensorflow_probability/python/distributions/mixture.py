@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -218,6 +219,13 @@ class Mixture(distribution.Distribution):
       raise ValueError(
           '`Mixture.cat` sharding must match `Mixture.components`.')
     return sharded
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        cat=parameter_properties.BatchedComponentProperties(),
+        components=parameter_properties.BatchedComponentProperties(
+            event_ndims=lambda self: [0 for _ in self.components]))
 
   def _batch_shape_tensor(self):
     return self._cat.batch_shape_tensor()

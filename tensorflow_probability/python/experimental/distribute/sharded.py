@@ -31,6 +31,25 @@ from tensorflow_probability.python.internal import samplers
 JAX_MODE = False
 
 
+def _implement_sharded_lp_fn(fn_name):
+  """Implements log_prob or unnormalized_log_prob."""
+  def lp_fn(self, x, reduce_over_shards=True, **kwargs):
+
+    def impl(value):
+      new_kwargs = dict(kwargs)
+      if self.distribution.experimental_shard_axis_names:
+        new_kwargs['reduce_over_shards'] = reduce_over_shards
+      return getattr(self.distribution, fn_name)(value, **new_kwargs)
+
+    if reduce_over_shards:
+      impl = distribute_lib.make_sharded_log_prob_parts(
+          impl, self.experimental_shard_axis_names)
+    return impl(x)
+
+  lp_fn.__name__ = f'_{fn_name}'
+  return lp_fn
+
+
 class Sharded(distribution_lib.Distribution):
   """A meta-distribution meant for use in an SPMD distributed context.
 
@@ -65,6 +84,9 @@ class Sharded(distribution_lib.Distribution):
     """
     parameters = dict(locals())
 
+    if JAX_MODE and shard_axis_name is None:
+      raise ValueError('Cannot provide a `None` axis name in JAX backend.')
+
     with tf.name_scope(name or 'Sharded' + distribution.name) as name:
       self._distribution = distribution
       self._shard_axis_name = shard_axis_name
@@ -76,38 +98,34 @@ class Sharded(distribution_lib.Distribution):
           parameters=parameters,
           name=name)
 
-  experimental_is_sharded = True
+  @property
+  def experimental_shard_axis_names(self):
+    if self._shard_axis_name is None:
+      # In TF, we use `True` as the default `axis_name`.
+      if self.distribution.experimental_shard_axis_names:
+        raise ValueError('Cannot nest sharded distributions in TF backend.')
+      return [True]
+    shard_axis_names = distribute_lib.canonicalize_axis_name(
+        self._shard_axis_name)
+    for axis_name in shard_axis_names:
+      if axis_name in self.distribution.experimental_shard_axis_names:
+        raise ValueError(f'Found nested axes with the same name: {axis_name}')
+    # Use inner axes before outer axes
+    return self.distribution.experimental_shard_axis_names + shard_axis_names
 
   @property
   def distribution(self):
     return self._distribution
 
-  @property
-  def shard_axis_name(self):
-    return self._shard_axis_name
-
-  @property
-  def replica_id(self):
-    return distribute_lib.get_replica_id(axis_name=self.shard_axis_name)
-
-  @property
-  def num_devices(self):
-    return distribute_lib.get_num_replicas(axis_name=self.shard_axis_name)
-
   def _sample_n(self, n, seed, **kwargs):
     seed = samplers.sanitize_seed(seed, salt='sharded_sample')
-    seed = samplers.fold_in(seed, tf.cast(self.replica_id, tf.int32))
+    for axis_name in self.experimental_shard_axis_names:
+      axis_index = distribute_lib.get_axis_index(axis_name)
+      seed = samplers.fold_in(seed, tf.cast(axis_index, tf.int32))
     return self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
 
-  def _log_prob(self, x, reduce_over_shards=True, **kwargs):
-
-    def log_prob_fn(value):
-      return self.distribution.log_prob(value, **kwargs)
-
-    if reduce_over_shards:
-      log_prob_fn = distribute_lib.make_sharded_log_prob_parts(
-          log_prob_fn, is_sharded=True, axis_name=self.shard_axis_name)
-    return log_prob_fn(x)
+  _log_prob = _implement_sharded_lp_fn('log_prob')
+  _unnormalized_log_prob = _implement_sharded_lp_fn('unnormalized_log_prob')
 
   def _batch_shape_tensor(self):
     return self.distribution.batch_shape_tensor()
@@ -139,9 +157,11 @@ class Sharded(distribution_lib.Distribution):
 def _sharded_log_prob_ratio(p, x, q, y, name=None, reduce_over_shards=True):
   """Distributed log-prob ratio for Sharded."""
   with tf.name_scope(name or 'sharded_log_prob_ratio'):
-    if p.shard_axis_name != q.shard_axis_name:
-      raise ValueError('Mismatched axis names '
-                       f'"{p.shard_axis_name}" vs "{q.shard_axis_name}"')
+    if p.experimental_shard_axis_names != q.experimental_shard_axis_names:
+      raise ValueError(
+          'Mismatched axis names '
+          f'"{p.experimental_shard_axis_names}" vs "'
+          f'"{q.experimental_shard_axis_names}"')
 
     def log_prob_ratio_fn(x_y):
       return log_prob_ratio.log_prob_ratio(p.distribution, x_y[0],
@@ -154,7 +174,6 @@ def _sharded_log_prob_ratio(p, x, q, y, name=None, reduce_over_shards=True):
           # bijectors are done, as it is likely that make_sharded_log_prob_parts
           # will be adjusted then to not have this limitation.
           log_prob_ratio_fn,
-          is_sharded=True,
-          axis_name=p.shard_axis_name)(
+          p.experimental_shard_axis_names)(
               tf.stack([x, y], axis=0))
     return log_prob_ratio_fn([x, y])

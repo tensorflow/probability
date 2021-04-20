@@ -223,10 +223,10 @@ class JointDistribution(distribution_lib.Distribution):
         for d in self._get_single_sample_distributions()])
 
   @property
-  def experimental_is_sharded(self):
-    """Indicates whether part distributions are sharded."""
+  def experimental_shard_axis_names(self):
+    """Indicates whether part distributions have active shard axis names."""
     return self._model_unflatten([
-        d.experimental_is_sharded
+        d.experimental_shard_axis_names
         for d in self._get_single_sample_distributions()])
 
   @property
@@ -412,6 +412,10 @@ class JointDistribution(distribution_lib.Distribution):
     xs = self._map_measure_over_dists('log_prob', value)
     return sum(maybe_check_wont_broadcast(xs, self.validate_args))
 
+  def _unnormalized_log_prob(self, value):
+    xs = self._map_measure_over_dists('unnormalized_log_prob', value)
+    return sum(maybe_check_wont_broadcast(xs, self.validate_args))
+
   @distribution_util.AppendDocstring(kwargs_dict={
       'value': ('`Tensor`s structured like `type(model)` used to parameterize '
                 'other dependent ("downstream") distribution-making functions. '
@@ -444,34 +448,43 @@ class JointDistribution(distribution_lib.Distribution):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
     ds, xs = self._call_flat_sample_distributions(
         value=value, seed=samplers.zeros_seed())
-    return (getattr(d, attr)(x) for d, x in zip(ds, xs))
+
+    if not callable(attr):
+      attr_name = attr
+      attr = lambda d, x: getattr(d, attr_name)(x)
+
+    return (attr(d, x) for d, x in zip(ds, xs))
 
   def _map_attr_over_dists(self, attr, dists=None):
     dists = (self._get_single_sample_distributions()
              if dists is None else dists)
     return (getattr(d, attr)() for d in dists)
 
+  def _resolve_value_from_kwargs(self, **kwargs):
+    names = self._flat_resolve_names()
+    kwargs.update({k: kwargs.get(k, None) for k in names})  # In place update
+    value, unmatched_kwargs = _resolve_value_from_args(
+        [],
+        kwargs,
+        dtype=self.dtype,
+        flat_names=names,
+        model_flatten_fn=self._model_flatten,
+        model_unflatten_fn=self._model_unflatten)
+    if unmatched_kwargs:
+      join = lambda args: ', '.join(str(j) for j in args)
+      kwarg_names = join(k for k, v in kwargs.items() if v is not None)
+      dist_name_str = join(names)
+      unmatched_str = join(unmatched_kwargs)
+      raise ValueError(
+          'Found unexpected keyword arguments. Distribution names '
+          'are\n{}\nbut received\n{}\nThese names were '
+          'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
+    return value
+
   def _call_flat_sample_distributions(
       self, sample_shape=(), seed=None, value=None, **kwargs):
     if (value is None) and kwargs:
-      names = self._flat_resolve_names()
-      kwargs.update({k: kwargs.get(k) for k in names})  # In place update
-      value, unmatched_kwargs = _resolve_value_from_args(
-          [],
-          kwargs,
-          dtype=self.dtype,
-          flat_names=names,
-          model_flatten_fn=self._model_flatten,
-          model_unflatten_fn=self._model_unflatten)
-      if unmatched_kwargs:
-        join = lambda args: ', '.join(str(j) for j in args)
-        kwarg_names = join(k for k, v in kwargs.items() if v is not None)
-        dist_name_str = join(names)
-        unmatched_str = join(unmatched_kwargs)
-        raise ValueError(
-            'Found unexpected keyword arguments. Distribution names '
-            'are\n{}\nbut received\n{}\nThese names were '
-            'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
+      value = self._resolve_value_from_kwargs(**kwargs)
     if value is not None:
       value = self._model_flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)

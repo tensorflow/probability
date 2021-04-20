@@ -27,8 +27,10 @@ py_library(
     name = "numpy",
     srcs = ["__init__.py"],
     deps = [
+        ":__internal__",
         ":bitwise",
         ":compat",
+        ":composite_tensor",
         ":config",
         ":control_flow",
         ":debugging",
@@ -40,6 +42,7 @@ py_library(
         ":linalg",
         ":misc",
         ":nest",
+        ":nested_structure_coder",
         ":nn",
         ":numpy_array",
         ":numpy_logging",
@@ -59,6 +62,14 @@ py_library(
 )
 
 py_library(
+    name = "__internal__",
+    srcs = ["__internal__.py"],
+    deps = [
+        ":composite_tensor",
+    ],
+)
+
+py_library(
     name = "bitwise",
     srcs = ["bitwise.py"],
     deps = [
@@ -74,6 +85,11 @@ py_library(
         ":v1",
         ":v2",
     ],
+)
+
+py_library(
+    name = "composite_tensor",
+    srcs = ["composite_tensor.py"],
 )
 
 py_library(
@@ -191,6 +207,11 @@ py_library(
     deps = [
         # tree dep,
     ],
+)
+
+py_library(
+    name = "nested_structure_coder",
+    srcs = ["nested_structure_coder.py"],
 )
 
 py_library(

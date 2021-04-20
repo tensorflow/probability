@@ -182,6 +182,7 @@ py_library(
 
 py_test(
     name = "fun_mcmc_test",
+    size = "large",
     srcs = ["fun_mcmc_test.py"],
     python_version = "PY3",
     shard_count = 8,

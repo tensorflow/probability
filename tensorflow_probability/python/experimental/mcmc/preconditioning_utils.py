@@ -28,7 +28,6 @@ from tensorflow_probability.python.distributions import joint_distribution_named
 from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvn_pfl
-from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -73,7 +72,7 @@ else:
       batch_broadcast.BatchBroadcast, omit_kwargs=('name',))
 
 
-def make_momentum_distribution(state_parts, batch_ndims,
+def make_momentum_distribution(state_parts, batch_shape,
                                running_variance_parts=None):
   """Construct a momentum distribution from the running variance.
 
@@ -82,7 +81,7 @@ def make_momentum_distribution(state_parts, batch_ndims,
 
   Args:
     state_parts: List of `Tensor`.
-    batch_ndims: Scalar, for leading batch dimensions.
+    batch_shape: Batch shape.
     running_variance_parts: Optional, list of `Tensor`
        outputs of `tfp.experimental.stats.RunningVariance.variance()`. Defaults
        to ones with the same shape as state_parts.
@@ -94,43 +93,78 @@ def make_momentum_distribution(state_parts, batch_ndims,
   if running_variance_parts is None:
     running_variance_parts = tf.nest.map_structure(tf.ones_like, state_parts)
   distributions = []
+  batch_ndims = ps.rank_from_shape(batch_shape)
   for variance_part, state_part in zip(running_variance_parts, state_parts):
-    running_variance_rank = ps.rank(variance_part)
-    state_rank = ps.rank(state_part)
     event_shape = state_part.shape[batch_ndims:]
     if not tensorshape_util.is_fully_defined(event_shape):
-      event_shape = ps.shape(state_part)[batch_ndims:]
-    batch_shape = state_part.shape[:batch_ndims]
-    if not tensorshape_util.is_fully_defined(batch_shape):
-      batch_shape = ps.shape(state_part)[:batch_ndims]
+      event_shape = ps.shape(state_part, name='state_part_shp')[batch_ndims:]
+    variance_tiled = tf.broadcast_to(
+        variance_part, ps.concat([batch_shape, event_shape], axis=0))
     nevt = ps.cast(ps.reduce_prod(event_shape), tf.int32)
-    # Pad dimensions and tile by multiplying by tf.ones to add a batch shape
-    ones = tf.ones(ps.shape(state_part)[:-(state_rank - running_variance_rank)],
-                   dtype=variance_part.dtype)
-    ones = bu.left_justified_expand_dims_like(ones, state_part)
-    variance_tiled = ones * variance_part
     variance_flattened = tf.reshape(
-        variance_tiled,
-        ps.concat([ps.shape(variance_tiled)[:batch_ndims],
-                   [nevt]], axis=0))
+        variance_tiled, ps.concat([batch_shape, [nevt]], axis=0))
 
     distribution = _CompositeTransformedDistribution(
         bijector=_CompositeReshape(
-            event_shape_out=event_shape, event_shape_in=[nevt]),
+            event_shape_out=event_shape,
+            name='reshape_mvnpfl'),
         distribution=(_CompositeMultivariateNormalPrecisionFactorLinearOperator(
             precision_factor=_CompositeLinearOperatorDiag(
                 tf.math.sqrt(variance_flattened)),
-            precision=_CompositeLinearOperatorDiag(variance_flattened))))
+            precision=_CompositeLinearOperatorDiag(variance_flattened),
+            name='momentum')))
     distributions.append(distribution)
   return maybe_make_list_and_batch_broadcast(
       _CompositeJointDistributionSequential(distributions), batch_shape)
+
+
+def update_momentum_distribution(momentum_distribution,
+                                 running_variance_parts):
+  """Updates a momentum distribution with new running variance.
+
+  Args:
+    momentum_distribution: Distribution arranged like a result of
+      `make_momentum_distribution`.
+    running_variance_parts: List of `Tensor` outputs of
+      `tfp.experimental.stats.RunningVariance.variance()`.
+
+  Returns:
+    `tfd.Distribution` where `.sample` has the same structure as `state_parts`,
+    and `.log_prob` of the sample will have the rank of `batch_ndims`
+  """
+  model = []
+  if len(running_variance_parts) != len(momentum_distribution.model):
+    raise ValueError(
+        'State size mismatch: '
+        f'{len(running_variance_parts)} vs {len(momentum_distribution.model)}')
+  for var, bb in zip(running_variance_parts, momentum_distribution.model):
+    if not isinstance(bb, batch_broadcast.BatchBroadcast):
+      raise ValueError(f'Part dist is not a BatchBroadcast: {bb}')
+    td = bb.distribution
+    if not isinstance(td, transformed_distribution.TransformedDistribution):
+      raise ValueError(f'Inner dist is not a TransformedDistribution: {td}')
+    mvnpfl = td.distribution
+    if not isinstance(
+        mvnpfl, mvn_pfl.MultivariateNormalPrecisionFactorLinearOperator):
+      raise ValueError(
+          'Inner dist is not a '
+          f'MultivariateNormalPrecisionFactorLinearOperator: {mvnpfl}')
+    var_flat = td.bijector.inverse(var)
+    var_flat_bc = tf.broadcast_to(var_flat,
+                                  ps.shape(mvnpfl.precision.diag_part()))
+    mvnpfl = mvnpfl.copy(
+        precision_factor=_CompositeLinearOperatorDiag(
+            tf.math.sqrt(var_flat_bc)),
+        precision=_CompositeLinearOperatorDiag(var_flat_bc))
+    model.append(bb.copy(distribution=td.copy(distribution=mvnpfl)))
+  return momentum_distribution.copy(model=model)
 
 
 def maybe_make_list_and_batch_broadcast(momentum_distribution, batch_shape):
   """Makes the distribution list-like and batched, if possible."""
   if not mcmc_util.is_list_like(momentum_distribution.dtype):
     momentum_distribution = _CompositeJointDistributionSequential(
-        [momentum_distribution])
+        [momentum_distribution], name='joint_momentum')
   if (isinstance(momentum_distribution, jds.JointDistributionSequential) and
       not isinstance(momentum_distribution, jdn.JointDistributionNamed) and
       not any(callable(dist_fn) for dist_fn in momentum_distribution.model)):

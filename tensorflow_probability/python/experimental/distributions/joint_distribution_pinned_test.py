@@ -25,6 +25,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import structural_tuple
 from tensorflow_probability.python.internal import test_util
 
+from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
 
 tfd = tfp.distributions
 tfde = tfp.experimental.distributions
@@ -394,6 +395,38 @@ class JointDistributionPinnedTest(test_util.TestCase):
         lambda shp: tf.random.uniform(shp, -2., 2., seed=test_util.test_seed()),
         bij0.inverse_event_shape(pinned0.event_shape)))
     self.assertAllCloseNested(bij0.forward(init), bij1.forward(init))
+
+  @test_util.numpy_disable_test_missing_functionality('vectorized_map')
+  @parameterized.named_parameters(
+      ('scalar_scalar', [], []),
+      ('scalar_batch', [], [4]),
+      ('batch_scalar', [3], []),
+      ('batch_batch', [3], [4]))
+  def test_bijector_for_autobatched_model(self, pin_batch_shape, sample_shape):
+    if not tf2.enabled():
+      self.skipTest('b/183994961')
+
+    @ tfd.JointDistributionCoroutineAutoBatched
+    def model():
+      a = yield tfd.Normal(0., 1., name='a')
+      yield tfd.Uniform(low=0., high=tf.exp(a * tf.ones([2])), name='b')
+
+    pinned = tfde.JointDistributionPinned(
+        model,
+        a=tf.random.stateless_normal(
+            pin_batch_shape,
+            seed=test_util.test_seed(sampler_type='stateless')))
+    ys = self.evaluate(
+        pinned.sample_unpinned(
+            sample_shape,
+            seed=test_util.test_seed(sampler_type='stateless')))
+    bij = pinned.experimental_default_event_space_bijector()
+    self.assertAllCloseNested(
+        ys,
+        bij.forward(
+            tf.nest.map_structure(
+                tf.identity,  # Bypass bijector cache.
+                bij.inverse(ys))))
 
 
 if __name__ == '__main__':

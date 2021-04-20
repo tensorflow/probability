@@ -363,6 +363,8 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertAllEqual([6], d[tf.newaxis, ..., :3].event_shape)
 
   def testSlicingSubclasses(self):
+    self.skipTest('b/183457779')
+
     class IndepBern1d(tfd.Independent):
 
       def __init__(self, logits):

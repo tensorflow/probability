@@ -13,5 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Library for pattern matching and rewriting."""
+from oryx.experimental.matching import jax_rewrite
 from oryx.experimental.matching import matcher
 from oryx.experimental.matching import rules

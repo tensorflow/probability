@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import generic as tfp_math
 
@@ -319,18 +319,16 @@ def _bessel_iv_ratio_bwd(aux, g):
   grad_z = pz * g
   _, grad_z = _fix_gradient_for_broadcasting(
       v, z, tf.ones_like(grad_z), grad_z)
-  return None, grad_z
+  return grad_z
 
 
-def _bessel_iv_ratio_jvp(primals, tangents):
+def _bessel_iv_ratio_jvp(v, primals, tangents):
   """Computes JVP for bessel_iv_ratio (supports JAX custom derivative)."""
-  v, z = primals
-  dv, dz = tangents
+  z, = primals
+  dz, = tangents
 
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dv),
-                                         prefer_static.shape(dz))
-  dv = tf.broadcast_to(dv, bc_shp)
+  bc_shp = ps.broadcast_shape(ps.shape(v), ps.shape(dz))
   dz = tf.broadcast_to(dz, bc_shp)
 
   x = _bessel_iv_ratio_naive(v, z)
@@ -349,7 +347,8 @@ def _bessel_iv_ratio_jvp(primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_bessel_iv_ratio_fwd,
     vjp_bwd=_bessel_iv_ratio_bwd,
-    jvp_fn=_bessel_iv_ratio_jvp)
+    jvp_fn=_bessel_iv_ratio_jvp,
+    nondiff_argnums=(0,))
 def _bessel_iv_ratio_custom_gradient(v, z):
   return _bessel_iv_ratio_naive(v, z)
 
@@ -957,26 +956,23 @@ def _bessel_ive_bwd(aux, g):
   _, grad_z = _fix_gradient_for_broadcasting(
       v, z, tf.ones_like(grad_z), grad_z)
 
-  # No gradient for this at the moment. This is a complicated expression
+  # No gradient for v at the moment. This is a complicated expression
   # The gradient with respect to the parameter doesn't have an easy closed
   # form. More work will need to be done to ensure good numerics for the
   # gradient.
   # TODO(b/169357627): Implement gradients of modified bessel functions with
   # respect to parameters.
-  grad_v = None
 
-  return grad_v, grad_z
+  return grad_z
 
 
-def _bessel_ive_jvp(primals, tangents):
+def _bessel_ive_jvp(v, primals, tangents):
   """Computes JVP for bessel_ive (supports JAX custom derivative)."""
-  v, z = primals
-  dv, dz = tangents
+  z, = primals
+  dz, = tangents
 
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dv),
-                                         prefer_static.shape(dz))
-  dv = tf.broadcast_to(dv, bc_shp)
+  bc_shp = ps.broadcast_shape(ps.shape(v), ps.shape(dz))
   dz = tf.broadcast_to(dz, bc_shp)
 
   ive = _bessel_ive_custom_gradient(v, z)
@@ -995,7 +991,8 @@ def _bessel_ive_jvp(primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_bessel_ive_fwd,
     vjp_bwd=_bessel_ive_bwd,
-    jvp_fn=_bessel_ive_jvp)
+    jvp_fn=_bessel_ive_jvp,
+    nondiff_argnums=(0,))
 def _bessel_ive_custom_gradient(v, z):
   return _bessel_ive_naive(v, z)
 
@@ -1074,26 +1071,23 @@ def _bessel_kve_bwd(aux, g):
   _, grad_z = _fix_gradient_for_broadcasting(
       v, z, tf.ones_like(grad_z), grad_z)
 
-  # No gradient for this at the moment. This is a complicated expression
+  # No gradient for v at the moment. This is a complicated expression
   # The gradient with respect to the parameter doesn't have an easy closed
   # form. More work will need to be done to ensure good numerics for the
   # gradient.
   # TODO(b/169357627): Implement gradients of modified bessel functions with
   # respect to parameters.
-  grad_v = None
 
-  return grad_v, grad_z
+  return grad_z
 
 
-def _bessel_kve_jvp(primals, tangents):
+def _bessel_kve_jvp(v, primals, tangents):
   """Computes JVP for bessel_kve (supports JAX custom derivative)."""
-  v, z = primals
-  dv, dz = tangents
+  z, = primals
+  dz, = tangents
 
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dv),
-                                         prefer_static.shape(dz))
-  dv = tf.broadcast_to(dv, bc_shp)
+  bc_shp = ps.broadcast_shape(ps.shape(v), ps.shape(dz))
   dz = tf.broadcast_to(dz, bc_shp)
 
   kve = _bessel_kve_custom_gradient(v, z)
@@ -1112,7 +1106,8 @@ def _bessel_kve_jvp(primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_bessel_kve_fwd,
     vjp_bwd=_bessel_kve_bwd,
-    jvp_fn=_bessel_kve_jvp)
+    jvp_fn=_bessel_kve_jvp,
+    nondiff_argnums=(0,))
 def _bessel_kve_custom_gradient(v, z):
   return _bessel_kve_naive(v, z)
 
@@ -1163,26 +1158,23 @@ def _log_bessel_ive_bwd(aux, g):
   _, grad_z = _fix_gradient_for_broadcasting(
       v, z, tf.ones_like(grad_z), grad_z)
 
-  # No gradient for this at the moment. This is a complicated expression
+  # No gradient for v at the moment. This is a complicated expression
   # The gradient with respect to the parameter doesn't have an easy closed
   # form. More work will need to be done to ensure good numerics for the
   # gradient.
   # TODO(b/169357627): Implement gradients of modified bessel functions with
   # respect to parameters.
-  grad_v = None
 
-  return grad_v, grad_z
+  return grad_z
 
 
-def _log_bessel_ive_jvp(primals, tangents):
+def _log_bessel_ive_jvp(v, primals, tangents):
   """Computes JVP for log_bessel_ive (supports JAX custom derivative)."""
-  v, z = primals
-  dv, dz = tangents
+  z, = primals
+  dz, = tangents
 
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dv),
-                                         prefer_static.shape(dz))
-  dv = tf.broadcast_to(dv, bc_shp)
+  bc_shp = ps.broadcast_shape(ps.shape(v), ps.shape(dz))
   dz = tf.broadcast_to(dz, bc_shp)
 
   log_ive = _log_bessel_ive_naive(v, z)
@@ -1202,7 +1194,8 @@ def _log_bessel_ive_jvp(primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_log_bessel_ive_fwd,
     vjp_bwd=_log_bessel_ive_bwd,
-    jvp_fn=_log_bessel_ive_jvp)
+    jvp_fn=_log_bessel_ive_jvp,
+    nondiff_argnums=(0,))
 def _log_bessel_ive_custom_gradient(v, z):
   return _log_bessel_ive_naive(v, z)
 
@@ -1263,29 +1256,26 @@ def _log_bessel_kve_bwd(aux, g):
   _, grad_z = _fix_gradient_for_broadcasting(
       v, z, tf.ones_like(grad_z), grad_z)
 
-  # No gradient for this at the moment. This is a complicated expression
+  # No gradient for v at the moment. This is a complicated expression
   # The gradient with respect to the parameter doesn't have an easy closed
   # form. More work will need to be done to ensure good numerics for the
   # gradient.
   # TODO(b/169357627): Implement gradients of modified bessel functions with
   # respect to parameters.
-  grad_v = None
 
-  return grad_v, grad_z
+  return grad_z
 
 
-def _log_bessel_kve_jvp(primals, tangents):
+def _log_bessel_kve_jvp(v, primals, tangents):
   """Computes JVP for bessel_kve (supports JAX custom derivative)."""
-  v, z = primals
-  dv, dz = tangents
+  z, = primals
+  dz, = tangents
 
   dtype = dtype_util.common_dtype([v, z], tf.float32)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
 
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dv),
-                                         prefer_static.shape(dz))
-  dv = tf.broadcast_to(dv, bc_shp)
+  bc_shp = ps.broadcast_shape(ps.shape(v), ps.shape(dz))
   dz = tf.broadcast_to(dz, bc_shp)
 
   log_kve = _log_bessel_kve_custom_gradient(v, z)
@@ -1308,7 +1298,8 @@ def _log_bessel_kve_jvp(primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_log_bessel_kve_fwd,
     vjp_bwd=_log_bessel_kve_bwd,
-    jvp_fn=_log_bessel_kve_jvp)
+    jvp_fn=_log_bessel_kve_jvp,
+    nondiff_argnums=(0,))
 def _log_bessel_kve_custom_gradient(v, z):
   return _log_bessel_kve_naive(v, z)
 
@@ -1347,8 +1338,8 @@ def _fix_gradient_for_broadcasting(a, b, grad_a, grad_b):
       tensorshape_util.is_fully_defined(b.shape) and
       a.shape == b.shape):
     return [grad_a, grad_b]
-  a_shape = tf.shape(a)
-  b_shape = tf.shape(b)
+  a_shape = ps.shape(a)
+  b_shape = ps.shape(b)
   ra, rb = tf.raw_ops.BroadcastGradientArgs(s0=a_shape, s1=b_shape)
   grad_a = tf.reshape(tf.reduce_sum(grad_a, axis=ra), a_shape)
   grad_b = tf.reshape(tf.reduce_sum(grad_b, axis=rb), b_shape)

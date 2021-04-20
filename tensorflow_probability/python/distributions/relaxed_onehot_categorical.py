@@ -512,7 +512,7 @@ class RelaxedOneHotCategorical(
         undefined statistics will return NaN for this statistic.
       name: A name for this distribution (optional).
     """
-
+    parameters = dict(locals())
     dist = ExpRelaxedOneHotCategorical(temperature,
                                        logits=logits,
                                        probs=probs,
@@ -522,7 +522,24 @@ class RelaxedOneHotCategorical(
     super(RelaxedOneHotCategorical, self).__init__(dist,
                                                    exp_bijector.Exp(),
                                                    validate_args=validate_args,
+                                                   parameters=parameters,
                                                    name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        temperature=parameter_properties.ParameterProperties(
+            shape_fn=lambda sample_shape: sample_shape[:-1],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        logits=parameter_properties.ParameterProperties(event_ndims=1),
+        probs=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            default_constraining_bijector_fn=softmax_centered_bijector
+            .SoftmaxCentered,
+            is_preferred=False))
+    # pylint: enable=g-long-lambda
 
   @property
   def temperature(self):

@@ -20,7 +20,9 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import copy
 import functools
+import inspect
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import util as tfp_util
@@ -30,6 +32,9 @@ from tensorflow_probability.python.bijectors import scale as scale_lib
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.bijectors import sigmoid
 from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import chi2
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import half_normal
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched
@@ -41,6 +46,12 @@ from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+
+
+__all__ = [
+    'register_asvi_substitution_rule',
+    'build_asvi_surrogate_posterior'
+]
 
 
 Root = joint_distribution_coroutine.JointDistributionCoroutine.Root
@@ -55,38 +66,93 @@ _NON_TRAINABLE_PARAMS = ['low', 'high']
 ASVIParameters = collections.namedtuple(
     'ASVIParameters', ['prior_weight', 'mean_field_parameter'])
 
+# Registry of transformations that are applied to distributions in the prior
+# before defining the surrogate family.
+ASVI_SURROGATE_SUBSTITUTIONS = {}
 
-def _as_trainable_family(distribution):
-  """Substitutes prior distributions with more easily trainable ones."""
-  with tf.name_scope('as_trainable_family'):
 
-    if isinstance(distribution, half_normal.HalfNormal):
-      return truncated_normal.TruncatedNormal(
-          loc=0.,
-          scale=distribution.scale,
-          low=0.,
-          high=distribution.scale * 10.)
-    elif isinstance(distribution, uniform.Uniform):
-      return shift.Shift(distribution.low)(
-          scale_lib.Scale(distribution.high - distribution.low)(beta.Beta(
-              concentration0=tf.ones(
-                  ps.concat([
-                      distribution.batch_shape_tensor(),
-                      distribution.event_shape_tensor()
-                  ], axis=0),
-                  dtype=distribution.dtype),
-              concentration1=1.)))
-    else:
-      return distribution
+def _as_substituted_distribution(distribution):
+  """Applies all substitution rules that match a distribution."""
+  for condition, substitution_fn in ASVI_SURROGATE_SUBSTITUTIONS.items():
+    if condition(distribution):
+      distribution = substitution_fn(distribution)
+  return distribution
+
+
+def register_asvi_substitution_rule(condition, substitution_fn):
+  """Registers a rule for substituting distributions in ASVI surrogates.
+
+  Args:
+    condition: Python `callable` that takes a Distribution instance and
+      returns a Python `bool` indicating whether or not to substitute it.
+      May also be a class type such as `tfd.Normal`, in which case the
+      condition is interpreted as
+      `lambda distribution: isinstance(distribution, class)`.
+    substitution_fn: Python `callable` that takes a Distribution
+      instance and returns a new Distribution instance used to define
+      the ASVI surrogate posterior. Note that this substitution does not modify
+      the original model.
+
+  #### Example
+
+  To use a Normal surrogate for all location-scale family distributions, we
+  could register the substitution:
+
+  ```python
+  tfp.experimental.vi.register_asvi_surrogate_substitution(
+    condition=lambda distribution: (
+      hasattr(distribution, 'loc') and hasattr(distribution, 'scale'))
+    substitution_fn=lambda distribution: (
+      # Invoking the event space bijector applies any relevant constraints,
+      # e.g., that HalfCauchy samples must be `>= loc`.
+      distribution.experimental_default_event_space_bijector()(
+        tfd.Normal(loc=distribution.loc, scale=distribution.scale)))
+  ```
+
+  This rule will fire when ASVI encounters a location-scale distribution,
+  and instructs ASVI to build a surrogate 'as if' the model had just used a
+  (possibly constrained) Normal in its place. Note that we could have used a
+  more precise condition, e.g., to limit the substitution to distributions with
+  a specific `name`, if we had reason to think that a Normal distribution would
+  be a good surrogate for some model variables but not others.
+
+  """
+  global ASVI_SURROGATE_SUBSTITUTIONS
+  if inspect.isclass(condition):
+    condition = lambda distribution, cls=condition: isinstance(  # pylint: disable=g-long-lambda
+        distribution, cls)
+  ASVI_SURROGATE_SUBSTITUTIONS[condition] = substitution_fn
+
+# Default substitutions attempt to express distributions using the most
+# flexible available parameterization.
+# pylint: disable=g-long-lambda
+register_asvi_substitution_rule(
+    half_normal.HalfNormal,
+    lambda dist: truncated_normal.TruncatedNormal(
+        loc=0., scale=dist.scale, low=0., high=dist.scale * 10.))
+register_asvi_substitution_rule(
+    uniform.Uniform,
+    lambda dist: shift.Shift(dist.low)(
+        scale_lib.Scale(dist.high - dist.low)(
+            beta.Beta(concentration0=tf.ones_like(dist.mean()),
+                      concentration1=1.))))
+register_asvi_substitution_rule(
+    exponential.Exponential,
+    lambda dist: gamma.Gamma(concentration=1., rate=dist.rate))
+register_asvi_substitution_rule(
+    chi2.Chi2,
+    lambda dist: gamma.Gamma(concentration=0.5 * dist.df, rate=0.5))
+# pylint: enable=g-long-lambda
 
 
 # TODO(kateslin): Add support for models with prior+likelihood written as
 # a single JointDistribution.
-def build_asvi_surrogate_posterior(prior,
-                                   mean_field=False,
-                                   initial_prior_weight=0.5,
-                                   seed=None,
-                                   name=None):
+def build_asvi_surrogate_posterior(
+    prior,
+    mean_field=False,
+    initial_prior_weight=0.5,
+    seed=None,
+    name=None):
   """Builds a structured surrogate posterior inspired by conjugate updating.
 
   ASVI, or Automatic Structured Variational Inference, was proposed by
@@ -227,6 +293,9 @@ def _asvi_surrogate_for_distribution(dist,
       sample_shape=sample_shape,
       seed=seed)
 
+  # Apply any substitutions, while attempting to preserve the original name.
+  dist = _set_name(_as_substituted_distribution(dist), name=_get_name(dist))
+
   # Handle wrapper ("meta") distributions.
   if isinstance(dist, sample.Sample):
     dist_sample_shape = distribution_util.expand_to_vector(dist.sample_shape)
@@ -239,7 +308,7 @@ def _asvi_surrogate_for_distribution(dist,
     surrogate_posterior = independent.Independent(
         nested_surrogate,
         reinterpreted_batch_ndims=ps.rank_from_shape(dist_sample_shape),
-        name=dist.name)
+        name=_get_name(dist))
   # Treat distributions that subclass TransformedDistribution with their own
   # parameters (e.g., Gumbel, Weibull, MultivariateNormal*, etc) as their
   # own type of base distribution, rather than as explicit TDs.
@@ -249,14 +318,14 @@ def _asvi_surrogate_for_distribution(dist,
     surrogate_posterior = transformed_distribution.TransformedDistribution(
         nested_surrogate,
         bijector=dist.bijector,
-        name=dist.name)
+        name=_get_name(dist))
   elif isinstance(dist, independent.Independent):
     nested_surrogate, variables = build_nested_surrogate(dist.distribution,
                                                          variables=variables)
     surrogate_posterior = independent.Independent(
         nested_surrogate,
         reinterpreted_batch_ndims=dist.reinterpreted_batch_ndims,
-        name=dist.name)
+        name=_get_name(dist))
   elif hasattr(dist, '_model_coroutine'):
     surrogate_posterior, variables = _asvi_surrogate_for_joint_distribution(
         dist,
@@ -332,7 +401,7 @@ def _asvi_surrogate_for_joint_distribution(
   surrogate_posterior = (
       joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched(
           posterior_generator,
-          name=dist.name))
+          name=_get_name(dist)))
 
   # Ensure that the surrogate posterior structure matches that of the prior.
   try:
@@ -344,7 +413,7 @@ def _asvi_surrogate_for_joint_distribution(
     surrogate_posterior = restructure.Restructure(
         output_structure=tokenize(dist),
         input_structure=tokenize(surrogate_posterior))(
-            surrogate_posterior, name=dist.name)
+            surrogate_posterior, name=_get_name(dist))
   return surrogate_posterior, variables
 
 
@@ -359,7 +428,6 @@ def _asvi_convex_update_for_base_distribution(dist,
   if variables is None:
     variables = {}
 
-  dist = _as_trainable_family(dist)
   posterior_batch_shape = dist.batch_shape_tensor()
   if sample_shape is not None:
     posterior_batch_shape = ps.concat([
@@ -395,7 +463,8 @@ def _asvi_convex_update_for_base_distribution(dist,
                                 initial_prior_weight,
                                 tf.convert_to_tensor(prior_value).dtype)),
                         bijector=sigmoid.Sigmoid(),
-                        name='prior_weight/{}/{}'.format(dist.name, param)))
+                        name='prior_weight/{}/{}'.format(
+                            _get_name(dist), param)))
 
     # Initialize the mean-field parameter as a (constrained) standard
     # normal sample.
@@ -408,9 +477,10 @@ def _asvi_convex_update_for_base_distribution(dist,
                     shape=bijector.inverse_event_shape(param_shape),
                     seed=param_seed)),
             bijector=bijector,
-            name='mean_field_parameter/{}/{}'.format(dist.name, param)))
+            name='mean_field_parameter/{}/{}'.format(
+                _get_name(dist), param)))
 
-  temp_params_dict = {'name': dist.name}
+  temp_params_dict = {'name': _get_name(dist)}
   for param, prior_value in dist.parameters.items():
     if param in (_NON_STATISTICAL_PARAMS +
                  _NON_TRAINABLE_PARAMS) or prior_value is None:
@@ -442,3 +512,20 @@ def _extract_variables_from_coroutine_model(model_fn, seed=None):
   except StopIteration:
     pass
   return flat_variables
+
+
+def _set_name(dist, name):
+  """Copies a distribution-like object, replacing its name."""
+  if hasattr(dist, 'copy'):
+    return dist.copy(name=name)
+  # Some distribution-like entities such as JointDistributionPinned don't
+  # inherit from tfd.Distribution and don't define `self.copy`. We'll try to set
+  # the name directly.
+  dist = copy.copy(dist)
+  dist._name = name  # pylint: disable=protected-access
+  return dist
+
+
+def _get_name(dist):
+  """Attempts to get a distribution's short name, excluding the name scope."""
+  return getattr(dist, 'parameters', {}).get('name', dist.name)

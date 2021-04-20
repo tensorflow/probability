@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -122,10 +123,12 @@ class JointDistributionVmapMixin(object):
     return result
 
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
-                           name='sample_distributions'):
+                           name='sample_distributions', **kwargs):
     with self._name_and_control_scope(name):
 
       value_might_have_sample_dims = False
+      if (value is None) and kwargs:
+        value = self._resolve_value_from_kwargs(**kwargs)
       if value is not None:
         value = _pad_value_to_full_length(value, self.dtype)
         value = tf.nest.map_structure(
@@ -150,6 +153,8 @@ class JointDistributionVmapMixin(object):
   def _sample_n(self, sample_shape, seed, value=None, **kwargs):
 
     value_might_have_sample_dims = False
+    if (value is None) and kwargs:
+      value = self._resolve_value_from_kwargs(**kwargs)
     if value is not None:
       value = _pad_value_to_full_length(value, self.dtype)
       value = tf.nest.map_structure(
@@ -163,7 +168,7 @@ class JointDistributionVmapMixin(object):
         value_might_have_sample_dims):
       # No need to auto-vectorize.
       xs = self._call_flat_sample_distributions(
-          sample_shape=sample_shape, seed=seed, value=value, **kwargs)[1]
+          sample_shape=sample_shape, seed=seed, value=value)[1]
       return self._model_unflatten(xs)
 
     # Set up for autovectorized sampling. To support the `value` arg, we need to
@@ -216,26 +221,54 @@ class JointDistributionVmapMixin(object):
     if self.use_vectorized_map:
       bijector_class = _DefaultJointBijectorAutoBatched
     if bool(args) or bool(kwargs):
-      return bijector_class(self.experimental_pin(*args, **kwargs))
+      return self.experimental_pin(
+          *args, **kwargs).experimental_default_event_space_bijector()
     return bijector_class(self)
 
 
-class _DefaultJointBijectorAutoBatched(
-    joint_distribution_lib._DefaultJointBijector):  # pylint: disable=protected-access
+class _DefaultJointBijectorAutoBatched(bijector_lib.Bijector):
   """Automatically vectorized support bijector for autobatched JDs."""
 
-  def __init__(self, *args, **kwargs):
-    super(_DefaultJointBijectorAutoBatched, self).__init__(*args, **kwargs)
-    self._forward = vectorization_util.make_rank_polymorphic(
-        self._forward, core_ndims=[self.forward_min_event_ndims])
-    self._inverse = vectorization_util.make_rank_polymorphic(
-        self._inverse, core_ndims=[self.inverse_min_event_ndims])
-    self._forward_log_det_jacobian = vectorization_util.make_rank_polymorphic(
-        self._forward_log_det_jacobian,
-        core_ndims=[self.forward_min_event_ndims,
-                    None])  # `event_ndims` arg is not batched.
-    self._inverse_log_det_jacobian = vectorization_util.make_rank_polymorphic(
-        self._inverse_log_det_jacobian,
-        core_ndims=[self.inverse_min_event_ndims,
-                    None])  # `event_ndims` arg is not batched.
+  def __init__(self, jd, **kwargs):
+    parameters = dict(locals())
+    self._jd = jd
+    self._bijector_kwargs = kwargs
+    self._joint_bijector = joint_distribution_lib._DefaultJointBijector(
+        jd=self._jd, **self._bijector_kwargs)
+    super(_DefaultJointBijectorAutoBatched, self).__init__(
+        forward_min_event_ndims=self._joint_bijector.forward_min_event_ndims,
+        inverse_min_event_ndims=self._joint_bijector.inverse_min_event_ndims,
+        validate_args=self._joint_bijector.validate_args,
+        parameters=parameters,
+        name=self._joint_bijector.name)
+    # Wrap the non-batched `joint_bijector` to take batched args.
+    # pylint: disable=protected-access
+    self._forward = self._vectorize_member_fn(
+        lambda bij, x: bij._forward(x),
+        core_ndims=[self._joint_bijector.forward_min_event_ndims])
+    self._inverse = self._vectorize_member_fn(
+        lambda bij, y: bij._inverse(y),
+        core_ndims=[self._joint_bijector.inverse_min_event_ndims])
+    self._forward_log_det_jacobian = self._vectorize_member_fn(
+        lambda bij, x: bij._forward_log_det_jacobian(  # pylint: disable=g-long-lambda
+            x, event_ndims=bij.forward_min_event_ndims),
+        core_ndims=[self._joint_bijector.forward_min_event_ndims])
+    self._inverse_log_det_jacobian = self._vectorize_member_fn(
+        lambda bij, y: bij._inverse_log_det_jacobian(  # pylint: disable=g-long-lambda
+            y, event_ndims=bij.inverse_min_event_ndims),
+        core_ndims=[self._joint_bijector.inverse_min_event_ndims])
+    for attr in ('_forward_event_shape',
+                 '_forward_event_shape_tensor',
+                 '_inverse_event_shape',
+                 '_inverse_event_shape_tensor',
+                 '_forward_dtype',
+                 '_inverse_dtype',
+                 'forward_event_ndims',
+                 'inverse_event_ndims',):
+      setattr(self, attr, getattr(self._joint_bijector, attr))
+    # pylint: enable=protected-access
 
+  def _vectorize_member_fn(self, member_fn, core_ndims):
+    return vectorization_util.make_rank_polymorphic(
+        lambda x: member_fn(self._joint_bijector, x),
+        core_ndims=core_ndims)

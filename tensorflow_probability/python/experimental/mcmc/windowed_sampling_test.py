@@ -22,6 +22,7 @@ from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.mcmc import windowed_sampling
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
@@ -187,7 +188,7 @@ class WindowedSamplingTest(test_util.TestCase):
     max_scale_reduction = tf.reduce_max(
         tf.nest.map_structure(tf.reduce_max,
                               tfp.mcmc.potential_scale_reduction(flat_draws)))
-    self.assertLess(self.evaluate(max_scale_reduction), 1.35)
+    self.assertLess(self.evaluate(max_scale_reduction), 1.39)
 
   @parameterized.named_parameters(
       dict(testcase_name='_' + fn.__name__, model_fn=fn) for fn in
@@ -228,6 +229,25 @@ class WindowedSamplingTest(test_util.TestCase):
       self.assertEqual(slow_window, 25)
       self.assertEqual(first_window, 75)
       self.assertEqual(last_window, 75)
+
+  def test_valid_init(self):
+
+    class _HalfNormal(tfd.HalfNormal):
+
+      def _default_event_space_bijector(self):
+        # This bijector is intentionally mis-specified so that ~50% of
+        # initialiations will fail.
+        return tfb.Identity(validate_args=self.validate_args)
+
+    tough_dist = tfd.JointDistributionSequential(
+        [_HalfNormal(scale=1., name=f'dist_{idx}') for idx in range(4)])
+
+    # Twenty chains with three parameters gives a 1 / 2^60 chance of
+    # initializing with a finite log probability by chance.
+    _, init, _ = windowed_sampling._setup_mcmc(
+        model=tough_dist, n_chains=20, seed=test_util.test_seed(), dist_3=1.)
+
+    self.assertAllGreater(self.evaluate(init), 0.)
 
   def test_hmc_fitting_gaussian(self):
     # See docstring to _gen_gaussian_updating_example
@@ -286,6 +306,90 @@ class WindowedSamplingTest(test_util.TestCase):
       return final_scaling, true_var
     final_scaling, true_var = do_sample()
     self.assertAllClose(true_var, final_scaling, rtol=0.1)
+
+
+def _beta_binomial(trials):
+  """Returns a function that constructs a beta binomial distribution."""
+
+  def _beta_binomial_distribution(mean, inverse_concentration):
+    """Returns a beta binomial distribution with the given parameters."""
+    # Mean and inverse concentration are broadcast across days.
+    mean = mean[..., tf.newaxis]
+    inverse_concentration = inverse_concentration[..., tf.newaxis]
+
+    beta_binomial = tfd.BetaBinomial(
+        total_count=trials,
+        concentration0=(1 - mean) / inverse_concentration,
+        concentration1=mean / inverse_concentration)
+    return tfd.Independent(beta_binomial, reinterpreted_batch_ndims=2)
+
+  return _beta_binomial_distribution
+
+
+def get_joint_distribution(
+    trials,
+    mean_prior=lambda: tfd.Uniform(0., 1.),
+    inverse_concentration_prior=lambda: tfd.HalfNormal(5.)):
+  """Returns a joint distribution over parameters and successes."""
+  param_shape = ps.shape(trials)[:1]
+  mean = tfd.Sample(mean_prior(), param_shape)
+  inverse_concentration = tfd.Sample(inverse_concentration_prior(), param_shape)
+  return tfd.JointDistributionNamed(
+      dict(mean=mean,
+           inverse_concentration=inverse_concentration,
+           successes=_beta_binomial(trials)),
+      name='jd')
+
+
+class PrecompiledTest(test_util.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    arms = 2
+    days = 3
+
+    self.trials = tfd.Poisson(100.).sample([arms, days])
+    dist = get_joint_distribution(self.trials)
+    self.true_values = dist.sample(seed=test_util.test_seed())
+
+  def nuts_kwargs(self):
+    return {'max_tree_depth': 2}
+
+  def hmc_kwargs(self):
+    return {'num_leapfrog_steps': 3, 'store_parameters_in_results': True}
+
+  @parameterized.named_parameters(('hmc_jit_sig', 'hmc'),
+                                  ('nuts_jit_sig', 'nuts'))
+  def test_base_kernel(self, kind):
+    self.skip_if_no_xla()
+
+    input_signature = (
+        tf.TensorSpec(
+            shape=[None, None], dtype=tf.float32, name='trials'),
+        tf.TensorSpec(
+            shape=[None, None], dtype=tf.float32, name='successes'))
+    @tf.function(jit_compile=True, input_signature=input_signature)
+    def do(trials, successes):
+      if kind == 'hmc':
+        proposal_kernel_kwargs = self.hmc_kwargs()
+      else:
+        proposal_kernel_kwargs = self.nuts_kwargs()
+
+      return windowed_sampling._windowed_adaptive_impl(
+          n_draws=9,
+          joint_dist=get_joint_distribution(trials),
+          kind=kind,
+          n_chains=11,
+          proposal_kernel_kwargs=proposal_kernel_kwargs,
+          num_adaptation_steps=525,
+          dual_averaging_kwargs={'target_accept_prob': 0.76},
+          trace_fn=None,
+          return_final_kernel_results=False,
+          discard_tuning=True,
+          seed=test_util.test_seed(),
+          successes=successes)
+
+    self.evaluate(do(self.trials + 0., self.true_values['successes']))
 
 
 if __name__ == '__main__':

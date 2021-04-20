@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -43,6 +44,8 @@ AutoNormal = tfp.experimental.auto_composite_tensor(
     tfd.Normal, omit_kwargs=('name',))
 AutoIndependent = tfp.experimental.auto_composite_tensor(
     tfd.Independent, omit_kwargs=('name',))
+AutoReshape = tfp.experimental.auto_composite_tensor(
+    tfb.Reshape, omit_kwargs=('name',))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -103,6 +106,15 @@ class AutoCompositeTensorTest(test_util.TestCase):
         (lp, dist),
         maximum_iterations=2)
     self.evaluate(lp)
+
+  def test_prefer_static_shape_params(self):
+    @tf.function
+    def f(b):
+      return b
+    b = AutoReshape(
+        event_shape_out=[2, 3],
+        event_shape_in=[tf.reduce_prod([2, 3])])  # Tensor in a list.
+    f(b)
 
   def test_nested(self):
     lop = AutoBlockDiag([AutoDiag(tf.ones([2]) * 2), AutoIdentity(1)])
@@ -209,6 +221,35 @@ class AutoCompositeTensorTest(test_util.TestCase):
         loop_vars=(init,),
         maximum_iterations=3)
     self.assertEqual(self.evaluate(out.value), 6)
+
+  def test_deferred_assertion_context(self):
+    # If `validate_args` assertions in `__init__` are not deferred, a graph
+    # cycle is created when `d._type_spec` calls `__init__` and this test fails.
+    d = AutoNormal(0., 1., validate_args=True)
+
+    @tf.function
+    def f(d):
+      return d
+
+    f(d)
+
+  def test_function_with_variable(self):
+    loc = tf.Variable(3.)
+    dist = AutoIndependent(
+        AutoNormal(loc, scale=tf.ones([3])), reinterpreted_batch_ndims=1)
+
+    new_loc = 32.
+    @tf.function
+    def f(d):
+      d.distribution.loc.assign(new_loc)
+      self.assertLen(d.trainable_variables, 1)
+      return d
+
+    dist_ = f(dist)
+    self.evaluate(loc.initializer)
+    self.assertEqual(self.evaluate(dist_.distribution.loc), new_loc)
+    self.assertEqual(self.evaluate(dist.distribution.loc), new_loc)
+    self.assertLen(dist.trainable_variables, 1)
 
 
 if __name__ == '__main__':

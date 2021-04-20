@@ -638,6 +638,56 @@ class HMCTest(test_util.TestCase):
     # Also ensure eval doesn't crash things.
     self.evaluate(r0)
 
+  def testDynamicStepSizeWorks(self):
+    if tf.executing_eagerly() or JAX_MODE:
+      raise self.skipTest(
+          'Dynamic step size makes no sense in Eager or JAX modes.')
+
+    true_mean = 0.0
+    true_var = 1.0
+    num_results = 200
+
+    def target_log_prob(x):
+      return -x**2 / 2.
+
+    step_size_ = 0.4456789
+    step_size_ph = tf1.placeholder_with_default(step_size_, shape=None)
+
+    def trace_fn(_, pkr):
+      return {
+          'accept_prob':
+              tf.exp(tf.minimum(pkr.log_accept_ratio, 0.)),
+          'step_size':
+              pkr.accepted_results.step_size,
+      }
+
+    states, trace = tfp.mcmc.sample_chain(
+        num_results=num_results,
+        current_state=0.123,
+        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+            target_log_prob_fn=target_log_prob,
+            step_size=step_size_ph,
+            num_leapfrog_steps=5,
+            store_parameters_in_results=True,
+        ),
+        num_burnin_steps=20,
+        trace_fn=trace_fn,
+        seed=test_util.test_seed())
+
+    states_, trace_ = self.evaluate([states, trace])
+
+    self.assertAllClose(trace_['step_size'], step_size_ * np.ones(
+        (num_results)))
+
+    # Basic sanity checks. It would be very strange if dynamic step size made
+    # these checks fail.
+    mean_accept = np.mean(trace_['accept_prob'])
+    self.assertGreater(mean_accept, 0.7, msg='Bad sampling')
+    self.assertAllClose(
+        np.mean(states_), true_mean, atol=10 / np.sqrt(num_results))
+    self.assertAllClose(
+        np.var(states_), true_var, rtol=10 / np.sqrt(num_results))
+
 
 class _LogCorrectionTest(object):
 

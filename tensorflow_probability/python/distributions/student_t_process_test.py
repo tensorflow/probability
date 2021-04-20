@@ -41,6 +41,8 @@ class _StudentTProcessTest(object):
     df = np.array(
         [[3., 4., 5., 4.], [7.5, 8, 5., 5.]],
         dtype=np.float32).reshape([2, 4, 1])
+    observation_noise_variance = np.array(
+        [1e-5, 1e-6, 1e-5], np.float32).reshape([3, 1, 1, 1])
     amplitude = np.array([1., 2.], np.float32).reshape([2, 1, 1])
     length_scale = np.array([1., 2., 3., 4.], np.float32).reshape([1, 4, 1])
     batched_index_points = np.stack([index_points]*6)
@@ -53,9 +55,13 @@ class _StudentTProcessTest(object):
           batched_index_points, shape=None)
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
     tp = tfd.StudentTProcess(
-        df, kernel, batched_index_points, jitter=1e-5, validate_args=True)
+        df,
+        kernel,
+        batched_index_points,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
 
-    batch_shape = [2, 4, 6]
+    batch_shape = [3, 2, 4, 6]
     event_shape = [25]
     sample_shape = [5, 3]
 

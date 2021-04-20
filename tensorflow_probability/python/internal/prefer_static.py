@@ -321,7 +321,7 @@ def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-built
   s_ = tf.get_static_value(s)
   if s_ is not None:
     return np.ones(s_, dtype_util.as_numpy_dtype(dtype or input.dtype))
-  return tf.ones(s, dtype or s.dtype, name)
+  return tf.ones(s, dtype or input.dtype, name)
 ones_like = _copy_docstring(tf.ones_like, _ones_like)
 
 
@@ -378,9 +378,8 @@ def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bu
   if not hasattr(input, 'shape'):
     x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype is np.object else x
-  input_shape = tf.TensorShape(input.shape)
   if tensorshape_util.is_fully_defined(input.shape):
-    return np.array(tensorshape_util.as_list(input_shape)).astype(
+    return np.array(tensorshape_util.as_list(input.shape)).astype(
         _numpy_dtype(out_type))
   # NOTE: tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**, so we
   # pre-emptively convert-to-tensor.
@@ -434,9 +433,9 @@ broadcast_to = _prefer_static(tf.broadcast_to, nptf.broadcast_to)
 cast = _prefer_static(tf.cast, nptf.cast)
 ceil = _prefer_static(tf.math.ceil, nptf.math.ceil)
 concat = _prefer_static(tf.concat, nptf.concat)
-convert_to_shape_tensor = _prefer_static(
-    tf.convert_to_tensor,
-    _convert_to_shape_tensor_jax if JAX_MODE else tf.convert_to_tensor)
+convert_to_shape_tensor = (
+    _prefer_static(tf.convert_to_tensor, _convert_to_shape_tensor_jax)
+    if JAX_MODE else tf.convert_to_tensor)
 cumprod = _prefer_static(tf.math.cumprod, nptf.math.cumprod)
 cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)

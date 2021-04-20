@@ -16,8 +16,6 @@
 """Contains utilities for testing."""
 from absl.testing import parameterized
 
-from jax.config import config
-
 
 __all__ = [
     'TestCase'
@@ -25,7 +23,4 @@ __all__ = [
 
 
 class TestCase(parameterized.TestCase):
-
-  def setUp(self):
-    super().setUp()
-    config.enable_omnistaging()
+  pass

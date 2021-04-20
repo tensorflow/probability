@@ -26,8 +26,8 @@ from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import joint_map
 from tensorflow_probability.python.bijectors import reshape
 from tensorflow_probability.python.bijectors import restructure
-from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.experimental.mcmc import diagonal_mass_matrix_adaptation as dmma
+from tensorflow_probability.python.experimental.mcmc import initialization
 from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
 from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts as pnuts
 from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
@@ -35,11 +35,15 @@ from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import unnest
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
 from tensorflow_probability.python.mcmc import sample
 
-__all__ = ['windowed_adaptive_hmc', 'windowed_adaptive_nuts']
+__all__ = [
+    'windowed_adaptive_hmc',
+    'windowed_adaptive_nuts'
+]
 
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
@@ -169,9 +173,6 @@ def _get_flat_unconstraining_bijector(jd_model):
                for x in unconstrained_shapes]
   to_chain.append(joint_map.JointMap(bijectors=reshapers))
 
-  size_splits = [ps.reduce_prod(x) for x in unconstrained_shapes]
-  to_chain.append(split.Split(num_or_size_splits=size_splits))
-
   return invert.Invert(chain.Chain(to_chain))
 
 
@@ -204,22 +205,23 @@ def _setup_mcmc(model, n_chains, seed, **pins):
   """
   pinned_model = model.experimental_pin(**pins)
   bijector = _get_flat_unconstraining_bijector(pinned_model)
-  initial_position = pinned_model.sample_unpinned(n_chains)
-  initial_transformed_position = bijector.forward(initial_position)
 
-  # Jitter init
-  initial_transformed_position = samplers.uniform(
-      ps.shape(initial_transformed_position),
-      minval=-2.,
-      maxval=2.,
-      seed=seed,
-      dtype=initial_transformed_position.dtype)
+  raw_init_dist = initialization.init_near_unconstrained_zero(pinned_model)
+  unconstrained_unif_init_position = initialization.retry_init(
+      raw_init_dist.sample,
+      target_fn=pinned_model.unnormalized_log_prob,
+      sample_shape=[n_chains],
+      seed=seed)
+  initial_transformed_position = tf.nest.map_structure(
+      tf.identity, bijector.forward(unconstrained_unif_init_position))
 
-  # pylint: disable=g-long-lambda
-  target_log_prob_fn = lambda x: pinned_model.unnormalized_log_prob(
-      bijector.inverse(x)) + bijector.inverse_log_det_jacobian(
-          x, event_ndims=1)
-  # pylint: enable=g-long-lambda
+  def target_log_prob_fn(*args):
+    lp = pinned_model.unnormalized_log_prob(bijector.inverse(args))
+    tensorshape_util.set_shape(lp, [n_chains])
+    ldj = bijector.inverse_log_det_jacobian(
+        args, event_ndims=[1 for _ in initial_transformed_position])
+    return lp + ldj
+
   return target_log_prob_fn, initial_transformed_position, bijector
 
 
@@ -286,16 +288,17 @@ def _fast_window(*,
     # pylint: enable=g-long-lambda
 
   draw_and_chain_axes = [0, 1]
-  prev_mean, prev_var = tf.nn.moments(draws[-num_draws // 2:],
-                                      axes=draw_and_chain_axes)
-
-  num_samples = tf.cast(
-      num_draws / 2,
-      dtype=dtype_util.common_dtype([prev_mean, prev_var], tf.float32))
-  weighted_running_variance = sample_stats.RunningVariance.from_stats(
-      num_samples=num_samples,
-      mean=prev_mean,
-      variance=prev_var)
+  weighted_running_variance = []
+  for d in list(draws):
+    prev_mean, prev_var = tf.nn.moments(d[-num_draws // 2:],
+                                        axes=draw_and_chain_axes)
+    num_samples = tf.cast(
+        num_draws / 2,
+        dtype=dtype_util.common_dtype([prev_mean, prev_var], tf.float32))
+    weighted_running_variance.append(sample_stats.RunningVariance.from_stats(
+        num_samples=num_samples,
+        mean=prev_mean,
+        variance=prev_var))
 
   step_size = unnest.get_outermost(fkr, 'step_size')
   return draws, trace, step_size, weighted_running_variance
@@ -336,15 +339,17 @@ def _slow_window(*,
     # pylint: enable=g-long-lambda
 
   draw_and_chain_axes = [0, 1]
-  prev_mean, prev_var = tf.nn.moments(draws[-num_draws // 2:],
-                                      axes=draw_and_chain_axes)
-  num_samples = tf.cast(
-      num_draws / 2,
-      dtype=dtype_util.common_dtype([prev_mean, prev_var], tf.float32))
-  weighted_running_variance = sample_stats.RunningVariance.from_stats(
-      num_samples=num_samples,
-      mean=prev_mean,
-      variance=prev_var)
+  weighted_running_variance = []
+  for d in list(draws):
+    prev_mean, prev_var = tf.nn.moments(d[-num_draws // 2:],
+                                        axes=draw_and_chain_axes)
+    num_samples = tf.cast(
+        num_draws / 2,
+        dtype=dtype_util.common_dtype([prev_mean, prev_var], tf.float32))
+    weighted_running_variance.append(sample_stats.RunningVariance.from_stats(
+        num_samples=num_samples,
+        mean=prev_mean,
+        variance=prev_var))
 
   step_size = unnest.get_outermost(fkr, 'step_size')
   momentum_distribution = unnest.get_outermost(fkr, 'momentum_distribution')
@@ -408,13 +413,13 @@ def _get_window_sizes(num_adaptation_steps):
   return first_window_size, slow_window_size, last_window_size
 
 
-def _init_momentum(initial_transformed_position):
+def _init_momentum(initial_transformed_position, *, batch_shape):
   """Initialize momentum so trace_fn can be concatenated."""
-  event_shape = ps.shape(initial_transformed_position)[-1]
+  variance_parts = [ps.ones_like(p) for p in initial_transformed_position]
   return preconditioning_utils.make_momentum_distribution(
-      state_parts=tf.nest.flatten(initial_transformed_position),
-      batch_ndims=1,
-      running_variance_parts=[ps.ones(event_shape)])
+      state_parts=initial_transformed_position,
+      batch_shape=batch_shape,
+      running_variance_parts=variance_parts)
 
 
 def windowed_adaptive_nuts(n_draws,
@@ -635,14 +640,14 @@ def _windowed_adaptive_impl(n_draws,
   init_step_size = tf.cast(
       ps.shape(initial_transformed_position)[-1], tf.float32) ** -0.25
 
-  all_draws = []
-  all_traces = []
   proposal_kernel_kwargs.update({
       'target_log_prob_fn': target_log_prob_fn,
-      'step_size': tf.fill([n_chains, 1], init_step_size),
-      'momentum_distribution': _init_momentum(initial_transformed_position),
+      'step_size': tf.fill([n_chains, 1], init_step_size, name='step_size'),
+      'momentum_distribution': _init_momentum(initial_transformed_position,
+                                              batch_shape=[n_chains]),
   })
-  draws, trace, step_size, running_variance = _fast_window(
+  all_traces = []
+  draws, trace, step_size, running_variances = _fast_window(
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       dual_averaging_kwargs=dual_averaging_kwargs,
@@ -653,48 +658,50 @@ def _windowed_adaptive_impl(n_draws,
       seed=init_seed)
   proposal_kernel_kwargs.update({'step_size': step_size})
 
-  all_draws.append(draws)
+  all_draws = [[d] for d in draws]
   all_traces.append(trace)
   *slow_seeds, seed = samplers.split_seed(seed, n=5)
   for idx, slow_seed in enumerate(slow_seeds):
     window_size = slow_window_size * (2**idx)
 
     # TODO(b/180011931): if num_adaptation_steps is small, this throws an error.
-    draws, trace, step_size, running_variance, momentum_distribution = _slow_window(
+    draws, trace, step_size, running_variances, momentum_distribution = _slow_window(
         kind=kind,
         proposal_kernel_kwargs=proposal_kernel_kwargs,
         dual_averaging_kwargs=dual_averaging_kwargs,
         num_draws=window_size,
-        initial_position=draws[-1],
-        initial_running_variance=running_variance,
+        initial_position=[d[-1] for d in draws],
+        initial_running_variance=running_variances,
         bijector=bijector,
         trace_fn=trace_fn,
         seed=slow_seed)
-    all_draws.append(draws)
+    for all_d, d in zip(all_draws, draws):
+      all_d.append(d)
     all_traces.append(trace)
     proposal_kernel_kwargs.update(
         {'step_size': step_size,
          'momentum_distribution': momentum_distribution})
 
   fast_seed, sample_seed = samplers.split_seed(seed)
-  draws, trace, step_size, running_variance = _fast_window(
+  draws, trace, step_size, _ = _fast_window(
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       dual_averaging_kwargs=dual_averaging_kwargs,
       num_draws=last_window_size,
-      initial_position=draws[-1],
+      initial_position=[d[-1] for d in draws],
       bijector=bijector,
       trace_fn=trace_fn,
       seed=fast_seed)
   proposal_kernel_kwargs.update({'step_size': step_size})
-  all_draws.append(draws)
+  for all_d, d in zip(all_draws, draws):
+    all_d.append(d)
   all_traces.append(trace)
 
   ret = _do_sampling(
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       num_draws=n_draws,
-      initial_position=draws[-1],
+      initial_position=[d[-1] for d in draws],
       bijector=bijector,
       trace_fn=trace_fn,
       return_final_kernel_results=return_final_kernel_results,
@@ -717,21 +724,25 @@ def _windowed_adaptive_impl(n_draws,
   else:
     if return_final_kernel_results:
       draws, trace, fkr = ret
-      all_draws.append(draws)
+      for all_d, d in zip(all_draws, draws):
+        all_d.append(d)
       all_traces.append(trace)
       return sample.CheckpointableStatesAndTrace(
-          all_states=bijector.inverse(tf.concat(all_draws, axis=0)),
+          all_states=bijector.inverse(
+              [tf.concat(d, axis=0) for d in all_draws]),
           trace=tf.nest.map_structure(lambda *s: tf.concat(s, axis=0),
                                       *all_traces, expand_composites=True),
           final_kernel_results=fkr)
     else:
       draws, trace = ret
-      all_draws.append(draws)
-      all_traces.append(trace)
+      for all_d, d in zip(all_draws, draws):
+        all_d.append(d)
+      all_states = bijector.inverse([tf.concat(d, axis=0) for d in all_draws])
       if no_trace:
-        return bijector.inverse(tf.concat(all_draws, axis=0))
+        return all_states
       else:
+        all_traces.append(trace)
         return sample.StatesAndTrace(
-            all_states=bijector.inverse(tf.concat(all_draws, axis=0)),
+            all_states=all_states,
             trace=tf.nest.map_structure(lambda *s: tf.concat(s, axis=0),
                                         *all_traces, expand_composites=True))

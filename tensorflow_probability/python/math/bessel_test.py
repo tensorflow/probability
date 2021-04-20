@@ -32,6 +32,7 @@ from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.bessel import _compute_general_continued_fraction
 
 
+@test_util.test_all_tf_execution_regimes
 class BesselIvRatioTest(test_util.TestCase):
 
   def testContinuedFraction(self):
@@ -148,6 +149,7 @@ class BesselIvRatioTest(test_util.TestCase):
     self.assertLess(err, 2e-4)
 
 
+@test_util.test_all_tf_execution_regimes
 class BesselIveTest(test_util.TestCase):
 
   def VerifyBesselIve(self, v, z, rtol, atol=1e-7):
@@ -382,7 +384,29 @@ class BesselIveTest(test_util.TestCase):
         functools.partial(tfp_math.log_bessel_ive, v), [z])
     self.assertLess(err, tol)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.named_parameters(("float32", np.float32),
+                                  ("float64", np.float64))
+  def testJitGradBcastLogBesselIve(self, dtype):
+    self.skip_if_no_xla()
 
+    @tf.function(jit_compile=True)
+    def f(v, z):
+      dy = tf.random.normal(z.shape, seed=test_util.test_seed(), dtype=dtype)
+      return tf.nest.map_structure(
+          lambda t: () if t is None else t,  # session.run doesn't like `None`.
+          tfp.math.value_and_gradient(
+              lambda v, z: tfp.math.log_bessel_ive(v, z)**2,
+              (v, z),
+              output_gradients=dy))
+
+    v = tf.constant(0.5, dtype=dtype)
+    z = tf.constant([[0.3, 0.5, 0.9], [1., 12., 22.]], dtype=dtype)
+
+    self.evaluate(f(v, z))
+
+
+@test_util.test_all_tf_execution_regimes
 class BesselKveTest(test_util.TestCase):
 
   def VerifyBesselKve(self, v, z, rtol):
@@ -536,10 +560,10 @@ class BesselKveTest(test_util.TestCase):
     self.assertLess(err, 3e-4)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 1e-6),
+      ("float32", np.float32, 1e-6, 1e-5),
       ("float64", np.float64, 1e-6),
   )
-  def testLogBesselKveCorrect(self, dtype, rtol):
+  def testLogBesselKveCorrect(self, dtype, rtol, atol=1e-6):
     seed_stream = test_util.test_seed_stream()
     v = tf.random.uniform(
         [int(1e5)], minval=0.1, maxval=0.5, seed=seed_stream(), dtype=dtype)
@@ -551,7 +575,7 @@ class BesselKveTest(test_util.TestCase):
         tf.math.log(tfp.math.bessel_kve(v, z)),
         tfp.math.log_bessel_kve(v, z)])
     self.assertAllClose(
-        log_bessel_kve_expected_, log_bessel_kve_actual_, rtol=rtol)
+        log_bessel_kve_expected_, log_bessel_kve_actual_, rtol=rtol, atol=atol)
 
   def testLogBesselTestNonInf(self):
     # Test that log_bessel_kve(v, z) has more resolution than simply computing

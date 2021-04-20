@@ -18,19 +18,42 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
 import functools
+import threading
 
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.saved_model import nested_structure_coder  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
+# pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import composite_tensor
+from tensorflow.python.ops import resource_variable_ops
+from tensorflow.python.saved_model import nested_structure_coder
+from tensorflow.python.util import tf_inspect
+# pylint: enable=g-direct-tensorflow-import
 
 __all__ = [
     'auto_composite_tensor',
     'AutoCompositeTensor',
+    'is_deferred_assertion_context',
 ]
+
+_DEFERRED_ASSERTION_CONTEXT = threading.local()
+_DEFERRED_ASSERTION_CONTEXT.is_deferred = False
+
+
+def is_deferred_assertion_context():
+  return getattr(_DEFERRED_ASSERTION_CONTEXT, 'is_deferred', False)
+
+
+@contextlib.contextmanager
+def _deferred_assertion_context(is_deferred=True):
+  was_deferred = getattr(_DEFERRED_ASSERTION_CONTEXT, 'is_deferred', False)
+  _DEFERRED_ASSERTION_CONTEXT.is_deferred = is_deferred
+  try:
+    yield
+  finally:
+    _DEFERRED_ASSERTION_CONTEXT.is_deferred = was_deferred
 
 
 _registry = {}  # Mapping from (python pkg, class name) -> class.
@@ -57,17 +80,10 @@ def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
   kwargs = {}
   not_found = object()
   for k in keys:
-
-    if k in prefer_static_value:
-      srcs = [
-          getattr(obj, 'parameters', {}).get(k, not_found),
-          getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
-      ]
-    else:
-      srcs = [
-          getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
-          getattr(obj, 'parameters', {}).get(k, not_found),
-      ]
+    srcs = [
+        getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
+        getattr(obj, 'parameters', {}).get(k, not_found),
+    ]
     if any(v is not not_found for v in srcs):
       kwargs[k] = [v for v in srcs if v is not not_found][0]
     else:
@@ -107,6 +123,9 @@ def _extract_type_spec_recursively(value):
   """
   if isinstance(value, composite_tensor.CompositeTensor):
     return value._type_spec  # pylint: disable=protected-access
+  if isinstance(value, tf.Variable):
+    return resource_variable_ops.VariableSpec(
+        value.shape, dtype=value.dtype, trainable=value.trainable)
   if tf.is_tensor(value):
     return tf.TensorSpec(value.shape, value.dtype)
   if isinstance(value, (list, tuple)):
@@ -163,7 +182,8 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
 
   def _from_components(self, components):
     kwargs = dict(self._non_tensor_params, **components)
-    return self.value_type(**kwargs)
+    with _deferred_assertion_context():
+      return self.value_type(**kwargs)
 
   @property
   def _component_specs(self):

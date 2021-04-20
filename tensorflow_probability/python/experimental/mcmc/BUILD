@@ -43,7 +43,6 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     substrates_omit_deps = [
         ":covariance_reducer",
-        ":diagonal_mass_matrix_adaptation",
         ":elliptical_slice_sampler",
         ":expectations_reducer",
         ":kernel_builder",
@@ -87,6 +86,7 @@ multi_substrate_py_library(
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
         ":step",
+        ":thermodynamic_integrals",
         ":thinning_kernel",
         ":tracing_reducer",
         ":weighted_resampling",
@@ -188,7 +188,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "diagonal_mass_matrix_adaptation",
     srcs = ["diagonal_mass_matrix_adaptation.py"],
     srcs_version = "PY3",
@@ -203,11 +203,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "diagonal_mass_matrix_adaptation_test",
     size = "large",
     timeout = "long",
     srcs = ["diagonal_mass_matrix_adaptation_test.py"],
+    disabled_substrates = ["numpy"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
@@ -558,7 +559,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["sample_sequential_monte_carlo_test.py"],
     disabled_substrates = ["numpy"],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -805,6 +806,31 @@ py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "thermodynamic_integrals",
+    srcs = ["thermodynamic_integrals.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "thermodynamic_integrals_test",
+    size = "small",
+    srcs = ["thermodynamic_integrals_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":thermodynamic_integrals",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 py_library(
     name = "thinning_kernel",
     srcs = ["thinning_kernel.py"],
@@ -934,7 +960,7 @@ multi_substrate_py_test(
     name = "gradient_based_trajectory_length_adaptation_test",
     size = "large",
     srcs = ["gradient_based_trajectory_length_adaptation_test.py"],
-    numpy_tags = ["notap"],  # Mostly gradient-based tests.
+    disabled_substrates = ["numpy"],  # Mostly gradient-based tests.
     python_version = "PY3",
     shard_count = 3,
     srcs_version = "PY3",
@@ -953,6 +979,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":diagonal_mass_matrix_adaptation",
+        ":initialization",
         ":preconditioned_hmc",
         ":preconditioned_nuts",
         ":preconditioning_utils",
@@ -962,7 +989,6 @@ py_library(
         "//tensorflow_probability/python/bijectors:joint_map",
         "//tensorflow_probability/python/bijectors:reshape",
         "//tensorflow_probability/python/bijectors:restructure",
-        "//tensorflow_probability/python/bijectors:split",
         "//tensorflow_probability/python/experimental/stats:sample_stats",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -978,12 +1004,16 @@ py_test(
     size = "large",
     srcs = ["windowed_sampling_test.py"],
     python_version = "PY3",
-    shard_count = 5,
+    shard_count = 12,
     srcs_version = "PY3",
+    tags = ["requires-mem:16g"],
     deps = [
-        # numpy dep,
+        ":windowed_sampling",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

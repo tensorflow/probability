@@ -139,10 +139,6 @@ class ExponentiallyModifiedGaussian(distribution.Distribution):
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
-  @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, scale=0, rate=0)
-
   @property
   def loc(self):
     """Distribution parameter for the mean of the normal distribution."""
@@ -204,12 +200,13 @@ class ExponentiallyModifiedGaussian(distribution.Distribution):
 
   def _log_cdf(self, x):
     rate = tf.convert_to_tensor(self.rate)
+    scale = tf.convert_to_tensor(self.scale)
     x_centralized = x - self.loc
     u = rate * x_centralized
-    v = rate * self.scale
+    v = rate * scale
     vsquared = tf.square(v)
     return tfp_math.log_sub_exp(
-        special_math.log_ndtr(x_centralized / self.scale),
+        special_math.log_ndtr(x_centralized / scale),
         -u + vsquared / 2. + special_math.log_ndtr((u - vsquared) / v))
 
   def _mean(self):

@@ -45,80 +45,12 @@ JAX_MODE = False
 # pylint: disable=no-value-for-parameter
 
 
-TF2_FRIENDLY_DISTS = (
-    'Bates',
-    'Bernoulli',
-    'Beta',
-    'BetaBinomial',
-    'BetaQuotient',
-    'Binomial',
-    'Chi',
-    'Chi2',
-    'CholeskyLKJ',
-    'Categorical',
-    'Cauchy',
-    'ContinuousBernoulli',
-    'Deterministic',
-    'DeterminantalPointProcess',
-    'Dirichlet',
-    'DirichletMultinomial',
-    'DoublesidedMaxwell',
-    'Empirical',
-    'Exponential',
-    'ExpGamma',
-    'ExpInverseGamma',
-    'FiniteDiscrete',
-    'Gamma',
-    'GammaGamma',
-    'GeneralizedNormal',
-    'GeneralizedPareto',
-    'Geometric',
-    'Gumbel',
-    'GeneralizedExtremeValue',
-    'HalfCauchy',
-    'HalfNormal',
-    'HalfStudentT',
-    'Horseshoe',
-    'InverseGamma',
-    'InverseGaussian',
-    'JohnsonSU',
-    'Kumaraswamy',
-    'Laplace',
-    'LKJ',
-    'LogLogistic',
-    'LogNormal',
-    'Logistic',
-    'Normal',
-    'Moyal',
-    'Multinomial',
-    'NegativeBinomial',
-    'NormalInverseGaussian',
-    'OneHotCategorical',
-    'OrderedLogistic',
-    'Pareto',
-    'PERT',
-    'PlackettLuce',
-    'Poisson',
-    'PowerSpherical',
-    # 'PoissonLogNormalQuadratureCompound' TODO(b/137956955): Add support
-    # for hypothesis testing
-    'ProbitBernoulli',
-    'RelaxedBernoulli',
-    'ExpRelaxedOneHotCategorical',
-    'SigmoidBeta',
-    # 'SinhArcsinh' TODO(b/137956955): Add support for hypothesis testing
-    'Skellam',
-    'SphericalUniform',
-    'StudentT',
-    'Triangular',
-    'TruncatedCauchy',
-    'TruncatedNormal',
-    'Uniform',
-    'VonMises',
-    'VonMisesFisher',
-    'Weibull',
-    'WishartTriL',
-    'Zipf',
+TF2_UNFRIENDLY_DISTS = (
+    # TODO(b/183723782): Enable these tests.
+    'MultivariateNormalDiag',
+    'MultivariateNormalFullCovariance',
+    'MultivariateNormalTriL',
+    'VectorExponentialDiag',
 )
 
 
@@ -133,6 +65,7 @@ SPECIAL_DISTS = (
     'Blockwise',
     'Distribution',  # Base class; not a distribution at all
     'Empirical',  # Base distribution with custom instantiation; (has strategy)
+    'HiddenMarkovModel',
     'JointDistribution',
     'JointDistributionCoroutine',
     'JointDistributionCoroutineAutoBatched',
@@ -140,11 +73,15 @@ SPECIAL_DISTS = (
     'JointDistributionNamedAutoBatched',
     'JointDistributionSequential',
     'JointDistributionSequentialAutoBatched',
+    'GaussianProcess',  # PSDKernel strategy not implemented.
+    'GaussianProcessRegressionModel',  # PSDKernel strategy not implemented.
     'Independent',  # (has strategy)
     'Masked',  # (has strategy)
     'Mixture',  # (has strategy)
     'MixtureSameFamily',  # (has strategy)
+    'MultivariateNormalLinearOperator',
     'MultivariateNormalDiagPlusLowRank',  # Some batch shapes fail (b/177958275)
+    'MultivariateStudentTLinearOperator',
     'Sample',  # (has strategy)
     'TransformedDistribution',  # (has strategy)
     'QuantizedDistribution',  # (has strategy)
@@ -303,6 +240,8 @@ CONSTRAINTS = {
         tf.math.softmax,
     'ExpRelaxedOneHotCategorical.probs':
         tf.math.softmax,
+    'RelaxedOneHotCategorical.probs':
+        tf.math.softmax,
     'FiniteDiscrete.probs':
         tf.math.softmax,
     'Multinomial.probs':
@@ -366,6 +305,8 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'scale':
         tfp_hps.softplus_plus_eps(),
+    'GeneralizedPareto.scale':  # Avoid underflow in support bijector.
+        tfp_hps.softplus_plus_eps(1e-2),
     'Wishart.scale':
         tfp_hps.positive_definite,
     'scale_diag':
@@ -478,12 +419,23 @@ def _instantiable_base_dists():
         dist_name in SPECIAL_DISTS):
       continue
     try:
-      params_event_ndims = dist_class._params_event_ndims()  # pylint: disable=protected-access
+      params_event_ndims = {
+          k: p.event_ndims
+          for (k, p) in dist_class.parameter_properties().items()
+          if p.is_tensor
+      }
+      has_concrete_event_ndims = all(
+          isinstance(nd, int) for nd in params_event_ndims.values())
     except NotImplementedError:
-      msg = 'Unable to test tfd.%s: _params_event_ndims not implemented.'
-      logging.warning(msg, dist_name)
-      continue
-    result[dist_name] = DistInfo(dist_class, params_event_ndims)
+      has_concrete_event_ndims = False
+    if has_concrete_event_ndims:
+      result[dist_name] = DistInfo(dist_class, params_event_ndims)
+    else:
+      logging.warning(
+          'Unable to test tfd.%s: `parameter_properties()` is not '
+          'implemented or does not define concrete (integer) `event_ndims` '
+          'for all parameters.',
+          dist_name)
 
   # Empirical._params_event_ndims depends on `self.event_ndims`, so we have to
   # explicitly list these entries.

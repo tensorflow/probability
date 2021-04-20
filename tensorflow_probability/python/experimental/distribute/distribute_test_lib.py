@@ -57,14 +57,26 @@ class DistributedTest(test_util.TestCase):
     return tf.nest.map_structure(
         lambda per_replica: tf.stack(per_replica.values, axis=axis), value)
 
-  def strategy_run(self, f, args=(), in_axes=0):
+  def per_replica_to_composite_tensor(self, value):
     if JAX_MODE:
+      return value
+    flattened = tf.nest.flatten(value, expand_composites=True)
+    stride = len(flattened) // NUM_DEVICES
+    reshaped = [flattened[idx::stride] for idx in range(stride)]
+
+    return tf.nest.pack_sequence_as(value.values[0],
+                                    reshaped,
+                                    expand_composites=True)
+
+  def strategy_run(self, f, args=(), in_axes=0, axis_name=None):
+    if JAX_MODE:
+      axis_name = axis_name or self.axis_name
       if in_axes is None:
         return jax.pmap(
             lambda _, args: f(*args),
             in_axes=(0, None),
-            axis_name=self.axis_name)(tf.ones(NUM_DEVICES), args)
-      return jax.pmap(f, axis_name=self.axis_name, in_axes=in_axes)(*args)
+            axis_name=axis_name)(tf.ones(NUM_DEVICES), args)
+      return jax.pmap(f, axis_name=axis_name, in_axes=in_axes)(*args)
     return self.strategy.run(tf.function(f, autograph=False), args)
 
   def shard_values(self, values, axis=0):

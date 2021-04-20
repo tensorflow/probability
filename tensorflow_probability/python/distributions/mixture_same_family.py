@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -218,6 +219,15 @@ class MixtureSameFamily(distribution.Distribution):
           '`MixtureSameFamily.mixture_distribution` sharding must match '
           '`MixtureSameFamily.components_distribution`.')
     return sharded
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        mixture_distribution=(
+            parameter_properties.BatchedComponentProperties()),
+        components_distribution=(
+            parameter_properties.BatchedComponentProperties(
+                event_ndims=1)))
 
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing

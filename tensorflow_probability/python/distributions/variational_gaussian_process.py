@@ -24,12 +24,14 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import psd_kernels as tfpk
@@ -171,6 +173,19 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
   @property
   def variational_scale(self):
     return self._variational_scale
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        base_kernel=parameter_properties.BatchedComponentProperties(),
+        inducing_index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        variational_scale=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+            default_constraining_bijector_fn=(
+                fill_scale_tril_bijector.FillScaleTriL)))
 
   def chol_kzz(self):
     return tf.convert_to_tensor(self._chol_kzz)

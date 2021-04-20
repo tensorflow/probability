@@ -112,6 +112,18 @@ class InitializationTest(test_util.TestCase):
           model_dist.log_prob,
           seed=seed))
 
+  @test_util.jax_disable_test_missing_functionality('dynamic shape')
+  @test_util.numpy_disable_test_missing_functionality('dynamic shape')
+  def testPartialShape(self):
+    @tf.function
+    def f(x):
+      model_dist = tfd.JointDistributionSequential([
+          tfd.Sample(tfd.Normal(0, 1), tf.shape(x))])
+      return tfp.experimental.mcmc.init_near_unconstrained_zero(
+          model_dist).sample(seed=test_util.test_seed())
+    g = f.get_concrete_function(tf.TensorSpec([None, 3], tf.float32))
+    self.evaluate(g(tf.ones([7, 3])))
+
 
 if __name__ == '__main__':
   tf.test.main()

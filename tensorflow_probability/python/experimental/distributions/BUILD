@@ -34,11 +34,53 @@ multi_substrate_py_library(
     name = "distributions",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
+    substrates_omit_deps = [
+        ":marginal_fns",
+    ],
     deps = [
-        ":laplace_approximation",
+        ":increment_log_prob",
+        ":joint_density_coroutine",
         ":joint_distribution_pinned",
+        ":laplace_approximation",
+        ":marginal_fns",
         ":mvn_precision_factor_linop",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "increment_log_prob",
+    srcs = ["increment_log_prob.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "joint_density_coroutine",
+    srcs = ["joint_density_coroutine.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":increment_log_prob",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "joint_density_coroutine_test",
+    size = "small",
+    srcs = ["joint_density_coroutine_test.py"],
+    jax_size = "small",
+    shard_count = 1,
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -59,6 +101,28 @@ multi_substrate_py_test(
     jax_size = "large",
     shard_count = 13,
     srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "marginal_fns",
+    srcs = ["marginal_fns.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:mvn_linear_operator",
+    ],
+)
+
+py_test(
+    name = "marginal_fns_test",
+    srcs = ["marginal_fns_test.py"],
+    python_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

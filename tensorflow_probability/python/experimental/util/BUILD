@@ -18,6 +18,7 @@
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
+    "multi_substrate_py_test",
 )
 
 package(
@@ -36,9 +37,12 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     substrates_omit_deps = [
         ":deferred_module",
+        ":trainable",
     ],
     deps = [
         ":deferred_module",
+        ":jit_public_methods",
+        ":trainable",
     ],
 )
 
@@ -67,5 +71,55 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "jit_public_methods",
+    srcs = ["jit_public_methods.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "jit_public_methods_test",
+    size = "small",
+    srcs = ["jit_public_methods_test.py"],
+    numpy_tags = ["notap"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+py_library(
+    name = "trainable",
+    srcs = ["trainable.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/util:deferred_tensor",
+    ],
+)
+
+py_test(
+    name = "trainable_test",
+    srcs = ["trainable_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

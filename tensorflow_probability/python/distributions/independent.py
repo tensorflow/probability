@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -202,6 +203,12 @@ class Independent(distribution_lib.Distribution):
         distribution=self.distribution[slices],
         reinterpreted_batch_ndims=self._static_reinterpreted_batch_ndims)
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties(
+            event_ndims=lambda self: self.reinterpreted_batch_ndims))
+
   def _batch_shape_tensor(self):
     batch_shape = self.distribution.batch_shape_tensor()
     batch_ndims = ps.rank_from_shape(
@@ -260,6 +267,10 @@ class Independent(distribution_lib.Distribution):
   def _log_prob(self, x, **kwargs):
     return self._reduce(
         self._sum_fn(), self.distribution.log_prob(x, **kwargs))
+
+  def _unnormalized_log_prob(self, x, **kwargs):
+    return self._reduce(
+        self._sum_fn(), self.distribution.unnormalized_log_prob(x, **kwargs))
 
   def _log_cdf(self, x, **kwargs):
     return self._reduce(self._sum_fn(), self.distribution.log_cdf(x, **kwargs))
