@@ -268,6 +268,10 @@ class _DefaultJointBijectorAutoBatched(bijector_lib.Bijector):
       setattr(self, attr, getattr(self._joint_bijector, attr))
     # pylint: enable=protected-access
 
+  @property
+  def _parts_interact(self):
+    return self._joint_bijector._parts_interact  # pylint: disable=protected-access
+
   def _vectorize_member_fn(self, member_fn, core_ndims):
     return vectorization_util.make_rank_polymorphic(
         lambda x: member_fn(self._joint_bijector, x),

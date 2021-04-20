@@ -177,9 +177,9 @@ class Restructure(bijector.Bijector):
     self._output_structure = self._no_dependency(output_structure)
     super(Restructure, self).__init__(
         forward_min_event_ndims=nest_util.broadcast_structure(
-            self._input_structure, None),
+            self._input_structure, 0),
         inverse_min_event_ndims=nest_util.broadcast_structure(
-            self._output_structure, None),
+            self._output_structure, 0),
         is_constant_jacobian=True,
         validate_args=False,
         parameters=parameters,
@@ -192,6 +192,10 @@ class Restructure(bijector.Bijector):
   @property
   def _is_permutation(self):
     return True
+
+  @property
+  def _parts_interact(self):
+    return False
 
   def _forward(self, x):
     flat_dict = {}

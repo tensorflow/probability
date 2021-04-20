@@ -20,13 +20,10 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import ldj_ratio
-from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Chain',
@@ -118,19 +115,20 @@ class Chain(composition.Composition):
               '_of_'.join(['chain'] + [b.name for b in bijectors]))
       name = name.replace('/', '')
 
+    # If there are no bijectors, treat this like a single-part Identity.
+    forward_min_event_ndims = 0
+    inverse_min_event_ndims = 0
     if bijectors:
-      f_min_event_ndims, i_min_event_ndims = _infer_min_event_ndims(bijectors)
-    else:
-      # If there are no bijectors, treat this like a single-part Identity.
-      f_min_event_ndims = i_min_event_ndims = None
+      forward_min_event_ndims = None  # Inferred by base class.
+      inverse_min_event_ndims = None  # Inferred by base class.
 
     with tf.name_scope(name) as name:
       super(Chain, self).__init__(
           bijectors=bijectors or (),
-          forward_min_event_ndims=f_min_event_ndims,
-          inverse_min_event_ndims=i_min_event_ndims,
           validate_args=validate_args,
           validate_event_size=validate_event_size,
+          forward_min_event_ndims=forward_min_event_ndims,
+          inverse_min_event_ndims=inverse_min_event_ndims,
           parameters=parameters,
           name=name)
 
@@ -169,86 +167,6 @@ class Chain(composition.Composition):
     those that are shape-related.
     """
     return ('bijectors',)
-
-
-def _infer_min_event_ndims(bijectors):
-  """Computes `min_event_ndims` for a sequence of bijectors."""
-  # Find the index of the first bijector with statically-known min_event_ndims.
-  try:
-    idx = next(i for i, b in enumerate(bijectors)
-               if b.has_static_min_event_ndims)
-  except StopIteration:
-    # If none of the nested bijectors have static min_event_ndims, give up
-    # and return tail-structures filled with `None`.
-    return (
-        nest_util.broadcast_structure(
-            bijectors[-1].forward_min_event_ndims, None),
-        nest_util.broadcast_structure(
-            bijectors[0].inverse_min_event_ndims, None))
-
-  # Accumulator tracking the maximum value of "min_event_ndims - ndims".
-  rolling_offset = 0
-
-  def update_event_ndims(input_event_ndims,
-                         input_min_event_ndims,
-                         output_min_event_ndims):
-    """Returns output_event_ndims and updates rolling_offset as needed."""
-    nonlocal rolling_offset
-    ldj_reduce_ndims = bijector_lib.ldj_reduction_ndims(
-        input_event_ndims, input_min_event_ndims)
-    # Update rolling_offset when batch_ndims are negative.
-    rolling_offset = ps.maximum(rolling_offset, -ldj_reduce_ndims)
-    return nest.map_structure(lambda nd: ldj_reduce_ndims + nd,
-                              output_min_event_ndims)
-
-  def sanitize_event_ndims(event_ndims):
-    """Updates `rolling_offset` when event_ndims are negative."""
-    nonlocal rolling_offset
-    max_missing_ndims = -ps.reduce_min(nest.flatten(event_ndims))
-    rolling_offset = ps.maximum(rolling_offset, max_missing_ndims)
-    return event_ndims
-
-  # Wrappers for Bijector.forward_event_ndims and Bijector.inverse_event_ndims
-  # that recursively walk into Composition bijectors when static min_event_ndims
-  # is not available.
-
-  def update_f_event_ndims(bij, event_ndims):
-    event_ndims = nest_util.coerce_structure(
-        bij.inverse_min_event_ndims, event_ndims)
-    if bij.has_static_min_event_ndims:
-      return update_event_ndims(
-          input_event_ndims=event_ndims,
-          input_min_event_ndims=bij.inverse_min_event_ndims,
-          output_min_event_ndims=bij.forward_min_event_ndims)
-    elif isinstance(bij, composition.Composition):
-      return bij._call_walk_inverse(update_f_event_ndims, event_ndims)  # pylint: disable=protected-access
-    else:
-      return sanitize_event_ndims(bij.inverse_event_ndims(event_ndims))
-
-  def update_i_event_ndims(bij, event_ndims):
-    event_ndims = nest_util.coerce_structure(
-        bij.forward_min_event_ndims, event_ndims)
-    if bij.has_static_min_event_ndims:
-      return update_event_ndims(
-          input_event_ndims=event_ndims,
-          input_min_event_ndims=bij.forward_min_event_ndims,
-          output_min_event_ndims=bij.inverse_min_event_ndims)
-    elif isinstance(bij, composition.Composition):
-      return bij._call_walk_forward(update_i_event_ndims, event_ndims)  # pylint: disable=protected-access
-    else:
-      return sanitize_event_ndims(bij.forward_event_ndims(event_ndims))
-
-  # Initialize event_ndims to the first statically-known min_event_ndims in
-  # the Chain of bijectors.
-  f_event_ndims = i_event_ndims = bijectors[idx].inverse_min_event_ndims
-  for b in bijectors[idx:]:
-    f_event_ndims = update_f_event_ndims(b, f_event_ndims)
-  for b in reversed(bijectors[:idx]):
-    i_event_ndims = update_i_event_ndims(b, i_event_ndims)
-
-  # Shift both event_ndims to satisfy min_event_ndims for nested components.
-  return (nest.map_structure(lambda nd: rolling_offset + nd, f_event_ndims),
-          nest.map_structure(lambda nd: rolling_offset + nd, i_event_ndims))
 
 
 @ldj_ratio.RegisterILDJRatio(Chain)

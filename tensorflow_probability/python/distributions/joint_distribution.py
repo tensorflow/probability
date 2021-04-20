@@ -799,6 +799,13 @@ class _DefaultJointBijector(composition.Composition):
       cond = rv if constrained else bij.forward(rv)
     return bijectors
 
+  @property
+  def _parts_interact(self):
+    # The bijector that operates on input part B may in general be a
+    # function of input part A. This dependence is not visible to the
+    # Composition base class, so we annotate it explicitly.
+    return True
+
   def _walk_forward(self, step_fn, values, _jd_conditioning=None):  # pylint: disable=invalid-name
     bijectors = self._conditioned_bijectors(_jd_conditioning, constrained=False)
     return self._jd._model_unflatten(tuple(
