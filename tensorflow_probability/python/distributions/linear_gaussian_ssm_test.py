@@ -1481,8 +1481,8 @@ class _KalmanStepsTest(object):
     self.assertAllClose(*self.evaluate((predictive_dist.mean(),
                                         predictive_dist_extended.mean()[:1])))
     self.assertAllClose(
-        *self.evaluate((predictive_dist.covariance(),
-                        predictive_dist_extended.covariance()[:1, :1])))
+        *self.evaluate((predictive_dist.stddev(),
+                        predictive_dist_extended.stddev()[:1])))
 
   def testMeanStep(self):
     prev_mean = np.asarray([[-2], [.4]], dtype=np.float32)
