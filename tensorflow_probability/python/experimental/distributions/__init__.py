@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.distributions.log_prob_ratio import log_prob_ratio
+from tensorflow_probability.python.experimental.distributions import marginal_fns
 from tensorflow_probability.python.experimental.distributions.increment_log_prob import IncrementLogProb
 from tensorflow_probability.python.experimental.distributions.joint_density_coroutine import JointDensityCoroutine
 from tensorflow_probability.python.experimental.distributions.joint_distribution_pinned import JointDistributionPinned
@@ -30,5 +31,6 @@ __all__ = [
     'IncrementLogProb',
     'JointDensityCoroutine',
     'JointDistributionPinned',
+    'marginal_fns',
     'MultivariateNormalPrecisionFactorLinearOperator',
 ]
