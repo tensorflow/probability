@@ -34,7 +34,7 @@ class _EffectiveSampleSizeTest(object):
   @property
   def use_static_shape(self):
     raise NotImplementedError(
-        "Subclass failed to implement `use_static_shape`.")
+        'Subclass failed to implement `use_static_shape`.')
 
   def _check_versus_expected_effective_sample_size(
       self,
@@ -182,15 +182,15 @@ class _EffectiveSampleSizeTest(object):
         filter_beyond_positive_pairs=True,
         rtol=0.15)
 
-  def testListArgs(self):
+  def testStructuredArgs(self):
     # x_ has correlation length 10 ==> ESS = N / 10
     # y_ has correlation length 1  ==> ESS = N
     iid_x_ = np.random.randn(5000, 1).astype(np.float32)
     x_ = (iid_x_ * np.ones((5000, 10)).astype(np.float32)).reshape((50000,))
     y_ = np.random.randn(50000).astype(np.float32)
-    states = [x_, x_, y_, y_]
-    filter_threshold = [0., None, 0., None]
-    filter_beyond_lag = [None, 5, None, 5]
+    states = [(x_, x_), {'foo': y_, 'bar': y_}]
+    filter_threshold = [(0., None), {'foo': 0., 'bar': None}]
+    filter_beyond_lag = [(None, 5), {'foo': None, 'bar': 5}]
 
     # See other tests for reasoning on tolerance.
     ess = tfp.mcmc.effective_sample_size(
@@ -198,12 +198,12 @@ class _EffectiveSampleSizeTest(object):
         filter_threshold=filter_threshold,
         filter_beyond_lag=filter_beyond_lag)
     ess_ = self.evaluate(ess)
-    self.assertAllEqual(4, len(ess_))
+    self.assertAllEqual(2, len(ess_))
 
-    self.assertAllClose(50000 // 10, ess_[0], rtol=0.3)
-    self.assertAllClose(50000 // 10, ess_[1], rtol=0.3)
-    self.assertAllClose(50000, ess_[2], rtol=0.1)
-    self.assertAllClose(50000, ess_[3], rtol=0.1)
+    self.assertAllClose(50000 // 10, ess_[0][0], rtol=0.3)
+    self.assertAllClose(50000 // 10, ess_[0][1], rtol=0.3)
+    self.assertAllClose(50000, ess_[1]['foo'], rtol=0.1)
+    self.assertAllClose(50000, ess_[1]['bar'], rtol=0.1)
 
   def testMaxLagsThresholdLessThanNeg1SameAsNone(self):
     # Setting both means we filter out items R_k from the auto-correlation
@@ -376,7 +376,7 @@ class _EffectiveSampleSizeTest(object):
     if not self.use_static_shape:
       cross_chain_dims = tf1.placeholder_with_default(
           cross_chain_dims, shape=[])
-    with self.assertRaisesRegexp(Exception, "there must be > 1 chain"):
+    with self.assertRaisesRegexp(Exception, 'there must be > 1 chain'):
       self.evaluate(
           tfp.mcmc.effective_sample_size(
               x,
@@ -408,7 +408,7 @@ class _PotentialScaleReductionTest(object):
   @property
   def use_static_shape(self):
     raise NotImplementedError(
-        "Subclass failed to implement `use_static_shape`.")
+        'Subclass failed to implement `use_static_shape`.')
 
   def testWithManualComputation(self):
     # 5 samples from 3 independent Markov chains
@@ -443,7 +443,7 @@ class _PotentialScaleReductionTest(object):
     self.assertEqual(tf.float64, float_rhat.dtype)
     self.assertNear(float_rhat, int_rhat, err=1e-6)
 
-  def testListOfStatesWhereFirstPassesSecondFails(self):
+  def testStructureOfStatesWhereFirstPassesSecondFails(self):
     """Simple test showing API with two states.  Read first!."""
     n_samples = 1000
 
@@ -457,18 +457,19 @@ class _PotentialScaleReductionTest(object):
     state_1 = np.random.randn(n_samples, 3, 4) + offset
 
     rhat = tfp.mcmc.potential_scale_reduction(
-        chains_states=[state_0, state_1], independent_chain_ndims=1)
+        chains_states={'pass': state_0, 'fail': state_1},
+        independent_chain_ndims=1)
 
-    self.assertIsInstance(rhat, list)
-    rhat_0_, rhat_1_ = self.evaluate(rhat)
+    self.assertIsInstance(rhat, dict)
+    rhat_ = self.evaluate(rhat)
 
     # r_hat_0 should be close to 1, meaning test is passed.
-    self.assertAllEqual((), rhat_0_.shape)
-    self.assertAllClose(1., rhat_0_, rtol=0.02)
+    self.assertAllEqual((), rhat_['pass'].shape)
+    self.assertAllClose(1., rhat_['pass'], rtol=0.02)
 
     # r_hat_1 should be greater than 1.2, meaning test has failed.
-    self.assertAllEqual((4,), rhat_1_.shape)
-    self.assertAllEqual(np.ones_like(rhat_1_).astype(bool), rhat_1_ > 1.2)
+    self.assertAllEqual((4,), rhat_['fail'].shape)
+    self.assertAllGreater(rhat_['fail'], 1.2)
 
   def check_results(self,
                     state_,
@@ -599,7 +600,7 @@ class _PotentialScaleReductionTest(object):
     input_ = np.random.rand(1, 10)
     x = tf1.placeholder_with_default(
         input_, shape=input_.shape if self.use_static_shape else None)
-    with self.assertRaisesError("Must provide at least 2 samples"):
+    with self.assertRaisesError('Must provide at least 2 samples'):
       self.evaluate(
           tfp.mcmc.potential_scale_reduction(
               # Require at least 2 samples...have only 1
@@ -611,7 +612,7 @@ class _PotentialScaleReductionTest(object):
     input_ = np.random.rand(3, 10)
     x = tf1.placeholder_with_default(
         input_, shape=input_.shape if self.use_static_shape else None)
-    with self.assertRaisesError("Must provide at least 4 samples"):
+    with self.assertRaisesError('Must provide at least 4 samples'):
       self.evaluate(
           tfp.mcmc.potential_scale_reduction(
               # Require at least 4 samples...have only 3
@@ -633,7 +634,7 @@ class PotentialScaleReductionStaticTest(test_util.TestCase,
     return self.assertRaisesRegexp(Exception, msg)
 
   def testIndependentNdimsLessThanOneRaises(self):
-    with self.assertRaisesRegexp(ValueError, "independent_chain_ndims"):
+    with self.assertRaisesRegexp(ValueError, 'independent_chain_ndims'):
       tfp.mcmc.potential_scale_reduction(
           np.random.rand(2, 3, 4), independent_chain_ndims=0)
 
@@ -658,7 +659,7 @@ class _ReduceVarianceTest(object):
   @property
   def use_static_shape(self):
     raise NotImplementedError(
-        "Subclass failed to implement `use_static_shape`.")
+        'Subclass failed to implement `use_static_shape`.')
 
   def check_versus_numpy(self, x_, axis, biased, keepdims):
     x_ = np.asarray(x_)
@@ -721,5 +722,5 @@ class ReduceVarianceTestDynamicShape(test_util.TestCase, _ReduceVarianceTest):
     return False
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()
