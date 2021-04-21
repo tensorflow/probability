@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 
 
@@ -29,7 +30,8 @@ __all__ = [
 ]
 
 
-class DiscreteCosineTransform(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class DiscreteCosineTransform(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = DCT(X)`, where DCT type is indicated by the `type` arg.
 
   The [discrete cosine transform](
@@ -50,6 +52,8 @@ class DiscreteCosineTransform(bijector.Bijector):
        efficient linear layer. In _International Conference on Learning
        Representations_, 2016. https://arxiv.org/abs/1511.05946
   """
+
+  _type_spec_id = 366918640
 
   def __init__(self, dct_type=2, validate_args=False, name='dct'):
     """Instantiates the `DiscreteCosineTransform` bijector.

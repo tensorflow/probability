@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -32,7 +33,8 @@ __all__ = [
 ]
 
 
-class Scale(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Scale(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X; scale) = scale * X`.
 
   Examples:
@@ -43,6 +45,8 @@ class Scale(bijector.Bijector):
   ```
 
   """
+
+  _type_spec_id = 366918667
 
   def __init__(self,
                scale=None,

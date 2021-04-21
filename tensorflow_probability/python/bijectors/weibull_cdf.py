@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -33,7 +34,8 @@ __all__ = [
 ]
 
 
-class WeibullCDF(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class WeibullCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = 1 - exp( -( X / scale) ** concentration), X >= 0`.
 
   This bijector maps inputs from `[0, inf]` to `[0, 1]`. The inverse of the
@@ -50,6 +52,8 @@ class WeibullCDF(bijector.Bijector):
 
   Likwewise, the forward of this bijector is the Weibull distribution CDF.
   """
+
+  _type_spec_id = 366918684
 
   def __init__(self,
                scale=1.,

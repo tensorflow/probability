@@ -19,10 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import os
 
 import tensorflow.compat.v2 as tf
-
 import tensorflow_probability as tfp
+
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
@@ -250,6 +251,50 @@ class AutoCompositeTensorTest(test_util.TestCase):
     self.assertEqual(self.evaluate(dist_.distribution.loc), new_loc)
     self.assertEqual(self.evaluate(dist.distribution.loc), new_loc)
     self.assertLen(dist.trainable_variables, 1)
+
+  def test_type_spec_id_collision_raises(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        'already used by '
+        'tensorflow_probability.python.bijectors.sigmoid.Sigmoid'):
+      @tfp.experimental.auto_composite_tensor  # pylint: disable=unused-variable
+      class ThingWithDuplicateID(tfp.experimental.AutoCompositeTensor):
+
+        _type_spec_id = 366918671  # This is tfb.Sigmoid's ID.
+
+  def test_export_import(self):
+    path = self.create_tempdir().full_path
+
+    class Model(tf.Module):
+
+      def __init__(self):
+        self.scale = tf.Variable([0., 1.], shape=[None])
+
+      @tf.function(input_signature=(
+          tfb.Scale([1., 2.], validate_args=True)._type_spec,))
+      def make_bij(self, b):
+        return tfb.Scale(
+            tf.convert_to_tensor(self.scale) + b.scale,
+            validate_args=True)
+
+    m1 = Model()
+    self.evaluate([v.initializer for v in m1.variables])
+    self.evaluate(m1.scale.assign(m1.scale + 1.))
+
+    tf.saved_model.save(m1, os.path.join(path, 'saved_model1'))
+    m2 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
+    self.evaluate(m2.scale.initializer)
+    b = tfb.Scale([5., 9.], validate_args=True)
+    self.evaluate(m2.make_bij(b).forward(2.))
+    self.evaluate(m2.scale.assign(m2.scale + [1., 2.]))
+    self.evaluate(m2.make_bij(b).forward(2.))
+
+    self.evaluate(m2.scale.assign([1., 2., 3.]))
+    tf.saved_model.save(m2, os.path.join(path, 'saved_model2'))
+    m3 = tf.saved_model.load(os.path.join(path, 'saved_model2'))
+    self.evaluate(m3.scale.initializer)
+    with self.assertRaisesOpError('compatible shape'):
+      self.evaluate(m3.make_bij(b).forward([3.]))
 
 
 if __name__ == '__main__':

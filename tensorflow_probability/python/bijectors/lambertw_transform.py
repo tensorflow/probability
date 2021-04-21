@@ -181,6 +181,7 @@ class _HeavyTailOnly(bijector.Bijector):
 # fix batch_shape inconsistencies when running distribution_properties_test.
 
 
+#  TODO(b/182603117): Enable AutoCompositeTensor when Chain is enabled.
 class LambertWTail(chain.Chain):
   """LambertWTail transformation for heavy-tail Lambert W x F random variables.
 

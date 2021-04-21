@@ -22,15 +22,17 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
-    "Ordered",
+    'Ordered',
 ]
 
 
-class Ordered(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Ordered(bijector.AutoCompositeTensorBijector):
   """Maps a vector of increasing elements to an unconstrained vector.
 
   Both the domain and the codomain of the mapping is [-inf, inf], however,
@@ -51,11 +53,13 @@ class Ordered(bijector.Bijector):
   ```
   """
 
+  _type_spec_id = 366918657
+
   @deprecation.deprecated(
-      "2021-01-09", "`Ordered` bijector is deprecated; please use "
-      "`tfb.Invert(tfb.Ascending())` instead.",
+      '2021-01-09', '`Ordered` bijector is deprecated; please use '
+      '`tfb.Invert(tfb.Ascending())` instead.',
       warn_once=True)
-  def __init__(self, validate_args=False, name="ordered"):
+  def __init__(self, validate_args=False, name='ordered'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Ordered, self).__init__(
@@ -101,4 +105,4 @@ class Ordered(bijector.Bijector):
       return []
     return [assert_util.assert_positive(
         t[..., 1:] - t[..., :-1],
-        message="Forward transformation input must be strictly increasing.")]
+        message='Forward transformation input must be strictly increasing.')]

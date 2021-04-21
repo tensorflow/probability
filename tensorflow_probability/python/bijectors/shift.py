@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -31,7 +32,8 @@ __all__ = [
 ]
 
 
-class Shift(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Shift(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X; shift) = X + shift`.
 
   where `shift` is a numeric `Tensor`.
@@ -47,6 +49,8 @@ class Shift(bijector.Bijector):
   ```
 
   """
+
+  _type_spec_id = 366918669
 
   def __init__(self,
                shift,

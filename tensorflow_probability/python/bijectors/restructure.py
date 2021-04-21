@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import nest_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -43,7 +44,8 @@ def unique_token_set(source_structure):
   return flat_token_set
 
 
-class Restructure(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Restructure(bijector.AutoCompositeTensorBijector):
   """Converts between nested structures of Tensors.
 
     This is useful when constructing non-trivial chains of multipart bijectors.
@@ -119,6 +121,8 @@ class Restructure(bijector.Bijector):
       ])
       ```
   """
+
+  _type_spec_id = 366918666
 
   def __init__(self,
                output_structure,
@@ -261,6 +265,10 @@ class Restructure(bijector.Bijector):
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
     with self._name_and_control_scope(name):
       return tf.zeros([], tf.float32)
+
+  @property
+  def _composite_tensor_shape_params(self):
+    return ('output_structure', 'input_structure')
 
 
 def tree_flatten(example, name='restructure'):

@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -64,7 +65,8 @@ else:
     return y, grad_fn
 
 
-class Sigmoid(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Sigmoid(bijector.AutoCompositeTensorBijector):
   """Bijector that computes the logistic sigmoid function.
 
   If the `low` and `high` parameters are not passed, the transformation is
@@ -80,6 +82,8 @@ class Sigmoid(bijector.Bijector):
   to slightly larger than `high`, which would trigger assertions
   elsewhere.  The formula `high * g(X) + low * g(-X)` doesn't do that.
   """
+
+  _type_spec_id = 366918671
 
   def __init__(self, low=None, high=None, validate_args=False, name='sigmoid'):
     """Initialize a `Sigmoid` bijector.

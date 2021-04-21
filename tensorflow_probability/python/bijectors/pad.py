@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
@@ -34,7 +35,8 @@ __all__ = [
 ]
 
 
-class Pad(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Pad(bijector.AutoCompositeTensorBijector):
   """Pads a value to the `event_shape` of a `Tensor`.
 
   The semantics of `tfp.bijectors.Pad` generally follow that of `tf.pad()`
@@ -95,6 +97,8 @@ class Pad(bijector.Bijector):
   ```
 
   """
+
+  _type_spec_id = 366918658
 
   def __init__(self,
                paddings=((0, 1),),
@@ -348,3 +352,7 @@ class Pad(bijector.Bijector):
             len_axis, len_paddings, message=msg))
 
     return assertions
+
+  @property
+  def _composite_tensor_shape_params(self):
+    return ('paddings', 'axis')

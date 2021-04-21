@@ -60,6 +60,15 @@ class AbsoluteValueTest(test_util.TestCase):
     with self.assertRaisesOpError("y was negative"):
       self.evaluate(bijector.inverse_log_det_jacobian(-1., event_ndims=0))
 
+  def testCompositeTensor(self):
+    bijector = tfb.AbsoluteValue(validate_args=True)
+    flat = tf.nest.flatten(bijector, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(bijector, flat, expand_composites=True)
+    x = tf.convert_to_tensor([0., 1., -1.])
+    self.assertAllClose(
+        bijector.forward(x),
+        tf.function(lambda b_: b_.forward(x))(unflat))
+
 
 if __name__ == "__main__":
   tf.test.main()

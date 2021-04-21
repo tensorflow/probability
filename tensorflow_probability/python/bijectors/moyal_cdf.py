@@ -27,6 +27,7 @@ from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -37,7 +38,8 @@ __all__ = [
 ]
 
 
-class MoyalCDF(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class MoyalCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = erfc(exp(- 1/2 * (X - loc) / scale) / sqrt(2))`.
 
   This bijector maps inputs from `[-inf, inf]` to `[0, 1]`. The inverse of the
@@ -51,6 +53,8 @@ class MoyalCDF(bijector.Bijector):
     (sqrt(2 * pi) * scale)
   ```
   """
+
+  _type_spec_id = 366918655
 
   def __init__(self,
                loc=0.,

@@ -31,6 +31,7 @@ from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.bijectors import softplus
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -41,7 +42,8 @@ __all__ = [
 ]
 
 
-class SoftClip(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class SoftClip(bijector.AutoCompositeTensorBijector):
   """Bijector that approximates clipping as a continuous, differentiable map.
 
   The `forward` method takes unconstrained scalar `x` to a value `y` in
@@ -176,6 +178,8 @@ class SoftClip(bijector.Bijector):
   correction and asymmetry are very small.
 
   """
+
+  _type_spec_id = 366918675
 
   def __init__(self,
                low=None,

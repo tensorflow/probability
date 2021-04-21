@@ -22,14 +22,16 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 
 __all__ = [
-    "Ascending",
+    'Ascending',
 ]
 
 
-class Ascending(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Ascending(bijector.AutoCompositeTensorBijector):
   """Maps unconstrained R^n to R^n in ascending order.
 
   Both the domain and the codomain of the mapping is `[-inf, inf]^n`, however,
@@ -49,7 +51,9 @@ class Ascending(bijector.Bijector):
   ```
   """
 
-  def __init__(self, validate_args=False, name="ascending"):
+  _type_spec_id = 366918634
+
+  def __init__(self, validate_args=False, name='ascending'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Ascending, self).__init__(
@@ -95,4 +99,4 @@ class Ascending(bijector.Bijector):
       return []
     return [assert_util.assert_greater(
         t[..., 1:], t[..., :-1],
-        message="Inverse transformation input must be strictly increasing.")]
+        message='Inverse transformation input must be strictly increasing.')]

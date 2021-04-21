@@ -22,15 +22,17 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
-    "Softsign",
+    'Softsign',
 ]
 
 
-class Softsign(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Softsign(bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = X / (1 + |X|)`.
 
   The softsign `Bijector` has the following two useful properties:
@@ -52,7 +54,9 @@ class Softsign(bijector.Bijector):
   ```
   """
 
-  def __init__(self, validate_args=False, name="softsign"):
+  _type_spec_id = 366918679
+
+  def __init__(self, validate_args=False, name='softsign'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Softsign, self).__init__(
@@ -99,9 +103,9 @@ class Softsign(bijector.Bijector):
         assert_util.assert_greater_equal(
             t,
             dtype_util.as_numpy_dtype(t.dtype)(-1),
-            message="Inverse transformation input must be >= -1."),
+            message='Inverse transformation input must be >= -1.'),
         assert_util.assert_less_equal(
             t,
             dtype_util.as_numpy_dtype(t.dtype)(1),
-            message="Inverse transformation input must be <= 1.")
+            message='Inverse transformation input must be <= 1.')
     ]

@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
@@ -37,7 +38,8 @@ __all__ = [
 ]
 
 
-class ScaleMatvecLU(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class ScaleMatvecLU(bijector.AutoCompositeTensorBijector):
   """Matrix-vector multiply using LU decomposition.
 
   This bijector is identical to the 'Convolution1x1' used in Glow
@@ -100,6 +102,8 @@ class ScaleMatvecLU(bijector.Bijector):
        Invertible 1x1 Convolutions. _arXiv preprint arXiv:1807.03039_, 2018.
        https://arxiv.org/abs/1807.03039
   """
+
+  _type_spec_id = 366918668
 
   def __init__(self,
                lower_upper,

@@ -23,16 +23,18 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
-    "CholeskyToInvCholesky",
+    'CholeskyToInvCholesky',
 ]
 
 
-class CholeskyToInvCholesky(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class CholeskyToInvCholesky(bijector.AutoCompositeTensorBijector):
   """Maps the Cholesky factor of `M` to the Cholesky factor of `M^{-1}`.
 
   The `forward` and `inverse` calculations are conceptually identical to:
@@ -59,7 +61,9 @@ class CholeskyToInvCholesky(bijector.Bijector):
   matrices.
   """
 
-  def __init__(self, validate_args=False, name="cholesky_to_inv_cholesky"):
+  _type_spec_id = 366918637
+
+  def __init__(self, validate_args=False, name='cholesky_to_inv_cholesky'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       self._cholesky = CholeskyOuterProduct()
@@ -119,14 +123,14 @@ class CholeskyToInvCholesky(bijector.Bijector):
       return []
     x_shape = tf.shape(x)
     is_matrix = assert_util.assert_rank_at_least(
-        x, 2, message="Input must have rank at least 2.")
+        x, 2, message='Input must have rank at least 2.')
     is_square = assert_util.assert_equal(
-        x_shape[-2], x_shape[-1], message="Input must be a square matrix.")
+        x_shape[-2], x_shape[-1], message='Input must be a square matrix.')
     diag_part_x = tf.linalg.diag_part(x)
     is_lower_triangular = assert_util.assert_equal(
         tf.linalg.band_part(x, 0, -1),  # Preserves triu, zeros rest.
         tf.linalg.diag(diag_part_x),
-        message="Input must be lower triangular.")
+        message='Input must be lower triangular.')
     is_positive_diag = assert_util.assert_positive(
-        diag_part_x, message="Input must have all positive diagonal entries.")
+        diag_part_x, message='Input must have all positive diagonal entries.')
     return [is_matrix, is_square, is_lower_triangular, is_positive_diag]

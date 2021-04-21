@@ -34,12 +34,14 @@ from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math import gradient
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
-
+# pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import deprecation
+from tensorflow.python.util import nest
+# pylint: enable=g-direct-tensorflow-import
 
 __all__ = [
     'Bijector',
+    'AutoCompositeTensorBijector',
 ]
 
 JAX_MODE = False
@@ -583,7 +585,13 @@ class Bijector(tf.Module):
     super(Bijector, self).__init__(name=name)
     self._name = name
     # TODO(b/176242804): Infer `parameters` if not specified by the child class.
-    self._parameters = self._no_dependency(parameters)
+
+    if parameters is None:
+      self._parameters = None
+    else:
+      self._parameters = self._no_dependency(
+          {k: v for k, v in parameters.items()
+           if not k.startswith('__') and k != 'self'})
 
     self._graph_parents = self._no_dependency(graph_parents or [])
 
@@ -800,10 +808,7 @@ class Bijector(tf.Module):
     # Remove "self", "__class__", or other special variables. These can appear
     # if the subclass used:
     # `parameters = dict(locals())`.
-    if self._parameters is None:
-      return None
-    return {k: v for k, v in self._parameters.items()
-            if not k.startswith('__') and k != 'self'}
+    return self._parameters
 
   def __hash__(self):
     return hash(cache_util.hashable_structure((
@@ -1582,6 +1587,50 @@ class Bijector(tf.Module):
     not in JAX applications.
     """
     return ()
+
+
+class AutoCompositeTensorBijector(
+    Bijector, auto_composite_tensor.AutoCompositeTensor):
+  r"""Base for `CompositeTensor` bijectors with auto-generated `TypeSpec`s.
+
+  `CompositeTensor` objects are able to pass in and out of `tf.function` and
+  `tf.while_loop`, or serve as part of the signature of a TF saved model.
+  `Bijector` subclasses that follow the contract of
+  `tfp.experimental.auto_composite_tensor` may be defined as `CompositeTensor`s
+  by inheriting from `AutoCompositeTensorBijector` and applying a class
+  decorator as shown here:
+
+  ```python
+  @tfp.experimental.auto_composite_tensor(omit_kwargs=('name',))
+  class MyBijector(tfb.AutoCompositeTensorBijector):
+
+    # Optional class attribute to enable `tf.saved_model`.
+    _type_spec_id = 1234567
+
+    # The remainder of the subclass implementation is unchanged.
+  ```
+
+  To enable `CompositeTensor` `Bijector`s to be serialized with
+  `tf.saved_model`, subclasses may optionally be assigned a unique `int32`
+  `_type_spec_id`. An error is raised if there is a collision between
+  assigned IDs. Existing mappings from IDs to `tf.TypeSpec` subclasses may be
+  accessed as follows:
+
+  ```python
+  from tensorflow.python.saved_model \
+  import nested_structure_coder
+
+  id_to_type_spec = (
+    nested_structure_coder._TypeSpecCodec.TYPE_SPEC_CLASS_FROM_PROTO)
+  ```
+
+  For `Bijector`s that inherit from `tf.__internal__.CompositeTensor` but not
+  `AutoCompositeTensor`, the `Bijector` subclass and its associated
+  `tf.TypeSpec` subclass must additionally be registered with
+  `tfp.experimental.auto_composite_tensor.register_type_spec` to enable
+  `tf.saved_model`.
+  """
+  pass
 
 
 def check_valid_ndims(ndims, validate=True):

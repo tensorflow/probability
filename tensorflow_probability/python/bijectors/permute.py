@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -36,7 +37,8 @@ __all__ = [
 ]
 
 
-class Permute(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Permute(bijector.AutoCompositeTensorBijector):
   """Permutes the rightmost dimension of a `Tensor`.
 
   ```python
@@ -71,6 +73,8 @@ class Permute(bijector.Bijector):
   ```
 
   """
+
+  _type_spec_id = 366918659
 
   def __init__(self, permutation, axis=-1, validate_args=False, name=None):
     """Creates the `Permute` bijector.
@@ -190,3 +194,7 @@ class Permute(bijector.Bijector):
                          'each of `{0, 1, ..., d}`.')))
 
     return assertions
+
+  @property
+  def _composite_tensor_shape_params(self):
+    return ('axis',)

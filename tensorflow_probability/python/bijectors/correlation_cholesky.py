@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import fill_triangular
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -32,7 +33,8 @@ __all__ = [
 ]
 
 
-class CorrelationCholesky(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class CorrelationCholesky(bijector.AutoCompositeTensorBijector):
   """Maps unconstrained reals to Cholesky-space correlation matrices.
 
   #### Mathematical Details
@@ -113,6 +115,8 @@ class CorrelationCholesky(bijector.Bijector):
   1989-2001.
 
   """
+
+  _type_spec_id = 366918638
 
   def __init__(self, validate_args=False, name='correlation_cholesky'):
     parameters = dict(locals())

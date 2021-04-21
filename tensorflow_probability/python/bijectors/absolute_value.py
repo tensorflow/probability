@@ -22,14 +22,16 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
-    "AbsoluteValue",
+    'AbsoluteValue',
 ]
 
 
-class AbsoluteValue(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class AbsoluteValue(bijector.AutoCompositeTensorBijector):
   """Computes `Y = g(X) = Abs(X)`, element-wise.
 
   This non-injective bijector allows for transformations of scalar distributions
@@ -68,7 +70,9 @@ class AbsoluteValue(bijector.Bijector):
 
   """
 
-  def __init__(self, validate_args=False, name="absolute_value"):
+  _type_spec_id = 366918633
+
+  def __init__(self, validate_args=False, name='absolute_value'):
     """Instantiates the `AbsoluteValue` bijector.
 
     Args:
@@ -115,4 +119,4 @@ class AbsoluteValue(bijector.Bijector):
     if not self.validate_args:
       return []
     return [assert_util.assert_non_negative(
-        t, message="Argument y was negative")]
+        t, message='Argument y was negative')]

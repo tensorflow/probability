@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.linalg import fill_triangular
 from tensorflow_probability.python.math.linalg import fill_triangular_inverse
@@ -35,7 +36,8 @@ __all__ = [
 ]
 
 
-class FillTriangular(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class FillTriangular(bijector.AutoCompositeTensorBijector):
   """Transforms vectors to triangular.
 
   Triangular matrix elements are filled in a clockwise spiral.
@@ -63,6 +65,8 @@ class FillTriangular(bijector.Bijector):
 
   ```
   """
+
+  _type_spec_id = 366918645
 
   def __init__(self,
                upper=False,

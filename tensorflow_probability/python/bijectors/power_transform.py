@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 
 __all__ = [
@@ -29,7 +30,8 @@ __all__ = [
 ]
 
 
-class PowerTransform(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class PowerTransform(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 + X * c)**(1 / c), X >= -1 / c`.
 
   The [power transform](https://en.wikipedia.org/wiki/Power_transform) maps
@@ -38,6 +40,8 @@ class PowerTransform(bijector.Bijector):
 
   This bijector is equivalent to the `Exp` bijector when `c=0`.
   """
+
+  _type_spec_id = 366918661
 
   def __init__(self,
                power=0.,

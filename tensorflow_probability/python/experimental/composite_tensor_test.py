@@ -453,6 +453,12 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.evaluate(unflat.sample())
     self.evaluate(unflat.log_prob(.5))
 
+  def test_already_composite_tensor(self):
+    b = tfb.Scale(2.)
+    b2 = tfp.experimental.as_composite(b)
+    self.assertIsInstance(b, tf.__internal__.CompositeTensor)
+    self.assertIs(b, b2)
+
 
 if __name__ == '__main__':
   tf.enable_v2_behavior()

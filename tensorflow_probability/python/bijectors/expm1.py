@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 
 __all__ = [
@@ -29,7 +30,8 @@ __all__ = [
 ]
 
 
-class Expm1(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Expm1(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = exp(X) - 1`.
 
     This `Bijector` is no different from Chain([Shift(-1), Exp()]).
@@ -53,6 +55,8 @@ class Expm1(bijector.Bijector):
     Note: the expm1(.) is applied element-wise but the Jacobian is a reduction
     over the event space.
   """
+
+  _type_spec_id = 366918643
 
   def __init__(self,
                validate_args=False,
@@ -90,8 +94,12 @@ class Expm1(bijector.Bijector):
     return tf.identity(x)
 
 
-class Log1p(invert.Invert):
+# TODO(b/182603117): Remove `AutoCompositeTensor` when `Invert` subclasses
+# `AutoCompositeTensor`.
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Log1p(invert.Invert, auto_composite_tensor.AutoCompositeTensor):
   """Compute `Y = log1p(X)`. This is `Invert(Expm1())`."""
+  _type_spec_id = 366918644
 
   def __init__(self, validate_args=False, name='log1p'):
     parameters = dict(locals())

@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
@@ -27,7 +28,8 @@ __all__ = [
 ]
 
 
-class Cumsum(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Cumsum(bijector.AutoCompositeTensorBijector):
   """Computes the cumulative sum of a tensor along a specified axis.
 
   If `axis` is not provided, the default uses the rightmost dimension, i.e.,
@@ -56,6 +58,8 @@ class Cumsum(bijector.Bijector):
   ```
 
   """
+
+  _type_spec_id = 366918639
 
   def __init__(self, axis=-1, validate_args=False, name='cumsum'):
     """Instantiates the `Cumsum` bijector.
@@ -119,3 +123,7 @@ class Cumsum(bijector.Bijector):
 
   def _forward_log_det_jacobian(self, x):
     return tf.constant(0., x.dtype)
+
+  @property
+  def _compposite_tensor_shape_params(self):
+    return ('axis',)

@@ -21,14 +21,16 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 
 __all__ = [
-    "Sinh",
+    'Sinh',
 ]
 
 
-class Sinh(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class Sinh(bijector.AutoCompositeTensorBijector):
   """Bijector that computes `Y = sinh(X)`.
 
   #### Examples
@@ -42,7 +44,9 @@ class Sinh(bijector.Bijector):
   ```
   """
 
-  def __init__(self, validate_args=False, name="sinh"):
+  _type_spec_id = 366918672
+
+  def __init__(self, validate_args=False, name='sinh'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Sinh, self).__init__(

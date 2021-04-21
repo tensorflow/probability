@@ -25,15 +25,17 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import special_math
 
 __all__ = [
-    "NormalCDF",
+    'NormalCDF',
 ]
 
 
-class NormalCDF(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class NormalCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = NormalCDF(x)`.
 
   This bijector maps inputs from `[-inf, inf]` to `[0, 1]`. The inverse of the
@@ -47,9 +49,11 @@ class NormalCDF(bijector.Bijector):
   ```
   """
 
+  _type_spec_id = 366918656
+
   def __init__(self,
                validate_args=False,
-               name="normal"):
+               name='normal'):
     """Instantiates the `NormalCDF` bijector.
 
     Args:
@@ -88,9 +92,9 @@ class NormalCDF(bijector.Bijector):
       return []
     return [
         assert_util.assert_non_negative(
-            t, message="Inverse transformation input must be greater than 0."),
+            t, message='Inverse transformation input must be greater than 0.'),
         assert_util.assert_less_equal(
             t,
             dtype_util.as_numpy_dtype(t.dtype)(1.),
-            message="Inverse transformation input must be less than or equal "
-            "to 1.")]
+            message='Inverse transformation input must be less than or equal '
+            'to 1.')]

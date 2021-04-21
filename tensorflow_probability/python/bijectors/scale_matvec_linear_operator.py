@@ -33,6 +33,8 @@ __all__ = [
 ]
 
 
+# TODO(b/182603117): Enable AutoCompositeTensor once LinearOperators are
+# converted to CompositeTensor.
 class _ScaleMatvecLinearOperatorBase(bijector.Bijector):
   """Common base class for `ScaleMatvecLinearOperator{Block}`."""
 

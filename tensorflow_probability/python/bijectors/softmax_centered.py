@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import pad as pad_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
@@ -34,7 +35,8 @@ __all__ = [
 ]
 
 
-class SoftmaxCentered(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class SoftmaxCentered(bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = exp([X 0]) / sum(exp([X 0]))`.
 
   To implement [softmax](https://en.wikipedia.org/wiki/Softmax_function) as a
@@ -60,6 +62,8 @@ class SoftmaxCentered(bijector.Bijector):
   implementation is not a bijection. However, the appended dimension
   makes the (forward) image non-open and the theorem does not directly apply.
   """
+
+  _type_spec_id = 366918677
 
   def __init__(self,
                validate_args=False,
