@@ -21,8 +21,8 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.experimental.math.no_pivot_ldl import no_pivot_ldl
-from tensorflow_probability.python.experimental.math.no_pivot_ldl import simple_robustified_cholesky
+from tensorflow_probability.python.experimental.linalg.no_pivot_ldl import no_pivot_ldl
+from tensorflow_probability.python.experimental.linalg.no_pivot_ldl import simple_robustified_cholesky
 from tensorflow_probability.python.internal import test_util
 
 
