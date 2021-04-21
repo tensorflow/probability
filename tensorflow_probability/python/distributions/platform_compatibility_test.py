@@ -204,10 +204,11 @@ XLA_LOGPROB_RTOL.update({
 
 
 SKIP_KL_CHECK_DIST_VAR_GRADS = [
-    'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
-    'JohnsonSU',  # TD's KL gradients do not rely on bijector variables.
     'GeneralizedExtremeValue',  # TD's KL gradients do not rely on bijector
                                 # variables.
+    'JohnsonSU',  # TD's KL gradients do not rely on bijector variables.
+    'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
+    'SinhArcsinh',  # TD's KL gradients do not rely on bijector variables.
 ]
 
 
@@ -312,7 +313,7 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
     dist2 = dist2.copy(validate_args=False)
 
     # Test that KL divergence reads distribution parameters at most once, and
-    # that is produces non-None gradients.
+    # that it produces non-None gradients.
     try:
       for d1, d2 in (dist, dist2), (dist2, dist):
         if dist_name in SKIP_KL_CHECK_DIST_VAR_GRADS:
