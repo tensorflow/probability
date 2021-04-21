@@ -47,6 +47,7 @@ MODULE_MAPPINGS = {
     'ops import control_flow_ops': 'control_flow as control_flow_ops',
     'ops import linalg_ops': 'linalg_impl as linalg_ops',
     'ops import math_ops': 'numpy_math as math_ops',
+    'ops import nn': 'nn',
     'ops import variables as variables_module': 'ops as variables_module',
     'ops.linalg import linalg_impl as linalg': 'linalg_impl as linalg'
 }

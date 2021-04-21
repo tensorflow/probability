@@ -42,6 +42,7 @@ from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import control_flow as control_flow_ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math_ops
+from tensorflow_probability.python.internal.backend.numpy import nn
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as linalg
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_util
@@ -228,8 +229,7 @@ class LinearOperatorHouseholder(linear_operator.LinearOperator):
     reflection_axis = ops.convert_to_tensor(
         self.reflection_axis)
     x = linalg.adjoint(x) if adjoint_arg else x
-    normalized_axis = reflection_axis / linalg.norm(
-        reflection_axis, axis=-1, keepdims=True)
+    normalized_axis = nn.l2_normalize(reflection_axis, axis=-1)
     mat = normalized_axis[..., _ops.newaxis]
     x_dot_normalized_v = _linalg.matmul(mat, x, adjoint_a=True)
 
@@ -259,8 +259,7 @@ class LinearOperatorHouseholder(linear_operator.LinearOperator):
   def _to_dense(self):
     reflection_axis = ops.convert_to_tensor(
         self.reflection_axis)
-    normalized_axis = reflection_axis / linalg.norm(
-        reflection_axis, axis=-1, keepdims=True)
+    normalized_axis = nn.l2_normalize(reflection_axis, axis=-1)
     mat = normalized_axis[..., _ops.newaxis]
     matrix = -2 * _linalg.matmul(mat, mat, adjoint_b=True)
     return _linalg.set_diag(
@@ -269,8 +268,7 @@ class LinearOperatorHouseholder(linear_operator.LinearOperator):
   def _diag_part(self):
     reflection_axis = ops.convert_to_tensor(
         self.reflection_axis)
-    normalized_axis = reflection_axis / linalg.norm(
-        reflection_axis, axis=-1, keepdims=True)
+    normalized_axis = nn.l2_normalize(reflection_axis, axis=-1)
     return 1. - 2 * normalized_axis * math_ops.conj(normalized_axis)
 
   def _eigvals(self):
