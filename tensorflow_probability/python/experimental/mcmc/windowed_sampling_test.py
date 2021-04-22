@@ -188,7 +188,7 @@ class WindowedSamplingTest(test_util.TestCase):
     max_scale_reduction = tf.reduce_max(
         tf.nest.map_structure(tf.reduce_max,
                               tfp.mcmc.potential_scale_reduction(flat_draws)))
-    self.assertLess(self.evaluate(max_scale_reduction), 1.39)
+    self.assertLess(self.evaluate(max_scale_reduction), 1.41)
 
   @parameterized.named_parameters(
       dict(testcase_name='_' + fn.__name__, model_fn=fn) for fn in
