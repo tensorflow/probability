@@ -136,7 +136,7 @@ class Independent(distribution_lib.Distribution):
         batch_ndims = tensorshape_util.rank(distribution.batch_shape)
         if batch_ndims is not None:
           self._static_reinterpreted_batch_ndims = max(0, batch_ndims - 1)
-          self._reinterpreted_batch_ndims = tf.convert_to_tensor(
+          self._reinterpreted_batch_ndims = ps.convert_to_shape_tensor(
               self._static_reinterpreted_batch_ndims,
               dtype_hint=tf.int32,
               name='reinterpreted_batch_ndims')
@@ -148,6 +148,7 @@ class Independent(distribution_lib.Distribution):
         self._reinterpreted_batch_ndims = tensor_util.convert_nonref_to_tensor(
             reinterpreted_batch_ndims,
             dtype_hint=tf.int32,
+            as_shape_tensor=True,
             name='reinterpreted_batch_ndims')
         static_val = tf.get_static_value(self._reinterpreted_batch_ndims)
         self._static_reinterpreted_batch_ndims = (
