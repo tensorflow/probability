@@ -35,6 +35,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import numeric
 from tensorflow_probability.python.math import special as tfp_math
 
 __all__ = [
@@ -339,7 +340,10 @@ class TruncatedCauchy(distribution.Distribution):
 
     tanb = tf.math.tan(tfp_math.atan_difference(std_high, std_low) * p)
     x = (std_low + tanb) / (1 - std_low * tanb)
-    return x * scale + loc
+    # Clip the answer to prevent it from falling numerically outside
+    # the support.
+    return numeric.clip_by_value_preserve_gradient(
+        x * scale + loc, clip_value_min=low, clip_value_max=high)
 
   def _default_event_space_bijector(self):
     return sigmoid_bijector.Sigmoid(
