@@ -481,8 +481,10 @@ class ParameterPropertiesTest(test_util.TestCase):
         'num_samples',
         'df',  # Can't represent constraint that Wishart df > dimension.
         'mean_direction')  # TODO(b/118492439): Add `UnitVector` bijector.
-    non_trainable_non_tensor_params = ('dimension', 'dtype'
-                                      )  # Required by Zipf.
+    non_trainable_non_tensor_params = (
+        'batch_shape',  # SphericalUniform, at least, has explicit batch shape
+        'dimension',
+        'dtype')
 
     dist = data.draw(
         dhps.distributions(
