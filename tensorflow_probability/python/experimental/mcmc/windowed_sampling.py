@@ -203,7 +203,7 @@ def _setup_mcmc(model, n_chains, seed, **pins):
     initial_transformed_position: `tf.Tensor`, sampled from a uniform (-2, 2).
     bijector: `tfb.Bijector` instance, which unconstrains and flattens.
   """
-  pinned_model = model.experimental_pin(**pins)
+  pinned_model = model.experimental_pin(**pins) if pins else model
   bijector = _get_flat_unconstraining_bijector(pinned_model)
 
   raw_init_dist = initialization.init_near_unconstrained_zero(pinned_model)

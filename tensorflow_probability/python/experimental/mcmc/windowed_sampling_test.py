@@ -249,6 +249,18 @@ class WindowedSamplingTest(test_util.TestCase):
 
     self.assertAllGreater(self.evaluate(init), 0.)
 
+  def test_extra_pins_not_required(self):
+    model = tfd.JointDistributionSequential([
+        tfd.Normal(0., 1., name='x'),
+        lambda x: tfd.Normal(x, 1., name='y')
+    ])
+    pinned = model.experimental_pin(y=4.2)
+
+    # No explicit pins are passed, since the model is already pinned.
+    _, init, _ = windowed_sampling._setup_mcmc(
+        model=pinned, n_chains=20, seed=test_util.test_seed())
+    self.assertLen(init, 1)
+
   def test_hmc_fitting_gaussian(self):
     # See docstring to _gen_gaussian_updating_example
     x_dim = 3
