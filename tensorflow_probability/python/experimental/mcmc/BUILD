@@ -818,7 +818,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "thermodynamic_integrals_test",
-    size = "small",
+    size = "medium",
     srcs = ["thermodynamic_integrals_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
