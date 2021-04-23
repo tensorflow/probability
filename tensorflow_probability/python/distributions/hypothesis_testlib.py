@@ -809,8 +809,6 @@ def spherical_uniforms(
     draw, batch_shape=None, event_dim=None, validate_args=True):
   """Strategy for drawing `SphericalUniform` distributions.
 
-  The underlying distribution is drawn from the `distributions` strategy.
-
   Args:
     draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting

@@ -98,7 +98,7 @@ class Masked(distribution_lib.Distribution):
 
   Sometimes we may want a way of masking out a subset of distributions. Perhaps
   we have labels for only a subset of batch members and want to evaluate a
-  log_prob. Or we may want to encode a sparse random variables as a dense
+  log_prob. Or we may want to encode a sparse random variable as a dense
   random variable with a mask applied. In single-program/multiple-data regimes,
   it can be necessary to pad Distributions and the samples thereof to a given
   size in order to achieve the "single-program" desideratum.

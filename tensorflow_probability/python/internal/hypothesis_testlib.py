@@ -799,7 +799,7 @@ def orthonormal(x):
 
 def lower_tril_positive_definite(x):
   return tf.linalg.band_part(
-      tf.linalg.set_diag(x, softplus_plus_eps()(tf.linalg.diag_part(x))),
+      tf.linalg.set_diag(x, softplus_plus_eps(1e-4)(tf.linalg.diag_part(x))),
       num_lower=-1,
       num_upper=0)
 

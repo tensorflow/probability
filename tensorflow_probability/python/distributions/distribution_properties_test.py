@@ -307,6 +307,7 @@ class NoNansTest(test_util.TestCase, dhps.TestCase):
     hp.note('Testing on samples {}'.format(samples))
     with tfp_hps.no_tf_rank_errors():
       lp = self.evaluate(dist.log_prob(samples))
+      hp.note('Got log_probs {}'.format(lp))
     self.assertAllEqual(np.zeros_like(lp), np.isnan(lp))
 
   @parameterized.named_parameters(
