@@ -122,6 +122,7 @@ LOG_PROB_ACCURACY_BLOCK_LIST = (
     'NegativeBinomial',
     'OneHotCategorical',
     'PlackettLuce',
+    'SinhArcsinh',  # b/183670203
     'Skellam',
     'StoppingRatioLogistic',  # Filters too much in 61/100 runs; this is odd.
     # TODO(axch): Fix numerics of _cauchy_cdf(x + delta) - _cauchy_cdf(x)
