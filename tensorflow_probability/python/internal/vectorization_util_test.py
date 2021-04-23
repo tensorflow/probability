@@ -178,6 +178,36 @@ class VectorizationTest(test_util.TestCase):
         tf.convert_to_tensor([[1., 3.], [2., 4.]])))
     self.assertAllEqual(ry, [1., 3.])
 
+  def test_unit_batch_dims_are_flattened(self):
+    # Define `fn` to expect a vector input.
+    fn = lambda x: tf.einsum('n->', x)
+    # Verify that it won't accept a batch dimension.
+    with self.assertRaisesRegexp(Exception, 'rank'):
+      fn(tf.zeros([1, 5]))
+
+    polymorphic_fn = vectorization_util.make_rank_polymorphic(fn,
+                                                              core_ndims=[1])
+    for batch_shape in ([], [1], [1, 1]):
+      self.assertEqual(batch_shape,
+                       polymorphic_fn(tf.zeros(batch_shape + [5])).shape)
+
+  def test_unit_batch_dims_are_not_vectorized(self):
+    if not tf.executing_eagerly():
+      self.skipTest('Test relies on eager execution.')
+
+    # Define `fn` to expect a vector input.
+    def must_run_eagerly(x):
+      if not tf.executing_eagerly():
+        raise ValueError('Code is running inside tf.function. This may '
+                         'indicate that auto-vectorization is being '
+                         'triggered unnecessarily.')
+      return x
+
+    polymorphic_fn = vectorization_util.make_rank_polymorphic(
+        must_run_eagerly, core_ndims=[0])
+    for batch_shape in ([], [1], [1, 1]):
+      polymorphic_fn(tf.zeros(batch_shape))
+
   def test_docstring_example_passing_fn_arg(self):
     def apply_binop(fn, a, b):
       return fn(a, b)

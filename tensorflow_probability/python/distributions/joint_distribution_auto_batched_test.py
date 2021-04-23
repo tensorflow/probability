@@ -487,6 +487,19 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         dist.sample([1, 1],
                     seed=test_util.test_seed(sampler_type='seedless')).x.shape)
 
+  def test_unit_sample_shape(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def dist():
+      x = yield tfd.Normal(loc=tf.zeros([3]), scale=1., name='x')
+      yield tfd.Bernoulli(logits=tf.einsum('n->', x), name='y')
+
+    for sample_shape in [(), 1, [1], [1, 1], [2]]:
+      self.assertAllEqual(
+          dist.log_prob(
+              dist.sample(sample_shape,
+                          seed=test_util.test_seed())).shape,
+          np.reshape(sample_shape, [-1]))
+
   def test_sample_dtype_structures_output(self):
 
     num_features = 4
