@@ -393,7 +393,7 @@ class PrecompiledTest(test_util.TestCase):
           kind=kind,
           n_chains=11,
           proposal_kernel_kwargs=proposal_kernel_kwargs,
-          num_adaptation_steps=525,
+          num_adaptation_steps=50,
           dual_averaging_kwargs={'target_accept_prob': 0.76},
           trace_fn=None,
           return_final_kernel_results=False,
