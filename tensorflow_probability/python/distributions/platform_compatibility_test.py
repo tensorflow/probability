@@ -146,7 +146,7 @@ XLA_LOGPROB_ATOL.update({
     'Binomial': 5e-6,
     'Categorical': 7e-6,  # sparse_softmax_cross_entropy_with_logits
     'DeterminantalPointProcess': 2e-5,
-    'DirichletMultinomial': 1e-4,
+    'DirichletMultinomial': 5e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
     'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
@@ -174,7 +174,7 @@ XLA_LOGPROB_RTOL.update({
     'CholeskyLKJ': 1e-4,
     'ContinuousBernoulli': 2e-6,
     'Dirichlet': 1e-3,
-    'DirichletMultinomial': 2e-4,
+    'DirichletMultinomial': 5e-4,
     'ExpRelaxedOneHotCategorical': 1e-3,  # TODO(b/163118820)
     'ExpGamma': 5e-2,  # TODO(b/166257329)
     'ExpInverseGamma': 5e-2,  # TODO(b/166257329)
