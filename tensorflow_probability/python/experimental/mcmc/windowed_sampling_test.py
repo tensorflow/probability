@@ -165,21 +165,50 @@ def _gen_gaussian_updating_example(x_dim, y_dim, seed):
   return model, tf.linalg.diag_part(true_cov)
 
 
-@test_util.test_graph_and_eager_modes
 class WindowedSamplingTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       dict(testcase_name='_' + fn.__name__, model_fn=fn) for fn in
       [eight_schools_coroutine, eight_schools_named, eight_schools_sequential,
        eight_schools_nested])
-  def test_hmc_samples(self, model_fn):
+  def test_hmc_type_checks(self, model_fn):
+    model = model_fn()
+    pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
+
+    @tf.function(autograph=False)
+    def do_sample():
+      return tfp.experimental.mcmc.windowed_adaptive_hmc(
+          3, model, num_leapfrog_steps=2, num_adaptation_steps=21,
+          seed=test_util.test_seed(), **pins)
+
+    draws, _ = do_sample()
+    self.evaluate(draws)
+
+  @parameterized.named_parameters(
+      dict(testcase_name='_' + fn.__name__, model_fn=fn) for fn in
+      [eight_schools_coroutine, eight_schools_named, eight_schools_sequential,
+       eight_schools_nested])
+  def test_nuts_type_checks(self, model_fn):
     model = model_fn()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
     @tf.function
     def do_sample():
+      return tfp.experimental.mcmc.windowed_adaptive_nuts(
+          3, model, max_tree_depth=2, num_adaptation_steps=50,
+          seed=test_util.test_seed(), **pins)
+
+    draws, _ = do_sample()
+    self.evaluate(draws)
+
+  def test_hmc_samples_well(self):
+    model = eight_schools_named()
+    pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
+
+    @tf.function
+    def do_sample():
       return tfp.experimental.mcmc.windowed_adaptive_hmc(
-          200, model, num_leapfrog_steps=8, seed=test_util.test_seed(),
+          400, model, num_leapfrog_steps=12, seed=test_util.test_seed(),
           **pins)
 
     draws, _ = do_sample()
@@ -188,14 +217,10 @@ class WindowedSamplingTest(test_util.TestCase):
     max_scale_reduction = tf.reduce_max(
         tf.nest.map_structure(tf.reduce_max,
                               tfp.mcmc.potential_scale_reduction(flat_draws)))
-    self.assertLess(self.evaluate(max_scale_reduction), 1.41)
+    self.assertLess(self.evaluate(max_scale_reduction), 1.25)
 
-  @parameterized.named_parameters(
-      dict(testcase_name='_' + fn.__name__, model_fn=fn) for fn in
-      [eight_schools_coroutine, eight_schools_named, eight_schools_sequential,
-       eight_schools_nested])
-  def test_nuts_samples(self, model_fn):
-    model = model_fn()
+  def test_nuts_samples_well(self):
+    model = eight_schools_named()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
     @tf.function
