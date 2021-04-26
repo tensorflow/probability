@@ -361,6 +361,7 @@ py_library(
     testonly = 1,
     srcs = ["tensor_shape_gen.py"],
     deps = [
+        # absl/logging dep,
         # six dep,
     ],
 )
