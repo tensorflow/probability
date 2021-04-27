@@ -208,7 +208,9 @@ class Independent(distribution_lib.Distribution):
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
         distribution=parameter_properties.BatchedComponentProperties(
-            event_ndims=lambda self: self.reinterpreted_batch_ndims))
+            event_ndims=lambda self: self.reinterpreted_batch_ndims,
+            event_ndims_tensor=(
+                lambda self: self._get_reinterpreted_batch_ndims())))  # pylint: disable=protected-access
 
   def _batch_shape_tensor(self):
     batch_shape = self.distribution.batch_shape_tensor()

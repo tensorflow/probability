@@ -38,7 +38,8 @@ def SHAPE_FN_NOT_IMPLEMENTED(sample_shape):  # pylint: disable=invalid-name
 
 class ParameterProperties(
     collections.namedtuple('ParameterProperties', [
-        'event_ndims', 'shape_fn', 'default_constraining_bijector_fn',
+        'event_ndims', 'event_ndims_tensor',
+        'shape_fn', 'default_constraining_bijector_fn',
         'is_preferred', 'is_tensor'
     ])):
   """Annotates expected properties of a `Tensor`-valued distribution parameter.
@@ -52,6 +53,13 @@ class ParameterProperties(
       the minimum effective Tensor rank of this parameter. See description
       below.
       Default value: `0`.
+    event_ndims_tensor: Either a callable or `None`. A callable must take an
+      instance of the annotated class, and return an integer (or
+      structure of integers) value for `event_ndims`. Unlike an `event_ndims`
+      callable, invoking `event_ndims_tensor` may have graph side effects.
+      If `event_ndims` can be computed without graph side effects, then
+      `event_ndims_tensor` should be `None`.
+      Default value: `None`.
     shape_fn: Python `callable` with signature
       `parameter_shape = shape_fn(shape)`. Given the desired shape of
       an 'output' from this instance, returns the expected shape of the
@@ -148,7 +156,9 @@ class ParameterProperties(
   outer class's relationship to the inner distribution depends on another
   instance parameter (`reinterpreted_batch_ndims`). The returned value may be
   a Python `int` or an integer `Tensor`, but the callable itself may not cause
-  graph side effects (e.g., creating new Tensors).
+  graph side effects (e.g., creating new Tensors). In cases where graph
+  operations are required, an `event_ndims_tensor` must be specified, and the
+  `event_ndims` callable should return `None`.
 
   **Structured parameters.** A parameter's `event_ndims` may be a nested
   structure (list, dict, etc.) of integers, if and only if the parameter value
@@ -158,7 +168,7 @@ class ParameterProperties(
   the `event_ndims` of the `bijectors` parameter would be `[0, 0]`, matching
   the structure of the `bijectors` value (note that since this structure is
   instance-dependent, the `event_ndims` would need to be specified using a
-  calalble, as detailed above).
+  callable, as detailed above).
 
   #### Choice of constraining bijectors
 
@@ -189,6 +199,7 @@ class ParameterProperties(
   # Specify default properties.
   def __new__(cls,
               event_ndims=0,
+              event_ndims_tensor=None,
               shape_fn=lambda sample_shape: sample_shape,
               default_constraining_bijector_fn=identity_bijector.Identity,
               is_preferred=True,
@@ -196,6 +207,7 @@ class ParameterProperties(
     return super(ParameterProperties, cls).__new__(
         cls,
         event_ndims=event_ndims,
+        event_ndims_tensor=event_ndims_tensor,
         shape_fn=shape_fn,
         default_constraining_bijector_fn=default_constraining_bijector_fn,
         is_preferred=is_preferred,
@@ -210,19 +222,31 @@ class ParameterProperties(
       return self.event_ndims(instance)  # Must not have graph side effects.
     return self.event_ndims
 
+  def instance_event_ndims_tensor(self, instance):
+    event_ndims = self.instance_event_ndims(instance)
+    if event_ndims is None and callable(self.event_ndims_tensor):
+      if instance is None:
+        raise ValueError('Attempting to get the per-event rank of a parameter '
+                         'for which this is instance-dependent, but no '
+                         'instance was provided.')
+      event_ndims = self.event_ndims_tensor(instance)
+    return event_ndims
+
 
 class BatchedComponentProperties(ParameterProperties):
   """Alias to assist in defining properties of non-Tensor parameters."""
 
   def __new__(cls,
               event_ndims=0,
-              shape_fn=None,
+              event_ndims_tensor=None,
               default_constraining_bijector_fn=None,
               is_preferred=True):
     return super(BatchedComponentProperties, cls).__new__(  # pylint: disable=redundant-keyword-arg
         cls=cls,
         event_ndims=event_ndims,
-        shape_fn=shape_fn,
+        event_ndims_tensor=event_ndims_tensor,
+        # TODO(davmre): do we need/want shape annotations for non-Tensor params?
+        shape_fn=SHAPE_FN_NOT_IMPLEMENTED,
         default_constraining_bijector_fn=default_constraining_bijector_fn,
         is_preferred=is_preferred,
         is_tensor=False)
