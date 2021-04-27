@@ -96,8 +96,5 @@ def clip_by_value_preserve_gradient(t, clip_value_min, clip_value_max,
   """
   with tf.name_scope(name or 'clip_by_value_preserve_gradient'):
     t = tf.convert_to_tensor(t, name='t')
-    # Use explicit tf.minimum and tf.maximum instead of
-    # tf.clip_by_value to avoid the XLA segfault in b/186428452.
-    clip_t = tf.minimum(tf.maximum(t, clip_value_min), clip_value_max)
-    # clip_t = tf.clip_by_value(t, clip_value_min, clip_value_max)
+    clip_t = tf.clip_by_value(t, clip_value_min, clip_value_max)
     return t + tf.stop_gradient(clip_t - t)
