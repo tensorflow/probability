@@ -159,7 +159,8 @@ XLA_LOGPROB_ATOL.update({
     'OneHotCategorical': 6e-6,
     'PowerSpherical': 2e-5,
     'SigmoidBeta': 5e-4,
-    'Skellam': 1e-4
+    'Skellam': 1e-4,
+    'TruncatedCauchy': 1e-5,
 })
 
 XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
@@ -195,7 +196,7 @@ XLA_LOGPROB_RTOL.update({
     'RelaxedBernoulli': 3e-3,
     'RelaxedOneHotCategorical': 2e-3,  # TODO(b/163118820)
     'SigmoidBeta': 5e-4,
-    'TruncatedCauchy': 2e-5,
+    'TruncatedCauchy': 5e-5,
     'VectorExponentialDiag': 7e-5,
     'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
