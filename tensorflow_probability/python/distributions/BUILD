@@ -4055,7 +4055,7 @@ py_test(
     args = ["--execute_only"],
     main = "jax_transformation_test.py",
     python_version = "PY3",
-    shard_count = 47,
+    shard_count = 50,
     srcs_version = "PY3",
     tags = [
         "hypothesis",
