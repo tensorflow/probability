@@ -65,7 +65,7 @@ def eight_schools_sequential():
                      scale=tf.constant(TREATMENT_STDDEVS)),
           reinterpreted_batch_ndims=1,
           name='treatment_effects')])
-      # pylint: enable=g-long-lambda
+  # pylint: enable=g-long-lambda
   return model
 
 
@@ -84,7 +84,7 @@ def eight_schools_named():
                          scale=tf.constant(TREATMENT_STDDEVS)),
               reinterpreted_batch_ndims=1,
               name='treatment_effects')))
-          # pylint: enable=g-long-lambda
+  # pylint: enable=g-long-lambda
   return model
 
 
@@ -105,7 +105,7 @@ def eight_schools_nested():
                          scale=tf.constant(TREATMENT_STDDEVS)),
               reinterpreted_batch_ndims=1,
               name='treatment_effects')))
-          # pylint: enable=g-long-lambda
+  # pylint: enable=g-long-lambda
   return model
 
 
@@ -255,6 +255,44 @@ class WindowedSamplingTest(test_util.TestCase):
       self.assertEqual(first_window, 75)
       self.assertEqual(last_window, 75)
 
+  def test_explicit_init(self):
+    sample_dist = tfd.JointDistributionSequential(
+        [tfd.HalfNormal(1., name=f'dist_{idx}') for idx in range(4)])
+
+    explicit_init = [tf.ones(20) for _ in range(3)]
+    _, init, bijector = windowed_sampling._setup_mcmc(
+        model=sample_dist,
+        n_chains=20,
+        init_position=explicit_init,
+        seed=test_util.test_seed(),
+        dist_3=1.)
+
+    self.assertAllEqual(self.evaluate(init),
+                        tf.convert_to_tensor(bijector(explicit_init)))
+
+  def test_explicit_init_samples(self):
+    stream = test_util.test_seed_stream()
+
+    # Compute everything in a function so it is consistent in graph mode
+    @tf.function
+    def do_sample():
+      jd_model = tfd.JointDistributionNamed({
+          'x': tfd.HalfNormal(1.),
+          'y': lambda x: tfd.Normal(0., x)})
+      init = {'x': tf.ones(64)}
+      return tfp.experimental.mcmc.windowed_adaptive_hmc(
+          10,
+          jd_model,
+          num_adaptation_steps=200,
+          current_state=init,
+          num_leapfrog_steps=5,
+          discard_tuning=False,
+          y=tf.constant(1.),
+          seed=stream(),
+          trace_fn=None)
+
+    self.evaluate(do_sample())
+
   def test_valid_init(self):
 
     class _HalfNormal(tfd.HalfNormal):
@@ -270,7 +308,10 @@ class WindowedSamplingTest(test_util.TestCase):
     # Twenty chains with three parameters gives a 1 / 2^60 chance of
     # initializing with a finite log probability by chance.
     _, init, _ = windowed_sampling._setup_mcmc(
-        model=tough_dist, n_chains=20, seed=test_util.test_seed(), dist_3=1.)
+        model=tough_dist,
+        n_chains=20,
+        seed=test_util.test_seed(),
+        dist_3=1.)
 
     self.assertAllGreater(self.evaluate(init), 0.)
 
@@ -283,7 +324,8 @@ class WindowedSamplingTest(test_util.TestCase):
 
     # No explicit pins are passed, since the model is already pinned.
     _, init, _ = windowed_sampling._setup_mcmc(
-        model=pinned, n_chains=20, seed=test_util.test_seed())
+        model=pinned, n_chains=20,
+        seed=test_util.test_seed())
     self.assertLen(init, 1)
 
   def test_hmc_fitting_gaussian(self):
@@ -419,6 +461,7 @@ class PrecompiledTest(test_util.TestCase):
           n_chains=11,
           proposal_kernel_kwargs=proposal_kernel_kwargs,
           num_adaptation_steps=50,
+          current_state=None,
           dual_averaging_kwargs={'target_accept_prob': 0.76},
           trace_fn=None,
           return_final_kernel_results=False,

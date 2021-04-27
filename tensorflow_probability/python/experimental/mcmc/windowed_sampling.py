@@ -176,7 +176,7 @@ def _get_flat_unconstraining_bijector(jd_model):
   return invert.Invert(chain.Chain(to_chain))
 
 
-def _setup_mcmc(model, n_chains, seed, **pins):
+def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
   """Construct bijector and transforms needed for windowed MCMC.
 
   This pins the initial model, constructs a bijector that unconstrains and
@@ -193,6 +193,10 @@ def _setup_mcmc(model, n_chains, seed, **pins):
       The model to sample from.
     n_chains: int
       Number of chains (independent examples) to run.
+    init_position: Optional
+      Structure of tensors at which to initialize sampling. Should have the
+      same shape and structure as
+      `model.experimental_pin(**pins).sample(n_chains)`.
     seed: A seed for reproducible sampling.
     **pins:
       Values passed to `model.experimental_pin`.
@@ -206,14 +210,21 @@ def _setup_mcmc(model, n_chains, seed, **pins):
   pinned_model = model.experimental_pin(**pins) if pins else model
   bijector = _get_flat_unconstraining_bijector(pinned_model)
 
-  raw_init_dist = initialization.init_near_unconstrained_zero(pinned_model)
-  unconstrained_unif_init_position = initialization.retry_init(
-      raw_init_dist.sample,
-      target_fn=pinned_model.unnormalized_log_prob,
-      sample_shape=[n_chains],
-      seed=seed)
+  if init_position is None:
+    raw_init_dist = initialization.init_near_unconstrained_zero(pinned_model)
+    init_position = initialization.retry_init(
+        raw_init_dist.sample,
+        target_fn=pinned_model.unnormalized_log_prob,
+        sample_shape=[n_chains],
+        seed=seed)
+  else:
+    tf.nest.map_structure(
+        lambda x, y: tf.assert_equal(x.shape, y.shape),
+        pinned_model.sample_unpinned(n_chains),
+        init_position)
+
   initial_transformed_position = tf.nest.map_structure(
-      tf.identity, bijector.forward(unconstrained_unif_init_position))
+      tf.identity, bijector.forward(init_position))
 
   def target_log_prob_fn(*args):
     lp = pinned_model.unnormalized_log_prob(bijector.inverse(args))
@@ -427,6 +438,7 @@ def windowed_adaptive_nuts(n_draws,
                            *,
                            n_chains=64,
                            num_adaptation_steps=525,
+                           current_state=None,
                            dual_averaging_kwargs=None,
                            max_tree_depth=10,
                            max_energy_diff=500.,
@@ -452,6 +464,10 @@ def windowed_adaptive_nuts(n_draws,
       Number of independent chains to run MCMC with.
     num_adaptation_steps: int
       Number of draws used to adapt step size and
+    current_state: Optional
+      Structure of tensors at which to initialize sampling. Should have the
+      same shape and structure as
+      `model.experimental_pin(**pins).sample(n_chains)`.
     dual_averaging_kwargs: Optional dict
       Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
       By default, a `target_accept_prob` of 0.85 is set, and the class defaults
@@ -511,6 +527,7 @@ def windowed_adaptive_nuts(n_draws,
       kind='nuts',
       n_chains=n_chains,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
+      current_state=current_state,
       num_adaptation_steps=num_adaptation_steps,
       dual_averaging_kwargs=dual_averaging_kwargs,
       trace_fn=trace_fn,
@@ -526,6 +543,7 @@ def windowed_adaptive_hmc(n_draws,
                           num_leapfrog_steps,
                           n_chains=64,
                           num_adaptation_steps=525,
+                          current_state=None,
                           dual_averaging_kwargs=None,
                           trace_fn=_default_hmc_trace_fn,
                           return_final_kernel_results=False,
@@ -549,6 +567,10 @@ def windowed_adaptive_hmc(n_draws,
       Number of independent chains to run MCMC with.
     num_adaptation_steps: int
       Number of draws used to adapt step size and
+    current_state: Optional
+      Structure of tensors at which to initialize sampling. Should have the
+      same shape and structure as
+      `model.experimental_pin(**pins).sample(n_chains)`.
     dual_averaging_kwargs: Optional dict
       Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
       By default, a `target_accept_prob` of 0.75 is set, and the class defaults
@@ -595,6 +617,7 @@ def windowed_adaptive_hmc(n_draws,
       n_chains=n_chains,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       num_adaptation_steps=num_adaptation_steps,
+      current_state=current_state,
       dual_averaging_kwargs=dual_averaging_kwargs,
       trace_fn=trace_fn,
       return_final_kernel_results=return_final_kernel_results,
@@ -610,6 +633,7 @@ def _windowed_adaptive_impl(n_draws,
                             n_chains,
                             proposal_kernel_kwargs,
                             num_adaptation_steps,
+                            current_state,
                             dual_averaging_kwargs,
                             trace_fn,
                             return_final_kernel_results,
@@ -628,7 +652,11 @@ def _windowed_adaptive_impl(n_draws,
   setup_seed, init_seed, seed = samplers.split_seed(
       samplers.sanitize_seed(seed), n=3)
   target_log_prob_fn, initial_transformed_position, bijector = _setup_mcmc(
-      joint_dist, n_chains=n_chains, seed=setup_seed, **pins)
+      joint_dist,
+      n_chains=n_chains,
+      init_position=current_state,
+      seed=setup_seed,
+      **pins)
 
   first_window_size, slow_window_size, last_window_size = _get_window_sizes(
       num_adaptation_steps)
