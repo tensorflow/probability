@@ -963,7 +963,7 @@ class Distribution(_BaseDistribution):
         continue
       properties = parameter_properties[param_name]
 
-      ndims = properties.instance_event_ndims_tensor(self)
+      ndims = properties.instance_event_ndims(self)
       batch_shapes += nest.flatten_up_to(
           ndims,
           nest.map_structure_up_to(
