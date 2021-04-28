@@ -76,6 +76,8 @@ SPECIAL_DISTS = (
     'GaussianProcess',  # PSDKernel strategy not implemented.
     'GaussianProcessRegressionModel',  # PSDKernel strategy not implemented.
     'Independent',  # (has strategy)
+    'MatrixNormalLinearOperator',
+    'MatrixTLinearOperator',
     'Masked',  # (has strategy)
     'Mixture',  # (has strategy)
     'MixtureSameFamily',  # (has strategy)
@@ -83,8 +85,11 @@ SPECIAL_DISTS = (
     'MultivariateNormalDiagPlusLowRank',  # Some batch shapes fail (b/177958275)
     'MultivariateStudentTLinearOperator',
     'Sample',  # (has strategy)
+    'StudentTProcess',
     'TransformedDistribution',  # (has strategy)
     'QuantizedDistribution',  # (has strategy)
+    'VariationalGaussianProcess',  # PSDKernel strategy not implemented.
+    'WishartLinearOperator'
 )
 
 

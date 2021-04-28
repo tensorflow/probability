@@ -216,13 +216,13 @@ class BatchedComponentProperties(ParameterProperties):
 
   def __new__(cls,
               event_ndims=0,
-              shape_fn=None,
               default_constraining_bijector_fn=None,
               is_preferred=True):
     return super(BatchedComponentProperties, cls).__new__(  # pylint: disable=redundant-keyword-arg
         cls=cls,
         event_ndims=event_ndims,
-        shape_fn=shape_fn,
+        # TODO(davmre): do we need/want shape annotations for non-Tensor params?
+        shape_fn=SHAPE_FN_NOT_IMPLEMENTED,
         default_constraining_bijector_fn=default_constraining_bijector_fn,
         is_preferred=is_preferred,
         is_tensor=False)

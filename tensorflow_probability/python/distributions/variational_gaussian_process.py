@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -173,19 +174,6 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
   @property
   def variational_scale(self):
     return self._variational_scale
-
-  @classmethod
-  def _parameter_properties(cls, dtype, num_classes=None):
-    return dict(
-        base_kernel=parameter_properties.BatchedComponentProperties(),
-        inducing_index_points=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: self.kernel.feature_ndims + 1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
-        variational_scale=parameter_properties.ParameterProperties(
-            event_ndims=2,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
-            default_constraining_bijector_fn=(
-                fill_scale_tril_bijector.FillScaleTriL)))
 
   def chol_kzz(self):
     return tf.convert_to_tensor(self._chol_kzz)
@@ -928,6 +916,35 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
           allow_nan_stats=allow_nan_stats,
           name=name)
       self._parameters = parameters
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        kernel=parameter_properties.BatchedComponentProperties(),
+        index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        inducing_index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        variational_inducing_observations_loc=(
+            parameter_properties.ParameterProperties(
+                event_ndims=1,
+                shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED)),
+        variational_inducing_observations_scale=(
+            parameter_properties.ParameterProperties(
+                event_ndims=2,
+                shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+                default_constraining_bijector_fn=(
+                    fill_scale_tril_bijector.FillScaleTriL))),
+        observation_noise_variance=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        predictive_noise_variance=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED))
 
   @property
   def inducing_index_points(self):

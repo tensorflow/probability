@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -91,12 +92,11 @@ class MatrixNormalLinearOperator(distribution.Distribution):
   col_cov = [[ 0.36,  0.12,  0.06],
              [ 0.12,  0.29, -0.13],
              [ 0.06, -0.13,  0.26]]
-  scale_column = tf.cholesky(col_cov)
+  scale_column = tf.linalg.LinearOperatorTriL(tf.cholesky(col_cov))
   # ==> [[ 0.6,  0. ,  0. ],
   #      [ 0.2,  0.5,  0. ],
   #      [ 0.1, -0.3,  0.4]])
-  scale_row = [[0.9, 0.],
-               [0. , 0.8]]
+  scale_row = tf.linalg.LinearOperatorDiag([0.9, 0.8])
 
   mvn = tfd.MatrixNormalLinearOperator(
       loc=mu,
@@ -154,9 +154,12 @@ class MatrixNormalLinearOperator(distribution.Distribution):
           loc, dtype=dtype, name='loc')
     self._loc = loc
 
+    if not hasattr(scale_row, 'matmul'):
+      raise ValueError('`scale_row` must be a `tf.linalg.LinearOperator`.')
+    if not hasattr(scale_column, 'matmul'):
+      raise ValueError('`scale_column` must be a `tf.linalg.LinearOperator`.')
     if validate_args and not scale_row.is_non_singular:
       raise ValueError('`scale_row` must be non-singular.')
-
     if validate_args and not scale_column.is_non_singular:
       raise ValueError('`scale_column` must be non-singular.')
 
@@ -171,6 +174,13 @@ class MatrixNormalLinearOperator(distribution.Distribution):
         parameters=parameters,
         name=name)
     self._parameters = parameters
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=2),
+        scale_row=parameter_properties.BatchedComponentProperties(),
+        scale_column=parameter_properties.BatchedComponentProperties())
 
   def _as_multivariate_normal(self, loc=None):
     # Rebuild the Multivariate Normal Distribution on every call because the
