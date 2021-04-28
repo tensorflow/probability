@@ -202,7 +202,7 @@ class HighwayFlow(tfb.Bijector):
   def activation_fn(self):
     return self._activation_fn
 
-  def _derivative_of_sigmoid(self, x):
+  def _derivative_of_softplus(self, x):
     return self.residual_fraction + (
         1. - self.residual_fraction) * tf.math.sigmoid(x)
 
@@ -210,14 +210,14 @@ class HighwayFlow(tfb.Bijector):
     return self.residual_fraction * tf.eye(self.width) + (
         1. - self.residual_fraction) * weights_matrix
 
-  def _inverse_of_sigmoid(self, y, n=20):
+  def _inverse_of_softplus(self, y, n=20):
     # Inverse of the activation layer with softplus using Newton iteration.
     x = tf.ones(y.shape)
     for _ in range(n):
       x = x - (self.residual_fraction * x + (
           1. - self.residual_fraction) * tf.math.softplus(
         x) - y) / (
-            self._derivative_of_sigmoid(x))
+            self._derivative_of_softplus(x))
     return x
 
   def _augmented_forward(self, x):
@@ -239,7 +239,7 @@ class HighwayFlow(tfb.Bijector):
       x) + (
             1 - self.residual_fraction) * self.bias
     if self.activation_fn:
-      fldj += tf.reduce_sum(tf.math.log(self._derivative_of_sigmoid(x)),
+      fldj += tf.reduce_sum(tf.math.log(self._derivative_of_softplus(x)),
                             -1)
       x = self.residual_fraction * x + (
           1. - self.residual_fraction) * self.activation_fn(x)
@@ -256,8 +256,8 @@ class HighwayFlow(tfb.Bijector):
           1. - self.residual_fraction) * tf.linalg.diag_part(
         self.upper_diagonal_weights_matrix)))
     if self.activation_fn:
-      y = self._inverse_of_sigmoid(y)
-      ildj -= tf.reduce_sum(tf.math.log(self._derivative_of_sigmoid(y)),
+      y = self._inverse_of_softplus(y)
+      ildj -= tf.reduce_sum(tf.math.log(self._derivative_of_softplus(y)),
                             -1)
 
     y = tf.linalg.triangular_solve(tf.transpose(
