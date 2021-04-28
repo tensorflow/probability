@@ -169,6 +169,23 @@ class Chain(composition.Composition):
     return ('bijectors',)
 
 
+@ldj_ratio.RegisterFLDJRatio(Chain)
+def _fldj_ratio_chain(p, x, q, y):
+  """Sum-of-diffs FLDJRatio for Chains."""
+  if len(p.bijectors) != len(q.bijectors):
+    raise ValueError('Mismatched lengths of bijectors: `p` has '
+                     f'{len(p.bijectors)} but `q` has {len(q.bijectors)}.')
+  ratios = []
+  max_shp = []
+  for p, q in zip(reversed(p.bijectors), reversed(q.bijectors)):
+    ratios.append(ldj_ratio.forward_log_det_jacobian_ratio(
+        p, x, q, y, p.forward_min_event_ndims))
+    max_shp = ps.broadcast_shape(max_shp, ps.shape(ratios[-1]))
+    x, y = p.forward(x), q.forward(y)
+  ratios = [tf.broadcast_to(r, max_shp) for r in ratios]
+  return tf.add_n(ratios)
+
+
 @ldj_ratio.RegisterILDJRatio(Chain)
 def _ildj_ratio_chain(p, x, q, y):
   """Sum-of-diffs ILDJRatio for Chains."""
@@ -176,8 +193,11 @@ def _ildj_ratio_chain(p, x, q, y):
     raise ValueError('Mismatched lengths of bijectors: `p` has '
                      f'{len(p.bijectors)} but `q` has {len(q.bijectors)}.')
   ratios = []
+  max_shp = []
   for p, q in zip(p.bijectors, q.bijectors):
     ratios.append(ldj_ratio.inverse_log_det_jacobian_ratio(
         p, x, q, y, p.inverse_min_event_ndims))
+    max_shp = ps.broadcast_shape(max_shp, ps.shape(ratios[-1]))
     x, y = p.inverse(x), q.inverse(y)
+  ratios = [tf.broadcast_to(r, max_shp) for r in ratios]
   return tf.add_n(ratios)

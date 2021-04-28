@@ -1626,6 +1626,18 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "ldj_ratio_test",
+    size = "small",
+    srcs = ["ldj_ratio_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "lambertw_transform_test",
     size = "small",
     srcs = ["lambertw_transform_test.py"],
