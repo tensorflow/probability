@@ -190,6 +190,11 @@ COMPOSITE_TENSOR_IS_BROKEN = [
     'TransformDiagonal',  # callable
 ]
 
+COMPOSITE_TENSOR_RTOL = collections.defaultdict(lambda: 2e-6)
+COMPOSITE_TENSOR_RTOL.update({
+    'PowerTransform': 5e-6,
+})
+COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
 
 # TODO(b/182603117): Enable AutoCT for meta-bijectors and LinearOperator.
 AUTO_COMPOSITE_TENSOR_IS_BROKEN = [
@@ -922,7 +927,8 @@ class BijectorPropertiesTest(test_util.TestCase):
     self.assertAllClose(
         before_ys,
         tf.function(lambda b: b.forward(xs))(composite_bij),
-        rtol=2e-6)
+        rtol=COMPOSITE_TENSOR_RTOL[bijector_name],
+        atol=COMPOSITE_TENSOR_ATOL[bijector_name])
 
     # Forward mapping: Check differentiation through forward mapping with
     # respect to the input and parameter variables.  Also check that any
