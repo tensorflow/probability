@@ -66,6 +66,13 @@ class SinhArcsinhTest(test_util.TestCase):
     samp = self.evaluate(sasnorm.sample(seed=test_util.test_seed()))
     self.assertAllEqual((5,), samp.shape)
 
+  def testBatchSamplesAreIndependent(self):
+    num_samples = 1000
+    sasnorm = tfd.SinhArcsinh(loc=[0., 0.], scale=1.)
+    xs = sasnorm.sample(num_samples, seed=test_util.test_seed())
+    cov = 1. / num_samples * tf.matmul(xs, xs, transpose_a=True)
+    self.assertAllClose(cov, tf.eye(2), atol=0.2)
+
   def testPassingInLaplacePlusDefaultsIsSameAsLaplace(self):
     b = 10
     scale = rng.rand(b) + 0.5
