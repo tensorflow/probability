@@ -192,7 +192,7 @@ COMPOSITE_TENSOR_IS_BROKEN = [
 
 COMPOSITE_TENSOR_RTOL = collections.defaultdict(lambda: 2e-6)
 COMPOSITE_TENSOR_RTOL.update({
-    'PowerTransform': 5e-6,
+    'PowerTransform': 1e-5,
 })
 COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
 
