@@ -228,6 +228,8 @@ class HighwayFlow(tfb.Bijector):
     """
     # Log determinant term from the upper matrix. Note that the log determinant
     # of the lower matrix is zero.
+    if len(x.shape) <= 1:
+      x = tf.expand_dims(x, 0)
     fldj = tf.zeros(x.shape[:-1]) + tf.reduce_sum(
       tf.math.log(self.residual_fraction + (
           1. - self.residual_fraction) * tf.linalg.diag_part(
@@ -251,6 +253,8 @@ class HighwayFlow(tfb.Bijector):
     :returns: y after inverse flow
     :rtype: `tf.Tensor`
     """
+    if len(y.shape) <= 1:
+      y = tf.expand_dims(y, 0)
     ildj = tf.zeros(y.shape[:-1]) - tf.reduce_sum(
       tf.math.log(self.residual_fraction + (
           1. - self.residual_fraction) * tf.linalg.diag_part(
