@@ -28,10 +28,6 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-from numpy.core.fromnumeric import argmin, clip
-
-from tensorflow.python.ops.gen_array_ops import gather, lower_bound, where
-from tensorflow_probability.python.internal.backend.numpy import dtype, numpy_math
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
@@ -87,7 +83,7 @@ LBfgsBOptimizerResults = collections.namedtuple(
     ])
 
 _ConstrainedCauchyState = collections.namedtuple(
-    '_ConstrainedCauchyResult', [
+    '_CauchyMinimizationResult', [
         'theta', # `\theta` in [2]; n the Cauchy search, relates to the implicit Hessian
                  # `B = \theta*I - WMW'` (`I` the identity, see [1,2] for details)
         'm', # `M_k` matrix in [2]; part of the implicit representation of the Hessian,
@@ -103,7 +99,7 @@ _ConstrainedCauchyState = collections.namedtuple(
                           #  while loop.
         'free_mask', # Boolean mask of free variables
         'p', # as in [2]
-        'c', # as in [2]
+        'c', # as in [2]; eventually made to equal `W'(cauchy_point - position)`
         'df', # `f'` in [2]; (corrected) gradient 2-norm
         'ddf', # `f''` in [2]; (corrected) laplacian 2-norm (?)
         'dt_min', # `\Delta t_min` in [2]; the minimizing parameter
@@ -142,7 +138,29 @@ def minimize(value_and_gradients_function,
   constrained minimum for a simple high-dimensional quadratic objective function.
 
   ```python
-    TODO
+  ndims = 60
+  minimum = tf.convert_to_tensor(
+      np.ones([ndims]), dtype=tf.float32)
+  lower_bounds = tf.convert_to_tensor(
+      np.arange(ndims), dtype=tf.float32)
+  upper_bounds = tf.convert_to_tensor(
+      np.arange(100, 100-ndims, -1), dtype=tf.float32)
+  scales = tf.convert_to_tensor(
+      (np.random.rand(ndims) + 1.)*5. + 1., dtype=tf.float32)
+  start = tf.constant(np.random.rand(2, ndims)*100, dtype=tf.float32)
+
+  # The objective function and the gradient.
+  def quadratic_loss_and_gradient(x):
+      return tfp.math.value_and_gradient(
+          lambda x: tf.reduce_sum(
+              scales * tf.math.squared_difference(x, minimum), axis=-1),
+          x)
+  opt_results = tfp.optimizer.lbfgsb_minimize(
+                  quadratic_loss_and_gradient,
+                  initial_position=start,
+                  num_correction_pairs=10,
+                  tolerance=1e-10,
+                  bounds=[lower_bounds, upper_bounds])
   ```
 
   ### References:
@@ -157,6 +175,13 @@ def minimize(value_and_gradients_function,
       SIAM Journal on Scientific Computing, 16(5), 1190–1208.
 
   https://doi.org/10.1137/0916069
+
+  [3] Jose Luis Morales, Jorge Nocedal (2011).
+      "Remark On Algorithm 788: L-BFGS-B: Fortran Subroutines for Large-Scale
+        Bound Constrained Optimization"
+      ACM Trans. Math. Softw. 38, 1, Article 7.
+
+  https://dl.acm.org/doi/abs/10.1145/2049662.2049669
 
   Args:
     value_and_gradients_function:  A Python callable that accepts a point as a
@@ -369,40 +394,28 @@ def minimize(value_and_gradients_function,
       """Main optimization loop."""
       current_state = bfgs_utils.terminate_if_not_finite(current_state)
   
-      cauchy_point, free_mask = \
-        _cauchy_minimization(current_state, num_correction_pairs, parallel_iterations)
+      cauchy_state, current_state = (
+        _cauchy_minimization(current_state, num_correction_pairs, parallel_iterations))
 
-      search_direction = _get_search_direction(current_state)
-
-      # TODO(b/120134934): Check if the derivative at the start point is not
-      # negative, if so then reset position/gradient deltas and recompute
-      # search direction.
-      # NOTE: Erasing is currently handled in `_bounded_line_search_step`
-      search_direction = tf.where(
-                          free_mask,
-                          search_direction,
-                          0.)
-      bad_direction = \
-        (tf.reduce_sum(search_direction * current_state.objective_gradient, axis=-1) > 0)
-
-      cauchy_search = _cauchy_line_search_step(current_state,
-          value_and_gradients_function, search_direction,
-          tolerance, f_relative_tolerance, x_tolerance, stopping_condition,
-          max_line_search_iterations, free_mask, cauchy_point)
+      search_direction, current_state, refresh = (
+        _find_search_direction(current_state, cauchy_state, num_correction_pairs))
       
-      search_direction = cauchy_search.position - current_state.position
-      next_state = _bounded_line_search_step(current_state,
-          value_and_gradients_function, search_direction,
+      next_state = _constrained_line_search_step(
+          current_state, value_and_gradients_function, search_direction,
           tolerance, f_relative_tolerance, x_tolerance, stopping_condition,
-          max_line_search_iterations, bad_direction)
+          max_line_search_iterations, refresh)
 
       # If not failed or converged, update the Hessian estimate.
-      # Only do this if the new pairs obey the s.y > 0
-      position_delta = next_state.position - current_state.position
-      gradient_delta = next_state.objective_gradient - current_state.objective_gradient
-      positive_prod = (tf.math.reduce_sum(position_delta * gradient_delta, axis=-1) > \
-                        1E-8*tf.reduce_sum(gradient_delta**2, axis=-1))
-      should_push = ~(next_state.converged | next_state.failed) & positive_prod & ~bad_direction
+      # Only do this if the new pairs obey the s.y > eps.||g||
+      position_delta = (next_state.position - current_state.position)
+      gradient_delta = (next_state.objective_gradient - current_state.objective_gradient)
+      # Article is ambiguous; see lbfgs.f:863
+      positive_prod = (
+        tf.reduce_sum(position_delta * gradient_delta, axis=-1) >
+          dtype_util.eps(current_state.position.dtype) *
+            tf.reduce_sum(current_state.objective_gradient**2, axis=-1)
+      )
+      should_push = ~(next_state.converged | next_state.failed) & positive_prod & ~refresh
       new_position_deltas = _queue_push(
               next_state.position_deltas, should_push, position_delta)
       new_gradient_deltas = _queue_push(
@@ -421,13 +434,13 @@ def minimize(value_and_gradients_function,
         new_history = tf.ensure_shape(
           new_history, next_state.history.shape)
 
-      state_after_inv_hessian_update = bfgs_utils.update_fields(
+      next_state = bfgs_utils.update_fields(
           next_state,
           position_deltas=new_position_deltas,
           gradient_deltas=new_gradient_deltas,
           history=new_history)
 
-      return [state_after_inv_hessian_update]
+      return [next_state]
 
     if previous_optimizer_results is None:
       assert initial_position is not None
@@ -455,26 +468,28 @@ def _cauchy_minimization(bfgs_state, num_correction_pairs, parallel_iterations):
   See algorithm CP and associated discussion of [Byrd,Lu,Nocedal,Zhu][2]
   for details.
 
+  This function may modify the given `bfgs_state`, in that it refreshes the memory
+  for batches that are found to be in an invalid state.
+
   Args:
-    bfgs_state: A `_ConstrainedCauchyState` initialized to the starting point of the
-    constrained minimization.
+    bfgs_state: current `LBfgsBOptimizerResults` state
+    num_correction_pairs: typically `m`; the (maximum) number of past steps to keep as
+      history for the LBFGS algorithm
+    parallel_iterations: argument of `tf.while` loops
   Returns:
-    A potentially modified `state`, the obtained `cauchy_point` and boolean
-    `free_mask` indicating which variables are free (`True`) and which variables
-    are under active constrain (`False`)
+    A `_CauchyMinimizationResult` containing the results of the Cauchy point computation.
+    Updated `bfgs_state`
   """
-  cauchy_state = _get_initial_cauchy_state(bfgs_state, num_correction_pairs)
-  # NOTE: See lbfgsb.f (l. 1649)
+  cauchy_state, bfgs_state = _get_initial_cauchy_state(bfgs_state, num_correction_pairs)
+  # NOTE: See lbfgsb.f (l. 1524)
   ddf_org = -cauchy_state.theta * cauchy_state.df
 
   def _cond(state):
     """Test convergence to Cauchy point at current branch"""
-    return tf.math.reduce_any(state.active)
+    return tf.reduce_any(state.active)
 
   def _body(state):
-    """Cauchy point iterative loop
-    
-    (While loop of CP algorithm [2])"""
+    """Cauchy point iterative loop (While loop of CP algorithm [2])"""
     # Remove b from the free indices
     free_vars_idx, free_mask = _cauchy_remove_breakpoint_min(
                                 state.free_vars_idx,
@@ -520,7 +535,8 @@ def _cauchy_minimization(bfgs_state, num_correction_pairs, parallel_iterations):
                 state.breakpoint_min_idx,
                 batch_dims=1))
 
-    keep_idx = (tf.range(ps.shape(state.cauchy_point)[-1]) != \
+    # Set the `b`th component of the `cauchy_point` to `x_cp_b`
+    keep_idx = (tf.range(ps.shape(state.cauchy_point)[-1])[tf.newaxis, ...] != 
                   state.breakpoint_min_idx[..., tf.newaxis])
     cauchy_point = tf.where(
                     state.active[..., tf.newaxis],
@@ -562,14 +578,14 @@ def _cauchy_minimization(bfgs_state, num_correction_pairs, parallel_iterations):
                   state.breakpoint_min_idx,
                   axis=-1,
                   batch_dims=1),
-                state.theta[..., tf.newaxis] * \
+                (state.theta[..., tf.newaxis] *
                   tf.gather(
                     tf.transpose(
                       bfgs_state.position_deltas,
                       perm=[1,0,2]),
                     state.breakpoint_min_idx,
                     axis=-1,
-                    batch_dims=1)
+                    batch_dims=1))
               ],
               axis=-1)
     # 2. "Permute" the relevant items to the right
@@ -596,34 +612,33 @@ def _cauchy_minimization(bfgs_state, num_correction_pairs, parallel_iterations):
     # NOTE Use of d_b = -g_b
     df = tf.where(
           state.active,
-          state.df + state.dt * state.ddf + \
-            d_b**2 - \
-            state.theta * d_b * z_b + \
+          (state.df + state.dt * state.ddf +
+            d_b**2 -
+            state.theta * d_b * z_b +
             d_b * tf.einsum(
                     '...j,...jk,...k->...',
                     w_b,
                     state.m,
-                    c),
+                    c)),
           state.df)
           
     # NOTE use of d_b = -g_b
     ddf = tf.where(
             state.active,
-            state.ddf - state.theta * d_b**2 + \
+            (state.ddf - state.theta * d_b**2 +
               2. * d_b * tf.einsum(
                           "...i,...ij,...j->...",
                           w_b,
                           state.m,
-                          state.p) - \
+                          state.p) -
               d_b**2 * tf.einsum(
                         "...i,...ij,...j->...",
                         w_b,
                         state.m,
-                        w_b),
+                        w_b)),
             state.ddf)
     # NOTE: See lbfgsb.f (l. 1649)
-    # TODO: How to get machine epsilon?
-    ddf = tf.math.maximum(ddf, 1E-8*ddf_org)
+    ddf = tf.math.maximum(ddf, dtype_util.eps(ddf.dtype)*ddf_org)
 
     # NOTE use of d_b = -g_b
     p = tf.where(
@@ -653,10 +668,10 @@ def _cauchy_minimization(bfgs_state, num_correction_pairs, parallel_iterations):
                           state.breakpoint_min_old)
     
     # Find b
-    breakpoint_min_idx, breakpoint_min = \
+    breakpoint_min_idx, breakpoint_min = (
       _cauchy_get_breakpoint_min(
         state.breakpoints,
-        free_vars_idx)
+        free_vars_idx))
     breakpoint_min_idx = tf.where(
                           state.active,
                           breakpoint_min_idx,
@@ -670,11 +685,9 @@ def _cauchy_minimization(bfgs_state, num_correction_pairs, parallel_iterations):
           state.active,
           breakpoint_min - state.breakpoint_min,
           state.dt)
-          
-    active = tf.where(
-              state.active,
-              _cauchy_update_active(free_vars_idx, dt_min, dt),
-              state.active)
+    
+    active = (state.active & 
+      _cauchy_update_active(free_vars_idx, state.breakpoints, dt_min, dt))
 
     # We have to hint the "compiler" that the shapes of the new
     # values are the same as the old values.
@@ -710,212 +723,444 @@ def _cauchy_minimization(bfgs_state, num_correction_pairs, parallel_iterations):
         parallel_iterations=parallel_iterations)[0]
 
   # The loop broke, so the last identified `b` index never got
-  # removed
-  _free_vars_idx, free_mask = _cauchy_remove_breakpoint_min(
-                              cauchy_loop.free_vars_idx,
-                              cauchy_loop.breakpoint_min_idx,
-                              cauchy_loop.free_mask,
-                              cauchy_loop.active)
+  # removed; we do not require knowledge of the free mask to
+  # terminate the algorithm and recalculate the free mask below
+  # with a different method, so we do not correct for this
+  #free_vars_idx, free_mask = _cauchy_remove_breakpoint_min(
+  #                            cauchy_loop.free_vars_idx,
+  #                            cauchy_loop.breakpoint_min_idx,
+  #                            cauchy_loop.free_mask,
+  #                            cauchy_loop.active)
 
   dt_min = tf.math.maximum(cauchy_loop.dt_min, 0)
   t_old = cauchy_loop.breakpoint_min_old + dt_min
   
   # A breakpoint of -1 means that we ran out of free variables
-  flagged_breakpoint_min = tf.where(
-                              cauchy_loop.breakpoint_min < 0,
-                              float('inf'),
-                              cauchy_loop.breakpoint_min)
+  change_cauchy = (
+    (cauchy_loop.breakpoint_min >= 0)[..., tf.newaxis] &
+    (cauchy_loop.breakpoints >= cauchy_loop.breakpoint_min[..., tf.newaxis])
+  )
   cauchy_point = tf.where(
       ~(bfgs_state.converged | bfgs_state.failed)[..., tf.newaxis],
       tf.where(
-        cauchy_loop.breakpoints >= flagged_breakpoint_min[..., tf.newaxis],
+        change_cauchy,
         bfgs_state.position + t_old[..., tf.newaxis] * cauchy_loop.steepest,
         cauchy_loop.cauchy_point),
       bfgs_state.position)
 
-  # NOTE: We only return the cauchy point and the free mask, so there is no
-  #  need to update the actual state, even though we could at this point update
-  #  `free_vars_idx`, `free_mask`, and `cauchy_point`
-  free_mask = free_mask & ~(cauchy_loop.breakpoints != cauchy_loop.breakpoint_min)
+  c = cauchy_loop.c + dt_min[..., tf.newaxis]*cauchy_loop.p
+  # NOTE: `c` is already permuted to match the subspace of `M`, because `w_b`
+  #  was already permuted.
+  # You can explicitly check this by comparing its value with W'.(x^c - x)
+  #  at this point.
 
-  return cauchy_point, free_mask
+  # Update the free mask;
+  # Instead of updating the mask as suggested in [1, CP Algorithm], we recalculate
+  # whether each variable is free by looking at whether the Cauchy point is near
+  # the bound. This matches other implementations, and avoids weirdness where
+  # the first considered variable is always marked as constrained.
+  # NOTE: the 10 epsilon margin is fairly arbitrary
+  free_mask =(
+    tf.math.minimum(
+      tf.math.abs(cauchy_point - bfgs_state.upper_bounds),
+      tf.math.abs(cauchy_point - bfgs_state.lower_bounds),
+    ) > 10. * dtype_util.eps(cauchy_point.dtype)
+  )
+  free_vars_idx = (
+    tf.where(
+      free_mask,
+      tf.range(ps.shape(free_mask)[-1])[tf.newaxis, ...],
+      -1))
+
+  # Update the final cauchy_state
+  # Hint the compiler that shape of things will not change
+  if not tf.executing_eagerly():
+    free_vars_idx = (
+      tf.ensure_shape(
+        free_vars_idx,
+        cauchy_loop.free_vars_idx.shape))
+    free_mask = (
+      tf.ensure_shape(
+        free_mask,
+        cauchy_loop.free_mask.shape))
+    cauchy_point = (
+      tf.ensure_shape(
+        cauchy_point,
+        cauchy_loop.cauchy_point.shape))
+    c = (
+      tf.ensure_shape(
+        c,
+        cauchy_loop.c.shape))
+  # Do the actual updating
+  final_cauchy_state = bfgs_utils.update_fields(
+    cauchy_loop,
+    free_vars_idx=free_vars_idx,
+    free_mask=free_mask,
+    cauchy_point=cauchy_point,
+    c=c)
+
+  return final_cauchy_state, bfgs_state
 
 
-def _cauchy_update_active(free_vars_idx, dt_min, dt):
-  return tf.where(
-            tf.reduce_any(free_vars_idx >= 0, axis=-1) & (dt_min >= dt),
-            True,
-            False)
+def _cauchy_update_active(free_vars_idx, breakpoints, dt_min, dt):
+  """Determines whether each batch of a `_CauchyMinimizationResult` is active.
+
+  The conditions for a batch being active (i.e. for the loop of "Algorithm CP"
+  of [2] to proceed for that batch are):
+
+  1. That `dt_min >= dt` (as made explicit in the paper),
+  2. That there are free variables, and
+  3. That of those free variables, at least one of the corresponding breakpoints is
+      finite.
+
+  Args:
+    free_vars_idx: tensor of shape [batch, dims] where each element corresponds to
+      the index of the variable if the variable is free, and `-1` if the variable is
+      actively constrained
+    breakpoints: the breakpoints (`t` in [2]) of the `_CauchyMinimizationResult`
+    dt_min: the current `dt_min` property of the `_CauchyMinimizationResult`
+    dt: the current `dt` property of the `_CauchyMinimizationResult`
+  """
+  free_vars = (free_vars_idx >= 0)
+  return (
+    (dt_min >= dt) &
+    tf.reduce_any(free_vars, axis=-1) &
+    tf.reduce_any(free_vars & (breakpoints != float('inf')), axis=-1))
 
 
-def _hz_line_search(state, value_and_gradients_function,
-      search_direction, max_iterations, inactive):
+def _find_search_direction(bfgs_state, cauchy_state, num_correction_pairs):
+  """Finds the search direction based on the direct primal method.
+
+  This function corresponds to points 1-6 of the Direct Primal Method presented
+  in [2, p. 1199], with the first modification suggested in [3].
+
+  If an invalid condition is reached for a given batch, its history is reset. Therefore,
+  this function also returns an updated `bfgs_state`. 
+
+  Args:
+    bfgs_state: the `LBfgsBOptimizerResults` object representing the current iteration.
+    cauchy_state: the `_CauchyMinimizationResult` results of a cauchy search computation.
+                  Typically the output of `_cauchy_minimization`.
+    num_correction_pairs: The (maximum) number of correction pairs stored in memory (`m`)
+  Returns:
+    Tensor of batched search directions,
+    Updated `bfgs_state`
+    Boolean mask of batches that have been refreshed
+  """
+  # Let the reduced gradient be [2, eq. 5.4]
+  #
+  #     ρ = Z'r
+  #     r = g + Θ(x^c - x) - W.M.c
+  #
+  # and the search direction [2, eq. 5.7]
+  #
+  #     d = -B⁻¹ρ
+  #
+  # and [2, eq. 5.10]
+  # 
+  #     B⁻¹ = 1/Θ [ I + 1/Θ Z'.W.N⁻¹.M.W'.Z ]
+  #     N   = I - 1/Θ M.W'.Z.Z'.W
+  #
+  # Therefore, (see NOTE below regarding minus sign)
+  #
+  #     d = Z' . (-1/Θ) . [ r + 1/Θ W.N⁻¹.M.W'.Z.Z'.r ]
+  #
+  # Letting
+  # 
+  #     K = M.W'.Z.Z'
+  #
+  # this is rewritten as
+  #
+  #     d = -Z' . (1/Θ) . [ r + 1/Θ W.N⁻¹.K.r ]
+  #     N = I - (1/Θ) K.W
+
+  idx = (
+    tf.concat([
+      tf.ragged.range(
+        num_correction_pairs - bfgs_state.history),
+      tf.ragged.range(
+        num_correction_pairs,
+        2*num_correction_pairs - bfgs_state.history),
+      tf.ragged.range(
+        num_correction_pairs - bfgs_state.history,
+        num_correction_pairs),
+      tf.ragged.range(
+        2*num_correction_pairs - bfgs_state.history,
+        2*num_correction_pairs)
+    ],
+    axis=-1).to_tensor())
+
+  w_transpose = (
+    tf.gather(
+      tf.transpose(
+        tf.concat(
+          [bfgs_state.gradient_deltas,
+          cauchy_state.theta[tf.newaxis, ..., tf.newaxis] * bfgs_state.position_deltas],
+          axis=0),
+        perm=[1, 0, 2]
+      ),
+      idx,
+    batch_dims=1)
+  )
+
+  k = (
+    tf.einsum(
+      '...ij,...jk->...ik',
+      cauchy_state.m,
+      tf.where(
+        cauchy_state.free_mask[..., tf.newaxis, :],
+        w_transpose,
+        0.
+      )
+    )
+  )
+
+  n = (
+    tf.eye(2*num_correction_pairs, batch_shape=ps.shape(bfgs_state.position)[:-1]) -
+    tf.einsum(
+      '...ij,...kj->...ik',
+      k,
+      w_transpose
+    ) / cauchy_state.theta[..., tf.newaxis, tf.newaxis]
+  )
+
+  n_mask = (
+    tf.range(2*num_correction_pairs)[tf.newaxis, ...] <
+      (2*num_correction_pairs - 2*bfgs_state.history)[..., tf.newaxis]
+  )[..., tf.newaxis]
+
+  n = (
+    tf.where(
+      n_mask,
+      tf.eye(2*num_correction_pairs, batch_shape=ps.shape(bfgs_state.position)[:-1]),
+      n
+    )
+  )
+
+  # NOTE: For no history, N is at the moment the identity (so never triggers a refresh),
+  #  and is correctly completely zeroed once the inversion is complete
+  refresh = (tf.linalg.det(n) == 0)
+
+  n = (
+    tf.where(
+      (refresh[..., tf.newaxis, tf.newaxis] | n_mask),
+      0.,
+      tf.linalg.inv(
+        tf.where(
+          refresh[..., tf.newaxis, tf.newaxis],
+          tf.eye(2*num_correction_pairs, batch_shape=ps.shape(bfgs_state.position)[:-1]),
+          n
+        )
+      )
+    )
+  )
+
+  r = (
+    bfgs_state.objective_gradient +
+    (cauchy_state.cauchy_point - bfgs_state.position) * cauchy_state.theta[..., tf.newaxis] -
+    tf.einsum(
+      '...ji,...jk,...k->...i',
+      w_transpose,
+      cauchy_state.m,
+      cauchy_state.c
+    )
+  )
+
+  # TODO: According to the comment at the top of this function's definition
+  #      there's a leading minus here, but both the article and the Fortran
+  #      implementation do not use it. I cannot understand why, but the negative
+  #      sign seems to produce the correct results.
+  #      (See lbfgsb.f:3021)
+  d = (
+    -(r +
+      tf.einsum(
+        '...ji,...jk,...kl,...l->...i',
+        w_transpose,
+        n,
+        k,
+        r
+      ) / cauchy_state.theta[..., tf.newaxis]
+    ) / cauchy_state.theta[..., tf.newaxis]
+  )
+
+  d = (
+    tf.where(
+      cauchy_state.free_mask,
+      d,
+      0.
+    )
+  )
+
+  # Per [3]:
+  # Clip the `(cauchy point) + d` into the bounds
+  lower_term = tf.math.divide_no_nan(
+                bfgs_state.lower_bounds - cauchy_state.cauchy_point,
+                d)
+  upper_term = tf.math.divide_no_nan(
+                bfgs_state.upper_bounds - cauchy_state.cauchy_point,
+                d)
+  clip_per_var = (
+                tf.where(
+                  (d > 0),
+                  upper_term,
+                  tf.where(
+                    (d < 0),
+                    lower_term,
+                    float('inf')))
+  )
+
+  movement_clip = (
+    tf.math.minimum(
+      tf.math.reduce_min(clip_per_var, axis=-1),
+      1.)
+  )
+  # NOTE: `d` is zeroed for constrained variables, and `movement_clip` is at most 1.
+  minimizer = (
+    cauchy_state.cauchy_point + movement_clip[..., tf.newaxis]*d
+  )
+  
+  # Per [3]: If the search direction obtained with this minimizer is not a direction
+  # of strong descent, do not clip `d` to obtain the minimizer (i.e. fall back to the
+  # original algorithm)
+  fallback = (
+    tf.reduce_sum(
+      (minimizer - bfgs_state.position) * bfgs_state.objective_gradient, axis=-1) > 0
+  )
+
+  minimizer = (
+    tf.where(
+      fallback[..., tf.newaxis],
+      cauchy_state.cauchy_point + d,
+      minimizer
+    )
+  )
+
+  search_direction = (minimizer - bfgs_state.position)
+
+  # Reset if the search direction still isn't a direction of strong descent
+  refresh |=  (
+    tf.reduce_sum(search_direction * bfgs_state.objective_gradient, axis=-1) > 0)
+
+  # Apply refresh
+  bfgs_state = _erase_history(bfgs_state, refresh)
+
+  return search_direction, bfgs_state, refresh
+
+
+def _hz_line_search(starting_position, starting_value, starting_gradient,
+      value_and_gradients_function, search_direction, max_iterations, inactive):
+  """Performs Hager Zhang line search via `bfgs_utils.linesearch.hager_zhang`."""
   line_search_value_grad_func = bfgs_utils._restrict_along_direction(
-      value_and_gradients_function, state.position, search_direction)
+      value_and_gradients_function, starting_position, search_direction)
   derivative_at_start_pt = tf.reduce_sum(
-      state.objective_gradient * search_direction, axis=-1)
-  val_0 = bfgs_utils.ValueAndGradient(x=bfgs_utils._broadcast(0, state.position),
-                           f=state.objective_value,
+      starting_gradient * search_direction, axis=-1)
+  val_0 = bfgs_utils.ValueAndGradient(x=bfgs_utils._broadcast(0, starting_position),
+                           f=starting_value,
                            df=derivative_at_start_pt,
-                           full_gradient=state.objective_gradient)
+                           full_gradient=starting_gradient)
   return bfgs_utils.linesearch.hager_zhang(
       line_search_value_grad_func,
-      initial_step_size=bfgs_utils._broadcast(1, state.position),
+      initial_step_size=bfgs_utils._broadcast(1, starting_position),
       value_at_zero=val_0,
       converged=inactive,
       max_iterations=max_iterations)  # No search needed for these.
 
 
-def _cauchy_line_search_step(state, value_and_gradients_function, search_direction,
+def _constrained_line_search_step(bfgs_state, value_and_gradients_function, search_direction,
                      grad_tolerance, f_relative_tolerance, x_tolerance,
-                     stopping_condition, max_iterations, free_mask, cauchy_point):
-  """Performs the line search in given direction, backtracking in direction to the cauchy point,
-  and clamping actively contrained variables to the cauchy point."""
-  inactive = state.failed | state.converged
-  ls_result = _hz_line_search(state, value_and_gradients_function,
-                search_direction, max_iterations, inactive)
-  
-  state_after_ls = bfgs_utils.update_fields(
-      state,
-      failed=state.failed | (~state.converged & ~ls_result.converged & tf.reduce_any(free_mask, axis=-1)),
-      num_iterations=state.num_iterations + 1,
-      num_objective_evaluations=(
-          state.num_objective_evaluations + ls_result.func_evals + 1))
+                     stopping_condition, max_iterations, refresh):
+  """Performs a constrained line search clamped to bounds in given direction."""
+  inactive = (bfgs_state.failed | bfgs_state.converged) | refresh
 
-  def _do_update_position():
-    # For inactive batch members `left.x` is zero. However, their
-    # `search_direction` might also be undefined, so we can't rely on
-    # multiplication by zero to produce a `position_delta` of zero.
-    alpha = ls_result.left.x[..., tf.newaxis]
-    ideal_position = tf.where(
-        inactive[..., tf.newaxis],
-        state.position,
-        tf.where(
-          free_mask,
-          state.position + search_direction * alpha,
-          cauchy_point))
-
-    # Backtrack from the ideal position in direction to the Cauchy point
-    cauchy_to_ideal = ideal_position - cauchy_point
-    clip_lower = tf.math.divide_no_nan(
-                  state.lower_bounds - cauchy_point,
-                  cauchy_to_ideal)
-    clip_upper = tf.math.divide_no_nan(
-                  state.upper_bounds - cauchy_point,
-                  cauchy_to_ideal)
-    clip = tf.math.reduce_min(
-            tf.where(
-              cauchy_to_ideal > 0,
-              clip_upper,
-              tf.where(
-                cauchy_to_ideal < 0,
-                clip_lower,
-                float('inf'))),
-            axis=-1)
-    alpha = tf.minimum(1.0, clip)[..., tf.newaxis]
-    
-    next_position = tf.where(
-        inactive[..., tf.newaxis],
-        state.position,
-        tf.where(
-          free_mask,
-          cauchy_point + alpha * cauchy_to_ideal,
-          cauchy_point))
-    
-    # NOTE: one extra call to the function
-    next_objective, next_gradient = \
-      value_and_gradients_function(next_position)
-
-    return _update_position(
-        state_after_ls,
-        next_position,
-        next_objective,
-        next_gradient,
-        grad_tolerance,
-        f_relative_tolerance,
-        x_tolerance,
-        tf.constant(False))
-
-  return ps.cond(
-      stopping_condition(state.converged, state.failed),
-      true_fn=lambda: state_after_ls,
-      false_fn=_do_update_position)
-
-
-def _bounded_line_search_step(state, value_and_gradients_function, search_direction,
-                     grad_tolerance, f_relative_tolerance, x_tolerance,
-                     stopping_condition, max_iterations, bad_direction):
-  """Performs a line search in given direction, clamping to the bounds, and fixing the actively
-  constrained values to the given values."""
-  inactive = state.failed | state.converged | bad_direction
-  ls_result = _hz_line_search(state, value_and_gradients_function,
-                search_direction, max_iterations, inactive)
-
-  new_failed = state.failed | (~state.converged & ~ls_result.converged \
-                              & tf.reduce_any(search_direction != 0, axis=-1)) \
-                                & ~bad_direction
-  new_num_iterations = state.num_iterations + 1
-  new_num_objective_evaluations = (
-          state.num_objective_evaluations + ls_result.func_evals + 1)
-
-  if not tf.executing_eagerly():
-    # Hint the compiler that the properties' shape will not change
-    new_failed = tf.ensure_shape(
-      new_failed, state.failed.shape)
-    new_num_iterations = tf.ensure_shape(
-      new_num_iterations, state.num_iterations.shape)
-    new_num_objective_evaluations = tf.ensure_shape(
-      new_num_objective_evaluations, state.num_objective_evaluations.shape)
-
-  state_after_ls = bfgs_utils.update_fields(
-      state,
-      failed=new_failed,
-      num_iterations=new_num_iterations,
-      num_objective_evaluations=new_num_objective_evaluations)
-
-  def _do_update_position():
+  def _do_line_search_step():
+    """Do unconstrained line search."""
+    # Truncation bounds
     lower_term = tf.math.divide_no_nan(
-                  state.lower_bounds - state.position,
-                  search_direction)
+                    bfgs_state.lower_bounds - bfgs_state.position,
+                    search_direction)
     upper_term = tf.math.divide_no_nan(
-                  state.upper_bounds - state.position,
+                  bfgs_state.upper_bounds - bfgs_state.position,
                   search_direction)
+
+    # Truncate the search direction to bounds before search
+    bounds_clip = (
+      tf.reduce_min(
+          tf.where(
+            (search_direction > 0),
+            upper_term,
+            tf.where(
+              (search_direction < 0),
+              lower_term,
+              float('inf'))),
+          axis=-1)
+    )
+    pre_clip = (
+      tf.math.minimum(
+        bounds_clip,
+        1.)
+    )
+
+    clipped_search_direction = search_direction * pre_clip[..., tf.newaxis]
     
-    under_clip = tf.math.reduce_max(
-                  tf.where(
-                    (search_direction > 0),
-                    lower_term,
-                    tf.where(
-                      (search_direction < 0),
-                      upper_term,
-                      -float('inf'))),
-                  axis=-1)
-    over_clip = tf.math.reduce_min(
-                  tf.where(
-                    (search_direction > 0),
-                    upper_term,
-                    tf.where(
-                      (search_direction < 0),
-                      lower_term,
-                      float('inf'))),
-                  axis=-1)
+    ls_result = _hz_line_search(bfgs_state.position, bfgs_state.objective_value, bfgs_state.objective_gradient,
+                                value_and_gradients_function, clipped_search_direction,
+                                max_iterations, inactive)
 
-    alpha_clip = tf.clip_by_value(
-                  ls_result.left.x,
-                  under_clip,
-                  over_clip)[..., tf.newaxis]
+    new_failed = ((bfgs_state.failed | (~bfgs_state.converged & ~ls_result.converged)) & ~inactive)
+    new_num_iterations = bfgs_state.num_iterations + 1
+    new_num_objective_evaluations = (
+            bfgs_state.num_objective_evaluations + ls_result.func_evals + 1)
 
+    # Also truncate to bounds after search
+    step = (
+      tf.math.minimum(
+        bounds_clip,
+        ls_result.left.x
+      )
+    )
+
+    # Hint the compiler that the properties' shape will not change
+    if not tf.executing_eagerly():
+      new_failed = tf.ensure_shape(
+        new_failed, bfgs_state.failed.shape)
+      new_num_iterations = tf.ensure_shape(
+        new_num_iterations, bfgs_state.num_iterations.shape)
+      new_num_objective_evaluations = tf.ensure_shape(
+        new_num_objective_evaluations, bfgs_state.num_objective_evaluations.shape)
+
+    state_after_ls = bfgs_utils.update_fields(
+        state=bfgs_state,
+        failed=new_failed,
+        num_iterations=new_num_iterations,
+        num_objective_evaluations=new_num_objective_evaluations)
+    
+    return step, state_after_ls
+  
+  # NOTE: It's important that the default (false `pred`) step matches
+  # the shape of true `pred` shape for graph purposes
+  step, state_after_ls = (
+    tf.cond(
+      pred=tf.math.logical_not(tf.reduce_all(inactive)),
+      true_fn=_do_line_search_step,
+      false_fn=lambda: (tf.zeros_like(inactive, dtype=search_direction.dtype), bfgs_state)
+    ))
+
+  def _do_update_position():
+    """Update the position"""
     # For inactive batch members `left.x` is zero. However, their
     # `search_direction` might also be undefined, so we can't rely on
     # multiplication by zero to produce a `position_delta` of zero.
+    # Also, the search direction has already been clipped to make sure
+    # it does not go out of bounds.
     next_position = tf.where(
         inactive[..., tf.newaxis],
-        state.position,
-        state.position + search_direction * alpha_clip)
+        bfgs_state.position,
+        bfgs_state.position + step[..., tf.newaxis] * search_direction)
           
     # one extra call to the function, counted above
-    next_objective, next_gradient = \
+    next_objective, next_gradient = (
       value_and_gradients_function(next_position)
+    )
 
     return _update_position(
         state_after_ls,
@@ -925,10 +1170,11 @@ def _bounded_line_search_step(state, value_and_gradients_function, search_direct
         grad_tolerance,
         f_relative_tolerance,
         x_tolerance,
-        bad_direction)
+        inactive)
 
   return ps.cond(
-      stopping_condition(state.converged, state.failed),
+      (stopping_condition(bfgs_state.converged, bfgs_state.failed) &
+        tf.math.logical_not(tf.reduce_all(inactive))),
       true_fn=lambda: state_after_ls,
       false_fn=_do_update_position)
 
@@ -940,34 +1186,22 @@ def _update_position(state,
                      grad_tolerance,
                      f_relative_tolerance,
                      x_tolerance,
-                     erase_memory):
-  """Updates the state advancing its position by a given position_delta.
-  Also erases the LBFGS memory if indicated."""
+                     inactive):
+  """Updates the state advancing its position by a given position_delta."""
   state = bfgs_utils.terminate_if_not_finite(state, next_objective, next_gradient)
 
-  converged = ~state.failed & \
-                      _check_convergence_bounded(state.position,
-                                                 next_position,
-                                                 state.objective_value,
-                                                 next_objective,
-                                                 next_gradient,
-                                                 grad_tolerance,
-                                                 f_relative_tolerance,
-                                                 x_tolerance,
-                                                 state.lower_bounds,
-                                                 state.upper_bounds)
-  new_position_deltas = tf.where(
-                      erase_memory[..., tf.newaxis],
-                      tf.zeros_like(state.position_deltas),
-                      state.position_deltas)
-  new_gradient_deltas = tf.where(
-                      erase_memory[..., tf.newaxis],
-                      tf.zeros_like(state.gradient_deltas),
-                      state.gradient_deltas)
-  new_history = tf.where(
-              erase_memory,
-              tf.zeros_like(state.history),
-              state.history)
+  converged = (~inactive &
+                ~state.failed &
+                  _check_convergence_bounded(state.position,
+                                            next_position,
+                                            state.objective_value,
+                                            next_objective,
+                                            next_gradient,
+                                            grad_tolerance,
+                                            f_relative_tolerance,
+                                            x_tolerance,
+                                            state.lower_bounds,
+                                            state.upper_bounds))
   new_converged = (state.converged | converged)
 
   if not tf.executing_eagerly():
@@ -976,19 +1210,57 @@ def _update_position(state,
     next_position = tf.ensure_shape(next_position, state.position.shape)
     next_objective = tf.ensure_shape(next_objective, state.objective_value.shape)
     next_gradient = tf.ensure_shape(next_gradient, state.objective_gradient.shape)
-    new_position_deltas = tf.ensure_shape(new_position_deltas, state.position_deltas.shape)
-    new_gradient_deltas = tf.ensure_shape(new_gradient_deltas, state.gradient_deltas.shape)
-    new_history = tf.ensure_shape(new_history, state.history.shape)
 
   return bfgs_utils.update_fields(
       state,
       converged=new_converged,
       position=next_position,
       objective_value=next_objective,
-      objective_gradient=next_gradient,
-      position_deltas=new_position_deltas,
-      gradient_deltas=new_gradient_deltas,
-      history=new_history)
+      objective_gradient=next_gradient)
+
+
+def _erase_history(bfgs_state, where_erase):
+  """Erases the BFGS correction pairs for the specified batches.
+
+  This function will zero `gradient_deltas`, `position_deltas`, and `history`.
+
+  Args:
+    `bfgs_state`: a `LBfgsBOptimizerResults` to modify
+    `where_erase`: a Boolean tensor with shape matching the batch dimensions
+                  with `True` for the batches to erase the history of.
+  Returns:
+    Modified `bfgs_state`.
+  """
+  # Calculate new values
+  new_gradient_deltas = (tf.where(
+                        where_erase[..., tf.newaxis],
+                        0.,
+                        bfgs_state.gradient_deltas))
+  new_position_deltas = (tf.where(
+                        where_erase[..., tf.newaxis],
+                        0.,
+                        bfgs_state.position_deltas))
+  new_history = tf.where(where_erase, 0, bfgs_state.history)
+  # Assure the compiler that the shape of things has not changed
+  if not tf.executing_eagerly():
+    new_gradient_deltas = (
+      tf.ensure_shape(
+        new_gradient_deltas,
+        bfgs_state.gradient_deltas.shape))
+    new_position_deltas = (
+      tf.ensure_shape(
+        new_position_deltas,
+        bfgs_state.position_deltas.shape))
+    new_history = (
+      tf.ensure_shape(
+        new_history,
+        bfgs_state.history.shape))
+  # Update and return
+  return bfgs_utils.update_fields(
+          bfgs_state,
+          gradient_deltas=new_gradient_deltas,
+          position_deltas=new_position_deltas,
+          history=new_history)
 
 
 def _check_convergence_bounded(current_position,
@@ -1002,16 +1274,21 @@ def _check_convergence_bounded(current_position,
                        lower_bounds,
                        upper_bounds):
   """Checks if the algorithm satisfies the convergence criteria."""
+  # NOTE: The original algorithm (as described in [2]) only considers halting on
+  # the projected gradient condition. However, `x_converged` and `f_converged` do
+  # not seem to pose a problem when refreshing is correctly accounted for (so that
+  # the optimization does not halt upon a refresh), and the default values of `0`
+  # for `f_relative_tolerance` and `x_tolerance` further strengthen these conditions.
   proj_grad_converged = bfgs_utils.norm(
                           tf.clip_by_value(
                             next_position - next_gradient,
                             lower_bounds,
                             upper_bounds) - next_position, dims=1) <= grad_tolerance
   x_converged = bfgs_utils.norm(next_position - current_position, dims=1) <= x_tolerance
-  f_converged = bfgs_utils.norm(next_objective - current_objective, dims=0) <= \
-                  f_relative_tolerance * current_objective
+  f_converged = (
+    bfgs_utils.norm(next_objective - current_objective, dims=0) <= 
+      f_relative_tolerance * current_objective)
   return proj_grad_converged | x_converged | f_converged
-
 
 def _get_initial_state(value_and_gradients_function,
                        initial_position,
@@ -1033,50 +1310,56 @@ def _get_initial_state(value_and_gradients_function,
   return LBfgsBOptimizerResults(**init_args)
 
 
-def _get_initial_cauchy_state(state, num_correction_pairs):
-  """Create _ConstrainedCauchyState with initial parameters"""
+def _get_initial_cauchy_state(bfgs_state, num_correction_pairs):
+  """Create `_ConstrainedCauchyState` with initial parameters.
+  
+  This will calculate the elements of `_ConstrainedCauchyState` based on the given
+  `LBfgsBOptimizerResults` state object. Some of these properties may be incalculable,
+  for which batches the state will be reset.
+
+  Args:
+    bfgs_state: `LBfgsBOptimizerResults` object representing the current state of the
+      LBFGSB optimization
+    num_correction_pairs: typically `m`; the (maximum) number of past steps to keep as
+      history for the LBFGS algorithm
+  
+  Returns:
+    Initialized `_ConstrainedCauchyState`
+    Updated `bfgs_state`
+  """
   
   theta = tf.math.divide_no_nan(
-              tf.reduce_sum(state.gradient_deltas[-1, ...]**2, axis=-1),
-              tf.reduce_sum(state.gradient_deltas[-1,...] * state.position_deltas[-1, ...], axis=-1))
+              tf.reduce_sum(bfgs_state.gradient_deltas[-1, ...]**2, axis=-1),
+              (tf.reduce_sum(bfgs_state.gradient_deltas[-1,...] *
+                bfgs_state.position_deltas[-1, ...], axis=-1)))
   theta = tf.where(
             theta != 0,
             theta,
-            1.0)
+            1.)
 
   m, refresh = _cauchy_init_m(
-                  state,
-                  ps.shape(state.position_deltas),
+                  bfgs_state,
+                  ps.shape(bfgs_state.position_deltas),
                   theta,
                   num_correction_pairs)
+  
   # Erase the history where M isn't invertible
-  state = \
-    bfgs_utils.update_fields(
-      state,
-      gradient_deltas=tf.where(
-                        refresh[..., tf.newaxis],
-                        tf.zeros_like(state.gradient_deltas),
-                        state.gradient_deltas),
-      position_deltas=tf.where(
-                        refresh[..., tf.newaxis],
-                        tf.zeros_like(state.position_deltas),
-                        state.position_deltas),
-      history=tf.where(refresh, 0, state.history))
-  theta = tf.where(refresh, 1.0, theta)
+  bfgs_state = _erase_history(bfgs_state, refresh)
+  theta = tf.where(refresh, 1., theta)
 
-  breakpoints = _cauchy_init_breakpoints(state)
+  breakpoints = _cauchy_init_breakpoints(bfgs_state)
 
   steepest = tf.where(
               breakpoints != 0.,
-              -state.objective_gradient,
+              -bfgs_state.objective_gradient,
               0.)
 
   free_mask = (breakpoints > 0)
   free_vars_idx = tf.where(
                     free_mask,
                     tf.broadcast_to(
-                      tf.range(ps.shape(state.position)[-1], dtype=tf.int32),
-                      ps.shape(state.position)),
+                      tf.range(ps.shape(bfgs_state.position)[-1], dtype=tf.int32),
+                      ps.shape(bfgs_state.position)),
                     -1)
 
   # We need to account for the varying histories:
@@ -1089,28 +1372,28 @@ def _get_initial_cauchy_state(state, num_correction_pairs):
         [
           tf.einsum(
                   "m...i,...i->...m",
-                  state.gradient_deltas,
+                  bfgs_state.gradient_deltas,
                   steepest),
-          theta[..., tf.newaxis] * \
+          (theta[..., tf.newaxis] *
                 tf.einsum(
                   "m...i,...i->...m",
-                  state.position_deltas,
-                  steepest)
+                  bfgs_state.position_deltas,
+                  steepest))
         ],
         axis=-1)
   # 2. Assemble the rows in the correct order
   idx = tf.concat(
           [
             tf.ragged.range(
-              num_correction_pairs - state.history),
+              num_correction_pairs - bfgs_state.history),
             tf.ragged.range(
               num_correction_pairs,
-              2*num_correction_pairs - state.history),
+              2*num_correction_pairs - bfgs_state.history),
             tf.ragged.range(
-              num_correction_pairs - state.history,
+              num_correction_pairs - bfgs_state.history,
               num_correction_pairs),
             tf.ragged.range(
-              2*num_correction_pairs - state.history,
+              2*num_correction_pairs - bfgs_state.history,
               2*num_correction_pairs)
           ],
           axis=-1).to_tensor()
@@ -1125,26 +1408,31 @@ def _get_initial_cauchy_state(state, num_correction_pairs):
   ddf = -theta*df - tf.einsum("...i,...ij,...j->...", p, m, p)
   dt_min = -tf.math.divide_no_nan(df, ddf)
 
-  breakpoint_min_idx, breakpoint_min = \
-    _cauchy_get_breakpoint_min(breakpoints, free_vars_idx)
+  breakpoint_min_idx, breakpoint_min = (
+    _cauchy_get_breakpoint_min(breakpoints, free_vars_idx))
 
   dt = breakpoint_min
 
   breakpoint_min_old = tf.zeros_like(breakpoint_min)
 
-  cauchy_point = state.position
+  cauchy_point = bfgs_state.position
 
-  active = ~(state.converged | state.failed) & \
-              _cauchy_update_active(free_vars_idx, dt_min, dt)
+  active = (~(bfgs_state.converged | bfgs_state.failed) &
+              _cauchy_update_active(free_vars_idx, breakpoints, dt_min, dt))
 
-  return _ConstrainedCauchyState(
-    theta, m, breakpoints, steepest, free_vars_idx, free_mask,
-    p, c, df, ddf, dt_min, breakpoint_min, breakpoint_min_idx,
-    dt, breakpoint_min_old, cauchy_point, active)
+  cauchy_state = (
+    _ConstrainedCauchyState(
+      theta, m, breakpoints, steepest, free_vars_idx, free_mask,
+      p, c, df, ddf, dt_min, breakpoint_min, breakpoint_min_idx,
+      dt, breakpoint_min_old, cauchy_point, active))
+  
+  return cauchy_state, bfgs_state
 
 
 def _cauchy_init_m(state, deltas_shape, theta, num_correction_pairs):
+  """Initialize the M matrix for a `_CauchyMinimizationResult` state."""
   def build_m():
+    """Construct and invert the M block matrix."""
     # All of the below block matrices have dimensions [..., m, m]
     #  where `...` denotes the batch dimensions, and `m` the number
     #  of correction pairs (compare to `deltas_shape`, which is [m,...,n]).
@@ -1176,18 +1464,23 @@ def _cauchy_init_m(state, deltas_shape, theta, num_correction_pairs):
 
     # Assemble into full matrix
     # TODO: Is there no better way to create a block matrix?
-    block_d = tf.concat([-d, tf.zeros_like(d)], axis=-1)
-    block_d = tf.concat([block_d, tf.zeros_like(block_d)], axis=-2)
-    block_l_transpose = tf.concat([tf.zeros_like(l_transpose), l_transpose], axis=-1)
-    block_l_transpose = tf.concat([block_l_transpose, tf.zeros_like(block_l_transpose)], axis=-2)
-    block_l = tf.concat([l, tf.zeros_like(l)], axis=-1)
-    block_l = tf.concat([tf.zeros_like(block_l), block_l], axis=-2)
-    block_s_t_s = tf.concat([tf.zeros_like(s_t_s), s_t_s], axis=-1)
-    block_s_t_s = tf.concat([tf.zeros_like(block_s_t_s), block_s_t_s], axis=-2)
+    m_inv = tf.concat(
+              [
+                tf.concat([-d, l_transpose], axis=-1),
+                tf.concat([l, theta[..., tf.newaxis, tf.newaxis] * s_t_s], axis=-1)
+              ], axis=-2)
+    #block_d = tf.concat([-d, tf.zeros_like(d)], axis=-1)
+    #block_d = tf.concat([block_d, tf.zeros_like(block_d)], axis=-2)
+    #block_l_transpose = tf.concat([tf.zeros_like(l_transpose), l_transpose], axis=-1)
+    #block_l_transpose = tf.concat([block_l_transpose, tf.zeros_like(block_l_transpose)], axis=-2)
+    #block_l = tf.concat([l, tf.zeros_like(l)], axis=-1)
+    #block_l = tf.concat([tf.zeros_like(block_l), block_l], axis=-2)
+    #block_s_t_s = tf.concat([tf.zeros_like(s_t_s), s_t_s], axis=-1)
+    #block_s_t_s = tf.concat([tf.zeros_like(block_s_t_s), block_s_t_s], axis=-2)
 
     # shape [b, 2m, 2m]
-    m_inv = block_d + block_l_transpose + block_l + \
-              theta[..., tf.newaxis, tf.newaxis] * block_s_t_s
+    #m_inv = (block_d + block_l_transpose + block_l +
+    #          theta[..., tf.newaxis, tf.newaxis] * block_s_t_s)
     
     # Adjust for varying history:
     # Push columns indexed h,...,2m-h to the left (but to the right of 0...m-h)
@@ -1210,9 +1503,9 @@ def _cauchy_init_m(state, deltas_shape, theta, num_correction_pairs):
               batch_dims=1)
 
     # Insert an identity in the empty block
-    identity_mask = \
-      (tf.range(ps.shape(m_inv)[-1])[tf.newaxis, ...] < \
-        2*(num_correction_pairs - state.history[..., tf.newaxis]))[..., tf.newaxis]
+    identity_mask = (
+      (tf.range(ps.shape(m_inv)[-1])[tf.newaxis, ...] <
+        2*(num_correction_pairs - state.history[..., tf.newaxis]))[..., tf.newaxis])
     
     m_inv = tf.where(
               identity_mask,
@@ -1249,7 +1542,8 @@ def _cauchy_init_m(state, deltas_shape, theta, num_correction_pairs):
 
 
 def _cauchy_init_breakpoints(state):
-  breakpoints = \
+  """Calculate the breakpoints for a `_CauchyMinimizationResult` state."""
+  breakpoints = (
     tf.where(
       state.objective_gradient < 0,
       tf.math.divide_no_nan(
@@ -1261,6 +1555,7 @@ def _cauchy_init_breakpoints(state):
           state.position - state.lower_bounds,
           state.objective_gradient),
         float('inf')))
+  )
 
   return breakpoints
 
@@ -1271,6 +1566,18 @@ def _cauchy_remove_breakpoint_min(free_vars_idx,
                                   active):
   """Update the free variable indices to remove the minimum breakpoint index.
 
+  This will set the `breakpoint_min_idx`th entry of `free_mask` to `False`,
+  and of `free_vars_idx` to `-1`.
+
+  Args:
+    free_vars_idx: tensor of shape [batch, dims] where each entry is the index of the
+      entry for the batch if the corresponding variable is free, and -1 otherwise
+    breakpoint_min_idx: tensor of shape [batch] denoting the indices to mark as
+      constrained for each batch
+    free_mask: tensor of shape [batch, dims] where `True` denotes a free variable, and
+      `False` an actively constrained variable
+    active: tensor of shape [batch] denoting whether each batch should be updated
+
   Returns:
     Updated `free_vars_idx`, `free_mask`
   """
@@ -1280,28 +1587,35 @@ def _cauchy_remove_breakpoint_min(free_vars_idx,
   #  every element of free_vars_idx is -1, and so there is no match.
   matching = (free_vars_idx == breakpoint_min_idx[..., tf.newaxis])
   free_vars_idx = tf.where(
-                    matching,
+                    active[..., tf.newaxis] & matching,
                     -1,
                     free_vars_idx)
   free_mask = tf.where(
                 active[..., tf.newaxis],
                 free_vars_idx >= 0,
                 free_mask)
-  
   return free_vars_idx, free_mask
 
 
 def _cauchy_get_breakpoint_min(breakpoints, free_vars_idx):
-  """Find the smallest breakpoint of free indices, returning the minimum breakpoint
-  and the corresponding index.
+  """Find the smallest breakpoint of free indices.
+
+  If every breakpoint is equal, this function will return the first found variable
+  that is not actively constrained.
+
+  Args:
+    breakpoints: tensor of breakpoints as initialized in a `_CauchyMinimizationResult`
+      state
+    free_vars_idx: tensor denoting free and constrained variables, as initialized in
+      a `_CauchyMinimizationResult` state
 
   Returns:
-    Tuple of `breakpoint_min_idx`, `breakpoint_min`
-    where
-      `breakpoint_min_idx` is the index that has min. breakpoint
-      `breakpoint_min` is the corresponding breakpoint
+    Index that has min. breakpoint
+    Corresponding breakpoint
   """
-  # A tensor of shape [batch, dims] that has +infinity where free_vars_idx < 0,
+  no_free = (~tf.reduce_any(free_vars_idx >= 0, axis=-1))
+  
+  # A tensor of shape [batch, dims] that has inf where free_vars_idx < 0,
   #  and has breakpoints[free_vars_idx] otherwise.
   flagged_breakpoints = tf.where(
                           free_vars_idx < 0,
@@ -1319,6 +1633,36 @@ def _cauchy_get_breakpoint_min(breakpoints, free_vars_idx):
                 axis=-1,
                 output_type=tf.int32)
   
+  # Sometimes free variables have 'inf' breakpoints, and then there
+  # is no guarantee that argmin will not have picked a constrained variable
+  # In this case, grab the first free variable by iterating along the variables
+  # until one is free
+
+  def _check_gathered(active, _):
+    """Whether we are still looking for a free variable."""
+    return tf.reduce_any(active)
+  
+  def _get_first(active, new_idx):
+    """Check if next variable is free."""
+    new_idx = tf.where(active, new_idx+1, new_idx)
+    active =  (~no_free & 
+                (tf.gather(
+                  free_vars_idx,
+                  new_idx,
+                  batch_dims=1) < 0))
+    return [active, new_idx]
+
+  active = (~no_free & 
+              (tf.gather(
+                free_vars_idx,
+                argmin_idx,
+                batch_dims=1) < 0))
+  _, argmin_idx = (
+    tf.while_loop(
+      cond=_check_gathered,
+      body=_get_first,
+      loop_vars=[active, argmin_idx]))
+  
   # NOTE: For situations where there are no more free indices
   #  (and therefore argmin_idx indexes into -1), we set
   #  breakpoint_min_idx to 0 and flag that there are no free
@@ -1327,10 +1671,6 @@ def _cauchy_get_breakpoint_min(breakpoints, free_vars_idx):
   #  This is because in branching situations, indexing with
   #  breakpoint_min_idx can occur, and later be discarded, but all
   #  elements in breakpoint_min_idx must be a priori valid indices.
-  no_free = tf.gather(
-              free_vars_idx,
-              argmin_idx,
-              batch_dims=1) < 0
   breakpoint_min_idx = tf.where(
                         no_free,
                         0,
@@ -1347,185 +1687,6 @@ def _cauchy_get_breakpoint_min(breakpoints, free_vars_idx):
                       batch_dims=1))
 
   return breakpoint_min_idx, breakpoint_min
-
-
-def _get_search_direction(state):
-  """Computes the search direction to follow at the current state.
-
-  On the `k`-th iteration of the main L-BFGS algorithm, the state has collected
-  the most recent `m` correction pairs in position_deltas and gradient_deltas,
-  where `k = state.num_iterations` and `m = min(k, num_correction_pairs)`.
-
-  Assuming these, the code below is an implementation of the L-BFGS two-loop
-  recursion algorithm given by [Nocedal and Wright(2006)][1]:
-
-  ```None
-    q_direction = objective_gradient
-    for i in reversed(range(m)):  # First loop.
-      inv_rho[i] = gradient_deltas[i]^T * position_deltas[i]
-      alpha[i] = position_deltas[i]^T * q_direction / inv_rho[i]
-      q_direction = q_direction - alpha[i] * gradient_deltas[i]
-
-    kth_inv_hessian_factor = (gradient_deltas[-1]^T * position_deltas[-1] /
-                              gradient_deltas[-1]^T * gradient_deltas[-1])
-    r_direction = kth_inv_hessian_factor * I * q_direction
-
-    for i in range(m):  # Second loop.
-      beta = gradient_deltas[i]^T * r_direction / inv_rho[i]
-      r_direction = r_direction + position_deltas[i] * (alpha[i] - beta)
-
-    return -r_direction  # Approximates - H_k * objective_gradient.
-  ```
-
-  Args:
-    state: A `LBfgsBOptimizerResults` tuple with the current state of the
-      search procedure.
-
-  Returns:
-    A real `Tensor` of the same shape as the `state.position`. The direction
-    along which to perform line search.
-  """
-  # The number of correction pairs that have been collected so far.
-  #num_elements = ps.minimum(
-  #    state.num_iterations,  # TODO(b/162733947): Change loop state -> closure.
-  #    ps.shape(state.position_deltas)[0])
-
-  def _two_loop_algorithm():
-    """L-BFGS two-loop algorithm."""
-    # Correction pairs are always appended to the end, so only the latest
-    # `num_elements` vectors have valid position/gradient deltas. Vectors
-    # that haven't been computed yet are zero.
-    position_deltas = state.position_deltas
-    gradient_deltas = state.gradient_deltas
-    num_correction_pairs, num_batches, _point_dims = \
-      ps.shape(gradient_deltas, out_type=tf.int32)
-
-    # Pre-compute all `inv_rho[i]`s.
-    inv_rhos = tf.reduce_sum(
-        gradient_deltas * position_deltas, axis=-1)
-
-    def first_loop(acc, args):
-      _, q_direction, num_iter = acc
-      position_delta, gradient_delta, inv_rho = args
-      active = (num_iter < state.history)
-      alpha = tf.math.divide_no_nan(
-                tf.reduce_sum(
-                  position_delta * q_direction,
-                  axis=-1),
-                inv_rho)
-      direction_delta = alpha[..., tf.newaxis] * gradient_delta
-      new_q_direction = tf.where(
-                          active[..., tf.newaxis],
-                          q_direction - direction_delta,
-                          q_direction)
-
-      return (alpha, new_q_direction, num_iter + 1)
-
-    # Run first loop body computing and collecting `alpha[i]`s, while also
-    # computing the updated `q_direction` at each step.
-    zero = tf.zeros_like(inv_rhos[0])
-    alphas, q_directions, _num_iters = tf.scan(
-        first_loop, [position_deltas, gradient_deltas, inv_rhos],
-        initializer=(zero, state.objective_gradient, 0), reverse=True)
-
-    # We use `H^0_k = gamma_k * I` as an estimate for the initial inverse
-    # hessian for the k-th iteration; then `r_direction = H^0_k * q_direction`.
-    idx = tf.transpose(
-            tf.stack(
-              [tf.where(
-                state.history > 0,
-                num_correction_pairs - state.history,
-                0),
-              tf.range(num_batches)]))
-    gamma_k = tf.math.divide_no_nan(
-                tf.gather_nd(inv_rhos, idx),
-                tf.reduce_sum(
-                  tf.gather_nd(gradient_deltas, idx)**2,
-                  axis=-1))
-    gamma_k = tf.where(
-                (state.history > 0),
-                gamma_k,
-                1.0)
-    r_direction = gamma_k[..., tf.newaxis] * tf.gather_nd(q_directions, idx)
-
-    def second_loop(acc, args):
-      r_direction, iter_idx = acc
-      alpha, position_delta, gradient_delta, inv_rho = args
-      active = (iter_idx >= num_correction_pairs - state.history)
-      beta = tf.math.divide_no_nan(
-              tf.reduce_sum(
-                gradient_delta * r_direction,
-                axis=-1),
-              inv_rho)
-      direction_delta = (alpha - beta)[..., tf.newaxis] * position_delta
-      new_r_direction = tf.where(
-                          active[..., tf.newaxis],
-                          r_direction + direction_delta,
-                          r_direction)
-      return (new_r_direction, iter_idx + 1)
-
-    # Finally, run second loop body computing the updated `r_direction` at each
-    # step.
-    r_directions, _num_iters = tf.scan(
-        second_loop, [alphas, position_deltas, gradient_deltas, inv_rhos],
-        initializer=(r_direction, 0))
-
-    return -r_directions[-1]
-
-  return ps.cond(tf.reduce_any(state.history != 0),
-                 _two_loop_algorithm,
-                 lambda: -state.objective_gradient)
-
-
-def _get_ragged_sizes(tensor, dtype=tf.int32):
-  """Creates a tensor indicating the size of each component of
-  a ragged dimension.
-
-  For example:
-
-  ```python
-  element = tf.ragged.constant([[1,2], [3,4,5], [], [0]])
-  _get_ragged_sizes(element)
-  # => <tf.Tensor: shape=(4, 1), dtype=int32, numpy=
-  #      array([[2],
-  #             [3],
-  #             [0],
-  #             [1]], dtype=int32)>
-  ```
-  """
-  return tf.reduce_sum(
-            tf.ones_like(
-              tensor,
-              dtype=dtype),
-            axis=-1)[..., tf.newaxis]
-
-
-def _get_range_like_ragged(tensor, dtype=tf.int32):
-  """Creates a batched range for the elements of the batched tensor.
-
-  For example:
-
-  ```python
-  element = tf.ragged.constant([[1,2], [3,4,5], [], [0]])
-  _get_range_like_ragged(element)
-  # => <tf.RaggedTensor [[0, 1], [0, 1, 2], [], [0]]>
-
-  Args:
-    tensor: a RaggedTensor of shape `[n, None]`.
-
-  Returns:
-    A ragged tensor of shape `[n, None]` where the ragged dimensions
-    match the ragged dimensions of `tensor`, and are a range from `0` to
-    the size of the ragged dimension.
-  ```
-  """
-  sizes = _get_ragged_sizes(tensor)
-  flat_ranges = tf.ragged.range(
-                  tf.reshape(
-                    sizes,
-                    [tf.reduce_prod(sizes.shape)]),
-                  dtype=dtype)
-  return tf.RaggedTensor.from_row_lengths(flat_ranges, sizes.shape[:-1])[0]
 
 
 def _make_empty_queue_for(k, element):
