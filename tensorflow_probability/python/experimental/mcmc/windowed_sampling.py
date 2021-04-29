@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import warnings
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import invert
@@ -39,6 +40,8 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import unnest
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
 from tensorflow_probability.python.mcmc import sample
+from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'windowed_adaptive_hmc',
@@ -270,6 +273,7 @@ def make_slow_adapt_kernel(*,
       initial_running_variance=initial_running_variance)
 
 
+@tf.function(autograph=False)
 def _fast_window(*,
                  kind,
                  proposal_kernel_kwargs,
@@ -280,6 +284,7 @@ def _fast_window(*,
                  trace_fn,
                  seed):
   """Sample using just step size adaptation."""
+  dual_averaging_kwargs = dict(dual_averaging_kwargs)
   dual_averaging_kwargs.update({'num_adaptation_steps': num_draws})
   kernel = make_fast_adapt_kernel(
       kind=kind,
@@ -315,7 +320,7 @@ def _fast_window(*,
   return draws, trace, step_size, weighted_running_variance
 
 
-# TODO(b/180601951): Decorate this and `_fast_window` with tf.function
+@tf.function(autograph=False)
 def _slow_window(*,
                  kind,
                  proposal_kernel_kwargs,
@@ -327,6 +332,7 @@ def _slow_window(*,
                  trace_fn,
                  seed):
   """Sample using both step size and mass matrix adaptation."""
+  dual_averaging_kwargs = dict(dual_averaging_kwargs)
   dual_averaging_kwargs.setdefault('num_adaptation_steps', num_draws)
   kernel = make_slow_adapt_kernel(
       kind=kind,
@@ -368,6 +374,7 @@ def _slow_window(*,
   return draws, trace, step_size, weighted_running_variance, momentum_distribution
 
 
+@tf.function(autograph=False)
 def _do_sampling(*,
                  kind,
                  proposal_kernel_kwargs,
@@ -647,7 +654,12 @@ def _windowed_adaptive_impl(n_draws,
   else:
     no_trace = False
 
-  num_adaptation_steps = tf.convert_to_tensor(num_adaptation_steps)
+  if (tf.executing_eagerly() or
+      not control_flow_util.GraphOrParentsInXlaContext(
+          tf1.get_default_graph())):
+    # A Tensor num_draws argument breaks XLA, which requires static TensorArray
+    # trace_fn result allocation sizes.
+    num_adaptation_steps = tf.convert_to_tensor(num_adaptation_steps)
 
   setup_seed, init_seed, seed = samplers.split_seed(
       samplers.sanitize_seed(seed), n=3)

@@ -165,6 +165,7 @@ def _gen_gaussian_updating_example(x_dim, y_dim, seed):
   return model, tf.linalg.diag_part(true_cov)
 
 
+@test_util.test_graph_and_eager_modes
 class WindowedSamplingTest(test_util.TestCase):
 
   @parameterized.named_parameters(
