@@ -36,7 +36,7 @@ class HighwayFlowTests(test_util.TestCase):
     width = 1
     for dim in range(2):
       if dim == 0:
-        x = tf.ones((width)) * samplers.uniform((1,width), minval=-1.,
+        x = tf.ones((width,)) * samplers.uniform((width,), minval=-1.,
                                                 maxval=1.,
                                                 seed=seed)
       elif dim == 1:

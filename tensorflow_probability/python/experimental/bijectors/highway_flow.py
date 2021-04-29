@@ -236,6 +236,8 @@ class HighwayFlow(tfb.Bijector):
     # of the lower matrix is zero.
     added_batch = False
     if len(x.shape) <= 1:
+      if len(x.shape) == 0:
+        x = tf.reshape(x, -1)
       added_batch = True
       x = tf.expand_dims(x, 0)
     fldj = tf.zeros(x.shape[:-1]) + tf.reduce_sum(
@@ -254,7 +256,7 @@ class HighwayFlow(tfb.Bijector):
       x = self.residual_fraction * x + (
           1. - self.residual_fraction) * self.activation_fn(x)
     if added_batch:
-      x = tf.squeeze(x)
+      x = tf.squeeze(x, 0)
     return x, {'ildj': -fldj, 'fldj': fldj}
 
   def _augmented_inverse(self, y):
@@ -265,6 +267,8 @@ class HighwayFlow(tfb.Bijector):
     """
     added_batch = False
     if len(y.shape) <= 1:
+      if len(y.shape) == 0:
+        y = tf.reshape(y, -1)
       added_batch = True
       y = tf.expand_dims(y, 0)
     ildj = tf.zeros(y.shape[:-1]) - tf.reduce_sum(
@@ -284,7 +288,7 @@ class HighwayFlow(tfb.Bijector):
     y = tf.linalg.matrix_transpose(tf.linalg.triangular_solve(
       self._convex_update(self.lower_diagonal_weights_matrix), y))
     if added_batch:
-      y = tf.squeeze(y)
+      y = tf.squeeze(y, 0)
     return y, {'ildj': ildj, 'fldj': -ildj}
 
   def _forward(self, x):
