@@ -26,6 +26,8 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import vectorization_util
 
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+
 
 JAX_MODE = False
 
@@ -52,9 +54,10 @@ def _pad_value_to_full_length(value, dtype):
     return type(dtype)({k: value.get(k, None) for k in dtype.keys()})
 
   # Otherwise, dtype is a sequence, so append `None`s.
-  return tf.nest.pack_sequence_as(dtype,
-                                  [value[i] if i < len(value) else None
-                                   for i in range(len(dtype))])
+  return tf.nest.pack_sequence_as(
+      dtype,
+      tf.nest.flatten([value[i] if i < len(value) else None
+                       for i in range(len(dtype))]))
 
 
 # Lint doesn't know that docstrings are defined in the base JD class.
@@ -130,12 +133,15 @@ class JointDistributionVmapMixin(object):
       if (value is None) and kwargs:
         value = self._resolve_value_from_kwargs(**kwargs)
       if value is not None:
-        value = _pad_value_to_full_length(value, self.dtype)
         value = tf.nest.map_structure(
             lambda v: v if v is None else tf.convert_to_tensor(v), value)
+        value = _pad_value_to_full_length(value, self.dtype)
         value_might_have_sample_dims = _might_have_excess_ndims(
-            flat_value=self._model_flatten(value),
-            flat_core_ndims=self._single_sample_ndims)
+            # Double-flatten in case any components have structured events.
+            flat_value=nest.flatten_up_to(self._single_sample_ndims,
+                                          self._model_flatten(value),
+                                          check_types=False),
+            flat_core_ndims=tf.nest.flatten(self._single_sample_ndims))
 
       # TODO(b/157953455): Return distributions as CompositeTensors once
       # vectorized_map supports this.
@@ -156,12 +162,15 @@ class JointDistributionVmapMixin(object):
     if (value is None) and kwargs:
       value = self._resolve_value_from_kwargs(**kwargs)
     if value is not None:
-      value = _pad_value_to_full_length(value, self.dtype)
       value = tf.nest.map_structure(
           lambda v: v if v is None else tf.convert_to_tensor(v), value)
+      value = _pad_value_to_full_length(value, self.dtype)
       value_might_have_sample_dims = _might_have_excess_ndims(
-          flat_value=self._model_flatten(value),
-          flat_core_ndims=self._single_sample_ndims)
+          # Double-flatten in case any components have structured events.
+          flat_value=nest.flatten_up_to(self._single_sample_ndims,
+                                        self._model_flatten(value),
+                                        check_types=False),
+          flat_core_ndims=tf.nest.flatten(self._single_sample_ndims))
 
     if not self.use_vectorized_map or not (
         _might_have_nonzero_size(sample_shape) or

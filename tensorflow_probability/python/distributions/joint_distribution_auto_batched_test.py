@@ -701,9 +701,13 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         joint.event_shape)
 
     # Sample shape.
-    z2 = joint.sample(5, seed=test_util.test_seed())
+    z2 = self.evaluate(
+        joint.sample(5, seed=test_util.test_seed()))
     lp2 = joint.log_prob(z2)
     self.assertAllEqual(lp2.shape, [5])
+
+    z3 = joint.sample(value=z2, seed=test_util.test_seed())
+    self.assertAllCloseNested(z2, z3)
 
   @parameterized.named_parameters(*[
       dict(testcase_name='_{}{}'.format(jd_class.__name__,  # pylint: disable=g-complex-comprehension
