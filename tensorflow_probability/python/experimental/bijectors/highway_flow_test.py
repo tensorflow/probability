@@ -33,11 +33,10 @@ def _activation_log_det_jacobian(x, residual_fraction, activation):
 class HighwayFlowTests(test_util.TestCase):
 
   def testBijector(self):
-    width = 2
+    width = 1
     for dim in range(2):
       if dim == 0:
-        x = tf.ones((5,
-                     width)) * samplers.uniform((5, width), minval=-1.,
+        x = tf.ones((width)) * samplers.uniform((1,width), minval=-1.,
                                                 maxval=1.,
                                                 seed=seed)
       elif dim == 1:

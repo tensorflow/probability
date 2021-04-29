@@ -53,6 +53,22 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5,
 
   bias_seed, upper_seed, lower_seed, diagonal_seed = samplers.split_seed(
     seed, n=4)
+  lower_bijector = tfb.Chain(
+    [tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
+     tfb.Pad(paddings=[(1, 0), (0, 1)]),
+     tfb.FillTriangular()])
+  unconstrained_lower_initial_values = samplers.normal(
+    shape=lower_bijector.inverse_event_shape([width, width]),
+    mean=0.,
+    stddev=1.,
+    seed=lower_seed)
+  upper_bijector = tfb.FillScaleTriL(diag_bijector=tfb.Softplus(),
+                                 diag_shift=None)
+  unconstrained_upper_initial_values = samplers.normal(
+    shape=upper_bijector.inverse_event_shape([width, width]),
+    mean=0.,
+    stddev=1.,
+    seed=upper_seed)
   return HighwayFlow(
     residual_fraction=util.TransformedVariable(
       initial_value=residual_fraction_initial_value,
@@ -63,22 +79,12 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5,
       samplers.normal((width,), mean=0., stddev=0.01, seed=bias_seed),
       dtype=dtype),
     upper_diagonal_weights_matrix=util.TransformedVariable(
-      initial_value=tf.experimental.numpy.tril(
-        samplers.normal((width, width), mean=0., stddev=1.,
-                        seed=upper_seed),
-        k=-1) + tf.linalg.diag(
-        samplers.uniform((width,), minval=0., maxval=1.,
-                         seed=diagonal_seed)),
-      bijector=tfb.FillScaleTriL(diag_bijector=tfb.Softplus(),
-                                 diag_shift=None),
+      initial_value=upper_bijector.forward(unconstrained_upper_initial_values),
+      bijector=upper_bijector,
       dtype=dtype),
     lower_diagonal_weights_matrix=util.TransformedVariable(
-      initial_value=samplers.normal((width, width), mean=0., stddev=1.,
-                                    seed=lower_seed),
-      bijector=tfb.Chain(
-        [tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
-         tfb.Pad(paddings=[(1, 0), (0, 1)]),
-         tfb.FillTriangular()]),
+      initial_value=lower_bijector.forward(unconstrained_lower_initial_values),
+      bijector=lower_bijector,
       dtype=dtype)
   )
 
@@ -228,7 +234,9 @@ class HighwayFlow(tfb.Bijector):
     """
     # Log determinant term from the upper matrix. Note that the log determinant
     # of the lower matrix is zero.
+    added_batch = False
     if len(x.shape) <= 1:
+      added_batch = True
       x = tf.expand_dims(x, 0)
     fldj = tf.zeros(x.shape[:-1]) + tf.reduce_sum(
       tf.math.log(self.residual_fraction + (
@@ -245,6 +253,8 @@ class HighwayFlow(tfb.Bijector):
                             -1)
       x = self.residual_fraction * x + (
           1. - self.residual_fraction) * self.activation_fn(x)
+    if added_batch:
+      x = tf.squeeze(x)
     return x, {'ildj': -fldj, 'fldj': fldj}
 
   def _augmented_inverse(self, y):
@@ -253,7 +263,9 @@ class HighwayFlow(tfb.Bijector):
     :returns: y after inverse flow
     :rtype: `tf.Tensor`
     """
+    added_batch = False
     if len(y.shape) <= 1:
+      added_batch = True
       y = tf.expand_dims(y, 0)
     ildj = tf.zeros(y.shape[:-1]) - tf.reduce_sum(
       tf.math.log(self.residual_fraction + (
@@ -269,9 +281,11 @@ class HighwayFlow(tfb.Bijector):
       tf.linalg.matrix_transpose(y - (
           1 - self.residual_fraction) * self.bias),
       lower=False)
-    y = tf.linalg.triangular_solve(
-      self._convex_update(self.lower_diagonal_weights_matrix), y)
-    return tf.linalg.matrix_transpose(y), {'ildj': ildj, 'fldj': -ildj}
+    y = tf.linalg.matrix_transpose(tf.linalg.triangular_solve(
+      self._convex_update(self.lower_diagonal_weights_matrix), y))
+    if added_batch:
+      y = tf.squeeze(y)
+    return y, {'ildj': ildj, 'fldj': -ildj}
 
   def _forward(self, x):
     y, _ = self._augmented_forward(x)
