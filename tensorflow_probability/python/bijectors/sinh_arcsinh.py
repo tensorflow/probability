@@ -34,7 +34,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class SinhArcsinh(bijector.AutoCompositeTensorBijector):
   """`Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight ) * multiplier`.
 
@@ -70,8 +71,6 @@ class SinhArcsinh(bijector.AutoCompositeTensorBijector):
   `|X| >> (|skewness| * tailweight)**tailweight`, we have
   `Y approx 0.5 X**tailweight e**(sign(X) skewness * tailweight)`.
   """
-
-  _type_spec_id = 366918674
 
   def __init__(self,
                skewness=None,

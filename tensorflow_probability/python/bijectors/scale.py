@@ -33,7 +33,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Scale(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X; scale) = scale * X`.
 
@@ -45,8 +46,6 @@ class Scale(bijector.AutoCompositeTensorBijector):
   ```
 
   """
-
-  _type_spec_id = 366918667
 
   def __init__(self,
                scale=None,

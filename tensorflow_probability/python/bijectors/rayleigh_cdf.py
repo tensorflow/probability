@@ -31,7 +31,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class RayleighCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = 1 - exp( -(X/scale)**2 / 2 ), X >= 0`.
 
@@ -49,8 +50,6 @@ class RayleighCDF(bijector.AutoCompositeTensorBijector):
 
   Likwewise, the forward of this bijector is the Rayleigh distribution CDF.
   """
-
-  _type_spec_id = 366918663
 
   def __init__(self,
                scale=1.,

@@ -28,7 +28,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Cumsum(bijector.AutoCompositeTensorBijector):
   """Computes the cumulative sum of a tensor along a specified axis.
 
@@ -58,8 +59,6 @@ class Cumsum(bijector.AutoCompositeTensorBijector):
   ```
 
   """
-
-  _type_spec_id = 366918639
 
   def __init__(self, axis=-1, validate_args=False, name='cumsum'):
     """Instantiates the `Cumsum` bijector.

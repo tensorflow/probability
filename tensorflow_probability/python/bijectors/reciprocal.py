@@ -28,7 +28,8 @@ from tensorflow_probability.python.internal import dtype_util
 __all__ = ['Reciprocal']
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Reciprocal(bijector.AutoCompositeTensorBijector):
   """A `Bijector` that computes the reciprocal `b(x) = 1. / x` entrywise.
 
@@ -48,8 +49,6 @@ class Reciprocal(bijector.AutoCompositeTensorBijector):
 
   ```
   """
-
-  _type_spec_id = 366918664
 
   def __init__(self, validate_args=False, name='reciprocal'):
     """Instantiates the `Reciprocal`.

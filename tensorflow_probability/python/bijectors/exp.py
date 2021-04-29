@@ -31,7 +31,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Exp(power_transform.PowerTransform):
   """Compute `Y = g(X) = exp(X)`.
 
@@ -52,8 +53,6 @@ class Exp(power_transform.PowerTransform):
     Note: the exp(.) is applied element-wise but the Jacobian is a reduction
     over the event space.
   """
-
-  _type_spec_id = 366918641
 
   def __init__(self,
                validate_args=False,
@@ -77,12 +76,11 @@ class Exp(power_transform.PowerTransform):
 
 # TODO(b/182603117): Remove `AutoCompositeTensor` when `Invert` subclasses
 # `AutoCompositeTensor` and ensure `tf.saved_model` still works.
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Log(invert.Invert,
           auto_composite_tensor.AutoCompositeTensor):
   """Compute `Y = log(X)`. This is `Invert(Exp())`."""
-
-  _type_spec_id = 366918642
 
   def __init__(self, validate_args=False, name='log'):
     parameters = dict(locals())

@@ -42,7 +42,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class SoftClip(bijector.AutoCompositeTensorBijector):
   """Bijector that approximates clipping as a continuous, differentiable map.
 
@@ -178,8 +179,6 @@ class SoftClip(bijector.AutoCompositeTensorBijector):
   correction and asymmetry are very small.
 
   """
-
-  _type_spec_id = 366918675
 
   def __init__(self,
                low=None,

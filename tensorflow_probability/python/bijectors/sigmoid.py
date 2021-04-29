@@ -65,7 +65,8 @@ else:
     return y, grad_fn
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Sigmoid(bijector.AutoCompositeTensorBijector):
   """Bijector that computes the logistic sigmoid function.
 
@@ -82,8 +83,6 @@ class Sigmoid(bijector.AutoCompositeTensorBijector):
   to slightly larger than `high`, which would trigger assertions
   elsewhere.  The formula `high * g(X) + low * g(-X)` doesn't do that.
   """
-
-  _type_spec_id = 366918671
 
   def __init__(self, low=None, high=None, validate_args=False, name='sigmoid'):
     """Initialize a `Sigmoid` bijector.

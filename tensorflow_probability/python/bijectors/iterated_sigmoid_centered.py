@@ -32,7 +32,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class IteratedSigmoidCentered(bijector.AutoCompositeTensorBijector):
   """Bijector which applies a Stick Breaking procedure.
 
@@ -72,8 +73,6 @@ class IteratedSigmoidCentered(bijector.AutoCompositeTensorBijector):
   [1]: Stan Development Team. 2018. Stan Modeling Language Users Guide and
        Reference Manual, Version 2.18.0. http://mc-stan.org
   """
-
-  _type_spec_id = 366918652
 
   def __init__(self,
                validate_args=False,

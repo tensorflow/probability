@@ -34,7 +34,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class FrechetCDF(bijector.AutoCompositeTensorBijector):
   """The Frechet cumulative density function.
 
@@ -53,8 +54,6 @@ class FrechetCDF(bijector.AutoCompositeTensorBijector):
       * ((y - loc) / scale)**(-(1 + concentration))
   ```
   """
-
-  _type_spec_id = 366918646
 
   def __init__(self,
                loc=0.,

@@ -35,7 +35,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Pad(bijector.AutoCompositeTensorBijector):
   """Pads a value to the `event_shape` of a `Tensor`.
 
@@ -97,8 +98,6 @@ class Pad(bijector.AutoCompositeTensorBijector):
   ```
 
   """
-
-  _type_spec_id = 366918658
 
   def __init__(self,
                paddings=((0, 1),),

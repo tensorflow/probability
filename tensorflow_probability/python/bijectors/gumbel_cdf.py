@@ -34,7 +34,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class GumbelCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = exp(-exp(-(X - loc) / scale))`, the Gumbel CDF.
 
@@ -49,8 +50,6 @@ class GumbelCDF(bijector.AutoCompositeTensorBijector):
     -( (y - loc) / scale + exp(- (y - loc) / scale) ) ) / scale
   ```
   """
-
-  _type_spec_id = 366918650
 
   def __init__(self,
                loc=0.,

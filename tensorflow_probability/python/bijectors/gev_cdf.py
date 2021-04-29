@@ -33,7 +33,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class GeneralizedExtremeValueCDF(bijector.AutoCompositeTensorBijector):
   """Compute the GeneralizedExtremeValue CDF.
 
@@ -66,8 +67,6 @@ class GeneralizedExtremeValueCDF(bijector.AutoCompositeTensorBijector):
     * exp(-(x - loc) / scale) when conc = 0.
   ```
   """
-
-  _type_spec_id = 366918648
 
   def __init__(self,
                loc=0.,

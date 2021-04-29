@@ -59,7 +59,8 @@ else:
     return y, grad_fn
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Softplus(bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = Log[1 + exp(X)]`.
 
@@ -102,8 +103,6 @@ class Softplus(bijector.AutoCompositeTensorBijector):
     Note: log(.) and exp(.) are applied element-wise but the Jacobian is a
     reduction over the event space.
   """
-
-  _type_spec_id = 366918678
 
   @distribution_util.AppendDocstring(
       kwargs_dict={

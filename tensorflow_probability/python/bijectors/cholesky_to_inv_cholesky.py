@@ -33,7 +33,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class CholeskyToInvCholesky(bijector.AutoCompositeTensorBijector):
   """Maps the Cholesky factor of `M` to the Cholesky factor of `M^{-1}`.
 
@@ -60,8 +61,6 @@ class CholeskyToInvCholesky(bijector.AutoCompositeTensorBijector):
   However, the actual calculations exploit the triangular structure of the
   matrices.
   """
-
-  _type_spec_id = 366918637
 
   def __init__(self, validate_args=False, name='cholesky_to_inv_cholesky'):
     parameters = dict(locals())

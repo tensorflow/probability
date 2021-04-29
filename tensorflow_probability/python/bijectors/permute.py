@@ -37,7 +37,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Permute(bijector.AutoCompositeTensorBijector):
   """Permutes the rightmost dimension of a `Tensor`.
 
@@ -73,8 +74,6 @@ class Permute(bijector.AutoCompositeTensorBijector):
   ```
 
   """
-
-  _type_spec_id = 366918659
 
   def __init__(self, permutation, axis=-1, validate_args=False, name=None):
     """Creates the `Permute` bijector.

@@ -30,7 +30,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Expm1(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = exp(X) - 1`.
 
@@ -55,8 +56,6 @@ class Expm1(bijector.AutoCompositeTensorBijector):
     Note: the expm1(.) is applied element-wise but the Jacobian is a reduction
     over the event space.
   """
-
-  _type_spec_id = 366918643
 
   def __init__(self,
                validate_args=False,
@@ -96,10 +95,10 @@ class Expm1(bijector.AutoCompositeTensorBijector):
 
 # TODO(b/182603117): Remove `AutoCompositeTensor` when `Invert` subclasses
 # `AutoCompositeTensor`.
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Log1p(invert.Invert, auto_composite_tensor.AutoCompositeTensor):
   """Compute `Y = log1p(X)`. This is `Invert(Expm1())`."""
-  _type_spec_id = 366918644
 
   def __init__(self, validate_args=False, name='log1p'):
     parameters = dict(locals())

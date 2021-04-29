@@ -33,7 +33,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class CorrelationCholesky(bijector.AutoCompositeTensorBijector):
   """Maps unconstrained reals to Cholesky-space correlation matrices.
 
@@ -115,8 +116,6 @@ class CorrelationCholesky(bijector.AutoCompositeTensorBijector):
   1989-2001.
 
   """
-
-  _type_spec_id = 366918638
 
   def __init__(self, validate_args=False, name='correlation_cholesky'):
     parameters = dict(locals())

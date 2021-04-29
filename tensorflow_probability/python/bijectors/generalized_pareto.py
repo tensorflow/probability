@@ -35,7 +35,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class GeneralizedPareto(bijector_lib.AutoCompositeTensorBijector):
   """Bijector mapping R**n to non-negative reals.
 
@@ -53,8 +54,6 @@ class GeneralizedPareto(bijector_lib.AutoCompositeTensorBijector):
   the `GeneralizedPareto` distribution.
 
   """
-
-  _type_spec_id = 366918647
 
   def __init__(self,
                loc,

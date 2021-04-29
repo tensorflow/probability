@@ -30,7 +30,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class AbsoluteValue(bijector.AutoCompositeTensorBijector):
   """Computes `Y = g(X) = Abs(X)`, element-wise.
 
@@ -69,8 +70,6 @@ class AbsoluteValue(bijector.AutoCompositeTensorBijector):
   ```
 
   """
-
-  _type_spec_id = 366918633
 
   def __init__(self, validate_args=False, name='absolute_value'):
     """Instantiates the `AbsoluteValue` bijector.

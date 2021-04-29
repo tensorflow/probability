@@ -31,7 +31,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Softsign(bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = X / (1 + |X|)`.
 
@@ -53,8 +54,6 @@ class Softsign(bijector.AutoCompositeTensorBijector):
   x / (1 - abs(x)) == softsign.inverse(x)
   ```
   """
-
-  _type_spec_id = 366918679
 
   def __init__(self, validate_args=False, name='softsign'):
     parameters = dict(locals())

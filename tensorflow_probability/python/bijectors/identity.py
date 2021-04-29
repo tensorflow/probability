@@ -34,7 +34,8 @@ class _NoOpCache(dict):
     return {}
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Identity(bijector.AutoCompositeTensorBijector):
   """Compute Y = g(X) = X.
 
@@ -50,8 +51,6 @@ class Identity(bijector.AutoCompositeTensorBijector):
     ```
 
   """
-
-  _type_spec_id = 366918651
 
   def __init__(self, validate_args=False, name='identity'):
     parameters = dict(locals())

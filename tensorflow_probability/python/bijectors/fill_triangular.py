@@ -36,7 +36,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class FillTriangular(bijector.AutoCompositeTensorBijector):
   """Transforms vectors to triangular.
 
@@ -65,8 +66,6 @@ class FillTriangular(bijector.AutoCompositeTensorBijector):
 
   ```
   """
-
-  _type_spec_id = 366918645
 
   def __init__(self,
                upper=False,

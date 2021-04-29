@@ -36,7 +36,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class ShiftedGompertzCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 - exp(-rate * X)) * exp(-c * exp(-rate * X))`.
 
@@ -60,8 +61,6 @@ class ShiftedGompertzCDF(bijector.AutoCompositeTensorBijector):
   to zero, for larger rates or larger concentrations, `bijector.forward` will
   quickly saturate to 1.
   """
-
-  _type_spec_id = 366918670
 
   def __init__(self,
                concentration,

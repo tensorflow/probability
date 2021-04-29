@@ -34,7 +34,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class WeibullCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = 1 - exp( -( X / scale) ** concentration), X >= 0`.
 
@@ -52,8 +53,6 @@ class WeibullCDF(bijector.AutoCompositeTensorBijector):
 
   Likwewise, the forward of this bijector is the Weibull distribution CDF.
   """
-
-  _type_spec_id = 366918684
 
   def __init__(self,
                scale=1.,

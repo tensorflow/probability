@@ -31,7 +31,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class MatrixInverseTriL(bijector.AutoCompositeTensorBijector):
   """Computes `g(L) = inv(L)`, where `L` is a lower-triangular matrix.
 
@@ -54,8 +55,6 @@ class MatrixInverseTriL(bijector.AutoCompositeTensorBijector):
   ```
 
   """
-
-  _type_spec_id = 366918654
 
   def __init__(self, validate_args=False, name='matrix_inverse_tril'):
     """Instantiates the `MatrixInverseTriL` bijector.

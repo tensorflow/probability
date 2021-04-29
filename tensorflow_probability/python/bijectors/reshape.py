@@ -38,7 +38,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Reshape(bijector.AutoCompositeTensorBijector):
   """Reshapes the `event_shape` of a `Tensor`.
 
@@ -126,8 +127,6 @@ class Reshape(bijector.AutoCompositeTensorBijector):
   ```
 
   """
-
-  _type_spec_id = 366918665
 
   def __init__(self, event_shape_out, event_shape_in=(-1,),
                validate_args=False, name=None):

@@ -30,7 +30,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class DiscreteCosineTransform(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = DCT(X)`, where DCT type is indicated by the `type` arg.
 
@@ -52,8 +53,6 @@ class DiscreteCosineTransform(bijector.AutoCompositeTensorBijector):
        efficient linear layer. In _International Conference on Learning
        Representations_, 2016. https://arxiv.org/abs/1511.05946
   """
-
-  _type_spec_id = 366918640
 
   def __init__(self, dct_type=2, validate_args=False, name='dct'):
     """Instantiates the `DiscreteCosineTransform` bijector.

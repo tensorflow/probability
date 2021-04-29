@@ -27,8 +27,8 @@ import tensorflow.compat.v2 as tf
 
 # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import composite_tensor
+from tensorflow.python.framework import type_spec
 from tensorflow.python.ops import resource_variable_ops
-from tensorflow.python.saved_model import nested_structure_coder
 from tensorflow.python.util import tf_inspect
 # pylint: enable=g-direct-tensorflow-import
 
@@ -36,7 +36,6 @@ __all__ = [
     'auto_composite_tensor',
     'AutoCompositeTensor',
     'is_deferred_assertion_context',
-    'register_type_spec',
 ]
 
 _DEFERRED_ASSERTION_CONTEXT = threading.local()
@@ -90,10 +89,10 @@ def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
     else:
       raise ValueError(
           f'Could not determine an appropriate value for field `{k}` in object '
-          ' `{obj}`. Looked for \n'
-          ' 1. an attr called `{k}`,\n'
-          ' 2. an attr called `_{k}`,\n'
-          ' 3. an entry in `obj.parameters` with key "{k}".')
+          f' `{obj}`. Looked for \n'
+          f' 1. an attr called `{k}`,\n'
+          f' 2. an attr called `_{k}`,\n'
+          f' 3. an entry in `obj.parameters` with key "{k}".')
     if k in prefer_static_value and kwargs[k] is not None:
       if tf.is_tensor(kwargs[k]):
         static_val = tf.get_static_value(kwargs[k])
@@ -226,7 +225,7 @@ class AutoCompositeTensor(composite_tensor.CompositeTensor):
     pass
 
 
-def auto_composite_tensor(cls=None, omit_kwargs=()):
+def auto_composite_tensor(cls=None, omit_kwargs=(), module_name=None):
   """Automagically generate `CompositeTensor` behavior for `cls`.
 
   `CompositeTensor` objects are able to pass in and out of `tf.function` and
@@ -327,27 +326,43 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
   Args:
     cls: The class for which to create a CompositeTensor subclass.
     omit_kwargs: Optional sequence of kwarg names to be omitted from the spec.
+    module_name: The module name with which to register the `TypeSpec`. If
+      `None`, defaults to `cls.__module__`.
 
   Returns:
     composite_tensor_subclass: A subclass of `cls` and TF CompositeTensor.
   """
   if cls is None:
     return functools.partial(auto_composite_tensor,
-                             omit_kwargs=omit_kwargs)
+                             omit_kwargs=omit_kwargs,
+                             module_name=module_name)
+
+  if module_name is None:
+    module_name = cls.__module__
+
+  type_spec_class_name = f'{cls.__name__}_ACTTypeSpec'
+  type_spec_name = f'{module_name}.{type_spec_class_name}'
+
+  try:
+    ts = type_spec.lookup(type_spec_name)
+    return ts.value_type.fget(None)
+  except ValueError:
+    pass
 
   # If the declared class is already a CompositeTensor subclass, we can avoid
   # affecting the actual type of the returned class. Otherwise, we need to
   # explicitly mix in the CT type, and hence create and return a newly
   # synthesized type.
   if issubclass(cls, composite_tensor.CompositeTensor):
+
+    @type_spec.register(type_spec_name)
     class _AlreadyCTTypeSpec(_AutoCompositeTensorTypeSpec):
 
       @property
       def value_type(self):
         return cls
 
-    _AlreadyCTTypeSpec.__name__ = f'{cls.__name__}_ACTTypeSpec'
-    register_type_spec(cls, _AlreadyCTTypeSpec)
+    _AlreadyCTTypeSpec.__name__ = type_spec_class_name
 
     cls._type_spec = property(  # pylint: disable=protected-access
         lambda self: _AlreadyCTTypeSpec.from_instance(self, omit_kwargs))
@@ -360,14 +375,14 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
   if clsid in _registry and issubclass(_registry[clsid], cls):
     return _registry[clsid]
 
+  @type_spec.register(type_spec_name)
   class _GeneratedCTTypeSpec(_AutoCompositeTensorTypeSpec):
 
     @property
     def value_type(self):
       return _registry[clsid]
 
-  _GeneratedCTTypeSpec.__name__ = f'{cls.__name__}_GCTTypeSpec'
-  register_type_spec(cls, _GeneratedCTTypeSpec)
+  _GeneratedCTTypeSpec.__name__ = type_spec_class_name
 
   class _AutoCompositeTensor(cls, composite_tensor.CompositeTensor):
     """A per-`cls` subclass of `CompositeTensor`."""
@@ -379,29 +394,3 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
   _AutoCompositeTensor.__name__ = '{}_AutoCompositeTensor'.format(cls.__name__)
   _registry[clsid] = _AutoCompositeTensor
   return _AutoCompositeTensor
-
-
-# pylint: disable=protected-access
-def register_type_spec(cls, type_spec_cls):
-  """Registers `tf.TypeSpec` subclasses for serialization with `tf.saved_model`.
-
-  Args:
-    cls: A subclass of `tf.__internal__.CompositeTensor`.
-    type_spec_cls: A subclass of `tf.TypeSpec` that implements the `_type_spec`
-      property of `cls` instances.
-  """
-  _TypeSpecCodec = nested_structure_coder._TypeSpecCodec  # pylint: disable=invalid-name
-  if hasattr(cls, '_type_spec_id'):
-    if cls._type_spec_id in _TypeSpecCodec.TYPE_SPEC_CLASS_FROM_PROTO:
-      other_cls = _TypeSpecCodec.TYPE_SPEC_CLASS_FROM_PROTO[
-          cls._type_spec_id].value_type.fget(None)
-      if cls is not other_cls:
-        raise ValueError(
-            'The `_type_spec_id` assigned to {} (= {}) is already used by '
-            '{}.{}. Please assign a unique `_type_spec_id`.'.format(
-                cls.__name__, cls._type_spec_id, other_cls.__module__,
-                other_cls.__name__))
-    _TypeSpecCodec.TYPE_SPEC_CLASS_FROM_PROTO[cls._type_spec_id] = type_spec_cls
-    _TypeSpecCodec.TYPE_SPEC_CLASS_TO_PROTO[type_spec_cls] = cls._type_spec_id
-    del _TypeSpecCodec
-# pylint: enable=protected-access

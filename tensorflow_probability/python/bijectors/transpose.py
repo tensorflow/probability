@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import type_spec  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Transpose',
@@ -95,8 +96,6 @@ class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
   ```
 
   """
-
-  _type_spec_id = 366918683
 
   def __init__(self, perm=None, rightmost_transposed_ndims=None,
                validate_args=False, name='transpose'):
@@ -406,11 +405,9 @@ def _maybe_validate_perm(
     return assertions
 
 
-# pylint: disable=protected-access
-class _TransposeTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):
+@type_spec.register('tfp.bijectors.Transpose_ACTypeSpec')
+class _TransposeTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):  # pylint: disable=protected-access
 
   @property
   def value_type(self):
     return Transpose
-
-auto_composite_tensor.register_type_spec(Transpose, _TransposeTypeSpec)

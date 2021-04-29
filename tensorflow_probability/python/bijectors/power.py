@@ -38,7 +38,8 @@ def _is_odd_integer(x):
   return ps.equal(x, ps.round(x)) & ps.not_equal(2. * ps.floor(x / 2.), x)
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Power(bijector.AutoCompositeTensorBijector):
   """Compute `g(X) = X ** power`; where X is a non-negative real number.
 
@@ -51,8 +52,6 @@ class Power(bijector.AutoCompositeTensorBijector):
   the `Invert` bijector instead (i.e. instead of `tfb.Power(power=1./3)`
   use `tfb.Invert(tfb.Power(power=3.))`).
   """
-
-  _type_spec_id = 366918660
 
   def __init__(self, power, validate_args=False, name='power'):
     """Instantiates the `Power` bijector.

@@ -34,7 +34,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class NormalCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = NormalCDF(x)`.
 
@@ -48,8 +49,6 @@ class NormalCDF(bijector.AutoCompositeTensorBijector):
   pdf(y; 0., 1.) = 1 / sqrt(2 * pi) * exp(-y ** 2 / 2)
   ```
   """
-
-  _type_spec_id = 366918656
 
   def __init__(self,
                validate_args=False,

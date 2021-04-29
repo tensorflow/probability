@@ -51,7 +51,6 @@ from tensorflow_probability.python.experimental.composite_tensor import register
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.internal.auto_composite_tensor import auto_composite_tensor
 from tensorflow_probability.python.internal.auto_composite_tensor import AutoCompositeTensor
-from tensorflow_probability.python.internal.auto_composite_tensor import register_type_spec
 
 
 _allowed_symbols = [
@@ -69,7 +68,6 @@ _allowed_symbols = [
     'nn',
     'parallel_filter',
     'register_composite',
-    'register_type_spec',
     'sequential',
     'stats',
     'substrates',

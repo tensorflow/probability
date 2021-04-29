@@ -33,7 +33,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Square(bijector.AutoCompositeTensorBijector):
   """Compute `g(X) = X^2`; X is a positive real number.
 
@@ -51,8 +52,6 @@ class Square(bijector.AutoCompositeTensorBijector):
   ```
 
   """
-
-  _type_spec_id = 366918681
 
   def __init__(self, validate_args=False, name='square'):
     """Instantiates the `Square` bijector.

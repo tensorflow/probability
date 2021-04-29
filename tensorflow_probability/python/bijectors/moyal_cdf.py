@@ -38,7 +38,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class MoyalCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = erfc(exp(- 1/2 * (X - loc) / scale) / sqrt(2))`.
 
@@ -53,8 +54,6 @@ class MoyalCDF(bijector.AutoCompositeTensorBijector):
     (sqrt(2 * pi) * scale)
   ```
   """
-
-  _type_spec_id = 366918655
 
   def __init__(self,
                loc=0.,

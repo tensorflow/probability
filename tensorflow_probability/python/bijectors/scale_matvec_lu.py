@@ -38,7 +38,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class ScaleMatvecLU(bijector.AutoCompositeTensorBijector):
   """Matrix-vector multiply using LU decomposition.
 
@@ -102,8 +103,6 @@ class ScaleMatvecLU(bijector.AutoCompositeTensorBijector):
        Invertible 1x1 Convolutions. _arXiv preprint arXiv:1807.03039_, 2018.
        https://arxiv.org/abs/1807.03039
   """
-
-  _type_spec_id = 366918668
 
   def __init__(self,
                lower_upper,

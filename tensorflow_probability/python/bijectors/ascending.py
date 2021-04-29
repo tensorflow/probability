@@ -30,7 +30,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Ascending(bijector.AutoCompositeTensorBijector):
   """Maps unconstrained R^n to R^n in ascending order.
 
@@ -50,8 +51,6 @@ class Ascending(bijector.AutoCompositeTensorBijector):
   # Result: [0.06428002, 0.40464228, 0.8936858]
   ```
   """
-
-  _type_spec_id = 366918634
 
   def __init__(self, validate_args=False, name='ascending'):
     parameters = dict(locals())

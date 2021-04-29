@@ -1601,34 +1601,12 @@ class AutoCompositeTensorBijector(
   decorator as shown here:
 
   ```python
-  @tfp.experimental.auto_composite_tensor(omit_kwargs=('name',))
+  @tfp.experimental.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='my_module')
   class MyBijector(tfb.AutoCompositeTensorBijector):
-
-    # Optional class attribute to enable `tf.saved_model`.
-    _type_spec_id = 1234567
 
     # The remainder of the subclass implementation is unchanged.
   ```
-
-  To enable `CompositeTensor` `Bijector`s to be serialized with
-  `tf.saved_model`, subclasses may optionally be assigned a unique `int32`
-  `_type_spec_id`. An error is raised if there is a collision between
-  assigned IDs. Existing mappings from IDs to `tf.TypeSpec` subclasses may be
-  accessed as follows:
-
-  ```python
-  from tensorflow.python.saved_model \
-  import nested_structure_coder
-
-  id_to_type_spec = (
-    nested_structure_coder._TypeSpecCodec.TYPE_SPEC_CLASS_FROM_PROTO)
-  ```
-
-  For `Bijector`s that inherit from `tf.__internal__.CompositeTensor` but not
-  `AutoCompositeTensor`, the `Bijector` subclass and its associated
-  `tf.TypeSpec` subclass must additionally be registered with
-  `tfp.experimental.auto_composite_tensor.register_type_spec` to enable
-  `tf.saved_model`.
   """
   pass
 

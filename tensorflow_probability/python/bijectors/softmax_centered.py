@@ -35,7 +35,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class SoftmaxCentered(bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = exp([X 0]) / sum(exp([X 0]))`.
 
@@ -62,8 +63,6 @@ class SoftmaxCentered(bijector.AutoCompositeTensorBijector):
   implementation is not a bijection. However, the appended dimension
   makes the (forward) image non-open and the theorem does not directly apply.
   """
-
-  _type_spec_id = 366918677
 
   def __init__(self,
                validate_args=False,

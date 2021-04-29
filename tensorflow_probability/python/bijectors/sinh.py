@@ -29,7 +29,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Sinh(bijector.AutoCompositeTensorBijector):
   """Bijector that computes `Y = sinh(X)`.
 
@@ -43,8 +44,6 @@ class Sinh(bijector.AutoCompositeTensorBijector):
   # Result: [[0.8813736, 0.], [1.8184465, 1.4436355]], i.e., asinh(y).
   ```
   """
-
-  _type_spec_id = 366918672
 
   def __init__(self, validate_args=False, name='sinh'):
     parameters = dict(locals())

@@ -59,7 +59,8 @@ _SplineShared = collections.namedtuple(
     'SplineShared', 'out_of_bounds,x_k,y_k,d_k,d_kp1,h_k,w_k,s_k')
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class RationalQuadraticSpline(bijector.AutoCompositeTensorBijector):
   """A piecewise rational quadratic spline, as developed in [1].
 
@@ -137,8 +138,6 @@ class RationalQuadraticSpline(bijector.AutoCompositeTensorBijector):
        Spline Flows. _arXiv preprint arXiv:1906.04032_, 2019.
        https://arxiv.org/abs/1906.04032
   """
-
-  _type_spec_id = 366918662
 
   def __init__(self,
                bin_widths,

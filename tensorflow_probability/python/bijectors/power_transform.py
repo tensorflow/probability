@@ -30,7 +30,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class PowerTransform(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 + X * c)**(1 / c), X >= -1 / c`.
 
@@ -40,8 +41,6 @@ class PowerTransform(bijector.AutoCompositeTensorBijector):
 
   This bijector is equivalent to the `Exp` bijector when `c=0`.
   """
-
-  _type_spec_id = 366918661
 
   def __init__(self,
                power=0.,

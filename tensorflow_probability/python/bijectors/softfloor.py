@@ -37,7 +37,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Softfloor(bijector.AutoCompositeTensorBijector):
   """Compute a differentiable approximation to `tf.math.floor`.
 
@@ -102,8 +103,6 @@ class Softfloor(bijector.AutoCompositeTensorBijector):
   soft_ceiling.forward(x) # Should be close to [3., 5., 6.]
   ```
   """
-
-  _type_spec_id = 366918676
 
   def __init__(self,
                temperature,

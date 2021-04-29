@@ -29,7 +29,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Tanh(bijector.AutoCompositeTensorBijector):
   """Bijector that computes `Y = tanh(X)`, therefore `Y in (-1, 1)`.
 
@@ -45,8 +46,6 @@ class Tanh(bijector.AutoCompositeTensorBijector):
   However, using the `Tanh` bijector directly is slightly faster and more
   numerically stable.
   """
-
-  _type_spec_id = 366918682
 
   def __init__(self, validate_args=False, name='tanh'):
     parameters = dict(locals())

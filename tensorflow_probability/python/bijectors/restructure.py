@@ -44,7 +44,8 @@ def unique_token_set(source_structure):
   return flat_token_set
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Restructure(bijector.AutoCompositeTensorBijector):
   """Converts between nested structures of Tensors.
 
@@ -121,8 +122,6 @@ class Restructure(bijector.AutoCompositeTensorBijector):
       ])
       ```
   """
-
-  _type_spec_id = 366918666
 
   def __init__(self,
                output_structure,

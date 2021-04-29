@@ -35,7 +35,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Split(bijector.AutoCompositeTensorBijector):
   """Split a `Tensor` event along an axis into a list of `Tensor`s.
 
@@ -57,8 +58,6 @@ class Split(bijector.AutoCompositeTensorBijector):
   ==> TensorShape([5, 6, 8])
   ```
   """
-
-  _type_spec_id = 366918680
 
   def __init__(
       self, num_or_size_splits, axis=-1, validate_args=False, name='split'):

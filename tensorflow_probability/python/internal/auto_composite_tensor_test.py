@@ -290,16 +290,6 @@ class AutoCompositeTensorTest(test_util.TestCase):
     self.assertEqual(self.evaluate(dist.distribution.loc), new_loc)
     self.assertLen(dist.trainable_variables, 1)
 
-  def test_type_spec_id_collision_raises(self):
-    with self.assertRaisesRegexp(
-        ValueError,
-        'already used by '
-        'tensorflow_probability.python.bijectors.sigmoid.Sigmoid'):
-      @tfp.experimental.auto_composite_tensor  # pylint: disable=unused-variable
-      class ThingWithDuplicateID(tfp.experimental.AutoCompositeTensor):
-
-        _type_spec_id = 366918671  # This is tfb.Sigmoid's ID.
-
   def test_export_import(self):
     path = self.create_tempdir().full_path
 

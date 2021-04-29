@@ -32,7 +32,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Shift(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X; shift) = X + shift`.
 
@@ -49,8 +50,6 @@ class Shift(bijector.AutoCompositeTensorBijector):
   ```
 
   """
-
-  _type_spec_id = 366918669
 
   def __init__(self,
                shift,

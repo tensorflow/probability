@@ -31,7 +31,8 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
 class Ordered(bijector.AutoCompositeTensorBijector):
   """Maps a vector of increasing elements to an unconstrained vector.
 
@@ -52,8 +53,6 @@ class Ordered(bijector.AutoCompositeTensorBijector):
   # Result: [0.06428002, 0.40464228, 0.8936858]
   ```
   """
-
-  _type_spec_id = 366918657
 
   @deprecation.deprecated(
       '2021-01-09', '`Ordered` bijector is deprecated; please use '
