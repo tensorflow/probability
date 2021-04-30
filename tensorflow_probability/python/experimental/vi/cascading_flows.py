@@ -357,10 +357,12 @@ def _cf_surrogate_for_joint_distribution(
         _extract_variables_from_coroutine_model(
           posterior_generator, seed=seed)))
 
-  surrogate_posterior = (
-    joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched(
-      posterior_generator,
-      name=_get_name(dist)))
+    # Temporary workaround for bijector caching issues with autobatched JDs.
+    surrogate_type = joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched
+    if not hasattr(dist, 'use_vectorized_map'):
+      surrogate_type = joint_distribution_coroutine.JointDistributionCoroutine
+    surrogate_posterior = surrogate_type(posterior_generator,
+                                         name=_get_name(dist))
 
   # Ensure that the surrogate posterior structure matches that of the prior.
   try:
