@@ -416,8 +416,10 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
     y = data.draw(
         tfp_hps.constrained_tensors(
             tfp_hps.identity_fn, total_sample_shape.as_list()))
+    hp.note('Trying to constrain inputs {}'.format(y))
     with tfp_hps.no_tf_rank_errors():
       x = event_space_bijector(y)
+      hp.note('Got constrained samples {}'.format(x))
       with tf.control_dependencies(dist._sample_control_dependencies(x)):
         self.evaluate(tf.identity(x))
 

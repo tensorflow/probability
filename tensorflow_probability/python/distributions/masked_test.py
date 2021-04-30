@@ -56,6 +56,33 @@ class MaskedTest(test_util.TestCase):
                    tf.sequence_mask(13, 20))
     self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  def test_event_space_bijector(self):
+    # Test that the default event space bijector executes.  This is
+    # non-trivial, because the event space bijector of this particular
+    # component distribution cannot be relied upon to produce finite
+    # values in the unconstrained space from samples of `sub_d`.
+    sub_d = tfd.ExpRelaxedOneHotCategorical(
+        logits=[0., 0., 0.],
+        temperature=[0.01, 0.01, 0.01, 0.01],
+        validate_args=True)
+    d = tfd.Masked(sub_d, validity_mask=False, validate_args=True)
+    bij = d.experimental_default_event_space_bijector()
+    x = bij(tf.zeros(shape=[4, 2]))
+    # The error tested for manifests as failed validations due to
+    # invalid values.
+    self.assertAllNotNan(self.evaluate(x))
+
+  def test_event_space_bijector_fldj(self):
+    # Also test forward log det jacobian for the default event space
+    # bijector in the same setting, for completeness.
+    sub_d = tfd.ExpRelaxedOneHotCategorical(
+        logits=[0., 0., 0.],
+        temperature=[0.01, 0.01, 0.01, 0.01])
+    d = tfd.Masked(sub_d, validity_mask=False, validate_args=True)
+    bij = d.experimental_default_event_space_bijector()
+    fldj = bij.forward_log_det_jacobian(tf.zeros(shape=[4, 2]))
+    self.assertAllEqual(fldj, tf.zeros_like(fldj))
+
   def test_degenerate_scalar_mask(self):
     d0 = tfd.Masked(tfd.Normal(0., 1.), validity_mask=False, validate_args=True)
     d1 = tfd.Masked(tfd.Normal(0., 1.), validity_mask=True, validate_args=True)
