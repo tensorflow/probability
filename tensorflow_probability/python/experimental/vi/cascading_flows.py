@@ -46,6 +46,8 @@ from tensorflow_probability.python.experimental.bijectors import HighwayFlow
 from tensorflow_probability.python.experimental.bijectors import \
   build_highway_flow_layer
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static as ps
 
 __all__ = [
   'register_asvi_substitution_rule',
@@ -150,6 +152,7 @@ register_asvi_substitution_rule(
 # a single JointDistribution.
 def build_cf_surrogate_posterior(
     prior,
+    num_auxiliary_variables=0,
     mean_field=False,
     initial_prior_weight=0.5,
     seed=None,
@@ -247,8 +250,8 @@ def build_cf_surrogate_posterior(
       dist=prior,
       base_distribution_surrogate_fn=functools.partial(
         _cf_convex_update_for_base_distribution,
-        mean_field=mean_field,
-        initial_prior_weight=initial_prior_weight),
+        initial_prior_weight=initial_prior_weight,
+        num_auxiliary_variables=num_auxiliary_variables),
       seed=seed)
     surrogate_posterior.also_track = variables
     return surrogate_posterior
@@ -338,7 +341,10 @@ def _cf_surrogate_for_joint_distribution(
         # save the variables.
         value_out = yield (surrogate_posterior if flat_variables
                            else (surrogate_posterior, variables))
-        dist = prior_gen.send(value_out)
+        if type(value_out) == list:
+          dist = prior_gen.send(value_out[0])
+        else:
+          dist = prior_gen.send(value_out)
         i += 1
     except StopIteration:
       pass
@@ -365,7 +371,8 @@ def _cf_surrogate_for_joint_distribution(
                                        name=_get_name(dist))
 
   # Ensure that the surrogate posterior structure matches that of the prior.
-  try:
+  # todo: check me, do we need this? in case needs to be modified
+  '''try:
     tf.nest.assert_same_structure(dist.dtype, surrogate_posterior.dtype)
   except TypeError:
     tokenize = lambda jd: jd._model_unflatten(
@@ -376,38 +383,48 @@ def _cf_surrogate_for_joint_distribution(
     surrogate_posterior = restructure.Restructure(
       output_structure=tokenize(dist),
       input_structure=tokenize(surrogate_posterior))(
-      surrogate_posterior, name=_get_name(dist))
+      surrogate_posterior, name=_get_name(dist))'''
   return surrogate_posterior, variables
 
 
 # TODO(davmre): consider breaking the mean field case into a separate method.
 def _cf_convex_update_for_base_distribution(dist,
-                                            mean_field,
                                             initial_prior_weight,
+                                            num_auxiliary_variables=0,
                                             sample_shape=None,
                                             variables=None,
                                             seed=None):
 
   """Creates a trainable surrogate for a (non-meta, non-joint) distribution."""
+
+  actual_event_shape = dist.event_shape_tensor()
   if variables is None:
-    actual_event_shape = dist.event_shape_tensor()
     layers = 3
-    bijectors = [tfb.Reshape([-1], event_shape_in=actual_event_shape)]
+    bijectors = [tfb.Reshape([-1], event_shape_in=actual_event_shape + num_auxiliary_variables)]
 
     for _ in range(0, layers - 1):
       bijectors.append(
-        build_highway_flow_layer(tf.reduce_prod(actual_event_shape),
+        build_highway_flow_layer(tf.reduce_prod(actual_event_shape + num_auxiliary_variables),
+                                residual_fraction_initial_value=initial_prior_weight,
                                  activation_fn=tf.nn.softplus))
     bijectors.append(
-      build_highway_flow_layer(tf.reduce_prod(actual_event_shape),
+      build_highway_flow_layer(tf.reduce_prod(actual_event_shape +  num_auxiliary_variables),
+                               residual_fraction_initial_value=initial_prior_weight,
                                activation_fn=None))
-    bijectors.append(tfb.Reshape(actual_event_shape))
+    bijectors.append(tfb.Reshape(actual_event_shape + num_auxiliary_variables))
 
     variables = tfb.Chain(bijectors=list(reversed(bijectors)))
 
-  cascading_flows = tfd.TransformedDistribution(
-    distribution=dist,
-    bijector=variables)
+  if num_auxiliary_variables > 0:
+
+    cascading_flows = tfb.Split([actual_event_shape[0],num_auxiliary_variables])(tfd.TransformedDistribution(
+      distribution=tfd.Blockwise([dist,tfd.Sample(tfd.Normal(0.,.1),num_auxiliary_variables)]),
+      bijector=variables))
+
+  else:
+    cascading_flows = tfd.TransformedDistribution(
+        distribution=dist,
+        bijector=variables)
 
   return cascading_flows, variables
 
@@ -423,7 +440,7 @@ def _extract_variables_from_coroutine_model(model_fn, seed=None):
       sampled_value = (dist.distribution.sample(seed=local_seed)
                        if isinstance(dist, Root)
                        else dist.sample(seed=local_seed))
-      dist, dist_variables = gen.send(sampled_value)
+      dist, dist_variables = gen.send(sampled_value)# tf.concat(sampled_value, axis=0)
       flat_variables.append(dist_variables)
   except StopIteration:
     pass
