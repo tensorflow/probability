@@ -975,13 +975,13 @@ def has_not_u_turn(state_diff,
     batch_dot_product_left = sum([
         tf.reduce_sum(  # pylint: disable=g-complex-comprehension
             s_diff * m,
-            axis=tf.range(log_prob_rank, ps.rank(m)))
+            axis=ps.range(log_prob_rank, ps.rank(m)))
         for s_diff, m in zip(state_diff, momentum_left)
     ])
     batch_dot_product_right = sum([
         tf.reduce_sum(  # pylint: disable=g-complex-comprehension
             s_diff * m,
-            axis=tf.range(log_prob_rank, ps.rank(m)))
+            axis=ps.range(log_prob_rank, ps.rank(m)))
         for s_diff, m in zip(state_diff, momentum_right)
     ])
     return (batch_dot_product_left >= 0) & (batch_dot_product_right >= 0)

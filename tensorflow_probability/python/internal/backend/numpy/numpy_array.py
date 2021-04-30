@@ -222,7 +222,6 @@ def _one_hot(  # pylint: disable=unused-argument
   else:
     dtype = utils.numpy_dtype(dtype)
   indices = np.array(indices)
-  depth = np.array(depth)
   pred = abs(np.arange(depth, dtype=indices.dtype) -
              indices[..., np.newaxis]) > 0
   y_out = np.where(pred, np.array(off_value, dtype), np.array(on_value, dtype))

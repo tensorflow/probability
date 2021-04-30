@@ -305,7 +305,7 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
             functools.reduce(ps.broadcast_shape, batch_shapes, []))
 
       # Flatten all of the batch dimensions into one.
-      n = tf.cast(ps.reduce_prod(broadcast_batch_shape), tf.int32)
+      n = ps.cast(ps.reduce_prod(broadcast_batch_shape), tf.int32)
       static_n = tf.get_static_value(n)
       if static_n == 1:
         # We can bypass `vectorized_map` if the batch shape is `[]`, `[1]`,

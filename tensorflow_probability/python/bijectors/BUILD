@@ -423,7 +423,9 @@ multi_substrate_py_library(
         ":bijector",
         ":invert",
         ":power_transform",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 

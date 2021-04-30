@@ -26,7 +26,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math.generic import reduce_logmeanexp
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -407,12 +407,12 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       new_log_averaging_step: Updated `log_averaging_step`.
       new_error_sum: Updated `error_sum`.
     """
-    num_reduce_dims = prefer_static.minimum(
+    num_reduce_dims = ps.minimum(
         log_accept_prob_rank,
-        (prefer_static.rank(state) - prefer_static.rank(step_size)))
+        (ps.rank(state) - ps.rank(step_size)))
     reduced_log_accept_prob = self.reduce_fn(
         log_accept_prob,
-        axis=prefer_static.range(num_reduce_dims),
+        axis=ps.range(num_reduce_dims),
         keepdims=False)
 
     # reduced_log_accept_prob must broadcast into step_size on the
@@ -425,13 +425,13 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     new_error_sum = (error_sum +
                      target_accept_prob -
                      tf.math.exp(reduced_log_accept_prob))
-    num_ones_to_pad = prefer_static.maximum(
-        prefer_static.rank(log_shrinkage_target) -
-        prefer_static.rank(new_error_sum), 0)
+    num_ones_to_pad = ps.maximum(
+        ps.rank(log_shrinkage_target) -
+        ps.rank(new_error_sum), 0)
     new_error_sum_extend = tf.reshape(
         new_error_sum,
-        shape=prefer_static.pad(
-            prefer_static.shape(new_error_sum),
+        shape=ps.pad(
+            ps.shape(new_error_sum),
             paddings=[[0, num_ones_to_pad]],
             constant_values=1))
 
@@ -485,7 +485,7 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
 
       step_size = self.step_size_getter_fn(new_inner_results)
       step_size_parts = tf.nest.flatten(step_size)
-      log_accept_prob_rank = tf.rank(log_accept_prob)
+      log_accept_prob_rank = ps.rank(log_accept_prob)
       error_sum_parts = tf.nest.flatten(previous_kernel_results.error_sum)
       log_averaging_step_parts = tf.nest.flatten(
           previous_kernel_results.log_averaging_step)
@@ -551,12 +551,12 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       error_sum, log_averaging_step, log_shrinkage_target = [], [], []
       for state_part, step_size_part, shrinkage_target_part in zip(
           state_parts, step_size_parts, shrinkage_target_parts):
-        num_reduce_dims = prefer_static.minimum(
-            prefer_static.rank(log_accept_prob),
-            prefer_static.rank(state_part) - prefer_static.rank(step_size_part))
+        num_reduce_dims = ps.minimum(
+            ps.rank(log_accept_prob),
+            ps.rank(state_part) - ps.rank(step_size_part))
         reduced_log_accept_prob = reduce_logmeanexp(
             log_accept_prob,
-            axis=prefer_static.range(num_reduce_dims))
+            axis=ps.range(num_reduce_dims))
         reduce_indices = get_differing_dims(
             reduced_log_accept_prob, step_size_part)
         reduced_log_accept_prob = reduce_logmeanexp(
