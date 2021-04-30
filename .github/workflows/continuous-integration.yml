@@ -68,3 +68,9 @@ jobs:
         run: |
           source ${TEST_VENV_PATH}/bin/activate
           ./testing/run_github_tests.sh
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v1
+        with:
+            name: testlogs-${{ matrix.shard }}
+            path: bazel-testlogs
