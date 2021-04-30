@@ -342,7 +342,11 @@ def _cf_surrogate_for_joint_distribution(
         value_out = yield (surrogate_posterior if flat_variables
                            else (surrogate_posterior, variables))
         if type(value_out) == list:
-          dist = prior_gen.send(value_out[0])
+          if len(dist.event_shape) == 0:
+            dist = prior_gen.send(tf.reshape(value_out[0], -1))
+          else:
+            dist = prior_gen.send(value_out[0])
+
         else:
           dist = prior_gen.send(value_out)
         i += 1
@@ -416,10 +420,13 @@ def _cf_convex_update_for_base_distribution(dist,
     variables = tfb.Chain(bijectors=list(reversed(bijectors)))
 
   if num_auxiliary_variables > 0:
-
-    cascading_flows = tfb.Split([actual_event_shape[0],num_auxiliary_variables])(tfd.TransformedDistribution(
-      distribution=tfd.Blockwise([dist,tfd.Sample(tfd.Normal(0.,.1),num_auxiliary_variables)]),
-      bijector=variables))
+    cascading_flows = tfb.Split(
+      [-1, num_auxiliary_variables])(
+      tfd.TransformedDistribution(
+        distribution=tfd.Blockwise([dist, tfd.BatchBroadcast(
+          tfd.Sample(tfd.Normal(0., .1), num_auxiliary_variables),
+          to_shape=dist.batch_shape)]),
+        bijector=variables))
 
   else:
     cascading_flows = tfd.TransformedDistribution(
