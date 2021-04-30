@@ -23,7 +23,8 @@ from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import samplers
 
 
-def build_highway_flow_layer(width, residual_fraction_initial_value=0.5,
+def build_highway_flow_layer(width,
+                             residual_fraction_initial_value=0.5,
                              activation_fn=False, seed=None):
   """
   Builds an HighwayFlow layer making sure that all the requirements are
@@ -60,15 +61,16 @@ def build_highway_flow_layer(width, residual_fraction_initial_value=0.5,
   unconstrained_lower_initial_values = samplers.normal(
     shape=lower_bijector.inverse_event_shape([width, width]),
     mean=0.,
-    stddev=1.,
+    stddev=.01,
     seed=lower_seed)
   upper_bijector = tfb.FillScaleTriL(diag_bijector=tfb.Softplus(),
-                                 diag_shift=None)
+                                     diag_shift=None)
   unconstrained_upper_initial_values = samplers.normal(
     shape=upper_bijector.inverse_event_shape([width, width]),
     mean=0.,
-    stddev=1.,
+    stddev=.01,
     seed=upper_seed)
+
   return HighwayFlow(
     residual_fraction=util.TransformedVariable(
       initial_value=residual_fraction_initial_value,
