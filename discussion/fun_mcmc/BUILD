@@ -137,7 +137,6 @@ py_library(
     ],
 )
 
-# pytype
 py_library(
     name = "backend_jax",
     srcs = ["backend_jax.py"],

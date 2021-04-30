@@ -45,6 +45,7 @@ import numpy as np
 
 from discussion.fun_mcmc import backend
 
+ps = backend.prefer_static
 tf = backend.tf
 tfp = backend.tfp
 util = backend.util
@@ -1349,7 +1350,7 @@ def hamiltonian_integrator(
   state_grads = int_state.state_grads
   state_extra = int_state.state_extra
 
-  num_steps = tf.convert_to_tensor(num_steps)
+  num_steps = ps.convert_to_shape_tensor(num_steps)
   is_ragged = len(num_steps.shape) > 0  # pylint: disable=g-explicit-length-test
 
   kinetic_energy, kinetic_energy_extra = call_potential_fn(
@@ -1358,7 +1359,7 @@ def hamiltonian_integrator(
 
   if is_ragged:
     step = 0
-    max_num_steps = tf.reduce_max(num_steps)
+    max_num_steps = ps.reduce_max(num_steps)
   else:
     step = []
     max_num_steps = num_steps

@@ -16,9 +16,11 @@
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import prefer_static
 from fun_mc.dynamic.backend_tensorflow import util
 
 __all__ = [
+    'prefer_static',
     'tf',
     'tfp',
     'util',

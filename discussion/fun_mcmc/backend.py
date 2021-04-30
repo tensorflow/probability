@@ -40,6 +40,7 @@ __all__ = [
     'get_backend',
     'JAX',
     'MANUAL_TRANSFORMS',
+    'prefer_static',
     'set_backend',
     'TENSORFLOW',
     'tf',
@@ -171,6 +172,7 @@ class _Dispatcher(object):
     return ret
 
 
+prefer_static = _Dispatcher('prefer_static')
 tf = _Dispatcher('tf')
 tfp = _Dispatcher('tfp')
 util = _Dispatcher('util')

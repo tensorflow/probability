@@ -17,10 +17,12 @@
 from fun_mc.dynamic.backend_jax import tf_on_jax
 from fun_mc.dynamic.backend_jax import util
 from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.substrates.jax.internal import prefer_static
 
 tf = tf_on_jax.tf
 
 __all__ = [
+    'prefer_static',
     'tf',
     'tfp',
     'util',

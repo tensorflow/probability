@@ -17,10 +17,12 @@
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from discussion.fun_mcmc import util_tf as util
+from tensorflow_probability.python.internal import prefer_static
 
 __all__ = [
     'BACKEND_NAME',
     'multi_backend_test',
+    'prefer_static',
     'tf',
     'tfp',
     'util',
