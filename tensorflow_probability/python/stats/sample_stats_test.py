@@ -560,6 +560,54 @@ class VarianceTest(test_util.TestCase):
                            for i in range(13)], axis=1)
     self.assertAllClose(from_numpy, var)
 
+  def check_independent_uniform_samples_windowed(
+      self, shape, low_indices, high_indices):
+    # Presume we are operating on a rank-3 shape at axis=1, as that
+    # should be enough coverage.
+    rng = test_util.test_np_rng()
+    x = rng.rand(*shape)
+
+    var = tfp.stats.windowed_variance(
+        x, low_indices=low_indices, high_indices=high_indices, axis=1)
+
+    var = self.evaluate(var)
+
+    low_indices = low_indices + np.zeros_like(high_indices)
+    high_indices = high_indices + np.zeros_like(low_indices)
+    from_numpy = np.stack(
+        [np.var(x[:, low:high, :], axis=1)
+         for low, high in zip(low_indices, high_indices)], axis=1)
+    self.assertAllClose(from_numpy, var)
+
+  def test_independent_uniform_samples_windowed(self):
+    self.check_independent_uniform_samples_windowed(
+        [11, 13, 17], low_indices=[0], high_indices=[4, 7, 8])
+    self.check_independent_uniform_samples_windowed(
+        [5, 7, 11], low_indices=[3, 4, 5], high_indices=6)
+    # Test equal indices == variance of a singleton set
+    self.check_independent_uniform_samples_windowed(
+        [5, 7, 3], low_indices=[4], high_indices=5)
+
+  def test_windowed_variance_corner_cases(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(7)
+    # Test variance of an empty set or a "negative singleton" set
+    var = tfp.stats.windowed_variance(
+        x, low_indices=[4, 5], high_indices=4, axis=0)
+    var = self.evaluate(var)
+    self.assertAllClose(var, tf.zeros_like(var))
+
+    # Test variance of a "negative" non-singleton set.  It's the same
+    # as the variance of the same set spelled "positively", but we
+    # need to be careful about the inclusive/exclusive semantics of
+    # the indices.
+    var_neg = tfp.stats.windowed_variance(
+        x, low_indices=[3, 5], high_indices=[1, 2])
+    var_pos = tfp.stats.windowed_variance(
+        x, low_indices=[1, 2], high_indices=[3, 5])
+    var_neg, var_pos = self.evaluate([var_neg, var_pos])
+    self.assertAllClose(var_neg, var_pos)
+
 
 @test_util.test_all_tf_execution_regimes
 class StddevTest(test_util.TestCase):
