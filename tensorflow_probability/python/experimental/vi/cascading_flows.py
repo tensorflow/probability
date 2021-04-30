@@ -357,12 +357,12 @@ def _cf_surrogate_for_joint_distribution(
         _extract_variables_from_coroutine_model(
           posterior_generator, seed=seed)))
 
-    # Temporary workaround for bijector caching issues with autobatched JDs.
-    surrogate_type = joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched
-    if not hasattr(dist, 'use_vectorized_map'):
-      surrogate_type = joint_distribution_coroutine.JointDistributionCoroutine
-    surrogate_posterior = surrogate_type(posterior_generator,
-                                         name=_get_name(dist))
+  # Temporary workaround for bijector caching issues with autobatched JDs.
+  surrogate_type = joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched
+  if not hasattr(dist, 'use_vectorized_map'):
+    surrogate_type = joint_distribution_coroutine.JointDistributionCoroutine
+  surrogate_posterior = surrogate_type(posterior_generator,
+                                       name=_get_name(dist))
 
   # Ensure that the surrogate posterior structure matches that of the prior.
   try:
@@ -391,7 +391,7 @@ def _cf_convex_update_for_base_distribution(dist,
   """Creates a trainable surrogate for a (non-meta, non-joint) distribution."""
   if variables is None:
     actual_event_shape = dist.event_shape_tensor()
-    layers = 1
+    layers = 3
     bijectors = [tfb.Reshape([-1], event_shape_in=actual_event_shape)]
 
     for _ in range(0, layers - 1):
