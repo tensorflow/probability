@@ -318,20 +318,27 @@ class ShardTest(test_lib.DistributedTest):
       ulp, g = tfp.math.value_and_gradient(ulp_fn, (w,))
       return ulp, g
 
+    def test_w_x(w, x):
+      sharded_x = self.shard_values(tf.reshape(x, [test_lib.NUM_DEVICES, -1]))
+
+      lp, g = self.evaluate(
+          self.per_replica_to_tensor(
+              self.strategy_run(ulp_grad, (
+                  w,
+                  sharded_x,
+              ), in_axes=(None, 0))))
+      true_lp, true_g = self.evaluate(true_ulp_grad(w, x))
+
+      self.assertAllClose(true_lp, lp[0])
+      self.assertAllClose(true_g[0], g[0][0])
+
     w = tf.constant(4.)
-    x = tf.zeros([x_size])
-    sharded_x = self.shard_values(tf.reshape(x, [test_lib.NUM_DEVICES, -1]))
-
-    lp, g = self.evaluate(
-        self.per_replica_to_tensor(
-            self.strategy_run(ulp_grad, (
-                w,
-                sharded_x,
-            ), in_axes=(None, 0))))
-    true_lp, true_g = self.evaluate(true_ulp_grad(w, x))
-
-    self.assertAllClose(true_lp, lp[0])
-    self.assertAllClose(true_g[0], g[0][0])
+    zeros = tf.zeros([x_size])
+    test_w_x(w, zeros)
+    random_x = self.evaluate(
+        tfd.Normal(loc=tf.zeros([x_size]),
+                   scale=tf.ones([x_size])).sample(seed=self.key))
+    test_w_x(w, random_x)
 
 
 if __name__ == '__main__':
