@@ -50,7 +50,6 @@ multi_substrate_py_library(
         ":nuts_autobatching",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
-        ":preconditioned_nuts",
         ":progress_bar_reducer",
         ":reducer",
         ":sample",
@@ -242,7 +241,7 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "preconditioned_nuts",
     srcs = ["preconditioned_nuts.py"],
     srcs_version = "PY3",
@@ -261,10 +260,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "pnuts_test",
     size = "medium",
     srcs = ["pnuts_test.py"],
+    disabled_substrates = ["numpy"],
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",

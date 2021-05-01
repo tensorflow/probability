@@ -478,7 +478,7 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
             state_parts, ps.shape(current_target_log_prob))
       momentum_distribution = pu.maybe_make_list_and_batch_broadcast(
           momentum_distribution, ps.shape(current_target_log_prob))
-      momentum_parts = momentum_distribution.sample()
+      momentum_parts = momentum_distribution.sample(seed=samplers.zeros_seed())
 
       def _init(shape_and_dtype):
         """Allocate TensorArray for storing state and velocity."""
