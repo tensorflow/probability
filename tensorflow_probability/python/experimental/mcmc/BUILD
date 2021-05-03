@@ -1006,7 +1006,10 @@ py_test(
     python_version = "PY3",
     shard_count = 12,
     srcs_version = "PY3",
-    tags = ["requires-mem:16g"],
+    tags = [
+        "no-oss-ci",  # Prohibitively slow.
+        "requires-mem:16g",
+    ],
     deps = [
         ":windowed_sampling",
         # absl/testing:parameterized dep,
