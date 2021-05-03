@@ -143,6 +143,8 @@ def gen_module(module_name):
   code = code.replace('.get_shape()', '.shape')
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+\.shape)([^(_])',
                 'tensor_shape.TensorShape(\\1)\\2', code)
+  code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_floating',
+                'np.issubdtype(\\1, np.floating)', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_complex',
                 'np.issubdtype(\\1, np.complexfloating)', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_integer',
