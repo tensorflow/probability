@@ -39,6 +39,7 @@ __all__ = [
     'log_average_probs',
     'stddev',
     'variance',
+    'windowed_mean',
     'windowed_variance',
 ]
 
@@ -772,34 +773,9 @@ def windowed_variance(
   """
   with tf.name_scope(name or 'windowed_variance'):
     x = tf.convert_to_tensor(x)
+    low_indices, high_indices, low_counts, high_counts = _prepare_window_args(
+        x, low_indices, high_indices, axis)
 
-    if high_indices is None:
-      high_indices = tf.range(ps.shape(x)[axis]) + 1
-    else:
-      high_indices = tf.convert_to_tensor(high_indices)
-    if low_indices is None:
-      low_indices = high_indices / 2
-    else:
-      low_indices = tf.convert_to_tensor(low_indices)
-    high_indices = high_indices + tf.zeros_like(low_indices)
-    low_indices = low_indices + tf.zeros_like(high_indices)
-
-    # TODO(axch): Support batch low and high indices.  That would
-    # complicate this shape munging (though tf.gather should work
-    # fine).
-
-    # We want to place `low_counts` and `high_counts` at the `axis`
-    # position, so we reshape them to shape `[1, 1, ..., 1, N, 1, ...,
-    # 1]`, where the `N` is at `axis`.  The `counts_shp`, below,
-    # is this shape.
-    size = ps.size(high_indices)
-    counts_shp = ps.one_hot(
-        axis, depth=ps.rank(x), on_value=size, off_value=1)
-
-    low_counts = tf.reshape(tf.cast(low_indices, dtype=x.dtype),
-                            shape=counts_shp)
-    high_counts = tf.reshape(tf.cast(high_indices, dtype=x.dtype),
-                             shape=counts_shp)
     # We have a problem with indexing: the standard convention demands
     # the low index be inclusive, and the high index be exclusive.
     # However, tf.cumsum and cumulative_variance both include the ith
@@ -849,6 +825,108 @@ def windowed_variance(
                  low_variances * low_counts +
                  adjustments * discrepancies)
     return _safe_average(residuals, counts)
+
+
+def windowed_mean(
+    x, low_indices=None, high_indices=None, axis=0, name=None):
+  """Windowed estimates of mean.
+
+  Computes means among data in the Tensor `x` along the given windows:
+
+    result[i] = mean(x[low_indices[i]:high_indices[i]+1])
+
+  efficiently.  To wit, if K is the size of `low_indices` and
+  `high_indices`, and `N` is the size of `x` along the given `axis`,
+  the computation takes O(K + N) work, O(log(N)) depth (the length of
+  the longest series of operations that are performed sequentially),
+  and only uses O(1) TensorFlow kernel invocations.
+
+  This function can be useful for assessing the behavior over time of
+  trailing-window estimators from some iterative process, such as the
+  last half of an MCMC chain.
+
+  Suppose `x` has shape `Bx + [N] + E`, where the `Bx` component has
+  rank `axis`, and `low_indices` and `high_indices` broadcast to shape
+  `[M]`.  Then each element of `low_indices` and `high_indices`
+  must be between 0 and N+1, and the shape of the output will be
+  `Bx + [M] + E`.  Batch shape in the indices is not currently supported.
+
+  The default windows are
+  `[0, 1), [1, 2), [1, 3), [2, 4), [2, 5), ...`
+  This corresponds to analyzing `x` as though it were streaming, for
+  example successive states of an MCMC sampler, and we were interested
+  in the variance of the last half of the data at each point.
+
+  Args:
+    x: A numeric `Tensor` holding `N` samples along the given `axis`,
+      whose windowed means are desired.
+    low_indices: An integer `Tensor` defining the lower boundary
+      (inclusive) of each window.  Default: elementwise half of
+      `high_indices`.
+    high_indices: An integer `Tensor` defining the upper boundary
+      (exclusive) of each window.  Must be broadcast-compatible with
+      `low_indices`.  Default: `tf.range(1, N+1)`, i.e., N windows
+      that each end in the corresponding datum from `x` (inclusive)`.
+    axis: Scalar `Tensor` designating the axis holding samples.  This
+      is the axis of `x` along which we take windows, and therefore
+      the axis that `low_indices` and `high_indices` index into.
+      Other axes are treated in batch.  Default value: `0` (leftmost
+      dimension).
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: `None` (i.e., `'windowed_mean'`).
+
+  Returns:
+    means: A numeric `Tensor` holding the windowed means of `x` along
+      the `axis` dimension.
+
+  """
+  with tf.name_scope(name or 'windowed_mean'):
+    x = tf.convert_to_tensor(x)
+    low_indices, high_indices, low_counts, high_counts = _prepare_window_args(
+        x, low_indices, high_indices, axis)
+
+    raw_cumsum = tf.cumsum(x, axis=axis)
+    cum_sums = tf.concat(
+        [tf.zeros_like(tf.gather(raw_cumsum, [0], axis=axis)), raw_cumsum],
+        axis=axis)
+    low_sums = tf.gather(cum_sums, low_indices, axis=axis)
+    high_sums = tf.gather(cum_sums, high_indices, axis=axis)
+
+    counts = high_counts - low_counts
+    return _safe_average(high_sums - low_sums, counts)
+
+
+def _prepare_window_args(x, low_indices=None, high_indices=None, axis=0):
+  """Common argument defaulting logic for windowed statistics."""
+  if high_indices is None:
+    high_indices = tf.range(ps.shape(x)[axis]) + 1
+  else:
+    high_indices = tf.convert_to_tensor(high_indices)
+  if low_indices is None:
+    low_indices = high_indices // 2
+  else:
+    low_indices = tf.convert_to_tensor(low_indices)
+  # Broadcast indices together.
+  high_indices = high_indices + tf.zeros_like(low_indices)
+  low_indices = low_indices + tf.zeros_like(high_indices)
+
+  # TODO(axch): Support batch low and high indices.  That would
+  # complicate this shape munging (though tf.gather should work
+  # fine).
+
+  # We want to place `low_counts` and `high_counts` at the `axis`
+  # position, so we reshape them to shape `[1, 1, ..., 1, N, 1, ...,
+  # 1]`, where the `N` is at `axis`.  The `counts_shp`, below,
+  # is this shape.
+  size = ps.size(high_indices)
+  counts_shp = ps.one_hot(
+      axis, depth=ps.rank(x), on_value=size, off_value=1)
+
+  low_counts = tf.reshape(tf.cast(low_indices, dtype=x.dtype),
+                          shape=counts_shp)
+  high_counts = tf.reshape(tf.cast(high_indices, dtype=x.dtype),
+                           shape=counts_shp)
+  return low_indices, high_indices, low_counts, high_counts
 
 
 def _safe_average(totals, counts):

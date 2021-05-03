@@ -631,6 +631,63 @@ class StddevTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
+class MeanTest(test_util.TestCase):
+
+  def check_independent_uniform_samples_windowed(
+      self, shape, low_indices, high_indices):
+    # Presume we are operating on a rank-3 shape at axis=1, as that
+    # should be enough coverage.
+    rng = test_util.test_np_rng()
+    x = rng.rand(*shape)
+
+    mean = tfp.stats.windowed_mean(
+        x, low_indices=low_indices, high_indices=high_indices, axis=1)
+
+    mean = self.evaluate(mean)
+
+    low_indices = low_indices + np.zeros_like(high_indices)
+    high_indices = high_indices + np.zeros_like(low_indices)
+    from_numpy = np.stack(
+        [np.mean(x[:, low:high, :], axis=1)
+         for low, high in zip(low_indices, high_indices)], axis=1)
+    self.assertAllClose(from_numpy, mean)
+
+  def test_independent_uniform_samples_windowed(self):
+    self.check_independent_uniform_samples_windowed(
+        [11, 13, 17], low_indices=[0], high_indices=[4, 7, 8])
+    self.check_independent_uniform_samples_windowed(
+        [5, 7, 11], low_indices=[3, 4, 5], high_indices=6)
+    # Test mean of a singleton set
+    self.check_independent_uniform_samples_windowed(
+        [5, 7, 3], low_indices=[4], high_indices=5)
+
+  def test_windowed_mean_corner_cases(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(7)
+    # Test mean of an empty set
+    mean = tfp.stats.windowed_mean(
+        x, low_indices=[4], high_indices=4, axis=0)
+    mean = self.evaluate(mean)
+    self.assertAllClose(mean, tf.zeros_like(mean))
+
+    # Test mean of a "negative" set.  It's the same
+    # as the mean of the same set spelled "positively", but we
+    # need to be careful about the inclusive/exclusive semantics of
+    # the indices.
+    mean_neg = tfp.stats.windowed_mean(
+        x, low_indices=[3, 5], high_indices=[1, 2])
+    mean_pos = tfp.stats.windowed_mean(
+        x, low_indices=[1, 2], high_indices=[3, 5])
+    mean_neg, mean_pos = self.evaluate([mean_neg, mean_pos])
+    self.assertAllClose(mean_neg, mean_pos)
+
+    # Test default windows: [0, 1), [1, 2), [1, 3), [2, 4), etc
+    y = [0., 1., 2., 3.]
+    self.assertAllClose(
+        [0., 1., 1.5, 2.5], self.evaluate(tfp.stats.windowed_mean(y)))
+
+
+@test_util.test_all_tf_execution_regimes
 class LogAverageProbsTest(test_util.TestCase):
 
   def test_mathematical_correctness_bernoulli(self):
