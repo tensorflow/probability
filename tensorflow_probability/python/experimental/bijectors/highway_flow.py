@@ -25,7 +25,9 @@ from tensorflow_probability.python.internal import samplers
 
 def build_highway_flow_layer(width,
                              residual_fraction_initial_value=0.5,
-                             activation_fn=False, seed=None):
+                             activation_fn=False,
+                             gate_first_n=-1,
+                             seed=None):
   """
   Builds an HighwayFlow layer making sure that all the requirements are
   satisfied, namely:
@@ -87,7 +89,8 @@ def build_highway_flow_layer(width,
     lower_diagonal_weights_matrix=util.TransformedVariable(
       initial_value=lower_bijector.forward(unconstrained_lower_initial_values),
       bijector=lower_bijector,
-      dtype=dtype)
+      dtype=dtype),
+    gate_first_n=gate_first_n
   )
 
 
@@ -152,7 +155,9 @@ class HighwayFlow(tfb.Bijector):
 
   def __init__(self, residual_fraction, activation_fn, bias,
                upper_diagonal_weights_matrix,
-               lower_diagonal_weights_matrix, validate_args=False,
+               lower_diagonal_weights_matrix,
+               gate_first_n=-1,
+               validate_args=False,
                name=None):
     '''
     Args:
@@ -179,6 +184,7 @@ class HighwayFlow(tfb.Bijector):
       self._upper_diagonal_weights_matrix = upper_diagonal_weights_matrix
       self._lower_diagonal_weights_matrix = lower_diagonal_weights_matrix
       self._activation_fn = activation_fn
+      self._gate_first_n = gate_first_n
 
       super(HighwayFlow, self).__init__(
         validate_args=validate_args,
@@ -210,13 +216,25 @@ class HighwayFlow(tfb.Bijector):
   def activation_fn(self):
     return self._activation_fn
 
+  @property
+  def gate_first_n(self):
+    return self._gate_first_n
+
   def _derivative_of_softplus(self, x):
     return self.residual_fraction + (
         1. - self.residual_fraction) * tf.math.sigmoid(x)
 
   def _convex_update(self, weights_matrix):
-    return self.residual_fraction * tf.eye(self.width) + (
-        1. - self.residual_fraction) * weights_matrix
+    if self.gate_first_n == -1 or self.gate_first_n == self.width:
+      return self.residual_fraction * tf.eye(self.width) + (
+          1. - self.residual_fraction) * weights_matrix
+    elif self.gate_first_n == 0:
+      return weights_matrix
+    else:
+      return tf.concat(
+        [self.residual_fraction * tf.eye(num_rows=self.gate_first_n, num_columns=self.width),
+         tf.zeros([self.width - self.gate_first_n, self.width])], axis=0) + tf.concat([(
+          1. - self.residual_fraction) * tf.ones(self.gate_first_n), tf.ones(self.width - self.gate_first_n)], axis=0) * weights_matrix
 
   def _inverse_of_softplus(self, y, n=20):
     # Inverse of the activation layer with softplus using Newton iteration.
@@ -250,8 +268,16 @@ class HighwayFlow(tfb.Bijector):
       self._convex_update(self.lower_diagonal_weights_matrix), x)
     x = tf.linalg.matvec(tf.transpose(
       self._convex_update(self.upper_diagonal_weights_matrix)),
-      x) + (
-            1 - self.residual_fraction) * self.bias
+      x)
+    if self.gate_first_n == -1 or self.gate_first_n == self.width:
+      x += (1 - self.residual_fraction) * self.bias
+    elif self.gate_first_n == 0:
+      x += self.bias
+    else:
+      x += tf.concat([(1. - self.residual_fraction) * tf.ones(
+        self.gate_first_n), tf.ones(self.width - self.gate_first_n)],
+                            axis=0) * self.bias
+
     if self.activation_fn:
       fldj += tf.reduce_sum(tf.math.log(self._derivative_of_softplus(x)),
                             -1)
@@ -282,10 +308,17 @@ class HighwayFlow(tfb.Bijector):
       ildj -= tf.reduce_sum(tf.math.log(self._derivative_of_softplus(y)),
                             -1)
 
+    if self.gate_first_n == -1 or self.gate_first_n == self.width:
+      y = y - (1 - self.residual_fraction) * self.bias
+    elif self.gate_first_n == 0:
+      y = y - self.bias
+    else:
+      y = y - tf.concat([(1. - self.residual_fraction) * tf.ones(
+        self.gate_first_n), tf.ones(self.width - self.gate_first_n)],
+                            axis=0) * self.bias
     y = tf.linalg.triangular_solve(tf.transpose(
       self._convex_update(self.upper_diagonal_weights_matrix)),
-      tf.linalg.matrix_transpose(y - (
-          1 - self.residual_fraction) * self.bias),
+      tf.linalg.matrix_transpose(y),
       lower=False)
     y = tf.linalg.matrix_transpose(tf.linalg.triangular_solve(
       self._convex_update(self.lower_diagonal_weights_matrix), y))

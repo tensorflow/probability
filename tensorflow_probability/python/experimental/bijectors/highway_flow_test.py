@@ -57,6 +57,24 @@ class HighwayFlowTests(test_util.TestCase):
         -bijector.inverse_log_det_jacobian(
           tf.identity(bijector.forward(x)), event_ndims=dim + 1))
 
+  def testGating(self):
+    width = 10
+    x = tf.ones((5, width,
+                 width)) * samplers.uniform((5, width, width),
+                                            minval=-1.,
+                                            maxval=1., seed=seed)
+    bijector = tfp.experimental.bijectors.build_highway_flow_layer(
+      width, activation_fn=tf.nn.softplus, gate_first_n=6)
+    self.evaluate(
+      [v.initializer for v in bijector.trainable_variables])
+    self.assertStartsWith(bijector.name, 'highway_flow')
+    self.assertAllClose(x, bijector.inverse(
+      tf.identity(bijector.forward(x))))
+    self.assertAllClose(
+      bijector.forward_log_det_jacobian(x, event_ndims=2),
+      -bijector.inverse_log_det_jacobian(
+        tf.identity(bijector.forward(x)), event_ndims=2))
+
   def testJacobianWithActivation(self):
     activations = ['softplus']
     batch_size = 3
