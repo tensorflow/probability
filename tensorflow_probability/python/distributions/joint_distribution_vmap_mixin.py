@@ -47,19 +47,6 @@ def _might_have_excess_ndims(flat_value, flat_core_ndims):
   return False
 
 
-def _pad_value_to_full_length(value, dtype):
-  """Fills a partial `value` structure with `None`s for any unspecified RVs."""
-  # If dtype is dict-like, set missing values to `None`.
-  if hasattr(dtype, 'keys'):
-    return type(dtype)({k: value.get(k, None) for k in dtype.keys()})
-
-  # Otherwise, dtype is a sequence, so append `None`s.
-  return tf.nest.pack_sequence_as(
-      dtype,
-      tf.nest.flatten([value[i] if i < len(value) else None
-                       for i in range(len(dtype))]))
-
-
 # Lint doesn't know that docstrings are defined in the base JD class.
 # pylint: disable=missing-docstring
 class JointDistributionVmapMixin(object):
@@ -128,20 +115,16 @@ class JointDistributionVmapMixin(object):
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
                            name='sample_distributions', **kwargs):
     with self._name_and_control_scope(name):
-
-      value_might_have_sample_dims = False
-      if (value is None) and kwargs:
-        value = self._resolve_value_from_kwargs(**kwargs)
-      if value is not None:
-        value = tf.nest.map_structure(
-            lambda v: v if v is None else tf.convert_to_tensor(v), value)
-        value = _pad_value_to_full_length(value, self.dtype)
-        value_might_have_sample_dims = _might_have_excess_ndims(
-            # Double-flatten in case any components have structured events.
-            flat_value=nest.flatten_up_to(self._single_sample_ndims,
-                                          self._model_flatten(value),
-                                          check_types=False),
-            flat_core_ndims=tf.nest.flatten(self._single_sample_ndims))
+      value = self._resolve_value(value=value, allow_partially_specified=True,
+                                  **kwargs)
+      value_might_have_sample_dims = (
+          value is not None
+          and _might_have_excess_ndims(
+              # Double-flatten in case any components have structured events.
+              flat_value=nest.flatten_up_to(self._single_sample_ndims,
+                                            self._model_flatten(value),
+                                            check_types=False),
+              flat_core_ndims=tf.nest.flatten(self._single_sample_ndims)))
 
       # TODO(b/157953455): Return distributions as CompositeTensors once
       # vectorized_map supports this.
@@ -156,21 +139,15 @@ class JointDistributionVmapMixin(object):
             sample_shape=sample_shape, seed=seed, value=value)
       return self._model_unflatten(ds), self._model_unflatten(xs)
 
-  def _sample_n(self, sample_shape, seed, value=None, **kwargs):
-
-    value_might_have_sample_dims = False
-    if (value is None) and kwargs:
-      value = self._resolve_value_from_kwargs(**kwargs)
-    if value is not None:
-      value = tf.nest.map_structure(
-          lambda v: v if v is None else tf.convert_to_tensor(v), value)
-      value = _pad_value_to_full_length(value, self.dtype)
-      value_might_have_sample_dims = _might_have_excess_ndims(
-          # Double-flatten in case any components have structured events.
-          flat_value=nest.flatten_up_to(self._single_sample_ndims,
-                                        self._model_flatten(value),
-                                        check_types=False),
-          flat_core_ndims=tf.nest.flatten(self._single_sample_ndims))
+  def _sample_n(self, sample_shape, seed, value=None):
+    value_might_have_sample_dims = (
+        value is not None
+        and _might_have_excess_ndims(
+            # Double-flatten in case any components have structured events.
+            flat_value=nest.flatten_up_to(self._single_sample_ndims,
+                                          self._model_flatten(value),
+                                          check_types=False),
+            flat_core_ndims=tf.nest.flatten(self._single_sample_ndims)))
 
     if not self.use_vectorized_map or not (
         _might_have_nonzero_size(sample_shape) or
