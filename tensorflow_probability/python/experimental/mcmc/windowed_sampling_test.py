@@ -138,7 +138,7 @@ def _gen_gaussian_updating_example(x_dim, y_dim, seed):
     (tfd.JointDistribution, tf.Tensor), representing the joint distribution
     above, and the posterior variance.
   """
-  seeds = samplers.split_seed(seed, 5)
+  seeds = samplers.split_seed(seed, 6)
   x_mean = samplers.normal((x_dim,), seed=seeds[0])
   x_scale_diag = samplers.normal((x_dim,), seed=seeds[1])
   y_scale_diag = samplers.normal((y_dim,), seed=seeds[2])
@@ -154,7 +154,7 @@ def _gen_gaussian_updating_example(x_dim, y_dim, seed):
         scale_diag=y_scale_diag,
         name='y')
 
-  dists, _ = model.sample_distributions()
+  dists, _ = model.sample_distributions(seed=seeds[5])
   precision_x = tf.linalg.inv(dists.x.covariance())
   precision_y = tf.linalg.inv(dists.y.covariance())
   true_cov = tf.linalg.inv(precision_x  +
@@ -177,12 +177,12 @@ class WindowedSamplingTest(test_util.TestCase):
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
     @tf.function(autograph=False)
-    def do_sample():
+    def do_sample(seed):
       return tfp.experimental.mcmc.windowed_adaptive_hmc(
           3, model, num_leapfrog_steps=2, num_adaptation_steps=21,
-          seed=test_util.test_seed(), **pins)
+          seed=seed, **pins)
 
-    draws, _ = do_sample()
+    draws, _ = do_sample(test_util.test_seed())
     self.evaluate(draws)
 
   @parameterized.named_parameters(
@@ -194,12 +194,12 @@ class WindowedSamplingTest(test_util.TestCase):
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
     @tf.function
-    def do_sample():
+    def do_sample(seed):
       return tfp.experimental.mcmc.windowed_adaptive_nuts(
           3, model, max_tree_depth=2, num_adaptation_steps=50,
-          seed=test_util.test_seed(), **pins)
+          seed=seed, **pins)
 
-    draws, _ = do_sample()
+    draws, _ = do_sample(test_util.test_seed())
     self.evaluate(draws)
 
   # TODO(b/186878587) Figure out what's wrong and re-enable.
@@ -208,12 +208,12 @@ class WindowedSamplingTest(test_util.TestCase):
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
     @tf.function
-    def do_sample():
+    def do_sample(seed):
       return tfp.experimental.mcmc.windowed_adaptive_hmc(
-          400, model, num_leapfrog_steps=12, seed=test_util.test_seed(),
+          400, model, num_leapfrog_steps=12, seed=seed,
           **pins)
 
-    draws, _ = do_sample()
+    draws, _ = do_sample(test_util.test_seed())
     flat_draws = tf.nest.flatten(
         model.experimental_pin(**pins)._model_flatten(draws))
     max_scale_reduction = tf.reduce_max(
@@ -422,6 +422,8 @@ def get_joint_distribution(
       name='jd')
 
 
+@test_util.disable_test_for_backend(disable_jax=True,
+                                    reason='Only applies to TF')
 class PrecompiledTest(test_util.TestCase):
 
   def setUp(self):
@@ -429,9 +431,10 @@ class PrecompiledTest(test_util.TestCase):
     arms = 2
     days = 3
 
-    self.trials = tfd.Poisson(100.).sample([arms, days])
+    strm = test_util.test_seed_stream()
+    self.trials = tfd.Poisson(100.).sample([arms, days], seed=strm())
     dist = get_joint_distribution(self.trials)
-    self.true_values = dist.sample(seed=test_util.test_seed())
+    self.true_values = dist.sample(seed=strm())
 
   def nuts_kwargs(self):
     return {'max_tree_depth': 2}

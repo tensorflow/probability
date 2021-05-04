@@ -220,11 +220,6 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
         target_fn=pinned_model.unnormalized_log_prob,
         sample_shape=[n_chains],
         seed=seed)
-  else:
-    tf.nest.map_structure(
-        lambda x, y: tf.assert_equal(x.shape, y.shape),
-        pinned_model.sample_unpinned(n_chains),
-        init_position)
 
   initial_transformed_position = tf.nest.map_structure(
       tf.identity, bijector.forward(init_position))
@@ -677,8 +672,9 @@ def _windowed_adaptive_impl(n_draws,
   # Peter Norgaard, and Rob Von Behren. 2019. “A Condition Number for
   # Hamiltonian Monte Carlo.” arXiv [stat.CO]. arXiv.
   # http://arxiv.org/abs/1905.09813.
-  init_step_size = tf.cast(
-      ps.shape(initial_transformed_position)[-1], tf.float32) ** -0.25
+  init_step_size = 0.5 * sum([
+      tf.cast(ps.shape(state_part)[-1], tf.float32)
+      for state_part in initial_transformed_position])**-0.25
 
   proposal_kernel_kwargs.update({
       'target_log_prob_fn': target_log_prob_fn,
