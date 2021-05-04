@@ -256,7 +256,7 @@ class HighwayFlow(tfb.Bijector):
       fldj += tf.reduce_sum(tf.math.log(self._derivative_of_softplus(x)),
                             -1)
       x = self.residual_fraction * x + (
-          1. - self.residual_fraction) * self.activation_fn(x)
+          1. - self.residual_fraction) * tf.nn.softplus(x)
     if added_batch:
       x = tf.squeeze(x, 0)
     return x, {'ildj': -fldj, 'fldj': fldj}
