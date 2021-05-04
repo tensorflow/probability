@@ -343,7 +343,7 @@ def _cf_surrogate_for_joint_distribution(
                            else (surrogate_posterior, variables))
         if type(value_out) == list:
           if len(dist.event_shape) == 0:
-            dist = prior_gen.send(tf.reshape(value_out[0], -1))
+            dist = prior_gen.send(tf.squeeze(value_out[0], -1))
           else:
             dist = prior_gen.send(value_out[0])
 
