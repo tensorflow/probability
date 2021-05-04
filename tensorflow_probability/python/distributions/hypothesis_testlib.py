@@ -83,6 +83,7 @@ SPECIAL_DISTS = (
     'Mixture',  # (has strategy)
     'MixtureSameFamily',  # (has strategy)
     'MultivariateNormalLinearOperator',
+    'MultivariateNormalLowRankUpdateLinearOperatorCovariance',
     'MultivariateNormalDiagPlusLowRank',  # Some batch shapes fail (b/177958275)
     'MultivariateStudentTLinearOperator',
     'Sample',  # (has strategy)
@@ -342,6 +343,14 @@ CONSTRAINTS = {
     'MultivariateNormalDiagPlusLowRank.scale_perturb_diag':
         tfp_hps.softplus_plus_eps(),
     'MultivariateNormalDiagPlusLowRank.scale_perturb_factor':
+        # Prevent large low-rank perturbations from creating numerically
+        # singular matrices.
+        tf.math.tanh,
+    'MultivariateNormalDiagPlusLowRankCovariance.cov_diag_factor':
+        # Ensure that the diagonal component is large enough to avoid being
+        # overwhelmed  by the (singular) low-rank perturbation.
+        tfp_hps.softplus_plus_eps(1. + 1e-6),
+    'MultivariateNormalDiagPlusLowRankCovariance.cov_perturb_factor':
         # Prevent large low-rank perturbations from creating numerically
         # singular matrices.
         tf.math.tanh,

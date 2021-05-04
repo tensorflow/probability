@@ -40,9 +40,10 @@ class MultivariateNormalDiagPlusLowRank(
   `scale` matrix; `covariance = scale @ scale.T` where `@` denotes
   matrix-multiplication.
 
-  Note that this is not the usual construction of a multivariate normal with a
-  diagonal plus low-rank _covariance_ matrix. Instead the _scale_ matrix is
-  diagonal plus low-rank.  This means
+  The scale matrix for this particular Normal is a (typically low rank)
+  perturbation of a diagonal matrix.
+  Compare to `MultivariateNormalDiagPlusLowRankCovariance` which perturbs the
+  *covariance* rather than scale.
 
   ```none
   C = S S.T

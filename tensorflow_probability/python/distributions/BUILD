@@ -115,6 +115,7 @@ multi_substrate_py_library(
         ":multivariate_student_t",
         ":mvn_diag",
         ":mvn_diag_plus_low_rank",
+        ":mvn_diag_plus_low_rank_covariance",
         ":mvn_full_covariance",
         ":mvn_linear_operator",
         ":mvn_tril",
@@ -1426,6 +1427,19 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "mvn_diag_plus_low_rank_covariance",
+    srcs = ["mvn_diag_plus_low_rank_covariance.py"],
+    deps = [
+        ":mvn_low_rank_update_linear_operator_covariance",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "mvn_diag",
     srcs = ["mvn_diag.py"],
     deps = [
@@ -1472,6 +1486,19 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "mvn_low_rank_update_linear_operator_covariance",
+    srcs = ["mvn_low_rank_update_linear_operator_covariance.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -3322,6 +3349,18 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "mvn_diag_plus_low_rank_covariance_test",
+    srcs = ["mvn_diag_plus_low_rank_covariance_test.py"],
+    deps = [
+        ":mvn_diag_plus_low_rank_covariance",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "mvn_diag_plus_low_rank_test",
     srcs = ["mvn_diag_plus_low_rank_test.py"],
     deps = [
@@ -3371,6 +3410,18 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "mvn_low_rank_update_linear_operator_covariance_test",
+    srcs = ["mvn_low_rank_update_linear_operator_covariance_test.py"],
+    deps = [
+        ":mvn_low_rank_update_linear_operator_covariance",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

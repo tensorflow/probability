@@ -86,11 +86,17 @@ NO_LOG_PROB_PARAM_GRADS = (
 
 NO_KL_PARAM_GRADS = ('Deterministic', 'VectorDeterministic')
 
+# Number of tensor conversions, *in addition to* the default conversions, is
+# allowed for these distributions.
 EXTRA_TENSOR_CONVERSION_DISTS = {
     'LambertWNormal': 2,
     'RelaxedBernoulli': 1,
     'WishartTriL': 3,  # not concretizing linear operator scale
     'Chi': 2,  # subclasses `Chi2`, runs redundant checks on `df` parameter
+    # Validating args 2 conversions, in addition to 1-3 extra for the method.
+    # E.g. entropy requires 2 extra, since it requires the base operator does a
+    # determinant + solve inside log_abs_determinant.
+    'MultivariateNormalDiagPlusLowRankCovariance': 3,
 }
 
 # TODO(b/130815467) All distributions should be auto-vectorizeable.
@@ -190,6 +196,7 @@ XLA_LOGPROB_RTOL.update({
     'MultivariateNormalDiag': 5e-6,
     'MultivariateNormalFullCovariance': 1e-5,
     'MultivariateNormalTriL': 1e-5,
+    'MultivariateNormalDiagPlusLowRankCovariance': 1e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
     'PERT': 5e-4,
     'Poisson': 3e-2,  # TODO(b/159999573)
