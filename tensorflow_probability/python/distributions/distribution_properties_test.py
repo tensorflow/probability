@@ -73,6 +73,7 @@ NO_NANS_TEST_BLOCK_LIST = (
     # Independent log_prob unavoidably emits `nan` if the underlying
     # distribution yields a +inf on one sample and a -inf on another.
     'Independent',
+    'LambertWNormal',
     'LogitNormal',  # TODO(axch): Maybe nan problem hints at accuracy problem
     # Mixtures of component distributions whose samples have different dtypes
     # cannot pass validate_args.
@@ -116,6 +117,7 @@ LOG_PROB_ACCURACY_BLOCK_LIST = (
     'GeneralizedExtremeValue',
     'JohnsonSU',
     'Kumaraswamy',
+    'LambertWNormal',
     'LogitNormal',  # Filters too much in 6/100 runs (nan samples too easy?)
     'MultivariateNormalDiag',
     'MultivariateNormalTriL',

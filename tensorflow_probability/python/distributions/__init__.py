@@ -76,6 +76,8 @@ from tensorflow_probability.python.distributions.joint_distribution_auto_batched
 from tensorflow_probability.python.distributions.joint_distribution_sequential import JointDistributionSequential
 from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionSequentialAutoBatched
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
+from tensorflow_probability.python.distributions.lambertw_f import LambertWDistribution
+from tensorflow_probability.python.distributions.lambertw_f import LambertWNormal
 from tensorflow_probability.python.distributions.laplace import Laplace
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
 from tensorflow_probability.python.distributions.lkj import LKJ
@@ -218,8 +220,10 @@ __all__ = [
     'JointDistributionSequential',
     'JointDistributionSequentialAutoBatched',
     'Kumaraswamy',
-    'LinearGaussianStateSpaceModel',
+    'LambertWDistribution',
+    'LambertWNormal',
     'Laplace',
+    'LinearGaussianStateSpaceModel',
     'LKJ',
     'Logistic',
     'LogLogistic',

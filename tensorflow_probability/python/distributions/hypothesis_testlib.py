@@ -76,6 +76,7 @@ SPECIAL_DISTS = (
     'GaussianProcess',  # PSDKernel strategy not implemented.
     'GaussianProcessRegressionModel',  # PSDKernel strategy not implemented.
     'Independent',  # (has strategy)
+    'LambertWDistribution',
     'MatrixNormalLinearOperator',
     'MatrixTLinearOperator',
     'Masked',  # (has strategy)

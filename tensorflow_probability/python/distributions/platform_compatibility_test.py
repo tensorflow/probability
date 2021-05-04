@@ -87,6 +87,7 @@ NO_LOG_PROB_PARAM_GRADS = (
 NO_KL_PARAM_GRADS = ('Deterministic', 'VectorDeterministic')
 
 EXTRA_TENSOR_CONVERSION_DISTS = {
+    'LambertWNormal': 2,
     'RelaxedBernoulli': 1,
     'WishartTriL': 3,  # not concretizing linear operator scale
     'Chi': 2,  # subclasses `Chi2`, runs redundant checks on `df` parameter
