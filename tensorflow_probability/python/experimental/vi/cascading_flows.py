@@ -401,9 +401,11 @@ def _cf_convex_update_for_base_distribution(dist,
 
   """Creates a trainable surrogate for a (non-meta, non-joint) distribution."""
 
-  actual_event_shape = dist.event_shape_tensor()
-  int_event_shape = int(actual_event_shape) if actual_event_shape.shape.as_list()[0] > 0 else 1
+
   if variables is None:
+    actual_event_shape = dist.event_shape_tensor()
+    int_event_shape = int(actual_event_shape) if \
+    actual_event_shape.shape.as_list()[0] > 0 else 1
     layers = 3
     bijectors = [tfb.Reshape([-1], event_shape_in=actual_event_shape + num_auxiliary_variables)]
 
