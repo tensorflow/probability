@@ -402,6 +402,7 @@ def _cf_convex_update_for_base_distribution(dist,
   """Creates a trainable surrogate for a (non-meta, non-joint) distribution."""
 
   actual_event_shape = dist.event_shape_tensor()
+  int_event_shape = int(actual_event_shape) if actual_event_shape.shape.as_list()[0] > 0 else 1
   if variables is None:
     layers = 3
     bijectors = [tfb.Reshape([-1], event_shape_in=actual_event_shape + num_auxiliary_variables)]
@@ -410,11 +411,11 @@ def _cf_convex_update_for_base_distribution(dist,
       bijectors.append(
         build_highway_flow_layer(tf.reduce_prod(actual_event_shape + num_auxiliary_variables),
                                 residual_fraction_initial_value=initial_prior_weight,
-                                 activation_fn=True))
+                                 activation_fn=True, gate_first_n=int_event_shape))
     bijectors.append(
       build_highway_flow_layer(tf.reduce_prod(actual_event_shape +  num_auxiliary_variables),
                                residual_fraction_initial_value=initial_prior_weight,
-                               activation_fn=False))
+                               activation_fn=False, gate_first_n=int_event_shape))
     bijectors.append(tfb.Reshape(actual_event_shape + num_auxiliary_variables))
 
     variables = tfb.Chain(bijectors=list(reversed(bijectors)))
