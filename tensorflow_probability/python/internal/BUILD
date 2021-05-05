@@ -120,6 +120,16 @@ multi_substrate_py_library(
     ],
 )
 
+multi_substrate_py_test(
+    name = "broadcast_util_test",
+    srcs = ["broadcast_util_test.py"],
+    deps = [
+        ":broadcast_util",
+        ":test_util",
+        # tensorflow dep,
+    ],
+)
+
 multi_substrate_py_library(
     name = "cache_util",
     srcs = ["cache_util.py"],

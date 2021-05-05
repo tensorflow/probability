@@ -28,6 +28,7 @@ __all__ = [
     'left_justified_expand_dims_to',
     'left_justified_broadcast_like',
     'left_justified_broadcast_to',
+    'right_justified_unsorted_segment_sum',
     'where_left_justified_mask',
 ]
 
@@ -68,3 +69,24 @@ def where_left_justified_mask(mask, vals1, vals2, name=None):
     target_rank = ps.maximum(ps.rank(vals1), ps.rank(vals2))
     bcast_mask = left_justified_expand_dims_to(mask, target_rank)
     return tf.where(bcast_mask, vals1, vals2)
+
+
+def right_justified_unsorted_segment_sum(
+    data, segment_ids, num_segments, name=None):
+  """Same as tf.segment_sum, except the segment ids line up on the right."""
+  with tf.name_scope(name or 'right_justified_unsorted_segment_sum'):
+    data = tf.convert_to_tensor(data)
+    segment_ids = tf.convert_to_tensor(segment_ids)
+    n_seg = ps.rank(segment_ids)
+    n_data = ps.rank(data)
+    # Move the rightmost n_seg dimensions to the left, where
+    # segment_sum will find them
+    perm = ps.concat(
+        [ps.range(n_data - n_seg, n_data), ps.range(0, n_data - n_seg)], axis=0)
+    data_justified = tf.transpose(data, perm=perm)
+    results_justified = tf.math.unsorted_segment_sum(
+        data_justified, segment_ids, num_segments)
+    # segment_sum puts the segment dimension of the result on the
+    # left; move it to the right.
+    inverse_perm = ps.concat([ps.range(1, n_data - n_seg + 1), [0]], axis=0)
+    return tf.transpose(results_justified, perm=inverse_perm)
