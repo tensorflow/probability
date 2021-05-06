@@ -20,6 +20,7 @@ load(
     "multi_substrate_py_library",
     "multi_substrate_py_test",
 )
+# [internal] load pytype.bzl (pytype_strict_test)
 
 licenses(["notice"])
 
@@ -56,15 +57,20 @@ multi_substrate_py_library(
     ],
 )
 
+# pytype_strict
 py_test(
     name = "auto_composite_tensor_test",
     srcs = ["auto_composite_tensor_test.py"],
+    data = glob(["testdata/auto_composite_tensor/**"]),
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        ":tensor_util",
+        ":test_util",
+        # absl/flags dep,
+        # absl/testing:absltest dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -111,6 +117,16 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "broadcast_util_test",
+    srcs = ["broadcast_util_test.py"],
+    deps = [
+        ":broadcast_util",
+        ":test_util",
+        # tensorflow dep,
     ],
 )
 

@@ -33,6 +33,8 @@ __all__ = [
 ]
 
 
+# TODO(b/182603117): Enable AutoCompositeTensor once LinearOperators are
+# converted to CompositeTensor.
 class _ScaleMatvecLinearOperatorBase(bijector.Bijector):
   """Common base class for `ScaleMatvecLinearOperator{Block}`."""
 
@@ -169,7 +171,6 @@ class ScaleMatvecLinearOperatorBlock(_ScaleMatvecLinearOperatorBase):
                scale,
                adjoint=False,
                validate_args=False,
-               allow_event_shape_broadcasting=False,
                parameters=None,
                name='scale_matvec_linear_operator_block'):
     """Instantiates the `ScaleMatvecLinearOperatorBlock` bijector.
@@ -185,8 +186,6 @@ class ScaleMatvecLinearOperatorBlock(_ScaleMatvecLinearOperatorBase):
         Default value: `False`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
-      allow_event_shape_broadcasting: Allow broadcasting among `event_shape`
-        components when computing LDJ, which may result in incorrect values.
       parameters: Locals dict captured by subclass constructor, to be used for
         copy/slice re-instantiation operators.
       name: Python `str` name given to ops managed by this object.
@@ -215,7 +214,6 @@ class ScaleMatvecLinearOperatorBlock(_ScaleMatvecLinearOperatorBase):
           parameters=parameters,
           name=name)
 
-      self._allow_event_shape_broadcasting = allow_event_shape_broadcasting
       if tensorshape_util.is_fully_defined(self._scale.batch_shape):
         self._parameter_batch_shape = self._scale.batch_shape
       else:

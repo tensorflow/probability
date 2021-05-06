@@ -22,7 +22,7 @@ import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
+from tensorflow_probability.python.experimental.mcmc import preconditioning_utils as pu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc import hmc
@@ -329,10 +329,10 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
       target_log_prob = self.target_log_prob_fn(*state_parts)
       if (not self._store_parameters_in_results or
           self.momentum_distribution is None):
-        momentum_distribution = preconditioning_utils.make_momentum_distribution(
-            state_parts, ps.rank(target_log_prob))
+        momentum_distribution = pu.make_momentum_distribution(
+            state_parts, ps.shape(target_log_prob))
       else:
-        momentum_distribution = preconditioning_utils.maybe_make_list_and_batch_broadcast(
+        momentum_distribution = pu.maybe_make_list_and_batch_broadcast(
             self.momentum_distribution, ps.shape(target_log_prob))
       result = UncalibratedPreconditionedHamiltonianMonteCarloKernelResults(
           **result._asdict(),  # pylint: disable=protected-access
@@ -456,9 +456,9 @@ def _prepare_args(target_log_prob_fn,
 
   # Default momentum distribution is None
   if momentum_distribution is None:
-    momentum_distribution = preconditioning_utils.make_momentum_distribution(
-        state_parts, ps.rank(target_log_prob))
-  momentum_distribution = preconditioning_utils.maybe_make_list_and_batch_broadcast(
+    momentum_distribution = pu.make_momentum_distribution(
+        state_parts, ps.shape(target_log_prob))
+  momentum_distribution = pu.maybe_make_list_and_batch_broadcast(
       momentum_distribution, ps.shape(target_log_prob))
 
   if len(step_sizes) == 1:

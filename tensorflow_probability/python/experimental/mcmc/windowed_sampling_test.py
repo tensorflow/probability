@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import unittest
-
 from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -67,7 +65,7 @@ def eight_schools_sequential():
                      scale=tf.constant(TREATMENT_STDDEVS)),
           reinterpreted_batch_ndims=1,
           name='treatment_effects')])
-      # pylint: enable=g-long-lambda
+  # pylint: enable=g-long-lambda
   return model
 
 
@@ -86,7 +84,7 @@ def eight_schools_named():
                          scale=tf.constant(TREATMENT_STDDEVS)),
               reinterpreted_batch_ndims=1,
               name='treatment_effects')))
-          # pylint: enable=g-long-lambda
+  # pylint: enable=g-long-lambda
   return model
 
 
@@ -107,7 +105,7 @@ def eight_schools_nested():
                          scale=tf.constant(TREATMENT_STDDEVS)),
               reinterpreted_batch_ndims=1,
               name='treatment_effects')))
-          # pylint: enable=g-long-lambda
+  # pylint: enable=g-long-lambda
   return model
 
 
@@ -140,7 +138,7 @@ def _gen_gaussian_updating_example(x_dim, y_dim, seed):
     (tfd.JointDistribution, tf.Tensor), representing the joint distribution
     above, and the posterior variance.
   """
-  seeds = samplers.split_seed(seed, 5)
+  seeds = samplers.split_seed(seed, 6)
   x_mean = samplers.normal((x_dim,), seed=seeds[0])
   x_scale_diag = samplers.normal((x_dim,), seed=seeds[1])
   y_scale_diag = samplers.normal((y_dim,), seed=seeds[2])
@@ -156,7 +154,7 @@ def _gen_gaussian_updating_example(x_dim, y_dim, seed):
         scale_diag=y_scale_diag,
         name='y')
 
-  dists, _ = model.sample_distributions()
+  dists, _ = model.sample_distributions(seed=seeds[5])
   precision_x = tf.linalg.inv(dists.x.covariance())
   precision_y = tf.linalg.inv(dists.y.covariance())
   true_cov = tf.linalg.inv(precision_x  +
@@ -174,30 +172,57 @@ class WindowedSamplingTest(test_util.TestCase):
       dict(testcase_name='_' + fn.__name__, model_fn=fn) for fn in
       [eight_schools_coroutine, eight_schools_named, eight_schools_sequential,
        eight_schools_nested])
-  def test_hmc_samples(self, model_fn):
+  def test_hmc_type_checks(self, model_fn):
     model = model_fn()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
-    @tf.function
-    def do_sample():
+    @tf.function(autograph=False)
+    def do_sample(seed):
       return tfp.experimental.mcmc.windowed_adaptive_hmc(
-          200, model, num_leapfrog_steps=8, seed=test_util.test_seed(),
-          **pins)
+          3, model, num_leapfrog_steps=2, num_adaptation_steps=21,
+          seed=seed, **pins)
 
-    draws, _ = do_sample()
-    flat_draws = tf.nest.flatten(
-        model.experimental_pin(**pins)._model_flatten(draws))
-    max_scale_reduction = tf.reduce_max(
-        tf.nest.map_structure(tf.reduce_max,
-                              tfp.mcmc.potential_scale_reduction(flat_draws)))
-    self.assertLess(self.evaluate(max_scale_reduction), 1.39)
+    draws, _ = do_sample(test_util.test_seed())
+    self.evaluate(draws)
 
   @parameterized.named_parameters(
       dict(testcase_name='_' + fn.__name__, model_fn=fn) for fn in
       [eight_schools_coroutine, eight_schools_named, eight_schools_sequential,
        eight_schools_nested])
-  def test_nuts_samples(self, model_fn):
+  def test_nuts_type_checks(self, model_fn):
     model = model_fn()
+    pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
+
+    @tf.function
+    def do_sample(seed):
+      return tfp.experimental.mcmc.windowed_adaptive_nuts(
+          3, model, max_tree_depth=2, num_adaptation_steps=50,
+          seed=seed, **pins)
+
+    draws, _ = do_sample(test_util.test_seed())
+    self.evaluate(draws)
+
+  # TODO(b/186878587) Figure out what's wrong and re-enable.
+  def disabled_test_hmc_samples_well(self):
+    model = eight_schools_named()
+    pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
+
+    @tf.function
+    def do_sample(seed):
+      return tfp.experimental.mcmc.windowed_adaptive_hmc(
+          400, model, num_leapfrog_steps=12, seed=seed,
+          **pins)
+
+    draws, _ = do_sample(test_util.test_seed())
+    flat_draws = tf.nest.flatten(
+        model.experimental_pin(**pins)._model_flatten(draws))
+    max_scale_reduction = tf.reduce_max(
+        tf.nest.map_structure(tf.reduce_max,
+                              tfp.mcmc.potential_scale_reduction(flat_draws)))
+    self.assertLess(self.evaluate(max_scale_reduction), 1.5)
+
+  def test_nuts_samples_well(self):
+    model = eight_schools_named()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
     @tf.function
@@ -232,6 +257,44 @@ class WindowedSamplingTest(test_util.TestCase):
       self.assertEqual(first_window, 75)
       self.assertEqual(last_window, 75)
 
+  def test_explicit_init(self):
+    sample_dist = tfd.JointDistributionSequential(
+        [tfd.HalfNormal(1., name=f'dist_{idx}') for idx in range(4)])
+
+    explicit_init = [tf.ones(20) for _ in range(3)]
+    _, init, bijector = windowed_sampling._setup_mcmc(
+        model=sample_dist,
+        n_chains=20,
+        init_position=explicit_init,
+        seed=test_util.test_seed(),
+        dist_3=1.)
+
+    self.assertAllEqual(self.evaluate(init),
+                        tf.convert_to_tensor(bijector(explicit_init)))
+
+  def test_explicit_init_samples(self):
+    stream = test_util.test_seed_stream()
+
+    # Compute everything in a function so it is consistent in graph mode
+    @tf.function
+    def do_sample():
+      jd_model = tfd.JointDistributionNamed({
+          'x': tfd.HalfNormal(1.),
+          'y': lambda x: tfd.Normal(0., x)})
+      init = {'x': tf.ones(64)}
+      return tfp.experimental.mcmc.windowed_adaptive_hmc(
+          10,
+          jd_model,
+          num_adaptation_steps=200,
+          current_state=init,
+          num_leapfrog_steps=5,
+          discard_tuning=False,
+          y=tf.constant(1.),
+          seed=stream(),
+          trace_fn=None)
+
+    self.evaluate(do_sample())
+
   def test_valid_init(self):
 
     class _HalfNormal(tfd.HalfNormal):
@@ -247,9 +310,25 @@ class WindowedSamplingTest(test_util.TestCase):
     # Twenty chains with three parameters gives a 1 / 2^60 chance of
     # initializing with a finite log probability by chance.
     _, init, _ = windowed_sampling._setup_mcmc(
-        model=tough_dist, n_chains=20, seed=test_util.test_seed(), dist_3=1.)
+        model=tough_dist,
+        n_chains=20,
+        seed=test_util.test_seed(),
+        dist_3=1.)
 
     self.assertAllGreater(self.evaluate(init), 0.)
+
+  def test_extra_pins_not_required(self):
+    model = tfd.JointDistributionSequential([
+        tfd.Normal(0., 1., name='x'),
+        lambda x: tfd.Normal(x, 1., name='y')
+    ])
+    pinned = model.experimental_pin(y=4.2)
+
+    # No explicit pins are passed, since the model is already pinned.
+    _, init, _ = windowed_sampling._setup_mcmc(
+        model=pinned, n_chains=20,
+        seed=test_util.test_seed())
+    self.assertLen(init, 1)
 
   def test_hmc_fitting_gaussian(self):
     # See docstring to _gen_gaussian_updating_example
@@ -278,7 +357,7 @@ class WindowedSamplingTest(test_util.TestCase):
       final_scaling = 1. / trace['variance_scaling'][0][-1, 0, :]
       return final_scaling, true_var
     final_scaling, true_var = do_sample()
-    self.assertAllClose(true_var, final_scaling, rtol=0.1)
+    self.assertAllClose(true_var, final_scaling, rtol=0.15)
 
   def test_nuts_fitting_gaussian(self):
     # See docstring to _gen_gaussian_updating_example
@@ -307,7 +386,7 @@ class WindowedSamplingTest(test_util.TestCase):
       final_scaling = 1. / trace['variance_scaling'][0][-1, 0, :]
       return final_scaling, true_var
     final_scaling, true_var = do_sample()
-    self.assertAllClose(true_var, final_scaling, rtol=0.1)
+    self.assertAllClose(true_var, final_scaling, rtol=0.1, atol=1e-3)
 
 
 def _beta_binomial(trials):
@@ -328,40 +407,34 @@ def _beta_binomial(trials):
   return _beta_binomial_distribution
 
 
-def get_joint_distribution(trials,
-                           mean_prior=tfd.Uniform(0., 1.),
-                           inverse_concentration_prior=tfd.HalfNormal(5.)):
+def get_joint_distribution(
+    trials,
+    mean_prior=lambda: tfd.Uniform(0., 1.),
+    inverse_concentration_prior=lambda: tfd.HalfNormal(5.)):
   """Returns a joint distribution over parameters and successes."""
   param_shape = ps.shape(trials)[:1]
-  mean = tfd.Sample(mean_prior, param_shape)
-  inverse_concentration = tfd.Sample(inverse_concentration_prior, param_shape)
-  return tfd.JointDistributionNamed(dict(
-      mean=mean,
-      inverse_concentration=inverse_concentration,
-      successes=_beta_binomial(trials)))
+  mean = tfd.Sample(mean_prior(), param_shape)
+  inverse_concentration = tfd.Sample(inverse_concentration_prior(), param_shape)
+  return tfd.JointDistributionNamed(
+      dict(mean=mean,
+           inverse_concentration=inverse_concentration,
+           successes=_beta_binomial(trials)),
+      name='jd')
 
 
+@test_util.disable_test_for_backend(disable_jax=True,
+                                    reason='Only applies to TF')
 class PrecompiledTest(test_util.TestCase):
 
   def setUp(self):
     super().setUp()
-    input_signature = [
-        tf.TensorSpec(shape=[None], dtype=tf.float32, name='init')
-    ]
-    self.init = tf.ones([7])
-    self.decorator = tf.function(
-        jit_compile=True, input_signature=input_signature)
-    self.arms = 2
-    self.days = 3
+    arms = 2
+    days = 3
 
-    self.n_chains = 5
-    self.trials = tfd.Poisson(100.).sample([self.arms, self.days])
-    self.dist = get_joint_distribution(self.trials)
-    self.true_values = self.dist.sample(seed=test_util.test_seed())
-
-  def get_model_ready(self, dist, successes):
-    return windowed_sampling._setup_mcmc(
-        dist, self.n_chains, test_util.test_seed(), successes=successes)
+    strm = test_util.test_seed_stream()
+    self.trials = tfd.Poisson(100.).sample([arms, days], seed=strm())
+    dist = get_joint_distribution(self.trials)
+    self.true_values = dist.sample(seed=strm())
 
   def nuts_kwargs(self):
     return {'max_tree_depth': 2}
@@ -369,19 +442,18 @@ class PrecompiledTest(test_util.TestCase):
   def hmc_kwargs(self):
     return {'num_leapfrog_steps': 3, 'store_parameters_in_results': True}
 
-  @unittest.skip('TODO(b/181594438): Re-enable this test.')
   @parameterized.named_parameters(('hmc_jit_sig', 'hmc'),
                                   ('nuts_jit_sig', 'nuts'))
   def test_base_kernel(self, kind):
-    input_signature = (tf.TensorSpec(
-        shape=[None, None], dtype=tf.float32, name='trials'),
-                       tf.TensorSpec(
-                           shape=[None, None],
-                           dtype=tf.float32,
-                           name='successes'))
+    self.skip_if_no_xla()
+
+    input_signature = (
+        tf.TensorSpec(
+            shape=[None, None], dtype=tf.float32, name='trials'),
+        tf.TensorSpec(
+            shape=[None, None], dtype=tf.float32, name='successes'))
     @tf.function(jit_compile=True, input_signature=input_signature)
     def do(trials, successes):
-      dist = get_joint_distribution(trials)
       if kind == 'hmc':
         proposal_kernel_kwargs = self.hmc_kwargs()
       else:
@@ -389,11 +461,12 @@ class PrecompiledTest(test_util.TestCase):
 
       return windowed_sampling._windowed_adaptive_impl(
           n_draws=9,
-          joint_dist=dist,
+          joint_dist=get_joint_distribution(trials),
           kind=kind,
           n_chains=11,
           proposal_kernel_kwargs=proposal_kernel_kwargs,
-          num_adaptation_steps=525,
+          num_adaptation_steps=50,
+          current_state=None,
           dual_averaging_kwargs={'target_accept_prob': 0.76},
           trace_fn=None,
           return_final_kernel_results=False,

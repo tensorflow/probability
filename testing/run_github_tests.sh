@@ -81,5 +81,7 @@ sharded_tests="${sharded_tests} $(query_and_shard_tests_by_size medium)"
 sharded_tests="${sharded_tests} $(query_and_shard_tests_by_size large)"
 
 # Run tests using run_tfp_test.sh script.
-echo "${sharded_tests}" \
-  | xargs $DIR/run_tfp_test.sh
+if echo "${sharded_tests}" | grep ".*\w.*"; then
+  echo "${sharded_tests}" \
+    | xargs $DIR/run_tfp_test.sh
+fi

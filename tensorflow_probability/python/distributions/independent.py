@@ -32,6 +32,8 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 class Independent(distribution_lib.Distribution):
   """Independent distribution from batch of distributions.
@@ -96,6 +98,12 @@ class Independent(distribution_lib.Distribution):
 
   """
 
+  @deprecation.deprecated_arg_values(
+      '2022-03-01',
+      'Please pass an integer value for `reinterpreted_batch_ndims`. The '
+      'current behavior corresponds to `reinterpreted_batch_ndims=tf.size('
+      'distribution.batch_shape_tensor()) - 1`.',
+      reinterpreted_batch_ndims=None)
   def __init__(self,
                distribution,
                reinterpreted_batch_ndims=None,
@@ -136,7 +144,7 @@ class Independent(distribution_lib.Distribution):
         batch_ndims = tensorshape_util.rank(distribution.batch_shape)
         if batch_ndims is not None:
           self._static_reinterpreted_batch_ndims = max(0, batch_ndims - 1)
-          self._reinterpreted_batch_ndims = tf.convert_to_tensor(
+          self._reinterpreted_batch_ndims = ps.convert_to_shape_tensor(
               self._static_reinterpreted_batch_ndims,
               dtype_hint=tf.int32,
               name='reinterpreted_batch_ndims')
@@ -148,6 +156,7 @@ class Independent(distribution_lib.Distribution):
         self._reinterpreted_batch_ndims = tensor_util.convert_nonref_to_tensor(
             reinterpreted_batch_ndims,
             dtype_hint=tf.int32,
+            as_shape_tensor=True,
             name='reinterpreted_batch_ndims')
         static_val = tf.get_static_value(self._reinterpreted_batch_ndims)
         self._static_reinterpreted_batch_ndims = (
@@ -207,7 +216,9 @@ class Independent(distribution_lib.Distribution):
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
         distribution=parameter_properties.BatchedComponentProperties(
-            event_ndims=lambda self: self.reinterpreted_batch_ndims))
+            # TODO(davmre): replace with `self.reinterpreted_batch_ndims` once
+            # support for `reinterpreted_batch_ndims=None` has been removed.
+            event_ndims=lambda self: self._get_reinterpreted_batch_ndims()))  # pylint: disable=protected-access
 
   def _batch_shape_tensor(self):
     batch_shape = self.distribution.batch_shape_tensor()
@@ -267,6 +278,10 @@ class Independent(distribution_lib.Distribution):
   def _log_prob(self, x, **kwargs):
     return self._reduce(
         self._sum_fn(), self.distribution.log_prob(x, **kwargs))
+
+  def _unnormalized_log_prob(self, x, **kwargs):
+    return self._reduce(
+        self._sum_fn(), self.distribution.unnormalized_log_prob(x, **kwargs))
 
   def _log_cdf(self, x, **kwargs):
     return self._reduce(self._sum_fn(), self.distribution.log_cdf(x, **kwargs))

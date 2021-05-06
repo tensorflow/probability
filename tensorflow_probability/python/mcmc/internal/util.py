@@ -339,6 +339,7 @@ def trace_scan(loop_fn,
                trace_fn,
                trace_criterion_fn=None,
                static_trace_allocation_size=None,
+               condition_fn=None,
                parallel_iterations=10,
                name=None):
   """A simplified version of `tf.scan` that has configurable tracing.
@@ -372,6 +373,10 @@ def trace_scan(loop_fn,
       It is primarily intended for contexts where static shapes are required,
       such as in XLA-compiled code.
       Default value: `None`.
+    condition_fn: Python `callable` additional loop termination condition, with
+     signature `should_continue = condition_fn(step, state, num_traced, trace)`;
+     returning `False` will terminate early and not scan over all of `elems`.
+     Default value: `None`, which means no additional termination condition.
     parallel_iterations: Passed to the internal `tf.while_loop`.
     name: Name scope used in this function. Default: 'trace_scan'.
 
@@ -401,7 +406,7 @@ def trace_scan(loop_fn,
     elems_array = elems_array.unstack(elems)
 
     # Initialize trace arrays.
-    if trace_criterion_fn is None:
+    if trace_criterion_fn is None and condition_fn is None:
       dynamic_size, initial_size = tf.is_tensor(length), length
     elif static_trace_allocation_size is not None:
       dynamic_size, initial_size = False, static_trace_allocation_size
@@ -440,8 +445,13 @@ def trace_scan(loop_fn,
 
       return i + 1, state, num_steps_traced, trace_arrays
 
+    if condition_fn is None:
+      cond = lambda i, *_: i < length
+    else:
+      cond = lambda i, *rest: (i < length) & condition_fn(i, *rest)
+
     _, final_state, _, trace_arrays = tf.while_loop(
-        cond=lambda i, *_: i < length,
+        cond=cond,
         body=_body,
         loop_vars=(0, initial_state, 0, trace_arrays),
         parallel_iterations=parallel_iterations)

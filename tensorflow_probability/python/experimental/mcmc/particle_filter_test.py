@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -477,7 +479,90 @@ class _ParticleFilterTest(test_util.TestCase):
     means = np.sum(np.exp(final_log_weights) * final_particles)
     self.assertAllClose(means, 9., atol=1.5)
 
+  def test_warns_if_transition_distribution_has_unexpected_shape(self):
 
+    initial_state_prior = tfd.JointDistributionNamedAutoBatched(
+        {'sales': tfd.Deterministic(0.),
+         'inventory': tfd.Deterministic(1000.)})
+
+    # Inventory decreases by a Poisson RV 'sales', but is lower bounded at zero.
+    def valid_transition_fn(_, particles):
+      return tfd.JointDistributionNamedAutoBatched(
+          {'sales': tfd.Poisson(10. * tf.ones_like(particles['inventory'])),
+           'inventory': lambda sales: tfd.Deterministic(  # pylint: disable=g-long-lambda
+               tf.maximum(0., particles['inventory'] - sales))},
+          batch_ndims=1,
+          validate_args=True)
+
+    def dummy_observation_fn(_, state):
+      return tfd.Normal(state['inventory'], 1000.)
+
+    run_filter = functools.partial(
+        tfp.experimental.mcmc.particle_filter,
+        observations=tf.zeros([10]),
+        initial_state_prior=initial_state_prior,
+        observation_fn=dummy_observation_fn,
+        num_particles=3,
+        seed=test_util.test_seed(sampler_type='stateless'))
+
+    # Check that the model runs as written.
+    self.evaluate(run_filter(transition_fn=valid_transition_fn))
+    self.evaluate(run_filter(transition_fn=valid_transition_fn,
+                             proposal_fn=valid_transition_fn))
+
+    # Check that broken transition functions raise exceptions.
+    def transition_fn_broadcasts_over_particles(_, particles):
+      return tfd.JointDistributionNamed(
+          {'sales': tfd.Poisson(10.),  # Proposes same value for all particles.
+           'inventory': lambda sales: tfd.Deterministic(  # pylint: disable=g-long-lambda
+               tf.maximum(0., particles['inventory'] - sales))},
+          validate_args=True)
+
+    def transition_fn_partial_batch_shape(_, particles):
+      return tfd.JointDistributionNamed(
+          # Using `Sample` ensures iid proposals for each particle, but not
+          # per-particle log probs.
+          {'sales': tfd.Sample(tfd.Poisson(10.),
+                               ps.shape(particles['sales'])),
+           'inventory': lambda sales: tfd.Deterministic(  # pylint: disable=g-long-lambda
+               tf.maximum(0., particles['inventory'] - sales))},
+          validate_args=True)
+
+    def transition_fn_no_batch_shape(_, particles):
+      # Autobatched JD defaults to treating num_particles as event shape, but
+      # we need it to be batch shape to get per-particle logprobs.
+      return tfd.JointDistributionNamedAutoBatched(
+          {'sales': tfd.Poisson(10. * tf.ones_like(particles['inventory'])),
+           'inventory': lambda sales: tfd.Deterministic(  # pylint: disable=g-long-lambda
+               tf.maximum(0., particles['inventory'] - sales))},
+          validate_args=True)
+
+    with self.assertRaisesRegex(ValueError, 'transition distribution'):
+      self.evaluate(
+          run_filter(transition_fn=transition_fn_broadcasts_over_particles))
+    with self.assertRaisesRegex(ValueError, 'transition distribution'):
+      self.evaluate(
+          run_filter(transition_fn=transition_fn_partial_batch_shape))
+    with self.assertRaisesRegex(ValueError, 'transition distribution'):
+      self.evaluate(
+          run_filter(transition_fn=transition_fn_no_batch_shape))
+
+    with self.assertRaisesRegex(ValueError, 'proposal distribution'):
+      self.evaluate(
+          run_filter(transition_fn=valid_transition_fn,
+                     proposal_fn=transition_fn_partial_batch_shape))
+    with self.assertRaisesRegex(ValueError, 'proposal distribution'):
+      self.evaluate(
+          run_filter(transition_fn=valid_transition_fn,
+                     proposal_fn=transition_fn_broadcasts_over_particles))
+
+    with self.assertRaisesRegex(ValueError, 'proposal distribution'):
+      self.evaluate(
+          run_filter(transition_fn=valid_transition_fn,
+                     proposal_fn=transition_fn_no_batch_shape))
+
+
+# TODO(b/186068104): add tests with dynamic shapes.
 class ParticleFilterTestFloat32(_ParticleFilterTest):
   dtype = np.float32
 

@@ -17,12 +17,14 @@
 from discussion.fun_mcmc import tf_on_jax
 from discussion.fun_mcmc import util_jax as util
 from tensorflow_probability.substrates import jax as tfp
+from tensorflow_probability.substrates.jax.internal import prefer_static
 
 tf = tf_on_jax.tf
 
 __all__ = [
     'BACKEND_NAME',
     'multi_backend_test',
+    'prefer_static',
     'tf',
     'tfp',
     'util',

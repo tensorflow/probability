@@ -76,6 +76,8 @@ from tensorflow_probability.python.distributions.joint_distribution_auto_batched
 from tensorflow_probability.python.distributions.joint_distribution_sequential import JointDistributionSequential
 from tensorflow_probability.python.distributions.joint_distribution_auto_batched import JointDistributionSequentialAutoBatched
 from tensorflow_probability.python.distributions.kumaraswamy import Kumaraswamy
+from tensorflow_probability.python.distributions.lambertw_f import LambertWDistribution
+from tensorflow_probability.python.distributions.lambertw_f import LambertWNormal
 from tensorflow_probability.python.distributions.laplace import Laplace
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import LinearGaussianStateSpaceModel
 from tensorflow_probability.python.distributions.lkj import LKJ
@@ -93,6 +95,7 @@ from tensorflow_probability.python.distributions.multinomial import Multinomial
 from tensorflow_probability.python.distributions.multivariate_student_t import MultivariateStudentTLinearOperator
 from tensorflow_probability.python.distributions.mvn_diag import MultivariateNormalDiag
 from tensorflow_probability.python.distributions.mvn_diag_plus_low_rank import MultivariateNormalDiagPlusLowRank
+from tensorflow_probability.python.distributions.mvn_diag_plus_low_rank_covariance import MultivariateNormalDiagPlusLowRankCovariance
 from tensorflow_probability.python.distributions.mvn_full_covariance import MultivariateNormalFullCovariance
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 from tensorflow_probability.python.distributions.mvn_tril import MultivariateNormalTriL
@@ -218,8 +221,10 @@ __all__ = [
     'JointDistributionSequential',
     'JointDistributionSequentialAutoBatched',
     'Kumaraswamy',
-    'LinearGaussianStateSpaceModel',
+    'LambertWDistribution',
+    'LambertWNormal',
     'Laplace',
+    'LinearGaussianStateSpaceModel',
     'LKJ',
     'Logistic',
     'LogLogistic',

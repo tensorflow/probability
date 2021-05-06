@@ -14,6 +14,7 @@
 # ============================================================================
 """TensorFlow Probability experimental bijectors package."""
 
+from tensorflow_probability.python.bijectors.ldj_ratio import forward_log_det_jacobian_ratio
 from tensorflow_probability.python.bijectors.ldj_ratio import inverse_log_det_jacobian_ratio
 from tensorflow_probability.python.experimental.bijectors.distribution_bijectors import make_distribution_bijector
 from tensorflow_probability.python.experimental.bijectors.scalar_function_with_inferred_inverse import ScalarFunctionWithInferredInverse
@@ -22,6 +23,7 @@ from tensorflow_probability.python.experimental.bijectors.highway_flow import Hi
 __all__ = [
     'build_highway_flow_layer',
     'HighwayFlow',
+    'forward_log_det_jacobian_ratio',
     'inverse_log_det_jacobian_ratio',
     'make_distribution_bijector',
     'ScalarFunctionWithInferredInverse',

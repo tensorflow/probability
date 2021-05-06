@@ -13,9 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Oryx is a neural network mini-library built on top of Jax."""
-# TODO(b/164218843): enable omnistaging in Oryx
-from jax.config import config
-config.enable_omnistaging()
 from oryx import bijectors  # pylint: disable=g-import-not-at-top
 from oryx import core
 from oryx import distributions

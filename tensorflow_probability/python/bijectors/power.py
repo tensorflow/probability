@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
@@ -37,7 +38,9 @@ def _is_odd_integer(x):
   return ps.equal(x, ps.round(x)) & ps.not_equal(2. * ps.floor(x / 2.), x)
 
 
-class Power(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Power(bijector.AutoCompositeTensorBijector):
   """Compute `g(X) = X ** power`; where X is a non-negative real number.
 
   When `power` is an odd integer, this bijector has domain the whole real line,

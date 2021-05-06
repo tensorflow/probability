@@ -59,6 +59,7 @@ FILENAMES = [
     "tensor_array_ops_test",
     "test_lib",
     "tf_inspect",
+    "type_spec",
     "v1",
     "v2",
     "_utils",

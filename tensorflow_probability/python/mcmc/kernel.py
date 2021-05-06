@@ -27,10 +27,6 @@ __all__ = [
 ]
 
 
-# TODO(b/74235190): Add additional documentation/examples to the
-# `TransitionKernel` docstring.
-
-
 @six.add_metaclass(abc.ABCMeta)
 class TransitionKernel(object):
   """Base class for all MCMC `TransitionKernel`s.
@@ -40,6 +36,56 @@ class TransitionKernel(object):
   state given some old state. It also takes (and returns) "side information"
   which may be used for debugging or optimization purposes (i.e, to "recycle"
   previously computed results).
+
+  #### Example (random walk transition kernel):
+
+  In this example we make isotropic Gaussian proposals of a given step size.
+
+  ```python
+  from tensorflow_probability.python.mcmc import kernel as kernel_base
+  import tensorflow.compat.v2 as tf
+  tf.enable_v2_behavior()
+  import tensorflow_probability as tfp
+
+  tfd = tfp.distributions
+
+  RWResult = collections.namedtuple("RWResult", 'target_log_prob')
+
+  class RandomWalkProposalKernel(kernel_base.TransitionKernel):
+    def __init__(self, target_log_prob_fn, step_size):
+      self._parameters = dict(
+        target_log_prob_fn = target_log_prob_fn,
+        step_size = step_size)
+
+    @property
+    def target_log_prob_fn(self):
+      return self._parameters['target_log_prob_fn']
+
+    @property
+    def step_size(self):
+      return self._parameters['step_size']
+
+    @property
+    def is_calibrated(self):
+      return False
+
+    def one_step(self, current_state, previous_kernel_results, seed=None):
+      scale = tf.broadcast_to(self.step_size, tf.shape(current_state))
+      isotropic_normal = tfd.Normal(loc=current_state, scale=scale)
+
+      next_state = isotropic_normal.sample(seed=seed)
+      next_target_log_prob = self.target_log_prob_fn(next_state)
+      new_kernel_results = previous_kernel_results._replace(
+        target_log_prob = next_target_log_prob)
+
+      return next_state, new_kernel_results
+
+    def bootstrap_results(self, init_state):
+      kernel_results = RWResult(
+        target_log_prob = self.target_log_prob_fn(init_state))
+      return kernel_results
+  ```
+
   """
 
   @abc.abstractmethod

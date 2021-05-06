@@ -25,18 +25,20 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.framework import type_spec  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Transpose',
 ]
 
 
-class Transpose(bijector.Bijector):
+class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
   """Compute `Y = g(X) = transpose_rightmost_dims(X, rightmost_perm)`.
 
   This bijector is semantically similar to `tf.transpose` except that it
@@ -165,7 +167,9 @@ class Transpose(bijector.Bijector):
 
       # TODO(b/110828604): If bijector base class ever supports dynamic
       # `min_event_ndims`, then this class already works dynamically and the
-      # following five lines can be removed.
+      # following five lines can be removed. In this case, we may have to
+      # deprecate doing work in the constructor to avoid graph cycles when
+      # `validate_args==True`.
       if rightmost_transposed_ndims_ is None:
         raise NotImplementedError('`rightmost_transposed_ndims` must be '
                                   'known prior to graph execution.')
@@ -306,6 +310,21 @@ class Transpose(bijector.Bijector):
 
     return assertions
 
+  @property
+  def _composite_tensor_shape_params(self):
+    return ('rightmost_transposed_ndims', 'perm')
+
+  @property
+  def _type_spec(self):
+    # Re-instantiate the bijector from the TypeSpec using the kwarg that the
+    # user originally passed to `__init__` (either `perm` or
+    # `rightmost_transposed_ndims`.
+    if self.parameters['perm'] is None:
+      omit_kwargs = ('name', 'perm')
+    else:
+      omit_kwargs = ('name', 'rightmost_transposed_ndims')
+    return _TransposeTypeSpec.from_instance(self, omit_kwargs=omit_kwargs)
+
 
 def _maybe_validate_rightmost_transposed_ndims(
     initial_rightmost_transposed_ndims,
@@ -384,3 +403,11 @@ def _maybe_validate_perm(
       ]
 
     return assertions
+
+
+@type_spec.register('tfp.bijectors.Transpose_ACTypeSpec')
+class _TransposeTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):  # pylint: disable=protected-access
+
+  @property
+  def value_type(self):
+    return Transpose

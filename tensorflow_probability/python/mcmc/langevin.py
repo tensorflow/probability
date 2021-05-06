@@ -755,7 +755,7 @@ def _compute_log_acceptance_correction(current_state_parts,
         proposed_drift_parts,
         step_size_parts,
     ):
-      axis = tf.range(independent_chain_ndims, tf.rank(current_state))
+      axis = ps.range(independent_chain_ndims, ps.rank(current_state))
 
       state_diff = proposed_state - current_state
 

@@ -58,6 +58,7 @@ py_library(
         ":tensor_array_ops",
         ":test_lib",
         ":tf_inspect",
+        ":type_spec",
     ],
 )
 
@@ -361,6 +362,7 @@ py_library(
     testonly = 1,
     srcs = ["tensor_shape_gen.py"],
     deps = [
+        # absl/logging dep,
         # six dep,
     ],
 )
@@ -379,6 +381,11 @@ py_library(
     name = "tf_inspect",
     srcs = ["tf_inspect.py"],
     deps = [],
+)
+
+py_library(
+    name = "type_spec",
+    srcs = ["type_spec.py"],
 )
 
 py_library(

@@ -137,7 +137,6 @@ py_library(
     ],
 )
 
-# pytype
 py_library(
     name = "backend_jax",
     srcs = ["backend_jax.py"],
@@ -182,6 +181,7 @@ py_library(
 
 py_test(
     name = "fun_mcmc_test",
+    size = "large",
     srcs = ["fun_mcmc_test.py"],
     python_version = "PY3",
     shard_count = 8,

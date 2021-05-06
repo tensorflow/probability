@@ -24,16 +24,19 @@ from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    "SinhArcsinh",
+    'SinhArcsinh',
 ]
 
 
-class SinhArcsinh(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class SinhArcsinh(bijector.AutoCompositeTensorBijector):
   """`Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight ) * multiplier`.
 
   For `skewness in (-inf, inf)` and `tailweight in (0, inf)`, this
@@ -73,7 +76,7 @@ class SinhArcsinh(bijector.Bijector):
                skewness=None,
                tailweight=None,
                validate_args=False,
-               name="sinh_arcsinh"):
+               name='sinh_arcsinh'):
     """Instantiates the `SinhArcsinh` bijector.
 
     Args:
@@ -92,9 +95,9 @@ class SinhArcsinh(bijector.Bijector):
       dtype = dtype_util.common_dtype([tailweight, skewness],
                                       dtype_hint=tf.float32)
       self._skewness = tensor_util.convert_nonref_to_tensor(
-          skewness, dtype=dtype, name="skewness")
+          skewness, dtype=dtype, name='skewness')
       self._tailweight = tensor_util.convert_nonref_to_tensor(
-          tailweight, dtype=dtype, name="tailweight")
+          tailweight, dtype=dtype, name='tailweight')
       self._scale_number = tf.convert_to_tensor(2., dtype=dtype)
       super(SinhArcsinh, self).__init__(
           forward_min_event_ndims=0,
@@ -175,5 +178,5 @@ class SinhArcsinh(bijector.Bijector):
     if is_init != tensor_util.is_ref(self.tailweight):
       assertions.append(assert_util.assert_positive(
           self.tailweight,
-          message="Argument `tailweight` must be positive."))
+          message='Argument `tailweight` must be positive.'))
     return assertions

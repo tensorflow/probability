@@ -8,6 +8,7 @@ from tensorflow_probability.python.internal import test_util
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
+#FIXME: test_util.test_seed throws an error
 seed = 1  # test_util.test_seed(sampler_type='stateless')
 
 
@@ -20,7 +21,8 @@ def _dx(x, activation):
     return 1. - tf.math.tanh(x) ** 2
 
 
-def _activation_log_det_jacobian(x, residual_fraction, activation, width, gate_first_n):
+def _activation_log_det_jacobian(x, residual_fraction, activation, width,
+                                 gate_first_n):
   if activation == 'none':
     return tf.zeros(x.shape[0])
   else:
@@ -28,8 +30,8 @@ def _activation_log_det_jacobian(x, residual_fraction, activation, width, gate_f
       tf.concat([(residual_fraction) * tf.ones(
         gate_first_n), tf.zeros(width - gate_first_n)],
                 axis=0) + tf.concat([(1. - residual_fraction) * tf.ones(
-      gate_first_n), tf.ones(width - gate_first_n)],
-                          axis=0) * _dx(x, activation)),
+        gate_first_n), tf.ones(width - gate_first_n)],
+                                    axis=0) * _dx(x, activation)),
       -1)
 
 
@@ -40,17 +42,19 @@ class HighwayFlowTests(test_util.TestCase):
     width = 1
     for dim in range(2):
       if dim == 0:
+        # Test generic case with scalar input
         x = tf.ones((width,)) * samplers.uniform((width,), minval=-1.,
-                                                maxval=1.,
-                                                seed=seed)
+                                                 maxval=1.,
+                                                 seed=seed)
       elif dim == 1:
+        # Test with 2D tensor + batch
         x = tf.ones((5, width,
                      width)) * samplers.uniform((5, width, width),
                                                 minval=-1.,
                                                 maxval=1., seed=seed)
 
       bijector = tfp.experimental.bijectors.build_highway_flow_layer(
-        width, activation_fn=tf.nn.softplus)
+        width, activation_fn=True)
       self.evaluate(
         [v.initializer for v in bijector.trainable_variables])
       self.assertStartsWith(bijector.name, 'highway_flow')
@@ -67,8 +71,23 @@ class HighwayFlowTests(test_util.TestCase):
                  width)) * samplers.uniform((2, width, width),
                                             minval=-1.,
                                             maxval=1., seed=seed)
+
+    # Test with gating half of the inputs
     bijector = tfp.experimental.bijectors.build_highway_flow_layer(
       width, activation_fn=True, gate_first_n=2)
+    self.evaluate(
+      [v.initializer for v in bijector.trainable_variables])
+    self.assertStartsWith(bijector.name, 'highway_flow')
+    self.assertAllClose(x, bijector.inverse(
+      tf.identity(bijector.forward(x))))
+    self.assertAllClose(
+      bijector.forward_log_det_jacobian(x, event_ndims=2),
+      -bijector.inverse_log_det_jacobian(
+        tf.identity(bijector.forward(x)), event_ndims=2))
+
+    # Test with gating no inputs
+    bijector = tfp.experimental.bijectors.build_highway_flow_layer(
+      width, activation_fn=True, gate_first_n=0)
     self.evaluate(
       [v.initializer for v in bijector.trainable_variables])
     self.assertStartsWith(bijector.name, 'highway_flow')
@@ -114,10 +133,12 @@ class HighwayFlowTests(test_util.TestCase):
       if activation == 'none':
         y = x
       else:
-        y = tf.concat([(residual_fraction) * tf.ones(gate_first_n), tf.zeros(width - gate_first_n)],
-                          axis=0) * x + tf.concat([(1. - residual_fraction) * tf.ones(
-      gate_first_n), tf.ones(width - gate_first_n)],
-                          axis=0) * activation_fn(x)
+        y = tf.concat([(residual_fraction) * tf.ones(gate_first_n),
+                       tf.zeros(width - gate_first_n)],
+                      axis=0) * x + tf.concat(
+          [(1. - residual_fraction) * tf.ones(
+            gate_first_n), tf.ones(width - gate_first_n)],
+          axis=0) * activation_fn(x)
       expected_forward_log_det_jacobian = \
         _activation_log_det_jacobian(x,
                                      residual_fraction,

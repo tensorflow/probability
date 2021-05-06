@@ -35,10 +35,17 @@ tfd = tfp.distributions
 tfb = tfp.bijectors
 tfde = tfp.experimental.distributions
 
-_CompositeMultivariateNormalPrecisionFactorLinearOperator = tfp.experimental.auto_composite_tensor(
-    tfde.MultivariateNormalPrecisionFactorLinearOperator, omit_kwargs=('name',))
-_CompositeJointDistributionSequential = tfp.experimental.auto_composite_tensor(
-    tfd.JointDistributionSequential, omit_kwargs=('name',))
+JAX_MODE = False
+
+if JAX_MODE:
+  _CompositeMultivariateNormalPrecisionFactorLinearOperator = tfde.MultivariateNormalPrecisionFactorLinearOperator
+  _CompositeJointDistributionSequential = tfd.JointDistributionSequential
+else:
+  _CompositeMultivariateNormalPrecisionFactorLinearOperator = tfp.experimental.auto_composite_tensor(
+      tfde.MultivariateNormalPrecisionFactorLinearOperator,
+      omit_kwargs=('name',))
+  _CompositeJointDistributionSequential = tfp.experimental.auto_composite_tensor(
+      tfd.JointDistributionSequential, omit_kwargs=('name',))
 
 
 @tf.function(autograph=False)
@@ -604,24 +611,6 @@ RunNUTSResults = collections.namedtuple('RunNUTSResults', [
 ])
 
 
-def _make_composite_tensor(dist):
-  """Wrapper to make distributions of linear operators composite."""
-  if dist is None:
-    return dist
-  composite_dist = tfp.experimental.auto_composite_tensor(dist.__class__,
-                                                          omit_kwargs='name')
-  p = dist.parameters
-
-  for k in p:
-    if isinstance(p[k], tfp.distributions.Distribution):
-      p[k] = _make_composite_tensor(p[k])
-    elif isinstance(p[k], tf.linalg.LinearOperator):
-      composite_linop = tfp.experimental.auto_composite_tensor(p[k].__class__)
-      p[k] = composite_linop(**p[k].parameters)
-  ac_dist = composite_dist(**p)
-  return ac_dist
-
-
 @test_util.test_graph_mode_only
 class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
   """More careful tests that sampling/preconditioning is actually working."""
@@ -659,6 +648,8 @@ class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
           precision_factor=cov_linop.cholesky(),
       )
     elif precondition_scheme == 'sqrtm':
+      if JAX_MODE:
+        self.skipTest('`sqrtm` is not yet implemented in JAX.')
       momentum_distribution = _CompositeMultivariateNormalPrecisionFactorLinearOperator(
           # The symmetric square root is a perfectly valid "factor".
           precision_factor=tf.linalg.LinearOperatorFullMatrix(
@@ -673,7 +664,6 @@ class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
     else:
       raise RuntimeError(
           'Unhandled precondition_scheme: {}'.format(precondition_scheme))
-    momentum_distribution = _make_composite_tensor(momentum_distribution)
 
     nuts_kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
@@ -693,15 +683,16 @@ class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
               results.step_size,
       }
 
+    strm = test_util.test_seed_stream()
     @tf.function
     def do_run_run_run():
       """Do a run, return RunNUTSResults."""
       states, trace = tfp.mcmc.sample_chain(
           num_results,
-          current_state=tf.identity(target_mvn.sample(seed=0)),
+          current_state=tf.identity(target_mvn.sample(seed=strm())),
           kernel=nuts_kernel,
           num_burnin_steps=num_adaptation_steps,
-          seed=test_util.test_seed(),
+          seed=strm(),
           trace_fn=trace_fn)
 
       # If we had some number of chain dimensions, we would change sample_axis.
@@ -846,15 +837,17 @@ class PreconditionedNUTSTest(test_util.TestCase):
     if use_default:
       momentum_distribution = None
     else:
-      momentum_distribution = tfp.experimental.as_composite(
-          tfd.Normal(0., tf.constant(.5, dtype=tf.float64)))
+      momentum_distribution = tfd.Normal(0., tf.constant(.5, dtype=tf.float64))
+      if not JAX_MODE:
+        momentum_distribution = tfp.experimental.as_composite(
+            momentum_distribution)
     kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
         lambda x: -x**2, step_size=.5, max_tree_depth=4,
         momentum_distribution=momentum_distribution)
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(kernel, num_adaptation_steps=3)
     self.evaluate(tfp.mcmc.sample_chain(
         1, kernel=kernel, current_state=tf.ones([], tf.float64),
-        num_burnin_steps=5, trace_fn=None))
+        num_burnin_steps=5, seed=test_util.test_seed(), trace_fn=None))
 
   # TODO(b/175787154): Enable this test
   def DISABLED_test_f64_multichain(self, use_default):
@@ -870,7 +863,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
     nchains = 7
     self.evaluate(tfp.mcmc.sample_chain(
         1, kernel=kernel, current_state=tf.ones([nchains], tf.float64),
-        num_burnin_steps=5, trace_fn=None))
+        num_burnin_steps=5, seed=test_util.test_seed(), trace_fn=None))
 
   def test_diag(self, use_default):
     """Test that a diagonal multivariate normal can be effectively sampled from.

@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -33,7 +34,9 @@ __all__ = [
 ]
 
 
-class FrechetCDF(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class FrechetCDF(bijector.AutoCompositeTensorBijector):
   """The Frechet cumulative density function.
 
   Computes `Y = g(X) = exp(-((X - loc) / scale)**(-concentration))`, the Frechet

@@ -28,8 +28,10 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import stats
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'effective_sample_size',
@@ -105,21 +107,21 @@ def effective_sample_size(states,
   reduce the noise in the estimate of `R_k`, reducing the need for truncation.
 
   Args:
-    states:  `Tensor` or list of `Tensor` objects.  Dimension zero should index
-      identically distributed states.
-    filter_threshold: `Tensor` or list of `Tensor` objects.  Must broadcast with
-      `state`.  The sequence of auto-correlations is truncated after the first
-      appearance of a term less than `filter_threshold`.  Setting to `None`
-      means we use no threshold filter.  Since `|R_k| <= 1`, setting to any
-      number less than `-1` has the same effect. Ignored if
+    states: `Tensor` or Python structure of `Tensor` objects.  Dimension zero
+      should index identically distributed states.
+    filter_threshold: `Tensor` or Python structure of `Tensor` objects.  Must
+      broadcast with `state`.  The sequence of auto-correlations is truncated
+      after the first appearance of a term less than `filter_threshold`.
+      Setting to `None` means we use no threshold filter.  Since `|R_k| <= 1`,
+      setting to any number less than `-1` has the same effect. Ignored if
       `filter_beyond_positive_pairs` is `True`.
-    filter_beyond_lag: `Tensor` or list of `Tensor` objects.  Must be `int`-like
-      and scalar valued.  The sequence of auto-correlations is truncated to this
-      length.  Setting to `None` means we do not filter based on the size of
-      lags.
+    filter_beyond_lag: `Tensor` or Python structure of `Tensor` objects.  Must
+      be `int`-like and scalar valued.  The sequence of auto-correlations is
+      truncated to this length.  Setting to `None` means we do not filter based
+      on the size of lags.
     filter_beyond_positive_pairs: Python boolean. If `True`, only consider the
       initial auto-correlation sequence where the pairwise sums are positive.
-    cross_chain_dims: An integer `Tensor` or a list of integer `Tensors`
+    cross_chain_dims: An integer `Tensor` or a structure of integer `Tensors`
       corresponding to each state component. If a list of `states` is provided,
       then this argument should also be a list of the same length. Which
       dimensions of `states` to treat as independent chains that ESS will be
@@ -130,14 +132,14 @@ def effective_sample_size(states,
     name:  `String` name to prepend to created ops.
 
   Returns:
-    ess:  `Tensor` or list of `Tensor` objects.  The effective sample size of
+    ess: `Tensor` structure parallel to `states`.  The effective sample size of
       each component of `states`.  If `cross_chain_dims` is None, the shape will
-      be `states.shape[1:]`. Otherwise, the shape is
-      `tf.reduce_mean(states, cross_chain_dims).shape[1:]`.
+      be `states.shape[1:]`. Otherwise, the shape is `tf.reduce_mean(states,
+      cross_chain_dims).shape[1:]`.
 
   Raises:
-    ValueError:  If `states` and `filter_threshold` or `states` and
-      `filter_beyond_lag` are both lists with different lengths.
+    ValueError: If `states` and `filter_threshold` or `states` and
+      `filter_beyond_lag` are both structures of different shapes.
     ValueError: If `cross_chain_dims` is not `None` and there are less than 2
       chains.
 
@@ -182,35 +184,23 @@ def effective_sample_size(states,
        for assessing convergence of MCMC, 2019. Retrieved from
        http://arxiv.org/abs/1903.08008
   """
-  states_was_list = _is_list_like(states)
-
-  # Convert all args to lists.
-  if states_was_list:
-    if cross_chain_dims is None:
-      cross_chain_dims = _broadcast_maybelist_arg(states, cross_chain_dims,
-                                                  'cross_chain_dims')
-  else:
-    states = [states]
-    cross_chain_dims = [cross_chain_dims]
-
-  filter_beyond_lag = _broadcast_maybelist_arg(states, filter_beyond_lag,
-                                               'filter_beyond_lag')
-  filter_threshold = _broadcast_maybelist_arg(states, filter_threshold,
-                                              'filter_threshold')
-  filter_beyond_positive_pairs = _broadcast_maybelist_arg(
-      states, filter_beyond_positive_pairs, 'filter_beyond_positive_pairs')
+  if cross_chain_dims is None:
+    cross_chain_dims = nest_util.broadcast_structure(states, None)
+  filter_beyond_lag = nest_util.broadcast_structure(states, filter_beyond_lag)
+  filter_threshold = nest_util.broadcast_structure(states, filter_threshold)
+  filter_beyond_positive_pairs = nest_util.broadcast_structure(
+      states, filter_beyond_positive_pairs)
 
   # Process items, one at a time.
+  def single_state(*args):
+    return _effective_sample_size_single_state(
+        *args, validate_args=validate_args)
   with tf.name_scope('effective_sample_size' if name is None else name):
-    ess_list = [
-        _effective_sample_size_single_state(*args, validate_args=validate_args)  # pylint: disable=g-complex-comprehension
-        for args in zip(states, filter_beyond_lag, filter_threshold,
-                        filter_beyond_positive_pairs, cross_chain_dims)
-    ]
-
-  if states_was_list:
-    return ess_list
-  return ess_list[0]
+    return nest.map_structure_up_to(
+        states,
+        single_state,
+        states, filter_beyond_lag, filter_threshold,
+        filter_beyond_positive_pairs, cross_chain_dims)
 
 
 def _effective_sample_size_single_state(states, filter_beyond_lag,
@@ -379,7 +369,7 @@ def potential_scale_reduction(chains_states,
     [Brooks and Gelman (1998)][2].
 
   Args:
-    chains_states:  `Tensor` or Python `list` of `Tensor`s representing the
+    chains_states:  `Tensor` or Python structure of `Tensor`s representing the
       states of a Markov Chain at each result step.  The `ith` state is
       assumed to have shape `[Ni, Ci1, Ci2,...,CiD] + A`.
       Dimension `0` indexes the `Ni > 1` result steps of the Markov Chain.
@@ -398,9 +388,9 @@ def potential_scale_reduction(chains_states,
       `potential_scale_reduction`.
 
   Returns:
-    `Tensor` or Python `list` of `Tensor`s representing the R-hat statistic for
-    the state(s).  Same `dtype` as `state`, and shape equal to
-    `state.shape[1 + independent_chain_ndims:]`.
+    `Tensor` structure parallel to `chains_states` representing the
+    R-hat statistic for the state(s).  Same `dtype` as `state`, and
+    shape equal to `state.shape[1 + independent_chain_ndims:]`.
 
   Raises:
     ValueError:  If `independent_chain_ndims < 1`.
@@ -467,10 +457,6 @@ def potential_scale_reduction(chains_states,
        for assessing convergence of MCMC, 2019. Retrieved from
        http://arxiv.org/abs/1903.08008
   """
-  chains_states_was_list = _is_list_like(chains_states)
-  if not chains_states_was_list:
-    chains_states = [chains_states]
-
   # tf.get_static_value returns None iff a constant value (as a numpy
   # array) is not efficiently computable.  Therefore, we try constant_value then
   # check for None.
@@ -483,16 +469,11 @@ def potential_scale_reduction(chains_states,
           'Argument `independent_chain_ndims` must be `>= 1`, found: {}'.format(
               independent_chain_ndims))
 
+  def single_state(s):
+    return _potential_scale_reduction_single_state(
+        s, independent_chain_ndims, split_chains, validate_args)
   with tf.name_scope('potential_scale_reduction' if name is None else name):
-    rhat_list = [
-        _potential_scale_reduction_single_state(s, independent_chain_ndims,
-                                                split_chains, validate_args)
-        for s in chains_states
-    ]
-
-  if chains_states_was_list:
-    return rhat_list
-  return rhat_list[0]
+    return tf.nest.map_structure(single_state, chains_states)
 
 
 def _potential_scale_reduction_single_state(state, independent_chain_ndims,
@@ -609,21 +590,3 @@ def _axis_size(x, axis=None):
   return ps.cast(
       ps.reduce_prod(
           ps.gather(ps.shape(x), axis)), x.dtype)
-
-
-def _is_list_like(x):
-  """Helper which returns `True` if input is `list`-like."""
-  return isinstance(x, (tuple, list))
-
-
-def _broadcast_maybelist_arg(states, secondary_arg, name):
-  """Broadcast a listable secondary_arg to that of states."""
-  if _is_list_like(secondary_arg):
-    if len(secondary_arg) != len(states):
-      raise ValueError('Argument `{}` was a list of different length ({}) than '
-                       '`states` ({})'.format(name, len(secondary_arg),
-                                              len(states)))
-  else:
-    secondary_arg = [secondary_arg] * len(states)
-
-  return secondary_arg

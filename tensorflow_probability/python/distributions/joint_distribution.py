@@ -32,8 +32,10 @@ from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import docstring_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -333,8 +335,10 @@ class JointDistribution(distribution_lib.Distribution):
         for each of `distribution_fn`.
     """
     with self._name_and_control_scope(name):
-      ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
-                                                    **kwargs)
+      value = self._resolve_value(value=value,
+                                  allow_partially_specified=True,
+                                  **kwargs)
+      ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
       if not sample_shape and value is None:
         # This is a single sample with no pinned values; this call will cache
         # the distributions if they are not already cached.
@@ -412,26 +416,18 @@ class JointDistribution(distribution_lib.Distribution):
     xs = self._map_measure_over_dists('log_prob', value)
     return sum(maybe_check_wont_broadcast(xs, self.validate_args))
 
+  def _unnormalized_log_prob(self, value):
+    xs = self._map_measure_over_dists('unnormalized_log_prob', value)
+    return sum(maybe_check_wont_broadcast(xs, self.validate_args))
+
   @distribution_util.AppendDocstring(kwargs_dict={
       'value': ('`Tensor`s structured like `type(model)` used to parameterize '
                 'other dependent ("downstream") distribution-making functions. '
                 'Using `None` for any element will trigger a sample from the '
                 'corresponding distribution. Default value: `None` '
-                '(i.e., draw a sample from each distribution).'),
-      '**kwargs:': ('This is an alternative to passing a `value`, and achieves '
-                    'the same effect. Named arguments will be used to '
-                    'parameterize other dependent ("downstream") '
-                    'distribution-making functions. See `value` for more '
-                    'details. If a `value` argument is also provided, raises '
-                    'a `ValueError`.')})
-  def _sample_n(self, sample_shape, seed, value=None, **kwargs):
-    if value is not None and kwargs:
-      keywords = ', '.join(map(str, kwargs))
-      raise ValueError('Supplied both `value` and keyword arguments to '
-                       'parameterize sampling. Supplied keywords were: '
-                       '{}'.format(keywords))
-    ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value,
-                                                  **kwargs)
+                '(i.e., draw a sample from each distribution).')})
+  def _sample_n(self, sample_shape, seed, value=None):
+    ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
     if not sample_shape and value is None:
       # This is a single sample with no pinned values; this call will cache
       # the distributions if they are not already cached.
@@ -456,11 +452,44 @@ class JointDistribution(distribution_lib.Distribution):
              if dists is None else dists)
     return (getattr(d, attr)() for d in dists)
 
-  def _resolve_value_from_kwargs(self, **kwargs):
+  def _sanitize_value(self, value):
+    """Ensures `value` matches `self.dtype` with `Tensor` or `None` elements."""
+    if value is None:
+      return value
+
+    if len(value) < len(self.dtype):
+      # Fill in missing entries with `None`.
+      if hasattr(self.dtype, 'keys'):
+        value = {k: value.get(k, None) for k in self.dtype.keys()}
+      else:  # dtype is a sequence.
+        value = [value[i] if i < len(value) else None
+                 for i in range(len(self.dtype))]
+
+    value = nest_util.cast_structure(value, self.dtype)
+    return nest.map_structure_up_to(
+        self.dtype,
+        lambda x, d: x if x is None else tf.convert_to_tensor(x, dtype_hint=d),
+        value, self.dtype)
+
+  def _resolve_value(self, *args, allow_partially_specified=False, **kwargs):
+    """Resolves a `value` structure from user-passed arguments."""
+    value = kwargs.pop('value', None)
+    if not (args or kwargs):
+       # Fast path when `value` is the only kwarg. The case where `value` is
+       # passed as a positional arg is handled by `_resolve_value_from_args`
+       # below.
+      return self._sanitize_value(value)
+    elif value is not None:
+      raise ValueError('Supplied both `value` and keyword '
+                       'arguments to parameterize sampling. Supplied keyword '
+                       'arguments were: {}. '.format(
+                           ', '.join(map(str, kwargs))))
+
     names = self._flat_resolve_names()
-    kwargs.update({k: kwargs.get(k, None) for k in names})  # In place update
+    if allow_partially_specified:
+      kwargs.update({k: kwargs.get(k, None) for k in names})  # In place update.
     value, unmatched_kwargs = _resolve_value_from_args(
-        [],
+        args,
         kwargs,
         dtype=self.dtype,
         flat_names=names,
@@ -475,16 +504,15 @@ class JointDistribution(distribution_lib.Distribution):
           'Found unexpected keyword arguments. Distribution names '
           'are\n{}\nbut received\n{}\nThese names were '
           'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
-    return value
+    return self._sanitize_value(value)
 
-  def _call_flat_sample_distributions(
-      self, sample_shape=(), seed=None, value=None, **kwargs):
-    if (value is None) and kwargs:
-      value = self._resolve_value_from_kwargs(**kwargs)
+  def _call_flat_sample_distributions(self,
+                                      sample_shape=(),
+                                      seed=None,
+                                      value=None):
     if value is not None:
       value = self._model_flatten(value)
     ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
-
     return ds, xs
 
   # Override the base method to capture *args and **kwargs, so we can
@@ -501,15 +529,8 @@ class JointDistribution(distribution_lib.Distribution):
       log_prob: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
         values of type `self.dtype`.
     """
-    kwargs['name'] = kwargs.get('name', 'log_prob')
-    value, unmatched_kwargs = _resolve_value_from_args(
-        args,
-        kwargs,
-        dtype=self.dtype,
-        flat_names=self._flat_resolve_names(),
-        model_flatten_fn=self._model_flatten,
-        model_unflatten_fn=self._model_unflatten)
-    return self._call_log_prob(value, **unmatched_kwargs)
+    name = kwargs.pop('name', 'log_prob')
+    return self._call_log_prob(self._resolve_value(*args, **kwargs), name=name)
 
   # Override the base method to capture *args and **kwargs, so we can
   # implement more flexible custom calling semantics.
@@ -525,16 +546,8 @@ class JointDistribution(distribution_lib.Distribution):
       prob: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
         values of type `self.dtype`.
     """
-    kwargs['name'] = kwargs.get('name', 'prob')
-    value, unmatched_kwargs = _resolve_value_from_args(
-        args,
-        kwargs,
-        dtype=self.dtype,
-        flat_names=self._flat_resolve_names(),
-        model_flatten_fn=self._model_flatten,
-        model_unflatten_fn=self._model_unflatten)
-
-    return self._call_prob(value, **unmatched_kwargs)
+    name = kwargs.pop('name', 'prob')
+    return self._call_prob(self._resolve_value(*args, **kwargs), name=name)
 
   def _flat_resolve_names(self, dummy_name='var'):
     """Resolves a name for each random variable in the model."""
@@ -560,8 +573,9 @@ class JointDistribution(distribution_lib.Distribution):
       return self._sample_n(
           sample_shape,
           seed=seed() if callable(seed) else seed,
-          value=value,
-          **kwargs)
+          value=self._resolve_value(value=value,
+                                    allow_partially_specified=True,
+                                    **kwargs))
 
   def _default_event_space_bijector(self, *args, **kwargs):
     if bool(args) or bool(kwargs):
@@ -794,6 +808,13 @@ class _DefaultJointBijector(composition.Composition):
       # If the RV is not yet constrained, transform it.
       cond = rv if constrained else bij.forward(rv)
     return bijectors
+
+  @property
+  def _parts_interact(self):
+    # The bijector that operates on input part B may in general be a
+    # function of input part A. This dependence is not visible to the
+    # Composition base class, so we annotate it explicitly.
+    return True
 
   def _walk_forward(self, step_fn, values, _jd_conditioning=None):  # pylint: disable=invalid-name
     bijectors = self._conditioned_bijectors(_jd_conditioning, constrained=False)

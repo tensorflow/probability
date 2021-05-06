@@ -44,9 +44,12 @@ from tensorflow_probability.python.stats.sample_stats import auto_correlation
 from tensorflow_probability.python.stats.sample_stats import cholesky_covariance
 from tensorflow_probability.python.stats.sample_stats import correlation
 from tensorflow_probability.python.stats.sample_stats import covariance
+from tensorflow_probability.python.stats.sample_stats import cumulative_variance
 from tensorflow_probability.python.stats.sample_stats import log_average_probs
 from tensorflow_probability.python.stats.sample_stats import stddev
 from tensorflow_probability.python.stats.sample_stats import variance
+from tensorflow_probability.python.stats.sample_stats import windowed_mean
+from tensorflow_probability.python.stats.sample_stats import windowed_variance
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
@@ -61,6 +64,7 @@ __all__ = [
     'correlation',
     'count_integers',
     'covariance',
+    'cumulative_variance',
     'expected_calibration_error',
     'expected_calibration_error_quantiles',
     'find_bins',
@@ -79,6 +83,8 @@ __all__ = [
     'quantiles',
     'stddev',
     'variance',
+    'windowed_mean',
+    'windowed_variance',
 ]
 
 all_util.remove_undocumented(__name__, __all__)

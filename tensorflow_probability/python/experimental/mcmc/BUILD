@@ -43,7 +43,6 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     substrates_omit_deps = [
         ":covariance_reducer",
-        ":diagonal_mass_matrix_adaptation",
         ":elliptical_slice_sampler",
         ":expectations_reducer",
         ":kernel_builder",
@@ -51,7 +50,6 @@ multi_substrate_py_library(
         ":nuts_autobatching",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
-        ":preconditioned_nuts",
         ":progress_bar_reducer",
         ":reducer",
         ":sample",
@@ -60,7 +58,6 @@ multi_substrate_py_library(
         ":sample_fold",
         ":thinning_kernel",
         ":tracing_reducer",
-        ":windowed_sampling",
         ":with_reductions",
     ],
     deps = [
@@ -189,7 +186,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "diagonal_mass_matrix_adaptation",
     srcs = ["diagonal_mass_matrix_adaptation.py"],
     srcs_version = "PY3",
@@ -204,11 +201,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "diagonal_mass_matrix_adaptation_test",
     size = "large",
     timeout = "long",
     srcs = ["diagonal_mass_matrix_adaptation_test.py"],
+    disabled_substrates = ["numpy"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
@@ -242,7 +240,7 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "preconditioned_nuts",
     srcs = ["preconditioned_nuts.py"],
     srcs_version = "PY3",
@@ -261,10 +259,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "pnuts_test",
     size = "medium",
     srcs = ["pnuts_test.py"],
+    disabled_substrates = ["numpy"],
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
@@ -559,7 +558,7 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["sample_sequential_monte_carlo_test.py"],
     disabled_substrates = ["numpy"],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -818,7 +817,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "thermodynamic_integrals_test",
-    size = "small",
+    size = "medium",
     srcs = ["thermodynamic_integrals_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
@@ -960,7 +959,7 @@ multi_substrate_py_test(
     name = "gradient_based_trajectory_length_adaptation_test",
     size = "large",
     srcs = ["gradient_based_trajectory_length_adaptation_test.py"],
-    numpy_tags = ["notap"],  # Mostly gradient-based tests.
+    disabled_substrates = ["numpy"],  # Mostly gradient-based tests.
     python_version = "PY3",
     shard_count = 3,
     srcs_version = "PY3",
@@ -973,7 +972,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "windowed_sampling",
     srcs = ["windowed_sampling.py"],
     srcs_version = "PY3",
@@ -999,13 +998,18 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "windowed_sampling_test",
     size = "large",
     srcs = ["windowed_sampling_test.py"],
+    disabled_substrates = ["numpy"],
     python_version = "PY3",
-    shard_count = 8,
+    shard_count = 12,
     srcs_version = "PY3",
+    tags = [
+        "no-oss-ci",  # Prohibitively slow.
+        "requires-mem:16g",
+    ],
     deps = [
         ":windowed_sampling",
         # absl/testing:parameterized dep,

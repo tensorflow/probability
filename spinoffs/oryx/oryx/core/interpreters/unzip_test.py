@@ -37,7 +37,8 @@ unzip_variable = functools.partial(unzip.unzip, tag=state.VARIABLE)
 
 def call_impl(f, *args, **params):
   del params
-  return f.call_wrapped(*args)
+  with jax_core.new_sublevel():
+    return f.call_wrapped(*args)
 call_p = jax_core.CallPrimitive('call')
 call_bind = call_p.bind
 call_p.def_impl(call_impl)

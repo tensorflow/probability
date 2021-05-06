@@ -47,6 +47,7 @@ MODULE_MAPPINGS = {
     'ops import control_flow_ops': 'control_flow as control_flow_ops',
     'ops import linalg_ops': 'linalg_impl as linalg_ops',
     'ops import math_ops': 'numpy_math as math_ops',
+    'ops import nn': 'nn',
     'ops import variables as variables_module': 'ops as variables_module',
     'ops.linalg import linalg_impl as linalg': 'linalg_impl as linalg'
 }
@@ -142,6 +143,8 @@ def gen_module(module_name):
   code = code.replace('.get_shape()', '.shape')
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+\.shape)([^(_])',
                 'tensor_shape.TensorShape(\\1)\\2', code)
+  code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_floating',
+                'np.issubdtype(\\1, np.floating)', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_complex',
                 'np.issubdtype(\\1, np.complexfloating)', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_integer',

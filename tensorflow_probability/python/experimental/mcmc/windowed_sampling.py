@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import warnings
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import invert
@@ -35,11 +36,17 @@ from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import unnest
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
 from tensorflow_probability.python.mcmc import sample
+from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
-__all__ = ['windowed_adaptive_hmc', 'windowed_adaptive_nuts']
+
+__all__ = [
+    'windowed_adaptive_hmc',
+    'windowed_adaptive_nuts'
+]
 
 # Cause all warnings to always be triggered.
 # Not having this means subsequent calls wont trigger the warning.
@@ -172,7 +179,7 @@ def _get_flat_unconstraining_bijector(jd_model):
   return invert.Invert(chain.Chain(to_chain))
 
 
-def _setup_mcmc(model, n_chains, seed, **pins):
+def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
   """Construct bijector and transforms needed for windowed MCMC.
 
   This pins the initial model, constructs a bijector that unconstrains and
@@ -189,6 +196,10 @@ def _setup_mcmc(model, n_chains, seed, **pins):
       The model to sample from.
     n_chains: int
       Number of chains (independent examples) to run.
+    init_position: Optional
+      Structure of tensors at which to initialize sampling. Should have the
+      same shape and structure as
+      `model.experimental_pin(**pins).sample(n_chains)`.
     seed: A seed for reproducible sampling.
     **pins:
       Values passed to `model.experimental_pin`.
@@ -199,22 +210,26 @@ def _setup_mcmc(model, n_chains, seed, **pins):
     initial_transformed_position: `tf.Tensor`, sampled from a uniform (-2, 2).
     bijector: `tfb.Bijector` instance, which unconstrains and flattens.
   """
-  pinned_model = model.experimental_pin(**pins)
+  pinned_model = model.experimental_pin(**pins) if pins else model
   bijector = _get_flat_unconstraining_bijector(pinned_model)
 
-  raw_init_dist = initialization.init_near_unconstrained_zero(pinned_model)
-  unconstrained_unif_init_position = initialization.retry_init(
-      raw_init_dist.sample,
-      target_fn=pinned_model.unnormalized_log_prob,
-      sample_shape=[n_chains],
-      seed=seed)
+  if init_position is None:
+    raw_init_dist = initialization.init_near_unconstrained_zero(pinned_model)
+    init_position = initialization.retry_init(
+        raw_init_dist.sample,
+        target_fn=pinned_model.unnormalized_log_prob,
+        sample_shape=[n_chains],
+        seed=seed)
+
   initial_transformed_position = tf.nest.map_structure(
-      tf.identity, bijector.forward(unconstrained_unif_init_position))
+      tf.identity, bijector.forward(init_position))
 
   def target_log_prob_fn(*args):
-    return (pinned_model.unnormalized_log_prob(bijector.inverse(args)) +
-            bijector.inverse_log_det_jacobian(
-                args, event_ndims=[1 for _ in initial_transformed_position]))
+    lp = pinned_model.unnormalized_log_prob(bijector.inverse(args))
+    tensorshape_util.set_shape(lp, [n_chains])
+    ldj = bijector.inverse_log_det_jacobian(
+        args, event_ndims=[1 for _ in initial_transformed_position])
+    return lp + ldj
 
   return target_log_prob_fn, initial_transformed_position, bijector
 
@@ -253,6 +268,7 @@ def make_slow_adapt_kernel(*,
       initial_running_variance=initial_running_variance)
 
 
+@tf.function(autograph=False)
 def _fast_window(*,
                  kind,
                  proposal_kernel_kwargs,
@@ -263,6 +279,7 @@ def _fast_window(*,
                  trace_fn,
                  seed):
   """Sample using just step size adaptation."""
+  dual_averaging_kwargs = dict(dual_averaging_kwargs)
   dual_averaging_kwargs.update({'num_adaptation_steps': num_draws})
   kernel = make_fast_adapt_kernel(
       kind=kind,
@@ -298,7 +315,7 @@ def _fast_window(*,
   return draws, trace, step_size, weighted_running_variance
 
 
-# TODO(b/180601951): Decorate this and `_fast_window` with tf.function
+@tf.function(autograph=False)
 def _slow_window(*,
                  kind,
                  proposal_kernel_kwargs,
@@ -310,6 +327,7 @@ def _slow_window(*,
                  trace_fn,
                  seed):
   """Sample using both step size and mass matrix adaptation."""
+  dual_averaging_kwargs = dict(dual_averaging_kwargs)
   dual_averaging_kwargs.setdefault('num_adaptation_steps', num_draws)
   kernel = make_slow_adapt_kernel(
       kind=kind,
@@ -351,6 +369,7 @@ def _slow_window(*,
   return draws, trace, step_size, weighted_running_variance, momentum_distribution
 
 
+@tf.function(autograph=False)
 def _do_sampling(*,
                  kind,
                  proposal_kernel_kwargs,
@@ -407,12 +426,12 @@ def _get_window_sizes(num_adaptation_steps):
   return first_window_size, slow_window_size, last_window_size
 
 
-def _init_momentum(initial_transformed_position):
+def _init_momentum(initial_transformed_position, *, batch_shape):
   """Initialize momentum so trace_fn can be concatenated."""
   variance_parts = [ps.ones_like(p) for p in initial_transformed_position]
   return preconditioning_utils.make_momentum_distribution(
       state_parts=initial_transformed_position,
-      batch_ndims=1,
+      batch_shape=batch_shape,
       running_variance_parts=variance_parts)
 
 
@@ -421,6 +440,7 @@ def windowed_adaptive_nuts(n_draws,
                            *,
                            n_chains=64,
                            num_adaptation_steps=525,
+                           current_state=None,
                            dual_averaging_kwargs=None,
                            max_tree_depth=10,
                            max_energy_diff=500.,
@@ -446,6 +466,10 @@ def windowed_adaptive_nuts(n_draws,
       Number of independent chains to run MCMC with.
     num_adaptation_steps: int
       Number of draws used to adapt step size and
+    current_state: Optional
+      Structure of tensors at which to initialize sampling. Should have the
+      same shape and structure as
+      `model.experimental_pin(**pins).sample(n_chains)`.
     dual_averaging_kwargs: Optional dict
       Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
       By default, a `target_accept_prob` of 0.85 is set, and the class defaults
@@ -505,6 +529,7 @@ def windowed_adaptive_nuts(n_draws,
       kind='nuts',
       n_chains=n_chains,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
+      current_state=current_state,
       num_adaptation_steps=num_adaptation_steps,
       dual_averaging_kwargs=dual_averaging_kwargs,
       trace_fn=trace_fn,
@@ -520,6 +545,7 @@ def windowed_adaptive_hmc(n_draws,
                           num_leapfrog_steps,
                           n_chains=64,
                           num_adaptation_steps=525,
+                          current_state=None,
                           dual_averaging_kwargs=None,
                           trace_fn=_default_hmc_trace_fn,
                           return_final_kernel_results=False,
@@ -543,6 +569,10 @@ def windowed_adaptive_hmc(n_draws,
       Number of independent chains to run MCMC with.
     num_adaptation_steps: int
       Number of draws used to adapt step size and
+    current_state: Optional
+      Structure of tensors at which to initialize sampling. Should have the
+      same shape and structure as
+      `model.experimental_pin(**pins).sample(n_chains)`.
     dual_averaging_kwargs: Optional dict
       Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
       By default, a `target_accept_prob` of 0.75 is set, and the class defaults
@@ -589,6 +619,7 @@ def windowed_adaptive_hmc(n_draws,
       n_chains=n_chains,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       num_adaptation_steps=num_adaptation_steps,
+      current_state=current_state,
       dual_averaging_kwargs=dual_averaging_kwargs,
       trace_fn=trace_fn,
       return_final_kernel_results=return_final_kernel_results,
@@ -604,6 +635,7 @@ def _windowed_adaptive_impl(n_draws,
                             n_chains,
                             proposal_kernel_kwargs,
                             num_adaptation_steps,
+                            current_state,
                             dual_averaging_kwargs,
                             trace_fn,
                             return_final_kernel_results,
@@ -617,12 +649,21 @@ def _windowed_adaptive_impl(n_draws,
   else:
     no_trace = False
 
-  num_adaptation_steps = tf.convert_to_tensor(num_adaptation_steps)
+  if (tf.executing_eagerly() or
+      not control_flow_util.GraphOrParentsInXlaContext(
+          tf1.get_default_graph())):
+    # A Tensor num_draws argument breaks XLA, which requires static TensorArray
+    # trace_fn result allocation sizes.
+    num_adaptation_steps = tf.convert_to_tensor(num_adaptation_steps)
 
   setup_seed, init_seed, seed = samplers.split_seed(
       samplers.sanitize_seed(seed), n=3)
   target_log_prob_fn, initial_transformed_position, bijector = _setup_mcmc(
-      joint_dist, n_chains=n_chains, seed=setup_seed, **pins)
+      joint_dist,
+      n_chains=n_chains,
+      init_position=current_state,
+      seed=setup_seed,
+      **pins)
 
   first_window_size, slow_window_size, last_window_size = _get_window_sizes(
       num_adaptation_steps)
@@ -631,13 +672,15 @@ def _windowed_adaptive_impl(n_draws,
   # Peter Norgaard, and Rob Von Behren. 2019. “A Condition Number for
   # Hamiltonian Monte Carlo.” arXiv [stat.CO]. arXiv.
   # http://arxiv.org/abs/1905.09813.
-  init_step_size = tf.cast(
-      ps.shape(initial_transformed_position)[-1], tf.float32) ** -0.25
+  init_step_size = 0.5 * sum([
+      tf.cast(ps.shape(state_part)[-1], tf.float32)
+      for state_part in initial_transformed_position])**-0.25
 
   proposal_kernel_kwargs.update({
       'target_log_prob_fn': target_log_prob_fn,
-      'step_size': tf.fill([n_chains, 1], init_step_size),
-      'momentum_distribution': _init_momentum(initial_transformed_position),
+      'step_size': tf.fill([n_chains, 1], init_step_size, name='step_size'),
+      'momentum_distribution': _init_momentum(initial_transformed_position,
+                                              batch_shape=[n_chains]),
   })
   all_traces = []
   draws, trace, step_size, running_variances = _fast_window(

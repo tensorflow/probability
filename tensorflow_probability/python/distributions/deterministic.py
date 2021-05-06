@@ -314,7 +314,7 @@ class Deterministic(_BaseDeterministic):
 
   def _event_shape_tensor(self, loc=None):
     del loc
-    return tf.constant([], dtype=tf.int32)
+    return ps.constant([], dtype=tf.int32)
 
   def _event_shape(self):
     return tf.TensorShape([])

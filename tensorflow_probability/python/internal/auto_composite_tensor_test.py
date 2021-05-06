@@ -19,13 +19,28 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import os
+
+from absl import flags
+from absl.testing import absltest
 
 import tensorflow.compat.v2 as tf
-
 import tensorflow_probability as tfp
+
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
+tf.enable_v2_behavior()
+
+flags.DEFINE_string(
+    'model_output_path',
+    None,
+    'If defined, serialize a `tf.Module` instance to this directory with '
+    '`tf.saved_model`.')
+
+FLAGS = flags.FLAGS
+
+TFP_PYTHON_DIR = 'tensorflow_probability/tensorflow_probability/python'
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -46,6 +61,30 @@ AutoIndependent = tfp.experimental.auto_composite_tensor(
     tfd.Independent, omit_kwargs=('name',))
 AutoReshape = tfp.experimental.auto_composite_tensor(
     tfb.Reshape, omit_kwargs=('name',))
+
+
+class Model(tf.Module):
+
+  def __init__(self):
+    self.scale = tf.Variable([0., 1.], shape=[None])
+
+  @tf.function(input_signature=(
+      tfb.Scale([1., 2.], validate_args=True)._type_spec,))
+  def make_bij(self, b):
+    return tfb.Scale(
+        tf.convert_to_tensor(self.scale) + b.scale,
+        validate_args=True)
+
+
+def tearDownModule():
+  # If `FLAGS.model_output_path` is set, serialize a `Model` instance to disk.
+  # To update the serialized data read by `test_saved_model_from_disk`, pass
+  # the local path to
+  # `tensorflow_probability/python/internal/testdata/auto_composite_tensor`.
+  # You may need to pass `--test_strategy=local` to avoid permissions errors.
+  if FLAGS.model_output_path is not None:
+    model = Model()
+    tf.saved_model.save(model, FLAGS.model_output_path)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -233,7 +272,59 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
     f(d)
 
+  def test_function_with_variable(self):
+    loc = tf.Variable(3.)
+    dist = AutoIndependent(
+        AutoNormal(loc, scale=tf.ones([3])), reinterpreted_batch_ndims=1)
+
+    new_loc = 32.
+    @tf.function
+    def f(d):
+      d.distribution.loc.assign(new_loc)
+      self.assertLen(d.trainable_variables, 1)
+      return d
+
+    dist_ = f(dist)
+    self.evaluate(loc.initializer)
+    self.assertEqual(self.evaluate(dist_.distribution.loc), new_loc)
+    self.assertEqual(self.evaluate(dist.distribution.loc), new_loc)
+    self.assertLen(dist.trainable_variables, 1)
+
+  def test_export_import(self):
+    path = self.create_tempdir().full_path
+
+    m1 = Model()
+    self.evaluate([v.initializer for v in m1.variables])
+    self.evaluate(m1.scale.assign(m1.scale + 1.))
+
+    tf.saved_model.save(m1, os.path.join(path, 'saved_model1'))
+    m2 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
+    self.evaluate(m2.scale.initializer)
+    b = tfb.Scale([5., 9.], validate_args=True)
+    self.evaluate(m2.make_bij(b).forward(2.))
+    self.evaluate(m2.scale.assign(m2.scale + [1., 2.]))
+    self.evaluate(m2.make_bij(b).forward(2.))
+
+    self.evaluate(m2.scale.assign([1., 2., 3.]))
+    tf.saved_model.save(m2, os.path.join(path, 'saved_model2'))
+    m3 = tf.saved_model.load(os.path.join(path, 'saved_model2'))
+    self.evaluate(m3.scale.initializer)
+    with self.assertRaisesOpError('compatible shape'):
+      self.evaluate(m3.make_bij(b).forward([3.]))
+
+  def test_saved_model_from_disk(self):
+
+    test_srcdir = absltest.get_default_test_srcdir()
+    relative_testdata_path = os.path.join(
+        TFP_PYTHON_DIR, 'internal/testdata/auto_composite_tensor')
+    absolute_testdata_path = os.path.join(test_srcdir, relative_testdata_path)
+
+    m = tf.saved_model.load(absolute_testdata_path)
+    self.evaluate(m.scale.initializer)
+    b = tfb.Scale([5., 9.], validate_args=True)
+    self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [10., 20.])
+    self.evaluate(m.scale.assign(m.scale + [1., 2.]))
+    self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [12., 24.])
 
 if __name__ == '__main__':
-  tf.enable_v2_behavior()
   tf.test.main()

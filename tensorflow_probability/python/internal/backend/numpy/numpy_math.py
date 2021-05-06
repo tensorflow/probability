@@ -272,7 +272,9 @@ def _invert_permutation(x, name=None):
 
 def _l2_normalize(x, axis=None, epsilon=1e-12, name=None):  # pylint: disable=unused-argument
   x = _convert_to_tensor(x)
-  return x / np.linalg.norm(x, ord=2, axis=_astuple(axis), keepdims=True)
+  norm = np.linalg.norm(x, ord=2, axis=_astuple(axis), keepdims=True)
+  norm = np.maximum(norm, np.sqrt(epsilon))
+  return x / norm
 
 
 def _lbeta(x, name=None):  # pylint: disable=unused-argument

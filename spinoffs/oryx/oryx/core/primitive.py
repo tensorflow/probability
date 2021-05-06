@@ -83,7 +83,8 @@ class HigherOrderPrimitive(jax_core.Primitive):
 
   def impl(self, f, *args, **params):
     del params
-    return f.call_wrapped(*args)
+    with jax_core.new_sublevel():
+      return f.call_wrapped(*args)
 
   def bind(self, f, *args, **params):
     top_trace = jax_core.find_top_trace(args)

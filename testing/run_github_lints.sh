@@ -23,11 +23,12 @@ get_changed_py_files() {
     git diff \
         --name-only \
         --diff-filter=AM origin/${GITHUB_BASE_REF} \
-      | grep '^tensorflow_probability.*\.py$'
+      | { grep '^tensorflow_probability.*\.py$' || true; }
   fi
 }
 
-pip install --quiet pylint
+python -m pip install --upgrade setuptools
+python -m pip install --quiet pylint
 
 # Run lints on added/changed python files.
 changed_py_files=$(get_changed_py_files)

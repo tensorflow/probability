@@ -49,7 +49,6 @@ from tensorflow_probability.python.distributions import variational_gaussian_pro
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.layers.internal import distribution_tensor_coercible as dtc
 from tensorflow_probability.python.layers.internal import tensor_tuple
-from tensorflow.python.keras.utils import tf_utils as keras_tf_utils  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -70,7 +69,7 @@ __all__ = [
 ]
 
 
-keras_tf_utils.register_symbolic_tensor_type(dtc._TensorCoercible)  # pylint: disable=protected-access
+tf.keras.__internal__.utils.register_symbolic_tensor_type(dtc._TensorCoercible)  # pylint: disable=protected-access
 
 
 def _event_size(event_shape, name=None):

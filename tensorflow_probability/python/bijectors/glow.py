@@ -696,7 +696,7 @@ class GlowBlock(chain.Chain):
     return bijector_fn
 
 
-class OneByOneConv(scale_matvec_lu.ScaleMatvecLU):
+class OneByOneConv(bijector.Bijector):
   """The 1x1 Conv bijector used in Glow.
 
   This class has a convenience function which initializes the parameters
@@ -704,9 +704,30 @@ class OneByOneConv(scale_matvec_lu.ScaleMatvecLU):
   """
 
   def __init__(self, event_size, seed=None, dtype=tf.float32, **kwargs):
-    lower_upper, permutation = self.trainable_lu_factorization(
-        event_size, seed=seed, dtype=dtype)
-    super(OneByOneConv, self).__init__(lower_upper, permutation, **kwargs)
+    parameters = dict(locals())
+    with tf.name_scope('OneByOneConv') as name:
+      lower_upper, permutation = self.trainable_lu_factorization(
+          event_size, seed=seed, dtype=dtype)
+      self._bijector = scale_matvec_lu.ScaleMatvecLU(
+          lower_upper, permutation, **kwargs)
+      super(OneByOneConv, self).__init__(
+          dtype=self._bijector.lower_upper.dtype,
+          is_constant_jacobian=True,
+          forward_min_event_ndims=1,
+          parameters=parameters,
+          name=name)
+
+  def forward(self, x):
+    return self._bijector.forward(x)
+
+  def inverse(self, y):
+    return self._bijector.inverse(y)
+
+  def inverse_log_det_jacobian(self, y, event_ndims=None):
+    return self._bijector.inverse_log_det_jacobian(y, event_ndims)
+
+  def forward_log_det_jacobian(self, x, event_ndims=None):
+    return self._bijector.forward_log_det_jacobian(x, event_ndims)
 
   @staticmethod
   def trainable_lu_factorization(event_size,

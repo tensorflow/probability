@@ -560,7 +560,7 @@ class BesselKveTest(test_util.TestCase):
     self.assertLess(err, 3e-4)
 
   @parameterized.named_parameters(
-      ("float32", np.float32, 1e-6, 2e-6),
+      ("float32", np.float32, 1e-6, 1e-5),
       ("float64", np.float64, 1e-6),
   )
   def testLogBesselKveCorrect(self, dtype, rtol, atol=1e-6):
@@ -575,7 +575,7 @@ class BesselKveTest(test_util.TestCase):
         tf.math.log(tfp.math.bessel_kve(v, z)),
         tfp.math.log_bessel_kve(v, z)])
     self.assertAllClose(
-        log_bessel_kve_expected_, log_bessel_kve_actual_, rtol=rtol)
+        log_bessel_kve_expected_, log_bessel_kve_actual_, rtol=rtol, atol=atol)
 
   def testLogBesselTestNonInf(self):
     # Test that log_bessel_kve(v, z) has more resolution than simply computing

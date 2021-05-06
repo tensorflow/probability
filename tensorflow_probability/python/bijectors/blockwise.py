@@ -42,6 +42,7 @@ def _get_static_splits(splits):
   return splits if static_splits is None else static_splits
 
 
+# TODO(b/182603117): Enable AutoCompositeTensor once Chain subclasses it.
 class Blockwise(chain.Chain):
   """Bijector which applies a list of bijectors to blocks of a `Tensor`.
 

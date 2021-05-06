@@ -159,6 +159,20 @@ class RestructureBijectorTest(test_util.TestCase):
     self.assertEqual(swapped_dist.dtype,
                      [dist.dtype[1], dist.dtype[0]])
 
+  def testCompositeTensor(self):
+    bij = tfb.Restructure({
+        'foo': [1, 2],
+        'bar': 0,
+        'baz': (3, 4)
+    })
+
+    x = [[1, 2, 3], [4, 5, 6], 7., 8., 9.]
+    flat = tf.nest.flatten(bij, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(bij, flat, expand_composites=True)
+    self.assertAllClose(
+        bij.forward(x),
+        tf.function(lambda b_: b_.forward(x))(unflat))
+
 
 if __name__ == '__main__':
   tf.test.main()

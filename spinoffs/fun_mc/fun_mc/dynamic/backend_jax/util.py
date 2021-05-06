@@ -71,7 +71,7 @@ def map_tree_up_to(shallow, fn, tree, *rest):
 
 def get_shallow_tree(is_leaf, tree):
   """Returns a shallow tree, expanding only when is_leaf(subtree) is False."""
-  return tree_util.tree_map(is_leaf, tree, is_leaf)
+  return tree_util.tree_map(is_leaf, tree, is_leaf=is_leaf)
 
 
 def assert_same_shallow_tree(shallow, tree):

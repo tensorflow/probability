@@ -31,6 +31,25 @@ from tensorflow_probability.python.internal import samplers
 JAX_MODE = False
 
 
+def _implement_sharded_lp_fn(fn_name):
+  """Implements log_prob or unnormalized_log_prob."""
+  def lp_fn(self, x, reduce_over_shards=True, **kwargs):
+
+    def impl(value):
+      new_kwargs = dict(kwargs)
+      if self.distribution.experimental_shard_axis_names:
+        new_kwargs['reduce_over_shards'] = reduce_over_shards
+      return getattr(self.distribution, fn_name)(value, **new_kwargs)
+
+    if reduce_over_shards:
+      impl = distribute_lib.make_sharded_log_prob_parts(
+          impl, self.experimental_shard_axis_names)
+    return impl(x)
+
+  lp_fn.__name__ = f'_{fn_name}'
+  return lp_fn
+
+
 class Sharded(distribution_lib.Distribution):
   """A meta-distribution meant for use in an SPMD distributed context.
 
@@ -105,18 +124,8 @@ class Sharded(distribution_lib.Distribution):
       seed = samplers.fold_in(seed, tf.cast(axis_index, tf.int32))
     return self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
 
-  def _log_prob(self, x, reduce_over_shards=True, **kwargs):
-
-    def log_prob_fn(value):
-      new_kwargs = dict(kwargs)
-      if self.distribution.experimental_shard_axis_names:
-        new_kwargs['reduce_over_shards'] = reduce_over_shards
-      return self.distribution.log_prob(value, **new_kwargs)
-
-    if reduce_over_shards:
-      log_prob_fn = distribute_lib.make_sharded_log_prob_parts(
-          log_prob_fn, self.experimental_shard_axis_names)
-    return log_prob_fn(x)
+  _log_prob = _implement_sharded_lp_fn('log_prob')
+  _unnormalized_log_prob = _implement_sharded_lp_fn('unnormalized_log_prob')
 
   def _batch_shape_tensor(self):
     return self.distribution.batch_shape_tensor()

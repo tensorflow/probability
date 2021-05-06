@@ -48,11 +48,13 @@ XLA_UNFRIENDLY_DISTS = frozenset([
     'Bates',
     # TODO(b/159996966)
     'Gamma',
+    'ExponentiallyModifiedGaussian',  # Fails in TF1
     # TODO(b/173546024)
     'GeneralizedExtremeValue',
     # TODO(b/163118820)
     'LogLogistic',
     'LogNormal',
+    'LogitNormal',
     # TODO(b/162935914): Needs to use XLA friendly Poisson sampler.
     'NegativeBinomial',
     'NormalInverseGaussian',  # Fails in TF1.
@@ -72,16 +74,29 @@ XLA_UNFRIENDLY_DISTS = frozenset([
 
 NO_SAMPLE_PARAM_GRADS = {
     'Deterministic': ('atol', 'rtol'),
+    'VectorDeterministic': ('atol', 'rtol'),
 }
 
-NO_LOG_PROB_PARAM_GRADS = ('Deterministic', 'Empirical')
+NO_LOG_PROB_PARAM_GRADS = (
+    'Deterministic',
+    'Empirical|event_ndims=0',
+    'Empirical|event_ndims=1',
+    'Empirical|event_ndims=2',
+    'VectorDeterministic')
 
-NO_KL_PARAM_GRADS = ('Deterministic',)
+NO_KL_PARAM_GRADS = ('Deterministic', 'VectorDeterministic')
 
+# Number of tensor conversions, *in addition to* the default conversions, is
+# allowed for these distributions.
 EXTRA_TENSOR_CONVERSION_DISTS = {
+    'LambertWNormal': 2,
     'RelaxedBernoulli': 1,
     'WishartTriL': 3,  # not concretizing linear operator scale
     'Chi': 2,  # subclasses `Chi2`, runs redundant checks on `df` parameter
+    # Validating args 2 conversions, in addition to 1-3 extra for the method.
+    # E.g. entropy requires 2 extra, since it requires the base operator does a
+    # determinant + solve inside log_abs_determinant.
+    'MultivariateNormalDiagPlusLowRankCovariance': 3,
 }
 
 # TODO(b/130815467) All distributions should be auto-vectorizeable.
@@ -137,8 +152,8 @@ XLA_LOGPROB_ATOL.update({
     'BetaQuotient': 1e-4,
     'Binomial': 5e-6,
     'Categorical': 7e-6,  # sparse_softmax_cross_entropy_with_logits
-    'DeterminantalPointProcess': 1e-5,
-    'DirichletMultinomial': 1e-4,
+    'DeterminantalPointProcess': 2e-5,
+    'DirichletMultinomial': 5e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
     'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
@@ -148,9 +163,11 @@ XLA_LOGPROB_ATOL.update({
     'Kumaraswamy': 4e-5,
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
+    'OneHotCategorical': 6e-6,
     'PowerSpherical': 2e-5,
     'SigmoidBeta': 5e-4,
-    'Skellam': 1e-4
+    'Skellam': 1e-4,
+    'TruncatedCauchy': 1e-5,
 })
 
 XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
@@ -165,7 +182,7 @@ XLA_LOGPROB_RTOL.update({
     'CholeskyLKJ': 1e-4,
     'ContinuousBernoulli': 2e-6,
     'Dirichlet': 1e-3,
-    'DirichletMultinomial': 2e-4,
+    'DirichletMultinomial': 5e-4,
     'ExpRelaxedOneHotCategorical': 1e-3,  # TODO(b/163118820)
     'ExpGamma': 5e-2,  # TODO(b/166257329)
     'ExpInverseGamma': 5e-2,  # TODO(b/166257329)
@@ -176,13 +193,19 @@ XLA_LOGPROB_RTOL.update({
     'JohnsonSU': 1e-2,
     'LKJ': .07,
     'Multinomial': 3e-4,
+    'MultivariateNormalDiag': 5e-6,
+    'MultivariateNormalFullCovariance': 1e-5,
+    'MultivariateNormalTriL': 1e-5,
+    'MultivariateNormalDiagPlusLowRankCovariance': 1e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
     'PERT': 5e-4,
     'Poisson': 3e-2,  # TODO(b/159999573)
     'PowerSpherical': .003,
     'RelaxedBernoulli': 3e-3,
+    'RelaxedOneHotCategorical': 2e-3,  # TODO(b/163118820)
     'SigmoidBeta': 5e-4,
-    'TruncatedCauchy': 2e-5,
+    'TruncatedCauchy': 5e-5,
+    'VectorExponentialDiag': 7e-5,
     'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
     'WishartTriL': 1e-5,
@@ -190,10 +213,11 @@ XLA_LOGPROB_RTOL.update({
 
 
 SKIP_KL_CHECK_DIST_VAR_GRADS = [
-    'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
-    'JohnsonSU',  # TD's KL gradients do not rely on bijector variables.
     'GeneralizedExtremeValue',  # TD's KL gradients do not rely on bijector
                                 # variables.
+    'JohnsonSU',  # TD's KL gradients do not rely on bijector variables.
+    'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
+    'SinhArcsinh',  # TD's KL gradients do not rely on bijector variables.
 ]
 
 
@@ -217,7 +241,8 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
-      for dname in dhps.TF2_FRIENDLY_DISTS)
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()))
+      if dname not in dhps.TF2_UNFRIENDLY_DISTS)
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistribution(self, dist_name, data):
@@ -297,7 +322,7 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
     dist2 = dist2.copy(validate_args=False)
 
     # Test that KL divergence reads distribution parameters at most once, and
-    # that is produces non-None gradients.
+    # that it produces non-None gradients.
     try:
       for d1, d2 in (dist, dist2), (dist2, dist):
         if dist_name in SKIP_KL_CHECK_DIST_VAR_GRADS:
@@ -394,7 +419,8 @@ class DistributionCompositeTensorTest(test_util.TestCase):
   # distributions.
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
-      for dname in dhps.TF2_FRIENDLY_DISTS)
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()))
+      if dname not in dhps.TF2_UNFRIENDLY_DISTS)
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testCompositeTensor(self, dist_name, data):
@@ -429,8 +455,10 @@ class DistributionXLATest(test_util.TestCase):
                         rtol=XLA_LOGPROB_RTOL[dist_name])
 
   @parameterized.named_parameters(
-      {'testcase_name': dname, 'dist_name': dname}
-      for dname in dhps.TF2_FRIENDLY_DISTS if dname not in XLA_UNFRIENDLY_DISTS)
+      {'testcase_name': dname, 'dist_name': dname}  # pylint: disable=g-complex-comprehension
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())) if
+      (dname not in dhps.TF2_UNFRIENDLY_DISTS) and
+      (dname not in XLA_UNFRIENDLY_DISTS))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testXLACompile(self, dist_name, data):

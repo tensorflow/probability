@@ -45,80 +45,12 @@ JAX_MODE = False
 # pylint: disable=no-value-for-parameter
 
 
-TF2_FRIENDLY_DISTS = (
-    'Bates',
-    'Bernoulli',
-    'Beta',
-    'BetaBinomial',
-    'BetaQuotient',
-    'Binomial',
-    'Chi',
-    'Chi2',
-    'CholeskyLKJ',
-    'Categorical',
-    'Cauchy',
-    'ContinuousBernoulli',
-    'Deterministic',
-    'DeterminantalPointProcess',
-    'Dirichlet',
-    'DirichletMultinomial',
-    'DoublesidedMaxwell',
-    'Empirical',
-    'Exponential',
-    'ExpGamma',
-    'ExpInverseGamma',
-    'FiniteDiscrete',
-    'Gamma',
-    'GammaGamma',
-    'GeneralizedNormal',
-    'GeneralizedPareto',
-    'Geometric',
-    'Gumbel',
-    'GeneralizedExtremeValue',
-    'HalfCauchy',
-    'HalfNormal',
-    'HalfStudentT',
-    'Horseshoe',
-    'InverseGamma',
-    'InverseGaussian',
-    'JohnsonSU',
-    'Kumaraswamy',
-    'Laplace',
-    'LKJ',
-    'LogLogistic',
-    'LogNormal',
-    'Logistic',
-    'Normal',
-    'Moyal',
-    'Multinomial',
-    'NegativeBinomial',
-    'NormalInverseGaussian',
-    'OneHotCategorical',
-    'OrderedLogistic',
-    'Pareto',
-    'PERT',
-    'PlackettLuce',
-    'Poisson',
-    'PowerSpherical',
-    # 'PoissonLogNormalQuadratureCompound' TODO(b/137956955): Add support
-    # for hypothesis testing
-    'ProbitBernoulli',
-    'RelaxedBernoulli',
-    'ExpRelaxedOneHotCategorical',
-    'SigmoidBeta',
-    'SinhArcsinh',
-    'Skellam',
-    'SphericalUniform',
-    'StudentT',
-    'Triangular',
-    'TruncatedCauchy',
-    'TruncatedNormal',
-    'Uniform',
-    'VonMises',
-    'VonMisesFisher',
-    'Weibull',
-    'WishartTriL',
-    'Zipf',
+TF2_UNFRIENDLY_DISTS = (
+    # TODO(b/183723782): Enable these tests.
+    'MultivariateNormalDiag',
+    'MultivariateNormalFullCovariance',
+    'MultivariateNormalTriL',
+    'VectorExponentialDiag',
 )
 
 
@@ -144,15 +76,22 @@ SPECIAL_DISTS = (
     'GaussianProcess',  # PSDKernel strategy not implemented.
     'GaussianProcessRegressionModel',  # PSDKernel strategy not implemented.
     'Independent',  # (has strategy)
+    'LambertWDistribution',
+    'MatrixNormalLinearOperator',
+    'MatrixTLinearOperator',
     'Masked',  # (has strategy)
     'Mixture',  # (has strategy)
     'MixtureSameFamily',  # (has strategy)
     'MultivariateNormalLinearOperator',
+    'MultivariateNormalLowRankUpdateLinearOperatorCovariance',
     'MultivariateNormalDiagPlusLowRank',  # Some batch shapes fail (b/177958275)
     'MultivariateStudentTLinearOperator',
     'Sample',  # (has strategy)
+    'StudentTProcess',
     'TransformedDistribution',  # (has strategy)
     'QuantizedDistribution',  # (has strategy)
+    'VariationalGaussianProcess',  # PSDKernel strategy not implemented.
+    'WishartLinearOperator'
 )
 
 
@@ -404,6 +343,14 @@ CONSTRAINTS = {
     'MultivariateNormalDiagPlusLowRank.scale_perturb_diag':
         tfp_hps.softplus_plus_eps(),
     'MultivariateNormalDiagPlusLowRank.scale_perturb_factor':
+        # Prevent large low-rank perturbations from creating numerically
+        # singular matrices.
+        tf.math.tanh,
+    'MultivariateNormalDiagPlusLowRankCovariance.cov_diag_factor':
+        # Ensure that the diagonal component is large enough to avoid being
+        # overwhelmed  by the (singular) low-rank perturbation.
+        tfp_hps.softplus_plus_eps(1. + 1e-6),
+    'MultivariateNormalDiagPlusLowRankCovariance.cov_perturb_factor':
         # Prevent large low-rank perturbations from creating numerically
         # singular matrices.
         tf.math.tanh,
@@ -876,8 +823,6 @@ def params_used(dist):
 def spherical_uniforms(
     draw, batch_shape=None, event_dim=None, validate_args=True):
   """Strategy for drawing `SphericalUniform` distributions.
-
-  The underlying distribution is drawn from the `distributions` strategy.
 
   Args:
     draw: Hypothesis strategy sampler supplied by `@hps.composite`.

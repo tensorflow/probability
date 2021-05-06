@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import composition
-from tensorflow_probability.python.internal import nest_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -96,19 +95,10 @@ class JointMap(composition.Composition):
       super(JointMap, self).__init__(
           bijectors=bijectors,
           validate_args=validate_args,
+          forward_min_event_ndims=self._nested_structure,
+          inverse_min_event_ndims=self._nested_structure,
           parameters=parameters,
-          name=name,
-          # JointMap and other bijectors that operate independently on
-          # parts of structured inputs do not have statically-known
-          # `min_event_ndims`. Infer the input/output structures, and fill them
-          # with `None`.
-          forward_min_event_ndims=nest.map_structure(
-              lambda b: nest_util.broadcast_structure(  # pylint: disable=g-long-lambda
-                  b.forward_min_event_ndims, None), bijectors),
-          inverse_min_event_ndims=nest.map_structure(
-              lambda b: nest_util.broadcast_structure(  # pylint: disable=g-long-lambda
-                  b.forward_min_event_ndims, None), bijectors),
-          )
+          name=name)
 
   def _walk_forward(self, step_fn, xs, **kwargs):
     """Applies `transform_fn` to `x` in parallel over nested bijectors."""

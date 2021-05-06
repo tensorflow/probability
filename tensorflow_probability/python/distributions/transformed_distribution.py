@@ -334,32 +334,16 @@ class TransformedDistribution(distribution_lib.Distribution):
     # the result of `self.bijector.forward` is not modified (and thus caching
     # works).
     with self._name_and_control_scope(name):
-      sample_shape = ps.convert_to_shape_tensor(
-          sample_shape, dtype=tf.int32, name='sample_shape')
-      sample_shape, n = self._expand_sample_shape_to_vector(
-          sample_shape, 'sample_shape')
-
       distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
       # First, generate samples from the base distribution.
-      x = self.distribution.sample(sample_shape=[n], seed=seed,
+      x = self.distribution.sample(sample_shape=sample_shape,
+                                   seed=seed,
                                    **distribution_kwargs)
-
-      # Next, we reshape `x` into its final form. We do this prior to the call
-      # to the bijector to ensure that the bijector caching works.
-      def reshape_sample_shape(t):
-        batch_event_shape = ps.shape(t)[1:]
-        final_shape = ps.concat([sample_shape, batch_event_shape], 0)
-        return tf.reshape(t, final_shape)
-      x = tf.nest.map_structure(reshape_sample_shape, x)
-
-      # Finally, we apply the bijector's forward transformation. For caching to
+      # Apply the bijector's forward transformation. For caching to
       # work, it is imperative that this is the last modification to the
       # returned result.
-      y = self.bijector.forward(x, **bijector_kwargs)
-      y = self._set_sample_static_shape(y, sample_shape)
-
-      return y
+      return self.bijector.forward(x, **bijector_kwargs)
 
   def _log_prob(self, y, **kwargs):
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)

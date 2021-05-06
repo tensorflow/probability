@@ -218,17 +218,13 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
-    # Subclasses must implement their own `_parameter_properties`. If they
-    # don't, call the base Distribution version to raise a NotImplementedError.
-    if cls is MultivariateStudentTLinearOperator:
-      return dict(
-          df=parameter_properties.ParameterProperties(
-              default_constraining_bijector_fn=(
-                  lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))
-              ),
-          loc=parameter_properties.ParameterProperties(event_ndims=1),
-          scale=parameter_properties.BatchedComponentProperties())
-    return distribution.Distribution._parameter_properties(dtype=dtype)  # pylint: disable=protected-access
+    return dict(
+        df=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))
+            ),
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        scale=parameter_properties.BatchedComponentProperties())
 
   def _batch_shape_tensor(self):
     shape_list = [

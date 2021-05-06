@@ -354,11 +354,16 @@ class StudentTProcess(distribution.Distribution):
     return dict(
         df=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
-                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+                lambda: softplus_bijector.Softplus(  # pylint: disable=g-long-lambda
+                    low=dtype_util.as_numpy_dtype(dtype)(2.)))),
         index_points=parameter_properties.ParameterProperties(
             event_ndims=lambda self: self.kernel.feature_ndims + 1,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
-        kernel=parameter_properties.BatchedComponentProperties())
+        kernel=parameter_properties.BatchedComponentProperties(),
+        observation_noise_variance=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED))
 
   def _is_univariate_marginal(self, index_points):
     """True if the given index_points would yield a univariate marginal.

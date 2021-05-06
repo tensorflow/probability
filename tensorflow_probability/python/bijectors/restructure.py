@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import nest_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -43,7 +44,9 @@ def unique_token_set(source_structure):
   return flat_token_set
 
 
-class Restructure(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Restructure(bijector.AutoCompositeTensorBijector):
   """Converts between nested structures of Tensors.
 
     This is useful when constructing non-trivial chains of multipart bijectors.
@@ -177,9 +180,9 @@ class Restructure(bijector.Bijector):
     self._output_structure = self._no_dependency(output_structure)
     super(Restructure, self).__init__(
         forward_min_event_ndims=nest_util.broadcast_structure(
-            self._input_structure, None),
+            self._input_structure, 0),
         inverse_min_event_ndims=nest_util.broadcast_structure(
-            self._output_structure, None),
+            self._output_structure, 0),
         is_constant_jacobian=True,
         validate_args=False,
         parameters=parameters,
@@ -192,6 +195,10 @@ class Restructure(bijector.Bijector):
   @property
   def _is_permutation(self):
     return True
+
+  @property
+  def _parts_interact(self):
+    return False
 
   def _forward(self, x):
     flat_dict = {}
@@ -257,6 +264,10 @@ class Restructure(bijector.Bijector):
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
     with self._name_and_control_scope(name):
       return tf.zeros([], tf.float32)
+
+  @property
+  def _composite_tensor_shape_params(self):
+    return ('output_structure', 'input_structure')
 
 
 def tree_flatten(example, name='restructure'):

@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -34,7 +35,9 @@ __all__ = [
 ]
 
 
-class KumaraswamyCDF(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class KumaraswamyCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 - X**a)**b, X in [0, 1]`.
 
   This bijector maps inputs from `[0, 1]` to `[0, 1]`. The inverse of the

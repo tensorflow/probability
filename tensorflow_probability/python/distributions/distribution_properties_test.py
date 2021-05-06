@@ -73,6 +73,7 @@ NO_NANS_TEST_BLOCK_LIST = (
     # Independent log_prob unavoidably emits `nan` if the underlying
     # distribution yields a +inf on one sample and a -inf on another.
     'Independent',
+    'LambertWNormal',
     'LogitNormal',  # TODO(axch): Maybe nan problem hints at accuracy problem
     # Mixtures of component distributions whose samples have different dtypes
     # cannot pass validate_args.
@@ -116,12 +117,14 @@ LOG_PROB_ACCURACY_BLOCK_LIST = (
     'GeneralizedExtremeValue',
     'JohnsonSU',
     'Kumaraswamy',
+    'LambertWNormal',
     'LogitNormal',  # Filters too much in 6/100 runs (nan samples too easy?)
     'MultivariateNormalDiag',
     'MultivariateNormalTriL',
     'NegativeBinomial',
     'OneHotCategorical',
     'PlackettLuce',
+    'SinhArcsinh',  # b/183670203
     'Skellam',
     'StoppingRatioLogistic',  # Filters too much in 61/100 runs; this is odd.
     # TODO(axch): Fix numerics of _cauchy_cdf(x + delta) - _cauchy_cdf(x)
@@ -307,6 +310,7 @@ class NoNansTest(test_util.TestCase, dhps.TestCase):
     hp.note('Testing on samples {}'.format(samples))
     with tfp_hps.no_tf_rank_errors():
       lp = self.evaluate(dist.log_prob(samples))
+      hp.note('Got log_probs {}'.format(lp))
     self.assertAllEqual(np.zeros_like(lp), np.isnan(lp))
 
   @parameterized.named_parameters(
@@ -414,8 +418,10 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
     y = data.draw(
         tfp_hps.constrained_tensors(
             tfp_hps.identity_fn, total_sample_shape.as_list()))
+    hp.note('Trying to constrain inputs {}'.format(y))
     with tfp_hps.no_tf_rank_errors():
       x = event_space_bijector(y)
+      hp.note('Got constrained samples {}'.format(x))
       with tf.control_dependencies(dist._sample_control_dependencies(x)):
         self.evaluate(tf.identity(x))
 
@@ -481,8 +487,10 @@ class ParameterPropertiesTest(test_util.TestCase):
         'num_samples',
         'df',  # Can't represent constraint that Wishart df > dimension.
         'mean_direction')  # TODO(b/118492439): Add `UnitVector` bijector.
-    non_trainable_non_tensor_params = ('dimension', 'dtype'
-                                      )  # Required by Zipf.
+    non_trainable_non_tensor_params = (
+        'batch_shape',  # SphericalUniform, at least, has explicit batch shape
+        'dimension',
+        'dtype')
 
     dist = data.draw(
         dhps.distributions(
