@@ -451,9 +451,11 @@ class PrecompiledTest(test_util.TestCase):
         tf.TensorSpec(
             shape=[None, None], dtype=tf.float32, name='trials'),
         tf.TensorSpec(
-            shape=[None, None], dtype=tf.float32, name='successes'))
+            shape=[None, None], dtype=tf.float32, name='successes'),
+        tf.TensorSpec(
+            shape=[2], dtype=tf.int32, name='seed'))
     @tf.function(jit_compile=True, input_signature=input_signature)
-    def do(trials, successes):
+    def do(trials, successes, seed):
       if kind == 'hmc':
         proposal_kernel_kwargs = self.hmc_kwargs()
       else:
@@ -471,10 +473,11 @@ class PrecompiledTest(test_util.TestCase):
           trace_fn=None,
           return_final_kernel_results=False,
           discard_tuning=True,
-          seed=test_util.test_seed(),
+          seed=seed,
           successes=successes)
 
-    self.evaluate(do(self.trials + 0., self.true_values['successes']))
+    self.evaluate(do(self.trials + 0., self.true_values['successes'],
+                     test_util.test_seed(sampler_type='stateless')))
 
 
 if __name__ == '__main__':

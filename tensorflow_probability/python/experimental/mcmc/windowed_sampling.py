@@ -224,6 +224,10 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
   initial_transformed_position = tf.nest.map_structure(
       tf.identity, bijector.forward(init_position))
 
+  # This tf.function is not redundant with the ones on _fast_window
+  # and _slow_window because the various kernels (like HMC) may invoke
+  # `target_log_prob_fn` multiple times within one window.
+  @tf.function(autograph=False)
   def target_log_prob_fn(*args):
     lp = pinned_model.unnormalized_log_prob(bijector.inverse(args))
     tensorshape_util.set_shape(lp, [n_chains])
