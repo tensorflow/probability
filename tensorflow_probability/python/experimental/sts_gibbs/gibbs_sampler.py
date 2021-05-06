@@ -207,15 +207,37 @@ def _get_design_matrix(model):
 
 def fit_with_gibbs_sampling(model,
                             observed_time_series,
+                            num_chains=(),
                             num_results=2000,
                             num_warmup_steps=200,
                             initial_state=None,
                             seed=None):
-  """Fits parameters for an STS model using Gibbs sampling."""
+  """Fits parameters for an STS model using Gibbs sampling.
+
+  Args:
+    model: A `tfp.sts.StructuralTimeSeries` model instance return by
+      `build_model_for_gibbs_fitting`.
+    observed_time_series: `float` `Tensor` of shape [..., T, 1]`
+      (omitting the trailing unit dimension is also supported when `T > 1`),
+      specifying an observed time series. May optionally be an instance of
+      `tfp.sts.MaskedTimeSeries`, which includes a mask `Tensor` to specify
+      timesteps with missing observations.
+    num_chains: Optional int to indicate the number of parallel MCMC chains.
+      Default to an empty tuple to sample a single chain.
+    num_results: Optional int to indicate number of MCMC samples.
+    num_warmup_steps: Optional int to indicate number of MCMC samples.
+    initial_state: A `GibbsSamplerState` structure of the initial states of the
+      MCMC chains.
+    seed: Optional `Python` `int` seed controlling the sampled values.
+  Returns:
+    model: A `GibbsSamplerState` structure of posterior samples.
+  """
   if not hasattr(model, 'supports_gibbs_sampling'):
     raise ValueError('This STS model does not support Gibbs sampling. Models '
                      'for Gibbs sampling must be created using the '
                      'method `build_model_for_gibbs_fitting`.')
+  if not tf.nest.is_nested(num_chains):
+    num_chains = [num_chains]
 
   [
       observed_time_series,
@@ -229,7 +251,11 @@ def fit_with_gibbs_sampling(model,
   # describe scalar time series only. For our purposes it'll be cleaner to
   # remove this dimension.
   observed_time_series = observed_time_series[..., 0]
-  batch_shape = prefer_static.shape(observed_time_series)[:-1]
+  batch_shape = prefer_static.concat(
+      [num_chains,
+       prefer_static.shape(observed_time_series)[:-1]], axis=-1)
+  level_slope_shape = prefer_static.concat(
+      [num_chains, prefer_static.shape(observed_time_series)], axis=-1)
 
   # Treat a LocalLevel model as the special case of LocalLinearTrend where
   # the slope_scale is always zero.
@@ -237,7 +263,7 @@ def fit_with_gibbs_sampling(model,
   initial_slope = 0.
   if isinstance(model.components[0], sts.LocalLinearTrend):
     initial_slope_scale = 1. * tf.ones(batch_shape, dtype=dtype)
-    initial_slope = tf.zeros_like(observed_time_series)
+    initial_slope = tf.zeros(level_slope_shape, dtype=dtype)
 
   if initial_state is None:
     initial_state = GibbsSamplerState(
@@ -247,7 +273,7 @@ def fit_with_gibbs_sampling(model,
         weights=tf.zeros(prefer_static.concat([
             batch_shape,
             _get_design_matrix(model).shape[-1:]], axis=0), dtype=dtype),
-        level=tf.zeros_like(observed_time_series),
+        level=tf.zeros(level_slope_shape, dtype=dtype),
         slope=initial_slope,
         seed=None)  # Set below.
 
