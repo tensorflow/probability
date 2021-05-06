@@ -74,7 +74,6 @@ py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
-
         "//tensorflow_probability/python/bijectors:build_highway_flow_layer",
         "//tensorflow_probability/python/bijectors:chain",
         "//tensorflow_probability/python/bijectors:reshape",
@@ -131,6 +130,22 @@ py_test(
     name = "automatic_structured_vi_test",
     size = "large",
     srcs = ["automatic_structured_vi_test.py"],
+    python_version = "PY3",
+    shard_count = 4,
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_test(
+    name = "cascading_flows_test",
+    size = "large",
+    srcs = ["cascading_flows_test.py"],
     python_version = "PY3",
     shard_count = 4,
     srcs_version = "PY3",
