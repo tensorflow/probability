@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":automatic_structured_vi",
+        ":cascading_flows",
         ":surrogate_posteriors",
         "//tensorflow_probability/python/experimental/vi/util",
         "//tensorflow_probability/python/internal:all_util",
@@ -64,6 +65,37 @@ py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/util",
+    ],
+)
+
+py_library(
+    name = "cascading_flows",
+    srcs = ["cascading_flows.py.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+
+        "//tensorflow_probability/python/bijectors:build_highway_flow_layer",
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:reshape",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:shift",
+        "//tensorflow_probability/python/bijectors:split",
+        "//tensorflow_probability/python/distributions:batch_broadcast",
+        "//tensorflow_probability/python/distributions:beta",
+        "//tensorflow_probability/python/distributions:blockwise",
+        "//tensorflow_probability/python/distributions:chi2",
+        "//tensorflow_probability/python/distributions:exponential",
+        "//tensorflow_probability/python/distributions:gamma",
+        "//tensorflow_probability/python/distributions:half_normal",
+        "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
+        "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/distributions:truncated_normal",
+        "//tensorflow_probability/python/distributions:uniform",
+        "//tensorflow_probability/python/internal:samplers",
     ],
 )
 
