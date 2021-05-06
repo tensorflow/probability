@@ -173,11 +173,6 @@ install_jax() {
 }
 
 install_python_packages() {
-  # Ensure newer than 18.x pip version, which is necessary after tf-nightly
-  # switched to manylinux2010.
-  python -m pip install $PIP_FLAGS --upgrade 'pip>=19.2'
-  python -m pip install --upgrade setuptools
-
   install_tensorflow
   install_jax
 
@@ -193,6 +188,11 @@ install_python_packages() {
   python -m pip --version
   python -m pip list
 }
+
+# Ensure newer than 18.x pip version, which is necessary after tf-nightly
+# switched to manylinux2010.
+python -m pip install $PIP_FLAGS --upgrade 'pip>=19.2'
+python -m pip install --upgrade setuptools
 
 check_for_common_package_conflicts
 install_python_packages
