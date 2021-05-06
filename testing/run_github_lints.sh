@@ -27,6 +27,7 @@ get_changed_py_files() {
   fi
 }
 
+python -m pip install --upgrade 'pip>=19.2'
 python -m pip install --upgrade setuptools
 python -m pip install --quiet pylint
 
