@@ -268,9 +268,6 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
       self._target_log_prob_fn = target_log_prob_fn
       if not tf.nest.is_nested(step_size):
         step_size = [step_size]
-      step_size = [
-          tf.convert_to_tensor(s, dtype_hint=tf.float32) for s in step_size
-      ]
       self._step_size = step_size
 
       self._parameters = dict(
@@ -460,6 +457,10 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
     with tf.name_scope(self.name + '.bootstrap_results'):
       if not tf.nest.is_nested(init_state):
         init_state = [init_state]
+      state_parts, _ = mcmc_util.prepare_state_parts(init_state,
+                                                     name='current_state')
+      current_target_log_prob, current_grads_log_prob = mcmc_util.maybe_call_fn_and_grads(
+          self.target_log_prob_fn, state_parts)
       # Padding the step_size so it is compatable with the states
       step_size = self.step_size
       if len(step_size) == 1:
@@ -468,10 +469,13 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
         raise ValueError('Expected either one step size or {} (size of '
                          '`init_state`), but found {}'.format(
                              len(init_state), len(step_size)))
-      state_parts, _ = mcmc_util.prepare_state_parts(init_state,
-                                                     name='current_state')
-      current_target_log_prob, current_grads_log_prob = mcmc_util.maybe_call_fn_and_grads(
-          self.target_log_prob_fn, state_parts)
+      step_size = tf.nest.map_structure(
+          lambda x: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
+              x,
+              dtype=current_target_log_prob.dtype,
+              name='step_size'),
+          step_size)
+
       momentum_distribution = self.momentum_distribution
       if momentum_distribution is None:
         momentum_distribution = pu.make_momentum_distribution(

@@ -260,9 +260,6 @@ class NoUTurnSampler(TransitionKernel):
       self._target_log_prob_fn = target_log_prob_fn
       if not tf.nest.is_nested(step_size):
         step_size = [step_size]
-      step_size = [
-          tf.convert_to_tensor(s, dtype_hint=tf.float32) for s in step_size
-      ]
       self._step_size = step_size
 
       self._parameters = dict(
@@ -447,15 +444,6 @@ class NoUTurnSampler(TransitionKernel):
     with tf.name_scope(self.name + '.bootstrap_results'):
       if not tf.nest.is_nested(init_state):
         init_state = [init_state]
-      # Padding the step_size so it is compatable with the states
-      step_size = self.step_size
-      if len(step_size) == 1:
-        step_size = step_size * len(init_state)
-      if len(step_size) != len(init_state):
-        raise ValueError('Expected either one step size or {} (size of '
-                         '`init_state`), but found {}'.format(
-                             len(init_state), len(step_size)))
-
       dummy_momentum = [tf.ones_like(state) for state in init_state]
 
       def _init(shape_and_dtype):
@@ -478,6 +466,21 @@ class NoUTurnSampler(TransitionKernel):
           current_grads_log_prob,
       ] = leapfrog_impl.process_args(self.target_log_prob_fn, dummy_momentum,
                                      init_state)
+
+      # Padding the step_size so it is compatable with the states
+      step_size = self.step_size
+      if len(step_size) == 1:
+        step_size = step_size * len(init_state)
+      if len(step_size) != len(init_state):
+        raise ValueError('Expected either one step size or {} (size of '
+                         '`init_state`), but found {}'.format(
+                             len(init_state), len(step_size)))
+      step_size = tf.nest.map_structure(
+          lambda x: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
+              x,
+              dtype=current_target_log_prob.dtype,
+              name='step_size'),
+          step_size)
 
       return NUTSKernelResults(
           target_log_prob=current_target_log_prob,
