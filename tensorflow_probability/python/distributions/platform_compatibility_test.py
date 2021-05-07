@@ -157,7 +157,7 @@ XLA_LOGPROB_ATOL.update({
     'ExpGamma': 2e-3,  # TODO(b/166257329)
     'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
-    'FiniteDiscrete': 6e-6,  # sparse_softmax_cross_entropy_with_logits
+    'FiniteDiscrete': 1e-5,  # sparse_softmax_cross_entropy_with_logits
     'HalfCauchy': 2e-6,
     'InverseGamma': 1e-4,
     'Kumaraswamy': 4e-5,
