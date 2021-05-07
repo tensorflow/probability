@@ -27,7 +27,6 @@ from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -431,10 +430,6 @@ def histogram(x,
     return counts
 
 
-@deprecation.deprecated_args(
-    '2020-05-03',
-    '`keep_dims` is deprecated, use `keepdims` instead.',
-    'keep_dims')
 def percentile(x,
                q,
                axis=None,
@@ -442,7 +437,6 @@ def percentile(x,
                keepdims=False,
                validate_args=False,
                preserve_gradients=True,
-               keep_dims=None,
                name=None):
   """Compute the `q`-th percentile(s) of `x`.
 
@@ -487,7 +481,6 @@ def percentile(x,
       the percentile `q` is preserved in the case of linear interpolation.
       If `False`, the gradient will be (incorrectly) zero when `q` corresponds
       to a point in `x`.
-    keep_dims: deprecated, use keepdims instead.
     name:  A Python string name to give this `Op`.  Default is 'percentile'
 
   Returns:
@@ -532,8 +525,6 @@ def percentile(x,
   ```
 
   """
-  keepdims = keepdims if keep_dims is None else keep_dims
-  del keep_dims
   name = name or 'percentile'
   allowed_interpolations = {'linear', 'lower', 'higher', 'nearest', 'midpoint'}
 
@@ -656,17 +647,12 @@ def percentile(x,
     return distribution_util.rotate_transpose(gathered_y, ps.rank(q))
 
 
-@deprecation.deprecated_args(
-    '2020-05-03',
-    '`keep_dims` is deprecated, use `keepdims` instead.',
-    'keep_dims')
 def quantiles(x,
               num_quantiles,
               axis=None,
               interpolation=None,
               keepdims=False,
               validate_args=False,
-              keep_dims=None,
               name=None):
   """Compute quantiles of `x` along `axis`.
 
@@ -708,7 +694,6 @@ def quantiles(x,
       If `False`, the last dimension is removed from the output shape.
     validate_args:  Whether to add runtime checks of argument validity. If
       False, and arguments are incorrect, correct behavior is not guaranteed.
-    keep_dims: deprecated, use keepdims instead.
     name:  A Python string name to give this `Op`.  Default is 'percentile'
 
   Returns:
@@ -742,8 +727,6 @@ def quantiles(x,
   ```
 
   """
-  keepdims = keepdims if keep_dims is None else keep_dims
-  del keep_dims
   with tf.name_scope(name or 'quantiles'):
     x = tf.convert_to_tensor(x, name='x')
     return percentile(

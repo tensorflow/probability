@@ -37,7 +37,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.optimizer.linesearch.internal import hager_zhang_lib as hzl
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'hager_zhang',
@@ -67,10 +66,6 @@ HagerZhangLineSearchResult = collections.namedtuple(
     ])
 
 
-@deprecation.deprecated_args(
-    '2020-10-13',
-    '`step_size_shrink_param` is ignored, and will stop being accepted.',
-    'step_size_shrink_param')
 def hager_zhang(value_and_gradients_function,
                 initial_step_size=None,
                 value_at_initial_step=None,
@@ -81,7 +76,6 @@ def hager_zhang(value_and_gradients_function,
                 expansion_param=5.0,
                 sufficient_decrease_param=0.1,
                 curvature_param=0.9,
-                step_size_shrink_param=0.1,
                 max_iterations=50,
                 name=None):
   """The Hager Zhang line search algorithm.
@@ -222,8 +216,6 @@ def hager_zhang(value_and_gradients_function,
     curvature_param: Positive scalar `Tensor` of real dtype. Bounded above
       by `1.`. Corresponds to 'sigma' in the terminology of
       [Hager and Zhang (2006)][2].
-    step_size_shrink_param: Ignored; deprecated; retained for backward
-      compatibility.
     max_iterations: Positive scalar `Tensor` of integral dtype or None. The
       maximum number of iterations to perform in the line search. The number of
       iterations used to bracket the minimum are also counted against this
@@ -249,7 +241,6 @@ def hager_zhang(value_and_gradients_function,
         equal to those of `left` on batch members where converged is True.
         Otherwise, it corresponds to the last interval computed.
   """
-  del step_size_shrink_param
   with tf.name_scope(name or 'hager_zhang'):
     val_0, val_initial, f_lim, prepare_evals = _prepare_args(
         value_and_gradients_function,

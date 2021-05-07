@@ -21,14 +21,12 @@ from tensorflow_probability.python.experimental.distribute.distribute_lib import
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionCoroutine
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionNamed
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionSequential
-from tensorflow_probability.python.experimental.distribute.sharded import ShardedIndependent
-from tensorflow_probability.python.experimental.distribute.sharded import ShardedSample
+from tensorflow_probability.python.experimental.distribute.sharded import Sharded
 
 __all__ = [
     'JointDistributionCoroutine',
     'JointDistributionNamed',
     'JointDistributionSequential',
     'make_sharded_log_prob_parts',
-    'ShardedIndependent',
-    'ShardedSample',
+    'Sharded',
 ]

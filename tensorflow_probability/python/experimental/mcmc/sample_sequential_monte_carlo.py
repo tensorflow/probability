@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
+from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.math.generic import log1mexp
@@ -113,7 +114,7 @@ def make_rwmh_kernel_fn(target_log_prob_fn, init_state, scalings):
     ]
     step_size = [
         s * ps.cast(  # pylint: disable=g-complex-comprehension
-            mcmc_util.left_justified_expand_dims_like(scalings, s), s.dtype)
+            bu.left_justified_expand_dims_like(scalings, s), s.dtype)
         for s in state_std
     ]
     return random_walk_metropolis.RandomWalkMetropolis(
@@ -125,7 +126,7 @@ def make_rwmh_kernel_fn(target_log_prob_fn, init_state, scalings):
 def compute_hmc_step_size(scalings, state_std, num_leapfrog_steps):
   return [
       s / ps.cast(num_leapfrog_steps, s.dtype) * ps.cast(  # pylint: disable=g-complex-comprehension
-          mcmc_util.left_justified_expand_dims_like(scalings, s),
+          bu.left_justified_expand_dims_like(scalings, s),
           s.dtype) for s in state_std
   ]
 

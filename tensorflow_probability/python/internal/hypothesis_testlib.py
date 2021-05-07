@@ -325,7 +325,7 @@ def min_rank_for_support(support):
   raise NotImplementedError(support)
 
 
-def constrained_tensors(constraint_fn, shape, dtype=np.float32):
+def constrained_tensors(constraint_fn, shape, dtype=np.float32, elements=None):
   """Strategy for drawing a constrained Tensor.
 
   Args:
@@ -333,6 +333,7 @@ def constrained_tensors(constraint_fn, shape, dtype=np.float32):
       constrained space.
     shape: Shape of the desired Tensors as a Python list.
     dtype: Dtype for constrained Tensors.
+    elements: Optional strategy for selecting array elements.
 
   Returns:
     tensors: A strategy for drawing constrained Tensors of the given shape.
@@ -341,7 +342,13 @@ def constrained_tensors(constraint_fn, shape, dtype=np.float32):
   # float32s = hps.floats(
   #     np.finfo(np.float32).min / 2, np.finfo(np.float32).max / 2,
   #     allow_nan=False, allow_infinity=False)
-  floats = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
+  if elements is None:
+    if dtype_util.is_floating(dtype):
+      elements = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
+    elif dtype_util.is_bool(dtype):
+      elements = hps.booleans()
+    else:
+      raise NotImplementedError(dtype)
 
   def mapper(x):
     x = constraint_fn(tf.convert_to_tensor(x, dtype_hint=dtype))
@@ -352,7 +359,7 @@ def constrained_tensors(constraint_fn, shape, dtype=np.float32):
             constraint_fn, np.array(x)))
     return x
 
-  return hpnp.arrays(dtype=dtype, shape=shape, elements=floats).map(mapper)
+  return hpnp.arrays(dtype=dtype, shape=shape, elements=elements).map(mapper)
 
 
 # pylint: disable=no-value-for-parameter
@@ -554,7 +561,7 @@ def maybe_variable(draw,
     else:
       alt_name = '{}_alt_value'.format(name)
     alt_value = tf.convert_to_tensor(
-        draw(strategy), dtype_hint=dtype, name=alt_name)
+        draw(strategy), dtype=result.dtype, name=alt_name)
     # This field provides an acceptable alternate value, to enable tests that
     # mutate the Variable (once).
     setattr(result, '_tfp_alt_value', alt_value)
@@ -751,6 +758,22 @@ def no_tf_rank_errors():
       raise
 
 
+@contextlib.contextmanager
+def finite_ground_truth_only():
+  # Recognizing the error message from python/internal/numerics_testing.py
+  pat = 'Cannot check accuracy if ground truth or derivatives are not finite'
+  try:
+    yield
+  except tf.errors.InvalidArgumentError as e:
+    msg = str(e)
+    if re.search(pat, msg):
+      # Tried an input regime where the 64-bit computation produced a
+      # non-finite value or gradient
+      hp.assume(False)
+    else:
+      raise
+
+
 # Utility functions for constraining parameters and/or domain/codomain members.
 
 
@@ -776,7 +799,7 @@ def orthonormal(x):
 
 def lower_tril_positive_definite(x):
   return tf.linalg.band_part(
-      tf.linalg.set_diag(x, softplus_plus_eps()(tf.linalg.diag_part(x))),
+      tf.linalg.set_diag(x, softplus_plus_eps(1e-4)(tf.linalg.diag_part(x))),
       num_lower=-1,
       num_upper=0)
 

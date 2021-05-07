@@ -393,7 +393,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
         ValueError, r'Joint distribution expected values for [0-9] components'):
       d.log_prob(badvar=27.)
 
-    with self.assertRaisesRegexp(TypeError, 'unexpected keyword argument'):
+    with self.assertRaisesRegexp(ValueError, 'unexpected keyword argument'):
       d.log_prob(*value, extra_arg=27.)
 
   def test_log_prob_with_manual_kwargs(self):

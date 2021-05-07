@@ -24,6 +24,7 @@ from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -34,7 +35,9 @@ __all__ = [
 ]
 
 
-class GeneralizedPareto(bijector_lib.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class GeneralizedPareto(bijector_lib.AutoCompositeTensorBijector):
   """Bijector mapping R**n to non-negative reals.
 
   Forward computation maps R**n to the support of the `GeneralizedPareto`
@@ -106,9 +109,10 @@ class GeneralizedPareto(bijector_lib.Bijector):
   def _negative_concentration_bijector(self):
     # Constructed dynamically so that `loc + scale / concentration` is
     # tape-safe.
-    high = self.loc + tf.math.abs(self.scale / self.concentration)
+    loc = tf.convert_to_tensor(self.loc)
+    high = loc + tf.math.abs(self.scale / self.concentration)
     return sigmoid_bijector.Sigmoid(
-        low=self.loc, high=high, validate_args=self.validate_args)
+        low=loc, high=high, validate_args=self.validate_args)
 
   def _forward(self, x):
     return tf.where(self._concentration < 0.,

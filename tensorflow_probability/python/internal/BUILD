@@ -20,6 +20,7 @@ load(
     "multi_substrate_py_library",
     "multi_substrate_py_test",
 )
+# [internal] load pytype.bzl (pytype_strict_test)
 
 licenses(["notice"])
 
@@ -56,15 +57,20 @@ multi_substrate_py_library(
     ],
 )
 
+# pytype_strict
 py_test(
     name = "auto_composite_tensor_test",
     srcs = ["auto_composite_tensor_test.py"],
+    data = glob(["testdata/auto_composite_tensor/**"]),
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        ":tensor_util",
+        ":test_util",
+        # absl/flags dep,
+        # absl/testing:absltest dep,
         # tensorflow dep,
         "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -82,6 +88,7 @@ multi_substrate_py_library(
     name = "batched_rejection_sampler",
     srcs = ["batched_rejection_sampler.py"],
     deps = [
+        ":broadcast_util",
         ":samplers",
         # numpy dep,  # For np.nan
         # tensorflow dep,
@@ -101,6 +108,25 @@ multi_substrate_py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "broadcast_util",
+    srcs = ["broadcast_util.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "broadcast_util_test",
+    srcs = ["broadcast_util_test.py"],
+    deps = [
+        ":broadcast_util",
+        ":test_util",
+        # tensorflow dep,
     ],
 )
 
@@ -313,6 +339,30 @@ multi_substrate_py_test(
         ":nest_util",
         # absl/testing:parameterized dep,
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "numerics_testing",
+    srcs = ["numerics_testing.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":dtype_util",
+        # absl/logging dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "numerics_testing_test",
+    size = "small",
+    srcs = ["numerics_testing_test.py"],
+    deps = [
+        ":numerics_testing",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],

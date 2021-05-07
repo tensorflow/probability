@@ -115,7 +115,7 @@ class VectorExponentialDiagTest(test_util.TestCase):
     vex = tfd.VectorExponentialDiag(
         loc=tf.ones([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
-        np.diag(np.ones([3], dtype=np.float32)),
+        self.evaluate(tf.eye(3, batch_shape=[2], dtype=np.float32)),
         self.evaluate(vex.covariance()))
 
     vex = tfd.VectorExponentialDiag(
@@ -144,7 +144,7 @@ class VectorExponentialDiagTest(test_util.TestCase):
     vex = tfd.VectorExponentialDiag(
         loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
-        np.ones([3], dtype=np.float32), self.evaluate(vex.variance()))
+        np.ones([2, 3], dtype=np.float32), self.evaluate(vex.variance()))
 
     vex = tfd.VectorExponentialDiag(
         loc=tf.ones([3], dtype=tf.float32),
@@ -164,7 +164,7 @@ class VectorExponentialDiagTest(test_util.TestCase):
     vex = tfd.VectorExponentialDiag(
         loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
-        np.ones([3], dtype=np.float32), self.evaluate(vex.stddev()))
+        np.ones([2, 3], dtype=np.float32), self.evaluate(vex.stddev()))
 
     vex = tfd.VectorExponentialDiag(
         loc=tf.zeros([3], dtype=tf.float32),

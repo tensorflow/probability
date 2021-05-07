@@ -34,10 +34,52 @@ multi_substrate_py_library(
     name = "distributions",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
+    substrates_omit_deps = [
+        ":marginal_fns",
+    ],
     deps = [
+        ":increment_log_prob",
+        ":joint_density_coroutine",
         ":joint_distribution_pinned",
+        ":marginal_fns",
         ":mvn_precision_factor_linop",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "increment_log_prob",
+    srcs = ["increment_log_prob.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "joint_density_coroutine",
+    srcs = ["joint_density_coroutine.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":increment_log_prob",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "joint_density_coroutine_test",
+    size = "small",
+    srcs = ["joint_density_coroutine_test.py"],
+    jax_size = "small",
+    shard_count = 1,
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
@@ -66,6 +108,28 @@ multi_substrate_py_test(
     ],
 )
 
+py_library(
+    name = "marginal_fns",
+    srcs = ["marginal_fns.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:mvn_linear_operator",
+    ],
+)
+
+py_test(
+    name = "marginal_fns_test",
+    srcs = ["marginal_fns_test.py"],
+    python_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 multi_substrate_py_library(
     name = "mvn_precision_factor_linop",
     srcs = ["mvn_precision_factor_linop.py"],
@@ -73,11 +137,16 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:scale_matvec_linear_operator",
+        "//tensorflow_probability/python/bijectors:shift",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
@@ -90,6 +159,8 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:test_combinations",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

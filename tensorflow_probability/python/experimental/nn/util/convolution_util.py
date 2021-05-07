@@ -303,7 +303,7 @@ def make_convolution_transpose_fn_with_dilation(
         dilations,
     ] = prepare_conv_args(
         filter_shape, rank=rank, strides=strides, padding=padding,
-        dilations=dilations, validate_args=validate_args)
+        dilations=dilations, is_transpose=True, validate_args=validate_args)
 
     sh, sw = strides
     fh, fw = filter_shape
@@ -364,7 +364,17 @@ def make_convolution_transpose_fn_with_dilation(
                         [batch_shape, (xh, sh - 1, xw * sw, c_in)], axis=0),
                     dtype=input_dtype), y], axis=-3),
             shape=ps.concat([batch_shape, (xh * sh, xw * sw, c_in)], axis=0))
-        x_pad = tf.pad(x, paddings=paddings, constant_values=0)
+
+        truncations = -ps.minimum(ps.cast(paddings, dtype=tf.int32), 0)
+        truncate_start, truncate_end = ps.unstack(truncations, axis=1)
+        x_truncate = tf.slice(
+            x,
+            begin=truncate_start,
+            size=ps.shape(x) - (truncate_start + truncate_end))
+
+        x_pad = tf.pad(
+            x_truncate, paddings=ps.maximum(paddings, 0), constant_values=0)
+
         flat_shape = ps.pad(batch_shape, paddings=[[0, 1]], constant_values=-1)
         flat_x = tf.gather(
             tf.reshape(x_pad, shape=flat_shape), indices=idx, axis=-1)
@@ -396,7 +406,7 @@ def make_convolution_transpose_fn_with_subkernels_matrix(
         dilations,
     ] = prepare_conv_args(
         filter_shape, rank=rank, strides=strides, padding=padding,
-        dilations=dilations, validate_args=validate_args)
+        dilations=dilations, is_transpose=True, validate_args=validate_args)
 
     fh, fw = filter_shape
     dh, dw = dilations
@@ -409,8 +419,9 @@ def make_convolution_transpose_fn_with_subkernels_matrix(
       i = i_ // strides
       j = i_ % strides
 
-      i_ind = ps.range(i * fw, fw * fh, delta=strides * fw, dtype=dtype)
-      j_ind = ps.range(j, fw, delta=strides, dtype=dtype)
+      i_ind = ps.range(
+          i * fw, ps.maximum(i, fh) * fw, delta=strides * fw, dtype=dtype)
+      j_ind = ps.range(j, ps.maximum(j, fw), delta=strides, dtype=dtype)
 
       nc = cartesian_add([i_ind, j_ind])
       ind = ps.reverse(ps.reshape(nc, shape=[-1]), axis=[0])
@@ -550,12 +561,12 @@ def make_convolution_transpose_fn_with_subkernels_matrix(
               shape=ps.concat([[tot_size], ps.shape(out)[-3:]], axis=0))
           out = tf.nn.depth_to_space(flat_out, block_size=strides)
 
-        if padding == 'VALID':
-          out_height = fh + strides * (xh - 1)
-          out_width = fw + strides * (xw - 1)
-        elif padding == 'SAME':
-          out_height = xh * strides
-          out_width = xw * strides
+        out_height = _deconv_output_length(
+            xh, filter_size=fh, padding=padding, output_padding=None,
+            stride=strides, dilation=dh)
+        out_width = _deconv_output_length(
+            xw, filter_size=fw, padding=padding, output_padding=None,
+            stride=strides, dilation=dw)
 
         out = out[..., truncate_top:truncate_top + out_height,
                   truncate_left:truncate_left + out_width, :]
@@ -573,6 +584,9 @@ def make_convolution_transpose_fn_with_subkernels(
   """Like `tf.nn.conv2d` except applies batch of kernels to batch of `x`."""
   with tf.name_scope(name or 'make_convolution_transpose_fn_with_dilation'):
 
+    # Enable v2 control flow to avoid None gradients through TensorArray.
+    tf.compat.v1.enable_control_flow_v2()
+
     if tf.get_static_value(rank) != 2:
       raise NotImplementedError('Argument `rank` currently only supports `2`; '
                                 'saw "{}".'.format(rank))
@@ -584,7 +598,7 @@ def make_convolution_transpose_fn_with_subkernels(
         dilations,
     ] = prepare_conv_args(
         filter_shape, rank=rank, strides=strides, padding=padding,
-        dilations=dilations, validate_args=validate_args)
+        dilations=dilations, is_transpose=True, validate_args=validate_args)
 
     sh, sw = strides
     fh, fw = filter_shape
@@ -597,8 +611,10 @@ def make_convolution_transpose_fn_with_subkernels(
     def loop_body(i_, kernels_ind):
       i = i_ // sw
       j = i_ % sw
-      i_ind = ps.range((sh - i - 1)*fw, fw * fh, delta=sh*fw, dtype=dtype)
-      j_ind = ps.range((sw - j - 1), fw, delta=sw, dtype=dtype)
+
+      i_ind = ps.range(
+          i * fw, ps.maximum(i, fh) * fw, delta=sh * fw, dtype=dtype)
+      j_ind = ps.range(j, ps.maximum(j, fw), delta=sw, dtype=dtype)
 
       last_j = sw - (fw - j - 1) % sw - 1
       last_i = sh - (fh - i - 1) % sh - 1
@@ -606,12 +622,10 @@ def make_convolution_transpose_fn_with_subkernels(
 
       nc = cartesian_add([i_ind, j_ind])
       kernels_ind = kernels_ind.write(
-          sh * sw - pos - 1, ps.reverse(ps.reverse(nc, [0]), [1]))
-
+          pos, ps.reverse(ps.reverse(nc, [0]), [1]))
       return i_ + 1, kernels_ind
 
-    kernels_ind = tf.TensorArray(dtype=dtype, infer_shape=False, size=1,
-                                 dynamic_size=True)
+    kernels_ind = tf.TensorArray(dtype=dtype, infer_shape=False, size=sh * sw)
 
     _, kernels_ind = tf.while_loop(
         lambda i, _: i < sh * sw,
@@ -701,8 +715,7 @@ def make_convolution_transpose_fn_with_subkernels(
               )
           return i + 1, outputs
 
-        outputs = tf.TensorArray(dtype=input_dtype, infer_shape=False, size=1,
-                                 dynamic_size=True)
+        outputs = tf.TensorArray(dtype=input_dtype, size=sh * sw)
 
         _, outputs = tf.while_loop(
             lambda i, _: i < sh * sw,
@@ -719,12 +732,12 @@ def make_convolution_transpose_fn_with_subkernels(
         y2 = tf.reshape(y2, ps.concat(
             [broadcast_batch_shape, ps.shape(y2)[-3:]], axis=0))
 
-        if padding == 'VALID':
-          out_height = fh + sh * (xh - 1)
-          out_width = fw + sw * (xw - 1)
-        elif padding == 'SAME':
-          out_height = xh * sh
-          out_width = xw * sw
+        out_height = _deconv_output_length(
+            xh, filter_size=fh, padding=padding, output_padding=None,
+            stride=sh, dilation=dh)
+        out_width = _deconv_output_length(
+            xw, filter_size=fw, padding=padding, output_padding=None,
+            stride=sw, dilation=dw)
 
         return y2[..., truncate_top:truncate_top+out_height,
                   truncate_left:truncate_left+out_width, :]
@@ -761,17 +774,14 @@ def _get_transpose_conv_dilated_padding(filter_dim, stride, dilation, padding):
   """Zero-padding for inputs dilated by strides."""
   tot_filter_dim = filter_dim + (filter_dim - 1) * (dilation - 1)
   if padding == 'VALID':
-    tot_pad = 2 * (tot_filter_dim - 1)
+    tot_pad = tot_filter_dim + stride - 2 + ps.maximum(
+        tot_filter_dim - stride, 0)
   elif padding == 'SAME':
     tot_pad = tot_filter_dim + stride - 2
-
-  # TODO(emilyaf): Don't need to consider case where stride > kernel_dim, right?
-  # if filter_dim > 1:
-  pad_end = tot_pad // 2
-  pad_start = tot_pad - pad_end - (stride - 1)  # implicit pad
-  # else:
-  #   pad_end = pad_start = 0
-  return pad_start, pad_end
+  return ps.cond(
+      filter_dim >= stride,
+      lambda: (tot_pad - tot_pad // 2 - stride + 1, tot_pad // 2),
+      lambda: (filter_dim - stride, tot_pad - filter_dim + 1))
 
 
 def _get_output_shape(rank, strides, padding, dilations, input_shape,
@@ -826,7 +836,7 @@ def _deconv_output_length(input_size, filter_size, padding, output_padding,
   # Infer length if output padding is None, else compute the exact length
   if output_padding is None:
     if padding == 'VALID':
-      return input_size * stride + max(filter_size - stride, 0)
+      return input_size * stride + ps.maximum(filter_size - stride, 0)
     elif padding == 'FULL':
       return input_size * stride - (stride + filter_size - 2)
     elif padding == 'SAME':
@@ -841,9 +851,10 @@ def _deconv_output_length(input_size, filter_size, padding, output_padding,
 
 
 def prepare_conv_args(
-    filter_shape, rank, strides, padding, dilations, validate_args=False):
+    filter_shape, rank, strides, padding, dilations,
+    is_transpose=False, validate_args=False):
   """Sanitizes use provided input."""
-  padding = _validate_padding(padding)  # pylint: disable=protected-access
+  padding = _validate_padding(padding)
   try:
     rank = int(tf.get_static_value(rank))
   except TypeError:
@@ -856,14 +867,36 @@ def prepare_conv_args(
       validate_args=validate_args)
   strides = prepare_tuple_argument(
       strides, n=rank, arg_name='strides', validate_args=validate_args)
-  padding = utils._prepare_padding_argument(padding)  # pylint: disable=protected-access
+  padding = _prepare_padding_argument(padding)
   dilations = prepare_tuple_argument(
       dilations, n=rank, arg_name='dilations', validate_args=validate_args)
-  return filter_shape, rank, strides, padding, dilations
+
+  strides_ = [tf.get_static_value(s) for s in strides]
+  dilations_ = [tf.get_static_value(d) for d in dilations]
+  assertions = []
+  if is_transpose:
+    if (all(s is not None for s in strides_)
+        and all(d is not None for d in dilations_)):
+      if any(s > 1 for s in strides_) and any(d > 1 for d in dilations_):
+        raise NotImplementedError('At least one of `dilations` and `strides` '
+                                  'must equal `1` for each dimension. Saw: '
+                                  '`strides={}`, `dilations={}`'.format(
+                                      strides, dilations))
+    elif validate_args:
+      assertions.append(
+          assert_util.assert_equal(
+              tf.logical_or(
+                  tf.equal(tf.reduce_max(strides), 1),
+                  tf.equal(tf.reduce_max(dilations), 1)),
+              True,
+              message='At least one of `dilations` and `strides` must equal `1` '
+              'for each dimension.'))
+
+  with tf.control_dependencies(assertions):
+    return filter_shape, rank, strides, padding, dilations
 
 
-# TODO(emilyaf): Replace the version in `utils` with this.
-def prepare_tuple_argument(arg, n, arg_name, validate_args):
+def prepare_tuple_argument(arg, n, arg_name, validate_args=False):
   """Helper which processes `Tensor`s to tuples in standard form."""
   arg_size = ps.size(arg)
   arg_size_ = tf.get_static_value(arg_size)
@@ -884,6 +917,24 @@ def prepare_tuple_argument(arg, n, arg_name, validate_args):
     arg = ps.broadcast_to(arg, shape=[n])
     arg = ps.unstack(arg, num=n)
     return arg
+
+
+def _prepare_padding_argument(x):
+  """Helper which processes the padding argument."""
+  if not hasattr(x, 'upper'):
+    return tuple(x)
+  padding = x.upper()
+  if padding in {'CAUSAL', 'FULL'}:
+    raise NotImplementedError(
+        'Argument `padding` value "{}" currently not supported. If you '
+        'require this feature, please create an issue on '
+        '`https://github.com/tensorflow/probability` or email '
+        '`tfprobability@tensorflow.org`.'.format(padding))
+  valid_values = {'VALID', 'SAME'}
+  if padding not in valid_values:
+    raise ValueError('Argument `padding` must be convertible to a tuple '
+                     'or one of {}; saw: "{}".'.format(valid_values, padding))
+  return padding
 
 
 def _call_conv2d_transpose(x, kernel, filter_shape, strides, padding, dilations,

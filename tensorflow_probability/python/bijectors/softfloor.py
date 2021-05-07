@@ -26,6 +26,7 @@ from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -36,7 +37,9 @@ __all__ = [
 ]
 
 
-class Softfloor(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Softfloor(bijector.AutoCompositeTensorBijector):
   """Compute a differentiable approximation to `tf.math.floor`.
 
   Given `x`, compute a differentiable approximation to `tf.math.floor(x)`.

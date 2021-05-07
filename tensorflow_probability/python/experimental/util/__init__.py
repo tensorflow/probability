@@ -19,11 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental.util.deferred_module import DeferredModule
+from tensorflow_probability.python.experimental.util.jit_public_methods import DEFAULT_METHODS_EXCLUDED_FROM_JIT
+from tensorflow_probability.python.experimental.util.jit_public_methods import JitPublicMethods
+from tensorflow_probability.python.experimental.util.trainable import make_trainable
 from tensorflow_probability.python.internal import all_util
 
 
 _allowed_symbols = [
+    'DEFAULT_METHODS_EXCLUDED_FROM_JIT',
     'DeferredModule',
+    'JitPublicMethods',
+    'make_trainable'
 ]
 
 all_util.remove_undocumented(__name__, _allowed_symbols)

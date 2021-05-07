@@ -63,10 +63,12 @@ def iid_sample(sample_fn, sample_shape):
   sample_shape = distribution_util.expand_to_vector(
       ps.cast(sample_shape, np.int32), tensor_name='sample_shape')
   n = ps.cast(ps.reduce_prod(sample_shape), dtype=np.int32)
+  static_n = tf.get_static_value(tf.convert_to_tensor(n))
 
   def unflatten(x):
+    sample_dims = 0 if static_n == 1 else 1
     unflattened_shape = ps.cast(
-        ps.concat([sample_shape, ps.shape(x)[1:]], axis=0),
+        ps.concat([sample_shape, ps.shape(x)[sample_dims:]], axis=0),
         dtype=np.int32)
     return tf.reshape(x, unflattened_shape)
 
@@ -98,7 +100,10 @@ def iid_sample(sample_fn, sample_shape):
           with tf.name_scope('iid_sample_fn_stateless_body'):
             return sample_fn(*args, seed=tf.gather(seed, i), **kwargs)
 
-      draws = parallel_for.pfor(pfor_loop_body, n)
+      if static_n == 1:
+        draws = pfor_loop_body(0)
+      else:
+        draws = parallel_for.pfor(pfor_loop_body, n)
       return tf.nest.map_structure(unflatten, draws, expand_composites=True)
 
   return iid_sample_fn
@@ -300,10 +305,17 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
             functools.reduce(ps.broadcast_shape, batch_shapes, []))
 
       # Flatten all of the batch dimensions into one.
-      n = tf.cast(ps.reduce_prod(broadcast_batch_shape), tf.int32)
+      n = ps.cast(ps.reduce_prod(broadcast_batch_shape), tf.int32)
       static_n = tf.get_static_value(n)
       if static_n == 1:
-        result = fn(*args)
+        # We can bypass `vectorized_map` if the batch shape is `[]`, `[1]`,
+        # `[1, 1]`, etc., just by flattening to batch shape `[]`.
+        result_batch_dims = 0
+        batched_result = fn_of_vectorized_args(
+            tf.nest.map_structure(
+                lambda x, nd: tf.reshape(x, ps.shape(x)[ps.rank(x) - nd:]),
+                vectorized_args,
+                vectorized_arg_core_ndims))
       else:
         # Pad all input parts to the common shape, then flatten
         # into the single leading dimension `[n]`.
@@ -317,16 +329,16 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
             tf.reshape(part, ps.concat([[n], core_shape], axis=0))
             for (part, core_shape) in zip(
                 broadcast_vectorized_args, core_shapes)]
+        result_batch_dims = 1
         batched_result = tf.vectorized_map(
             fn_of_vectorized_args, vectorized_args_with_flattened_batch_dim)
 
-        # Unflatten any `Tensor`s in the result.
-        unflatten = lambda x: tf.reshape(x, ps.concat([  # pylint: disable=g-long-lambda
-            broadcast_batch_shape, ps.shape(x)[1:]], axis=0))
-        result = tf.nest.map_structure(
-            lambda x: unflatten(x) if tf.is_tensor(x) else x, batched_result,
-            expand_composites=True)
+      # Unflatten any `Tensor`s in the result.
+      unflatten = lambda x: tf.reshape(x, ps.concat([  # pylint: disable=g-long-lambda
+          broadcast_batch_shape, ps.shape(x)[result_batch_dims:]], axis=0))
+      result = tf.nest.map_structure(
+          lambda x: unflatten(x) if tf.is_tensor(x) else x, batched_result,
+          expand_composites=True)
     return result
 
   return vectorized_fn
-

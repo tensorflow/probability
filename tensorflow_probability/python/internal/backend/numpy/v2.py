@@ -24,6 +24,7 @@ import functools
 import numpy as np
 
 # pylint: disable=unused-import
+from tensorflow_probability.python.internal.backend.numpy import __internal__
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import bitwise
 from tensorflow_probability.python.internal.backend.numpy import config
@@ -71,7 +72,8 @@ def _function(func=None, input_signature=None, autograph=True,  # pylint: disabl
       def non_jittable(arg):
         # Use static args for callables and for bools, which will sometimes
         # be used in a `if` block and fail if they are tracers.
-        return callable(arg) or np.asarray(arg).dtype == np.bool
+        return (arg is not None and
+                (callable(arg) or np.asarray(arg).dtype == np.bool))
 
       def jit_decorator(f):
         cache = {}
@@ -118,11 +120,30 @@ def _function(func=None, input_signature=None, autograph=True,  # pylint: disabl
   return transform
 
 
+class _SingleReplicaContext(object):
+  """Dummy replica context for numpy."""
+
+  @property
+  def replica_id_in_sync_group(self):
+    if JAX_MODE:
+      raise NotImplementedError
+    return 0
+
+  @property
+  def num_replicas_in_sync(self):
+    if JAX_MODE:
+      raise NotImplementedError
+    return 1
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
 compat = collections.namedtuple('compat', 'dimension_value')(
     lambda dim: None if dim is None else int(dim))
+
+distribute = collections.namedtuple('distribute', 'get_replica_context')(
+    _SingleReplicaContext)
 
 function = utils.copy_docstring(
     'tf.function',

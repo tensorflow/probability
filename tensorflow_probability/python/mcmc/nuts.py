@@ -42,6 +42,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
@@ -259,9 +260,6 @@ class NoUTurnSampler(TransitionKernel):
       self._target_log_prob_fn = target_log_prob_fn
       if not tf.nest.is_nested(step_size):
         step_size = [step_size]
-      step_size = [
-          tf.convert_to_tensor(s, dtype_hint=tf.float32) for s in step_size
-      ]
       self._step_size = step_size
 
       self._parameters = dict(
@@ -327,9 +325,15 @@ class NoUTurnSampler(TransitionKernel):
     start_trajectory_seed, loop_seed = samplers.split_seed(seed)
 
     with tf.name_scope(self.name + '.one_step'):
-      unwrap_state_list = not tf.nest.is_nested(current_state)
-      if unwrap_state_list:
-        current_state = [current_state]
+      state_structure = current_state
+      current_state = tf.nest.flatten(current_state)
+      if (tf.nest.is_nested(state_structure)
+          and (not mcmc_util.is_list_like(state_structure)
+               or len(current_state) != len(state_structure))):
+        # TODO(b/170865194): Support dictionaries and other non-list-like state.
+        raise TypeError('NUTS does not currently support nested or '
+                        'non-list-like state structures (saw: {}).'.format(
+                            state_structure))
 
       current_target_log_prob = previous_kernel_results.target_log_prob
       [
@@ -431,10 +435,8 @@ class NoUTurnSampler(TransitionKernel):
           seed=seed,
       )
 
-      result_state = new_step_metastate.candidate_state.state
-      if unwrap_state_list:
-        result_state = result_state[0]
-
+      result_state = tf.nest.pack_sequence_as(
+          state_structure, new_step_metastate.candidate_state.state)
       return result_state, kernel_results
 
   def bootstrap_results(self, init_state):
@@ -442,15 +444,6 @@ class NoUTurnSampler(TransitionKernel):
     with tf.name_scope(self.name + '.bootstrap_results'):
       if not tf.nest.is_nested(init_state):
         init_state = [init_state]
-      # Padding the step_size so it is compatable with the states
-      step_size = self.step_size
-      if len(step_size) == 1:
-        step_size = step_size * len(init_state)
-      if len(step_size) != len(init_state):
-        raise ValueError('Expected either one step size or {} (size of '
-                         '`init_state`), but found {}'.format(
-                             len(init_state), len(step_size)))
-
       dummy_momentum = [tf.ones_like(state) for state in init_state]
 
       def _init(shape_and_dtype):
@@ -473,6 +466,21 @@ class NoUTurnSampler(TransitionKernel):
           current_grads_log_prob,
       ] = leapfrog_impl.process_args(self.target_log_prob_fn, dummy_momentum,
                                      init_state)
+
+      # Padding the step_size so it is compatable with the states
+      step_size = self.step_size
+      if len(step_size) == 1:
+        step_size = step_size * len(init_state)
+      if len(step_size) != len(init_state):
+        raise ValueError('Expected either one step size or {} (size of '
+                         '`init_state`), but found {}'.format(
+                             len(init_state), len(step_size)))
+      step_size = tf.nest.map_structure(
+          lambda x: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
+              x,
+              dtype=current_target_log_prob.dtype,
+              name='step_size'),
+          step_size)
 
       return NUTSKernelResults(
           target_log_prob=current_target_log_prob,
@@ -543,13 +551,11 @@ class NoUTurnSampler(TransitionKernel):
           dtype=tf.bool)
 
       tree_start_states = tf.nest.map_structure(
-          lambda v: tf.where(  # pylint: disable=g-long-lambda
-              mcmc_util.left_justified_expand_dims_like(direction, v[1]),
-              v[1], v[0]),
+          lambda v: bu.where_left_justified_mask(direction, v[1], v[0]),
           initial_step_state)
 
       directions_expanded = [
-          mcmc_util.left_justified_expand_dims_like(direction, state)
+          bu.left_justified_expand_dims_like(direction, state)
           for state in tree_start_states.state
       ]
 
@@ -615,30 +621,23 @@ class NoUTurnSampler(TransitionKernel):
 
       new_candidate_state = TreeDoublingStateCandidate(
           state=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      choose_new_state, s0),
-                  s0, s1)
+              bu.where_left_justified_mask(choose_new_state, s0, s1)
               for s0, s1 in zip(candidate_tree_state.state,
                                 last_candidate_state.state)
           ],
-          target=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  choose_new_state,
-                  candidate_tree_state.target),
-              candidate_tree_state.target, last_candidate_state.target),
+          target=bu.where_left_justified_mask(
+              choose_new_state,
+              candidate_tree_state.target,
+              last_candidate_state.target),
           target_grad_parts=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      choose_new_state, grad0),
-                  grad0, grad1)
+              bu.where_left_justified_mask(choose_new_state, grad0, grad1)
               for grad0, grad1 in zip(candidate_tree_state.target_grad_parts,
                                       last_candidate_state.target_grad_parts)
           ],
-          energy=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  choose_new_state, candidate_tree_state.target),
-              candidate_tree_state.energy, last_candidate_state.energy),
+          energy=bu.where_left_justified_mask(
+              choose_new_state,
+              candidate_tree_state.energy,
+              last_candidate_state.energy),
           weight=weight_sum)
 
       for new_candidate_state_temp, old_candidate_state_temp in zip(
@@ -655,18 +654,13 @@ class NoUTurnSampler(TransitionKernel):
       # Update left right information of the trajectory, and check trajectory
       # level U turn
       tree_otherend_states = tf.nest.map_structure(
-          lambda v: tf.where(  # pylint: disable=g-long-lambda
-              mcmc_util.left_justified_expand_dims_like(direction, v[1]),
-              v[0], v[1]), initial_step_state)
+          lambda v: bu.where_left_justified_mask(direction, v[0], v[1]),
+          initial_step_state)
 
       new_step_state = tf.nest.pack_sequence_as(initial_step_state, [
           tf.stack([  # pylint: disable=g-complex-comprehension
-              tf.where(
-                  mcmc_util.left_justified_expand_dims_like(direction, left),
-                  right, left),
-              tf.where(
-                  mcmc_util.left_justified_expand_dims_like(direction, left),
-                  left, right),
+              bu.where_left_justified_mask(direction, right, left),
+              bu.where_left_justified_mask(direction, left, right),
           ], axis=0)
           for left, right in zip(tf.nest.flatten(tree_final_states),
                                  tf.nest.flatten(tree_otherend_states))
@@ -895,27 +889,20 @@ class NoUTurnSampler(TransitionKernel):
 
       next_candidate_tree_state = TreeDoublingStateCandidate(
           state=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      is_sample_accepted, s0), s0, s1)
+              bu.where_left_justified_mask(is_sample_accepted, s0, s1)
               for s0, s1 in zip(next_state_parts, candidate_tree_state.state)
           ],
-          target=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  is_sample_accepted, next_target),
-              next_target, candidate_tree_state.target),
+          target=bu.where_left_justified_mask(
+              is_sample_accepted, next_target, candidate_tree_state.target),
           target_grad_parts=[
-              tf.where(  # pylint: disable=g-complex-comprehension
-                  mcmc_util.left_justified_expand_dims_like(
-                      is_sample_accepted, grad0),
-                  grad0, grad1)
+              bu.where_left_justified_mask(is_sample_accepted, grad0, grad1)
               for grad0, grad1 in zip(next_target_grad_parts,
                                       candidate_tree_state.target_grad_parts)
           ],
-          energy=tf.where(
-              mcmc_util.left_justified_expand_dims_like(
-                  is_sample_accepted, next_target),
-              current_energy, candidate_tree_state.energy),
+          energy=bu.where_left_justified_mask(
+              is_sample_accepted,
+              current_energy,
+              candidate_tree_state.energy),
           weight=weight_sum)
 
       continue_tree = not_divergent & continue_tree_previous
@@ -991,13 +978,13 @@ def has_not_u_turn(state_diff,
     batch_dot_product_left = sum([
         tf.reduce_sum(  # pylint: disable=g-complex-comprehension
             s_diff * m,
-            axis=tf.range(log_prob_rank, ps.rank(m)))
+            axis=ps.range(log_prob_rank, ps.rank(m)))
         for s_diff, m in zip(state_diff, momentum_left)
     ])
     batch_dot_product_right = sum([
         tf.reduce_sum(  # pylint: disable=g-complex-comprehension
             s_diff * m,
-            axis=tf.range(log_prob_rank, ps.rank(m)))
+            axis=ps.range(log_prob_rank, ps.rank(m)))
         for s_diff, m in zip(state_diff, momentum_right)
     ])
     return (batch_dot_product_left >= 0) & (batch_dot_product_right >= 0)

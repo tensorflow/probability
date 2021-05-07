@@ -21,6 +21,7 @@ from __future__ import print_function
 import os
 
 # Dependency imports
+import numpy as np
 import six
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -93,10 +94,10 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     # pylint: enable=g-error-prone-assert-raises
 
   def test_basics_assertfails(self):
-    dist = normal_composite(0, 1, validate_args=True)
+    dist = normal_composite(0., 1., validate_args=True)
     flat = tf.nest.flatten(dist, expand_composites=True)
-    flat[1] = tf.constant(-1.)
-    with self.assertRaisesOpError('`scale` must be positive'):
+    flat[1] = tf.constant(2)
+    with self.assertRaises(TypeError):
       unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
       self.evaluate(unflat.log_prob(.5))
 
@@ -140,7 +141,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
       def __init__(self):
         self.loc = tf.Variable([0., 1.])
-        self.scale_adj = tf.Variable(0.)
+        self.scale_adj = tf.Variable([0.], shape=[None])
 
       @tf.function(input_signature=(normal_composite(0, [1, 2])._type_spec,))
       def make_dist(self, d):
@@ -161,11 +162,11 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.evaluate(m2.loc.assign(m2.loc + 2))
     self.evaluate(m2.make_dist(d).sample())
 
-    self.evaluate(m2.scale_adj.assign(-30.))
+    self.evaluate(m2.scale_adj.assign([1., 2., 3.]))
     tf.saved_model.save(m2, os.path.join(path, 'saved_model2'))
     m3 = tf.saved_model.load(os.path.join(path, 'saved_model2'))
     self.evaluate([v.initializer for v in (m3.loc, m3.scale_adj)])
-    with self.assertRaisesOpError('Argument `scale` must be positive'):
+    with self.assertRaisesOpError('compatible shape'):
       self.evaluate(m3.make_dist(d).sample())
 
   def test_import_uncached_class(self):
@@ -389,6 +390,37 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     log_prob_after = self.evaluate(unflat.log_prob(sample))
     self.assertAllEqual(log_prob_before, log_prob_after)
 
+  def test_keras_layers(self):
+    # 10-vector to 5-vector
+    def layer_helper(x):
+      loc = tf.split(x, 2, axis=-1)[0]
+      scale = tf.math.exp(tf.split(x, 2, axis=-1)[1])
+      d = tfd.Normal(loc, scale)
+      cd = tfp.experimental.as_composite(d)
+      return cd
+
+    model1 = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(10),
+        tf.keras.layers.Lambda(layer_helper),
+        tf.keras.layers.Lambda(tfd.Distribution.mean),
+        tf.keras.layers.Dense(10),
+    ])
+    model2 = tf.keras.models.Sequential([
+        tf.keras.layers.Dense(10),
+        tfp.layers.DistributionLambda(layer_helper),
+        tf.keras.layers.Dense(10),
+    ])
+
+    model1.compile(optimizer='sgd', loss='mean_squared_error')
+    model2.compile(optimizer='sgd', loss='mean_squared_error')
+    xs = np.array([-1.0, 0.0, 1.0, 2.0, 3.0, 4.0])
+    ys = np.array([-3.0, -1.0, 1.0, 3.0, 5.0, 7.0])
+    model1.fit(xs, ys, epochs=500)
+    model2.fit(xs, ys, epochs=500, steps_per_epoch=5)
+    x_test = np.array([10.0])
+    model1.predict(x_test, steps=1)
+    model2.predict(x_test, steps=1)
+
   def test_transformed_distribution(self):
     fd = tfd.TransformedDistribution(
         distribution=tfd.Normal(loc=0., scale=1.),
@@ -420,6 +452,12 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
     self.evaluate(unflat.log_prob(.5))
+
+  def test_already_composite_tensor(self):
+    b = tfb.Scale(2.)
+    b2 = tfp.experimental.as_composite(b)
+    self.assertIsInstance(b, tf.__internal__.CompositeTensor)
+    self.assertIs(b, b2)
 
 
 if __name__ == '__main__':

@@ -26,9 +26,11 @@ toc:
   path: /probability/examples/Optimizers_in_TensorFlow_Probability
 - title: TensorFlow Probability on JAX
   path: /probability/examples/TensorFlow_Probability_on_JAX
-  status: new
 - title: Automatically Batched Joint Distributions
   path: /probability/examples/JointDistributionAutoBatched_A_Gentle_Tutorial
+  status: new
+- title: Distributed Inference with JAX
+  path: /probability/examples/Distributed_Inference_with_JAX
   status: new
 - heading: "Tutorials"
 - title:  Probabilistic regression
@@ -73,6 +75,8 @@ toc:
   path: /probability/examples/STS_approximate_inference_for_models_with_non_Gaussian_observations
 - title: Structural time series
   path: /probability/examples/Structural_Time_Series_Modeling_Case_Studies_Atmospheric_CO2_and_Electricity_Demand
+- title: Variational Inference and Joint Distributions
+  path: /probability/examples/Variational_Inference_and_Joint_Distributions
 - title: Covariance estimation
   path: /probability/examples/TensorFlow_Probability_Case_Study_Covariance_Estimation
 - heading: "Releases"

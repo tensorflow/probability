@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -34,7 +35,9 @@ __all__ = [
 ]
 
 
-class Split(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Split(bijector.AutoCompositeTensorBijector):
   """Split a `Tensor` event along an axis into a list of `Tensor`s.
 
   Example Use:
@@ -512,3 +515,7 @@ class Split(bijector.Bijector):
                          'expected `split_size` dimension (={})'.format(
                              output_size, split_size))))
     return assertions
+
+  @property
+  def _composite_tensor_shape_params(self):
+    return ('num_or_size_splits', 'axis')

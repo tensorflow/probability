@@ -32,6 +32,8 @@ __all__ = [
 ]
 
 
+# TODO(b/182603117): Enable AutoCompositeTensor once LinearOperators are
+# converted to CompositeTensor.
 class ScaleMatvecDiag(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
   """Compute `Y = g(X; scale) = scale @ X`.
 

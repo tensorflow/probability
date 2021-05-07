@@ -195,6 +195,10 @@ class Autoregressive(distribution.Distribution):
       return self._num_steps_deprecated_behavior()
     return self._num_steps
 
+  @property
+  def experimental_is_sharded(self):
+    return self._get_distribution0().experimental_is_sharded
+
   @deprecation.deprecated(
       '2020-02-15',
       'The `num_steps` property will return `None` when the distribution is '

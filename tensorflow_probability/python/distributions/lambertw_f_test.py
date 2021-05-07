@@ -72,6 +72,13 @@ class LambertWNormalTest(test_util.TestCase):
         validate_args=True)
     self.assertAllEqual(lwn.batch_shape, [4, 3, 2])
 
+  def testBatchSamplesAreIndependent(self):
+    num_samples = 1000
+    lwn = tfd.LambertWNormal(loc=0., scale=1., tailweight=[0., 0.])
+    xs = lwn.sample(num_samples, seed=test_util.test_seed())
+    cov = 1. / num_samples * tf.matmul(xs, xs, transpose_a=True)
+    self.assertAllClose(cov, tf.eye(2), atol=0.2)
+
   def testSampleMethod(self):
     """Tests that samples can be correctly transformed into gaussian samples."""
     tailweight = .1

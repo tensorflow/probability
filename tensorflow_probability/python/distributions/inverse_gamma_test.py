@@ -122,6 +122,19 @@ class InverseGammaTest(test_util.TestCase):
     self.assertEqual(cdf.shape, (batch_size,))
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
 
+  def testInverseGammaQuantile(self):
+    batch_size = 6
+    alpha = np.linspace(2., 10., batch_size).astype(np.float32)[..., np.newaxis]
+    beta = np.linspace(4., 17., batch_size).astype(np.float32)[..., np.newaxis]
+    x = np.linspace(0., 1., 13).astype(np.float32)
+    inv_gamma = tfd.InverseGamma(
+        concentration=alpha, scale=beta, validate_args=True)
+    expected_quantile = stats.invgamma.ppf(x, alpha, scale=beta)
+
+    quantile = inv_gamma.quantile(x)
+    self.assertEqual(quantile.shape, (batch_size, 13))
+    self.assertAllClose(self.evaluate(quantile), expected_quantile, rtol=3e-6)
+
   def testInverseGammaMode(self):
     alpha_v = np.array([5.5, 3.0, 2.5])
     beta_v = np.array([1.0, 4.0, 5.0])

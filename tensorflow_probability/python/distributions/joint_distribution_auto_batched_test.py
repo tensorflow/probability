@@ -36,6 +36,7 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
+JAX_MODE = False
 Root = tfd.JointDistributionCoroutineAutoBatched.Root
 
 
@@ -352,6 +353,20 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     x2 = self.evaluate(dist.sample(value=x, seed=test_util.test_seed()))
     self.assertAllCloseNested(x, x2)
 
+  def test_sample_with_value_as_kwarg(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def dist():
+      a = yield tfd.Sample(tfd.Normal(0, 1.), 2, name='a')
+      b = yield tfd.Sample(tfd.Normal(0, 1.), 3, name='b')
+      # The following line fails if not autovectorized.
+      yield tfd.Normal(a[tf.newaxis, ...] * b[..., tf.newaxis], 1., name='c')
+
+    x = self.evaluate(dist.sample(4, seed=test_util.test_seed()))
+    x2 = self.evaluate(dist.sample(seed=test_util.test_seed(), a=x.a))
+    self.assertAllClose(x.a, x2.a)
+    self.assertAllEqual(x2.b.shape, [4, 3])
+    self.assertAllEqual(x2.c.shape, [4, 3, 2])
+
   @parameterized.named_parameters(
       dict(testcase_name='stateful', sampler_type='stateful'),
       dict(testcase_name='stateless', sampler_type='stateless'))
@@ -444,6 +459,46 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
                             [value_partial_batch_dim, num_columns])
         self.assertAllEqual(xs[2].shape,
                             [value_partial_batch_dim, num_rows, num_columns])
+
+  def test_unit_sample_shape_avoids_vectorization(self):
+    if not tf.executing_eagerly():
+      self.skipTest('Test relies on eager execution.')
+
+    @tfd.JointDistributionCoroutineAutoBatched
+    def dist():
+      # Because `pfor` operates by tracing its loop body, to ensure we're
+      # not inside of a `pfor` loop body it's sufficient to check that we're
+      # not inside of a tf.function.
+      if not tf.executing_eagerly():
+        raise ValueError('Model is running inside tf.function. This may '
+                         'indicate that auto-vectorization is being '
+                         'triggered unnecessarily.')
+      yield tfd.Normal(0., 1., name='x')
+    self.assertEqual(
+        [1],
+        dist.sample(
+            1, seed=test_util.test_seed(sampler_type='seedless')).x.shape)
+    self.assertEqual(
+        [1],
+        dist.sample([1],
+                    seed=test_util.test_seed(sampler_type='seedless')).x.shape)
+    self.assertEqual(
+        [1, 1],
+        dist.sample([1, 1],
+                    seed=test_util.test_seed(sampler_type='seedless')).x.shape)
+
+  def test_unit_sample_shape(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def dist():
+      x = yield tfd.Normal(loc=tf.zeros([3]), scale=1., name='x')
+      yield tfd.Bernoulli(logits=tf.einsum('n->', x), name='y')
+
+    for sample_shape in [(), 1, [1], [1, 1], [2]]:
+      self.assertAllEqual(
+          dist.log_prob(
+              dist.sample(sample_shape,
+                          seed=test_util.test_seed())).shape,
+          np.reshape(sample_shape, [-1]))
 
   def test_sample_dtype_structures_output(self):
 
@@ -594,31 +649,31 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     models = {}
     def coroutine_model():
-      g = yield tfd.LogNormal(0., [1., 2.])
-      df = yield tfd.Exponential([1., 2.])
-      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
-      yield tfd.StudentT(df[:, tf.newaxis], loc, 1)
+      high = yield tfd.LogNormal(0., 1)
+      yield tfd.Uniform(low=[-1., -2.], high=high)
     models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
 
     models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.LogNormal(0., [1., 2.]),
-        tfd.Exponential([1., 2.]),
-        lambda _, g: tfd.Sample(tfd.Normal(0, g), 20),
-        lambda loc, df: tfd.StudentT(df[:, tf.newaxis], loc, 1)
+        tfd.LogNormal(0., 1.),
+        lambda high: tfd.Uniform(low=[-1., -2.], high=high)
     ]
 
     models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('g', tfd.LogNormal(0., [1., 2.])),
-        ('df', tfd.Exponential([1., 2.])),
-        ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
-        ('x', lambda loc, df: tfd.StudentT(df[:, tf.newaxis], loc, 1))))
+        ('high', tfd.LogNormal(0., 1.)),
+        ('x', lambda high: tfd.Uniform(low=[-1., -2.], high=high))))
 
-    joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
+    joint = jd_class(models[jd_class], validate_args=True)
     joint_bijector = joint.experimental_default_event_space_bijector()
-    x = self.evaluate(joint.sample(seed=test_util.test_seed()))
-    self.assertAllClose(
-        x,
-        self.evaluate(joint_bijector.forward(joint_bijector.inverse(x))))
+
+    y = self.evaluate(joint.sample([2, 3], seed=test_util.test_seed()))
+    x = joint_bijector.inverse(y)
+    self.assertAllClose(y, joint_bijector.forward(x))
+
+    event_ndims = tf.nest.pack_sequence_as(joint.dtype, [0, 1])
+    fldj = joint_bijector.forward_log_det_jacobian(x, event_ndims=event_ndims)
+    ildj = joint_bijector.inverse_log_det_jacobian(y, event_ndims=event_ndims)
+    self.assertAllEqual(fldj.shape, [2, 3])
+    self.assertAllClose(fldj, -ildj)
 
   def test_nested_joint_distributions(self):
     batch_shape = [2, 3]
@@ -646,9 +701,13 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         joint.event_shape)
 
     # Sample shape.
-    z2 = joint.sample(5, seed=test_util.test_seed())
+    z2 = self.evaluate(
+        joint.sample(5, seed=test_util.test_seed()))
     lp2 = joint.log_prob(z2)
     self.assertAllEqual(lp2.shape, [5])
+
+    z3 = joint.sample(value=z2, seed=test_util.test_seed())
+    self.assertAllCloseNested(z2, z3)
 
   @parameterized.named_parameters(*[
       dict(testcase_name='_{}{}'.format(jd_class.__name__,  # pylint: disable=g-complex-comprehension
@@ -663,6 +722,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     maybe_jit = lambda f: f
     if jit:
       self.skip_if_no_xla()
+      if not JAX_MODE and not tf.test.is_gpu_available():
+        self.skipTest('b/179303849')
       maybe_jit = tf.function(jit_compile=True)
 
     def make_models(dtype):

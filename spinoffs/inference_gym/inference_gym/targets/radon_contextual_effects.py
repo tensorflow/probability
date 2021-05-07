@@ -18,6 +18,7 @@ import functools
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import dtype_util
 
 from inference_gym.internal import data
 from inference_gym.targets import bayesian_model
@@ -347,11 +348,13 @@ class RadonContextualEffectsMinnesota(RadonContextualEffects):
 
   GROUND_TRUTH_MODULE = radon_contextual_effects_minnesota
 
-  def __init__(self):
+  def __init__(self, dtype=tf.float64):
     dataset = data.radon(state='MN')
     for key in list(dataset.keys()):
       if key.startswith('test_'):
         del dataset[key]
+      elif dtype_util.is_floating(dataset[key].dtype):
+        dataset[key] = tf.cast(dataset[key], dtype)
     super(RadonContextualEffectsMinnesota, self).__init__(
         name='radon_contextual_effects_minnesota',
         pretty_name='Radon Contextual Effects Minnesota',
@@ -374,11 +377,13 @@ class RadonContextualEffectsHalfNormalMinnesota(RadonContextualEffects):
 
   GROUND_TRUTH_MODULE = radon_contextual_effects_minnesota_halfnormal
 
-  def __init__(self):
+  def __init__(self, dtype=tf.float64):
     dataset = data.radon(state='MN')
     for key in list(dataset.keys()):
       if key.startswith('test_'):
         del dataset[key]
+      elif dtype_util.is_floating(dataset[key].dtype):
+        dataset[key] = tf.cast(dataset[key], dtype)
     super(RadonContextualEffectsHalfNormalMinnesota, self).__init__(
         name='radon_contextual_effects_halfnormal_minnesota',
         pretty_name='Radon Contextual Effects HalfNormal Minnesota',

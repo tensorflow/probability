@@ -18,10 +18,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
 
@@ -81,6 +84,23 @@ class RestructureBijectorTest(test_util.TestCase):
     self.assertAllEqualNested(
         0., self.evaluate(bij.inverse_log_det_jacobian(y, y_ndims)))
 
+  def testSmartConstructors(self):
+    x = collections.OrderedDict([
+        ('a', [1, 2, 3]),
+        ('b', [4, 5, 6]),
+        ('c', 7.),
+        ('d', 8.),
+        ('e', 9.)])
+    bij = tfb.tree_flatten(x)
+
+    bij_2 = tfb.pack_sequence_as(x)
+
+    # Invert assertion arguments to infer structure from bijector output.
+    self.assertAllEqualNested(
+        bij.forward(x), [1, 2, 3, 4, 5, 6, 7, 8, 9], check_types=True)
+    self.assertAllEqualNested(
+        bij_2.forward(bij.forward(x)), x, check_types=True)
+
   def testStructureToStructure(self):
     bij = tfb.Restructure(
         input_structure={'foo': [0, 1], 'bar': 2, 'baz': (3, 4)},
@@ -117,6 +137,41 @@ class RestructureBijectorTest(test_util.TestCase):
         y_ndims, bij.forward_event_ndims(x_ndims), check_types=True)
     self.assertAllEqualNested(
         x_ndims, bij.inverse_event_ndims(y_ndims), check_types=True)
+
+  def testPartsWithUnusedInternalStructure(self):
+    dist = tfd.JointDistributionSequential([
+        tfd.JointDistributionNamed({'a': tfd.Normal(0., 1.)}),
+        tfd.JointDistributionNamed({'b': tfd.Normal(1000., 1.)}),
+    ])
+    x = dist.sample(  # Shape: [{'a': []}, {'b': []}]
+        seed=test_util.test_seed(sampler_type='stateless'))
+
+    # Test that we can swap the outer list entries, even though they contain
+    # internal structure (i.e., are themselves dicts).
+    swap_elements = tfb.Restructure(input_structure=[1, 0],
+                                    output_structure=[0, 1])
+    self.assertAllEqualNested(swap_elements(x), [x[1], x[0]], check_types=True)
+
+    swapped_dist = swap_elements(dist)
+    self.assertAllEqualNested(swapped_dist.event_shape,
+                              [dist.event_shape[1], dist.event_shape[0]],
+                              check_types=True)
+    self.assertEqual(swapped_dist.dtype,
+                     [dist.dtype[1], dist.dtype[0]])
+
+  def testCompositeTensor(self):
+    bij = tfb.Restructure({
+        'foo': [1, 2],
+        'bar': 0,
+        'baz': (3, 4)
+    })
+
+    x = [[1, 2, 3], [4, 5, 6], 7., 8., 9.]
+    flat = tf.nest.flatten(bij, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(bij, flat, expand_composites=True)
+    self.assertAllClose(
+        bij.forward(x),
+        tf.function(lambda b_: b_.forward(x))(unflat))
 
 
 if __name__ == '__main__':

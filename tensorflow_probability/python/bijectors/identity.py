@@ -21,9 +21,10 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 __all__ = [
-    "Identity",
+    'Identity',
 ]
 
 
@@ -33,7 +34,9 @@ class _NoOpCache(dict):
     return {}
 
 
-class Identity(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Identity(bijector.AutoCompositeTensorBijector):
   """Compute Y = g(X) = X.
 
     Example Use:
@@ -49,7 +52,7 @@ class Identity(bijector.Bijector):
 
   """
 
-  def __init__(self, validate_args=False, name="identity"):
+  def __init__(self, validate_args=False, name='identity'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Identity, self).__init__(

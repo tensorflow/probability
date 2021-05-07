@@ -45,6 +45,7 @@ import numpy as np
 
 from discussion.fun_mcmc import backend
 
+ps = backend.prefer_static
 tf = backend.tf
 tfp = backend.tfp
 util = backend.util
@@ -682,6 +683,9 @@ def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
       transformed space.
   """
 
+  bijector_structure = util.get_shallow_tree(
+      lambda b: isinstance(b, tfb.Bijector), bijector)
+
   def wrapper(*args, **kwargs):
     """Transformed wrapper."""
     bijector_ = bijector
@@ -689,8 +693,9 @@ def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
     args = recover_state_from_args(args, kwargs, bijector_)
     args = util.map_tree(lambda x: 0. + x, args)
 
-    original_space_args = util.map_tree(lambda b, x: b.forward(x), bijector_,
-                                        args)
+    original_space_args = util.map_tree_up_to(bijector_structure,
+                                              lambda b, x: b.forward(x),
+                                              bijector_, args)
     original_space_log_prob, extra = call_potential_fn(log_prob_fn,
                                                        original_space_args)
     event_ndims = util.map_tree(
@@ -698,15 +703,17 @@ def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
 
     return original_space_log_prob + sum(
         util.flatten_tree(
-            util.map_tree(
+            util.map_tree_up_to(
+                bijector_structure,
                 lambda b, x, e: b.forward_log_det_jacobian(x, event_ndims=e),
                 bijector_, args, event_ndims))), [original_space_args, extra]
 
   if init_state is None:
     return wrapper
   else:
-    return wrapper, util.map_tree(lambda b, s: b.inverse(s), bijector,
-                                  init_state)
+    return wrapper, util.map_tree_up_to(bijector_structure,
+                                        lambda b, s: b.inverse(s), bijector,
+                                        init_state)
 
 
 IntegratorStepState = collections.namedtuple('IntegratorStepState',
@@ -1343,7 +1350,7 @@ def hamiltonian_integrator(
   state_grads = int_state.state_grads
   state_extra = int_state.state_extra
 
-  num_steps = tf.convert_to_tensor(num_steps)
+  num_steps = ps.convert_to_shape_tensor(num_steps)
   is_ragged = len(num_steps.shape) > 0  # pylint: disable=g-explicit-length-test
 
   kinetic_energy, kinetic_energy_extra = call_potential_fn(
@@ -1352,7 +1359,7 @@ def hamiltonian_integrator(
 
   if is_ragged:
     step = 0
-    max_num_steps = tf.reduce_max(num_steps)
+    max_num_steps = ps.reduce_max(num_steps)
   else:
     step = []
     max_num_steps = num_steps

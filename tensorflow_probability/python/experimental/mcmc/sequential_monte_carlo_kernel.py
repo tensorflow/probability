@@ -247,7 +247,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         is_initial_step = ps.equal(kernel_results.steps, 0)
         # TODO(davmre): this `where` assumes the state size didn't change.
         state = tf.nest.map_structure(
-            lambda a, b: ps.where(is_initial_step, a, b), state, proposed_state)
+            lambda a, b: tf.where(is_initial_step, a, b), state, proposed_state)
 
         normalized_log_weights = tf.nn.log_softmax(state.log_weights, axis=0)
         # Every entry of `log_weights` differs from `normalized_log_weights`

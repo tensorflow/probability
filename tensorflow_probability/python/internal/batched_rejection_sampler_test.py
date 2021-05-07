@@ -43,7 +43,7 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
 
       return ((negative_values, values), good)
 
-    ((negative_values, values), _) = self.evaluate(
+    ((negative_values, values), _, _) = self.evaluate(
         brs.batched_las_vegas_algorithm(
             uniform_less_than_point_five,
             seed=test_util.test_seed()))
@@ -52,12 +52,37 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
     self.assertAllClose(-values, negative_values)
 
     # Check for reproducibility.
-    ((negative_values_2, values_2), _) = self.evaluate(
+    ((negative_values_2, values_2), _, _) = self.evaluate(
         brs.batched_las_vegas_algorithm(
             uniform_less_than_point_five,
             seed=test_util.test_seed()))
     self.assertAllEqual(negative_values, negative_values_2)
     self.assertAllEqual(values, values_2)
+
+  def testBatchedStructuredLasVegasAlgorithm(self):
+    def uniform_in_circle(seed):
+      coords = samplers.uniform([6, 2], minval=-1.0, maxval=1.0, seed=seed)
+      radii = tf.reduce_sum(coords * coords, axis=-1)
+      good = tf.less(radii, 1)
+      return (coords, good)
+
+    (coords, _, _) = brs.batched_las_vegas_algorithm(
+        uniform_in_circle,
+        seed=test_util.test_seed())
+
+    radii = self.evaluate(tf.reduce_sum(coords * coords, axis=-1))
+    self.assertAllLess(radii, 1.0)
+
+  def testGivingUp(self):
+    def trial(seed):
+      del seed
+      return tf.constant([1, 0]), tf.constant([True, False])
+    values, final_successes, num_iters = self.evaluate(
+        brs.batched_las_vegas_algorithm(
+            trial, max_trials=50, seed=test_util.test_seed()))
+    self.assertAllEqual(values, [1, 0])
+    self.assertAllEqual(final_successes, [True, False])
+    self.assertAllEqual(50, num_iters)
 
   @parameterized.named_parameters(
       dict(testcase_name='_static_float32', is_static=True, dtype=tf.float32),

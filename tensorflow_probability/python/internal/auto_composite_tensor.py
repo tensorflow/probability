@@ -18,18 +18,42 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import contextlib
 import functools
-import inspect
+import threading
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.saved_model import nested_structure_coder  # pylint: disable=g-direct-tensorflow-import
+# pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import composite_tensor
+from tensorflow.python.framework import type_spec
+from tensorflow.python.ops import resource_variable_ops
+from tensorflow.python.util import tf_inspect
+# pylint: enable=g-direct-tensorflow-import
 
 __all__ = [
     'auto_composite_tensor',
     'AutoCompositeTensor',
+    'is_deferred_assertion_context',
 ]
+
+_DEFERRED_ASSERTION_CONTEXT = threading.local()
+_DEFERRED_ASSERTION_CONTEXT.is_deferred = False
+
+
+def is_deferred_assertion_context():
+  return getattr(_DEFERRED_ASSERTION_CONTEXT, 'is_deferred', False)
+
+
+@contextlib.contextmanager
+def _deferred_assertion_context(is_deferred=True):
+  was_deferred = getattr(_DEFERRED_ASSERTION_CONTEXT, 'is_deferred', False)
+  _DEFERRED_ASSERTION_CONTEXT.is_deferred = is_deferred
+  try:
+    yield
+  finally:
+    _DEFERRED_ASSERTION_CONTEXT.is_deferred = was_deferred
 
 
 _registry = {}  # Mapping from (python pkg, class name) -> class.
@@ -42,30 +66,42 @@ _AUTO_COMPOSITE_TENSOR_VERSION = 2
 def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
                          prefer_static_value=()):
   """Extract constructor kwargs to reconstruct `obj`."""
-  argspec = inspect.getfullargspec(obj.__init__)
-  if argspec.varargs or argspec.varkw:
+  sig = tf_inspect.signature(obj.__init__)
+  if any(v.kind in (tf_inspect.Parameter.VAR_KEYWORD,
+                    tf_inspect.Parameter.VAR_POSITIONAL)
+         for v in sig.parameters.values()):
     raise ValueError(
-        '*args and **kwargs are not supported. Found `{}`'.format(argspec))
+        '*args and **kwargs are not supported. Found `{}`'.format(sig))
 
-  params = argspec.args + argspec.kwonlyargs
-  keys = [p for p in params if p != 'self' and p not in omit_kwargs]
+  keys = [p for p in sig.parameters if p != 'self' and p not in omit_kwargs]
   if limit_to is not None:
     keys = [k for k in keys if k in limit_to]
 
   kwargs = {}
+  not_found = object()
   for k in keys:
-    if hasattr(obj, k):
-      kwargs[k] = getattr(obj, k)
-    elif hasattr(obj, '_' + k):
-      kwargs[k] = getattr(obj, '_' + k)
+    srcs = [
+        getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
+        getattr(obj, 'parameters', {}).get(k, not_found),
+    ]
+    if any(v is not not_found for v in srcs):
+      kwargs[k] = [v for v in srcs if v is not not_found][0]
     else:
       raise ValueError(
-          'Object did not have an attr corresponding to constructor argument '
-          '{k}. (Tried both `obj.{k}` and obj._{k}`).'.format(k=k))
+          f'Could not determine an appropriate value for field `{k}` in object '
+          f' `{obj}`. Looked for \n'
+          f' 1. an attr called `{k}`,\n'
+          f' 2. an attr called `_{k}`,\n'
+          f' 3. an entry in `obj.parameters` with key "{k}".')
     if k in prefer_static_value and kwargs[k] is not None:
-      static_val = tf.get_static_value(kwargs[k])
-      if static_val is not None:
-        kwargs[k] = static_val
+      if tf.is_tensor(kwargs[k]):
+        static_val = tf.get_static_value(kwargs[k])
+        if static_val is not None:
+          kwargs[k] = static_val
+    if isinstance(kwargs[k], (np.ndarray, np.generic)):
+      # Generally, these are shapes or int, but may be other parameters such as
+      # `power` for `tfb.PowerTransform`.
+      kwargs[k] = kwargs[k].tolist()
   return kwargs
 
 
@@ -86,10 +122,13 @@ def _extract_type_spec_recursively(value):
     spec: the `TypeSpec` or collection of `TypeSpec`s corresponding to `value`
     or `value`, if no `Tensor`s are found.
   """
-  if tf.is_tensor(value):
-    return tf.TensorSpec.from_tensor(value)
   if isinstance(value, composite_tensor.CompositeTensor):
     return value._type_spec  # pylint: disable=protected-access
+  if isinstance(value, tf.Variable):
+    return resource_variable_ops.VariableSpec(
+        value.shape, dtype=value.dtype, trainable=value.trainable)
+  if tf.is_tensor(value):
+    return tf.TensorSpec(value.shape, value.dtype)
   if isinstance(value, (list, tuple)):
     specs = [_extract_type_spec_recursively(v) for v in value]
     has_tensors = any(a is not b for a, b in zip(value, specs))
@@ -144,7 +183,8 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
 
   def _from_components(self, components):
     kwargs = dict(self._non_tensor_params, **components)
-    return self.value_type(**kwargs)
+    with _deferred_assertion_context():
+      return self.value_type(**kwargs)
 
   @property
   def _component_specs(self):
@@ -170,14 +210,6 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
     return cls(*encoded[1:])
 
 
-_TypeSpecCodec = nested_structure_coder._TypeSpecCodec  # pylint: disable=protected-access
-_TypeSpecCodec.TYPE_SPEC_CLASS_FROM_PROTO[321584790] = (
-    _AutoCompositeTensorTypeSpec)
-_TypeSpecCodec.TYPE_SPEC_CLASS_TO_PROTO[_AutoCompositeTensorTypeSpec] = (
-    321584790)
-del _TypeSpecCodec
-
-
 class AutoCompositeTensor(composite_tensor.CompositeTensor):
   """Recommended base class for `@auto_composite_tensor`-ified classes.
 
@@ -193,7 +225,7 @@ class AutoCompositeTensor(composite_tensor.CompositeTensor):
     pass
 
 
-def auto_composite_tensor(cls=None, omit_kwargs=()):
+def auto_composite_tensor(cls=None, omit_kwargs=(), module_name=None):
   """Automagically generate `CompositeTensor` behavior for `cls`.
 
   `CompositeTensor` objects are able to pass in and out of `tf.function` and
@@ -294,24 +326,44 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
   Args:
     cls: The class for which to create a CompositeTensor subclass.
     omit_kwargs: Optional sequence of kwarg names to be omitted from the spec.
+    module_name: The module name with which to register the `TypeSpec`. If
+      `None`, defaults to `cls.__module__`.
 
   Returns:
     composite_tensor_subclass: A subclass of `cls` and TF CompositeTensor.
   """
   if cls is None:
     return functools.partial(auto_composite_tensor,
-                             omit_kwargs=omit_kwargs)
+                             omit_kwargs=omit_kwargs,
+                             module_name=module_name)
+
+  if module_name is None:
+    module_name = cls.__module__
+
+  type_spec_class_name = f'{cls.__name__}_ACTTypeSpec'
+  type_spec_name = f'{module_name}.{type_spec_class_name}'
+
+  try:
+    ts = type_spec.lookup(type_spec_name)
+    return ts.value_type.fget(None)
+  except ValueError:
+    pass
 
   # If the declared class is already a CompositeTensor subclass, we can avoid
   # affecting the actual type of the returned class. Otherwise, we need to
   # explicitly mix in the CT type, and hence create and return a newly
   # synthesized type.
   if issubclass(cls, composite_tensor.CompositeTensor):
+
+    @type_spec.register(type_spec_name)
     class _AlreadyCTTypeSpec(_AutoCompositeTensorTypeSpec):
 
       @property
       def value_type(self):
         return cls
+
+    _AlreadyCTTypeSpec.__name__ = type_spec_class_name
+
     cls._type_spec = property(  # pylint: disable=protected-access
         lambda self: _AlreadyCTTypeSpec.from_instance(self, omit_kwargs))
     return cls
@@ -323,11 +375,14 @@ def auto_composite_tensor(cls=None, omit_kwargs=()):
   if clsid in _registry and issubclass(_registry[clsid], cls):
     return _registry[clsid]
 
+  @type_spec.register(type_spec_name)
   class _GeneratedCTTypeSpec(_AutoCompositeTensorTypeSpec):
 
     @property
     def value_type(self):
       return _registry[clsid]
+
+  _GeneratedCTTypeSpec.__name__ = type_spec_class_name
 
   class _AutoCompositeTensor(cls, composite_tensor.CompositeTensor):
     """A per-`cls` subclass of `CompositeTensor`."""

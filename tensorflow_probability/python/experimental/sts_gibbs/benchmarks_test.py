@@ -81,11 +81,16 @@ class XLABenchmarkTests(tfp_test_util.TestCase):
         num_timesteps=336, batch_shape=[])
 
     t0 = time.time()
-    samples = gibbs_sampler.fit_with_gibbs_sampling(
-        model, tfp.sts.MaskedTimeSeries(
-            observed_time_series[..., tf.newaxis], is_missing),
-        num_results=500, num_warmup_steps=100, seed=seed,
-        compile_steps_with_xla=True)
+    samples = tf.function(
+        gibbs_sampler.fit_with_gibbs_sampling,
+        autograph=False,
+        experimental_compile=True)(
+            model,
+            tfp.sts.MaskedTimeSeries(observed_time_series[..., tf.newaxis],
+                                     is_missing),
+            num_results=500,
+            num_warmup_steps=100,
+            seed=seed)
     t1 = time.time()
     print('Drew (100+500) samples in time', t1-t0)
     print('Results:', samples)

@@ -37,7 +37,10 @@ __all__ = [
     'det',
     'diag',
     'diag_part',
+    'eig',
     'eigh',
+    'eigvals',
+    'eigvalsh',
     'einsum',
     'eye',
     'inv',
@@ -58,7 +61,6 @@ __all__ = [
     'trace',
     'triangular_solve',
     # 'cross',
-    # 'eigvalsh',
     # 'expm',
     # 'global_norm',
     # 'logm',
@@ -132,6 +134,30 @@ def _eye(num_rows, num_columns=None, batch_shape=None,
   if batch_shape is not None:
     x = x * np.ones(tuple(batch_shape) + (1, 1)).astype(dt)
   return x
+
+
+def _eig(tensor, name=None):
+  del name
+  tensor = ops.convert_to_tensor(tensor)
+  e, v = np.linalg.eig(tensor)
+  dt = tensor.dtype
+  if dt == np.float32:
+    out_dtype = np.complex64
+  elif dt == np.float64:
+    out_dtype = np.complex128
+  return e.astype(out_dtype), v.astype(out_dtype)
+
+
+def _eigvals(tensor, name=None):
+  del name
+  tensor = ops.convert_to_tensor(tensor)
+  e = np.linalg.eigvals(tensor)
+  dt = tensor.dtype
+  if dt == np.float32:
+    out_dtype = np.complex64
+  elif dt == np.float64:
+    out_dtype = np.complex128
+  return e.astype(out_dtype)
 
 
 def _lu_pivot_to_permutation(swaps, m):
@@ -365,9 +391,17 @@ diag_part = utils.copy_docstring(
     lambda input, name=None: np.diagonal(  # pylint: disable=g-long-lambda
         ops.convert_to_tensor(input), axis1=-2, axis2=-1))
 
+eig = utils.copy_docstring('tf.linalg.eig', _eig)
+
 eigh = utils.copy_docstring(
     'tf.linalg.eigh',
     lambda tensor, name=None: np.linalg.eigh(tensor))
+
+eigvals = utils.copy_docstring('tf.linalg.eigvals', _eigvals)
+
+eigvalsh = utils.copy_docstring(
+    'tf.linalg.eigvalsh',
+    lambda tensor, name=None: np.linalg.eigvalsh(tensor))
 
 einsum = utils.copy_docstring(
     'tf.linalg.einsum',

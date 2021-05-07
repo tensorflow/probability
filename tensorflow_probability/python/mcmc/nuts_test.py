@@ -209,8 +209,7 @@ class NutsTest(test_util.TestCase):
         self, normal_dist, step_size=0.2))
 
   def testSigmoidBetaTargetConservation(self):
-    sigmoid_beta_dist = tfb.Invert(tfb.Sigmoid())(
-        tfd.Beta(concentration0=1., concentration1=2.))
+    sigmoid_beta_dist = tfd.SigmoidBeta(concentration0=1., concentration1=2.)
     self.evaluate(assert_univariate_target_conservation(
         self, sigmoid_beta_dist, step_size=0.2))
 

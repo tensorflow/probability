@@ -22,7 +22,6 @@ import hypothesis as hp
 from hypothesis import strategies as hps
 import jax
 from jax import random
-from jax.config import config
 import jax.numpy as np
 
 # pylint: disable=no-name-in-module
@@ -45,16 +44,13 @@ JIT_SAMPLE_BLOCKLIST = (
     'Bates',
     'Independent',  # http://b/164415821
     'Multinomial',
-    'Skellam',  # http://b/171079052
-    'VonMisesFisher',  # http://b/171079052
 )
 JIT_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
     'Bates',
     'Independent',  # http://b/164415821
     'MixtureSameFamily',  # http://b/164415821
-    'Skellam',  # http://b/171079052
-    'VonMisesFisher',  # http://b/171079052
+    'NegativeBinomial',  # http://b/170871051
 )
 
 VMAP_SAMPLE_BLOCKLIST = (
@@ -80,26 +76,27 @@ PMAP_LOGPROB_BLOCKLIST = (
 
 JVP_SAMPLE_BLOCKLIST = ()
 JVP_LOGPROB_SAMPLE_BLOCKLIST = (
+    'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
-    'Skellam',  # http://b/171079052
 )
 JVP_LOGPROB_PARAM_BLOCKLIST = (
-    'Skellam',  # http://b/171079052
-    'VonMisesFisher',  # http://b/171079052
+    'BetaQuotient',  # https://b/178552958
 )
 
 VJP_SAMPLE_BLOCKLIST = ()
 VJP_LOGPROB_SAMPLE_BLOCKLIST = (
+    'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
-    'Skellam',  # http://b/171079052
 )
 VJP_LOGPROB_PARAM_BLOCKLIST = (
-    'Skellam',  # http://b/171079052
-    'VonMisesFisher',  # http://b/171079052
+    'BetaQuotient',  # https://b/178552958
 )
 
 PYTREE_BLOCKLIST = (
     'Bates',
+    'MixtureSameFamily',  # Too slow: http://b/170871051
+    'Sample',  # Too slow: http://b/170871051
+    'SinhArcsinh',  # b/183670203
     'TransformedDistribution',
 )
 
@@ -408,6 +405,5 @@ class PytreeTest(test_util.TestCase):
     dist_and_sample(dist)
 
 if __name__ == '__main__':
-  config.enable_omnistaging()
   os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=8'
   tf.test.main()

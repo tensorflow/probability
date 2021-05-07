@@ -23,6 +23,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -169,12 +170,11 @@ class Empirical(distribution.Distribution):
           parameters=parameters,
           name=name)
 
-  @staticmethod
-  def _param_shapes(sample_shape):
-    return {'samples': tf.convert_to_tensor(sample_shape, dtype=tf.int32)}
-
-  def _params_event_ndims(self):
-    return dict(samples=self._event_ndims + 1)
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        samples=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self._event_ndims + 1))  # pylint: disable=protected-access
 
   @property
   def samples(self):

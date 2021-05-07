@@ -437,8 +437,11 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
         process_name=process_name, enable_vars=True))
     self.evaluate([var.initializer for var in process.variables])
 
-    with tf.GradientTape() as tape:
-      sample = process.sample()
+    # TODO(b/147770193): Avoid non-PSD matrices in
+    # `GaussianProcessRegressionModel`.
+    with kernel_hps.no_pd_errors():
+      with tf.GradientTape() as tape:
+        sample = process.sample()
     if process.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
       grads = tape.gradient(sample, process.variables)
       for grad, var in zip(grads, process.variables):
@@ -459,7 +462,10 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
     self.evaluate([var.initializer for var in process.variables])
 
     # Test that log_prob produces non-None gradients.
-    sample = process.sample()
+    # TODO(b/147770193): Avoid non-PSD matrices in
+    # `GaussianProcessRegressionModel`.
+    with kernel_hps.no_pd_errors():
+      sample = process.sample()
     with tf.GradientTape() as tape:
       lp = process.log_prob(sample)
     grads = tape.gradient(lp, process.variables)
@@ -483,7 +489,10 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
     self.evaluate([var.initializer for var in process.variables])
 
     hp.note('Testing excessive var usage in {}.log_prob'.format(process_name))
-    sample = process.sample()
+    # TODO(b/147770193): Avoid non-PSD matrices in
+    # `GaussianProcessRegressionModel`.
+    with kernel_hps.no_pd_errors():
+      sample = process.sample()
     try:
       with tfp_hps.assert_no_excessive_var_usage(
           'method `log_prob` of `{}`'.format(process),

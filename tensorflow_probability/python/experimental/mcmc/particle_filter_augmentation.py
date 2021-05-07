@@ -81,7 +81,8 @@ def _wrap_as_distributions(structure):
   return tf.nest.map_structure(
       lambda x: independent.Independent(  # pylint: disable=g-long-lambda
           deterministic.Deterministic(x),
-          reinterpreted_batch_ndims=tf.rank(x)),
+          # Particles are a batch dimension.
+          reinterpreted_batch_ndims=tf.rank(x) - 1),
       structure)
 
 

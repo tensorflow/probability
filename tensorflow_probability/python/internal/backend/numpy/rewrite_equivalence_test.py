@@ -69,10 +69,12 @@ class RewriteEquivalenceTest(absltest.TestCase):
           wrong_modules.append(module)
     if wrong_modules:
       msg = '\n'.join([
-          'Modules `{}` require updates.'.format(repr(wrong_modules)),
+          'Modules `{}` require updates.  To update them, run'.format(
+              repr(wrong_modules)),
           'bazel build -c opt :rewrite_equivalence_test',
           'bazel-py3/bin/.../rewrite_equivalence_test --update '
-          '--modules_to_check={}'.format(','.join(wrong_modules))
+          '--modules_to_check={}'.format(','.join(wrong_modules)),
+          'It may be necessary to adapt the generator programs.'
       ])
       raise AssertionError(msg)
 

@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -273,25 +274,42 @@ class Zipf(distribution.Distribution):
       """)
   def _sample_n(self, n, seed=None):
     power = tf.convert_to_tensor(self.power)
-    shape = tf.concat([[n], tf.shape(power)], axis=0)
+    shape = ps.concat([[n], ps.shape(power)], axis=0)
+    numpy_dtype = dtype_util.as_numpy_dtype(power.dtype)
 
     seed = samplers.sanitize_seed(seed, salt='zipf')
 
-    minval_u = self._hat_integral(0.5, power=power) + 1.
-    maxval_u = self._hat_integral(
-        dtype_util.max(tf.int64) - 0.5, power=power)
+    # Because `_hat_integral` is montonically decreasing, the bounds for u will
+    # switch.
+    # Compute the hat_integral explicitly here since we can calculate the log of
+    # the inputs statically in float64 with numpy.
+    maxval_u = tf.math.exp(
+        -(power - 1.) * numpy_dtype(np.log1p(0.5)) -
+        tf.math.log(power - 1.)) + 1.
+    minval_u = tf.math.exp(
+        -(power - 1.) * numpy_dtype(np.log1p(
+            dtype_util.max(self.dtype) - 0.5)) - tf.math.log(power - 1.))
 
     def loop_body(should_continue, k, seed):
       """Resample the non-accepted points."""
       u_seed, next_seed = samplers.split_seed(seed)
-      # The range of U is chosen so that the resulting sample K lies in
-      # [0, tf.int64.max). The final sample, if accepted, is K + 1.
+      # Uniform variates must be sampled from the open-interval `(0, 1)` rather
+      # than `[0, 1)`. To do so, we use
+      # `np.finfo(dtype_util.as_numpy_dtype(self.dtype)).tiny`
+      # because it is the smallest, positive, 'normal' number. A 'normal' number
+      # is such that the mantissa has an implicit leading 1. Normal, positive
+      # numbers x, y have the reasonable property that, `x + y >= max(x, y)`. In
+      # this case, a subnormal number (i.e., np.nextafter) can cause us to
+      # sample 0.
       u = samplers.uniform(
           shape,
-          minval=minval_u,
-          maxval=maxval_u,
+          minval=np.finfo(dtype_util.as_numpy_dtype(power.dtype)).tiny,
+          maxval=numpy_dtype(1.),
           dtype=power.dtype,
           seed=u_seed)
+      # We use (1 - u) * maxval_u + u * minval_u rather than the other way
+      # around, since we want to draw samples in (minval_u, maxval_u].
+      u = maxval_u + (minval_u - maxval_u) * u
       # set_shape needed here because of b/139013403
       tensorshape_util.set_shape(u, should_continue.shape)
 

@@ -17,10 +17,12 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+from scipy import misc as sp_misc
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import math as tfm
 from tensorflow_probability.python.internal import test_util
 
 
@@ -373,6 +375,54 @@ class _InverseGaussianTest(object):
         _scipy_invgauss(loc_v, concentration_v).var(),
         rtol=.02,
         atol=0)
+
+  @test_util.numpy_disable_gradient_test
+  def testInverseGaussianFullyReparameterized(self):
+    concentration = tf.constant(4.0)
+    loc = tf.constant(3.0)
+    _, [grad_concentration, grad_loc] = tfm.value_and_gradient(
+        lambda a, b: tfd.InverseGaussian(a, b, validate_args=True).  # pylint: disable=g-long-lambda
+        sample(100, seed=test_util.test_seed()), [concentration, loc])
+    self.assertIsNotNone(grad_concentration)
+    self.assertIsNotNone(grad_loc)
+
+  @test_util.numpy_disable_gradient_test
+  def testCompareToExplicitGradient(self):
+    """Compare to the explicit reparameterization derivative."""
+    concentration_np = np.arange(4)[..., np.newaxis] + 1.
+    concentration = tf.constant(concentration_np, self.dtype)
+    loc_np = np.arange(3) + 1.
+    loc = tf.constant(loc_np, self.dtype)
+
+    def gen_samples(l, c):
+      return tfd.InverseGaussian(l, c).sample(2, seed=test_util.test_seed())
+
+    samples, [loc_grad, concentration_grad] = self.evaluate(
+        tfm.value_and_gradient(gen_samples, [loc, concentration]))
+    self.assertEqual(samples.shape, (2, 4, 3))
+    self.assertEqual(concentration_grad.shape, concentration.shape)
+    self.assertEqual(loc_grad.shape, loc.shape)
+    # Compute the gradient by computing the derivative of gammaincinv
+    # over each entry and summing.
+    def expected_grad(s, l, c):
+      u = _scipy_invgauss(l, c).cdf(s)
+      delta = 1e-4
+      return (
+          sp_misc.derivative(
+              lambda x: _scipy_invgauss(x, c).ppf(u), l, dx=delta * l),
+          sp_misc.derivative(
+              lambda x: _scipy_invgauss(l, x).ppf(u), c, dx=delta * c))
+    expected_loc_grad, expected_concentration_grad = expected_grad(
+        samples, loc_np, concentration_np)
+
+    self.assertAllClose(
+        concentration_grad,
+        np.sum(expected_concentration_grad, axis=(0, 2))[..., np.newaxis],
+        rtol=1e-3)
+
+    self.assertAllClose(
+        loc_grad,
+        np.sum(expected_loc_grad, axis=(0, 1)), rtol=1e-3)
 
   def testModifiedVariableAssertion(self):
     concentration = tf.Variable(0.9, dtype=self.dtype)

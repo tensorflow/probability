@@ -162,7 +162,7 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       # Drop the final two newlines.
       raise AssertionError(final_msg[:-2])
 
-  def assertAllEqualNested(self, a, b, check_types=False):
+  def assertAllEqualNested(self, a, b, check_types=False, shallow=None):
     """Assert that analogous entries in two nested structures are equivalent.
 
     Args:
@@ -171,13 +171,18 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
       check_types: If `True`, types of sequences are checked as well, including
         the keys of dictionaries. If `False`, for example a list and a tuple of
         objects may be equivalent.
+      shallow: If not None, uses this as the shared tree prefix of `a` and `b`
+        for the purpose of being able to use `a` and `b` which only share that
+        tree prefix (e.g. `[1, 2]` and `[[1], 2]` share the `[., .]` tree
+        prefix).
     """
     self.assertAllAssertsNested(
         self.assertAllEqual,
         a,
         b,
         check_types=check_types,
-        msg='AllEqualNested failed')
+        msg='AllEqualNested failed',
+        shallow=shallow)
 
   def assertAllCloseNested(
       self, a, b, rtol=1e-06, atol=1e-06, check_types=False):

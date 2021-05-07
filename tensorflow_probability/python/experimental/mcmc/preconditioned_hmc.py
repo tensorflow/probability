@@ -22,9 +22,7 @@ import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions import independent
-from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
-from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental.mcmc import preconditioning_utils as pu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc import hmc
@@ -287,13 +285,6 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
                                   momentum_distribution.log_prob)
       kinetic_energy_fn = lambda *args: -momentum_log_prob(*args)
 
-      # Let the integrator handle the case where no momentum distribution
-      # is provided
-      if self.momentum_distribution is None:
-        leapfrog_kinetic_energy_fn = None
-      else:
-        leapfrog_kinetic_energy_fn = kinetic_energy_fn
-
       integrator = leapfrog_impl.SimpleLeapfrogIntegrator(
           self.target_log_prob_fn, step_sizes, num_leapfrog_steps)
 
@@ -307,7 +298,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
           current_state_parts,
           target=current_target_log_prob,
           target_grad_parts=current_target_log_prob_grad_parts,
-          kinetic_energy_fn=leapfrog_kinetic_energy_fn)
+          kinetic_energy_fn=kinetic_energy_fn)
       if self.state_gradients_are_stopped:
         next_state_parts = [tf.stop_gradient(x) for x in next_state_parts]
 
@@ -333,11 +324,16 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
       result = super(UncalibratedPreconditionedHamiltonianMonteCarlo,
                      self).bootstrap_results(init_state)
 
+      state_parts, _ = mcmc_util.prepare_state_parts(init_state,
+                                                     name='current_state')
+      target_log_prob = self.target_log_prob_fn(*state_parts)
       if (not self._store_parameters_in_results or
           self.momentum_distribution is None):
-        momentum_distribution = []
+        momentum_distribution = pu.make_momentum_distribution(
+            state_parts, ps.shape(target_log_prob))
       else:
-        momentum_distribution = self.momentum_distribution
+        momentum_distribution = pu.maybe_make_list_and_batch_broadcast(
+            self.momentum_distribution, ps.shape(target_log_prob))
       result = UncalibratedPreconditionedHamiltonianMonteCarloKernelResults(
           **result._asdict(),  # pylint: disable=protected-access
           momentum_distribution=momentum_distribution)
@@ -458,28 +454,12 @@ def _prepare_args(target_log_prob_fn,
   step_sizes, _ = mcmc_util.prepare_state_parts(
       step_size, dtype=target_log_prob.dtype, name='step_size')
 
-  # Default momentum distribution is None, but if `store_parameters_in_results`
-  # is true, then `momentum_distribution` defaults to an empty list.
-  # In any other case, `momentum_distribution` must be a single distribution,
-  # so we do not have to check that the list is actually empty.
-  if momentum_distribution is None or isinstance(momentum_distribution, list):
-    batch_rank = ps.rank(target_log_prob)
-    def _batched_isotropic_normal_like(state_part):
-      event_ndims = ps.rank(state_part) - batch_rank
-      return independent.Independent(
-          normal.Normal(ps.zeros_like(state_part), 1.),
-          reinterpreted_batch_ndims=event_ndims)
-
-    momentum_distribution = jds.JointDistributionSequential(
-        [_batched_isotropic_normal_like(state_part)
-         for state_part in state_parts])
-
-  # The momentum will get "maybe listified" to zip with the state parts,
-  # and this step makes sure that the momentum distribution will have the
-  # same "maybe listified" underlying shape.
-  if not mcmc_util.is_list_like(momentum_distribution.dtype):
-    momentum_distribution = jds.JointDistributionSequential(
-        [momentum_distribution])
+  # Default momentum distribution is None
+  if momentum_distribution is None:
+    momentum_distribution = pu.make_momentum_distribution(
+        state_parts, ps.shape(target_log_prob))
+  momentum_distribution = pu.maybe_make_list_and_batch_broadcast(
+      momentum_distribution, ps.shape(target_log_prob))
 
   if len(step_sizes) == 1:
     step_sizes *= len(state_parts)

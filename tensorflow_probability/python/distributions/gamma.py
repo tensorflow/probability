@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -267,6 +268,9 @@ class Gamma(distribution.Distribution):
     # Note that igamma returns the regularized incomplete gamma function,
     # which is what we want for the CDF.
     return tf.math.igamma(self.concentration, self._rate_parameter() * x)
+
+  def _quantile(self, p):
+    return tfp_math.igammainv(self.concentration, p) / self._rate_parameter()
 
   def _entropy(self):
     concentration = tf.convert_to_tensor(self.concentration)

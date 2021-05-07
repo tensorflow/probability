@@ -271,7 +271,6 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
       self.assertAllClose(expected, actual)
 
   def test_matmul_grad_xla_kernelparams(self):
-    self.skipTest('b/149145533')
     skip_if_no_xla(self.skipTest)
     if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     feature_dim = 3

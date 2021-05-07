@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 from absl.testing import parameterized
 import numpy as np
 from scipy import special as scipy_special
@@ -40,6 +42,7 @@ def _w0(z):
   return scipy_special.lambertw(z, k=0)
 
 
+@test_util.test_graph_and_eager_modes
 class RoundExponentialBumpFunctionTest(test_util.TestCase):
 
   @parameterized.named_parameters(
@@ -169,14 +172,372 @@ class RoundExponentialBumpFunctionTest(test_util.TestCase):
     self.assertAllEqual(dy_dx_, np.zeros((6,)))
 
 
-class SpecialTest(test_util.TestCase):
+@test_util.test_graph_and_eager_modes
+class DawsnTest(test_util.TestCase):
 
-  def testErfcinv(self):
-    x = tf.random.uniform(
-        shape=[int(1e5)],
+  def testDawsnBoundary(self):
+    self.assertAllClose(0., tfp.math.dawsn(0.))
+    self.assertTrue(np.isnan(self.evaluate(tfp.math.dawsn(np.nan))))
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testDawsnOdd(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = self.evaluate(
+        tf.random.uniform(
+            [int(1e4)], 0., 100., dtype=dtype, seed=seed_stream()))
+    self.assertAllClose(
+        self.evaluate(tfp.math.dawsn(x)),
+        self.evaluate(-tfp.math.dawsn(-x)))
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testDawsnSmall(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = self.evaluate(
+        tf.random.uniform(
+            [int(1e4)], 0., 1., dtype=dtype, seed=seed_stream()))
+    self.assertAllClose(
+        scipy_special.dawsn(x), self.evaluate(tfp.math.dawsn(x)))
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testDawsnMedium(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = self.evaluate(
+        tf.random.uniform([int(1e4)], 1., 10., dtype=dtype, seed=seed_stream()))
+    self.assertAllClose(
+        scipy_special.dawsn(x), self.evaluate(tfp.math.dawsn(x)))
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testDawsnLarge(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = self.evaluate(tf.random.uniform(
+        [int(1e4)], 10., 100., dtype=dtype, seed=seed_stream()))
+    self.assertAllClose(
+        scipy_special.dawsn(x), self.evaluate(tfp.math.dawsn(x)))
+
+  @test_util.numpy_disable_gradient_test
+  def testDawsnGradient(self):
+    x = np.linspace(0.1, 100., 50)
+    err = self.compute_max_gradient_error(tfp.math.dawsn, [x])
+    self.assertLess(err, 2e-5)
+
+  @test_util.numpy_disable_gradient_test
+  def testDawsnSecondDerivative(self):
+    x = np.linspace(0.1, 100., 50)
+    err = self.compute_max_gradient_error(
+        lambda z: tfp.math.value_and_gradient(tfp.math.dawsn, z)[1], [x])
+    self.assertLess(err, 2e-5)
+
+
+@test_util.test_graph_and_eager_modes
+class IgammainvTest(test_util.TestCase):
+
+  def test_igammainv_bounds(self):
+    a = [-1., -4., 0.1, 2.]
+    p = [0.2, 0.3, -1., 10.]
+    # Out of bounds.
+    self.assertAllClose(
+        np.full_like(a, np.nan), tfp.math.igammainv(a, p))
+    self.assertAllClose(
+        np.full_like(a, np.nan), tfp.math.igammacinv(a, p))
+
+    a = np.random.uniform(1., 5., size=4)
+
+    self.assertAllClose(np.zeros_like(a), tfp.math.igammainv(a, 0.))
+    self.assertAllClose(np.zeros_like(a), tfp.math.igammacinv(a, 1.))
+
+    self.assertAllClose(
+        np.full_like(a, np.inf), tfp.math.igammainv(a, 1.))
+    self.assertAllClose(
+        np.full_like(a, np.inf), tfp.math.igammacinv(a, 0.))
+    self.assertTrue(
+        np.isnan(self.evaluate(tfp.math.igammainv(np.nan, np.nan))))
+    self.assertTrue(
+        np.isnan(self.evaluate(tfp.math.igammacinv(np.nan, np.nan))))
+
+  @parameterized.parameters((np.float32, 1.5e-4), (np.float64, 1e-6))
+  def test_igammainv_inverse_small_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammainv, a, p = self.evaluate([tfp.math.igammainv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammaincinv(a, p), igammainv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 1.5e-4), (np.float64, 1e-6))
+  def test_igammacinv_inverse_small_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammacinv, a, p = self.evaluate([tfp.math.igammacinv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammainccinv(a, p), igammacinv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 1e-4), (np.float64, 1e-6))
+  def test_igammainv_inverse_medium_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform([int(1e4)], 1., 100., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammainv, a, p = self.evaluate([tfp.math.igammainv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammaincinv(a, p), igammainv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 1e-4), (np.float64, 1e-6))
+  def test_igammacinv_inverse_medium_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform([int(1e4)], 1., 100., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammacinv, a, p = self.evaluate([tfp.math.igammacinv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammainccinv(a, p), igammacinv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 3e-4), (np.float64, 1e-6))
+  def test_igammainv_inverse_large_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        [int(1e4)], 100., 10000., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammainv, a, p = self.evaluate([tfp.math.igammainv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammaincinv(a, p), igammainv, rtol=rtol)
+
+  @parameterized.parameters((np.float32, 3e-4), (np.float64, 1e-6))
+  def test_igammacinv_inverse_large_a(self, dtype, rtol):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        [int(1e4)], 100., 10000., dtype=dtype, seed=seed_stream())
+    p = tf.random.uniform([int(1e4)], 0., 1., dtype=dtype, seed=seed_stream())
+    igammacinv, a, p = self.evaluate([tfp.math.igammacinv(a, p), a, p])
+    self.assertAllClose(scipy_special.gammainccinv(a, p), igammacinv, rtol=rtol)
+
+  @test_util.numpy_disable_gradient_test
+  def testIgammainvGradient(self):
+    a = np.logspace(-2., 2., 11)[..., np.newaxis]
+    # Avoid the end points where the gradient can veer off to infinity.
+    p = np.linspace(0.1, 0.7, 23)
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.igammainv(a, x), [p], delta=1e-4)
+    self.assertLess(err, 2e-5)
+
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.igammainv(x, p), [a], delta=1e-4)
+    self.assertLess(err, 2e-5)
+
+  @test_util.numpy_disable_gradient_test
+  def testIgammacinvGradient(self):
+    a = np.logspace(-2., 2., 11)[..., np.newaxis]
+    # Avoid the end points where the gradient can veer off to infinity.
+    p = np.linspace(0.1, 0.7, 23)
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.igammacinv(a, x), [p], delta=1e-4)
+    self.assertLess(err, 2e-5)
+
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.igammacinv(x, p), [a], delta=1e-4)
+    self.assertLess(err, 2e-5)
+
+  @test_util.numpy_disable_gradient_test
+  def testIgammainvSecondDerivativeNotNaN(self):
+    a = tf.constant(np.linspace(2., 5., 11)[..., np.newaxis])
+    # Avoid the end points where the gradient can veer off to infinity.
+    p = tf.constant(np.linspace(0.1, 0.7, 23))
+
+    def igammainv_first_der(a, p):
+      return tfp.math.value_and_gradient(
+          lambda z: tfp.math.igammainv(a, z), p)[1]
+    err = self.compute_max_gradient_error(
+        lambda x: igammainv_first_der(a, x), [p], delta=1e-4)
+    self.assertLess(err, 1e-3)
+
+    err = self.compute_max_gradient_error(
+        lambda y: igammainv_first_der(y, p), [a], delta=1e-4)
+    self.assertLess(err, 1e-3)
+
+    def igammacinv_first_der(a, p):
+      return tfp.math.value_and_gradient(
+          lambda z: tfp.math.igammacinv(a, z), p)[1]
+
+    err = self.compute_max_gradient_error(
+        lambda x: igammacinv_first_der(a, x), [p], delta=1e-4)
+    self.assertLess(err, 2e-3)
+
+    err = self.compute_max_gradient_error(
+        lambda y: igammacinv_first_der(y, p), [a], delta=1e-4)
+    self.assertLess(err, 2e-3)
+
+
+@test_util.test_graph_and_eager_modes
+class OwensTTest(test_util.TestCase):
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testOwensTOddEven(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    a = self.evaluate(
+        tf.random.uniform(
+            shape=[int(1e3)],
+            minval=0.,
+            maxval=100.,
+            dtype=dtype,
+            seed=seed_stream()))
+    h = self.evaluate(
+        tf.random.uniform(
+            shape=[int(1e3)],
+            minval=0.,
+            maxval=100.,
+            dtype=dtype,
+            seed=seed_stream()))
+    # OwensT(h, a) = OwensT(-h, a)
+    self.assertAllClose(
+        self.evaluate(tfp.math.owens_t(h, a)),
+        self.evaluate(tfp.math.owens_t(-h, a)),
+    )
+    # OwensT(h, a) = -OwensT(h, -a)
+    self.assertAllClose(
+        self.evaluate(tfp_math.owens_t(h, a)),
+        self.evaluate(-tfp_math.owens_t(h, -a)),
+    )
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testOwensTSmall(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        shape=[int(1e4)],
         minval=0.,
         maxval=1.,
-        seed=test_util.test_seed())
+        dtype=dtype,
+        seed=seed_stream())
+    h = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=0.,
+        maxval=1.,
+        dtype=dtype,
+        seed=seed_stream())
+    a_, h_, owens_t_ = self.evaluate([a, h, tfp.math.owens_t(h, a)])
+    self.assertAllClose(scipy_special.owens_t(h_, a_), owens_t_)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testOwensTLarger(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=1.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+    h = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=1.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+    a_, h_, owens_t_ = self.evaluate([a, h, tfp.math.owens_t(h, a)])
+    self.assertAllClose(scipy_special.owens_t(h_, a_), owens_t_)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testOwensTLarge(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    a = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=100.,
+        maxval=1000.,
+        dtype=dtype,
+        seed=seed_stream())
+    h = tf.random.uniform(
+        shape=[int(1e4)],
+        minval=100.,
+        maxval=1000.,
+        dtype=dtype,
+        seed=seed_stream())
+    a_, h_, owens_t_ = self.evaluate([a, h, tfp.math.owens_t(h, a)])
+    self.assertAllClose(scipy_special.owens_t(h_, a_), owens_t_)
+
+  @test_util.numpy_disable_gradient_test
+  def testOwensTGradient(self):
+    h = tf.constant([0.01, 0.1, 0.5, 1., 10.])[..., tf.newaxis]
+    a = tf.constant([0.01, 0.1, 0.5, 1., 10.])
+
+    err = self.compute_max_gradient_error(
+        functools.partial(tfp.math.owens_t, h), [a])
+    self.assertLess(err, 2e-4)
+
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.owens_t(x, a), [h])
+    self.assertLess(err, 2e-4)
+
+    err = self.compute_max_gradient_error(
+        functools.partial(tfp.math.owens_t, -h), [a])
+    self.assertLess(err, 2e-4)
+
+    err = self.compute_max_gradient_error(
+        lambda x: tfp.math.owens_t(x, -a), [h])
+    self.assertLess(err, 2e-4)
+
+
+@test_util.test_graph_and_eager_modes
+class SpecialTest(test_util.TestCase):
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testAtanDifferenceSmall(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-10.,
+        maxval=10.,
+        dtype=dtype,
+        seed=seed_stream())
+    y = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-10.,
+        maxval=10.,
+        dtype=dtype,
+        seed=seed_stream())
+
+    x_, y_, atan_diff_ = self.evaluate([x, y, tfp.math.atan_difference(x, y)])
+    self.assertAllClose(np.arctan(x_) - np.arctan(y_), atan_diff_)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testAtanDifferenceLarge(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-100.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+    y = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-100.,
+        maxval=100.,
+        dtype=dtype,
+        seed=seed_stream())
+
+    x_, y_, atan_diff_ = self.evaluate([x, y, tfp.math.atan_difference(x, y)])
+    self.assertAllClose(np.arctan(x_) - np.arctan(y_), atan_diff_)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testAtanDifferenceCloseInputs(self, dtype):
+    y = np.linspace(1e4, 1e5, 100).astype(dtype)
+    x = y + 1.
+
+    atan_diff_ = self.evaluate(tfp.math.atan_difference(x, y))
+    # Ensure there isn't cancellation for large values.
+    self.assertAllGreater(atan_diff_, 0.)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testAtanDifferenceProductIsNegativeOne(self, dtype):
+    seed_stream = test_util.test_seed_stream()
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-10.,
+        maxval=10.,
+        dtype=dtype,
+        seed=seed_stream())
+    y = -tf.math.reciprocal(x)
+
+    x_, y_, atan_diff_ = self.evaluate([x, y, tfp.math.atan_difference(x, y)])
+    self.assertAllClose(np.arctan(x_) - np.arctan(y_), atan_diff_)
+
+  def testErfcinv(self):
+    x = self.evaluate(
+        tf.random.uniform(
+            shape=[int(1e5)],
+            minval=0.,
+            maxval=1.,
+            seed=test_util.test_seed()))
     erfcinv = tfp.math.erfcinv(x)
     x_prime = tf.math.erfc(erfcinv)
     x_prime, erfcinv = self.evaluate([x_prime, erfcinv])
@@ -185,6 +546,143 @@ class SpecialTest(test_util.TestCase):
     self.assertGreaterEqual(np.min(erfcinv), 0.)
     # Check that erfc(erfcinv(x)) = x.
     self.assertAllClose(x_prime, x, rtol=1e-6)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxSmall(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=0.,
+        maxval=1.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxMedium(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=1.,
+        maxval=20.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxLarge(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=20.,
+        maxval=100.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxSmallNegative(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-1.,
+        maxval=0.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxMediumNegative(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-20.,
+        maxval=-1.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_, rtol=4.5e-6)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testErfcxLargeNegative(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-100.,
+        maxval=-20.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, erfcx_ = self.evaluate([x, tfp.math.erfcx(x)])
+    self.assertAllClose(scipy_special.erfcx(x_), erfcx_)
+
+  @test_util.numpy_disable_gradient_test
+  def testErfcxGradient(self):
+    x = np.linspace(-1., 3., 20).astype(np.float32)
+    err = self.compute_max_gradient_error(tfp.math.erfcx, [x])
+    self.assertLess(err, 2.1e-4)
+
+  @test_util.numpy_disable_gradient_test
+  def testErfcxSecondDerivative(self):
+    x = np.linspace(-1., 3., 20).astype(np.float32)
+    err = self.compute_max_gradient_error(
+        lambda z: tfp.math.value_and_gradient(tfp.math.erfcx, z)[1], [x])
+    self.assertLess(err, 1e-3)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testLogErfc(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-3.,
+        maxval=3.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, logerfc_ = self.evaluate([x, tfp.math.logerfc(x)])
+    self.assertAllClose(np.log(scipy_special.erfc(x_)), logerfc_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  @test_util.numpy_disable_gradient_test
+  def testLogErfcValueAndGradientNoNaN(self, dtype):
+    x = tf.constant(np.logspace(1., 10., 40), dtype=dtype)
+    logerfc_, grad_logerfc_ = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.logerfc, x))
+    self.assertAllNotNan(logerfc_)
+    self.assertAllNotNan(grad_logerfc_)
+
+    logerfc_, grad_logerfc_ = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.logerfc, -x))
+    self.assertAllNotNan(logerfc_)
+    self.assertAllNotNan(grad_logerfc_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testLogErfcx(self, dtype):
+    x = tf.random.uniform(
+        shape=[int(1e5)],
+        minval=-3.,
+        maxval=3.,
+        dtype=dtype,
+        seed=test_util.test_seed())
+
+    x_, logerfcx_ = self.evaluate([x, tfp.math.logerfcx(x)])
+    self.assertAllClose(np.log(scipy_special.erfcx(x_)), logerfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  @test_util.numpy_disable_gradient_test
+  def testLogErfcxValueAndGradientNoNaN(self, dtype):
+    x = tf.constant(np.logspace(1., 10., 40), dtype=dtype)
+    logerfcx_, grad_logerfcx_ = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.logerfcx, x))
+    self.assertAllNotNan(logerfcx_)
+    self.assertAllNotNan(grad_logerfcx_)
+
+    logerfcx_, grad_logerfcx_ = self.evaluate(
+        tfp.math.value_and_gradient(tfp.math.logerfcx, -x))
+    self.assertAllNotNan(logerfcx_)
+    self.assertAllNotNan(grad_logerfcx_)
 
   # See https://en.wikipedia.org/wiki/Lambert_W_function#Special_values
   # for a list of special values and known identities.
@@ -220,7 +718,7 @@ class SpecialTest(test_util.TestCase):
       ("5", 5.),
       ("10", 10.),
       ("100", 100.))
-  def testLambertWApproxmiation(self, value):
+  def testLambertWApproximation(self, value):
     """Tests the approximation of the LambertW function."""
     exact = _w0(value)
     value = tf.convert_to_tensor(value)

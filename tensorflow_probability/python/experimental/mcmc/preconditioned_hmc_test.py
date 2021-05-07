@@ -27,6 +27,10 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import unnest
+
+JAX_MODE = False
+
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -62,6 +66,8 @@ RunHMCResults = collections.namedtuple('RunHMCResults', [
 
 def _make_composite_tensor(dist):
   """Wrapper to make distributions of linear operators composite."""
+  if JAX_MODE:
+    return dist
   if dist is None:
     return dist
   composite_dist = tfp.experimental.auto_composite_tensor(dist.__class__,
@@ -76,6 +82,12 @@ def _make_composite_tensor(dist):
       p[k] = composite_linop(**p[k].parameters)
   ac_dist = composite_dist(**p)
   return ac_dist
+
+
+def as_composite(obj):
+  if JAX_MODE:
+    return obj
+  return tfp.experimental.as_composite(obj)
 
 
 @test_util.test_graph_and_eager_modes
@@ -150,6 +162,8 @@ class PreconditionedHMCCorrectnessTest(test_util.TestCase):
       # Internal to the sampler, these scales are being used (implicitly).
       internal_scales = tf.ones(dims)
     elif precondition_scheme == 'sqrtm':
+      if JAX_MODE:
+        self.skipTest('`sqrtm` is not yet implemented in JAX.')
       momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
           # The symmetric square root is a perfectly valid "factor".
           precision_factor=tf.linalg.LinearOperatorFullMatrix(
@@ -211,7 +225,8 @@ class PreconditionedHMCCorrectnessTest(test_util.TestCase):
       """Do a run, return RunHMCResults."""
       states, trace = tfp.mcmc.sample_chain(
           num_results,
-          current_state=tf.identity(target_mvn.sample(seed=0)),
+          current_state=tf.identity(target_mvn.sample(
+              seed=test_util.test_seed())),
           kernel=hmc_kernel,
           num_burnin_steps=num_adaptation_steps,
           seed=test_util.test_seed(),
@@ -379,6 +394,62 @@ class PreconditionedHMCCorrectnessTest(test_util.TestCase):
             0.5 if precondition_scheme == 'no_preconditioner' else 0.25),
     )
 
+  def test_sets_kinetic_energy(self):
+    dist = tfd.MultivariateNormalDiag(scale_diag=tf.constant([0.1, 10.]))
+    step_size = 0.1
+    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+        target_log_prob_fn=dist.log_prob,
+        step_size=step_size,
+        num_leapfrog_steps=1,
+        store_parameters_in_results=True)
+    init_state = tf.constant([0.1, 0.1])
+    kr = kernel.bootstrap_results(init_state)
+
+    # Manually set the momentum distribution.
+    kr = unnest.replace_innermost(kr, momentum_distribution=dist)
+
+    # Take one leapfrog step using the kernel.
+    _, nkr = kernel.one_step(init_state, kr, seed=test_util.test_seed())
+    # Need to evaluate here for consistency in graph mode.
+    (momentum_parts,
+     target_grad_parts,
+     proposed_state,
+     final_momentum,
+     target_log_prob,
+     grads_target_log_prob) = self.evaluate([
+         nkr.proposed_results.initial_momentum,
+         nkr.accepted_results.grads_target_log_prob,
+         nkr.proposed_state,
+         nkr.proposed_results.final_momentum,
+         nkr.proposed_results.target_log_prob,
+         nkr.proposed_results.grads_target_log_prob])
+
+    # Take one leapfrog step manually.
+    leapfrog = tfp.mcmc.internal.leapfrog_integrator.SimpleLeapfrogIntegrator(
+        target_fn=dist.log_prob,
+        step_sizes=[step_size],
+        num_steps=1)
+    # Again, need to evaluate here for graph mode consistency.
+    (next_momentum,
+     next_state,
+     next_target_log_prob,
+     grads_next_target_log_prob) = self.evaluate(leapfrog(
+         momentum_parts=momentum_parts,
+         state_parts=[init_state],
+         target=dist.log_prob(init_state),
+         target_grad_parts=target_grad_parts,
+         kinetic_energy_fn=lambda x: -dist.log_prob(x)))
+
+    # Verify resulting states are the same
+    self.assertAllClose(proposed_state,
+                        next_state[0])
+    self.assertAllClose(final_momentum,
+                        next_momentum)
+    self.assertAllClose(target_log_prob,
+                        next_target_log_prob)
+    self.assertAllClose(grads_target_log_prob,
+                        grads_next_target_log_prob)
+
 
 @test_util.test_all_tf_execution_regimes
 @parameterized.named_parameters(
@@ -390,7 +461,7 @@ class PreconditionedHMCTest(test_util.TestCase):
     if use_default:
       momentum_distribution = None
     else:
-      momentum_distribution = tfp.experimental.as_composite(
+      momentum_distribution = as_composite(
           tfd.Normal(0., tf.constant(.5, dtype=tf.float64)))
     kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
         lambda x: -x**2, step_size=.5, num_leapfrog_steps=2,
@@ -398,14 +469,13 @@ class PreconditionedHMCTest(test_util.TestCase):
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(kernel, num_adaptation_steps=3)
     self.evaluate(tfp.mcmc.sample_chain(
         1, kernel=kernel, current_state=tf.ones([], tf.float64),
-        num_burnin_steps=5, trace_fn=None))
+        num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
 
-  # TODO(b/175787154): Enable this test
-  def DISABLED_test_f64_multichain(self, use_default):
+  def test_f64_multichain(self, use_default):
     if use_default:
       momentum_distribution = None
     else:
-      momentum_distribution = tfp.experimental.as_composite(
+      momentum_distribution = as_composite(
           tfd.Normal(0., tf.constant(.5, dtype=tf.float64)))
     kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
         lambda x: -x**2, step_size=.5, num_leapfrog_steps=2,
@@ -414,7 +484,26 @@ class PreconditionedHMCTest(test_util.TestCase):
     nchains = 7
     self.evaluate(tfp.mcmc.sample_chain(
         1, kernel=kernel, current_state=tf.ones([nchains], tf.float64),
-        num_burnin_steps=5, trace_fn=None))
+        num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
+
+  def test_f64_multichain_multipart(self, use_default):
+    if use_default:
+      momentum_distribution = None
+    else:
+      momentum_distribution = _make_composite_tensor(
+          tfd.JointDistributionSequential([
+              tfd.Normal(0., tf.constant(.5, dtype=tf.float64)),
+              tfd.Normal(0., tf.constant(.25, dtype=tf.float64))]))
+    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+        lambda x, y: -x**2 - y**2, step_size=.5, num_leapfrog_steps=2,
+        momentum_distribution=momentum_distribution)
+    kernel = tfp.mcmc.SimpleStepSizeAdaptation(kernel, num_adaptation_steps=3)
+    nchains = 7
+    self.evaluate(tfp.mcmc.sample_chain(
+        1, kernel=kernel,
+        current_state=(tf.ones([nchains], tf.float64),
+                       tf.ones([nchains], tf.float64)),
+        num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
 
   def test_diag(self, use_default):
     """Test that a diagonal multivariate normal can be effectively sampled from.
@@ -663,7 +752,6 @@ class PreconditionedHMCTest(test_util.TestCase):
       self.assertAllClose(self.evaluate(ess), 100 * n_chains * tf.ones(3))
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
-
 
 if __name__ == '__main__':
   tf.test.main()

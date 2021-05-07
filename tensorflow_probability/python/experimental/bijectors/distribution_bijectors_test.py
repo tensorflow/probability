@@ -18,6 +18,7 @@ from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -39,9 +40,9 @@ PRECONDITIONING_FAILS_DISTS = (
     'GeneralizedNormal',  # CDF gradient incorrect at 0.
     'HalfStudentT',  # Uses StudentT CDF.
     'Laplace',  # CDF gradient incorrect at 0.
+    'LambertWNormal',  # CDF gradient incorrect at 0.
+    'SigmoidBeta',  # inverse CDF numerical precision issues for large x
     'StudentT',  # CDF gradient incorrect at 0 (and unstable near zero).
-    'TruncatedCauchy',  # b/175630511
-    'TruncatedNormal',  # b/175630511
     )
 
 if JAX_MODE:
@@ -56,7 +57,7 @@ def _constrained_zeros_fn(shape, dtype, constraint_fn):
 
 
 @test_util.test_graph_and_eager_modes
-class DistributionFlowsTest(test_util.TestCase):
+class DistributionBijectorsTest(test_util.TestCase):
 
   def assertDistributionIsApproximatelyStandardNormal(self,
                                                       dist,
@@ -72,7 +73,8 @@ class DistributionFlowsTest(test_util.TestCase):
         reinterpreted_batch_ndims=event_ndims)
     zs = tf.reshape([-4., -2., 0., 2., 4.],
                     ps.concat([[5],
-                               ps.ones([batch_ndims + event_ndims])],
+                               ps.ones([batch_ndims + event_ndims],
+                                       dtype=np.int32)],
                               axis=0))
     zs = tf.broadcast_to(zs, ps.concat([[5], dist_shape], axis=0))
     lp_dist, grad_dist = tfp.math.value_and_gradient(dist.log_prob, zs)

@@ -27,9 +27,12 @@ from tensorflow_probability.python.distributions import distribution as distribu
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class Independent(distribution_lib.Distribution):
@@ -95,6 +98,12 @@ class Independent(distribution_lib.Distribution):
 
   """
 
+  @deprecation.deprecated_arg_values(
+      '2022-03-01',
+      'Please pass an integer value for `reinterpreted_batch_ndims`. The '
+      'current behavior corresponds to `reinterpreted_batch_ndims=tf.size('
+      'distribution.batch_shape_tensor()) - 1`.',
+      reinterpreted_batch_ndims=None)
   def __init__(self,
                distribution,
                reinterpreted_batch_ndims=None,
@@ -135,7 +144,7 @@ class Independent(distribution_lib.Distribution):
         batch_ndims = tensorshape_util.rank(distribution.batch_shape)
         if batch_ndims is not None:
           self._static_reinterpreted_batch_ndims = max(0, batch_ndims - 1)
-          self._reinterpreted_batch_ndims = tf.convert_to_tensor(
+          self._reinterpreted_batch_ndims = ps.convert_to_shape_tensor(
               self._static_reinterpreted_batch_ndims,
               dtype_hint=tf.int32,
               name='reinterpreted_batch_ndims')
@@ -147,6 +156,7 @@ class Independent(distribution_lib.Distribution):
         self._reinterpreted_batch_ndims = tensor_util.convert_nonref_to_tensor(
             reinterpreted_batch_ndims,
             dtype_hint=tf.int32,
+            as_shape_tensor=True,
             name='reinterpreted_batch_ndims')
         static_val = tf.get_static_value(self._reinterpreted_batch_ndims)
         self._static_reinterpreted_batch_ndims = (
@@ -167,6 +177,10 @@ class Independent(distribution_lib.Distribution):
   @property
   def reinterpreted_batch_ndims(self):
     return self._reinterpreted_batch_ndims
+
+  @property
+  def experimental_is_sharded(self):
+    return self.distribution.experimental_is_sharded
 
   def _get_reinterpreted_batch_ndims(self,
                                      distribution_batch_shape_tensor=None):
@@ -197,6 +211,14 @@ class Independent(distribution_lib.Distribution):
     return self.copy(
         distribution=self.distribution[slices],
         reinterpreted_batch_ndims=self._static_reinterpreted_batch_ndims)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties(
+            # TODO(davmre): replace with `self.reinterpreted_batch_ndims` once
+            # support for `reinterpreted_batch_ndims=None` has been removed.
+            event_ndims=lambda self: self._get_reinterpreted_batch_ndims()))  # pylint: disable=protected-access
 
   def _batch_shape_tensor(self):
     batch_shape = self.distribution.batch_shape_tensor()
@@ -256,6 +278,10 @@ class Independent(distribution_lib.Distribution):
   def _log_prob(self, x, **kwargs):
     return self._reduce(
         self._sum_fn(), self.distribution.log_prob(x, **kwargs))
+
+  def _unnormalized_log_prob(self, x, **kwargs):
+    return self._reduce(
+        self._sum_fn(), self.distribution.unnormalized_log_prob(x, **kwargs))
 
   def _log_cdf(self, x, **kwargs):
     return self._reduce(self._sum_fn(), self.distribution.log_cdf(x, **kwargs))
@@ -383,18 +409,19 @@ def _kl_independent(a, b, name='kl_independent'):
 
 
 @log_prob_ratio.RegisterLogProbRatio(Independent)
-def _independent_log_prob_ratio(p, x, q, y):
+def _independent_log_prob_ratio(p, x, q, y, name=None):
   """Sum-of-diffs log(p(x)/q(y)) for `Independent`s."""
-  checks = []
-  if p.validate_args or q.validate_args:
-    checks.append(tf.debugging.assert_equal(
-        p.reinterpreted_batch_ndims, q.reinterpreted_batch_ndims))
-  if p._experimental_use_kahan_sum or q._experimental_use_kahan_sum:  # pylint: disable=protected-access
-    sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
-  else:
-    sum_fn = tf.reduce_sum
-  with tf.control_dependencies(checks):
-    return sum_fn(
-        log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
-        axis=-1 - ps.range(p.reinterpreted_batch_ndims))
+  with tf.name_scope(name or 'independent_log_prob_ratio'):
+    checks = []
+    if p.validate_args or q.validate_args:
+      checks.append(tf.debugging.assert_equal(
+          p.reinterpreted_batch_ndims, q.reinterpreted_batch_ndims))
+    if p._experimental_use_kahan_sum or q._experimental_use_kahan_sum:  # pylint: disable=protected-access
+      sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
+    else:
+      sum_fn = tf.reduce_sum
+    with tf.control_dependencies(checks):
+      return sum_fn(
+          log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
+          axis=-1 - ps.range(p.reinterpreted_batch_ndims))
 

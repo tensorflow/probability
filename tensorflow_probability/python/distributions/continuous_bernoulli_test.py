@@ -75,8 +75,8 @@ def entropy(probs):
 
 def cdf(x, probs):
   # do not evaluate close to 0.5
-  tentative_cdf = (probs ** x * (1.0 - probs) ** (1.0 - x) + probs - 1.0) / (
-      2. * probs - 1.)
+  tentative_cdf = sp_special.xlogy(x, probs) + sp_special.xlog1py(1 - x, -probs)
+  tentative_cdf = (np.expm1(tentative_cdf) + probs) / (2 * probs - 1.)
   correct_above = np.where(x > 1., 1., tentative_cdf)
   return np.where(x < 0, 0., correct_above)
 
@@ -309,6 +309,7 @@ class ContinuousBernoulliTest(test_util.TestCase):
     x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
+  @test_util.numpy_disable_gradient_test
   def testReparameterized(self):
     prob = tf.constant([0.2, 0.6])
     _, grad_prob = tfp.math.value_and_gradient(
@@ -420,6 +421,14 @@ class ContinuousBernoulliTest(test_util.TestCase):
             ],
             dtype=np.float32))
 
+  def testCdfMultidimensional(self):
+    probs = np.array(
+        [0., 0.1, 0.3, 0.7, 0.9, 1.], dtype=np.float32)[..., np.newaxis]
+    logits = np.log(probs) - np.log1p(-probs)
+    dist = tfd.ContinuousBernoulli(logits=logits)
+    x = np.array([-1., 0., 0.1, 0.3, 0.7, 0.9, 1., 2.], dtype=np.float32)
+    self.assertAllClose(self.evaluate(dist.cdf(x)), cdf(x, probs))
+
   def testQuantile(self):
     prob = 0.2
     dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
@@ -438,6 +447,14 @@ class ContinuousBernoulliTest(test_util.TestCase):
         self.evaluate(
             dist.quantile(np.array(
                 [[0., 0.1, 0.3, 0.9, 1.]], dtype=np.float32))))
+
+  @test_util.numpy_disable_gradient_test
+  def testQuantileGradsAreNotNaN(self):
+    probs = tf.constant([0.2, 0.6])
+    x = np.linspace(0.1, 0.9, 20)[..., np.newaxis].astype(np.float32)
+    _, grad_prob = tfp.math.value_and_gradient(
+        lambda x: tfd.ContinuousBernoulli(probs=probs).quantile(x), x)
+    self.assertAllNotNan(self.evaluate(grad_prob))
 
   def testSampleAtExtremesIsNotNaN(self):
     prob = [[0.], [1.]]
@@ -473,6 +490,19 @@ class ContinuousBernoulliTest(test_util.TestCase):
 
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected)
+
+  def testLogitsNearZeroNotNaN(self):
+    dist = tfd.ContinuousBernoulli(logits=[-0.1, 0., 0.1])
+    self.assertAllNotNan(self.evaluate(dist.mean()))
+    self.assertAllNotNan(self.evaluate(dist.variance()))
+    samples = self.evaluate(dist.sample(int(1e3), seed=test_util.test_seed()))
+    self.assertAllNotNan(samples)
+    self.assertAllNotNan(dist.log_prob(samples))
+    self.assertAllNotNan(dist.log_cdf(samples))
+
+    # Check specific values.
+    self.assertAllClose(0.5, dist.mean()[1])
+    self.assertAllClose(1 / 12., dist.variance()[1])
 
 
 class _MakeSlicer(object):

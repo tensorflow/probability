@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for RandomWalkMetropolisNormal and RandomWalkMetropolisUniform."""
+"""Tests for RandomWalkMetropolis."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -21,10 +21,13 @@ from __future__ import print_function
 # Dependency imports
 
 import numpy as np
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
+
+JAX_MODE = False
 
 
 @test_util.test_all_tf_execution_regimes
@@ -71,6 +74,37 @@ class RWMTest(test_util.TestCase):
     sample_std = tf.math.reduce_std(samples, axis=(0, 1))
 
     [sample_mean_, sample_std_] = self.evaluate([sample_mean, sample_std])
+
+    self.assertAllClose(0., sample_mean_, atol=0.2, rtol=0.)
+    self.assertAllClose(1., sample_std_, atol=0.2, rtol=0.)
+
+  def testRWM1DNormalWithDynamicScaleForNextState(self):
+    """Sampling from the Standard Normal Distribution with adaptation."""
+    if tf.executing_eagerly() or JAX_MODE:
+      raise self.skipTest(
+          'Dynamic scale makes no sense in Eager or JAX modes.')
+
+    scale_ph = tf1.placeholder_with_default(1.0, shape=None)
+
+    def target_log_prob(x):
+      return -tf.reduce_sum(x**2) / 2
+
+    samples = tfp.mcmc.sample_chain(
+        num_results=500,
+        current_state=np.float32([0.] * 4),  # 4 parallel chains
+        kernel=tfp.mcmc.RandomWalkMetropolis(
+            target_log_prob,
+            new_state_fn=tfp.mcmc.random_walk_normal_fn(scale_ph),
+        ),
+        num_burnin_steps=500,
+        trace_fn=None,
+        seed=test_util.test_seed(),
+    )
+
+    sample_mean = tf.math.reduce_mean(samples, axis=(0, 1))
+    sample_std = tf.math.reduce_std(samples, axis=(0, 1))
+
+    sample_mean_, sample_std_ = self.evaluate([sample_mean, sample_std])
 
     self.assertAllClose(0., sample_mean_, atol=0.2, rtol=0.)
     self.assertAllClose(1., sample_std_, atol=0.2, rtol=0.)

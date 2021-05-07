@@ -24,6 +24,9 @@ from tensorflow_probability.python.stats.calibration import brier_decomposition
 from tensorflow_probability.python.stats.calibration import brier_score
 from tensorflow_probability.python.stats.calibration import expected_calibration_error
 from tensorflow_probability.python.stats.calibration import expected_calibration_error_quantiles
+from tensorflow_probability.python.stats.kendalls_tau import iterative_mergesort
+from tensorflow_probability.python.stats.kendalls_tau import kendalls_tau
+from tensorflow_probability.python.stats.kendalls_tau import lexicographical_indirect_sort
 from tensorflow_probability.python.stats.leave_one_out import log_loomean_exp
 from tensorflow_probability.python.stats.leave_one_out import log_loosum_exp
 from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
@@ -41,9 +44,12 @@ from tensorflow_probability.python.stats.sample_stats import auto_correlation
 from tensorflow_probability.python.stats.sample_stats import cholesky_covariance
 from tensorflow_probability.python.stats.sample_stats import correlation
 from tensorflow_probability.python.stats.sample_stats import covariance
+from tensorflow_probability.python.stats.sample_stats import cumulative_variance
 from tensorflow_probability.python.stats.sample_stats import log_average_probs
 from tensorflow_probability.python.stats.sample_stats import stddev
 from tensorflow_probability.python.stats.sample_stats import variance
+from tensorflow_probability.python.stats.sample_stats import windowed_mean
+from tensorflow_probability.python.stats.sample_stats import windowed_variance
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
@@ -58,10 +64,14 @@ __all__ = [
     'correlation',
     'count_integers',
     'covariance',
+    'cumulative_variance',
     'expected_calibration_error',
     'expected_calibration_error_quantiles',
     'find_bins',
     'histogram',
+    'iterative_mergesort',
+    'kendalls_tau',
+    'lexicographical_indirect_sort',
     'log_average_probs',
     'log_loomean_exp',
     'log_loosum_exp',
@@ -73,6 +83,8 @@ __all__ = [
     'quantiles',
     'stddev',
     'variance',
+    'windowed_mean',
+    'windowed_variance',
 ]
 
 all_util.remove_undocumented(__name__, __all__)

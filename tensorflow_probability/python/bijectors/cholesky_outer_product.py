@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -31,11 +32,13 @@ from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
-    "CholeskyOuterProduct",
+    'CholeskyOuterProduct',
 ]
 
 
-class CholeskyOuterProduct(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class CholeskyOuterProduct(bijector.AutoCompositeTensorBijector):
   """Compute `g(X) = X @ X.T`; X is lower-triangular, positive-diagonal matrix.
 
   Note: the upper-triangular part of X is ignored (whether or not its zero).
@@ -70,7 +73,7 @@ class CholeskyOuterProduct(bijector.Bijector):
 
   """
 
-  def __init__(self, validate_args=False, name="cholesky_outer_product"):
+  def __init__(self, validate_args=False, name='cholesky_outer_product'):
     """Instantiates the `CholeskyOuterProduct` bijector.
 
     Args:
@@ -211,5 +214,5 @@ class CholeskyOuterProduct(bijector.Bijector):
     is_matrix = assert_util.assert_rank_at_least(t, 2)
     is_square = assert_util.assert_equal(tf.shape(t)[-2], tf.shape(t)[-1])
     is_positive_definite = assert_util.assert_positive(
-        tf.linalg.diag_part(t), message="Input must be positive definite.")
+        tf.linalg.diag_part(t), message='Input must be positive definite.')
     return [is_matrix, is_square, is_positive_definite]

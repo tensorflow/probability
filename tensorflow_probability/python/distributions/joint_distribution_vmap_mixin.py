@@ -20,9 +20,13 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import vectorization_util
+
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 JAX_MODE = False
@@ -41,18 +45,6 @@ def _might_have_excess_ndims(flat_value, flat_core_ndims):
     if static_excess_ndims is None or static_excess_ndims > 0:
       return True
   return False
-
-
-def _pad_value_to_full_length(value, dtype):
-  """Fills a partial `value` structure with `None`s for any unspecified RVs."""
-  # If dtype is dict-like, set missing values to `None`.
-  if hasattr(dtype, 'keys'):
-    return type(dtype)({k: value.get(k, None) for k in dtype.keys()})
-
-  # Otherwise, dtype is a sequence, so append `None`s.
-  return tf.nest.pack_sequence_as(dtype,
-                                  [value[i] if i < len(value) else None
-                                   for i in range(len(dtype))])
 
 
 # Lint doesn't know that docstrings are defined in the base JD class.
@@ -121,17 +113,18 @@ class JointDistributionVmapMixin(object):
     return result
 
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
-                           name='sample_distributions'):
+                           name='sample_distributions', **kwargs):
     with self._name_and_control_scope(name):
-
-      value_might_have_sample_dims = False
-      if value is not None:
-        value = _pad_value_to_full_length(value, self.dtype)
-        value = tf.nest.map_structure(
-            lambda v: v if v is None else tf.convert_to_tensor(v), value)
-        value_might_have_sample_dims = _might_have_excess_ndims(
-            flat_value=self._model_flatten(value),
-            flat_core_ndims=self._single_sample_ndims)
+      value = self._resolve_value(value=value, allow_partially_specified=True,
+                                  **kwargs)
+      value_might_have_sample_dims = (
+          value is not None
+          and _might_have_excess_ndims(
+              # Double-flatten in case any components have structured events.
+              flat_value=nest.flatten_up_to(self._single_sample_ndims,
+                                            self._model_flatten(value),
+                                            check_types=False),
+              flat_core_ndims=tf.nest.flatten(self._single_sample_ndims)))
 
       # TODO(b/157953455): Return distributions as CompositeTensors once
       # vectorized_map supports this.
@@ -146,23 +139,22 @@ class JointDistributionVmapMixin(object):
             sample_shape=sample_shape, seed=seed, value=value)
       return self._model_unflatten(ds), self._model_unflatten(xs)
 
-  def _sample_n(self, sample_shape, seed, value=None, **kwargs):
-
-    value_might_have_sample_dims = False
-    if value is not None:
-      value = _pad_value_to_full_length(value, self.dtype)
-      value = tf.nest.map_structure(
-          lambda v: v if v is None else tf.convert_to_tensor(v), value)
-      value_might_have_sample_dims = _might_have_excess_ndims(
-          flat_value=self._model_flatten(value),
-          flat_core_ndims=self._single_sample_ndims)
+  def _sample_n(self, sample_shape, seed, value=None):
+    value_might_have_sample_dims = (
+        value is not None
+        and _might_have_excess_ndims(
+            # Double-flatten in case any components have structured events.
+            flat_value=nest.flatten_up_to(self._single_sample_ndims,
+                                          self._model_flatten(value),
+                                          check_types=False),
+            flat_core_ndims=tf.nest.flatten(self._single_sample_ndims)))
 
     if not self.use_vectorized_map or not (
         _might_have_nonzero_size(sample_shape) or
         value_might_have_sample_dims):
       # No need to auto-vectorize.
       xs = self._call_flat_sample_distributions(
-          sample_shape=sample_shape, seed=seed, value=value, **kwargs)[1]
+          sample_shape=sample_shape, seed=seed, value=value)[1]
       return self._model_unflatten(xs)
 
     # Set up for autovectorized sampling. To support the `value` arg, we need to
@@ -199,7 +191,7 @@ class JointDistributionVmapMixin(object):
       # We always provide a seed, since _flat_sample_distributions will
       # unconditionally split the seed.
       with tf.name_scope('map_measure_fn'):
-        constant_seed = joint_distribution_lib.dummy_seed()
+        constant_seed = samplers.zeros_seed()
         return [getattr(d, attr)(x) for (d, x) in zip(
             *self._flat_sample_distributions(value=value, seed=constant_seed))]
     if self.use_vectorized_map:
@@ -209,3 +201,64 @@ class JointDistributionVmapMixin(object):
           validate_args=self.validate_args)
 
     return map_measure_fn(value)
+
+  def _default_event_space_bijector(self, *args, **kwargs):
+    bijector_class = joint_distribution_lib._DefaultJointBijector  # pylint: disable=protected-access
+    if self.use_vectorized_map:
+      bijector_class = _DefaultJointBijectorAutoBatched
+    if bool(args) or bool(kwargs):
+      return self.experimental_pin(
+          *args, **kwargs).experimental_default_event_space_bijector()
+    return bijector_class(self)
+
+
+class _DefaultJointBijectorAutoBatched(bijector_lib.Bijector):
+  """Automatically vectorized support bijector for autobatched JDs."""
+
+  def __init__(self, jd, **kwargs):
+    parameters = dict(locals())
+    self._jd = jd
+    self._bijector_kwargs = kwargs
+    self._joint_bijector = joint_distribution_lib._DefaultJointBijector(
+        jd=self._jd, **self._bijector_kwargs)
+    super(_DefaultJointBijectorAutoBatched, self).__init__(
+        forward_min_event_ndims=self._joint_bijector.forward_min_event_ndims,
+        inverse_min_event_ndims=self._joint_bijector.inverse_min_event_ndims,
+        validate_args=self._joint_bijector.validate_args,
+        parameters=parameters,
+        name=self._joint_bijector.name)
+    # Wrap the non-batched `joint_bijector` to take batched args.
+    # pylint: disable=protected-access
+    self._forward = self._vectorize_member_fn(
+        lambda bij, x: bij._forward(x),
+        core_ndims=[self._joint_bijector.forward_min_event_ndims])
+    self._inverse = self._vectorize_member_fn(
+        lambda bij, y: bij._inverse(y),
+        core_ndims=[self._joint_bijector.inverse_min_event_ndims])
+    self._forward_log_det_jacobian = self._vectorize_member_fn(
+        lambda bij, x: bij._forward_log_det_jacobian(  # pylint: disable=g-long-lambda
+            x, event_ndims=bij.forward_min_event_ndims),
+        core_ndims=[self._joint_bijector.forward_min_event_ndims])
+    self._inverse_log_det_jacobian = self._vectorize_member_fn(
+        lambda bij, y: bij._inverse_log_det_jacobian(  # pylint: disable=g-long-lambda
+            y, event_ndims=bij.inverse_min_event_ndims),
+        core_ndims=[self._joint_bijector.inverse_min_event_ndims])
+    for attr in ('_forward_event_shape',
+                 '_forward_event_shape_tensor',
+                 '_inverse_event_shape',
+                 '_inverse_event_shape_tensor',
+                 '_forward_dtype',
+                 '_inverse_dtype',
+                 'forward_event_ndims',
+                 'inverse_event_ndims',):
+      setattr(self, attr, getattr(self._joint_bijector, attr))
+    # pylint: enable=protected-access
+
+  @property
+  def _parts_interact(self):
+    return self._joint_bijector._parts_interact  # pylint: disable=protected-access
+
+  def _vectorize_member_fn(self, member_fn, core_ndims):
+    return vectorization_util.make_rank_polymorphic(
+        lambda x: member_fn(self._joint_bijector, x),
+        core_ndims=core_ndims)

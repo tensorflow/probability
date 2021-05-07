@@ -538,7 +538,7 @@ def segment_ids(draw, n):
   while rsum < n:
     lengths.append(draw(hps.integers(1, n-rsum)))
     rsum += lengths[-1]
-  return np.repeat(np.arange(len(lengths)), lengths)
+  return np.repeat(np.arange(len(lengths)), np.array(lengths))
 
 
 @hps.composite
@@ -562,9 +562,12 @@ def top_k_params(draw):
 
 @hps.composite
 def histogram_fixed_width_bins_params(draw):
+  # TODO(b/187125431): the `min_side=2` and `unique` check can be removed if
+  # https://github.com/tensorflow/tensorflow/pull/38899 is re-implemented.
   values = draw(single_arrays(
       dtype=np.float32,
-      shape=shapes(min_dims=1),
+      shape=shapes(min_dims=1, min_side=2),
+      unique=True,
       elements=hps.floats(min_value=-1e5, max_value=1e5)
   ))
   vmin, vmax = np.min(values), np.max(values)
@@ -661,6 +664,13 @@ def qr_params(draw):
 def _qr_post_process(qr):
   """Values of q corresponding to zero values of r may have arbitrary values."""
   return np.matmul(qr.q, qr.r), np.float32(qr.q.shape), np.float32(qr.r.shape)
+
+
+def _eig_post_process(vals):
+  if not isinstance(vals, tuple):
+    return np.sort(vals, axis=-1)
+  e, v = vals
+  return np.einsum('...ab,...b,...bc->...ac', v, e, v.swapaxes(-1, -2))
 
 
 # __Currently untested:__
@@ -798,6 +808,13 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
     TestCase('linalg.matmul', [matmul_compatible_pairs()]),
+    TestCase('linalg.eig', [pd_matrices()], post_processor=_eig_post_process,
+             xla_disabled=True),
+    TestCase('linalg.eigh', [pd_matrices()], post_processor=_eig_post_process),
+    TestCase('linalg.eigvals', [pd_matrices()],
+             post_processor=_eig_post_process, xla_disabled=True),
+    TestCase('linalg.eigvalsh', [pd_matrices()],
+             post_processor=_eig_post_process),
     TestCase('linalg.det', [nonsingular_matrices()],
              xla_disabled=True),  # TODO(b/162937268): missing kernel.
 
@@ -1795,6 +1812,40 @@ class NumpyTest(test_util.TestCase):
 
       check_consistency(tensorflow_function, numpy_function)
 
+  def test_can_flatten_linear_operators(self):
+    if NUMPY_MODE:
+      self.skipTest('Flattening not supported in JAX backend.')
+
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+
+    self.assertLen(
+        tree_util.tree_leaves(nptf.linalg.LinearOperatorIdentity(5)), 0)
+
+    linop = nptf.linalg.LinearOperatorDiag(nptf.ones(5))
+    self.assertLen(tree_util.tree_leaves(linop), 1)
+    self.assertTupleEqual(tree_util.tree_leaves(linop)[0].shape, (5,))
+
+    linop = nptf.linalg.LinearOperatorLowerTriangular(nptf.eye(5))
+    self.assertLen(tree_util.tree_leaves(linop), 1)
+    self.assertTupleEqual(tree_util.tree_leaves(linop)[0].shape, (5, 5))
+
+    linop = nptf.linalg.LinearOperatorFullMatrix(nptf.eye(5))
+    self.assertLen(tree_util.tree_leaves(linop), 1)
+    self.assertTupleEqual(tree_util.tree_leaves(linop)[0].shape, (5, 5))
+
+    linop1 = nptf.linalg.LinearOperatorDiag(nptf.ones(3))
+    linop2 = nptf.linalg.LinearOperatorDiag(nptf.ones(4))
+    linop = nptf.linalg.LinearOperatorBlockDiag([linop1, linop2])
+    self.assertLen(tree_util.tree_leaves(linop), 2)
+    self.assertListEqual([a.shape for a in tree_util.tree_leaves(linop)],
+                         [(3,), (4,)])
+
+    linop1 = nptf.linalg.LinearOperatorFullMatrix(nptf.ones([4, 3]))
+    linop2 = nptf.linalg.LinearOperatorFullMatrix(nptf.ones([3, 2]))
+    linop = nptf.linalg.LinearOperatorComposition([linop1, linop2])
+    self.assertLen(tree_util.tree_leaves(linop), 2)
+    self.assertListEqual([a.shape for a in tree_util.tree_leaves(linop)],
+                         [(4, 3), (3, 2)])
 
 if __name__ == '__main__':
   tf.test.main()

@@ -283,9 +283,9 @@ class LinearOperatorToeplitz(linear_operator.LinearOperator):
     # We construct these set of indices below.
     indices = math_ops.mod(
         # How much to shift right. This corresponds to `i`.
-        math_ops.range(0, n) +
+        array_ops.range(0, n) +
         # Specifies the last `n` indices.
-        math_ops.range(n - 1, -1, -1)[..., _ops.newaxis],
+        array_ops.range(n - 1, -1, -1)[..., _ops.newaxis],
         # Mod out by the total number of elements to ensure the index is
         # non-negative (for tf.gather) and < 2 * n - 1.
         2 * n - 1)

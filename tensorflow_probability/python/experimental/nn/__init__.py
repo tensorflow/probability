@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental.nn import initializers
+from tensorflow_probability.python.experimental.nn import losses
 from tensorflow_probability.python.experimental.nn import util
 from tensorflow_probability.python.experimental.nn.affine_layers import Affine
 from tensorflow_probability.python.experimental.nn.affine_layers import AffineVariationalFlipout
@@ -32,7 +33,6 @@ from tensorflow_probability.python.experimental.nn.convolutional_layers_v2 impor
 from tensorflow_probability.python.experimental.nn.convolutional_transpose_layers import ConvolutionTranspose
 from tensorflow_probability.python.experimental.nn.convolutional_transpose_layers import ConvolutionTransposeVariationalFlipout
 from tensorflow_probability.python.experimental.nn.convolutional_transpose_layers import ConvolutionTransposeVariationalReparameterization
-from tensorflow_probability.python.experimental.nn.layers import Lambda
 from tensorflow_probability.python.experimental.nn.layers import Layer
 from tensorflow_probability.python.experimental.nn.layers import Sequential
 from tensorflow_probability.python.experimental.nn.variational_base import VariationalLayer
@@ -53,12 +53,12 @@ _allowed_symbols = [
     'ConvolutionV2',
     'ConvolutionVariationalFlipoutV2',
     'ConvolutionVariationalReparameterizationV2',
-    'Lambda',
     'Layer',
     'Sequential',
     'VariationalLayer',
     'initializers',
-    'util',
+    'losses',
+    'util'
 ]
 
 

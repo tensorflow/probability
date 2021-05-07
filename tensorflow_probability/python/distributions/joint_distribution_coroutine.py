@@ -132,7 +132,7 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   Root = tfd.JointDistributionCoroutine.Root  # Convenient alias.
   def model():
     e = yield Root(tfd.Independent(
-        tfd.Exponential(rate=[100, 120], name='e'), 1))
+        tfd.Exponential(rate=[100, 120]), 1), name='e')
     g = yield tfd.Gamma(concentration=e[..., 0], rate=e[..., 1], name='g')
     n = yield Root(tfd.Normal(loc=0, scale=2., name='n'))
     m = yield tfd.Normal(loc=n, scale=g, name='m')

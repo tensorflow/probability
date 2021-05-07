@@ -32,8 +32,16 @@ tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
-@parameterized.parameters(np.float32, np.float64)
+@parameterized.named_parameters(('_float32', np.float32),
+                                ('_float64', np.float64))
 class CholeskyLKJTest(test_util.TestCase):
+
+  def testDtypePreservation(self, dtype):
+    dist = tfd.CholeskyLKJ(2, dtype([1.]))
+    x = dist.sample(seed=test_util.test_seed())
+    lp = dist.log_prob(x)
+    self.assertEqual(dtype, x.dtype)
+    self.assertEqual(dtype, lp.dtype)
 
   def testLogProbMatchesTransformedDistribution(self, dtype):
 

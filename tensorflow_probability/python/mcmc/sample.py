@@ -25,6 +25,7 @@ import collections
 import warnings
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -317,11 +318,11 @@ def sample_chain(
     warnings.warn('supplied `TransitionKernel` is not calibrated. Markov '
                   'chain may not converge to intended target distribution.')
   with tf.name_scope(name or 'mcmc_sample_chain'):
-    num_results = tf.convert_to_tensor(
+    num_results = ps.convert_to_shape_tensor(
         num_results, dtype=tf.int32, name='num_results')
-    num_burnin_steps = tf.convert_to_tensor(
+    num_burnin_steps = ps.convert_to_shape_tensor(
         num_burnin_steps, dtype=tf.int32, name='num_burnin_steps')
-    num_steps_between_results = tf.convert_to_tensor(
+    num_steps_between_results = ps.convert_to_shape_tensor(
         num_steps_between_results,
         dtype=tf.int32,
         name='num_steps_between_results')

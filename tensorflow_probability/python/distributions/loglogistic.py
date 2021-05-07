@@ -94,6 +94,8 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     """Distribution parameter of the underlying distribution."""
     return self.distribution.scale
 
+  experimental_is_sharded = False
+
   def _mean(self):
     scale = tf.convert_to_tensor(self.scale)
     with tf.control_dependencies([] if self.allow_nan_stats else [  # pylint: disable=g-long-ternary
@@ -137,8 +139,14 @@ class LogLogistic(transformed_distribution.TransformedDistribution):
     scale = tf.convert_to_tensor(self.scale)
     loc = tf.convert_to_tensor(self.loc)
     log_z = self._log_z(x, loc=loc, scale=scale)
-    return (-tf.math.log(scale) - loc +
-            (1. - scale) * log_z - 2 * tf.math.softplus(log_z))
+    answer = (-tf.math.log(scale) - loc +
+              (1. - scale) * log_z - 2 * tf.math.softplus(log_z))
+    # The formula computes `nan` for `x == +inf`.  However, it shouldn't be too
+    # inaccurate for large finite `x`, because `x` only appears as `log(x)`, and
+    # `log` is effectively discountinuous at `+inf`.
+    return tf.where(x >= np.inf,
+                    tf.constant(-np.inf, dtype=answer.dtype),
+                    answer)
 
   def _log_cdf(self, x):
     return -tf.math.softplus(-self._log_z(x))

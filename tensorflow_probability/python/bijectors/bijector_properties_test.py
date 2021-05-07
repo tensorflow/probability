@@ -34,6 +34,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
 TF2_FRIENDLY_BIJECTORS = (
@@ -49,9 +50,10 @@ TF2_FRIENDLY_BIJECTORS = (
     'FillScaleTriL',
     'FillTriangular',
     'FrechetCDF',
+    'GeneralizedExtremeValueCDF',
+    'GeneralizedPareto',
     'GompertzCDF',
     'GumbelCDF',
-    'GeneralizedExtremeValueCDF',
     'Identity',
     'Inline',
     'Invert',
@@ -95,6 +97,7 @@ BIJECTOR_PARAMS_NDIMS = {
     'GompertzCDF': dict(concentration=0, rate=0),
     'GumbelCDF': dict(loc=0, scale=0),
     'GeneralizedExtremeValueCDF': dict(loc=0, scale=0, concentration=0),
+    'GeneralizedPareto': dict(loc=0, scale=0, concentration=0),
     'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
     'MoyalCDF': dict(loc=0, scale=0),
     'Power': dict(power=0),
@@ -138,6 +141,7 @@ TRANSFORM_DIAGONAL_ALLOWLIST = {
     'GompertzCDF',
     'GumbelCDF',
     'GeneralizedExtremeValueCDF',
+    'GeneralizedPareto',
     'Identity',
     'Inline',
     'KumaraswamyCDF',
@@ -178,10 +182,26 @@ AUTOVECTORIZATION_ATOL.update({
     'ScaleMatvecLU': 1e-2,  # TODO(b/151041130) tighten this.
     'ScaleMatvecTriL': 1e-1})  # TODO(b/150250388) tighten this.
 
+
 COMPOSITE_TENSOR_IS_BROKEN = [
-    'BatchNormalization',
+    'BatchNormalization',  # tf.layers arg
     'Inline',  # callable
+    'RationalQuadraticSpline',  # TODO(b/185628453): Debug loss of static info.
     'TransformDiagonal',  # callable
+]
+
+COMPOSITE_TENSOR_RTOL = collections.defaultdict(lambda: 2e-6)
+COMPOSITE_TENSOR_RTOL.update({
+    'PowerTransform': 1e-5,
+})
+COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
+
+# TODO(b/182603117): Enable AutoCT for meta-bijectors and LinearOperator.
+AUTO_COMPOSITE_TENSOR_IS_BROKEN = [
+    'FillScaleTriL',
+    'Invert',
+    'ScaleMatvecDiag',
+    'ScaleMatvecTriL',
 ]
 
 
@@ -191,6 +211,10 @@ def is_invert(bijector):
 
 def is_transform_diagonal(bijector):
   return isinstance(bijector, tfb.TransformDiagonal)
+
+
+def is_generalized_pareto(bijector):
+  return isinstance(bijector, tfb.GeneralizedPareto)
 
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
@@ -323,6 +347,13 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   elif bijector_name == 'DiscreteCosineTransform':
     dct_type = hps.integers(min_value=2, max_value=3)
     bijector_params = {'dct_type': draw(dct_type)}
+  elif bijector_name == 'GeneralizedPareto':
+    concentration = hps.floats(min_value=-200., max_value=200)
+    scale = hps.floats(min_value=1e-2, max_value=200)
+    loc = hps.floats(min_value=-200, max_value=200)
+    bijector_params = {'concentration': draw(concentration),
+                       'scale': draw(scale),
+                       'loc': draw(loc)}
   elif bijector_name == 'PowerTransform':
     power = hps.floats(min_value=1e-6, max_value=10.)
     bijector_params = {'power': draw(power)}
@@ -474,7 +505,11 @@ def codomain_tensors(draw, bijector, shape=None):
     shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
   support = bijector_hps.bijector_supports()[bijector_name].inverse
-  constraint_fn = tfp_hps.constrainer(support)
+  if is_generalized_pareto(bijector):
+    constraint_fn = bijector_hps.generalized_pareto_constraint(
+        bijector.loc, bijector.scale, bijector.concentration)
+  else:
+    constraint_fn = tfp_hps.constrainer(support)
   return draw(tfp_hps.constrained_tensors(constraint_fn, shape))
 
 
@@ -509,6 +544,12 @@ def _ldj_tensor_conversions_allowed(bijector, is_forward):
     return _ldj_tensor_conversions_allowed(bijector.bijector, not is_forward)
   elif is_transform_diagonal(bijector):
     return _ldj_tensor_conversions_allowed(bijector.diag_bijector, is_forward)
+  elif is_generalized_pareto(bijector):
+    return max(
+        _ldj_tensor_conversions_allowed(
+            bijector._negative_concentration_bijector(), is_forward),
+        _ldj_tensor_conversions_allowed(
+            bijector._non_negative_concentration_bijector, is_forward))
   elif is_forward:
     return 2 if hasattr(bijector, '_forward_log_det_jacobian') else 4
   else:
@@ -842,16 +883,32 @@ class BijectorPropertiesTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testCompositeTensor(self, bijector_name, data):
-    # Test that making a composite tensor of this bijector doesn't throw any
-    # errors.
+
     bijector, event_dim = self._draw_bijector(
-        bijector_name, data, batch_shape=[],
+        bijector_name, data,
+        batch_shape=[],
+        validate_args=True,
         allowed_bijectors=(set(TF2_FRIENDLY_BIJECTORS) -
                            set(COMPOSITE_TENSOR_IS_BROKEN)))
-    composite_bij = experimental.as_composite(bijector)
+
+    # TODO(b/182603117): Remove "if" condition and s/composite_bij/bijector
+    # when AutoCT is enabled for meta-bijectors and LinearOperator.
+    if type(bijector).__name__ in AUTO_COMPOSITE_TENSOR_IS_BROKEN:
+      composite_bij = experimental.as_composite(bijector)
+    else:
+      composite_bij = bijector
+
+    if not tf.executing_eagerly():
+      composite_bij = tf.nest.map_structure(
+          lambda x: (tf.convert_to_tensor(x)  # pylint: disable=g-long-lambda
+                     if isinstance(x, DeferredTensor) else x),
+          composite_bij,
+          expand_composites=True)
+
+    self.assertIsInstance(composite_bij, tf.__internal__.CompositeTensor)
     flat = tf.nest.flatten(composite_bij, expand_composites=True)
-    unflat = tf.nest.pack_sequence_as(composite_bij, flat,
-                                      expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        composite_bij, flat, expand_composites=True)
 
     # Compare forward maps before and after compositing.
     n = 3
@@ -865,6 +922,26 @@ class BijectorPropertiesTest(test_util.TestCase):
     before_xs = bijector.inverse(ys)
     after_xs = unflat.inverse(ys)
     self.assertAllClose(*self.evaluate((before_xs, after_xs)))
+
+    # Input to tf.function
+    self.assertAllClose(
+        before_ys,
+        tf.function(lambda b: b.forward(xs))(composite_bij),
+        rtol=COMPOSITE_TENSOR_RTOL[bijector_name],
+        atol=COMPOSITE_TENSOR_ATOL[bijector_name])
+
+    # Forward mapping: Check differentiation through forward mapping with
+    # respect to the input and parameter variables.  Also check that any
+    # variables are not referenced overmuch.
+    xs = self._draw_domain_tensor(bijector, data, event_dim)
+    wrt_vars = [xs] + [v for v in composite_bij.trainable_variables
+                       if v.dtype.is_floating]
+    with tf.GradientTape() as tape:
+      tape.watch(wrt_vars)
+      # TODO(b/73073515): Fix graph mode gradients with bijector caching.
+      ys = bijector.forward(xs + 0)
+    grads = tape.gradient(ys, wrt_vars)
+    assert_no_none_grad(bijector, 'forward', wrt_vars, grads)
 
 
 def ensure_nonzero(x):

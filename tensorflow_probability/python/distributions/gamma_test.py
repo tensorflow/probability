@@ -165,6 +165,24 @@ class GammaTest(test_util.TestCase):
     self.assertAllClose(cdf, expected_cdf)
     self.assertAllClose(gamma_lr.cdf(x), expected_cdf)
 
+  def testGammaQuantile(self):
+    batch_size = 6
+    concentration = np.linspace(
+        1, 10., batch_size).astype(np.float32)[..., np.newaxis]
+    rate = np.linspace(3., 7., batch_size).astype(np.float32)[..., np.newaxis]
+    x = np.array([0.1, 0.2, 0.3, 0.9, 0.8, 0.5, 0.7], dtype=np.float32)
+
+    gamma = tfd.Gamma(
+        concentration=concentration, rate=rate, validate_args=True)
+    gamma_lr = tfd.Gamma(
+        concentration=concentration, log_rate=tf.math.log(rate),
+        validate_args=True)
+    quantile = gamma.quantile(x)
+    self.assertEqual(quantile.shape, (6, 7))
+    expected_quantile = sp_stats.gamma.ppf(x, concentration, scale=1 / rate)
+    self.assertAllClose(quantile, expected_quantile)
+    self.assertAllClose(gamma_lr.quantile(x), expected_quantile)
+
   def testGammaMean(self):
     concentration_v = np.array([1.0, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
@@ -606,6 +624,7 @@ class GammaSamplingTest(test_util.TestCase):
 
   @test_util.jax_disable_test_missing_functionality('tf stateless_gamma')
   def testSampleCPU(self):
+    self.skipTest('b/179283344')
     with tf.device('CPU'):
       _, runtime = self.evaluate(
           gamma_lib.random_gamma_with_runtime(

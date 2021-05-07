@@ -34,6 +34,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic as tfp_math
 
 __all__ = [
     'ExponentiallyModifiedGaussian',
@@ -138,10 +139,6 @@ class ExponentiallyModifiedGaussian(distribution.Distribution):
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
-  @classmethod
-  def _params_event_ndims(cls):
-    return dict(loc=0, scale=0, rate=0)
-
   @property
   def loc(self):
     """Distribution parameter for the mean of the normal distribution."""
@@ -201,13 +198,15 @@ class ExponentiallyModifiedGaussian(distribution.Distribution):
     return (tf.math.log(rate) + w / two * (w - 2 * z) +
             special_math.log_ndtr(z - w))
 
-  def _cdf(self, x):
+  def _log_cdf(self, x):
     rate = tf.convert_to_tensor(self.rate)
+    scale = tf.convert_to_tensor(self.scale)
     x_centralized = x - self.loc
     u = rate * x_centralized
-    v = rate * self.scale
+    v = rate * scale
     vsquared = tf.square(v)
-    return special_math.ndtr(x_centralized / self.scale) - tf.exp(
+    return tfp_math.log_sub_exp(
+        special_math.log_ndtr(x_centralized / scale),
         -u + vsquared / 2. + special_math.log_ndtr((u - vsquared) / v))
 
   def _mean(self):

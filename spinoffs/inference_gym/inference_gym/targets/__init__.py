@@ -41,6 +41,7 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.probit_regression import GermanCreditNumericProbitRegression
   from inference_gym.targets.probit_regression import ProbitRegression
   from inference_gym.targets.radon_contextual_effects import RadonContextualEffects
+  from inference_gym.targets.radon_contextual_effects import RadonContextualEffectsHalfNormalMinnesota
   from inference_gym.targets.radon_contextual_effects import RadonContextualEffectsMinnesota
   from inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
   from inference_gym.targets.sparse_logistic_regression import SparseLogisticRegression
@@ -76,6 +77,7 @@ __all__ = [
     'NonIdentifiableQuarticMeasurementModel',
     'ProbitRegression',
     'RadonContextualEffects',
+    'RadonContextualEffectsHalfNormalMinnesota',
     'RadonContextualEffectsMinnesota',
     'SparseLogisticRegression',
     'StochasticVolatility',

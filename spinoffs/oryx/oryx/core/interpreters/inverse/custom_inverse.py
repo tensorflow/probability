@@ -26,8 +26,8 @@ This module provides a `custom_inverse` decorator for Python functions that
 enables overriding the default programmatic inversion. See `custom_inverse`
 for further documentation.
 """
-from jax import tree_util
 from jax import util as jax_util
+from jax._src import tree_util
 from oryx.core import kwargs_util
 from oryx.core import primitive
 

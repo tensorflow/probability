@@ -28,13 +28,13 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 # Cause all warnings to always be triggered.
@@ -80,16 +80,11 @@ class Mixture(distribution.Distribution):
 
   """
 
-  @deprecation.deprecated_args(
-      '2021-01-14', 'The `use_static_graph` argument is deprecated.'
-      ' Mixture behaves equivalently to `use_static_graph=True`,'
-      ' and the flag is ignored.', 'use_static_graph')
   def __init__(self,
                cat,
                components,
                validate_args=False,
                allow_nan_stats=True,
-               use_static_graph=True,
                name='Mixture'):
     """Initialize a Mixture distribution.
 
@@ -119,7 +114,6 @@ class Mixture(distribution.Distribution):
        exception if a statistic (e.g. mean/mode/etc...) is undefined for any
         batch member. If `True`, batch members with valid parameters leading to
         undefined statistics will return NaN for this statistic.
-      use_static_graph: Deprecated and ignored.
       name: A name for this distribution (optional).
 
     Raises:
@@ -217,6 +211,21 @@ class Mixture(distribution.Distribution):
   @property
   def num_components(self):
     return self._num_components
+
+  @property
+  def experimental_is_sharded(self):
+    sharded = self.cat.experimental_is_sharded
+    if sharded != self.components.experimental_is_sharded:
+      raise ValueError(
+          '`Mixture.cat` sharding must match `Mixture.components`.')
+    return sharded
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        cat=parameter_properties.BatchedComponentProperties(),
+        components=parameter_properties.BatchedComponentProperties(
+            event_ndims=lambda self: [0 for _ in self.components]))
 
   def _batch_shape_tensor(self):
     return self._cat.batch_shape_tensor()

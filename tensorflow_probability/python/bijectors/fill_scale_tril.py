@@ -33,6 +33,7 @@ __all__ = [
 ]
 
 
+# TODO(b/182603117): Enable AutoCompositeTensor once Chain subclasses it.
 class FillScaleTriL(chain.Chain):
   """Transforms unconstrained vectors to TriL matrices with positive diagonal.
 

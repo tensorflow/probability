@@ -77,6 +77,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/sts/internal",
     ],
 )
@@ -163,6 +164,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/sts/internal",
     ],
 )

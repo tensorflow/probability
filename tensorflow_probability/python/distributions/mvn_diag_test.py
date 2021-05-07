@@ -133,7 +133,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     mvn = tfd.MultivariateNormalDiag(
         loc=tf.zeros([2, 3], dtype=tf.float32), validate_args=True)
     self.assertAllClose(
-        np.diag(np.ones([3], dtype=np.float32)),
+        self.evaluate(tf.eye(3, batch_shape=[2], dtype=tf.float32)),
         self.evaluate(mvn.covariance()))
 
     mvn = tfd.MultivariateNormalDiag(

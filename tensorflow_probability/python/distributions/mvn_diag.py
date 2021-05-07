@@ -104,32 +104,32 @@ class MultivariateNormalDiag(
       loc=[1., -1],
       scale_diag=[1, 2.])
 
-  mvn.mean().eval()
+  mvn.mean()
   # ==> [1., -1]
 
-  mvn.stddev().eval()
+  mvn.stddev()
   # ==> [1., 2]
 
   # Evaluate this on an observation in `R^2`, returning a scalar.
-  mvn.prob([-1., 0]).eval()  # shape: []
+  mvn.prob([-1., 0])  # shape: []
 
   # Initialize a 3-batch, 2-variate scaled-identity Gaussian.
   mvn = tfd.MultivariateNormalDiag(
       loc=[1., -1],
       scale_identity_multiplier=[1, 2., 3])
 
-  mvn.mean().eval()  # shape: [3, 2]
+  mvn.mean()  # shape: [3, 2]
   # ==> [[1., -1]
   #      [1, -1],
   #      [1, -1]]
 
-  mvn.stddev().eval()  # shape: [3, 2]
+  mvn.stddev()  # shape: [3, 2]
   # ==> [[1., 1],
   #      [2, 2],
   #      [3, 3]]
 
   # Evaluate this on an observation in `R^2`, returning a length-3 vector.
-  mvn.prob([-1., 0]).eval()  # shape: [3]
+  mvn.prob([-1., 0])  # shape: [3]
 
   # Initialize a 2-batch of 3-variate Gaussians.
   mvn = tfd.MultivariateNormalDiag(
@@ -142,14 +142,14 @@ class MultivariateNormalDiag(
   # vector.
   x = [[-1., 0, 1],
        [-11, 0, 11.]]   # shape: [2, 3].
-  mvn.prob(x).eval()    # shape: [2]
+  mvn.prob(x)    # shape: [2]
   ```
 
   """
 
   @deprecation.deprecated_args(
       '2020-01-01',
-      '`scale_identity_multiplier` is deprecated; please combine it with '
+      '`scale_identity_multiplier` is deprecated; please combine it into '
       '`scale_diag` directly instead.',
       'scale_identity_multiplier')
   def __init__(self,
@@ -288,3 +288,6 @@ class MultivariateNormalDiag(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
             is_preferred=False))
     # pylint: enable=g-long-lambda
+
+  _composite_tensor_nonshape_params = (
+      'loc', 'scale_diag', 'scale_identity_multiplier')

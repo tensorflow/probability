@@ -22,9 +22,9 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.experimental.nn import layers as layers_lib
-from tensorflow_probability.python.experimental.nn import util as nn_util_lib
 from tensorflow_probability.python.experimental.nn import variational_base as vi_lib
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.experimental.nn.util import kernel_bias as kernel_bias_lib
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
@@ -37,7 +37,6 @@ __all__ = [
 
 # The following aliases ensure docstrings read more succinctly.
 tfd = distribution_lib
-kl_divergence_monte_carlo = vi_lib.kl_divergence_monte_carlo
 unpack_kernel_and_bias = vi_lib.unpack_kernel_and_bias
 
 
@@ -49,9 +48,9 @@ class Affine(layers_lib.KernelBiasLayer):
       input_size,
       output_size,
       # Weights
-      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.initializers.zeros()
-      make_kernel_bias_fn=nn_util_lib.make_kernel_bias,
+      kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
+      bias_initializer=None,    # tf.initializers.zeros()
+      make_kernel_bias_fn=kernel_bias_lib.make_kernel_bias,
       dtype=tf.float32,
       batch_shape=(),
       # Misc
@@ -62,10 +61,10 @@ class Affine(layers_lib.KernelBiasLayer):
     Args:
       input_size: ...
       output_size: ...
-      init_kernel_fn: ...
+      kernel_initializer: ...
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
-      init_bias_fn: ...
+      bias_initializer: ...
         Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_kernel_bias_fn: ...
         Default value: `tfp.experimental.nn.util.make_kernel_bias`.
@@ -78,18 +77,17 @@ class Affine(layers_lib.KernelBiasLayer):
       name: ...
         Default value: `None` (i.e., `'Affine'`).
     """
-    batch_shape = tf.constant(
-        [], dtype=tf.int32) if batch_shape is None else prefer_static.cast(
-            prefer_static.reshape(batch_shape, shape=[-1]), tf.int32)
-    batch_ndims = prefer_static.size(batch_shape)
-    kernel_shape = prefer_static.concat([
+    batch_shape = (tf.constant([], dtype=tf.int32) if batch_shape is None
+                   else ps.cast(ps.reshape(batch_shape, shape=[-1]), tf.int32))
+    batch_ndims = ps.size(batch_shape)
+    kernel_shape = ps.concat([
         batch_shape, [input_size, output_size]], axis=0)
-    bias_shape = prefer_static.concat([batch_shape, [output_size]], axis=0)
+    bias_shape = ps.concat([batch_shape, [output_size]], axis=0)
     apply_kernel_fn = lambda x, k: tf.matmul(
         x[..., tf.newaxis, :], k)[..., 0, :]  # pylint-disable=long-lambda
     kernel, bias = make_kernel_bias_fn(
         kernel_shape, bias_shape,
-        init_kernel_fn, init_bias_fn,
+        kernel_initializer, bias_initializer,
         batch_ndims, batch_ndims,
         dtype)
     self._make_kernel_bias_fn = make_kernel_bias_fn  # For tracking.
@@ -185,11 +183,11 @@ class AffineVariationalReparameterization(
       padding='same',
       filter_shape=5,
       # Use `he_uniform` because we'll use the `relu` family.
-      init_kernel_fn=tf.initializers.he_uniform())
+      kernel_initializer=tf.initializers.he_uniform())
 
   BayesAffine = functools.partial(
       tfn.AffineVariationalReparameterization,
-      init_kernel_fn=tf.initializers.he_normal())
+      kernel_initializer=tf.initializers.he_normal())
 
   scale = tfp.util.TransformedVariable(1., tfb.Softplus())
   bnn = tfn.Sequential([
@@ -197,11 +195,9 @@ class AffineVariationalReparameterization(
                   activation_fn=tf.nn.leaky_relu),           # [b, 14, 14, 32]
       tfn.util.flatten_rightmost(ndims=3),                   # [b, 14 * 14 * 32]
       BayesAffine(14 * 14 * 32, np.prod(target_shape) - 1),  # [b, 9]
-      tfn.Lambda(
-          eval_fn=lambda loc: tfb.SoftmaxCentered()(
-              tfd.Independent(tfd.Normal(loc, scale),
-                              reinterpreted_batch_ndims=1)),
-          also_track=scale),                                 # [b, 10]
+      lambda loc: tfb.SoftmaxCentered()(
+          tfd.Independent(tfd.Normal(loc, scale),
+                          reinterpreted_batch_ndims=1))  # [b, 10]
   ], name='bayesian_neural_network')
 
   print(bnn.summary())
@@ -239,29 +235,27 @@ class AffineVariationalReparameterization(
       input_size,
       output_size,
       # Weights
-      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.initializers.zeros()
-      make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
-      make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
+      kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
+      bias_initializer=None,    # tf.initializers.zeros()
+      make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
+      make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       dtype=tf.float32,
-      # Penalty.
-      penalty_weight=None,
-      posterior_penalty_fn=kl_divergence_monte_carlo,
       # Misc
       activation_fn=None,
       seed=None,
+      validate_args=False,
       name=None):
     """Constructs layer.
 
     Args:
       input_size: ...
       output_size: ...
-      init_kernel_fn: ...
+      kernel_initializer: ...
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
-      init_bias_fn: ...
+      bias_initializer: ...
         Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
@@ -275,14 +269,12 @@ class AffineVariationalReparameterization(
         Default value: `unpack_kernel_and_bias`
       dtype: ...
         Default value: `tf.float32`.
-      penalty_weight: ...
-        Default value: `None` (i.e., weight is `1`).
-      posterior_penalty_fn: ...
-        Default value: `kl_divergence_monte_carlo`.
       activation_fn: ...
         Default value: `None`.
       seed: ...
         Default value: `None` (i.e., no seed).
+      validate_args: ...
+        Default value: `False`.
       name: ...
         Default value: `None` (i.e.,
         `'AffineVariationalReparameterization'`).
@@ -293,21 +285,20 @@ class AffineVariationalReparameterization(
     super(AffineVariationalReparameterization, self).__init__(
         posterior=make_posterior_fn(
             [input_size, output_size], [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
         prior=make_prior_fn(
             [input_size, output_size], [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
         apply_kernel_fn=tf.matmul,
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
         dtype=dtype,
-        penalty_weight=penalty_weight,
-        posterior_penalty_fn=posterior_penalty_fn,
         activation_fn=activation_fn,
+        validate_args=validate_args,
         seed=seed,
         name=name)
 
@@ -375,29 +366,27 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
       input_size,
       output_size,
       # Weights
-      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.initializers.zeros()
-      make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
-      make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
+      kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
+      bias_initializer=None,    # tf.initializers.zeros()
+      make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
+      make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       dtype=tf.float32,
-      # Penalty.
-      penalty_weight=None,
-      posterior_penalty_fn=kl_divergence_monte_carlo,
       # Misc
       activation_fn=None,
       seed=None,
+      validate_args=False,
       name=None):
     """Constructs layer.
 
     Args:
       input_size: ...
       output_size: ...
-      init_kernel_fn: ...
+      kernel_initializer: ...
         Default value: `None` (i.e.,
         `tfp.experimental.nn.initializers.glorot_uniform()`).
-      init_bias_fn: ...
+      bias_initializer: ...
         Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
@@ -411,14 +400,12 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
         Default value: `unpack_kernel_and_bias`
       dtype: ...
         Default value: `tf.float32`.
-      penalty_weight: ...
-        Default value: `None` (i.e., weight is `1`).
-      posterior_penalty_fn: ...
-        Default value: `kl_divergence_monte_carlo`.
       activation_fn: ...
         Default value: `None`.
-      seed: ...
+     seed: ...
         Default value: `None` (i.e., no seed).
+     validate_args: ...
+        Default value: `False`.
       name: ...
         Default value: `None` (i.e.,
         `'AffineVariationalFlipout'`).
@@ -429,22 +416,21 @@ class AffineVariationalFlipout(vi_lib.VariationalFlipoutKernelBiasLayer):
     super(AffineVariationalFlipout, self).__init__(
         posterior=make_posterior_fn(
             [input_size, output_size], [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
         prior=make_prior_fn(
             [input_size, output_size], [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
         apply_kernel_fn=tf.matmul,
         posterior_value_fn=posterior_value_fn,
         unpack_weights_fn=unpack_weights_fn,
         dtype=dtype,
-        penalty_weight=penalty_weight,
-        posterior_penalty_fn=posterior_penalty_fn,
         activation_fn=activation_fn,
         seed=seed,
+        validate_args=validate_args,
         name=name)
 
 
@@ -519,29 +505,27 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
       input_size,
       output_size,
       # Weights
-      init_kernel_fn=None,  # tfp.experimental.nn.initializers.glorot_uniform()
-      init_bias_fn=None,    # tf.initializers.zeros()
-      make_posterior_fn=nn_util_lib.make_kernel_bias_posterior_mvn_diag,
-      make_prior_fn=nn_util_lib.make_kernel_bias_prior_spike_and_slab,
+      kernel_initializer=None,  # tfp.nn.initializers.glorot_uniform()
+      bias_initializer=None,    # tf.initializers.zeros()
+      make_posterior_fn=kernel_bias_lib.make_kernel_bias_posterior_mvn_diag,
+      make_prior_fn=kernel_bias_lib.make_kernel_bias_prior_spike_and_slab,
       posterior_value_fn=tfd.Distribution.sample,
       unpack_weights_fn=unpack_kernel_and_bias,
       dtype=tf.float32,
-      # Penalty.
-      penalty_weight=None,
-      posterior_penalty_fn=kl_divergence_monte_carlo,
       # Misc
       activation_fn=None,
       seed=None,
+      validate_args=False,
       name=None):
     """Constructs layer.
 
     Args:
       input_size: ...
       output_size: ...
-      init_kernel_fn: ...
+      kernel_initializer: ...
         Default value: `None` (i.e.,
-        `tfp.experimental.nn.initializers.glorot_uniform()`).
-      init_bias_fn: ...
+        `tfp.nn.initializers.glorot_uniform()`).
+      bias_initializer: ...
         Default value: `None` (i.e., `tf.initializers.zeros()`).
       make_posterior_fn: ...
         Default value:
@@ -555,14 +539,12 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
         Default value: `unpack_kernel_and_bias`
       dtype: ...
         Default value: `tf.float32`.
-      penalty_weight: ...
-        Default value: `None` (i.e., weight is `1`).
-      posterior_penalty_fn: ...
-        Default value: `kl_divergence_monte_carlo`.
       activation_fn: ...
         Default value: `None`.
       seed: ...
         Default value: `None` (i.e., no seed).
+      validate_args: ...
+        Default value: `False`.
       name: ...
         Default value: `None` (i.e.,
         `'AffineVariationalFlipout'`).
@@ -573,19 +555,18 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
     super(AffineVariationalReparameterizationLocal, self).__init__(
         posterior=make_posterior_fn(
             [input_size, output_size], [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
         prior=make_prior_fn(
             [input_size, output_size], [output_size],
-            init_kernel_fn, init_bias_fn,
+            kernel_initializer, bias_initializer,
             batch_ndims, batch_ndims,
             dtype),
         dtype=dtype,
-        penalty_weight=penalty_weight,
-        posterior_penalty_fn=posterior_penalty_fn,
         posterior_value_fn=posterior_value_fn,
         activation_fn=activation_fn,
+        validate_args=validate_args,
         seed=seed,
         name=name)
     self._unpack_weights_fn = unpack_weights_fn
@@ -594,14 +575,17 @@ class AffineVariationalReparameterizationLocal(vi_lib.VariationalLayer):
   def unpack_weights_fn(self):
     return self._unpack_weights_fn
 
-  def _eval(self, x, weights):
+  def __call__(self, x):
+    x = tf.convert_to_tensor(x, dtype=self.dtype, name='x')
+    self._posterior_value = self.posterior_value_fn(
+        self.posterior, seed=self._seed())  # pylint: disable=not-callable
     kernel_dist, bias_dist = self.unpack_weights_fn(  # pylint: disable=not-callable
-        self.posterior.sample_distributions(value=weights)[0])
+        self.posterior.sample_distributions(value=self.posterior_value)[0])
     kernel_loc, kernel_scale = vi_lib.get_spherical_normal_loc_scale(
         kernel_dist)
     loc = tf.matmul(x, kernel_loc)
     scale = tf.sqrt(tf.matmul(tf.square(x), tf.square(kernel_scale)))
-    _, sampled_bias = self.unpack_weights_fn(weights)  # pylint: disable=not-callable
+    _, sampled_bias = self.unpack_weights_fn(self.posterior_value)  # pylint: disable=not-callable
     if sampled_bias is not None:
       try:
         bias_loc, bias_scale = vi_lib.get_spherical_normal_loc_scale(

@@ -41,24 +41,97 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import experimental as tfe
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import numerics_testing as nt
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
 
 
+STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST = (
+    'BatchReshape',  # b/183405889
+    'Independent',  # b/183405889
+    'Mixture',  # b/183405889
+    'Sample',  # b/183405889
+    'TransformedDistribution',  # b/183405889
+)
+
+
 WORKING_PRECISION_TEST_BLOCK_LIST = (
+    'Masked',  # b/182313283
     # The difficulty concerns Mixtures of component distributions whose samples
     # have different dtypes.
     'Mixture',
 )
 
 
-NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST = (
-    'ContinuousBernoulli',  # b/169321398
-    'Mixture',  # b/169847344.  Not a nan, but can't always sample from Mixture
+NO_NANS_TEST_BLOCK_LIST = (
+    'BetaQuotient',  # b/178925774
+    'Dirichlet',  # b/169689852
+    'ExpRelaxedOneHotCategorical',  # b/169663302
+    'RelaxedOneHotCategorical',  # b/169663302
+    # Independent log_prob unavoidably emits `nan` if the underlying
+    # distribution yields a +inf on one sample and a -inf on another.
+    'Independent',
+    'LambertWNormal',
+    'LogitNormal',  # TODO(axch): Maybe nan problem hints at accuracy problem
+    # Mixtures of component distributions whose samples have different dtypes
+    # cannot pass validate_args.
+    'Mixture',
+    'MixtureSameFamily',  # b/169790025
+    'OneHotCategorical',  # b/169680869
+    # TODO(axch) Re-enable after CDFs of underlying distributions are tested
+    # for NaN production.
+    'QuantizedDistribution',
+    # Sample log_prob unavoidably emits `nan` if the underlying distribution
+    # yields a +inf on one sample and a -inf on another.  This can happen even
+    # with iid samples, if one sample is at a pole of the distribution, and the
+    # other is far enough into the tail to round to +inf.  Weibull with a low
+    # concentration is an example of a distribution that can produce this
+    # effect.
+    'Sample',
+    'SinhArcsinh',  # b/183670203
     'TransformedDistribution',  # Bijectors may introduce nans
-    'Zipf',  # b/175929563 triggered by Zipf inside Independent
+    # TODO(axch): Edit C++ sampler to reject numerically out-of-bounds samples
+    'TruncatedNormal',
+)
+
+NANS_EVEN_IN_SAMPLE_LIST = (
+    'Mixture',  # b/169847344.  Not a nan, but can't always sample from Mixture
+    'SinhArcsinh',  # b/183670203
+    'TransformedDistribution',  # Bijectors may introduce nans
+)
+
+LOG_PROB_ACCURACY_BLOCK_LIST = (
+    # TODO(axch): Understand why each of these has 20+ bad bits; fix
+    # or file good bugs.
+    'Beta',  # Hypothesis filters too much in 4/100 runs; this is odd.
+    'BetaBinomial',
+    'BetaQuotient',  # Filters too much in 46/100 runs (nan samples too easy?)
+    'Binomial',
+    'Categorical',
+    'ContinuousBernoulli',
+    'Dirichlet',  # Filters too much in 1/100 runs
+    'ExponentiallyModifiedGaussian',
+    'FiniteDiscrete',
+    'GeneralizedExtremeValue',
+    'JohnsonSU',
+    'Kumaraswamy',
+    'LambertWNormal',
+    'LogitNormal',  # Filters too much in 6/100 runs (nan samples too easy?)
+    'MultivariateNormalDiag',
+    'MultivariateNormalTriL',
+    'NegativeBinomial',
+    'OneHotCategorical',
+    'PlackettLuce',
+    'SinhArcsinh',  # b/183670203
+    'Skellam',
+    'StoppingRatioLogistic',  # Filters too much in 61/100 runs; this is odd.
+    # TODO(axch): Fix numerics of _cauchy_cdf(x + delta) - _cauchy_cdf(x)
+    'TruncatedCauchy',
+    # TODO(axch): Is this the same problem as the NoNansTest exclusion?
+    'TruncatedNormal',
+    'WishartTriL',
 )
 
 # Batch slicing requires implementing `_params_event_ndims`.  Generic
@@ -67,7 +140,9 @@ NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST = (
 # without that.  Of those, this variable lists the ones that do not support
 # batch slicing.
 INSTANTIABLE_BUT_NOT_SLICABLE = (
+    'BatchBroadcast',
     'BatchReshape',
+    'Masked',
     'Mixture',
     'QuantizedDistribution',
 )
@@ -76,7 +151,12 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
 EVENT_SPACE_BIJECTOR_IS_BROKEN = [
     'InverseGamma',  # TODO(b/143090143): Enable this when the bug is fixed.
                      # (Reciprocal(Softplus(x)) -> inf for small x)
-    'Sample',  # TODO(b/168139745): Needs transpose before calling underlying.
+    'PowerSpherical',  # TODO(b/182609813): Enable when we have a proper
+                       # event space bijector
+    'SphericalUniform',  # TODO(b/182609813): Enable when we have a proper
+                         # event space bijector
+    'VonMisesFisher',  # TODO(b/182609813): Enable when we have a proper
+                       # event space bijector
 ]
 
 SLICING_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-5)
@@ -90,11 +170,58 @@ SLICING_LOGPROB_RTOL.update({
 })
 
 
-def tensor_to_f64(x):
-  if tf.is_tensor(x) and x.dtype.is_floating:
-    return tf.cast(x, dtype=tf.float64)
-  else:
-    return x
+@test_util.test_all_tf_execution_regimes
+class StatisticConsistentShapesTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())
+                          + list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    if dist_name in STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST:
+      self.skipTest('{} is blocked'.format(dist_name))
+    def eligibility_filter(name):
+      return name not in STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST
+    dist = data.draw(dhps.distributions(
+        dist_name=dist_name, eligibility_filter=eligibility_filter,
+        enable_vars=False, validate_args=False))
+    hp.note('Trying distribution {}'.format(
+        self.evaluate_dict(dist.parameters)))
+
+    for statistic in ['mean', 'mode', 'stddev', 'variance']:
+      hp.note('Testing {}.{}'.format(dist_name, statistic))
+      self.check_statistic(
+          dist, statistic,
+          dist.batch_shape + dist.event_shape,
+          tf.concat([dist.batch_shape_tensor(),
+                     dist.event_shape_tensor()], axis=0))
+    hp.note('Testing {}.covariance'.format(dist_name))
+    self.check_statistic(
+        dist, 'covariance',
+        dist.batch_shape + dist.event_shape + dist.event_shape,
+        tf.concat([dist.batch_shape_tensor(),
+                   dist.event_shape_tensor(),
+                   dist.event_shape_tensor()], axis=0))
+    hp.note('Testing {}.entropy'.format(dist_name))
+    self.check_statistic(
+        dist, 'entropy', dist.batch_shape, dist.batch_shape_tensor())
+
+  def check_statistic(
+      self, dist, statistic, expected_static_shape, expected_dynamic_shape):
+    try:
+      with tfp_hps.no_tf_rank_errors():
+        result = getattr(dist, statistic)()
+      msg = 'Shape {} not compatible with expected {}.'.format(
+          result.shape, expected_static_shape)
+      self.assertTrue(expected_static_shape.is_compatible_with(
+          tf.broadcast_static_shape(result.shape, expected_static_shape)), msg)
+      self.assertAllEqual(self.evaluate(expected_dynamic_shape),
+                          self.evaluate(tf.broadcast_dynamic_shape(
+                              tf.shape(result), expected_dynamic_shape)))
+    except NotImplementedError:
+      pass
 
 
 @test_util.test_all_tf_execution_regimes
@@ -126,9 +253,11 @@ class LogProbConsistentPrecisionTest(test_util.TestCase):
       return dist.log_prob(x)
 
     dist64 = tf.nest.map_structure(
-        tensor_to_f64, tfe.as_composite(dist), expand_composites=True)
+        nt.floating_tensor_to_f64,
+        tfe.as_composite(dist),
+        expand_composites=True)
     with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
-      result64 = log_prob_function(dist64, tensor_to_f64(samples))
+      result64 = log_prob_function(dist64, nt.floating_tensor_to_f64(samples))
     self.assertEqual(result64.dtype, tf.float64)
 
 
@@ -160,7 +289,7 @@ class ReproducibilityTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-class NoNansInSampleTest(test_util.TestCase):
+class NoNansTest(test_util.TestCase, dhps.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -169,45 +298,105 @@ class NoNansInSampleTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testDistribution(self, dist_name, data):
-    if dist_name in NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST:
+    if dist_name in NO_NANS_TEST_BLOCK_LIST:
       self.skipTest('{} is blocked'.format(dist_name))
     def eligibility_filter(name):
-      return name not in NO_NANS_IN_SAMPLE_TEST_BLOCK_LIST
+      return name not in NO_NANS_TEST_BLOCK_LIST
     dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
                                         eligibility_filter=eligibility_filter))
+    samples = self.check_samples_not_nan(dist)
+    self.assume_loc_scale_ok(dist)
+
+    hp.note('Testing on samples {}'.format(samples))
+    with tfp_hps.no_tf_rank_errors():
+      lp = self.evaluate(dist.log_prob(samples))
+      hp.note('Got log_probs {}'.format(lp))
+    self.assertAllEqual(np.zeros_like(lp), np.isnan(lp))
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(NO_NANS_TEST_BLOCK_LIST)
+      if dname not in NANS_EVEN_IN_SAMPLE_LIST)
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testSampleOnly(self, dist_name, data):
+    def eligibility_filter(name):
+      # We use this eligibility filter to focus the test's attention
+      # on sub-distributions that are not already tested by the sample
+      # and log_prob test.  However, we also include some relatively
+      # widely used distributions to make sure that at least one legal
+      # sub-distribution exists for every meta-distribution we may be
+      # testing.
+      return ((name in NO_NANS_TEST_BLOCK_LIST
+               or name in dhps.QUANTIZED_BASE_DISTS)
+              and name not in NANS_EVEN_IN_SAMPLE_LIST)
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
+                                        eligibility_filter=eligibility_filter))
+    self.check_samples_not_nan(dist)
+
+  def check_samples_not_nan(self, dist):
     hp.note('Trying distribution {}'.format(
         self.evaluate_dict(dist.parameters)))
     seed = test_util.test_seed(sampler_type='stateless')
     with tfp_hps.no_tf_rank_errors():
-      s1 = self.evaluate(dist.sample(20, seed=seed))
-    self.assertAllEqual(np.zeros_like(s1), np.isnan(s1))
+      samples = self.evaluate(dist.sample(20, seed=seed))
+    self.assertAllEqual(np.zeros_like(samples), np.isnan(samples))
+    return samples
+
+
+# TODO(axch): Testing only in Eager mode because Graph mode barfs on a
+# weird tf.constant error inside value_and_gradients.
+# @test_util.test_all_tf_execution_regimes
+class DistributionAccuracyTest(test_util.TestCase):
+
+  def skip_if_tf1(self):
+    # This is a hack to check whether we're running under TF1, which
+    # seems to have a less-accurate implementation of some special
+    # function.
+    # pylint: disable=g-import-not-at-top
+    import tensorflow
+    if hasattr(tensorflow, 'Session'):
+      self.skipTest('TODO(axch): TF1 seems to have an inaccurate base function')
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(set(dhps.INSTANTIABLE_BASE_DISTS.keys()) -
+                               set(LOG_PROB_ACCURACY_BLOCK_LIST))))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testLogProbAccuracy(self, dist_name, data):
+    self.skip_if_tf1()
+    dist = tfe.as_composite(data.draw(dhps.distributions(
+        dist_name=dist_name,
+        # Accuracy tools can't handle batches (yet?)
+        batch_shape=(),
+        # Variables presumably do not affect the numerics
+        enable_vars=False,
+        # Checking that samples pass validations (including in 64-bit
+        # arithmetic) is left for another test
+        validate_args=False)))
+    seed = test_util.test_seed(sampler_type='stateless')
+    with tfp_hps.no_tf_rank_errors():
+      sample = dist.sample(seed=seed)
+    if sample.dtype.is_floating:
+      hp.assume(self.evaluate(tf.reduce_all(~tf.math.is_nan(sample))))
+    hp.note('Testing on sample {}'.format(sample))
+
+    as_tensors = tf.nest.flatten(dist, expand_composites=True)
+    def log_prob_function(tensors, x):
+      dist_ = tf.nest.pack_sequence_as(dist, tensors, expand_composites=True)
+      return dist_.log_prob(x)
+
+    with tfp_hps.finite_ground_truth_only():
+      badness = nt.excess_wrong_bits(log_prob_function, as_tensors, sample)
+    # TODO(axch): Lower the acceptable badness to 4, which corresponds
+    # to slightly better accuracy than 1e-6 relative error for
+    # well-conditioned functions.
+    self.assertAllLess(badness, 20)
 
 
 @test_util.test_all_tf_execution_regimes
-class EventSpaceBijectorsTest(test_util.TestCase):
-
-  def check_bad_loc_scale(self, dist):
-    if hasattr(dist, 'distribution'):
-      # BatchReshape, Independent, TransformedDistribution, and
-      # QuantizedDistribution
-      self.check_bad_loc_scale(dist.distribution)
-    if isinstance(dist, tfd.MixtureSameFamily):
-      self.check_bad_loc_scale(dist.mixture_distribution)
-      self.check_bad_loc_scale(dist.components_distribution)
-    if isinstance(dist, tfd.Mixture):
-      self.check_bad_loc_scale(dist.cat)
-      self.check_bad_loc_scale(dist.components)
-    if hasattr(dist, 'loc') and hasattr(dist, 'scale'):
-      try:
-        loc_ = tf.convert_to_tensor(dist.loc)
-        scale_ = tf.convert_to_tensor(dist.scale)
-      except (ValueError, TypeError):
-        # If they're not Tensor-convertible, don't try to check them.  This is
-        # the case, in, for example, multivariate normal, where the scale is a
-        # `LinearOperator`.
-        return
-      loc, scale = self.evaluate([loc_, scale_])
-      hp.assume(np.all(np.abs(loc / scale) < 1e7))
+class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
 
   def check_event_space_bijector_constrains(self, dist, data):
     event_space_bijector = dist.experimental_default_event_space_bijector()
@@ -222,16 +411,17 @@ class EventSpaceBijectorsTest(test_util.TestCase):
         # domain. This is the shape of `y` in R**n, such that
         # x = event_space_bijector(y) has the event shape of the distribution.
         data.draw(tfp_hps.broadcasting_shapes(
-            tensorshape_util.concatenate(
-                dist.batch_shape,
-                event_space_bijector.inverse_event_shape(
-                    dist.event_shape)), n=1))[0])
+            event_space_bijector.inverse_event_shape(
+                tensorshape_util.concatenate(
+                    dist.batch_shape, dist.event_shape)), n=1))[0])
 
     y = data.draw(
         tfp_hps.constrained_tensors(
             tfp_hps.identity_fn, total_sample_shape.as_list()))
+    hp.note('Trying to constrain inputs {}'.format(y))
     with tfp_hps.no_tf_rank_errors():
       x = event_space_bijector(y)
+      hp.note('Got constrained samples {}'.format(x))
       with tf.control_dependencies(dist._sample_control_dependencies(x)):
         self.evaluate(tf.identity(x))
 
@@ -245,7 +435,7 @@ class EventSpaceBijectorsTest(test_util.TestCase):
     dist = data.draw(dhps.base_distributions(
         dist_name=dist_name, enable_vars=True))
     self.evaluate([var.initializer for var in dist.variables])
-    self.check_bad_loc_scale(dist)
+    self.assume_loc_scale_ok(dist)
     self.check_event_space_bijector_constrains(dist, data)
 
   # TODO(b/146572907): Fix `enable_vars` for metadistributions and
@@ -263,12 +453,12 @@ class EventSpaceBijectorsTest(test_util.TestCase):
         dist_name=dist_name, enable_vars=True,
         eligibility_filter=ok))
     self.evaluate([var.initializer for var in dist.variables])
-    self.check_bad_loc_scale(dist)
+    self.assume_loc_scale_ok(dist)
     self.check_event_space_bijector_constrains(dist, data)
 
 
 @test_util.test_all_tf_execution_regimes
-class ParameterBijectorsTest(test_util.TestCase):
+class ParameterPropertiesTest(test_util.TestCase):
 
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
@@ -276,14 +466,14 @@ class ParameterBijectorsTest(test_util.TestCase):
 
     # TODO(b/169874884): Implement `width` parameters to work around the need
     # for a high > low` joint constraint.
-    high_gt_low_constraint_dists = ('Bates', 'PERT', 'Triangular',
-                                    'TruncatedCauchy', 'TruncatedNormal',
-                                    'Uniform')
+    # NormalInverseGaussian needs |skewness| < tailweight
+    high_gt_low_constraint_dists = ('Bates', 'NormalInverseGaussian', 'PERT',
+                                    'Triangular', 'TruncatedCauchy',
+                                    'TruncatedNormal', 'Uniform')
     not_annotated_dists = ('Empirical|event_ndims=0', 'Empirical|event_ndims=1',
                            'Empirical|event_ndims=2', 'FiniteDiscrete',
                            'MultivariateStudentTLinearOperator',
                            'PoissonLogNormalQuadratureCompound',
-                           'SphericalUniform', 'SinhArcsinh',
                            'StoppingRatioLogistic',)
     non_trainable_dists = (
         high_gt_low_constraint_dists + not_annotated_dists +
@@ -297,8 +487,10 @@ class ParameterBijectorsTest(test_util.TestCase):
         'num_samples',
         'df',  # Can't represent constraint that Wishart df > dimension.
         'mean_direction')  # TODO(b/118492439): Add `UnitVector` bijector.
-    non_trainable_non_tensor_params = ('dimension', 'dtype'
-                                      )  # Required by Zipf.
+    non_trainable_non_tensor_params = (
+        'batch_shape',  # SphericalUniform, at least, has explicit batch shape
+        'dimension',
+        'dtype')
 
     dist = data.draw(
         dhps.distributions(
@@ -347,6 +539,21 @@ class ParameterBijectorsTest(test_util.TestCase):
 
     # Valid parameters should give non-nan samples.
     self.assertAllFalse(np.isnan(x))
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(set(dhps.INSTANTIABLE_META_DISTS))))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testInferredBatchShapeMatchesTrueBatchShape(self, dist_name, data):
+    dist = data.draw(dhps.distributions(dist_name=dist_name))
+    try:
+      self.assertAllEqual(dist.batch_shape_tensor(),
+                          dist._inferred_batch_shape_tensor())
+      self.assertAllEqual(dist.batch_shape,
+                          dist._inferred_batch_shape())
+    except NotImplementedError as e:
+      self.skipTest(str(e))
 
 
 def _all_shapes(thing):

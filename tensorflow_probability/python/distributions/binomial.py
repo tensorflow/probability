@@ -185,7 +185,7 @@ def _btrs(counts, probs, full_shape, seed):
     return k, (~reject) & (accept_boxed | accept_bounded)
 
   return batched_rejection_sampler.batched_las_vegas_algorithm(
-      batched_las_vegas_trial_fn, seed)[0]  # Drop `num_trials`.
+      batched_las_vegas_trial_fn, seed=seed)[0]  # Pick out samples.
 
 
 def _random_binomial_noncpu(

@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -78,7 +79,7 @@ class MixtureSameFamily(distribution.Distribution):
   # Plot PDF.
   x = np.linspace(-2., 3., int(1e4), dtype=np.float32)
   import matplotlib.pyplot as plt
-  plt.plot(x, gm.prob(x).eval());
+  plt.plot(x, gm.prob(x));
 
   ### Create a mixture of two Bivariate Gaussians:
 
@@ -104,7 +105,7 @@ class MixtureSameFamily(distribution.Distribution):
     grid = np.concatenate([gx.ravel()[None, :], gy.ravel()[None, :]], axis=0)
     return grid.T.reshape(x.size, y.size, 2)
   grid = meshgrid(np.linspace(-2, 2, 100, dtype=np.float32))
-  plt.contour(grid[..., 0], grid[..., 1], gm.prob(grid).eval());
+  plt.contour(grid[..., 0], grid[..., 1], gm.prob(grid));
 
   ```
 
@@ -209,6 +210,24 @@ class MixtureSameFamily(distribution.Distribution):
   @property
   def components_distribution(self):
     return self._components_distribution
+
+  @property
+  def experimental_is_sharded(self):
+    sharded = self.components_distribution.experimental_is_sharded
+    if self.mixture_distribution.experimental_is_sharded != sharded:
+      raise ValueError(
+          '`MixtureSameFamily.mixture_distribution` sharding must match '
+          '`MixtureSameFamily.components_distribution`.')
+    return sharded
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        mixture_distribution=(
+            parameter_properties.BatchedComponentProperties()),
+        components_distribution=(
+            parameter_properties.BatchedComponentProperties(
+                event_ndims=1)))
 
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing

@@ -17,8 +17,9 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
-
 # Dependency imports
+
+from absl.testing import parameterized
 
 import numpy as np
 import tensorflow.compat.v1 as tf1
@@ -28,6 +29,8 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.platform import test as tf_test  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+from tensorflow.python.platform import tf_logging  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class TupleDistribution(tfd.Distribution):
@@ -517,6 +520,45 @@ class DistributionTest(test_util.TestCase):
     with self.assertRaisesRegexp(
         NotImplementedError, 'log_cdf is not implemented'):
       terrible_distribution.log_cdf(1.)
+    with self.assertRaisesRegexp(NotImplementedError,
+                                 'unnormalized_log_prob is not implemented'):
+      terrible_distribution.unnormalized_log_prob(1.)
+
+  def testUnnormalizedProbDerivation(self):
+
+    class DistributionWithProbOnly(tfd.Distribution):
+
+      def __init__(self):
+        super(DistributionWithProbOnly, self).__init__(
+            dtype=tf.float32,
+            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            validate_args=False,
+            allow_nan_stats=False)
+
+      def _prob(self, _):
+        return 2.0
+
+    distribution_with_prob_only = DistributionWithProbOnly()
+    self.assertEqual(
+        self.evaluate(distribution_with_prob_only.unnormalized_log_prob(3.0)),
+        self.evaluate(tf.math.log(2.0)))
+
+    class DistributionWithLogProbOnly(tfd.Distribution):
+
+      def __init__(self):
+        super(DistributionWithLogProbOnly, self).__init__(
+            dtype=tf.float32,
+            reparameterization_type=tfd.NOT_REPARAMETERIZED,
+            validate_args=False,
+            allow_nan_stats=False)
+
+      def _log_prob(self, _):
+        return 5.0
+
+    distribution_with_log_prob_only = DistributionWithLogProbOnly()
+    self.assertAllClose(
+        5.0,
+        distribution_with_log_prob_only.unnormalized_log_prob(3.0))
 
   def testNotIterable(self):
     normal = tfd.Normal(loc=0., scale=1.)
@@ -574,6 +616,44 @@ class ParametersTest(test_util.TestCase):
     self.assertNear(0.5 * np.log(2. * np.pi * np.e * scale**2.),
                     self.evaluate(normal_differential_entropy(scale)),
                     err=1e-5)
+
+  @test_util.jax_disable_test_missing_functionality('tf_logging')
+  @tf_test.mock.patch.object(tf_logging, 'warning', autospec=True)
+  def testParameterPropertiesNotInherited(self, mock_warning):
+    # TODO(b/183457779) Test for NotImplementedError (rather than just warning).
+
+    # Subclasses that don't redefine __init__ can inherit properties.
+    class NormalTrivialSubclass(tfd.Normal):
+      pass
+
+    class NormalWithPassThroughInit(tfd.Normal):
+
+      def __init__(self, *args, **kwargs):
+        self._not_a_new_parameter = 42
+        super(NormalWithPassThroughInit, self).__init__(*args, **kwargs)
+
+    # It's safe for direct subclasses of Distribution to inherit
+    # Distribution._parameter_properties, since it just throws a
+    # NotImplementedError.
+    class MyDistribution(tfd.Distribution):
+
+      def __init__(self, param1, param2):
+        pass
+
+    NormalTrivialSubclass.parameter_properties()
+    NormalWithPassThroughInit.parameter_properties()
+    with self.assertRaises(NotImplementedError):
+      MyDistribution.parameter_properties()
+    self.assertEqual(0, mock_warning.call_count)
+
+    class NormalWithExtraParam(tfd.Normal):
+
+      def __init__(self, extra_param, *args, **kwargs):
+        self._extra_param = extra_param
+        super(NormalWithExtraParam, self).__init__(*args, **kwargs)
+
+    NormalWithExtraParam.parameter_properties()
+    self.assertEqual(1, mock_warning.call_count)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -729,6 +809,54 @@ class ConditionalDistributionTest(test_util.TestCase):
     method = getattr(dist, 'stddev')
     with self.assertRaisesRegexp(ValueError, 'b1.*b2'):
       method(arg1='b1', arg2='b2')
+
+
+@tf_test_util.run_all_in_graph_and_eager_modes
+class BatchShapeInferenceTests(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': '_trivial',
+       'value_fn': lambda: tfd.Normal(loc=0., scale=1.),
+       'expected_batch_shape': []},
+      {'testcase_name': '_simple_tensor_broadcasting',
+       'value_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+           loc=[0., 0.], scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
+       'expected_batch_shape': [2]},
+      {'testcase_name': '_rank_deficient_tensor_broadcasting',
+       'value_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+           loc=0., scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
+       'expected_batch_shape': [2]},
+      {'testcase_name': '_mixture_same_family',
+       'value_fn': lambda: tfd.MixtureSameFamily(  # pylint: disable=g-long-lambda
+           mixture_distribution=tfd.Categorical(
+               logits=[[[1., 2., 3.],
+                        [4., 5., 6.]]]),
+           components_distribution=tfd.Normal(loc=0.,
+                                              scale=[[[1., 2., 3.],
+                                                      [4., 5., 6.]]])),
+       'expected_batch_shape': [1, 2]},
+      {'testcase_name': '_deeply_nested',
+       'value_fn': lambda: tfd.Independent(  # pylint: disable=g-long-lambda
+           tfd.Independent(
+               tfd.Independent(
+                   tfd.Independent(
+                       tfd.Normal(loc=0., scale=[[[[[[[[1.]]]]]]]]),
+                       reinterpreted_batch_ndims=2),
+                   reinterpreted_batch_ndims=0),
+               reinterpreted_batch_ndims=1),
+           reinterpreted_batch_ndims=1),
+       'expected_batch_shape': [1, 1, 1, 1]})
+  def test_batch_shape_inference_is_correct(
+      self, value_fn, expected_batch_shape):
+    value = value_fn()  # Defer construction until we're in the right graph.
+    self.assertAllEqual(
+        expected_batch_shape,
+        value._inferred_batch_shape_tensor())
+
+    batch_shape = value._inferred_batch_shape()
+    self.assertIsInstance(batch_shape, tf.TensorShape)
+    self.assertTrue(
+        batch_shape.is_compatible_with(expected_batch_shape))
 
 
 if __name__ == '__main__':

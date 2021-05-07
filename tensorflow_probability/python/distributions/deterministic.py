@@ -137,10 +137,20 @@ class _BaseDeterministic(distribution.Distribution):
     return tf.zeros(self.batch_shape_tensor(), dtype=self.dtype)
 
   def _mean(self):
-    return tf.identity(self.loc)
+    loc = tf.convert_to_tensor(self.loc)
+    return tf.broadcast_to(
+        loc,
+        ps.concat([self._batch_shape_tensor(loc=loc),
+                   self._event_shape_tensor(loc=loc)],
+                  axis=0))
 
   def _variance(self):
-    return tf.zeros_like(self.loc)
+    loc = tf.convert_to_tensor(self.loc)
+    return tf.broadcast_to(
+        tf.zeros_like(loc),
+        ps.concat([self._batch_shape_tensor(loc=loc),
+                   self._event_shape_tensor(loc=loc)],
+                  axis=0))
 
   def _mode(self):
     return self.mean()
@@ -304,7 +314,7 @@ class Deterministic(_BaseDeterministic):
 
   def _event_shape_tensor(self, loc=None):
     del loc
-    return tf.constant([], dtype=tf.int32)
+    return ps.constant([], dtype=tf.int32)
 
   def _event_shape(self):
     return tf.TensorShape([])

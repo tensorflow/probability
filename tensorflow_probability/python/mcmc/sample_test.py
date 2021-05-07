@@ -357,7 +357,16 @@ class SampleChainTest(test_util.TestCase):
       dict(testcase_name='HMC_namedtuple',
            kernel_from_log_prob=lambda lp_fn: tfp.mcmc.HamiltonianMonteCarlo(  # pylint: disable=g-long-lambda
                lp_fn, step_size=0.1, num_leapfrog_steps=10),
-           skip='HMC requires gradients' if NUMPY_MODE else '')
+           skip='HMC requires gradients' if NUMPY_MODE else ''),
+      dict(testcase_name='NUTS_tuple',
+           kernel_from_log_prob=lambda lp_fn: tfp.mcmc.NoUTurnSampler(  # pylint: disable=g-long-lambda
+               lp_fn, step_size=0.1),
+           skip='NUTS requires gradients' if NUMPY_MODE else '',
+           sample_dtype=(tf.float32,) * 4),
+      dict(testcase_name='NUTS_namedtuple',
+           kernel_from_log_prob=lambda lp_fn: tfp.mcmc.NoUTurnSampler(  # pylint: disable=g-long-lambda
+               lp_fn, step_size=0.1),
+           skip='NUTS requires gradients' if NUMPY_MODE else '')
       )
   def testStructuredState(self, kernel_from_log_prob, skip='',
                           **model_kwargs):

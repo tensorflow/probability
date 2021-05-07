@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -37,7 +38,9 @@ __all__ = [
 ]
 
 
-class Reshape(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Reshape(bijector.AutoCompositeTensorBijector):
   """Reshapes the `event_shape` of a `Tensor`.
 
   The semantics generally follow that of `tf.reshape()`, with
@@ -213,6 +216,7 @@ class Reshape(bijector.Bijector):
     output_shape, output_tensorshape = _replace_event_shape_in_shape_tensor(
         ps.shape(x), self._event_shape_in, self._event_shape_out,
         self.validate_args)
+
     y = tf.reshape(x, output_shape)
     tensorshape_util.set_shape(y, output_tensorshape)
     return y
@@ -257,6 +261,8 @@ class Reshape(bijector.Bijector):
         self._event_shape_in,
         self.validate_args)[0]
 
+  _composite_tensor_shape_params = ('event_shape_in', 'event_shape_out')
+
 
 def _replace_event_shape_in_shape_tensor(
     input_shape, event_shape_in, event_shape_out, validate_args):
@@ -289,10 +295,10 @@ def _replace_event_shape_in_shape_tensor(
     return output_shape, output_tensorshape
 
   event_shape_in_ndims = (
-      tf.size(event_shape_in)
+      ps.size(event_shape_in)
       if tensorshape_util.num_elements(event_shape_in.shape) is None else
       tensorshape_util.num_elements(event_shape_in.shape))
-  input_non_event_shape, input_event_shape = tf.split(
+  input_non_event_shape, input_event_shape = ps.split(
       input_shape, num_or_size_splits=[-1, event_shape_in_ndims])
 
   additional_assertions = []
@@ -316,7 +322,7 @@ def _replace_event_shape_in_shape_tensor(
     # already makes this assertion.
 
   with tf.control_dependencies(additional_assertions):
-    output_shape = tf.concat([input_non_event_shape, event_shape_out], axis=0,
+    output_shape = ps.concat([input_non_event_shape, event_shape_out], axis=0,
                              name='output_shape')
 
   return output_shape, output_tensorshape
@@ -387,7 +393,6 @@ def _replace_event_shape_in_tensorshape(
   else:
     output_tensorshape = tensorshape_util.concatenate(
         input_non_event_tensorshape, event_tensorshape_out)
-
   return output_tensorshape, is_validated
 
 

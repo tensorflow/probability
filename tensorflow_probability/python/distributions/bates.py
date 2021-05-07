@@ -117,10 +117,10 @@ class Bates(distribution.Distribution):
   Compute some values for the pdf.
 
   ```python
-  dist.probs(50.).eval()    # shape: [3]
+  dist.prob(50.)    # shape: [3]
   x = [[50., 50., 50.],
        [5., 10., 20.]]      # shape: [2, 3]
-  dist.probs(x).eval()      # shape: [2]
+  dist.prob(x)      # shape: [2, 3]
   ```
   """
 
@@ -238,7 +238,8 @@ class Bates(distribution.Distribution):
     return _bates_cdf(self.total_count, self.low, self.high, self.dtype, value)
 
   def _mean(self):
-    return (self.low + self.high) / 2.
+    return tf.broadcast_to(
+        (self.low + self.high) / 2., self._batch_shape_tensor())
 
   @distribution_util.AppendDocstring(
       'For `n = 1`, any value in `(low, high)` is a mode; this gives the mean.')
@@ -489,6 +490,9 @@ def _segmented_range(limits):
   Returns:
     segments: 1D `Tensor` of segment ranges.
   """
+  # To cope with [0]-shaped limits, which disagrees with the sensibilities of
+  # tf.repeat, we left-pad, then slice the output.
+  limits = tf.pad(limits, [[1, 0]], constant_values=0)
   return (tf.range(tf.reduce_sum(limits)) -
           tf.repeat(tf.concat([[0], tf.cumsum(limits[:-1])], axis=0), limits))
 

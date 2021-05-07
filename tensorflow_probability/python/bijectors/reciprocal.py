@@ -22,12 +22,15 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 
-__all__ = ["Reciprocal"]
+__all__ = ['Reciprocal']
 
 
-class Reciprocal(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Reciprocal(bijector.AutoCompositeTensorBijector):
   """A `Bijector` that computes the reciprocal `b(x) = 1. / x` entrywise.
 
   This bijector accepts any non-zero values for both `forward` and `inverse`.
@@ -47,7 +50,7 @@ class Reciprocal(bijector.Bijector):
   ```
   """
 
-  def __init__(self, validate_args=False, name="reciprocal"):
+  def __init__(self, validate_args=False, name='reciprocal'):
     """Instantiates the `Reciprocal`.
 
     Args:
@@ -88,4 +91,4 @@ class Reciprocal(bijector.Bijector):
       return []
     return [assert_util.assert_none_equal(
         t, dtype_util.as_numpy_dtype(t.dtype)(0.),
-        message="All elements must be non-zero.")]
+        message='All elements must be non-zero.')]

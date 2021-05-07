@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 
 __all__ = [
     'BroadcastGradientArgs',
+    'IgammaGradA',
     'MatrixDiagPartV2',
     'RandomGammaGrad',
 ]
@@ -42,13 +43,13 @@ _BroadcastGradientArgs = collections.namedtuple(
 
 
 def _broadcast_gradient_args(s0, s1, name=None):  # pylint: disable=unused-argument
-  bc_shp = np.array(
-      (np.zeros(tuple(s0) + (0,)) + np.zeros(tuple(s1) + (0,))).shape[:-1],
-      dtype=np.int32)
-  pad_s0 = np.pad(s0, [[len(bc_shp) - len(s0), 0]],
-                  mode='constant', constant_values=-1)
-  pad_s1 = np.pad(s1, [[len(bc_shp) - len(s1), 0]],
-                  mode='constant', constant_values=-1)
+  bc_shp = onp.array(
+      (onp.zeros(tuple(s0) + (0,)) + onp.zeros(tuple(s1) + (0,))).shape[:-1],
+      dtype=onp.int32)
+  pad_s0 = onp.pad(s0, [[len(bc_shp) - len(s0), 0]],
+                   mode='constant', constant_values=-1)
+  pad_s1 = onp.pad(s1, [[len(bc_shp) - len(s1), 0]],
+                   mode='constant', constant_values=-1)
   return _BroadcastGradientArgs(
       onp.where((bc_shp != pad_s0) | (pad_s0 == 1))[0].astype(onp.int32),
       onp.where((bc_shp != pad_s1) | (pad_s1 == 1))[0].astype(onp.int32))
@@ -83,9 +84,23 @@ def _random_gamma_grad(alpha, sample, name=None):  # pylint: disable=unused-argu
   raise NotImplementedError
 
 
+def _igamma_grad_a(a, x, name=None):  # pylint: disable=unused-argument
+  if JAX_MODE:
+    import jax.lax  # pylint: disable=g-import-not-at-top
+    # Broadcast a and x.
+
+    a, x = np.broadcast_arrays(a, x)
+    return jax.lax.igamma_grad_a(a, x)
+  raise NotImplementedError
+
+
 BroadcastGradientArgs = utils.copy_docstring(  # pylint: disable=invalid-name
     'tf.raw_ops.BroadcastGradientArgs',
     _broadcast_gradient_args)
+
+IgammaGradA = utils.copy_docstring(  # pylint: disable=invalid-name
+    'tf.raw_ops.IgammaGradA',
+    _igamma_grad_a)
 
 MatrixDiagPartV2 = utils.copy_docstring(  # pylint: disable=invalid-name
     'tf.raw_ops.MatrixDiagPartV2',

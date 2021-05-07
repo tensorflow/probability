@@ -25,6 +25,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
@@ -237,6 +238,25 @@ class ExpOnlyJacobian(tfb.Bijector):
 
   def _forward_log_det_jacobian(self, x):
     return tf.math.log(x)
+
+
+class VectorExpOnlyJacobian(tfb.Bijector):
+  """An Exp bijector that operates only on vector (or higher-order) events."""
+
+  def __init__(self):
+    parameters = dict(locals())
+    super(VectorExpOnlyJacobian, self).__init__(
+        validate_args=False,
+        is_constant_jacobian=False,
+        forward_min_event_ndims=1,
+        parameters=parameters,
+        name='vector_exp')
+
+  def _inverse_log_det_jacobian(self, y):
+    return -tf.reduce_sum(tf.math.log(y), axis=-1)
+
+  def _forward_log_det_jacobian(self, x):
+    return tf.reduce_sum(tf.math.log(x), axis=-1)
 
 
 class ConstantJacobian(tfb.Bijector):
@@ -513,6 +533,33 @@ class BijectorReduceEventDimsTest(test_util.TestCase):
         np.sum(np.log(x), axis=(-1, -2)),
         self.evaluate(bij.forward_log_det_jacobian(x, event_ndims=2)))
 
+  def testNoReductionWhenEventNdimsIsOmitted(self):
+    x = [[[1., 2.], [3., 4.]]]
+
+    bij = ExpOnlyJacobian()
+    self.assertAllClose(
+        np.log(x),
+        self.evaluate(bij.forward_log_det_jacobian(x)))
+    self.assertAllClose(
+        -np.log(x),
+        self.evaluate(bij.inverse_log_det_jacobian(x)))
+
+    bij = VectorExpOnlyJacobian()
+    self.assertAllClose(
+        np.sum(np.log(x), axis=-1),
+        self.evaluate(bij.forward_log_det_jacobian(x)))
+    self.assertAllClose(
+        np.sum(-np.log(x), axis=-1),
+        self.evaluate(bij.inverse_log_det_jacobian(x)))
+
+  def testInverseWithEventDimsOmitted(self):
+    bij = tfb.Split(2)
+
+    self.assertAllEqual(
+        0.0,
+        self.evaluate(bij.inverse_log_det_jacobian(
+            [tf.ones((3, 4, 5)), tf.ones((3, 4, 5))])))
+
   def testReduceEventNdimsForwardRaiseError(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian(forward_min_event_ndims=1)
@@ -719,6 +766,49 @@ class ConditionalBijectorTest(test_util.TestCase):
       with mock.patch.object(b, '_' + name, return_value=retval) as mock_method:
         method(1., event_ndims=0, arg1=arg1, arg2=arg2)
       mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
+
+
+@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+class CompositeForwardBijector(tfb.AutoCompositeTensorBijector):
+
+  def __init__(self, scale=2., validate_args=False, name=None):
+    parameters = dict(locals())
+    with tf.name_scope(name or 'forward_only') as name:
+      self._scale = tensor_util.convert_nonref_to_tensor(
+          scale,
+          dtype_hint=tf.float32)
+      super(CompositeForwardBijector, self).__init__(
+          validate_args=validate_args,
+          forward_min_event_ndims=0,
+          parameters=parameters,
+          name=name)
+
+  def _forward(self, x):
+    return self._scale * x
+
+  def _forward_log_det_jacobian(self, _):
+    return tf.math.log(self._scale)
+
+
+@test_util.test_all_tf_execution_regimes
+class AutoCompositeTensorBijectorTest(test_util.TestCase):
+
+  def test_disable_ct_bijector(self):
+
+    ct_bijector = CompositeForwardBijector()
+    self.assertIsInstance(ct_bijector, tf.__internal__.CompositeTensor)
+
+    non_ct_bijector = ForwardOnlyBijector()
+    self.assertNotIsInstance(non_ct_bijector, tf.__internal__.CompositeTensor)
+
+    flat = tf.nest.flatten(ct_bijector, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        ct_bijector, flat, expand_composites=True)
+
+    x = tf.constant([2., 3.])
+    self.assertAllClose(
+        non_ct_bijector.forward(x),
+        tf.function(lambda b: b.forward(x))(unflat))
 
 
 if __name__ == '__main__':

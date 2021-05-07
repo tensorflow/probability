@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import joint_distribution_seque
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
@@ -230,6 +231,23 @@ class Blockwise(distribution_lib.Distribution):
   @property
   def distributions(self):
     return self._distributions
+
+  @property
+  def experimental_is_sharded(self):
+    any_is_sharded = any(
+        d.experimental_is_sharded for d in self.distributions)
+    all_are_sharded = all(
+        d.experimental_is_sharded for d in self.distributions)
+    if any_is_sharded and not all_are_sharded:
+      raise ValueError('`Blockwise.distributions` sharding must match.')
+    return all_are_sharded
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distributions=parameter_properties.BatchedComponentProperties(
+            event_ndims=(
+                lambda self: [0 for _ in self.distributions])))
 
   def _batch_shape(self):
     return functools.reduce(tensorshape_util.merge_with,

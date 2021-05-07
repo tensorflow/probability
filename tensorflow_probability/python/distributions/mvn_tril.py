@@ -252,3 +252,5 @@ class MultivariateNormalTriL(
   @property
   def scale_tril(self):
     return self._scale_tril
+
+  _composite_tensor_nonshape_params = ('loc', 'scale_tril')

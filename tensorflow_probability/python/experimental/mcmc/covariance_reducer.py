@@ -26,7 +26,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import reducer as reducer_base
 from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import nest_util
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -182,11 +181,9 @@ class CovarianceReducer(reducer_base.Reducer):
           self.transform_fn)
       event_ndims = _canonicalize_event_ndims(
           initial_fn_result, self.event_ndims)
-      def init(tensor, event_ndims):
-        return sample_stats.RunningCovariance.from_shape(
-            ps.shape(tensor), tensor.dtype, event_ndims)
       running_covariances = tf.nest.map_structure(
-          init, initial_fn_result, event_ndims)
+          sample_stats.RunningCovariance.from_example,
+          initial_fn_result, event_ndims)
       return CovarianceReducerState(running_covariances)
 
   def one_step(

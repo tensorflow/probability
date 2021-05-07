@@ -22,11 +22,9 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.distributions import independent
-from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
-from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvn_pfl
+
+from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
 from tensorflow_probability.python.experimental.stats import sample_stats
-from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import unnest
 from tensorflow_probability.python.mcmc import kernel as kernel_base
@@ -36,18 +34,6 @@ __all__ = [
     'DiagonalMassMatrixAdaptation',
 ]
 
-# Add auto-composite tensors to the global namespace to avoid creating new
-# classes inside functions.
-_CompositeJointDistributionSequential = auto_composite_tensor.auto_composite_tensor(
-    jds.JointDistributionSequential, omit_kwargs=('name',))
-_CompositeLinearOperatorDiag = auto_composite_tensor.auto_composite_tensor(
-    tf.linalg.LinearOperatorDiag, omit_kwargs=('name',))
-_CompositeMultivariateNormalPrecisionFactorLinearOperator = auto_composite_tensor.auto_composite_tensor(
-    mvn_pfl.MultivariateNormalPrecisionFactorLinearOperator,
-    omit_kwargs=('name',))
-_CompositeIndependent = auto_composite_tensor.auto_composite_tensor(
-    independent.Independent, omit_kwargs=('name',))
-
 
 def hmc_like_momentum_distribution_setter_fn(kernel_results, new_distribution):
   """Setter for `momentum_distribution` so it can be adapted."""
@@ -56,6 +42,11 @@ def hmc_like_momentum_distribution_setter_fn(kernel_results, new_distribution):
   # `accepted_results.momentum_distribution`.
   return unnest.replace_innermost(
       kernel_results, momentum_distribution=new_distribution)
+
+
+def hmc_like_momentum_distribution_getter_fn(kernel_results):
+  """Getter for `momentum_distribution` so it can be updated."""
+  return unnest.get_innermost(kernel_results, 'momentum_distribution')
 
 
 class DiagonalMassMatrixAdaptationResults(
@@ -100,6 +91,7 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
       inner_kernel,
       initial_running_variance,
       momentum_distribution_setter_fn=hmc_like_momentum_distribution_setter_fn,
+      momentum_distribution_getter_fn=hmc_like_momentum_distribution_getter_fn,
       validate_args=False,
       name=None):
     """Creates the diagonal mass matrix adaptation kernel.
@@ -125,6 +117,14 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
         `hmc_like_momentum_distribution_setter_fn`, presumes HMC-style
         `kernel_results`, and sets the `momentum_distribution` only under the
         `accepted_results` field.
+      momentum_distribution_getter_fn: A callable with the signature
+        `kernel_results -> momentum_distribution`
+        where `kernel_results` are the results of the `inner_kernel` and
+        `momentum_distribution` is a `CompositeTensor` or a nested
+        collection of `CompositeTensor`s. The default,
+        `hmc_like_momentum_distribution_getter_fn`, presumes HMC-style
+        `kernel_results`, and gets the `momentum_distribution` only under the
+        `accepted_results` field.
       validate_args: Python `bool`. When `True` kernel parameters are checked
         for validity. When `False` invalid inputs may silently render incorrect
         outputs.
@@ -136,6 +136,7 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
         inner_kernel=inner_kernel,
         initial_running_variance=initial_running_variance,
         momentum_distribution_setter_fn=momentum_distribution_setter_fn,
+        momentum_distribution_getter_fn=momentum_distribution_getter_fn,
         name=name,
     )
 
@@ -150,6 +151,9 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
   @property
   def initial_running_variance(self):
     return self._parameters['initial_running_variance']
+
+  def momentum_distribution_getter_fn(self, kernel_results):
+    return self._parameters['momentum_distribution_getter_fn'](kernel_results)
 
   def momentum_distribution_setter_fn(self, kernel_results,
                                       new_momentum_distribution):
@@ -167,13 +171,12 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
                             'one_step')):
       variance_parts = previous_kernel_results.running_variance
       diags = [variance_part.variance() for variance_part in variance_parts]
-      # Set the momentum.
-      batch_ndims = ps.rank(unnest.get_innermost(previous_kernel_results,
-                                                 'target_log_prob'))
-      state_parts = tf.nest.flatten(current_state)
-      new_momentum_distribution = _make_momentum_distribution(diags,
-                                                              state_parts,
-                                                              batch_ndims)
+      # Update the momentum.
+      prev_momentum_distribution = self.momentum_distribution_getter_fn(
+          previous_kernel_results.inner_results)
+      new_momentum_distribution = (
+          preconditioning_utils.update_momentum_distribution(
+              prev_momentum_distribution, diags))
       inner_results = self.momentum_distribution_setter_fn(
           previous_kernel_results.inner_results, new_momentum_distribution)
 
@@ -247,11 +250,11 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
       # Step inner results.
       inner_results = self.inner_kernel.bootstrap_results(init_state)
       # Set the momentum.
-      batch_ndims = ps.rank(unnest.get_innermost(inner_results,
-                                                 'target_log_prob'))
+      batch_shape = ps.shape(unnest.get_innermost(inner_results,
+                                                  'target_log_prob'))
       init_state_parts = tf.nest.flatten(init_state)
-      momentum_distribution = _make_momentum_distribution(
-          diags, init_state_parts, batch_ndims)
+      momentum_distribution = preconditioning_utils.make_momentum_distribution(
+          init_state_parts, batch_shape, diags)
       inner_results = self.momentum_distribution_setter_fn(
           inner_results, momentum_distribution)
       proposed = unnest.get_innermost(inner_results, 'proposed_results',
@@ -268,40 +271,3 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
   @property
   def is_calibrated(self):
     return False
-
-
-def _make_momentum_distribution(running_variance_parts, state_parts,
-                                batch_ndims):
-  """Construct a momentum distribution from the running variance.
-
-  This uses a running variance to construct a momentum distribution with the
-  correct batch_shape and event_shape.
-
-  Args:
-    running_variance_parts: List of `Tensor`, outputs of
-      `tfp.experimental.stats.RunningVariance.variance()`.
-    state_parts: List of `Tensor`.
-    batch_ndims: Scalar, for leading batch dimensions.
-
-  Returns:
-    `tfd.Distribution` where `.sample` has the same structure as `state_parts`,
-    and `.log_prob` of the sample will have the rank of `batch_ndims`
-  """
-  distributions = []
-  for variance_part, state_part in zip(running_variance_parts, state_parts):
-    running_variance_rank = ps.rank(variance_part)
-    state_rank = ps.rank(state_part)
-    # Pad dimensions and tile by multiplying by tf.ones to add a batch shape
-    ones = tf.ones(ps.shape(state_part)[:-(state_rank - running_variance_rank)])
-    ones = mcmc_util.left_justified_expand_dims_like(ones, state_part)
-    variance_tiled = variance_part * ones
-    reinterpreted_batch_ndims = state_rank - batch_ndims - 1
-
-    distributions.append(
-        _CompositeIndependent(
-            _CompositeMultivariateNormalPrecisionFactorLinearOperator(
-                precision_factor=_CompositeLinearOperatorDiag(
-                    tf.math.sqrt(variance_tiled)),
-                precision=_CompositeLinearOperatorDiag(variance_tiled)),
-            reinterpreted_batch_ndims=reinterpreted_batch_ndims))
-  return _CompositeJointDistributionSequential(distributions)

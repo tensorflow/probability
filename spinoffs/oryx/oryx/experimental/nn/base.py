@@ -450,7 +450,7 @@ def custom_layer_cau_batch(vals, dims, *, num_consts, in_tree, out_tree, kwargs,
       assert len(vals_out) == len(dims_out)
       assert len(update_out) == len(dims_update)
       return vals_out + update_out, dims_out + dims_update
-  batched, out_dims = batching.batch_fun2(lu.wrap_init(
+  batched, out_dims = primitive.batch_fun(lu.wrap_init(
       layer_cau_p.impl, dict(params, num_consts=num_consts, in_tree=in_tree,
                              out_tree=out_tree,
                              kwargs=kwargs)), orig_dims)

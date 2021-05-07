@@ -143,7 +143,8 @@ class ProbitBernoulli(distribution.Distribution):
   def _log_prob(self, event):
     log_probs0, log_probs1 = self._outcome_log_probs()
     event = tf.cast(event, log_probs0.dtype)
-    return event * (log_probs1 - log_probs0) + log_probs0
+    return (tf.math.multiply_no_nan(log_probs0, 1 - event) +
+            tf.math.multiply_no_nan(log_probs1, event))
 
   def _outcome_log_probs(self):
     if self._probits is None:

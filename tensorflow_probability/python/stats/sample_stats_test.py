@@ -424,6 +424,15 @@ class CovarianceTest(test_util.TestCase):
     # Test passes when this does not fail.
     tfp.stats.covariance(x)
 
+  def test_jit(self):
+    self.skip_if_no_xla()
+
+    @tf.function(jit_compile=True)
+    def cov(x):
+      return tfp.stats.covariance(x)
+
+    self.evaluate(cov(tf.random.normal([1000, 4], seed=test_util.test_seed())))
+
 
 @test_util.test_all_tf_execution_regimes
 class CorrelationTest(test_util.TestCase):
@@ -538,6 +547,67 @@ class VarianceTest(test_util.TestCase):
 
     self.assertAllClose(np.var(x), var)
 
+  def test_independent_uniform_samples_cumulative(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(11, 13, 17)
+
+    var = tfp.stats.cumulative_variance(x, sample_axis=1)
+    self.assertAllEqual((11, 13, 17), var.shape)
+
+    var = self.evaluate(var)
+
+    from_numpy = np.stack([np.var(x[:, 0:i+1, :], axis=1)
+                           for i in range(13)], axis=1)
+    self.assertAllClose(from_numpy, var)
+
+  def check_independent_uniform_samples_windowed(
+      self, shape, low_indices, high_indices):
+    # Presume we are operating on a rank-3 shape at axis=1, as that
+    # should be enough coverage.
+    rng = test_util.test_np_rng()
+    x = rng.rand(*shape)
+
+    var = tfp.stats.windowed_variance(
+        x, low_indices=low_indices, high_indices=high_indices, axis=1)
+
+    var = self.evaluate(var)
+
+    low_indices = low_indices + np.zeros_like(high_indices)
+    high_indices = high_indices + np.zeros_like(low_indices)
+    from_numpy = np.stack(
+        [np.var(x[:, low:high, :], axis=1)
+         for low, high in zip(low_indices, high_indices)], axis=1)
+    self.assertAllClose(from_numpy, var)
+
+  def test_independent_uniform_samples_windowed(self):
+    self.check_independent_uniform_samples_windowed(
+        [11, 13, 17], low_indices=[0], high_indices=[4, 7, 8])
+    self.check_independent_uniform_samples_windowed(
+        [5, 7, 11], low_indices=[3, 4, 5], high_indices=6)
+    # Test equal indices == variance of a singleton set
+    self.check_independent_uniform_samples_windowed(
+        [5, 7, 3], low_indices=[4], high_indices=5)
+
+  def test_windowed_variance_corner_cases(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(7)
+    # Test variance of an empty set or a "negative singleton" set
+    var = tfp.stats.windowed_variance(
+        x, low_indices=[4, 5], high_indices=4, axis=0)
+    var = self.evaluate(var)
+    self.assertAllClose(var, tf.zeros_like(var))
+
+    # Test variance of a "negative" non-singleton set.  It's the same
+    # as the variance of the same set spelled "positively", but we
+    # need to be careful about the inclusive/exclusive semantics of
+    # the indices.
+    var_neg = tfp.stats.windowed_variance(
+        x, low_indices=[3, 5], high_indices=[1, 2])
+    var_pos = tfp.stats.windowed_variance(
+        x, low_indices=[1, 2], high_indices=[3, 5])
+    var_neg, var_pos = self.evaluate([var_neg, var_pos])
+    self.assertAllClose(var_neg, var_pos)
+
 
 @test_util.test_all_tf_execution_regimes
 class StddevTest(test_util.TestCase):
@@ -558,6 +628,63 @@ class StddevTest(test_util.TestCase):
     self.assertAllEqual(stddev, stddev_kd.reshape((10,)))
 
     self.assertAllClose(np.std(x, axis=(1, -1)), stddev)
+
+
+@test_util.test_all_tf_execution_regimes
+class MeanTest(test_util.TestCase):
+
+  def check_independent_uniform_samples_windowed(
+      self, shape, low_indices, high_indices):
+    # Presume we are operating on a rank-3 shape at axis=1, as that
+    # should be enough coverage.
+    rng = test_util.test_np_rng()
+    x = rng.rand(*shape)
+
+    mean = tfp.stats.windowed_mean(
+        x, low_indices=low_indices, high_indices=high_indices, axis=1)
+
+    mean = self.evaluate(mean)
+
+    low_indices = low_indices + np.zeros_like(high_indices)
+    high_indices = high_indices + np.zeros_like(low_indices)
+    from_numpy = np.stack(
+        [np.mean(x[:, low:high, :], axis=1)
+         for low, high in zip(low_indices, high_indices)], axis=1)
+    self.assertAllClose(from_numpy, mean)
+
+  def test_independent_uniform_samples_windowed(self):
+    self.check_independent_uniform_samples_windowed(
+        [11, 13, 17], low_indices=[0], high_indices=[4, 7, 8])
+    self.check_independent_uniform_samples_windowed(
+        [5, 7, 11], low_indices=[3, 4, 5], high_indices=6)
+    # Test mean of a singleton set
+    self.check_independent_uniform_samples_windowed(
+        [5, 7, 3], low_indices=[4], high_indices=5)
+
+  def test_windowed_mean_corner_cases(self):
+    rng = test_util.test_np_rng()
+    x = rng.rand(7)
+    # Test mean of an empty set
+    mean = tfp.stats.windowed_mean(
+        x, low_indices=[4], high_indices=4, axis=0)
+    mean = self.evaluate(mean)
+    self.assertAllClose(mean, tf.zeros_like(mean))
+
+    # Test mean of a "negative" set.  It's the same
+    # as the mean of the same set spelled "positively", but we
+    # need to be careful about the inclusive/exclusive semantics of
+    # the indices.
+    mean_neg = tfp.stats.windowed_mean(
+        x, low_indices=[3, 5], high_indices=[1, 2])
+    mean_pos = tfp.stats.windowed_mean(
+        x, low_indices=[1, 2], high_indices=[3, 5])
+    mean_neg, mean_pos = self.evaluate([mean_neg, mean_pos])
+    self.assertAllClose(mean_neg, mean_pos)
+
+    # Test default windows: [0, 1), [1, 2), [1, 3), [2, 4), etc
+    y = [0., 1., 2., 3.]
+    self.assertAllClose(
+        [0., 1., 1.5, 2.5], self.evaluate(tfp.stats.windowed_mean(y)))
 
 
 @test_util.test_all_tf_execution_regimes

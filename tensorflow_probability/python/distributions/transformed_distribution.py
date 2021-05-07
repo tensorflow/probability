@@ -25,6 +25,7 @@ from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -167,6 +168,8 @@ class TransformedDistribution(distribution_lib.Distribution):
       bijector=tfb.Shift(shift=mean)(tfb.ScaleMatvecTriL(scale_tril=chol_cov)))
   mvn2 = ds.MultivariateNormalTriL(loc=mean, scale_tril=chol_cov)
   # mvn1.log_prob(x) == mvn2.log_prob(x)
+  ```
+
   """
 
   def __init__(self,
@@ -237,6 +240,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     return self._bijector
 
   @property
+  def experimental_is_sharded(self):
+    raise NotImplementedError  # TODO(b/175084455): Handle bijector sharding.
+
+  @property
   def _composite_tensor_nonshape_params(self):
     if type(self).__init__ is not TransformedDistribution.__init__:
       # Handles subclasses of TransformedDistribution
@@ -261,6 +268,13 @@ class TransformedDistribution(distribution_lib.Distribution):
     if self.parameters.get('distribution', None) is not None:
       overrides['distribution'] = self.distribution[slices]
     return self.copy(**overrides)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties(),
+        bijector=parameter_properties.BatchedComponentProperties(
+            event_ndims=_count_bijector_batch_ndims_used_by_event))
 
   def _event_shape_tensor(self):
     return self.bijector.forward_event_shape_tensor(
@@ -320,32 +334,16 @@ class TransformedDistribution(distribution_lib.Distribution):
     # the result of `self.bijector.forward` is not modified (and thus caching
     # works).
     with self._name_and_control_scope(name):
-      sample_shape = ps.convert_to_shape_tensor(
-          sample_shape, dtype=tf.int32, name='sample_shape')
-      sample_shape, n = self._expand_sample_shape_to_vector(
-          sample_shape, 'sample_shape')
-
       distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
       # First, generate samples from the base distribution.
-      x = self.distribution.sample(sample_shape=[n], seed=seed,
+      x = self.distribution.sample(sample_shape=sample_shape,
+                                   seed=seed,
                                    **distribution_kwargs)
-
-      # Next, we reshape `x` into its final form. We do this prior to the call
-      # to the bijector to ensure that the bijector caching works.
-      def reshape_sample_shape(t):
-        batch_event_shape = ps.shape(t)[1:]
-        final_shape = ps.concat([sample_shape, batch_event_shape], 0)
-        return tf.reshape(t, final_shape)
-      x = tf.nest.map_structure(reshape_sample_shape, x)
-
-      # Finally, we apply the bijector's forward transformation. For caching to
+      # Apply the bijector's forward transformation. For caching to
       # work, it is imperative that this is the last modification to the
       # returned result.
-      y = self.bijector.forward(x, **bijector_kwargs)
-      y = self._set_sample_static_shape(y, sample_shape)
-
-      return y
+      return self.bijector.forward(x, **bijector_kwargs)
 
   def _log_prob(self, y, **kwargs):
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
@@ -574,19 +572,80 @@ def _kl_transformed_transformed(a, b, name=None):
 
 
 @log_prob_ratio.RegisterLogProbRatio(TransformedDistribution)
-def _transformed_log_prob_ratio(p, x, q, y):
+def _transformed_log_prob_ratio(p, x, q, y, name=None):
   """Computes p.log_prob(x) - q.log_prob(y) for p and q both TDs."""
-  x_ = p.bijector.inverse(x)
-  y_ = q.bijector.inverse(y)
+  with tf.name_scope(name or 'transformed_log_prob_ratio'):
+    x_ = p.bijector.inverse(x)
+    y_ = q.bijector.inverse(y)
 
-  base_log_prob_ratio = log_prob_ratio.log_prob_ratio(
-      p.distribution, x_, q.distribution, y_)
+    base_log_prob_ratio = log_prob_ratio.log_prob_ratio(
+        p.distribution, x_, q.distribution, y_)
 
-  event_ndims = tf.nest.map_structure(
-      ps.rank_from_shape,
-      p.event_shape_tensor,
-      tf.nest.map_structure(tensorshape_util.merge_with,
-                            p.event_shape, q.event_shape))
-  ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
-      p.bijector, x, q.bijector, y, event_ndims)
-  return base_log_prob_ratio + tf.cast(ildj_ratio, base_log_prob_ratio.dtype)
+    event_ndims = tf.nest.map_structure(
+        ps.rank_from_shape,
+        p.event_shape_tensor,
+        tf.nest.map_structure(tensorshape_util.merge_with,
+                              p.event_shape, q.event_shape))
+    ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
+        p.bijector, x, q.bijector, y, event_ndims)
+    return base_log_prob_ratio + tf.cast(ildj_ratio, base_log_prob_ratio.dtype)
+
+
+def _count_bijector_batch_ndims_used_by_event(transformed_distribution):
+  """Counts the bijector batch rank used when sampling an event.
+
+  This is defined as the maximum amount by which the base
+  distribution's event ndims exceeds the bijector's `min_event_ndims`, taken
+  over all parts of the sampled value.
+
+  Note that the bijector batch dimensions may in many cases be trivial and
+  implicit.  For example, we would say that the transformation
+
+  ```python
+  td = TransformedDistribution(tfd.WishartTriL(...), tfb.Exp())
+  ```
+
+  uses two 'batch dimensions' of the Exp bijector implicitly via broadcasting,
+  even though the Exp bijector itself has only a trivial batch shape of `[]`.
+
+  Args:
+    transformed_distribution: instance of `tfd.TransformedDistribution`.
+  Returns:
+    ndims_used: Python scalar `int` bijector batch rank assumed
+      (implicitly or explicitly) when sampling a single event from
+      `transformed_distribution`.
+  """
+  # Get the rank of the base distribution's event (or event parts).
+  base_event_ndims = tf.nest.map_structure(
+      tensorshape_util.rank,
+      transformed_distribution.distribution.event_shape)
+
+  # To avoid introducing a distinction in ParameterProperties between
+  # `event_ndims` and `event_ndims_tensor`, let's assume for now that the event
+  # rank is always static, even if the shape itself is unknown.
+  # TODO(davmre): Investigate how safe this assumption is.
+  if any(nd is None for nd in tf.nest.flatten(base_event_ndims)):
+    raise NotImplementedError(
+        'Batch shape inference is not yet implemented for '
+        'TransformedDistributions when the base distribution has non-static '
+        'event rank. (saw base distribution {} with event shape {})'.format(
+            transformed_distribution.distribution,
+            transformed_distribution.distribution.event_shape))
+
+  bijector_batch_ndims_used_at_each_part = tf.nest.map_structure(
+      lambda a, b: max(  # pylint: disable=g-long-lambda
+          a - b,  # Avoid negative values if event_ndims < min_event_ndims. This
+          0),     # should never happen, but if it does, the bijector will
+                  # throw a more informative error than we'd get here.
+      base_event_ndims,
+      transformed_distribution.bijector.forward_min_event_ndims)
+
+  # TODO(b/184890269): handle batch broadcasting and structured-batch bijectors.
+  flat_ndims = tf.nest.flatten(bijector_batch_ndims_used_at_each_part)
+  if any(nd != flat_ndims[0] for nd in flat_ndims):
+    raise NotImplementedError(
+        'Batch broadcasting for multipart bijectors is not yet supported. '
+        'Please ensure that all values being transformed have the same '
+        'number of batch dimensions (defined as dimensions beyond the number '
+        'specified in `bijector.forward_min_event_ndims`).')
+  return flat_ndims[0]

@@ -321,7 +321,7 @@ def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-built
   s_ = tf.get_static_value(s)
   if s_ is not None:
     return np.ones(s_, dtype_util.as_numpy_dtype(dtype or input.dtype))
-  return tf.ones(s, dtype or s.dtype, name)
+  return tf.ones(s, dtype or input.dtype, name)
 ones_like = _copy_docstring(tf.ones_like, _ones_like)
 
 
@@ -330,7 +330,7 @@ def _rank(input, name=None):  # pylint: disable=redefined-builtin,unused-argumen
     input = (tf.convert_to_tensor(input) if tf.get_static_value(input) is None
              else np.array(input))
   ndims_ = tensorshape_util.rank(getattr(input, 'shape', None))
-  return tf.rank(input) if ndims_ is None else np.int32(ndims_)
+  return tf.rank(input) if ndims_ is None else np.array(ndims_, np.int32)
 rank = _copy_docstring(
     tf.rank,
     _rank)
@@ -378,9 +378,8 @@ def _shape(input, out_type=tf.int32, name=None):  # pylint: disable=redefined-bu
   if not hasattr(input, 'shape'):
     x = np.array(input)
     input = tf.convert_to_tensor(input) if x.dtype is np.object else x
-  input_shape = tf.TensorShape(input.shape)
   if tensorshape_util.is_fully_defined(input.shape):
-    return np.array(tensorshape_util.as_list(input_shape)).astype(
+    return np.array(tensorshape_util.as_list(input.shape)).astype(
         _numpy_dtype(out_type))
   # NOTE: tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**, so we
   # pre-emptively convert-to-tensor.
@@ -434,14 +433,17 @@ broadcast_to = _prefer_static(tf.broadcast_to, nptf.broadcast_to)
 cast = _prefer_static(tf.cast, nptf.cast)
 ceil = _prefer_static(tf.math.ceil, nptf.math.ceil)
 concat = _prefer_static(tf.concat, nptf.concat)
-convert_to_shape_tensor = _prefer_static(
-    tf.convert_to_tensor,
-    _convert_to_shape_tensor_jax if JAX_MODE else tf.convert_to_tensor)
+convert_to_shape_tensor = (
+    _prefer_static(tf.convert_to_tensor, _convert_to_shape_tensor_jax)
+    if JAX_MODE else tf.convert_to_tensor)
+constant = _prefer_static(tf.constant, nptf.constant)
 cumprod = _prefer_static(tf.math.cumprod, nptf.math.cumprod)
 cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)
+not_equal = _prefer_static(tf.not_equal, nptf.not_equal)
 expm1 = _prefer_static(tf.math.expm1, nptf.math.expm1)
 floor = _prefer_static(tf.math.floor, nptf.math.floor)
+fill = _prefer_static(tf.fill, nptf.fill)
 gather = _prefer_static(tf.gather, nptf.gather)
 greater = _prefer_static(tf.greater, nptf.greater)
 identity = _prefer_static(tf.identity, nptf.identity)

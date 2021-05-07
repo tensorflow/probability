@@ -21,13 +21,16 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.bijectors import ordered as ordered_bijector
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -180,14 +183,14 @@ class StoppingRatioLogistic(distribution.Distribution):
           name=name)
 
   @classmethod
-  def _params_event_ndims(cls):
-    return dict(cutpoints=1, loc=0)
-
-  @staticmethod
-  def _param_shapes(sample_shape):
+  def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
-        zip(('loc', 'scale'),
-            ([tf.convert_to_tensor(sample_shape, dtype=tf.int32)] * 2)))
+        cutpoints=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+            default_constraining_bijector_fn=(
+                lambda: invert_bijector.Invert(ordered_bijector.Ordered()))),
+        loc=parameter_properties.ParameterProperties())
 
   @property
   def cutpoints(self):
@@ -247,7 +250,7 @@ class StoppingRatioLogistic(distribution.Distribution):
     return tf.math.exp(self.categorical_log_probs())
 
   def _num_categories(self):
-    return prefer_static.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
+    return ps.shape(self.cutpoints, out_type=self.dtype)[-1] + 1
 
   def _sample_n(self, n, seed=None):
     return categorical.Categorical(
@@ -256,9 +259,7 @@ class StoppingRatioLogistic(distribution.Distribution):
   def _batch_shape_tensor(self, cutpoints=None, loc=None):
     cutpoints = self.cutpoints if cutpoints is None else cutpoints
     loc = self.loc if loc is None else loc
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(cutpoints)[:-1],
-        prefer_static.shape(loc))
+    return ps.broadcast_shape(ps.shape(cutpoints)[:-1], ps.shape(loc))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(

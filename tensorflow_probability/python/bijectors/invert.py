@@ -105,6 +105,10 @@ class Invert(bijector_lib.Bijector):
   def _is_permutation(self):
     return self.bijector._is_permutation  # pylint: disable=protected-access
 
+  @property
+  def _parts_interact(self):
+    return self.bijector._parts_interact  # pylint: disable=protected-access
+
   def _internal_is_increasing(self, **kwargs):
     return self.bijector._internal_is_increasing(**kwargs)  # pylint: disable=protected-access
 
@@ -114,10 +118,10 @@ class Invert(bijector_lib.Bijector):
   def inverse(self, y, **kwargs):
     return self.bijector.forward(y, **kwargs)
 
-  def inverse_log_det_jacobian(self, y, event_ndims, **kwargs):
+  def inverse_log_det_jacobian(self, y, event_ndims=None, **kwargs):
     return self.bijector.forward_log_det_jacobian(y, event_ndims, **kwargs)
 
-  def forward_log_det_jacobian(self, x, event_ndims, **kwargs):
+  def forward_log_det_jacobian(self, x, event_ndims=None, **kwargs):
     return self.bijector.inverse_log_det_jacobian(x, event_ndims, **kwargs)
 
   def forward_dtype(self, dtype=bijector_lib.UNSPECIFIED, **kwargs):

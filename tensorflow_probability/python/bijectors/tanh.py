@@ -21,14 +21,17 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 
 __all__ = [
-    "Tanh",
+    'Tanh',
 ]
 
 
-class Tanh(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Tanh(bijector.AutoCompositeTensorBijector):
   """Bijector that computes `Y = tanh(X)`, therefore `Y in (-1, 1)`.
 
   This can be achieved by an affine transform of the Sigmoid bijector, i.e.,
@@ -44,7 +47,7 @@ class Tanh(bijector.Bijector):
   numerically stable.
   """
 
-  def __init__(self, validate_args=False, name="tanh"):
+  def __init__(self, validate_args=False, name='tanh'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(Tanh, self).__init__(

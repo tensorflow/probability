@@ -35,6 +35,7 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     numpy_omit_deps = [
         "//tensorflow_probability/python/experimental/distribute",
+        "//tensorflow_probability/python/experimental/stats",
     ],
     srcs_version = "PY3",
     substrates_omit_deps = [
@@ -45,7 +46,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/marginalize",
         "//tensorflow_probability/python/experimental/nn",
         "//tensorflow_probability/python/experimental/sequential",
-        "//tensorflow_probability/python/experimental/stats",
         "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/experimental/substrates",
         "//tensorflow_probability/python/experimental/vi",

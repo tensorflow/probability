@@ -23,6 +23,8 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import nest_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -42,7 +44,9 @@ def unique_token_set(source_structure):
   return flat_token_set
 
 
-class Restructure(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Restructure(bijector.AutoCompositeTensorBijector):
   """Converts between nested structures of Tensors.
 
     This is useful when constructing non-trivial chains of multipart bijectors.
@@ -52,7 +56,37 @@ class Restructure(bijector.Bijector):
     Example Usage:
       ```python
 
-      # What restructure does:
+      # Pack a 3-element list of tensors into a dict. The output structure,
+      # `structure_1`, is defined as a dict in which the values are list
+      # indices.
+      structure_1 = {'a': 1, 'b': 2, 'c': 0}
+      list_to_dict = Restructure(output_structure=structure_1)
+      input_list = [0.01, 0.02, 0.03]
+      assert list_to_dict.forward(input_list) == {
+        'a': 0.02, 'b': 0.03, 'c': 0.01}
+
+      # Now assume that, instead of a list/tuple (the default), the input
+      # structure is another dict. The output structure is the same as
+      # defined above, and consecutive integers are again used to associate
+      # components of the input and output structures.
+      structure_2 = {'c': 2, 'd': 1, 'e': 0}
+      dict_to_dict = Restructure(
+        structure_1, input_structure=structure_2)
+      input_dict = {'c': -3.5, 'd': 96.0, 'e': 12.0}
+      assert dict_to_dict.forward(input_dict) == {
+        'a': 96.0, 'b': -3.5, 'c': 12.0}
+
+      # Restructure a dict to a namedtuple.
+      Example = collections.namedtuple('Example', ['x', 'y', 'z'])
+      structure_3 = Example(2, 0, 1)
+      namedtuple_to_dict = Restructure(structure_3, input_structure=structure_2)
+      assert namedtuple_to_dict(input_dict) == Example(x=-3.5, y=12.0, z=96.0)
+
+      assert namedtuple_to_dict.inverse(Example(x=0.01, y=0.02, z=0.03)) == {
+        'c': 0.01, 'd': 0.03, 'e': 0.02}
+
+      # Restructure can be applied to structures of mixed type and arbitrary
+      # depth:
       restructure = Restructure({
         'foo': [0, 1],
         'bar': [3, 2],
@@ -69,7 +103,7 @@ class Restructure(bijector.Bijector):
           'baz': [16, 32, 64]
       }
 
-      # Where restructure is useful:
+      # Where Restructure is useful:
       complex_bijector = Chain([
         # Apply different transformations to each block.
         JointMap({
@@ -146,9 +180,9 @@ class Restructure(bijector.Bijector):
     self._output_structure = self._no_dependency(output_structure)
     super(Restructure, self).__init__(
         forward_min_event_ndims=nest_util.broadcast_structure(
-            self._input_structure, None),
+            self._input_structure, 0),
         inverse_min_event_ndims=nest_util.broadcast_structure(
-            self._output_structure, None),
+            self._output_structure, 0),
         is_constant_jacobian=True,
         validate_args=False,
         parameters=parameters,
@@ -161,6 +195,10 @@ class Restructure(bijector.Bijector):
   @property
   def _is_permutation(self):
     return True
+
+  @property
+  def _parts_interact(self):
+    return False
 
   def _forward(self, x):
     flat_dict = {}
@@ -182,22 +220,22 @@ class Restructure(bijector.Bijector):
 
   ### Shape/ndims/etc transformations do the same thing as forward/inverse.
 
-  def _forward_event_shape(self, x_shape, **kwargs):
+  def forward_event_shape(self, x_shape, **kwargs):
     return self._forward(x_shape)
 
-  def _inverse_event_shape(self, y_shape, **kwargs):
+  def inverse_event_shape(self, y_shape, **kwargs):
     return self._inverse(y_shape)
 
-  def _forward_event_shape_tensor(self, x_shape, **kwargs):
+  def forward_event_shape_tensor(self, x_shape, **kwargs):
     return self._forward(x_shape)
 
-  def _inverse_event_shape_tensor(self, y_shape, **kwargs):
+  def inverse_event_shape_tensor(self, y_shape, **kwargs):
     return self._inverse(y_shape)
 
-  def _forward_dtype(self, x_dtype, **kwargs):
+  def forward_dtype(self, x_dtype, **kwargs):
     return self._forward(x_dtype)
 
-  def _inverse_dtype(self, y_dtype, **kwargs):
+  def inverse_dtype(self, y_dtype, **kwargs):
     return self._inverse(y_dtype)
 
   def forward_event_ndims(self, x_ndims, **kwargs):
@@ -226,3 +264,85 @@ class Restructure(bijector.Bijector):
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
     with self._name_and_control_scope(name):
       return tf.zeros([], tf.float32)
+
+  @property
+  def _composite_tensor_shape_params(self):
+    return ('output_structure', 'input_structure')
+
+
+def tree_flatten(example, name='restructure'):
+  """Returns a Bijector variant of tf.nest.flatten.
+
+  To make it a Bijector, it has to know how to "unflatten" as
+  well---unlike the real `tf.nest.flatten`, this can only flatten or
+  unflatten a specific structure.  The `example` argument defines the
+  structure.
+
+  See also the `Restructure` bijector for general rearrangements.
+
+  Args:
+    example: A Tensor or (potentially nested) collection of Tensors.
+    name: An optional Python string, inserted into names of TF ops
+      created by this bijector.
+
+  Returns:
+    flatten: A Bijector whose `forward` method flattens structures
+      parallel to `example` into a list of Tensors, and whose
+      `inverse` method packs a list of Tensors of the right length
+      into a structure parallel to `example`.
+
+  #### Example
+
+  ```python
+  x = tf.constant(1)
+  example = collections.OrderedDict([
+      ('a', [x, x, x]),
+      ('b', x)])
+  bij = tfb.tree_flatten(example)
+  ys = collections.OrderedDict([
+      ('a', [1, 2, 3]),
+      ('b', 4.)])
+  bij.forward(ys)
+  # Returns [1, 2, 3, 4.]
+  ```
+
+  """
+  return invert.Invert(pack_sequence_as(example, name))
+
+
+def pack_sequence_as(example, name='restructure'):
+  """Returns a Bijector variant of tf.nest.pack_sequence_as.
+
+  See also the `Restructure` bijector for general rearrangements.
+
+  Args:
+    example: A Tensor or (potentially nested) collection of Tensors.
+    name: An optional Python string, inserted into names of TF ops
+      created by this bijector.
+
+  Returns:
+    pack: A Bijector whose `forward` method packs a list of Tensors of
+      the right length into a structure parallel to `example`, and
+      whose `inverse` method flattens structures parallel to `example`
+      into a list of Tensors.
+
+  #### Example
+
+  ```python
+  x = tf.constant(1)
+  example = collections.OrderedDict([
+      ('a', [x, x, x]),
+      ('b', x)])
+  bij = tfb.pack_sequence_as(example)
+  bij.forward([1, 2, 3, 4.])
+
+  # Returns
+  # collections.OrderedDict([
+  #     ('a', [1, 2, 3]),
+  #     ('b', 4.)])
+  ```
+
+  """
+  tokens = tf.nest.pack_sequence_as(
+      example, list(range(len(tf.nest.flatten(example)))))
+  return Restructure(output_structure=tokens, name=name)

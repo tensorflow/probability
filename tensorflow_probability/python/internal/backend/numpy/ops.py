@@ -60,7 +60,10 @@ __all__ = [
     'GradientTape',
     'Module',
     'Tensor',
+    'TensorSpec',
+    'TypeSpec',
     'Variable',
+    'VariableSpec',
     # 'gradients',
 ]
 
@@ -86,6 +89,9 @@ class _NullContext(object):
 
 def _broadcast_static_shape(shape_x, shape_y):
   """Reimplements `tf.broadcast_static_shape` in JAX/NumPy."""
+  if (tensor_shape.TensorShape(shape_x).ndims is None or
+      tensor_shape.TensorShape(shape_y).ndims is None):
+    return tensor_shape.TensorShape(None)
   shape_x = tuple(tensor_shape.TensorShape(shape_x).as_list())
   shape_y = tuple(tensor_shape.TensorShape(shape_y).as_list())
   try:
@@ -408,22 +414,17 @@ def _custom_gradient(f):
   if not JAX_MODE:
     # Numpy backend ignores custom gradients, so we do too.
     return lambda *args, **kwargs: f(*args, **kwargs)[0]
-  def f_(*args, **kwargs):
+
+  @jax.custom_gradient
+  @functools.wraps(f)
+  def wrapped(*args, **kwargs):
     value, vjp = f(*args, **kwargs)
     def vjp_(cts_out):
       cts_in = vjp(cts_out)
       if isinstance(cts_in, list):
         cts_in = tuple(cts_in)
-      elif not isinstance(cts_in, tuple):
-        cts_in = (cts_in,)
       return cts_in
     return value, vjp_
-  @jax.custom_transforms
-  @functools.wraps(f)
-  def wrapped(*args, **kwargs):
-    value, _ = f(*args, **kwargs)
-    return value
-  jax.defvjp_all(wrapped, f_)
   return wrapped
 
 custom_gradient = utils.copy_docstring(
@@ -692,6 +693,18 @@ class Tensor(six.with_metaclass(_TensorMeta)):
       '__matmul__',
       '__rmatmul__'
   ))
+
+
+class TensorSpec(object):
+  pass
+
+
+class TypeSpec(object):
+  pass
+
+
+class VariableSpec(object):
+  pass
 
 
 class Module(object):

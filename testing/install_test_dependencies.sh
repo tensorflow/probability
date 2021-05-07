@@ -40,6 +40,9 @@
 # commands, telling pip to install the dependencies in the user install
 # directory.
 
+set -v  # print commands as they are executed
+set -e  # fail and exit on any command erroring
+
 # Get the absolute path to the directory containing this script.
 DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 
@@ -91,7 +94,8 @@ find_good_tf_nightly_version_str() {
   PKG_NAME=$1
   # These are nightly builds we'd like to avoid for some reason; separated by
   # regex OR operator.
-  BAD_NIGHTLY_DATES="20200112\|20200113"
+  BAD_NIGHTLY_DATES="20200112\|20200113\|20210119\|20210219\|20210220\|\
+  20210221\|20210222\|20210224\|20210316"
   # This will fail to find version 'X" and log available version strings to
   # stderr. We then sort, remove bad versions and take the last entry. This
   # allows us to avoid hardcoding the main version number, which would then need
@@ -169,10 +173,6 @@ install_jax() {
 }
 
 install_python_packages() {
-  # Ensure newer than 18.x pip version, which is necessary after tf-nightly
-  # switched to manylinux2010.
-  python -m pip install $PIP_FLAGS --upgrade 'pip>=19.2'
-
   install_tensorflow
   install_jax
 
@@ -183,15 +183,16 @@ install_python_packages() {
   # Install additional TFP dependencies.
   python -m pip install $PIP_FLAGS decorator 'cloudpickle>=1.3' dm-tree
 
-  # Upgrade numpy to the latest to address issues that happen when testing with
-  # Python 3 (https://github.com/tensorflow/tensorflow/issues/16488).
-  python -m pip install -U $PIP_FLAGS numpy
-
   # Print out all versions, as an FYI in the logs.
   python --version
   python -m pip --version
   python -m pip list
 }
+
+# Ensure newer than 18.x pip version, which is necessary after tf-nightly
+# switched to manylinux2010.
+python -m pip install $PIP_FLAGS --upgrade 'pip>=19.2'
+python -m pip install --upgrade setuptools
 
 check_for_common_package_conflicts
 install_python_packages

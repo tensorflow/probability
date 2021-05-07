@@ -23,6 +23,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
@@ -33,7 +34,7 @@ __all__ = [
 
 
 def batched_las_vegas_algorithm(
-    batched_las_vegas_trial_fn, seed=None, name=None):
+    batched_las_vegas_trial_fn, max_trials=None, seed=None, name=None):
   """Batched Las Vegas Algorithm.
 
   This utility encapsulates the notion of a 'batched las_vegas_algorithm'
@@ -48,7 +49,7 @@ def batched_las_vegas_algorithm(
 
   Because we keep running the callable repeatedly until we've generated at least
   one good value for every batch point, we may generate multiple good values for
-  many batch point. In this case, the particular good batch point returned is
+  many batch points. In this case, the particular good batch point returned is
   deliberately left unspecified.
 
   Args:
@@ -56,14 +57,20 @@ def batched_las_vegas_algorithm(
       two values. (1) A structure of Tensors containing the results of the
       computation, all with a shape broadcastable with (2) a boolean mask
       representing whether each batch point succeeded.
+    max_trials: An optional integer Tensor giving an upper bound on
+      the number of calls to `batched_las_vegas_trial_fn`.  If not
+      supplied, no limit is enforced.
     seed: Python integer or `Tensor`, for seeding PRNG.
     name: A name to prepend to created ops.
       Default value: `'batched_las_vegas_algorithm'`.
 
   Returns:
-    results, num_iters: A structure of Tensors representing the results of a
-    successful computation for each batch point, and a scalar int32 tensor, the
-    number of calls to `randomized_computation`.
+    results: A structure of Tensors representing the results of a
+      successful computation for each batch point.
+    successes: A boolean Tensor indicating which batch points succeeded.
+      This will be all `True` if no `max_trials` limit was supplied.
+    num_iters: A scalar int32 tensor, the number of calls to
+      `batched_las_vegas_algorithm`.
 
   #### References
 
@@ -75,8 +82,12 @@ def batched_las_vegas_algorithm(
     values, good_values_mask = batched_las_vegas_trial_fn(init_seed)
     num_iters = tf.constant(1)
 
-    def cond(unused_values, good_values_mask, unused_num_iters, unused_seed):
-      return ~tf.reduce_all(good_values_mask)
+    def cond(unused_values, good_values_mask, num_iters, unused_seed):
+      all_done = tf.reduce_all(good_values_mask)
+      if max_trials is not None:
+        return ~all_done & (num_iters < max_trials)
+      else:
+        return ~all_done
 
     def body(values, good_values_mask, num_iters, seed):
       """Batched Las Vegas Algorithm body."""
@@ -84,17 +95,18 @@ def batched_las_vegas_algorithm(
       trial_seed, new_seed = samplers.split_seed(seed)
       new_values, new_good_values_mask = batched_las_vegas_trial_fn(trial_seed)
 
-      values = tf.nest.map_structure(
-          lambda new, old: tf.where(new_good_values_mask, new, old),
-          new_values, values)
+      def pick(new, old):
+        return bu.where_left_justified_mask(new_good_values_mask, new, old)
+
+      values = tf.nest.map_structure(pick, new_values, values)
 
       good_values_mask = good_values_mask | new_good_values_mask
 
       return values, good_values_mask, num_iters + 1, new_seed
 
-    (values, _, num_iters, _) = tf.while_loop(
+    (values, final_successes, num_iters, _) = tf.while_loop(
         cond, body, (values, good_values_mask, num_iters, loop_seed))
-    return values, num_iters
+    return values, final_successes, num_iters
 
 
 def batched_rejection_sampler(
@@ -178,4 +190,6 @@ def batched_rejection_sampler(
       good_samples_mask |= nans
       return proposed_samples, good_samples_mask
 
-    return batched_las_vegas_algorithm(randomized_computation, seed)
+    samples, _, num_iters = batched_las_vegas_algorithm(
+        randomized_computation, seed=seed)
+    return samples, num_iters

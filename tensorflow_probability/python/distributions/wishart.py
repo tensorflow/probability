@@ -131,6 +131,17 @@ class WishartLinearOperator(distribution.Distribution):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    # pylint: disable=g-long-lambda
+    return dict(
+        df=parameter_properties.ParameterProperties(
+            shape_fn=lambda sample_shape: sample_shape[:-2],
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED),
+        scale=parameter_properties.BatchedComponentProperties())
+    # pylint: enable=g-long-lambda
+
   @property
   def df(self):
     """Wishart distribution degree(s) of freedom."""

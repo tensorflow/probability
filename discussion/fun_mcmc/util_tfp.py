@@ -27,6 +27,7 @@ from typing import Any, Optional, Tuple
 
 tf = backend.tf
 tfp = backend.tfp
+tfb = tfp.bijectors
 util = backend.util
 
 
@@ -64,14 +65,17 @@ def bijector_to_transform_fn(
   Returns:
     transform_fn: The created transformation.
   """
+  bijector_structure = util.get_shallow_tree(
+      lambda b: isinstance(b, tfb.Bijector), bijector)
 
   def transform_fn(bijector, state_structure, *args, **kwargs):
     """Transport map implemented via the bijector."""
     state = fun_mcmc_lib.recover_state_from_args(args, kwargs, state_structure)
 
-    value = util.map_tree_up_to(bijector, lambda b, x: b(x), bijector, state)
+    value = util.map_tree_up_to(bijector_structure, lambda b, x: b(x), bijector,
+                                state)
     ldj_parts = util.map_tree_up_to(
-        bijector,
+        bijector_structure,
         lambda b, x: b.forward_log_det_jacobian(  # pylint: disable=g-long-lambda
             x,
             event_ndims=util.map_tree(lambda x: tf.rank(x) - batch_ndims, x)),
@@ -81,14 +85,15 @@ def bijector_to_transform_fn(
 
     return value, ((), ldj)
 
-  inverse_bijector = util.map_tree(tfp.bijectors.Invert, bijector)
+  inverse_bijector = util.map_tree_up_to(
+      bijector_structure, tfp.bijectors.Invert, bijector)
 
   forward_transform_fn = functools.partial(transform_fn, bijector,
                                            state_structure)
   inverse_transform_fn = functools.partial(
       transform_fn, inverse_bijector,
-      util.map_tree_up_to(bijector, lambda b, s: b.forward_dtype(s), bijector,
-                          state_structure))
+      util.map_tree_up_to(bijector_structure, lambda b, s: b.forward_dtype(s),
+                          bijector, state_structure))
 
   forward_transform_fn.inverse = inverse_transform_fn
   inverse_transform_fn.inverse = forward_transform_fn

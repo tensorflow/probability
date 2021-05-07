@@ -200,6 +200,8 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution):
     """Concentration parameter associated with a `0` outcome."""
     return self._kumaraswamy_cdf.concentration0
 
+  experimental_is_sharded = False
+
   def _entropy(self):
     a = tf.convert_to_tensor(self.concentration1)
     b = tf.convert_to_tensor(self.concentration0)

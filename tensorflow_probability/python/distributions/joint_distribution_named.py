@@ -20,8 +20,6 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.distributions import joint_distribution_sequential
 from tensorflow_probability.python.internal import distribution_util
 
@@ -204,6 +202,8 @@ class JointDistributionNamed(
   def _flat_resolve_names(self, distribution_names=None, leaf_name='x'):
     return self._dist_fn_name
 
+  _composite_tensor_nonshape_params = ('model',)
+
 
 class _Node(object):
 
@@ -264,11 +264,22 @@ def _prob_chain_rule_model_flatten(named_makers):
       return dist_fn(**kwargs)
     return _fn
   named_makers = _convert_to_dict(named_makers)
-  g = tf.nest.map_structure(
-      lambda v: (None if distribution_util.is_distribution_instance(v)  # pylint: disable=g-long-lambda
-                 else joint_distribution_sequential._get_required_args(v)),  # pylint: disable=protected-access
-      named_makers)
-  g = _best_order(g)
+
+  previous_keys = []
+  parents = type(named_makers)()
+  for key, dist_fn in named_makers.items():
+    if distribution_util.is_distribution_instance(dist_fn):
+      parents[key] = None   # pylint: disable=g-long-lambda
+    else:
+      parents[key] = joint_distribution_sequential._get_required_args(  # pylint: disable=protected-access
+          dist_fn,
+          # To ensure an acyclic dependence graph, a dist_fn that takes
+          # `**kwargs` is treated as depending on all distributions that were
+          # defined above it, but not any defined below it.
+          previous_args=previous_keys)
+    previous_keys.append(key)
+
+  g = _best_order(parents)
   dist_fn_name, dist_fn_args = zip(*g)
   dist_fn_args = tuple(None if a is None else tuple(a) for a in dist_fn_args)
   dist_fn_wrapped = tuple(_make(named_makers[name], parents)

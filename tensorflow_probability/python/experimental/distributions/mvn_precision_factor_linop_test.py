@@ -24,6 +24,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
 
@@ -144,6 +145,79 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
         arrs['sample_cov'],
         arrs['cov'],
         atol=5 * np.sqrt(2) * np.max(arrs['var']) / np.sqrt(n_samples))
+
+  def test_dynamic_shape(self):
+    x = tf.Variable(ps.ones([7, 3]), shape=[7, None])
+    self.evaluate(x.initializer)
+
+    # Check that the shape is actually `None`.
+    if not tf.executing_eagerly():
+      last_shape = x.shape[-1]
+      if last_shape is not None:  # This is a `tf.Dimension` in tf1.
+        last_shape = last_shape.value
+      self.assertIsNone(last_shape)
+    dynamic_dist = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+        precision_factor=tf.linalg.LinearOperatorDiag(tf.ones_like(x)))
+    static_dist = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+        precision_factor=tf.linalg.LinearOperatorDiag(tf.ones([7, 3])))
+    in_ = tf.zeros([7, 3])
+    self.assertAllClose(self.evaluate(dynamic_dist.log_prob(in_)),
+                        static_dist.log_prob(in_))
+
+  @test_combinations.generate(
+      test_combinations.combine(
+          batch_shape=[(), (2,)],
+          dtype=[np.float32, np.float64],
+      ),
+  )
+  def test_mean_and_mode(self, batch_shape, dtype):
+    event_size = 3
+    cov = self._random_constant_spd_linop(
+        event_size, batch_shape=batch_shape, dtype=dtype)
+    precision_factor = cov.inverse().cholesky()
+
+    # Make sure to evaluate here, else you'll have a random loc vector!
+    loc = self.evaluate(
+        tf.random.normal(
+            batch_shape + (event_size,),
+            dtype=dtype,
+            seed=test_util.test_seed()))
+
+    mvn_precision = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+        loc=loc,
+        precision_factor=precision_factor)
+    self.assertAllClose(mvn_precision.mean(), loc)
+    self.assertAllClose(mvn_precision.mode(), loc)
+
+  @test_combinations.generate(
+      test_combinations.combine(
+          batch_shape=[(), (2,)],
+          use_precision=[True, False],
+          dtype=[np.float32, np.float64],
+      ),
+  )
+  def test_cov_var_stddev(self, batch_shape, use_precision, dtype):
+    event_size = 3
+    cov = self._random_constant_spd_linop(
+        event_size, batch_shape=batch_shape, dtype=dtype)
+    precision = cov.inverse()
+    precision_factor = precision.cholesky()
+
+    # Make sure to evaluate here, else you'll have a random loc vector!
+    loc = self.evaluate(
+        tf.random.normal(
+            batch_shape + (event_size,),
+            dtype=dtype,
+            seed=test_util.test_seed()))
+
+    mvn_precision = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+        loc=loc,
+        precision_factor=precision_factor,
+        precision=precision if use_precision else None)
+    self.assertAllClose(mvn_precision.covariance(), cov.to_dense(), atol=1e-4)
+    self.assertAllClose(mvn_precision.variance(), cov.diag_part(), atol=1e-4)
+    self.assertAllClose(mvn_precision.stddev(), tf.sqrt(cov.diag_part()),
+                        atol=1e-5)
 
 
 if __name__ == '__main__':

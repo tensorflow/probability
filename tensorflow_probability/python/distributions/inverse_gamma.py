@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import reciprocal as reciprocal_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
@@ -225,6 +226,10 @@ class InverseGamma(distribution.Distribution):
     # Note that igammac returns the upper regularized incomplete gamma
     # function Q(a, x), which is what we want for the CDF.
     return tf.math.igammac(self.concentration, self.scale / x)
+
+  def _quantile(self, p):
+    return tf.math.reciprocal(
+        tfp_math.igammacinv(self.concentration, p)) * self.scale
 
   def _entropy(self):
     concentration = tf.convert_to_tensor(self.concentration)

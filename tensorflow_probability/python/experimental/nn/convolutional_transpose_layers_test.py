@@ -67,9 +67,9 @@ class BnnEndToEnd(object):
                     padding='valid'),                        # [b, 7, 7, 64]
         make_deconv(64, 32, filter_shape=4, strides=4),      # [2, 28, 28, 32]
         make_conv(32, 1, filter_shape=2, strides=1),         # [2, 28, 28, 1]
-        tfn.Lambda(eval_fn=lambda loc: tfd.Independent(  # pylint: disable=g-long-lambda
+        lambda loc: tfd.Independent(  # pylint: disable=g-long-lambda
             tfb.Sigmoid()(tfd.Normal(loc, scale)),
-            reinterpreted_batch_ndims=3), also_track=scale),  # [b, 28, 28, 1]
+            reinterpreted_batch_ndims=3)  # [b, 28, 28, 1]
     ], name='bayesian_autoencoder')
 
     # 3  Train.
@@ -77,7 +77,7 @@ class BnnEndToEnd(object):
     def loss_fn():
       x = next(train_iter)
       nll = -tf.reduce_mean(bnn(x).log_prob(x), axis=-1)
-      kl = bnn.extra_loss / tf.cast(train_size, tf.float32)
+      kl = tfn.losses.compute_extra_loss(bnn) / tf.cast(train_size, tf.float32)
       loss = nll + kl
       return loss, (nll, kl)
     opt = tf.optimizers.Adam()
@@ -105,14 +105,14 @@ class ConvolutionTransposeVariationalReparameterizationTest(
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     make_deconv = functools.partial(
         tfn.ConvolutionTransposeVariationalReparameterization,
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv, make_deconv)
 
@@ -129,14 +129,14 @@ class ConvolutionTransposeVariationalFlipoutTest(
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     make_deconv = functools.partial(
         tfn.ConvolutionTransposeVariationalFlipout,
         rank=2,
         padding='same',
         filter_shape=5,
-        init_kernel_fn=tfn.initializers.he_uniform(),
+        kernel_initializer=tfn.initializers.he_uniform(),
         activation_fn=tf.nn.elu)
     self.run_bnn_test(make_conv, make_deconv)
 

@@ -24,8 +24,10 @@ package(
 
 FILENAMES = [
     "__init__",
+    "__internal__",
     "bitwise",
     "compat",
+    "composite_tensor",
     "config",
     "control_flow",
     "debugging",
@@ -40,6 +42,7 @@ FILENAMES = [
     "linalg_impl",
     "misc",
     "nest",
+    "nested_structure_coder",
     "nn",
     "numpy_array",
     "numpy_logging",
@@ -56,6 +59,7 @@ FILENAMES = [
     "tensor_array_ops_test",
     "test_lib",
     "tf_inspect",
+    "type_spec",
     "v1",
     "v2",
     "_utils",

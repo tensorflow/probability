@@ -25,14 +25,17 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 
 __all__ = [
-    "Square",
+    'Square',
 ]
 
 
-class Square(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Square(bijector.AutoCompositeTensorBijector):
   """Compute `g(X) = X^2`; X is a positive real number.
 
   g is a bijection between the non-negative real numbers (R_+) and the
@@ -50,7 +53,7 @@ class Square(bijector.Bijector):
 
   """
 
-  def __init__(self, validate_args=False, name="square"):
+  def __init__(self, validate_args=False, name='square'):
     """Instantiates the `Square` bijector.
 
     Args:
@@ -90,4 +93,4 @@ class Square(bijector.Bijector):
     if not self.validate_args:
       return []
     return [assert_util.assert_non_negative(
-        t, message="All elements must be non-negative.")]
+        t, message='All elements must be non-negative.')]

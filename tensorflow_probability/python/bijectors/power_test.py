@@ -83,10 +83,37 @@ class RaiseBijectorTest(test_util.TestCase):
         b_other.inverse_log_det_jacobian(y, event_ndims=0)))
     self.assertAllClose(ildj, ildj_other)
 
+  def testPowerOddInteger(self):
+    power = np.array([3., -5., 5., -7.]).reshape((4, 1))
+    bijector = tfb.Power(power=power, validate_args=True)
+    self.assertStartsWith(bijector.name, 'power')
+    x = np.linspace(-10., 10., 20)
+    y = np.power(x, power)
+    ildj = -np.log(np.abs(power)) - (power - 1.) * np.log(np.abs(x))
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x * np.ones((4, 1)), self.evaluate(bijector.inverse(y)))
+    self.assertAllClose(
+        ildj,
+        self.evaluate(bijector.inverse_log_det_jacobian(
+            y, event_ndims=0)), atol=0., rtol=1e-6)
+    self.assertAllClose(
+        self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=0)),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=0)),
+        atol=0.,
+        rtol=1e-7)
+
   def testZeroPowerRaisesError(self):
     with self.assertRaisesRegexp(Exception, 'must be non-zero'):
       b = tfb.Power(power=0., validate_args=True)
       b.forward(1.)
+
+  def testPowerNegativeInputRaisesError(self):
+    with self.assertRaisesOpError('must be non-negative'):
+      b = tfb.Power(power=2.5, validate_args=True)
+      self.evaluate(b.inverse(-1.))
+
+    b = tfb.Power(power=3., validate_args=True)
+    self.evaluate(b.inverse(-1.))
 
 if __name__ == '__main__':
   tf.test.main()

@@ -133,7 +133,7 @@ class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
     transformations.
     """
     num_counties = 85
-    model = self.build_model()
+    model = self.build_model(dtype=tf.float32)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -150,6 +150,7 @@ class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
         check_ground_truth_mean=True,
         check_ground_truth_standard_deviation=True,
     )
+    self.assertSameElements(tf.nest.flatten(model.dtype), [tf.float32])
 
   @test_util.uses_tfds
   @tfp_test_util.numpy_disable_gradient_test
@@ -162,7 +163,9 @@ class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
         num_steps=4000,
         num_leapfrog_steps=15,
         step_size=0.03,
-        dtype=tf.float64)
+        dtype=tf.float64,
+        standard_deviation_fudge_atol=1e-4)
+    self.assertSameElements(tf.nest.flatten(model.dtype), [tf.float64])
 
 
 @test_util.multi_backend_test(globals(),

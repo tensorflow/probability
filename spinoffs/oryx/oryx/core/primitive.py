@@ -83,7 +83,8 @@ class HigherOrderPrimitive(jax_core.Primitive):
 
   def impl(self, f, *args, **params):
     del params
-    return f.call_wrapped(*args)
+    with jax_core.new_sublevel():
+      return f.call_wrapped(*args)
 
   def bind(self, f, *args, **params):
     top_trace = jax_core.find_top_trace(args)
@@ -139,6 +140,19 @@ def hop_translation_rule(prim):
 register_hop_transformation_rule('translation', hop_translation_rule)
 
 
+def batch_fun(fun: lu.WrappedFun, in_dims):
+  fun, out_dims = batching.batch_subtrace(fun)
+  return _batch_fun(fun, in_dims), out_dims
+
+
+@lu.transformation
+def _batch_fun(in_dims, *in_vals, **params):
+  with jax_core.new_main(batching.BatchTrace, axis_name=None) as main:
+    out_vals = yield (main, in_dims,) + in_vals, params
+    del main
+  yield out_vals
+
+
 class FlatPrimitive(jax_core.Primitive):
   """Contains default implementations of transformations."""
 
@@ -156,8 +170,7 @@ class FlatPrimitive(jax_core.Primitive):
     ad.primitive_jvps[self] = _jvp
 
     def _batch(args, dims, **params):
-      batched, out_dims = batching.batch_fun2(lu.wrap_init(self.impl, params),
-                                              dims)
+      batched, out_dims = batch_fun(lu.wrap_init(self.impl, params), dims)
       return batched.call_wrapped(*args), out_dims()
     batching.primitive_batchers[self] = _batch
 

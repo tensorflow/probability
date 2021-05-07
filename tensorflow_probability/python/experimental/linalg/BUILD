@@ -31,6 +31,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":linear_operator_psd_kernel",
+        ":no_pivot_ldl",
         "//tensorflow_probability/python/internal:all_util",
     ],
 )
@@ -60,5 +61,27 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+py_library(
+    name = "no_pivot_ldl",
+    srcs = ["no_pivot_ldl.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+py_test(
+    name = "no_pivot_ldl_test",
+    srcs = ["no_pivot_ldl_test.py"],
+    python_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/linalg:no_pivot_ldl",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

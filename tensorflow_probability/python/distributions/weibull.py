@@ -83,7 +83,7 @@ class Weibull(transformed_distribution.TransformedDistribution):
   Example of initialization of a 3-batch of distributions with varying scales
   and concentrations.
 
-    ```python
+  ```python
   tfd = tfp.distributions
 
   # Define a 3-batch of Weibull distributions.
@@ -172,6 +172,8 @@ class Weibull(transformed_distribution.TransformedDistribution):
   def scale(self):
     """Distribution parameter for scale."""
     return self._weibull_bijector.scale
+
+  experimental_is_sharded = False
 
   def _entropy(self):
     one = tf.constant(1., dtype=self.dtype)

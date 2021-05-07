@@ -14,8 +14,6 @@
 # ============================================================================
 name: Tests
 on: [push, pull_request]
-env:
-  TEST_VENV_PATH: ~/test_virtualenv
 jobs:
   lints:
     name: Lints
@@ -32,13 +30,8 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Setup virtualenv
-        run: |
-          sudo apt install virtualenv
-          virtualenv -p python${{ matrix.python-version }} ${TEST_VENV_PATH}
       - name: Lints
         run: |
-          source ${TEST_VENV_PATH}/bin/activate
           ./testing/run_github_lints.sh
   tests:
     name: Tests
@@ -48,7 +41,6 @@ jobs:
         python-version: [3.7]
         shard: [0, 1, 2, 3, 4]
     env:
-      TEST_VENV_PATH: ~/test_virtualenv
       SHARD: ${{ matrix.shard }}
       NUM_SHARDS: 5
     steps:
@@ -60,11 +52,12 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Setup virtualenv
-        run: |
-          sudo apt install virtualenv
-          virtualenv -p python${{ matrix.python-version }} ${TEST_VENV_PATH}
       - name: Tests
         run: |
-          source ${TEST_VENV_PATH}/bin/activate
           ./testing/run_github_tests.sh
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v1
+        with:
+            name: testlogs-${{ matrix.shard }}
+            path: bazel-testlogs

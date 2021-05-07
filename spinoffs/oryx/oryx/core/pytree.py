@@ -30,7 +30,8 @@ class Pytree(metaclass=abc.ABCMeta):
     tree_util.register_pytree_node(
         cls,
         cls.flatten,
-        cls.unflatten
+        # Pytype incorrectly thinks that cls.unflatten accepts three arguments.
+        cls.unflatten  # type: ignore
     )
 
   @abc.abstractmethod

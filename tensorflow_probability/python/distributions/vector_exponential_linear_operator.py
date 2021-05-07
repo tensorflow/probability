@@ -121,8 +121,8 @@ class VectorExponentialLinearOperator(
   vex = tfd.VectorExponentialLinearOperator(
       scale=tf.linalg.LinearOperatorFullMatrix(mat))
 
-  # Compute the pdf of an`R^2` observation; return a scalar.
-  vex.prob([1., 2.]).eval()  # shape: []
+  # Compute the pdf of an `R^2` observation; return a scalar.
+  vex.prob([1., 2.])  # shape: []
 
   # Initialize a 2-batch of 3-variate Vector Exponential's.
   mu = [[1., 2, 3],
@@ -137,7 +137,7 @@ class VectorExponentialLinearOperator(
   # Compute the pdf of two `R^3` observations; return a length-2 vector.
   x = [[1.9, 2.2, 3.1],
        [10., 1.0, 9.0]]     # shape: [2, 3]
-  vex.prob(x).eval()    # shape: [2]
+  vex.prob(x)    # shape: [2]
   ```
 
   """
@@ -225,6 +225,8 @@ class VectorExponentialLinearOperator(
     """The `scale` `LinearOperator` in `Y = scale @ X + loc`."""
     return self._scale
 
+  experimental_is_sharded = False
+
   @distribution_util.AppendDocstring(_mvn_sample_note)
   def _log_prob(self, x):
     return super(VectorExponentialLinearOperator, self)._log_prob(x)
@@ -255,31 +257,34 @@ class VectorExponentialLinearOperator(
     # and then since Cov(wi, wj) = 1 if i=j, and 0 otherwise,
     #   Cov(X) = L Cov(W W^T) L^T = L L^T.
     if distribution_util.is_diagonal_scale(self.scale):
-      return tf.linalg.diag(tf.square(self.scale.diag_part()))
+      answer = tf.linalg.diag(tf.square(self.scale.diag_part()))
     else:
-      return self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)
+      answer = self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)
+    return self._broadcast_covariance_like_with_loc(answer)
 
   def _variance(self):
     if distribution_util.is_diagonal_scale(self.scale):
-      return tf.square(self.scale.diag_part())
+      answer = tf.square(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense()))
+      answer = tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense()))
     else:
-      return tf.linalg.diag_part(
+      answer = tf.linalg.diag_part(
           self.scale.matmul(self.scale.to_dense(), adjoint_arg=True))
+    return self._broadcast_variance_like_with_loc(answer)
 
   def _stddev(self):
     if distribution_util.is_diagonal_scale(self.scale):
-      return tf.abs(self.scale.diag_part())
+      answer = tf.abs(self.scale.diag_part())
     elif (isinstance(self.scale, tf.linalg.LinearOperatorLowRankUpdate) and
           self.scale.is_self_adjoint):
-      return tf.sqrt(
+      answer = tf.sqrt(
           tf.linalg.diag_part(self.scale.matmul(self.scale.to_dense())))
     else:
-      return tf.sqrt(
+      answer = tf.sqrt(
           tf.linalg.diag_part(
               self.scale.matmul(self.scale.to_dense(), adjoint_arg=True)))
+    return self._broadcast_variance_like_with_loc(answer)
 
   def _mode(self):
     scale_x_zeros = self.scale.matvec(
@@ -318,3 +323,20 @@ class VectorExponentialLinearOperator(
             scale=self.scale, validate_args=self.validate_args),
         softplus_bijector.Softplus(validate_args=self.validate_args)
     ], validate_args=self.validate_args)
+
+  def _broadcast_variance_like_with_loc(self, item):
+    if self.loc is None:
+      return item
+    return item + tf.zeros_like(self.loc)
+
+  def _broadcast_covariance_like_with_loc(self, item):
+    if self.loc is None:
+      return item
+    if tensorshape_util.rank(self.loc.shape) == 0:
+      # Scalar loc is irrelevant; but this check only works if that's
+      # known statically.
+      return item
+    event_shape = self.event_shape_tensor()
+    cov_shape = tf.concat(
+        [self.batch_shape_tensor(), event_shape, event_shape], axis=0)
+    return tf.broadcast_to(item, cov_shape)

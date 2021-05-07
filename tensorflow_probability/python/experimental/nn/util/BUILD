@@ -24,18 +24,6 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "util",
-    srcs = ["__init__.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":convolution_util",
-        ":random_variable",
-        ":utils",
-        "//tensorflow_probability/python/internal:all_util",
-    ],
-)
-
-py_library(
     name = "convolution_util",
     srcs = ["convolution_util.py"],
     srcs_version = "PY3",
@@ -63,6 +51,53 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "kernel_bias",
+    srcs = ["kernel_bias.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:shift",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
+        "//tensorflow_probability/python/distributions:mixture_same_family",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/experimental/nn/initializers:initializers_lib",
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+py_test(
+    name = "kernel_bias_test",
+    size = "small",
+    srcs = ["kernel_bias_test.py"],
+    python_version = "PY3",
+    shard_count = 4,
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "util",
+    srcs = ["__init__.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":convolution_util",
+        ":kernel_bias",
+        ":random_variable",
+        ":utils",
+        "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
@@ -97,23 +132,10 @@ py_library(
     srcs = ["utils.py"],
     srcs_version = "PY3",
     deps = [
-        # matplotlib dep,
         # numpy dep,
-        # six dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:chain",
-        "//tensorflow_probability/python/bijectors:shift",
-        "//tensorflow_probability/python/bijectors:softplus",
-        "//tensorflow_probability/python/distributions:categorical",
-        "//tensorflow_probability/python/distributions:independent",
-        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
-        "//tensorflow_probability/python/distributions:mixture_same_family",
-        "//tensorflow_probability/python/distributions:normal",
-        "//tensorflow_probability/python/distributions:sample",
-        "//tensorflow_probability/python/experimental/nn/initializers:initializers_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )

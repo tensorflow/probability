@@ -662,6 +662,22 @@ class TfFunctionTest(test_util.TestCase):
     tf.function(
         lambda: adaptive_kernel.one_step(init, extra, seed=seed_stream()))()
 
+  @parameterized.named_parameters(
+      dict(testcase_name='_nuts', preconditioned=False),
+      dict(testcase_name='_pnuts', preconditioned=True))
+  def test_nuts_f64(self, preconditioned):
+    target_log_prob_fn = lambda x: -x**2
+    if preconditioned:
+      nuts_kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler
+    else:
+      nuts_kernel = tfp.mcmc.NoUTurnSampler
+    kernel = nuts_kernel(target_log_prob_fn, step_size=1.)
+    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(kernel,
+                                                      num_adaptation_steps=50)
+    init = tf.constant(0., dtype=tf.float64)
+    extra = kernel.bootstrap_results(init)
+    seed_stream = test_util.test_seed_stream()
+    tf.function(lambda: kernel.one_step(init, extra, seed=seed_stream()))()
 
 if __name__ == '__main__':
   tf.test.main()
