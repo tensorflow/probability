@@ -25,21 +25,20 @@ import inspect
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.experimental.bijectors import \
-  build_highway_flow_layer
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import reshape
 from tensorflow_probability.python.bijectors import scale as scale_lib
 from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.bijectors import split
-
 from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import blockwise
 from tensorflow_probability.python.distributions import chi2
+from tensorflow_probability.python.distributions import deterministic
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import \
   joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import \
@@ -49,10 +48,12 @@ from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import truncated_normal
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.experimental.bijectors import \
+  build_highway_flow_layer
 from tensorflow_probability.python.internal import samplers
 
 __all__ = [
-  'register_asvi_substitution_rule',
+  'register_cf_substitution_rule',
   'build_cf_surrogate_posterior'
 ]
 
@@ -83,7 +84,7 @@ def _as_substituted_distribution(distribution):
 
 
 # Todo: inherited from asvi code, do we need this?
-def register_asvi_substitution_rule(condition, substitution_fn):
+def register_cf_substitution_rule(condition, substitution_fn):
   """Registers a rule for substituting distributions in ASVI surrogates.
 
   Args:
@@ -132,20 +133,20 @@ def register_asvi_substitution_rule(condition, substitution_fn):
 # Default substitutions attempt to express distributions using the most
 # flexible available parameterization.
 # pylint: disable=g-long-lambda
-register_asvi_substitution_rule(
+register_cf_substitution_rule(
   half_normal.HalfNormal,
   lambda dist: truncated_normal.TruncatedNormal(
     loc=0., scale=dist.scale, low=0., high=dist.scale * 10.))
-register_asvi_substitution_rule(
+register_cf_substitution_rule(
   uniform.Uniform,
   lambda dist: shift.Shift(dist.low)(
     scale_lib.Scale(dist.high - dist.low)(
       beta.Beta(concentration0=tf.ones_like(dist.mean()),
                 concentration1=1.))))
-register_asvi_substitution_rule(
+register_cf_substitution_rule(
   exponential.Exponential,
   lambda dist: gamma.Gamma(concentration=1., rate=dist.rate))
-register_asvi_substitution_rule(
+register_cf_substitution_rule(
   chi2.Chi2,
   lambda dist: gamma.Gamma(concentration=0.5 * dist.df, rate=0.5))
 
@@ -255,6 +256,7 @@ def build_cf_surrogate_posterior(
         _cf_convex_update_for_base_distribution,
         initial_prior_weight=initial_prior_weight,
         num_auxiliary_variables=num_auxiliary_variables),
+      num_auxiliary_variables=num_auxiliary_variables,
       seed=seed)
     surrogate_posterior.also_track = variables
     return surrogate_posterior
@@ -264,6 +266,8 @@ def _cf_surrogate_for_distribution(dist,
                                    base_distribution_surrogate_fn,
                                    sample_shape=None,
                                    variables=None,
+                                   num_auxiliary_variables=0,
+                                   global_auxiliary_variables=None,
                                    seed=None):
   # todo: change docstrings
   """Recursively creates ASVI surrogates, and creates new variables if needed.
@@ -303,15 +307,19 @@ def _cf_surrogate_for_distribution(dist,
       dist,
       base_distribution_surrogate_fn=base_distribution_surrogate_fn,
       variables=variables,
+      num_auxiliary_variables=num_auxiliary_variables,
+      global_auxiliary_variables=global_auxiliary_variables,
       seed=seed)
   else:
     surrogate_posterior, variables = base_distribution_surrogate_fn(
-      dist=dist, sample_shape=sample_shape, variables=variables, seed=seed)
+      dist=dist, sample_shape=sample_shape, variables=variables,
+      global_auxiliary_variables=global_auxiliary_variables, seed=seed)
   return surrogate_posterior, variables
 
 
 def _cf_surrogate_for_joint_distribution(
-    dist, base_distribution_surrogate_fn, variables=None, seed=None):
+    dist, base_distribution_surrogate_fn, variables=None,
+    num_auxiliary_variables=0, global_auxiliary_variables=None, seed=None):
   """Builds a structured joint surrogate posterior for a joint model."""
 
   # Probabilistic program for CF surrogate posterior.
@@ -322,7 +330,46 @@ def _cf_surrogate_for_joint_distribution(
   def posterior_generator(seed=seed):
     prior_gen = prior_coroutine()
     dist = next(prior_gen)
-    i = 0
+
+    if num_auxiliary_variables > 0:
+      i = 1
+
+      if flat_variables:
+        variables = flat_variables[0]
+
+      else:
+        layers = 3
+        bijectors = []
+
+        for _ in range(0, layers - 1):
+          bijectors.append(
+            build_highway_flow_layer(num_auxiliary_variables,
+                                     residual_fraction_initial_value=0.5,
+                                     activation_fn=True, gate_first_n=0,
+                                     seed=seed))
+        bijectors.append(
+          build_highway_flow_layer(num_auxiliary_variables,
+                                   residual_fraction_initial_value=0.5,
+                                   activation_fn=False, gate_first_n=0,
+                                   seed=seed))
+
+        variables = chain.Chain(bijectors=list(reversed(bijectors)))
+
+      eps = transformed_distribution.TransformedDistribution(
+        distribution=sample.Sample(normal.Normal(0., 0.1),
+                                   num_auxiliary_variables),
+        bijector=variables)
+
+      eps = Root(eps)
+
+      value_out = yield (eps if flat_variables
+                         else (eps, variables))
+
+      global_auxiliary_variables = value_out
+
+    else:
+      i = 0
+
     try:
       while True:
         was_root = isinstance(dist, Root)
@@ -334,9 +381,10 @@ def _cf_surrogate_for_joint_distribution(
           dist,
           base_distribution_surrogate_fn=base_distribution_surrogate_fn,
           variables=flat_variables[i] if flat_variables else None,
+          global_auxiliary_variables=global_auxiliary_variables,
           seed=init_seed)
 
-        if was_root:
+        if was_root and num_auxiliary_variables == 0:
           surrogate_posterior = Root(surrogate_posterior)
         # If variables were not given---i.e., we're creating new
         # variables---then yield the new variables along with the surrogate
@@ -367,6 +415,8 @@ def _cf_surrogate_for_joint_distribution(
     return _cf_surrogate_for_joint_distribution(
       dist=dist,
       base_distribution_surrogate_fn=base_distribution_surrogate_fn,
+      num_auxiliary_variables=num_auxiliary_variables,
+      global_auxiliary_variables=global_auxiliary_variables,
       variables=dist._model_unflatten(  # pylint: disable=protected-access
         _extract_variables_from_coroutine_model(
           posterior_generator, seed=seed)))
@@ -401,6 +451,7 @@ def _cf_surrogate_for_joint_distribution(
 def _cf_convex_update_for_base_distribution(dist,
                                             initial_prior_weight,
                                             num_auxiliary_variables=0,
+                                            global_auxiliary_variables=None,
                                             sample_shape=None,
                                             variables=None,
                                             seed=None):
@@ -412,31 +463,39 @@ def _cf_convex_update_for_base_distribution(dist,
       actual_event_shape.shape.as_list()[0] > 0 else 1
     layers = 3
     bijectors = [reshape.Reshape([-1],
-                             event_shape_in=actual_event_shape +
-                                            num_auxiliary_variables)]
+                                 event_shape_in=actual_event_shape +
+                                                num_auxiliary_variables)]
 
     for _ in range(0, layers - 1):
       bijectors.append(
         build_highway_flow_layer(
           tf.reduce_prod(actual_event_shape + num_auxiliary_variables),
           residual_fraction_initial_value=initial_prior_weight,
-          activation_fn=True, gate_first_n=int_event_shape))
+          activation_fn=True, gate_first_n=int_event_shape, seed=seed))
     bijectors.append(
       build_highway_flow_layer(
         tf.reduce_prod(actual_event_shape + num_auxiliary_variables),
         residual_fraction_initial_value=initial_prior_weight,
-        activation_fn=False, gate_first_n=int_event_shape))
-    bijectors.append(reshape.Reshape(actual_event_shape + num_auxiliary_variables))
+        activation_fn=False, gate_first_n=int_event_shape, seed=seed))
+    bijectors.append(
+      reshape.Reshape(actual_event_shape + num_auxiliary_variables))
 
     variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
   if num_auxiliary_variables > 0:
+    batch_shape = global_auxiliary_variables.shape[0] if len(
+      global_auxiliary_variables.shape) > 1 else []
+
     cascading_flows = split.Split(
       [-1, num_auxiliary_variables])(
       transformed_distribution.TransformedDistribution(
-        distribution=blockwise.Blockwise([dist, batch_broadcast.BatchBroadcast(
-          sample.Sample(normal.Normal(0., .1), num_auxiliary_variables),
-          to_shape=dist.batch_shape)]),
+        distribution=blockwise.Blockwise([
+          batch_broadcast.BatchBroadcast(dist,
+                                         to_shape=batch_shape),
+          independent.Independent(
+            deterministic.Deterministic(
+              global_auxiliary_variables),
+            reinterpreted_batch_ndims=1)]),
         bijector=variables))
 
   else:
