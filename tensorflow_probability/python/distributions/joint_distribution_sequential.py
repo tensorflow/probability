@@ -24,12 +24,9 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
-from tensorflow_probability.python.distributions import joint_distribution_coroutine
 
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import samplers
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -217,7 +214,6 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
           None if a else d() for d, a
           in zip(self._dist_fn_wrapped, self._dist_fn_args)])
 
-      self._always_use_specified_sample_shape = False
       super(JointDistributionSequential, self).__init__(
           dtype=None,  # Ignored; we'll override.
           reparameterization_type=None,  # Ignored; we'll override.
@@ -247,48 +243,9 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     for dist_fn, args in zip(self._dist_fn_wrapped, self._dist_fn_args):
       dist = dist_fn(*xs)
       if not args:
-        dist = joint_distribution_coroutine.JointDistributionCoroutine.Root(
-            dist)
+        dist = self.Root(dist)
       x = yield dist
       xs.append(x)
-
-  def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
-    # This function additionally depends on:
-    #   self._dist_fn_wrapped
-    #   self._dist_fn_args
-    #   self._always_use_specified_sample_shape
-    num_dists = len(self._dist_fn_wrapped)
-    # Ensures reproducibility even when xs are (partially) set.
-    seeds = samplers.split_seed(seed, n=num_dists,
-                                salt='JointDistributionSequential')
-    ds = []
-    xs = [None] * num_dists if value is None else list(value)
-    if len(xs) != num_dists:
-      raise ValueError('Number of `xs`s must match number of '
-                       'distributions.')
-    for i, (dist_fn, args) in enumerate(zip(self._dist_fn_wrapped,
-                                            self._dist_fn_args)):
-      ds.append(dist_fn(*xs[:i]))  # Chain rule of probability.
-
-      if xs[i] is None:
-        # TODO(b/129364796): We should ignore args prefixed with `_`; this
-        # would mean we more often identify when to use `sample_shape=()`
-        # rather than `sample_shape=sample_shape`.
-        xs[i] = ds[-1].sample(
-            () if args and not self._always_use_specified_sample_shape
-            else sample_shape, seed=seeds[i])
-      else:
-        # This signature does not allow kwarg names. Applies
-        # `convert_to_tensor` on the next value.
-        xs[i] = nest.map_structure_up_to(
-            ds[-1].dtype,  # shallow_tree
-            lambda x, dtype: tf.convert_to_tensor(x, dtype_hint=dtype),  # func
-            xs[i],  # x
-            ds[-1].dtype)  # dtype
-    # Note: we could also resolve distributions up to the first non-`None` in
-    # `self._model_flatten(value)`, however we omit this feature for simplicity,
-    # speed, and because it has not yet been requested.
-    return ds, xs
 
   def _model_unflatten(self, xs):
     try:
@@ -308,15 +265,6 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
           'Unable to flatten like `model` with type "{}". '
           'Exception: {}'.format(type(self.model).__name__, e))
     return xs + (None,)*(len(self._dist_fn_args) - len(xs))
-
-  def _call_attr(self, attr):
-    if any(self._dist_fn_args):
-      # Const seed for maybe CSE.
-      ds, _ = self._flat_sample_distributions(
-          seed=samplers.zeros_seed())
-    else:
-      ds = tuple(d() for d in self._dist_fn_wrapped)
-    return (getattr(d, attr)() for d in ds)
 
   def resolve_graph(self, distribution_names=None, leaf_name='x'):
     """Creates a `tuple` of `tuple`s of dependencies.

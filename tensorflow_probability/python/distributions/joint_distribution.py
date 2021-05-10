@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import abc
 import collections
+import itertools
+import warnings
 import numpy as np
 import six
 
@@ -35,6 +37,9 @@ from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.util.seed_stream import SeedStream
+from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
+
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -146,11 +151,8 @@ class JointDistribution(distribution_lib.Distribution):
 
   Subclasses implement:
 
-  - `_flat_sample_distributions`: returns two `list`-likes: the first being a
-    sequence of `Distribution`-like instances the second being a sequence of
-    `Tensor` samples, each one drawn from its corresponding `Distribution`-like
-    instance. The optional `value` argument is either `None` or a `list`-like
-    with the same `len` as either of the results.
+  - `_model_coroutine`: A generator that yields a sequence of
+    `tfd.Distribution`-like instances.
 
   - `_model_flatten`: takes a structured input and returns a sequence.
 
@@ -163,6 +165,18 @@ class JointDistribution(distribution_lib.Distribution):
       mapping from graph id to a prototypical list of component distributions
       sampled from the model.
   """
+
+  class Root(collections.namedtuple('Root', ['distribution'])):
+    """Wrapper for coroutine distributions which lack distribution parents."""
+    __slots__ = ()
+
+  # TODO(b/166658748): Once the bug is resolved, we should be able to eliminate
+  #   this workaround that disables sanitize_seed for JD*AB.
+  _stateful_to_stateless = True
+
+  @property
+  def _require_root(self):
+    return True
 
   def _get_single_sample_distributions(self, candidate_dists=None):
     """Returns a list of dists from a single sample of the model."""
@@ -190,10 +204,6 @@ class JointDistribution(distribution_lib.Distribution):
   def _flatten(self, *args, **kwargs):
     self._get_single_sample_distributions()
     return super(JointDistribution, self)._flatten(*args, **kwargs)
-
-  @abc.abstractmethod
-  def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
-    raise NotImplementedError()
 
   @abc.abstractmethod
   def _model_unflatten(self, xs):
@@ -576,6 +586,148 @@ class JointDistribution(distribution_lib.Distribution):
           value=self._resolve_value(value=value,
                                     allow_partially_specified=True,
                                     **kwargs))
+
+  def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
+    """Executes `model`, creating both samples and distributions."""
+    ds = []
+    values_out = []
+    if samplers.is_stateful_seed(seed):
+      seed_stream = SeedStream(seed, salt='JointDistribution')
+      if not self._stateful_to_stateless:
+        seed = None
+    else:
+      seed_stream = None  # We got a stateless seed for seed=.
+
+    # TODO(b/166658748): Make _stateful_to_stateless always True (eliminate it).
+    if self._stateful_to_stateless and (seed is not None or not JAX_MODE):
+      seed = samplers.sanitize_seed(seed, salt='JointDistribution')
+    gen = self._model_coroutine()
+    index = 0
+    d = next(gen)
+    if self._require_root and not isinstance(d, self.Root):
+      raise ValueError('First distribution yielded by coroutine must '
+                       'be wrapped in `Root`.')
+    try:
+      while True:
+        actual_distribution = d.distribution if isinstance(d, self.Root) else d
+        ds.append(actual_distribution)
+        # Ensure reproducibility even when xs are (partially) set. Always split.
+        stateful_sample_seed = None if seed_stream is None else seed_stream()
+        if seed is None:
+          stateless_sample_seed = None
+        else:
+          stateless_sample_seed, seed = samplers.split_seed(seed)
+
+        if (value is not None and len(value) > index and
+            value[index] is not None):
+
+          def convert_tree_to_tensor(x, dtype_hint):
+            return tf.convert_to_tensor(x, dtype_hint=dtype_hint)
+
+          # This signature does not allow kwarg names. Applies
+          # `convert_to_tensor` on the next value.
+          next_value = nest.map_structure_up_to(
+              ds[-1].dtype,  # shallow_tree
+              convert_tree_to_tensor,  # func
+              value[index],  # x
+              ds[-1].dtype)  # dtype_hint
+        else:
+          try:
+            next_value = actual_distribution.sample(
+                sample_shape=sample_shape if isinstance(d, self.Root) else (),
+                seed=(stateful_sample_seed if stateless_sample_seed is None
+                      else stateless_sample_seed))
+          except TypeError as e:
+            if ('Expected int for argument' not in str(e) and
+                TENSOR_SEED_MSG_PREFIX not in str(e)) or (
+                    stateful_sample_seed is None):
+              raise
+            msg = (
+                'Falling back to stateful sampling for distribution #{index} '
+                '(0-based) of type `{dist_cls}` with component name '
+                '{component_name} and `dist.name` "{dist_name}". Please '
+                'update to use `tf.random.stateless_*` RNGs. This fallback may '
+                'be removed after 20-Dec-2020. ({exc})')
+            component_name = get_explicit_name_for_component(ds[-1])
+            if component_name is None:
+              component_name = '[None specified]'
+            else:
+              component_name = '"{}"'.format(component_name)
+            warnings.warn(msg.format(
+                index=index,
+                component_name=component_name,
+                dist_name=ds[-1].name,
+                dist_cls=type(ds[-1]),
+                exc=str(e)))
+            next_value = actual_distribution.sample(
+                sample_shape=sample_shape if isinstance(d, self.Root) else (),
+                seed=stateful_sample_seed)
+
+        if self._validate_args:
+          with tf.control_dependencies(
+              itertools.chain.from_iterable(
+                  self._assert_compatible_shape(index, sample_shape, value_part)
+                  for value_part in tf.nest.flatten(next_value))):
+            values_out.append(tf.nest.map_structure(tf.identity, next_value))
+        else:
+          values_out.append(next_value)
+
+        index += 1
+        d = gen.send(next_value)
+    except StopIteration:
+      pass
+    return ds, values_out
+
+  def _assert_compatible_shape(self, index, sample_shape, samples):
+    requested_shape, _ = self._expand_sample_shape_to_vector(
+        tf.convert_to_tensor(sample_shape, dtype=tf.int32),
+        name='requested_shape')
+    actual_shape = prefer_static.shape(samples)
+    actual_rank = prefer_static.rank_from_shape(actual_shape)
+    requested_rank = prefer_static.rank_from_shape(requested_shape)
+
+    # We test for two properties we expect of yielded distributions:
+    # (1) The rank of the tensor of generated samples must be at least
+    #     as large as the rank requested.
+    # (2) The requested shape must be a prefix of the shape of the
+    #     generated tensor of samples.
+    # We attempt to perform test (1) statically first.
+    # We don't need to do this explicitly for test (2) because
+    # `assert_equal` evaluates statically if it can.
+    static_actual_rank = tf.get_static_value(actual_rank)
+    static_requested_rank = tf.get_static_value(requested_rank)
+
+    assertion_message = ('Samples yielded by distribution #{} are not '
+                         'consistent with `sample_shape` passed to '
+                         '`JointDistributionCoroutine` '
+                         'distribution.'.format(index))
+
+    # TODO Remove this static check (b/138738650)
+    if (static_actual_rank is not None and
+        static_requested_rank is not None):
+      # We're able to statically check the rank
+      if static_actual_rank < static_requested_rank:
+        raise ValueError(assertion_message)
+      else:
+        control_dependencies = []
+    else:
+      # We're not able to statically check the rank
+      control_dependencies = [
+          assert_util.assert_greater_equal(
+              actual_rank, requested_rank,
+              message=assertion_message)
+          ]
+
+    with tf.control_dependencies(control_dependencies):
+      trimmed_actual_shape = actual_shape[:requested_rank]
+
+    control_dependencies = [
+        assert_util.assert_equal(
+            requested_shape, trimmed_actual_shape,
+            message=assertion_message)
+    ]
+
+    return control_dependencies
 
   def _default_event_space_bijector(self, *args, **kwargs):
     if bool(args) or bool(kwargs):
