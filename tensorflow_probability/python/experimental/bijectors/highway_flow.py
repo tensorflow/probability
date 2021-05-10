@@ -28,24 +28,25 @@ def build_highway_flow_layer(width,
                              activation_fn=False,
                              gate_first_n=-1,
                              seed=None):
-  """
-  Builds an HighwayFlow layer making sure that all the requirements are
-  satisfied, namely:
-  - `residual_fraction` is bounded between 0 and 1;
-  - `upper_diagonal_weights_matrix` is a randomly initialized (lower) diagonal
-    matrix with positive diagonal of size `width x width`;
-  - `lower_diagonal_weights_matrix` is a randomly initialized lower diagonal
-    matrix with ones on the diagonal of size `width x width`;
-  - `bias` is a randomly initialized vector of size `width`
+  """Builds HighwayFlow making sure that all the requirements ar satisfied.
 
-  :param int width: input dimension of the bijector
-  :param float residual_fraction_initial_value: initial value for residual
-  fraction, must be between 0. and 1.
-  :param bool activation_fn: whether or not use activation function in the
-  HighwayFlow
-  :param int seed: seed for random initialization of the weights
-  :returns: the initialized HighwayFlow bijector
-  :rtype: `tfb.Bijector`
+  Args:
+    width: Input dimension of the bijector.
+    residual_fraction_initial_value: Initial value for gating parameter, must be
+     between 0 and 1.
+     activation_fn: Whether or not use SoftPlus activation function.
+    gate_first_n: Decides which part of the input should be gated (useful for
+    example when using auxiliary variables).
+    seed: Seed for random initialization of the weights.
+
+  Returns:
+    The initialized bijector with the following elements:
+      `residual_fraction` is bounded between 0 and 1.
+      `upper_diagonal_weights_matrix` is a randomly initialized (lower) diagonal
+      matrix with positive diagonal of size `width x width`.
+      `lower_diagonal_weights_matrix` is a randomly initialized lower diagonal
+      matrix with ones on the diagonal of size `width x width`;
+      `bias` is a randomly initialized vector of size `width`
   """
 
   if gate_first_n == -1:
@@ -98,10 +99,11 @@ def build_highway_flow_layer(width,
 
 
 class HighwayFlow(tfb.Bijector):
-  """Implements an Highway Flow bijector [1], which interpolates the input
-  `X` with the transformations at each step of the bjiector.
-  The Highway Flow can be used as building block for a Cascading flow [1]
-  or as a generic normalizing flow.
+  """Implements an Highway Flow bijector [1].
+
+  HighwayFlow interpolates the input `X` with the transformations at each step
+  of the bjiector. The Highway Flow can be used as building block for a
+  Cascading flow [1 or as a generic normalizing flow.
 
   The transformation consists in a convex update between the input `X` and a
   linear transformation of `X` followed by activation with the form `g(A @
@@ -145,6 +147,19 @@ class HighwayFlow(tfb.Bijector):
   [1]: Ambrogioni, Luca, Gianluigi Silvestri, and Marcel van Gerven.
   "Automatic variational inference with
   cascading flows." arXiv preprint arXiv:2102.04801 (2021).
+
+  Attributes:
+    residual_fraction: Scalar `Tensor` used for the convex update, must be
+      between 0 and 1.
+    activation_fn: Boolean to decide whether to use SoftPlus (True) activation
+      or no activation (False).
+    bias: Bias vector.
+    upper_diagonal_weights_matrix: Lower diagional matrix of size (width, width)
+      with positive diagonal (is transposed to Upper diagonal within the
+      bijector).
+    lower_diagonal_weights_matrix: Lower diagonal matrix with ones on the main
+      diagional.
+    gate_first_n: Integer that decides what part of the input is gated.
   """
 
   # HighWay Flow simultaneously computes `forward` and `fldj`
@@ -162,20 +177,7 @@ class HighwayFlow(tfb.Bijector):
                gate_first_n,
                validate_args=False,
                name=None):
-    '''
-    Args:
-        residual_fraction: scalar `Tensor` used for the convex update,
-        must be
-        between 0 and 1
-        activation_fn: bool to decide whether to use softplus (True)
-        activation or no activation (False)
-        bias: bias vector
-        upper_diagonal_weights_matrix: Lower diagional matrix of size
-        (width, width) with positive diagonal
-        (is transposed to Upper diagonal within the bijector)
-        lower_diagonal_weights_matrix: Lower diagonal matrix with ones on
-        the main diagional.
-    '''
+    """Initializes the HighwayFlow."""
     parameters = dict(locals())
     name = name or 'highway_flow'
     with tf.name_scope(name) as name:
@@ -242,7 +244,7 @@ class HighwayFlow(tfb.Bijector):
                           axis=0) * weights_matrix
 
   def _inverse_of_softplus(self, y, n=20):
-    # Inverse of the activation layer with softplus using Newton iteration.
+    """Inverse of the activation layer with softplus using Newton iteration."""
     x = tf.ones(y.shape)
     for _ in range(n):
       x = x - (tf.concat([(self.residual_fraction) * tf.ones(
@@ -257,12 +259,18 @@ class HighwayFlow(tfb.Bijector):
 
   def _augmented_forward(self, x):
     """Computes forward and forward_log_det_jacobian transformations.
-    :param tf.Tensor x: input of the bijector
-    :returns: x after forward flow
-    :rtype: `tf.Tensor`
+
+    Args:
+      x: Input of the bijector.
+
+    Returns:
+      x after forward flow and a dict containing forward and inverse log
+      determinant of the jacobian.
     """
+
     # Log determinant term from the upper matrix. Note that the log determinant
     # of the lower matrix is zero.
+
     added_batch = False
     if len(x.shape) <= 1:
       if len(x.shape) == 0:
@@ -302,10 +310,15 @@ class HighwayFlow(tfb.Bijector):
 
   def _augmented_inverse(self, y):
     """Computes inverse and inverse_log_det_jacobian transformations.
-    :param tf.Tensor y: input of the (inverse) bijector
-    :returns: y after inverse flow
-    :rtype: `tf.Tensor`
+
+    Args:
+      y: input of the (inverse) bijectorr.
+
+    Returns:
+      y after inverse flow and a dict containing inverse and forward log
+      determinant of the jacobian.
     """
+
     added_batch = False
     if len(y.shape) <= 1:
       if len(y.shape) == 0:
