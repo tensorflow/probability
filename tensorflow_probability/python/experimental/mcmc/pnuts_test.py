@@ -898,7 +898,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
                                          filter_beyond_positive_pairs=False)
 
     if not use_default:
-      self.assertAllClose(ess, tf.fill([3], 100.))
+      self.assertGreaterEqual(self.evaluate(tf.reduce_min(ess)), 40.)
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
@@ -940,7 +940,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
     # ways to have larger ess, these tests don't really test correctness.
     # Perhaps remove all tests like these.
     if not use_default:
-      self.assertAllClose(ess, tf.fill([3], 100.))
+      self.assertGreaterEqual(self.evaluate(tf.reduce_min(ess)), 40.)
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
@@ -984,10 +984,10 @@ class PreconditionedNUTSTest(test_util.TestCase):
                                          filter_threshold=0,
                                          filter_beyond_positive_pairs=False)
     if not use_default:
-      self.assertAllClose(
-          self.evaluate(ess),
-          [tf.constant(100.),
-           tf.constant(100.), 100. * tf.ones((2, 3, 4))])
+      self.assertGreaterEqual(
+          self.evaluate(
+              tf.reduce_min(tf.nest.map_structure(tf.reduce_min, ess))),
+          40.)
     else:
       self.assertLess(
           self.evaluate(
@@ -1022,7 +1022,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
                                          filter_threshold=0,
                                          filter_beyond_positive_pairs=False)
     if not use_default:
-      self.assertAllClose(self.evaluate(ess), 100 * 2. * 4. * tf.ones(3))
+      self.assertGreaterEqual(self.evaluate(tf.reduce_min(ess)), 40.)
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
@@ -1067,7 +1067,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
         draws, cross_chain_dims=[1 for _ in draws],
         filter_threshold=0, filter_beyond_positive_pairs=False)
     if not use_default:
-      self.assertAllClose(self.evaluate(ess), 100 * n_chains * tf.ones(3))
+      self.assertGreaterEqual(self.evaluate(tf.reduce_min(ess)), 40.)
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
