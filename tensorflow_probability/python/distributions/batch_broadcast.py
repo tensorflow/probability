@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -172,6 +173,13 @@ class BatchBroadcast(distribution_lib.Distribution):
           allow_nan_stats=distribution.allow_nan_stats,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties(),
+        to_shape=parameter_properties.ShapeParameterProperties(),
+        with_shape=parameter_properties.ShapeParameterProperties())
 
   @property
   def distribution(self):

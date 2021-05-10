@@ -805,15 +805,17 @@ class Distribution(_BaseDistribution):
       params_event_ndims: Per-event parameter ranks, a `str->int dict`.
     """
     try:
-      return {
-          k: param.instance_event_ndims(self)
-          for (k, param) in type(self).parameter_properties().items()
-          if param.is_tensor
-      }
+      properties = type(self).parameter_properties()
     except NotImplementedError:
       raise NotImplementedError(
           '{} does not support batch slicing; must implement '
           '_parameter_properties.'.format(type(self)))
+    params_event_ndims = {}
+    for (k, param) in properties.items():
+      ndims = param.instance_event_ndims(self)
+      if param.is_tensor and not (ndims is None or param.specifies_shape):
+        params_event_ndims[k] = ndims
+    return params_event_ndims
 
   def __getitem__(self, slices):
     """Slices the batch axes of this distribution, returning a new instance.
@@ -952,8 +954,13 @@ class Distribution(_BaseDistribution):
       if param_name not in parameter_properties:
         continue
       properties = parameter_properties[param_name]
+      if properties.specifies_shape:
+        continue
 
       ndims = properties.instance_event_ndims(self)
+      if ndims is None:
+        continue
+
       batch_shapes += nest.flatten_up_to(
           ndims,
           nest.map_structure_up_to(
@@ -1041,11 +1048,16 @@ class Distribution(_BaseDistribution):
       if param_name not in parameter_properties:
         continue
       properties = parameter_properties[param_name]
+      if properties.specifies_shape:
+        continue
 
       # Note that `ndims` may be returned here as a Tensor, but
       # `_batch_shape_from_parameter` is smart about avoiding graph side effects
       # (returns `TensorShape(None)` if a static value is not available).
       ndims = properties.instance_event_ndims(self)
+      if ndims is None:
+        continue
+
       batch_shapes += nest.flatten_up_to(
           ndims,
           nest.map_structure_up_to(

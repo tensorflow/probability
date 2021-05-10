@@ -185,7 +185,7 @@ class Bates(distribution.Distribution):
         # TODO(b/169874884): Support decoupled parameterization.
         high=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED,))
+            .BIJECTOR_NOT_IMPLEMENTED))
 
   @property
   def total_count(self):

@@ -61,6 +61,7 @@ TF2_UNFRIENDLY_DISTS = (
 SPECIAL_DISTS = (
     'Autoregressive',
     'BatchBroadcast',  # (has strategy)
+    'BatchConcat',
     'BatchReshape',  # (has strategy)
     'Blockwise',
     'Distribution',  # Base class; not a distribution at all
@@ -437,7 +438,7 @@ def _instantiable_base_dists():
       params_event_ndims = {
           k: p.event_ndims
           for (k, p) in dist_class.parameter_properties().items()
-          if p.is_tensor
+          if p.is_tensor and p.event_ndims is not None
       }
       has_concrete_event_ndims = all(
           isinstance(nd, int) for nd in params_event_ndims.values())

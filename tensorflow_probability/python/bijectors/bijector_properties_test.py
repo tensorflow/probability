@@ -727,6 +727,7 @@ class BijectorPropertiesTest(test_util.TestCase):
         'perm',  # Transpose.
         'rightmost_transposed_ndims',  # Transpose.
         'diag_bijector',  # TransformDiagonal.
+        'diag_shift'  # FillScaleTriL (doesn't support batch shape).
     )
     bijector, event_dim = self._draw_bijector(
         bijector_name, data,
@@ -749,6 +750,9 @@ class BijectorPropertiesTest(test_util.TestCase):
     seeds = samplers.split_seed(test_util.test_seed(), n=len(params))
     new_parameters = {}
     for i, (param_name, param) in enumerate(params.items()):
+      if param_name in non_trainable_params:
+        continue
+
       # Check that the shape_fn is consistent with event_ndims.
       try:
         param_shape = param.shape_fn(sample_shape=output_shape)

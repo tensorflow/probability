@@ -546,6 +546,10 @@ class ParameterPropertiesTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testInferredBatchShapeMatchesTrueBatchShape(self, dist_name, data):
+    # TODO(davmre): delete this blocklist after batch shape inference is enabled
+    # by default (cl/349603774).
+    if dist_name in ('BatchBroadcast', 'BatchReshape', 'BatchConcat'):
+      self.skipTest('Nonstandard batch semantics.')
     dist = data.draw(dhps.distributions(dist_name=dist_name))
     try:
       self.assertAllEqual(dist.batch_shape_tensor(),

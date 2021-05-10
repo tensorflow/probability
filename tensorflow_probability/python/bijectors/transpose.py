@@ -189,16 +189,9 @@ class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
   @classmethod
   def _parameter_properties(cls, dtype):
     return dict(
-        rightmost_transposed_ndims=parameter_properties.ParameterProperties(
-            shape_fn=lambda sample_shape: [],
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED,
-            is_preferred=False),
-        perm=parameter_properties.ParameterProperties(
-            event_ndims=1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED))
+        rightmost_transposed_ndims=(
+            parameter_properties.ShapeParameterProperties(is_preferred=False)),
+        perm=parameter_properties.ShapeParameterProperties())
 
   @property
   def perm(self):

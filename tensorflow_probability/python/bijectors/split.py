@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -116,7 +117,9 @@ class Split(bijector.AutoCompositeTensorBijector):
 
   @classmethod
   def _parameter_properties(cls, dtype):
-    return dict()
+    return dict(
+        num_or_size_splits=parameter_properties.ShapeParameterProperties(),
+        axis=parameter_properties.ShapeParameterProperties())
 
   @property
   def num_splits(self):

@@ -26,6 +26,7 @@ from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -122,6 +123,12 @@ class BatchReshape(distribution_lib.Distribution):
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties(),
+        batch_shape=parameter_properties.ShapeParameterProperties())
 
   def _calculate_new_shape(self):
     # Try to get the old shape statically if available.

@@ -218,7 +218,9 @@ class Independent(distribution_lib.Distribution):
         distribution=parameter_properties.BatchedComponentProperties(
             # TODO(davmre): replace with `self.reinterpreted_batch_ndims` once
             # support for `reinterpreted_batch_ndims=None` has been removed.
-            event_ndims=lambda self: self._get_reinterpreted_batch_ndims()))  # pylint: disable=protected-access
+            event_ndims=lambda self: self._get_reinterpreted_batch_ndims()),  # pylint: disable=protected-access
+        reinterpreted_batch_ndims=(
+            parameter_properties.ShapeParameterProperties()))
 
   def _batch_shape_tensor(self):
     batch_shape = self.distribution.batch_shape_tensor()

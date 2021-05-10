@@ -160,10 +160,7 @@ class Pad(bijector.AutoCompositeTensorBijector):
   @classmethod
   def _parameter_properties(cls, dtype):
     return dict(
-        paddings=parameter_properties.ParameterProperties(
-            event_ndims=1,
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED),
+        paddings=parameter_properties.ShapeParameterProperties(),
         constant_values=parameter_properties.ParameterProperties())
 
   @property

@@ -197,16 +197,8 @@ class Reshape(bijector.AutoCompositeTensorBijector):
   @classmethod
   def _parameter_properties(cls, dtype):
     return dict(
-        event_shape_out=parameter_properties.ParameterProperties(
-            event_ndims=1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED),
-        event_shape_in=parameter_properties.ParameterProperties(
-            event_ndims=1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED))
+        event_shape_out=parameter_properties.ShapeParameterProperties(),
+        event_shape_in=parameter_properties.ShapeParameterProperties())
 
   @property
   def _is_permutation(self):

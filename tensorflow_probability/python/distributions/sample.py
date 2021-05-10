@@ -175,7 +175,8 @@ class Sample(distribution_lib.Distribution):
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
-        distribution=parameter_properties.BatchedComponentProperties())
+        distribution=parameter_properties.BatchedComponentProperties(),
+        sample_shape=parameter_properties.ShapeParameterProperties())
 
   @property
   def sample_shape(self):

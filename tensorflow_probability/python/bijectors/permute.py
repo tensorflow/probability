@@ -134,7 +134,8 @@ class Permute(bijector.AutoCompositeTensorBijector):
         permutation=parameter_properties.ParameterProperties(
             event_ndims=1,
             default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED))
+            .BIJECTOR_NOT_IMPLEMENTED),
+        axis=parameter_properties.ShapeParameterProperties())
 
   @property
   def permutation(self):
