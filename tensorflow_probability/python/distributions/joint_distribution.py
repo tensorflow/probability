@@ -51,6 +51,53 @@ __all__ = [
 
 JAX_MODE = False
 
+
+class ValueWithTrace(collections.namedtuple(
+    'ValueWithTrace',
+    ['value', 'traced'])):
+  """Represents an RV's realized value, and related quantity(s) to trace.
+
+     Traced quantities may include the RV's distribution, log prob, etc. The
+     realized value is not itself traced unless explicitly included in `traced`.
+
+     During model execution, each call to `sample_and_trace_fn` returns a
+     `ValueWithTrace` structure. The model uses the realized `value`, e.g., to
+     define the distributions of downstream random variables, while the
+     `traced` quantities are accumulated and returned to the caller (for JDs
+     that use `vectorized_map`, they will be returned from inside the vmap, and
+     so must be `Tensor`s or `BatchableCompositeTensor`s).
+
+  Components:
+    value: The realized value of this random variable. May be a Tensor or
+      nested structure of Tensors.
+    traced: Quantitiy(s) to be accumulated and
+      returned from the execution of the probabilistic program. These
+      may have any type (for example, they may be structures, contain
+      `tfd.Distribution` instances, etc).
+  """
+
+
+def trace_distributions_and_values(dist, sample_shape, seed, value=None):
+  """Draws a sample, and traces both the distribution and sampled value."""
+  if value is None:
+    value = dist.sample(sample_shape, seed=seed)
+  return ValueWithTrace(value=value, traced=(dist, value))
+
+
+def trace_distributions_only(dist, sample_shape, seed, value=None):
+  """Draws a sample, and traces the sampled value."""
+  if value is None:
+    value = dist.sample(sample_shape, seed=seed)
+  return ValueWithTrace(value=value, traced=dist)
+
+
+def trace_values_only(dist, sample_shape, seed, value=None):
+  """Draws a sample, and traces the sampled value."""
+  if value is None:
+    value = dist.sample(sample_shape, seed=seed)
+  return ValueWithTrace(value=value, traced=value)
+
+
 CALLING_CONVENTION_DESCRIPTION = """
 The measure methods of `JointDistribution` (`log_prob`, `prob`, etc.)
 can be called either by passing a single structure of tensors or by using
@@ -193,8 +240,9 @@ class JointDistribution(distribution_lib.Distribution):
       if candidate_dists is not None:
         ds = candidate_dists
       else:
-        ds = self._flat_sample_distributions(  # Constant seed for CSE.
-            seed=samplers.zeros_seed())[0]
+        ds = self._execute_model(
+            seed=samplers.zeros_seed(),  # Constant seed for CSE.
+            sample_and_trace_fn=trace_distributions_only)
       self._single_sample_distributions[graph_id] = ds
     return ds
 
@@ -240,6 +288,10 @@ class JointDistribution(distribution_lib.Distribution):
     return self._model_unflatten([
         d.experimental_shard_axis_names
         for d in self._get_single_sample_distributions()])
+
+  @property
+  def use_vectorized_map(self):
+    return False
 
   @property
   def batch_shape(self):
@@ -348,13 +400,32 @@ class JointDistribution(distribution_lib.Distribution):
       value = self._resolve_value(value=value,
                                   allow_partially_specified=True,
                                   **kwargs)
-      ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
-      if not sample_shape and value is None:
+      might_have_batch_dims = (
+          distribution_util.shape_may_be_nontrivial(sample_shape)
+          or value is not None)
+      if self.use_vectorized_map and might_have_batch_dims:
+        raise NotImplementedError('`sample_distributions` with nontrivial '
+                                  'sample shape is not yet supported '
+                                  'for autovectorized JointDistributions.')
+
+      ds, xs = self._call_flat_sample_distributions(
+          sample_shape, seed=seed, value=value)
+      if not might_have_batch_dims:
         # This is a single sample with no pinned values; this call will cache
         # the distributions if they are not already cached.
         self._get_single_sample_distributions(candidate_dists=ds)
 
       return self._model_unflatten(ds), self._model_unflatten(xs)
+
+  def _call_flat_sample_distributions(self,
+                                      sample_shape=(),
+                                      seed=None,
+                                      value=None):
+    return zip(*self._call_execute_model(
+        sample_shape,
+        seed=seed,
+        value=value,
+        sample_and_trace_fn=trace_distributions_and_values))
 
   def log_prob_parts(self, value, name='log_prob_parts'):
     """Log probability density/mass function.
@@ -437,8 +508,21 @@ class JointDistribution(distribution_lib.Distribution):
                 'corresponding distribution. Default value: `None` '
                 '(i.e., draw a sample from each distribution).')})
   def _sample_n(self, sample_shape, seed, value=None):
-    ds, xs = self._call_flat_sample_distributions(sample_shape, seed, value)
-    if not sample_shape and value is None:
+    might_have_batch_dims = (
+        distribution_util.shape_may_be_nontrivial(sample_shape)
+        or value is not None)
+    if might_have_batch_dims:
+      xs = self._call_execute_model(
+          sample_shape,
+          seed=seed,
+          value=value,
+          sample_and_trace_fn=trace_values_only)
+    else:
+      ds, xs = zip(*self._call_execute_model(
+          sample_shape,
+          seed=seed,
+          value=value,
+          sample_and_trace_fn=trace_distributions_and_values))
       # This is a single sample with no pinned values; this call will cache
       # the distributions if they are not already cached.
       self._get_single_sample_distributions(candidate_dists=ds)
@@ -448,14 +532,18 @@ class JointDistribution(distribution_lib.Distribution):
   def _map_measure_over_dists(self, attr, value):
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
-    ds, xs = self._call_flat_sample_distributions(
-        value=value, seed=samplers.zeros_seed())
 
     if not callable(attr):
       attr_name = attr
       attr = lambda d, x: getattr(d, attr_name)(x)
 
-    return (attr(d, x) for d, x in zip(ds, xs))
+    return self._call_execute_model(
+        sample_shape=(),
+        value=value,
+        seed=samplers.zeros_seed(),
+        sample_and_trace_fn=(
+            lambda dist, value, **_: ValueWithTrace(value=value,  # pylint: disable=g-long-lambda
+                                                    traced=attr(dist, value))))
 
   def _map_attr_over_dists(self, attr, dists=None):
     dists = (self._get_single_sample_distributions()
@@ -516,14 +604,16 @@ class JointDistribution(distribution_lib.Distribution):
           'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
     return self._sanitize_value(value)
 
-  def _call_flat_sample_distributions(self,
-                                      sample_shape=(),
-                                      seed=None,
-                                      value=None):
-    if value is not None:
-      value = self._model_flatten(value)
-    ds, xs = self._flat_sample_distributions(sample_shape, seed, value)
-    return ds, xs
+  def _call_execute_model(self,
+                          sample_shape=(),
+                          seed=None,
+                          value=None,
+                          sample_and_trace_fn=trace_distributions_and_values):
+    return self._execute_model(
+        sample_shape,
+        seed=seed,
+        value=value if value is None else self._model_flatten(value),
+        sample_and_trace_fn=sample_and_trace_fn)
 
   # Override the base method to capture *args and **kwargs, so we can
   # implement more flexible custom calling semantics.
@@ -587,9 +677,12 @@ class JointDistribution(distribution_lib.Distribution):
                                     allow_partially_specified=True,
                                     **kwargs))
 
-  def _flat_sample_distributions(self, sample_shape=(), seed=None, value=None):
+  def _execute_model(self,
+                     sample_shape=(),
+                     seed=None,
+                     value=None,
+                     sample_and_trace_fn=trace_distributions_and_values):
     """Executes `model`, creating both samples and distributions."""
-    ds = []
     values_out = []
     if samplers.is_stateful_seed(seed):
       seed_stream = SeedStream(seed, salt='JointDistribution')
@@ -610,7 +703,6 @@ class JointDistribution(distribution_lib.Distribution):
     try:
       while True:
         actual_distribution = d.distribution if isinstance(d, self.Root) else d
-        ds.append(actual_distribution)
         # Ensure reproducibility even when xs are (partially) set. Always split.
         stateful_sample_seed = None if seed_stream is None else seed_stream()
         if seed is None:
@@ -618,6 +710,7 @@ class JointDistribution(distribution_lib.Distribution):
         else:
           stateless_sample_seed, seed = samplers.split_seed(seed)
 
+        value_at_index = None
         if (value is not None and len(value) > index and
             value[index] is not None):
 
@@ -626,57 +719,62 @@ class JointDistribution(distribution_lib.Distribution):
 
           # This signature does not allow kwarg names. Applies
           # `convert_to_tensor` on the next value.
-          next_value = nest.map_structure_up_to(
-              ds[-1].dtype,  # shallow_tree
+          value_at_index = nest.map_structure_up_to(
+              actual_distribution.dtype,  # shallow_tree
               convert_tree_to_tensor,  # func
               value[index],  # x
-              ds[-1].dtype)  # dtype_hint
-        else:
-          try:
-            next_value = actual_distribution.sample(
-                sample_shape=sample_shape if isinstance(d, self.Root) else (),
-                seed=(stateful_sample_seed if stateless_sample_seed is None
-                      else stateless_sample_seed))
-          except TypeError as e:
-            if ('Expected int for argument' not in str(e) and
-                TENSOR_SEED_MSG_PREFIX not in str(e)) or (
-                    stateful_sample_seed is None):
-              raise
-            msg = (
-                'Falling back to stateful sampling for distribution #{index} '
-                '(0-based) of type `{dist_cls}` with component name '
-                '{component_name} and `dist.name` "{dist_name}". Please '
-                'update to use `tf.random.stateless_*` RNGs. This fallback may '
-                'be removed after 20-Dec-2020. ({exc})')
-            component_name = get_explicit_name_for_component(ds[-1])
-            if component_name is None:
-              component_name = '[None specified]'
-            else:
-              component_name = '"{}"'.format(component_name)
-            warnings.warn(msg.format(
-                index=index,
-                component_name=component_name,
-                dist_name=ds[-1].name,
-                dist_cls=type(ds[-1]),
-                exc=str(e)))
-            next_value = actual_distribution.sample(
-                sample_shape=sample_shape if isinstance(d, self.Root) else (),
-                seed=stateful_sample_seed)
-
+              actual_distribution.dtype)  # dtype_hint
+        try:
+          next_value, traced_values = sample_and_trace_fn(
+              actual_distribution,
+              sample_shape=sample_shape if isinstance(d, self.Root) else (),
+              seed=(stateful_sample_seed if stateless_sample_seed is None
+                    else stateless_sample_seed),
+              value=value_at_index)
+        except TypeError as e:
+          if ('Expected int for argument' not in str(e) and
+              TENSOR_SEED_MSG_PREFIX not in str(e)) or (
+                  stateful_sample_seed is None):
+            raise
+          msg = (
+              'Falling back to stateful sampling for distribution #{index} '
+              '(0-based) of type `{dist_cls}` with component name '
+              '{component_name} and `dist.name` "{dist_name}". Please '
+              'update to use `tf.random.stateless_*` RNGs. This fallback may '
+              'be removed after 20-Dec-2020. ({exc})')
+          component_name = get_explicit_name_for_component(actual_distribution)
+          if component_name is None:
+            component_name = '[None specified]'
+          else:
+            component_name = '"{}"'.format(component_name)
+          warnings.warn(msg.format(
+              index=index,
+              component_name=component_name,
+              dist_name=actual_distribution.name,
+              dist_cls=type(actual_distribution),
+              exc=str(e)))
+          next_value, traced_values = sample_and_trace_fn(
+              actual_distribution,
+              sample_shape=sample_shape if isinstance(d, self.Root) else (),
+              seed=stateful_sample_seed,
+              value=value_at_index)
         if self._validate_args:
           with tf.control_dependencies(
               itertools.chain.from_iterable(
                   self._assert_compatible_shape(index, sample_shape, value_part)
                   for value_part in tf.nest.flatten(next_value))):
-            values_out.append(tf.nest.map_structure(tf.identity, next_value))
+            values_out.append(
+                tf.nest.map_structure(
+                    lambda x: tf.identity(x) if tf.is_tensor(x) else x,
+                    traced_values))
         else:
-          values_out.append(next_value)
+          values_out.append(traced_values)
 
         index += 1
         d = gen.send(next_value)
     except StopIteration:
       pass
-    return ds, values_out
+    return values_out
 
   def _assert_compatible_shape(self, index, sample_shape, samples):
     requested_shape, _ = self._expand_sample_shape_to_vector(
