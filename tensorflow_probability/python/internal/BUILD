@@ -65,10 +65,12 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        ":auto_composite_tensor",
         ":tensor_util",
         ":test_util",
         # absl/flags dep,
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],

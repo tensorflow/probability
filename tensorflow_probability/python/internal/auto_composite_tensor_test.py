@@ -23,10 +23,12 @@ import os
 
 from absl import flags
 from absl.testing import absltest
+from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
@@ -74,6 +76,18 @@ class Model(tf.Module):
     return tfb.Scale(
         tf.convert_to_tensor(self.scale) + b.scale,
         validate_args=True)
+
+
+@tfp.experimental.auto_composite_tensor
+class ThingWithCallableArg(tfp.experimental.AutoCompositeTensor):
+
+  def __init__(self, a, f):
+    self.a = tf.convert_to_tensor(a, dtype_hint=tf.float32, name='a')
+    self.f = f
+    self.parameters = dict(a=self.a, b=self.f)
+
+  def call(self):
+    return self.f(self.a)
 
 
 def tearDownModule():
@@ -325,6 +339,322 @@ class AutoCompositeTensorTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [10., 20.])
     self.evaluate(m.scale.assign(m.scale + [1., 2.]))
     self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [12., 24.])
+
+  def test_callable_arg(self):
+
+    t = ThingWithCallableArg(1., lambda x: x + 2.)
+    self.assertIsInstance(t, tf.__internal__.CompositeTensor)
+
+    ts = t._type_spec
+    components = ts._to_components(t)
+    self.assertAllEqualNested(components, dict(a=1.))
+
+    t2 = ts._from_components(components)
+    self.assertIsInstance(t2, ThingWithCallableArg)
+
+    self.assertAllClose(tf.function(lambda t: t.call())(t2), 3.)
+
+  def test_different_names_type_specs_equal(self):
+
+    dist_1 = AutoNormal([0., 2.], scale=1., name='FirstNormal')
+    dist_2 = AutoNormal([1., 3.], scale=2., name='SecondNormal')
+    self.assertEqual(dist_1._type_spec, dist_2._type_spec)
+
+  def test_save_restore_functor(self):
+
+    f = lambda x: x ** 2
+    a = tf.constant([3., 2.])
+    ct = ThingWithCallableArg(a, f=f)
+
+    struct_coder = tf.__internal__.saved_model.StructureCoder()
+    with self.assertRaisesRegex(ValueError, 'Cannot serialize'):
+      struct_coder.encode_structure(ct._type_spec)  # pylint: disable=protected-access
+
+    @tfp.experimental.auto_composite_tensor(module_name='my.module')
+    class F(tfp.experimental.AutoCompositeTensor):
+
+      def __call__(self, *args, **kwargs):
+        return f(*args, **kwargs)
+
+    ct_functor = ThingWithCallableArg(a, f=F())
+    enc = struct_coder.encode_structure(ct_functor._type_spec)
+    dec = struct_coder.decode_proto(enc)
+    self.assertEqual(dec, ct_functor._type_spec)
+
+
+class _TestTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):
+
+  @property
+  def value_type(self):
+    """Unused `value_type` to allow the `TypeSpec` to be instantiated."""
+    pass
+
+
+@test_util.test_all_tf_execution_regimes
+class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      ('WithoutCallable',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32)},
+           non_tensor_params={'validate_args': True},
+           omit_kwargs=('name',),
+           prefer_static_value=('a',)),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32)},
+           non_tensor_params={'validate_args': True},
+           omit_kwargs=('name',),
+           prefer_static_value=('a',))),
+      ('WithCallable',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
+                        'b': tfb.Scale(3.)._type_spec},
+           non_tensor_params={},
+           omit_kwargs=('name', 'foo'),
+           prefer_static_value=('a',),
+           callable_params={'f': tf.math.exp}),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
+                        'b': tfb.Scale(3.)._type_spec},
+           non_tensor_params={},
+           omit_kwargs=('name', 'foo'),
+           prefer_static_value=('a',),
+           callable_params={'f': tf.math.exp})),
+      )
+  def testEquality(self, v1, v2):
+    # pylint: disable=g-generic-assert
+    self.assertEqual(v1, v2)
+    self.assertEqual(v2, v1)
+    self.assertFalse(v1 != v2)
+    self.assertFalse(v2 != v1)
+    self.assertEqual(hash(v1), hash(v2))
+
+  @parameterized.named_parameters(
+      ('DifferentTensorSpecs',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, 2], tf.float32)},
+           non_tensor_params={'validate_args': True},
+           omit_kwargs=('name',),
+           prefer_static_value=()),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32)},
+           non_tensor_params={'validate_args': True},
+           omit_kwargs=('name',),
+           prefer_static_value=())),
+      ('DifferentCallables',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('name', 'foo'),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.exp}),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('name', 'foo'),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.sigmoid}))
+      )
+  def testInequality(self, v1, v2):
+    # pylint: disable=g-generic-assert
+    self.assertNotEqual(v1, v2)
+    self.assertNotEqual(v2, v1)
+    self.assertFalse(v1 == v2)
+    self.assertFalse(v2 == v1)
+
+  @parameterized.named_parameters(
+      ('WithoutCallable',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
+           non_tensor_params={'validate_args': True, 'b': 3.},
+           omit_kwargs=('name',),
+           prefer_static_value=('b',)),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
+           non_tensor_params={'validate_args': True, 'b': 3.},
+           omit_kwargs=('name',),
+           prefer_static_value=('b',))),
+      ('WithCallable',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
+                        'b': tfb.Scale(
+                            tf.Variable(2., shape=None))._type_spec},
+           non_tensor_params={},
+           omit_kwargs=('name', 'foo'),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.exp}),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
+                        'b': tfb.Scale(3.)._type_spec},
+           non_tensor_params={},
+           omit_kwargs=('name', 'foo'),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.exp}))
+      )
+  def testIsCompatibleWith(self, v1, v2):
+    self.assertTrue(v1.is_compatible_with(v2))
+    self.assertTrue(v2.is_compatible_with(v1))
+
+  @parameterized.named_parameters(
+      ('IncompatibleTensorSpecs',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, 2, 3], tf.float32)},
+           non_tensor_params={'validate_args': True, 'b': [3, 2]},
+           omit_kwargs=('name',),
+           prefer_static_value=('b',)),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
+           non_tensor_params={'validate_args': True, 'b': [3, 2]},
+           omit_kwargs=('name',),
+           prefer_static_value=('b',))),
+      ('DifferentMetadataSameCallables',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
+           non_tensor_params={'validate_args': True},
+           omit_kwargs=('name',),
+           prefer_static_value=(),
+           callable_params={'g': tf.math.softplus}),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
+           non_tensor_params={'validate_args': False},
+           omit_kwargs=('name',),
+           prefer_static_value=(),
+           callable_params={'g': tf.math.softplus})),
+      ('DifferentCallables',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
+                        'b': tfb.Scale(
+                            tf.Variable(2., shape=None))._type_spec},
+           non_tensor_params={},
+           omit_kwargs=('name', 'foo'),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.exp}),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
+                        'b': tfb.Scale(3.)._type_spec},
+           non_tensor_params={},
+           omit_kwargs=('name', 'foo'),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.sigmoid}))
+      )
+  def testIsNotCompatibleWith(self, v1, v2):
+    self.assertFalse(v1.is_compatible_with(v2))
+    self.assertFalse(v2.is_compatible_with(v1))
+
+  @parameterized.named_parameters(
+      ('WithoutCallable',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('name',),
+           prefer_static_value=()),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('name',),
+           prefer_static_value=()),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('name',),
+           prefer_static_value=())),
+      ('WithCallable',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec(None, tf.float32),
+                        'b': tfb.Scale(
+                            tf.Variable(2., shape=None))._type_spec},
+           non_tensor_params={},
+           omit_kwargs=(),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.exp}),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
+                        'b': tfb.Scale(tf.Variable(3.))._type_spec},
+           non_tensor_params={},
+           omit_kwargs=(),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.exp}),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec(None, tf.float32),
+                        'b': tfb.Scale(
+                            tf.Variable(2., shape=None))._type_spec},
+           non_tensor_params={},
+           omit_kwargs=(),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.exp})),
+      )
+  def testMostSpecificCompatibleType(self, v1, v2, expected):
+    self.assertEqual(v1.most_specific_compatible_type(v2), expected)
+    self.assertEqual(v2.most_specific_compatible_type(v1), expected)
+
+  @parameterized.named_parameters(
+      ('DifferentParamSpecs',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('foo',),
+           prefer_static_value=()),
+       _TestTypeSpec(
+           param_specs={'b': tf.TensorSpec([5, None], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('foo',),
+           prefer_static_value=())),
+      ('DifferentMetadata',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('foo',),
+           prefer_static_value=()),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('bar',),
+           prefer_static_value=())),
+      ('DifferentCallables',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec(None, tf.float32),
+                        'b': tfb.Scale(
+                            tf.Variable(2., shape=None))._type_spec},
+           non_tensor_params={},
+           omit_kwargs=(),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.exp}),
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
+                        'b': tfb.Scale(tf.Variable(3.))._type_spec},
+           non_tensor_params={},
+           omit_kwargs=(),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.softplus})),
+      )
+  def testMostSpecificCompatibleTypeException(self, v1, v2):
+    with self.assertRaises(ValueError):
+      v1.most_specific_compatible_type(v2)
+    with self.assertRaises(ValueError):
+      v2.most_specific_compatible_type(v1)
+
+  @parameterized.named_parameters(
+      ('WithoutCallable',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
+           non_tensor_params={},
+           omit_kwargs=('name',),
+           prefer_static_value=())),
+      ('WithCallable',
+       _TestTypeSpec(
+           param_specs={'a': tf.TensorSpec(None, tf.float32),
+                        'b': tfb.Scale(
+                            tf.Variable(2., shape=None))._type_spec},
+           non_tensor_params={},
+           omit_kwargs=(),
+           prefer_static_value=(),
+           callable_params={'f': tf.math.exp})),
+      )
+  def testRepr(self, spec):
+    spec_data = (auto_composite_tensor._AUTO_COMPOSITE_TENSOR_VERSION,
+                 spec._param_specs, spec._non_tensor_params, spec._omit_kwargs,
+                 spec._prefer_static_value, spec._callable_params)
+    self.assertEqual(repr(spec), f'_TestTypeSpec{spec_data}')
 
 if __name__ == '__main__':
   tf.test.main()
