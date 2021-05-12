@@ -26,6 +26,7 @@ from tensorflow_probability.python.experimental.mcmc import windowed_sampling
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.internal import unnest
 
 
 tfb = tfp.bijectors
@@ -263,7 +264,7 @@ class WindowedSamplingTest(test_util.TestCase):
         [tfd.HalfNormal(1., name=f'dist_{idx}') for idx in range(4)])
 
     explicit_init = [tf.ones(20) for _ in range(3)]
-    _, init, bijector = windowed_sampling._setup_mcmc(
+    _, init, bijector, _ = windowed_sampling._setup_mcmc(
         model=sample_dist,
         n_chains=20,
         init_position=explicit_init,
@@ -310,7 +311,7 @@ class WindowedSamplingTest(test_util.TestCase):
 
     # Twenty chains with three parameters gives a 1 / 2^60 chance of
     # initializing with a finite log probability by chance.
-    _, init, _ = windowed_sampling._setup_mcmc(
+    _, init, _, _ = windowed_sampling._setup_mcmc(
         model=tough_dist,
         n_chains=20,
         seed=test_util.test_seed(),
@@ -326,7 +327,7 @@ class WindowedSamplingTest(test_util.TestCase):
     pinned = model.experimental_pin(y=4.2)
 
     # No explicit pins are passed, since the model is already pinned.
-    _, init, _ = windowed_sampling._setup_mcmc(
+    _, init, _, _ = windowed_sampling._setup_mcmc(
         model=pinned, n_chains=20,
         seed=test_util.test_seed())
     self.assertLen(init, 1)
@@ -395,12 +396,118 @@ class WindowedSamplingTest(test_util.TestCase):
             tf.constant(0., dtype=tf.float64),
             tf.constant(1., dtype=tf.float64))
     ])
-    target_log_prob_fn, initial_transformed_position, _ = windowed_sampling._setup_mcmc(
+    target_log_prob_fn, initial_transformed_position, _, _ = windowed_sampling._setup_mcmc(
         dist, n_chains=5, init_position=None, seed=test_util.test_seed())
     init_step_size = windowed_sampling._get_step_size(
         initial_transformed_position, target_log_prob_fn)
     self.assertDTypeEqual(init_step_size, np.float64)
     self.assertAllFinite(init_step_size)
+
+
+@test_util.test_graph_and_eager_modes
+class WindowedSamplingStepSizeTest(test_util.TestCase):
+
+  def test_supply_full_step_size(self):
+    stream = test_util.test_seed_stream()
+
+    jd_model = tfd.JointDistributionNamed({
+        'a': tfd.Normal(0., 1.),
+        'b': tfd.MultivariateNormalDiag(
+            loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
+    })
+
+    init_step_size = {'a': tf.reshape(tf.linspace(1., 2., 20), (20, 1)),
+                      'b': tf.reshape(tf.linspace(1., 2., 60), (20, 3))}
+
+    _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_hmc(
+        1,
+        jd_model,
+        num_adaptation_steps=100,
+        n_chains=20,
+        init_step_size=init_step_size,
+        num_leapfrog_steps=5,
+        discard_tuning=False,
+        trace_fn=lambda *args: unnest.get_innermost(args[-1], 'step_size'),
+        seed=stream(),
+    )
+
+    # Gets a newaxis because step size needs to have an event dimension.
+    self.assertAllCloseNested([init_step_size['a'],
+                               init_step_size['b']],
+                              [j[0] for j in actual_step_size])
+
+  def test_supply_partial_step_size(self):
+    stream = test_util.test_seed_stream()
+
+    jd_model = tfd.JointDistributionNamed({
+        'a': tfd.Normal(0., 1.),
+        'b': tfd.MultivariateNormalDiag(
+            loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
+    })
+
+    init_step_size = {'a': 1., 'b': 2.}
+    _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_hmc(
+        1,
+        jd_model,
+        num_adaptation_steps=100,
+        n_chains=20,
+        init_step_size=init_step_size,
+        num_leapfrog_steps=5,
+        discard_tuning=False,
+        trace_fn=lambda *args: unnest.get_innermost(args[-1], 'step_size'),
+        seed=stream(),
+    )
+
+    actual_step = [j[0] for j in actual_step_size]
+    expected_step = [1., 2.]
+    self.assertAllCloseNested(expected_step, actual_step)
+
+  def test_supply_single_step_size(self):
+    stream = test_util.test_seed_stream()
+
+    jd_model = tfd.JointDistributionNamed({
+        'a': tfd.Normal(0., 1.),
+        'b': tfd.MultivariateNormalDiag(
+            loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
+    })
+
+    init_step_size = 1.
+    _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_hmc(
+        1,
+        jd_model,
+        num_adaptation_steps=100,
+        n_chains=20,
+        init_step_size=init_step_size,
+        num_leapfrog_steps=5,
+        discard_tuning=False,
+        trace_fn=lambda *args: unnest.get_innermost(args[-1], 'step_size'),
+        seed=stream(),
+    )
+
+    actual_step = [j[0] for j in actual_step_size]
+    expected_step = [1., 1.]
+    self.assertAllCloseNested(expected_step, actual_step)
+
+  def test_sequential_step_size(self):
+    stream = test_util.test_seed_stream()
+
+    jd_model = tfd.JointDistributionSequential(
+        [tfd.HalfNormal(scale=1., name=f'dist_{idx}') for idx in range(4)])
+    init_step_size = [1., 2., 3.]
+    _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_nuts(
+        1,
+        jd_model,
+        num_adaptation_steps=100,
+        n_chains=20,
+        init_step_size=init_step_size,
+        discard_tuning=False,
+        trace_fn=lambda *args: unnest.get_innermost(args[-1], 'step_size'),
+        dist_3=tf.constant(1.),
+        seed=stream(),
+    )
+
+    self.assertAllCloseNested(init_step_size,
+                              [j[0] for j in actual_step_size])
 
 
 def _beta_binomial(trials):

@@ -34,6 +34,7 @@ from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts 
 from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
 from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
@@ -158,25 +159,26 @@ def _get_flat_unconstraining_bijector(jd_model):
       model.
 
   Returns:
-    A `tfb.Bijector` where the `.forward` method flattens and unconstrains
-    points.
+    Two `tfb.Bijector`s where the `.forward` method flattens and unconstrains
+    points, and the second may be used to initialize a step size.
   """
   # TODO(b/180396233): This bijector is in general point-dependent.
-  to_chain = [jd_model.experimental_default_event_space_bijector()]
+  event_space_bij = jd_model.experimental_default_event_space_bijector()
   flat_bijector = restructure.pack_sequence_as(jd_model.event_shape_tensor())
-  to_chain.append(flat_bijector)
 
   unconstrained_shapes = flat_bijector.inverse_event_shape_tensor(
       jd_model.event_shape_tensor())
 
   # this reshaping is required as as split can produce a tensor of shape [1]
   # when the distribution event shape is []
-  reshapers = [reshape.Reshape(event_shape_out=x,
-                               event_shape_in=[-1])
-               for x in unconstrained_shapes]
-  to_chain.append(joint_map.JointMap(bijectors=reshapers))
+  unsplit = joint_map.JointMap(bijectors=[
+      reshape.Reshape(event_shape_out=x, event_shape_in=[-1])
+      for x in unconstrained_shapes])
 
-  return invert.Invert(chain.Chain(to_chain))
+  bij = invert.Invert(chain.Chain([event_space_bij, flat_bijector, unsplit]))
+  step_size_bij = invert.Invert(flat_bijector)
+
+  return bij, step_size_bij
 
 
 def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
@@ -211,7 +213,7 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     bijector: `tfb.Bijector` instance, which unconstrains and flattens.
   """
   pinned_model = model.experimental_pin(**pins) if pins else model
-  bijector = _get_flat_unconstraining_bijector(pinned_model)
+  bijector, step_bijector = _get_flat_unconstraining_bijector(pinned_model)
 
   if init_position is None:
     raw_init_dist = initialization.init_near_unconstrained_zero(pinned_model)
@@ -235,7 +237,11 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
         args, event_ndims=[1 for _ in initial_transformed_position])
     return lp + ldj
 
-  return target_log_prob_fn, initial_transformed_position, bijector
+  def step_broadcast(step_size):
+    return step_bijector(
+        nest_util.broadcast_structure(pinned_model.event_shape_tensor(),
+                                      step_size))
+  return target_log_prob_fn, initial_transformed_position, bijector, step_broadcast
 
 
 def _make_base_kernel(*, kind, proposal_kernel_kwargs):
@@ -471,6 +477,7 @@ def windowed_adaptive_nuts(n_draws,
                            n_chains=64,
                            num_adaptation_steps=525,
                            current_state=None,
+                           init_step_size=None,
                            dual_averaging_kwargs=None,
                            max_tree_depth=10,
                            max_energy_diff=500.,
@@ -500,6 +507,17 @@ def windowed_adaptive_nuts(n_draws,
       Structure of tensors at which to initialize sampling. Should have the
       same shape and structure as
       `model.experimental_pin(**pins).sample(n_chains)`.
+    init_step_size: Optional
+      Where to initialize the step size for the leapfrog integrator. The
+      structure should broadcast with `current_state`. For example, if the
+      initial state is
+      ```
+      {'a': tf.zeros(n_chains),
+       'b': tf.zeros([n_chains, n_features])}
+       ```
+      then any of `1.`, `{'a': 1., 'b': 1.}`, or
+      `{'a': tf.ones(n_chains), 'b': tf.ones([n_chains, n_features])}` will
+      work. Defaults to the dimension of the log density to the 0.25 power.
     dual_averaging_kwargs: Optional dict
       Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
       By default, a `target_accept_prob` of 0.85 is set, and the class defaults
@@ -549,6 +567,7 @@ def windowed_adaptive_nuts(n_draws,
     dual_averaging_kwargs = {}
   dual_averaging_kwargs.setdefault('target_accept_prob', 0.85)
   proposal_kernel_kwargs = {
+      'step_size': init_step_size,
       'max_tree_depth': max_tree_depth,
       'max_energy_diff': max_energy_diff,
       'unrolled_leapfrog_steps': unrolled_leapfrog_steps,
@@ -576,6 +595,7 @@ def windowed_adaptive_hmc(n_draws,
                           n_chains=64,
                           num_adaptation_steps=525,
                           current_state=None,
+                          init_step_size=None,
                           dual_averaging_kwargs=None,
                           trace_fn=_default_hmc_trace_fn,
                           return_final_kernel_results=False,
@@ -603,6 +623,17 @@ def windowed_adaptive_hmc(n_draws,
       Structure of tensors at which to initialize sampling. Should have the
       same shape and structure as
       `model.experimental_pin(**pins).sample(n_chains)`.
+    init_step_size: Optional
+      Where to initialize the step size for the leapfrog integrator. The
+      structure should broadcast with `current_state`. For example, if the
+      initial state is
+      ```
+      {'a': tf.zeros(n_chains),
+       'b': tf.zeros([n_chains, n_features])}
+       ```
+      then any of `1.`, `{'a': 1., 'b': 1.}`, or
+      `{'a': tf.ones(n_chains), 'b': tf.ones([n_chains, n_features])}` will
+      work. Defaults to the dimension of the log density to the 0.25 power.
     dual_averaging_kwargs: Optional dict
       Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
       By default, a `target_accept_prob` of 0.75 is set, and the class defaults
@@ -641,6 +672,7 @@ def windowed_adaptive_hmc(n_draws,
   dual_averaging_kwargs.setdefault('target_accept_prob', 0.75)
   proposal_kernel_kwargs = {
       'num_leapfrog_steps': num_leapfrog_steps,
+      'step_size': init_step_size,
       'store_parameters_in_results': True}
   return _windowed_adaptive_impl(
       n_draws=n_draws,
@@ -688,24 +720,28 @@ def _windowed_adaptive_impl(n_draws,
 
   setup_seed, init_seed, seed = samplers.split_seed(
       samplers.sanitize_seed(seed), n=3)
-  target_log_prob_fn, initial_transformed_position, bijector = _setup_mcmc(
+  target_log_prob_fn, initial_transformed_position, bijector, step_broadcast = _setup_mcmc(
       joint_dist,
       n_chains=n_chains,
       init_position=current_state,
       seed=setup_seed,
       **pins)
 
-  init_step_size = _get_step_size(initial_transformed_position,
-                                  target_log_prob_fn)
-  first_window_size, slow_window_size, last_window_size = _get_window_sizes(
-      num_adaptation_steps)
+  if proposal_kernel_kwargs.get('step_size') is None:
+    init_step_size = _get_step_size(initial_transformed_position,
+                                    target_log_prob_fn)
+  else:
+    init_step_size = step_broadcast(proposal_kernel_kwargs['step_size'])
 
   proposal_kernel_kwargs.update({
       'target_log_prob_fn': target_log_prob_fn,
-      'step_size': tf.fill([n_chains, 1], init_step_size, name='step_size'),
+      'step_size': init_step_size,
       'momentum_distribution': _init_momentum(initial_transformed_position,
-                                              batch_shape=[n_chains]),
-  })
+                                              batch_shape=[n_chains])})
+
+  first_window_size, slow_window_size, last_window_size = _get_window_sizes(
+      num_adaptation_steps)
+
   all_traces = []
   draws, trace, step_size, running_variances = _fast_window(
       kind=kind,
