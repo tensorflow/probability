@@ -335,10 +335,6 @@ class Independent(distribution_lib.Distribution):
     axis = 1 + ps.range(self._get_reinterpreted_batch_ndims())
     return op(stat, axis=-axis)
 
-  _composite_tensor_nonshape_params = ('distribution',)
-
-  _composite_tensor_shape_params = ('reinterpreted_batch_ndims',)
-
 
 @kullback_leibler.RegisterKL(Independent, Independent)
 def _kl_independent(a, b, name='kl_independent'):

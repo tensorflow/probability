@@ -467,10 +467,6 @@ class BatchReshape(distribution_lib.Distribution):
 
     return assertions
 
-  _composite_tensor_nonshape_params = ('distribution',)
-
-  _composite_tensor_shape_params = ('batch_shape',)
-
 
 def validate_init_args_statically(distribution, batch_shape):
   """Helper to __init__ which makes or raises assertions."""

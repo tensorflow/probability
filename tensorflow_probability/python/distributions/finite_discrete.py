@@ -362,7 +362,3 @@ class FiniteDiscrete(distribution.Distribution):
               message='outcomes is not strictly increasing.'))
 
     return assertions
-
-  _composite_tensor_nonshape_params = ('outcomes', 'logits', 'probs', 'rtol',
-                                       'atol')
-  # 'outcomes' is not in _params_event_ndims(), so we expose this manually

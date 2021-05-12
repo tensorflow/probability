@@ -312,10 +312,6 @@ class Transpose(bijector.AutoCompositeTensorBijector):
 
     return assertions
 
-  @property
-  def _composite_tensor_shape_params(self):
-    return ('perm', 'rightmost_transposed_ndims')
-
 
 def _maybe_validate_rightmost_transposed_ndims(
     initial_rightmost_transposed_ndims,

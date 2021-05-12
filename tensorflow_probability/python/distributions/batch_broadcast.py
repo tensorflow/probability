@@ -333,9 +333,6 @@ class BatchBroadcast(distribution_lib.Distribution):
   def _sample_control_dependencies(self, value, **kwargs):
     return self.distribution._sample_control_dependencies(value, **kwargs)  # pylint: disable=protected-access
 
-  _composite_tensor_nonshape_params = ('distribution',)
-  _composite_tensor_shape_params = ('with_shape', 'to_shape')
-
 
 class _BroadcastingBijector(bijector_lib.Bijector):
   """Event space bijector for BatchBroadcast."""

@@ -314,8 +314,6 @@ class Masked(distribution_lib.Distribution):
       return None
     return _MaskedBijector(self, underlying_bijector)
 
-  _composite_tensor_nonshape_params = ('validity_mask', 'distribution')
-
 
 @kullback_leibler.RegisterKL(Masked, Masked)
 def _kl_masked_masked(a, b, name=None):

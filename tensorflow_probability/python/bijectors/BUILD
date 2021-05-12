@@ -1143,6 +1143,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:cache_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:test_util",
     ],

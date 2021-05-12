@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.experimental.distribute import distribute_lib
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import samplers
 
 
@@ -113,6 +114,11 @@ class Sharded(distribution_lib.Distribution):
     # Use inner axes before outer axes
     return self.distribution.experimental_shard_axis_names + shard_axis_names
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties())
+
   @property
   def distribution(self):
     return self._distribution
@@ -149,8 +155,6 @@ class Sharded(distribution_lib.Distribution):
     # construct.
     return self.distribution.experimental_default_event_space_bijector(
         *args, **kwargs)
-
-  _composite_tensor_nonshape_params = ('distribution',)
 
 
 @log_prob_ratio.RegisterLogProbRatio(Sharded)

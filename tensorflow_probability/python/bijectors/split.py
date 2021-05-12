@@ -518,7 +518,3 @@ class Split(bijector.AutoCompositeTensorBijector):
                          'expected `split_size` dimension (={})'.format(
                              output_size, split_size))))
     return assertions
-
-  @property
-  def _composite_tensor_shape_params(self):
-    return ('num_or_size_splits', 'axis')

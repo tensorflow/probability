@@ -268,10 +268,6 @@ class Restructure(bijector.AutoCompositeTensorBijector):
     with self._name_and_control_scope(name):
       return tf.zeros([], tf.float32)
 
-  @property
-  def _composite_tensor_shape_params(self):
-    return ('output_structure', 'input_structure')
-
 
 def tree_flatten(example, name='restructure'):
   """Returns a Bijector variant of tf.nest.flatten.

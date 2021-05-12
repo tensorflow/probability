@@ -401,6 +401,9 @@ def auto_composite_tensor(cls=None, omit_kwargs=(), module_name=None):
   `tf.get_static_value` to attempt to preserve shapes as static metadata, for
   fields whose name matches a name specified in that field. Preserving static
   values can be important to correctly propagating shapes through a loop.
+  Note that the Distribution and Bijector base classes provide a
+  default implementation of `_composite_tensor_shape_parameters`, populated by
+  `parameter_properties` annotations.
 
   If the decorated class `A` does not subclass `CompositeTensor`, a *new class*
   will be generated, which mixes in `A` and `CompositeTensor`.

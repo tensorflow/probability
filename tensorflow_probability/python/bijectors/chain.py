@@ -159,18 +159,6 @@ class Chain(composition.Composition):
       y = step_fn(bij, y, **kwargs.get(bij.name, {}))
     return y  # Now `x`
 
-  @property
-  def _composite_tensor_nonshape_params(self):
-    """A tuple describing which parameters are non-shape-related tensors.
-
-    Flattening in JAX involves many of the same considerations with regards to
-    identifying tensor arguments for the purposes of CompositeTensor, except
-    that shape-related items will be considered metadata.  This property
-    identifies the keys of parameters that are expected to be tensors, except
-    those that are shape-related.
-    """
-    return ('bijectors',)
-
 
 @ldj_ratio.RegisterFLDJRatio(Chain)
 def _fldj_ratio_chain(p, x, q, y):

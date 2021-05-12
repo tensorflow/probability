@@ -23,6 +23,7 @@ from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -218,6 +219,13 @@ class MultivariateNormalPrecisionFactorLinearOperator(
           name=name)
       self._parameters = parameters
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        precision_factor=parameter_properties.BatchedComponentProperties(),
+        precision=parameter_properties.BatchedComponentProperties())
+
   @property
   def loc(self):
     # Note: if the `loc` kwarg is None, this is `None`.
@@ -315,5 +323,3 @@ class MultivariateNormalPrecisionFactorLinearOperator(
             # positive, since it is precision_factor not scale.
             self._precision_factor.log_abs_determinant() +
             self._log_prob_unnormalized(value))
-
-  _composite_tensor_nonshape_params = ('loc', 'precision_factor', 'precision')

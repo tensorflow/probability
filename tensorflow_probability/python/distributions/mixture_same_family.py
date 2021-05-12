@@ -200,10 +200,6 @@ class MixtureSameFamily(distribution.Distribution):
         self.components_distribution.event_shape)
 
   @property
-  def _composite_tensor_nonshape_params(self):
-    return ('mixture_distribution', 'components_distribution')
-
-  @property
   def mixture_distribution(self):
     return self._mixture_distribution
 

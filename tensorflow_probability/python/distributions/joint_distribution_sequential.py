@@ -410,6 +410,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
     return self.copy(model=self._model_unflatten(dfn))
 
   _composite_tensor_nonshape_params = ('model',)
+  _composite_tensor_shape_params = ()
 
 
 def _unify_call_signature(i, dist_fn):

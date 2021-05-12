@@ -628,7 +628,8 @@ class Distribution(_BaseDistribution):
     identifies the keys of parameters that are expected to be tensors, except
     those that are shape-related.
     """
-    return tuple(self._params_event_ndims().keys())
+    return tuple(k for k, v in self.parameter_properties().items()
+                 if not v.specifies_shape)
 
   @property
   def _composite_tensor_shape_params(self):
@@ -641,7 +642,8 @@ class Distribution(_BaseDistribution):
     tensors, so that they can be collected appropriately in CompositeTensor but
     not in JAX applications.
     """
-    return ()
+    return tuple(k for k, v in self.parameter_properties().items()
+                 if v.specifies_shape)
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
@@ -813,7 +815,7 @@ class Distribution(_BaseDistribution):
     params_event_ndims = {}
     for (k, param) in properties.items():
       ndims = param.instance_event_ndims(self)
-      if param.is_tensor and not (ndims is None or param.specifies_shape):
+      if param.is_tensor and ndims is not None:
         params_event_ndims[k] = ndims
     return params_event_ndims
 

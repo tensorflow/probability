@@ -194,7 +194,3 @@ class Permute(bijector.AutoCompositeTensorBijector):
                          'each of `{0, 1, ..., d}`.')))
 
     return assertions
-
-  @property
-  def _composite_tensor_shape_params(self):
-    return ('axis',)
