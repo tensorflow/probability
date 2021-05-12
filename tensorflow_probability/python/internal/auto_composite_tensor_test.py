@@ -381,6 +381,24 @@ class AutoCompositeTensorTest(test_util.TestCase):
     dec = struct_coder.decode_proto(enc)
     self.assertEqual(dec, ct_functor._type_spec)
 
+  def test_subclass_with_inherited_type_spec_raises(self):
+
+    class StandardNormal(AutoNormal):
+
+      def __init__(self):
+        super(StandardNormal, self).__init__(
+            loc=0., scale=1., validate_args=True)
+
+    d = StandardNormal()
+    with self.assertRaisesRegex(
+        ValueError,
+        '`StandardNormal` has inherited the `_type_spec` of `Normal`'):
+      tf.nest.flatten(d, expand_composites=True)
+
+    AutoStandardNormal = tfp.experimental.auto_composite_tensor(StandardNormal)  # pylint: disable=invalid-name
+    d_ct = AutoStandardNormal()
+    self.assertLen(tf.nest.flatten(d_ct, expand_composites=True), 0)
+
 
 class _TestTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):
 

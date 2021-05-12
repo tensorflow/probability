@@ -200,6 +200,13 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
 
   @classmethod
   def from_instance(cls, instance, omit_kwargs=()):
+    cls_value_type = cls.value_type.fget(None)
+    if type(instance) is not cls_value_type:  # pylint: disable=unidiomatic-typecheck
+      raise ValueError(f'`{type(instance).__name__}` has inherited the '
+                       f'`_type_spec` of `{cls_value_type.__name__}`. It '
+                       f'should define its own, either directly, or by '
+                       f'applying `auto_composite_tensor` to '
+                       f'`{type(instance).__name__}.`')
     prefer_static_value = tuple(
         getattr(instance, '_composite_tensor_shape_params', ()))
     kwargs = _extract_init_kwargs(instance, omit_kwargs=omit_kwargs,
@@ -539,6 +546,6 @@ def auto_composite_tensor(cls=None, omit_kwargs=(), module_name=None):
     def _type_spec(self):
       return _GeneratedCTTypeSpec.from_instance(self, omit_kwargs)
 
-  _AutoCompositeTensor.__name__ = '{}_AutoCompositeTensor'.format(cls.__name__)
+  _AutoCompositeTensor.__name__ = cls.__name__
   _registry[clsid] = _AutoCompositeTensor
   return _AutoCompositeTensor
