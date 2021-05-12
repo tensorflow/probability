@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 from absl.testing import parameterized
+import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.mcmc import windowed_sampling
@@ -387,6 +388,19 @@ class WindowedSamplingTest(test_util.TestCase):
       return final_scaling, true_var
     final_scaling, true_var = do_sample()
     self.assertAllClose(true_var, final_scaling, rtol=0.1, atol=1e-3)
+
+  def test_f64_step_size(self):
+    dist = tfd.JointDistributionSequential([
+        tfd.Normal(
+            tf.constant(0., dtype=tf.float64),
+            tf.constant(1., dtype=tf.float64))
+    ])
+    target_log_prob_fn, initial_transformed_position, _ = windowed_sampling._setup_mcmc(
+        dist, n_chains=5, init_position=None, seed=test_util.test_seed())
+    init_step_size = windowed_sampling._get_step_size(
+        initial_transformed_position, target_log_prob_fn)
+    self.assertDTypeEqual(init_step_size, np.float64)
+    self.assertAllFinite(init_step_size)
 
 
 def _beta_binomial(trials):

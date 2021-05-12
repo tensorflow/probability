@@ -430,6 +430,32 @@ def _get_window_sizes(num_adaptation_steps):
   return first_window_size, slow_window_size, last_window_size
 
 
+def _get_step_size(initial_transformed_position, log_prob_fn):
+  """Heuristic for initializing step size.
+
+  If we (over) optimistically assume good scaling, 1 / sum(event_dims)**0.25
+  will be near the optimal step size. We further scale that downwards. See
+  Langmore, Ian, Michael Dikovsky, Scott Geraedts, Peter Norgaard, and Rob Von
+  Behren. 2019. “A Condition Number for Hamiltonian Monte Carlo.” arXiv
+  [stat.CO]. arXiv. http://arxiv.org/abs/1905.09813.
+
+  Args:
+    initial_transformed_position: Iterable of arguments to log_prob_fn, in order
+      to get a dtype and find a heuristic for an initial step size. We assume
+      the Tensor has been flattened so that number of event dimensions is the
+      last one.
+    log_prob_fn: Target log probability function.
+
+  Returns:
+    Scalar float of the same dtype as log_prob_fn.
+  """
+  # TODO(b/187658871): Update this code after internal kernels can support it.
+  dtype = log_prob_fn(*initial_transformed_position).dtype
+  return 0.5 * sum([
+      tf.cast(ps.shape(state_part)[-1], dtype)
+      for state_part in initial_transformed_position])**-0.25
+
+
 def _init_momentum(initial_transformed_position, *, batch_shape):
   """Initialize momentum so trace_fn can be concatenated."""
   variance_parts = [ps.ones_like(p) for p in initial_transformed_position]
@@ -669,16 +695,10 @@ def _windowed_adaptive_impl(n_draws,
       seed=setup_seed,
       **pins)
 
+  init_step_size = _get_step_size(initial_transformed_position,
+                                  target_log_prob_fn)
   first_window_size, slow_window_size, last_window_size = _get_window_sizes(
       num_adaptation_steps)
-  # If we (over) optimistically assume good scaling, this will be near the
-  # optimal step size, see Langmore, Ian, Michael Dikovsky, Scott Geraedts,
-  # Peter Norgaard, and Rob Von Behren. 2019. “A Condition Number for
-  # Hamiltonian Monte Carlo.” arXiv [stat.CO]. arXiv.
-  # http://arxiv.org/abs/1905.09813.
-  init_step_size = 0.5 * sum([
-      tf.cast(ps.shape(state_part)[-1], tf.float32)
-      for state_part in initial_transformed_position])**-0.25
 
   proposal_kernel_kwargs.update({
       'target_log_prob_fn': target_log_prob_fn,
