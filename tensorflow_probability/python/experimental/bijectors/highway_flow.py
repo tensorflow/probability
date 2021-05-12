@@ -271,12 +271,6 @@ class HighwayFlow(tfb.Bijector):
     # Log determinant term from the upper matrix. Note that the log determinant
     # of the lower matrix is zero.
 
-    added_batch = False
-    if len(x.shape) <= 1:
-      if len(x.shape) == 0:
-        x = tf.reshape(x, -1)
-      added_batch = True
-      x = tf.expand_dims(x, 0)
     fldj = tf.zeros(x.shape[:-1]) + tf.reduce_sum(
       tf.math.log(tf.concat([(self.residual_fraction) * tf.ones(
         self.gate_first_n), tf.zeros(self.width - self.gate_first_n)],
@@ -286,17 +280,17 @@ class HighwayFlow(tfb.Bijector):
                                tf.ones(self.width - self.gate_first_n)],
                               axis=0)) * tf.linalg.diag_part(
         self.upper_diagonal_weights_matrix)))
+    x = x[tf.newaxis, ...]
     x = tf.linalg.matvec(
       self._convex_update(self.lower_diagonal_weights_matrix), x)
-    x = tf.linalg.matvec(tf.transpose(
-      self._convex_update(self.upper_diagonal_weights_matrix)),
-      x)
-    x += tf.concat([(1. - self.residual_fraction) * tf.ones(
+    x = tf.linalg.matvec(self._convex_update(self.upper_diagonal_weights_matrix),
+      x, transpose_a=True)
+    x += (tf.concat([(1. - self.residual_fraction) * tf.ones(
       self.gate_first_n), tf.ones(self.width - self.gate_first_n)],
-                   axis=0) * self.bias
+                   axis=0) * self.bias)[tf.newaxis, ...]
 
     if self.activation_fn:
-      fldj += tf.reduce_sum(tf.math.log(self._derivative_of_softplus(x)),
+      fldj += tf.reduce_sum(tf.math.log(self._derivative_of_softplus(x[0])),
                             -1)
       x = tf.concat([(self.residual_fraction) * tf.ones(
         self.gate_first_n), tf.zeros(self.width - self.gate_first_n)],
@@ -304,9 +298,8 @@ class HighwayFlow(tfb.Bijector):
         [(1. - self.residual_fraction) * tf.ones(
           self.gate_first_n), tf.ones(self.width - self.gate_first_n)],
         axis=0) * tf.nn.softplus(x)
-    if added_batch:
-      x = tf.squeeze(x, 0)
-    return x, {'ildj': -fldj, 'fldj': fldj}
+
+    return tf.squeeze(x, 0), {'ildj': -fldj, 'fldj': fldj}
 
   def _augmented_inverse(self, y):
     """Computes inverse and inverse_log_det_jacobian transformations.
@@ -319,12 +312,6 @@ class HighwayFlow(tfb.Bijector):
       determinant of the jacobian.
     """
 
-    added_batch = False
-    if len(y.shape) <= 1:
-      if len(y.shape) == 0:
-        y = tf.reshape(y, -1)
-      added_batch = True
-      y = tf.expand_dims(y, 0)
     ildj = tf.zeros(y.shape[:-1]) - tf.reduce_sum(
       tf.math.log(tf.concat([(self.residual_fraction) * tf.ones(
         self.gate_first_n), tf.zeros(self.width - self.gate_first_n)],
@@ -333,23 +320,25 @@ class HighwayFlow(tfb.Bijector):
           self.gate_first_n), tf.ones(self.width - self.gate_first_n)],
         axis=0) * tf.linalg.diag_part(
         self.upper_diagonal_weights_matrix)))
+
+
     if self.activation_fn:
       y = self._inverse_of_softplus(y)
       ildj -= tf.reduce_sum(tf.math.log(self._derivative_of_softplus(y)),
                             -1)
 
-    y = y - tf.concat([(1. - self.residual_fraction) * tf.ones(
+    y = y[..., tf.newaxis]
+
+    y = y - (tf.concat([(1. - self.residual_fraction) * tf.ones(
       self.gate_first_n), tf.ones(self.width - self.gate_first_n)],
-                      axis=0) * self.bias
-    y = tf.linalg.triangular_solve(tf.transpose(
-      self._convex_update(self.upper_diagonal_weights_matrix)),
-      tf.linalg.matrix_transpose(y),
-      lower=False)
-    y = tf.linalg.matrix_transpose(tf.linalg.triangular_solve(
-      self._convex_update(self.lower_diagonal_weights_matrix), y))
-    if added_batch:
-      y = tf.squeeze(y, 0)
-    return y, {'ildj': ildj, 'fldj': -ildj}
+                      axis=0) * self.bias)[..., tf.newaxis]
+    y = tf.linalg.triangular_solve(
+      self._convex_update(self.upper_diagonal_weights_matrix), y,
+      lower=True, adjoint=True)
+    y = tf.linalg.triangular_solve(
+      self._convex_update(self.lower_diagonal_weights_matrix), y)
+
+    return tf.squeeze(y, -1), {'ildj': ildj, 'fldj': -ildj}
 
   def _forward(self, x):
     y, _ = self._augmented_forward(x)
