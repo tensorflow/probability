@@ -426,10 +426,10 @@ class TruncatedNormal(distribution.Distribution):
     #  https://en.wikipedia.org/wiki/Truncated_normal_distribution#Generating_values_from_the_truncated_normal_distribution
     #  for a discussion on alternatives.
     loc, scale, low, high = self._loc_scale_low_high()
-    alpha = (low - loc) / scale
-    beta = (high - loc) / scale
+    std_low, std_high = self._standardized_low_and_high(
+        low=low, high=high, loc=loc, scale=scale)
     quantile = tf.math.ndtri(
-      special_math.ndtr(alpha) + p * (special_math.ndtr(beta) - special_math.ndtr(alpha))
+      special_math.ndtr(std_low) + p * (special_math.ndtr(std_high) - special_math.ndtr(std_low))
     ) * scale + loc
     return quantile
 
