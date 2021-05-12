@@ -28,13 +28,13 @@ def build_highway_flow_layer(width,
                              activation_fn=False,
                              gate_first_n=-1,
                              seed=None):
-  """Builds HighwayFlow making sure that all the requirements ar satisfied.
+  """Builds HighwayFlow making sure that all the requirements are satisfied.
 
   Args:
     width: Input dimension of the bijector.
     residual_fraction_initial_value: Initial value for gating parameter, must be
-     between 0 and 1.
-     activation_fn: Whether or not use SoftPlus activation function.
+      between 0 and 1.
+    activation_fn: Whether or not use SoftPlus activation function.
     gate_first_n: Decides which part of the input should be gated (useful for
     example when using auxiliary variables).
     seed: Seed for random initialization of the weights.
@@ -58,8 +58,8 @@ def build_highway_flow_layer(width,
     name='residual_fraction_initial_value')
   dtype = residual_fraction_initial_value.dtype
 
-  bias_seed, upper_seed, lower_seed, diagonal_seed = samplers.split_seed(
-    seed, n=4)
+  bias_seed, upper_seed, lower_seed = samplers.split_seed(
+    seed, n=3)
   lower_bijector = tfb.Chain(
     [tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
      tfb.Pad(paddings=[(1, 0), (0, 1)]),
@@ -103,9 +103,9 @@ class HighwayFlow(tfb.Bijector):
 
   HighwayFlow interpolates the input `X` with the transformations at each step
   of the bjiector. The Highway Flow can be used as building block for a
-  Cascading flow [1 or as a generic normalizing flow.
+  Cascading flow [1] or as a generic normalizing flow.
 
-  The transformation consists in a convex update between the input `X` and a
+  The transformation consists of a convex update between the input `X` and a
   linear transformation of `X` followed by activation with the form `g(A @
   X + b)`, where `g(.)` is a differentiable non-decreasing activation
   function, and `A` and `b` are trainable weights.
@@ -128,7 +128,7 @@ class HighwayFlow(tfb.Bijector):
 
   For more details on Highway Flow and Cascading Flows see [1].
 
-  #### Usage example:
+  #### Usage example
   ```python
   tfd = tfp.distributions
   tfb = tfp.bijectors
@@ -145,21 +145,8 @@ class HighwayFlow(tfb.Bijector):
   #### References
 
   [1]: Ambrogioni, Luca, Gianluigi Silvestri, and Marcel van Gerven.
-  "Automatic variational inference with
-  cascading flows." arXiv preprint arXiv:2102.04801 (2021).
-
-  Attributes:
-    residual_fraction: Scalar `Tensor` used for the convex update, must be
-      between 0 and 1.
-    activation_fn: Boolean to decide whether to use SoftPlus (True) activation
-      or no activation (False).
-    bias: Bias vector.
-    upper_diagonal_weights_matrix: Lower diagional matrix of size (width, width)
-      with positive diagonal (is transposed to Upper diagonal within the
-      bijector).
-    lower_diagonal_weights_matrix: Lower diagonal matrix with ones on the main
-      diagional.
-    gate_first_n: Integer that decides what part of the input is gated.
+  "Automatic variational inference with cascading flows." arXiv preprint
+  arXiv:2102.04801 (2021).
   """
 
   # HighWay Flow simultaneously computes `forward` and `fldj`
@@ -177,7 +164,20 @@ class HighwayFlow(tfb.Bijector):
                gate_first_n,
                validate_args=False,
                name=None):
-    """Initializes the HighwayFlow."""
+    """Initializes the HighwayFlow.
+    Args:
+      residual_fraction: Scalar `Tensor` used for the convex update, must be
+        between 0 and 1.
+      activation_fn: Boolean to decide whether to use SoftPlus (True) activation
+        or no activation (False).
+      bias: Bias vector.
+      upper_diagonal_weights_matrix: Lower diagional matrix of size
+        (width, width) with positive diagonal (is transposed to Upper diagonal
+        within the bijector).
+      lower_diagonal_weights_matrix: Lower diagonal matrix with ones on the main
+        diagional.
+      gate_first_n: Integer that decides what part of the input is gated.
+    """
     parameters = dict(locals())
     name = name or 'highway_flow'
     with tf.name_scope(name) as name:
