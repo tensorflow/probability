@@ -381,6 +381,15 @@ class AutoCompositeTensorTest(test_util.TestCase):
     dec = struct_coder.decode_proto(enc)
     self.assertEqual(dec, ct_functor._type_spec)
 
+  def test_composite_tensor_callable_arg(self):
+    # Parameters that are both `CompositeTensor` and callable should be
+    # handled by the `_type_spec` as `CompositeTensor`.
+    inner_bij = tfb.Scale([[1., 3.]], validate_args=True)
+    bij = tfb.TransformDiagonal(inner_bij, validate_args=True)
+    self.assertLen(tf.nest.flatten(bij), 1)
+    self.assertLen(bij._type_spec._callable_params, 0)  # pylint: disable=protected-access
+    self.assertIn('diag_bijector', bij._type_spec._param_specs)  # pylint: disable=protected-access
+
   def test_subclass_with_inherited_type_spec_raises(self):
 
     class StandardNormal(AutoNormal):

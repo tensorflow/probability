@@ -29,16 +29,18 @@ from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.framework import type_spec  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Transpose',
 ]
 
 
-class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Transpose(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = transpose_rightmost_dims(X, rightmost_perm)`.
 
   This bijector is semantically similar to `tf.transpose` except that it
@@ -153,17 +155,10 @@ class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
           raise ValueError(msg[:-1] + ', saw: {}.'.format(
               rightmost_transposed_ndims_))
 
-        perm_start = (
-            distribution_util.prefer_static_value(rightmost_transposed_ndims) -
-            1)
-        perm = tf.range(start=perm_start, limit=-1, delta=-1, name='perm')
       else:  # perm is not None:
         perm = tensor_util.convert_nonref_to_tensor(
             perm, dtype_hint=np.int32, name='perm')
-        rightmost_transposed_ndims = tf.size(
-            perm, name='rightmost_transposed_ndims')
-        rightmost_transposed_ndims_ = tf.get_static_value(
-            rightmost_transposed_ndims)
+        rightmost_transposed_ndims_ = tf.get_static_value(tf.size(perm))
 
       # TODO(b/110828604): If bijector base class ever supports dynamic
       # `min_event_ndims`, then this class already works dynamically and the
@@ -211,18 +206,31 @@ class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
     raise NotImplementedError(
         '`_is_increasing` not supported unless Transpose is no-op.')
 
+  def _get_perm(self):
+    if self.perm is None:
+      perm_start = (
+          distribution_util.prefer_static_value(
+              self.rightmost_transposed_ndims) - 1)
+      return tf.range(start=perm_start, limit=-1, delta=-1, name='perm')
+    return self.perm
+
+  def _get_rightmost_transposed_ndims(self):
+    if self.rightmost_transposed_ndims is None:
+      return ps.size(self.perm)
+    return self.rightmost_transposed_ndims
+
   def _forward(self, x):
-    return self._transpose(x, self.perm)
+    return self._transpose(x, self._get_perm())
 
   def _event_shape(self, shape, static_perm_to_shape):
     """Helper for _forward and _inverse_event_shape."""
-    rightmost_ = tf.get_static_value(self.rightmost_transposed_ndims)
+    rightmost_ = tf.get_static_value(self._get_rightmost_transposed_ndims())
     if tensorshape_util.rank(shape) is None or rightmost_ is None:
       return tf.TensorShape(None)
     if tensorshape_util.rank(shape) < rightmost_:
       raise ValueError('Invalid shape: min event ndims={} but got {}'.format(
           rightmost_, shape))
-    perm_ = tf.get_static_value(self.perm, partial=True)
+    perm_ = tf.get_static_value(self._get_perm(), partial=True)
     if perm_ is None:
       return shape[:tensorshape_util.rank(shape) - rightmost_].concatenate(
           [None] * int(rightmost_))
@@ -244,11 +252,11 @@ class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
     return self._event_shape(input_shape, static_perm_to_shape)
 
   def _forward_event_shape_tensor(self, input_shape):
-    perm = self._make_perm(tf.size(input_shape), self.perm)
+    perm = self._make_perm(tf.size(input_shape), self._get_perm())
     return tf.gather(input_shape, perm)
 
   def _inverse(self, y):
-    return self._transpose(y, tf.argsort(self.perm))
+    return self._transpose(y, tf.argsort(self._get_perm()))
 
   def _inverse_event_shape(self, output_shape):
     def static_perm_to_shape(subshp, perm):
@@ -260,7 +268,7 @@ class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
     return self._event_shape(output_shape, static_perm_to_shape)
 
   def _inverse_event_shape_tensor(self, output_shape):
-    perm = self._make_perm(tf.size(output_shape), tf.argsort(self.perm))
+    perm = self._make_perm(tf.size(output_shape), tf.argsort(self._get_perm()))
     return tf.gather(output_shape, perm)
 
   def _inverse_log_det_jacobian(self, y):
@@ -272,7 +280,8 @@ class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
   def _make_perm(self, x_rank, perm):
     sample_batch_ndims = (
         distribution_util.prefer_static_value(x_rank) -
-        distribution_util.prefer_static_value(self.rightmost_transposed_ndims))
+        distribution_util.prefer_static_value(
+            self._get_rightmost_transposed_ndims()))
     dtype = perm.dtype
     perm = tf.concat([
         tf.range(tf.cast(sample_batch_ndims, dtype)),
@@ -293,30 +302,19 @@ class Transpose(bijector.Bijector, tf.__internal__.CompositeTensor):
       if self.validate_args:
         assertions += _maybe_validate_rightmost_transposed_ndims(
             self._initial_rightmost_transposed_ndims,
-            self.rightmost_transposed_ndims, self.validate_args)
+            self._get_rightmost_transposed_ndims(), self.validate_args)
 
     if is_init != tensor_util.is_ref(self.perm):
       if self.validate_args:
         assertions += _maybe_validate_perm(
             self._initial_rightmost_transposed_ndims,
-            self.perm, self.validate_args)
+            self._get_perm(), self.validate_args)
 
     return assertions
 
   @property
   def _composite_tensor_shape_params(self):
-    return ('rightmost_transposed_ndims', 'perm')
-
-  @property
-  def _type_spec(self):
-    # Re-instantiate the bijector from the TypeSpec using the kwarg that the
-    # user originally passed to `__init__` (either `perm` or
-    # `rightmost_transposed_ndims`.
-    if self.parameters['perm'] is None:
-      omit_kwargs = ('name', 'perm')
-    else:
-      omit_kwargs = ('name', 'rightmost_transposed_ndims')
-    return _TransposeTypeSpec.from_instance(self, omit_kwargs=omit_kwargs)
+    return ('perm', 'rightmost_transposed_ndims')
 
 
 def _maybe_validate_rightmost_transposed_ndims(
@@ -396,11 +394,3 @@ def _maybe_validate_perm(
       ]
 
     return assertions
-
-
-@type_spec.register('tfp.bijectors.Transpose_ACTypeSpec')
-class _TransposeTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):  # pylint: disable=protected-access
-
-  @property
-  def value_type(self):
-    return Transpose

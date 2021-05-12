@@ -584,6 +584,7 @@ multi_substrate_py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
     ],
 )
 
@@ -1064,6 +1065,7 @@ multi_substrate_py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
     ],
 )
 

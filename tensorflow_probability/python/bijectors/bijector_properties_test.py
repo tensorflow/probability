@@ -185,9 +185,7 @@ AUTOVECTORIZATION_ATOL.update({
 
 COMPOSITE_TENSOR_IS_BROKEN = [
     'BatchNormalization',  # tf.layers arg
-    'Inline',  # callable
     'RationalQuadraticSpline',  # TODO(b/185628453): Debug loss of static info.
-    'TransformDiagonal',  # callable
 ]
 
 COMPOSITE_TENSOR_RTOL = collections.defaultdict(lambda: 2e-6)
@@ -245,12 +243,14 @@ def broadcasting_params(draw,
           mutex_params=MUTEX_PARAMS))
 
 
-class CallableModule(tf.Module):  # TODO(b/141098791): Eliminate this.
+# TODO(b/141098791): Eliminate this.
+@experimental.auto_composite_tensor
+class CallableModule(tf.Module, experimental.AutoCompositeTensor):
   """Convenience object for capturing variables closed over by Inline."""
 
   def __init__(self, fn, varobj):
     self._fn = fn
-    self._vars = varobj
+    self._varobj = varobj
 
   def __call__(self, *args, **kwargs):
     return self._fn(*args, **kwargs)

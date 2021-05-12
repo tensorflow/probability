@@ -20,13 +20,16 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 __all__ = [
     'TransformDiagonal',
 ]
 
 
-class TransformDiagonal(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name', 'parameters'), module_name='tfp.bijectors')
+class TransformDiagonal(bijector.AutoCompositeTensorBijector):
   """Applies a Bijector to the diagonal of a matrix.
 
   #### Example
