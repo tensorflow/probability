@@ -31,18 +31,15 @@ class HighwayFlowTests(test_util.TestCase):
     for dim in range(2):
       if dim == 0:
         # Test generic case with scalar input
-        x = tf.ones((width,)) * samplers.uniform((width,), minval=-1.,
-                                                 maxval=1.,
-                                                 seed=test_util.test_seed(
-                                                   sampler_type='stateless'))
+        x = samplers.uniform((width,), minval=-1.,
+                             maxval=1.,
+                             seed=test_util.test_seed(sampler_type='stateless'))
       elif dim == 1:
         # Test with 2D tensor + batch
-        x = tf.ones((5, width,
-                     width)) * samplers.uniform((5, width, width),
-                                                minval=-1.,
-                                                maxval=1.,
-                                                seed=test_util.test_seed(
-                                                  sampler_type='stateless'))
+        x = samplers.uniform((5, width, width),
+                             minval=-1.,
+                             maxval=1.,
+                             seed=test_util.test_seed(sampler_type='stateless'))
 
       bijector = tfp.experimental.bijectors.build_highway_flow_layer(
         width, activation_fn=True)
@@ -58,12 +55,10 @@ class HighwayFlowTests(test_util.TestCase):
 
   def testBijectorWithoutActivation(self):
     width = 4
-    x = tf.ones(2, width,
-                width) * samplers.uniform((2, width, width),
-                                          minval=-1.,
-                                          maxval=1.,
-                                          seed=test_util.test_seed(
-                                            sampler_type='stateless'))
+    x = samplers.uniform((2, width, width),
+                         minval=-1.,
+                         maxval=1.,
+                         seed=test_util.test_seed(sampler_type='stateless'))
 
     bijector = tfp.experimental.bijectors.build_highway_flow_layer(
       width, activation_fn=False)
@@ -79,11 +74,10 @@ class HighwayFlowTests(test_util.TestCase):
 
   def testGating(self):
     width = 4
-    x = tf.ones((2, width,
-                 width)) * samplers.uniform((2, width, width),
-                                            minval=-1.,
-                                            maxval=1., seed=test_util.test_seed(
-        sampler_type='stateless'))
+    x = samplers.uniform((2, width, width),
+                         minval=-1.,
+                         maxval=1.,
+                         seed=test_util.test_seed(sampler_type='stateless'))
 
     # Test with gating half of the inputs
     bijector = tfp.experimental.bijectors.build_highway_flow_layer(
@@ -135,9 +129,9 @@ class HighwayFlowTests(test_util.TestCase):
 
     # pylint: disable=protected-access
     bijector._residual_fraction = residual_fraction + h
-    y1 = tf.reduce_mean(target.log_prob(bijector.forward(x)))
+    y1 = tf.reduce_mean(target.log_prob(bijector.forward(tf.identity(x))))
     bijector._residual_fraction = residual_fraction - h
-    y2 = tf.reduce_mean(target.log_prob(bijector.forward(x)))
+    y2 = tf.reduce_mean(target.log_prob(bijector.forward(tf.identity(x))))
     # pylint: enable=protected-access
 
     manual_grad = (y1 - y2) / (2 * h)
