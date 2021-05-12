@@ -472,6 +472,9 @@ class ParameterPropertiesTest(test_util.TestCase):
                                     'TruncatedNormal', 'Uniform')
     not_annotated_dists = ('Empirical|event_ndims=0', 'Empirical|event_ndims=1',
                            'Empirical|event_ndims=2', 'FiniteDiscrete',
+                           # cov_perturb_factor is not annotated since its shape
+                           # could be a vector or a matrix.
+                           'MultivariateNormalDiagPlusLowRankCovariance',
                            'MultivariateStudentTLinearOperator',
                            'PoissonLogNormalQuadratureCompound',
                            'StoppingRatioLogistic',)
