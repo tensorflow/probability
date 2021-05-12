@@ -239,9 +239,9 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
       parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
       name: Python `str` name prefixed to Ops created by this function.
-        Default value: `None` (i.e., 'nuts_kernel').
+        Default value: `None` (i.e., 'PreconditionedNoUTurnSampler').
     """
-    with tf.name_scope(name or 'NoUTurnSampler') as name:
+    with tf.name_scope(name or 'PreconditionedNoUTurnSampler') as name:
       # Process `max_tree_depth` argument.
       max_tree_depth = tf.get_static_value(max_tree_depth)
       if max_tree_depth is None or max_tree_depth < 1:
@@ -1085,5 +1085,3 @@ def compute_hamiltonian(target_log_prob, momentum_parts, momentum_distribution):
 def get_kinetic_energy_fn(momentum_distribution):
   """Comvert a momentum distribution to a kinetic energy function."""
   return lambda *args: -momentum_distribution.log_prob(*args)
-
-

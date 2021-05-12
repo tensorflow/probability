@@ -231,7 +231,7 @@ class NoUTurnSampler(TransitionKernel):
       parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
       name: Python `str` name prefixed to Ops created by this function.
-        Default value: `None` (i.e., 'nuts_kernel').
+        Default value: `None` (i.e., 'NoUTurnSampler').
     """
     with tf.name_scope(name or 'NoUTurnSampler') as name:
       # Process `max_tree_depth` argument.

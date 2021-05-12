@@ -194,7 +194,7 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
         This is incompatible with `step_size_update_fn`, which must be set to
         `None`.
       name: Python `str` name prefixed to Ops created by this function.
-        Default value: `None` (i.e., 'hmc_kernel').
+        Default value: `None` (i.e., 'phmc_kernel').
     """
     if step_size_update_fn and store_parameters_in_results:
       raise ValueError('It is invalid to simultaneously specify '
@@ -207,7 +207,7 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
             num_leapfrog_steps=num_leapfrog_steps,
             state_gradients_are_stopped=state_gradients_are_stopped,
             momentum_distribution=momentum_distribution,
-            name=name or 'hmc_kernel',
+            name=name or 'phmc_kernel',
             store_parameters_in_results=store_parameters_in_results))
     self._parameters = self._impl.inner_kernel.parameters.copy()
     self._parameters.pop('seed', None)  # TODO(b/159636942): Remove this line.
