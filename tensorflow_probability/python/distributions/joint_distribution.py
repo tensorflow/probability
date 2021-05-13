@@ -649,6 +649,24 @@ class JointDistribution(distribution_lib.Distribution):
     name = kwargs.pop('name', 'prob')
     return self._call_prob(self._resolve_value(*args, **kwargs), name=name)
 
+  # Override the base method to capture *args and **kwargs, so we can
+  # implement more flexible custom calling semantics.
+  @docstring_util.expand_docstring(
+      calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(
+          method='unnormalized_log_prob', method_abbr='lp'))
+  def unnormalized_log_prob(self, *args, **kwargs):  # pylint: disable=g-doc-args
+    """Unnormalized log probability density/mass function.
+
+    ${calling_convention_description}
+
+    Returns:
+      log_prob: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
+        values of type `self.dtype`.
+    """
+    name = kwargs.pop('name', 'unnormalized_log_prob')
+    return self._call_unnormalized_log_prob(
+        self._resolve_value(*args, **kwargs), name=name)
+
   def _flat_resolve_names(self, dummy_name='var'):
     """Resolves a name for each random variable in the model."""
     names = []
