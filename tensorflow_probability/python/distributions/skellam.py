@@ -175,18 +175,6 @@ class Skellam(distribution.Distribution):
     """Interpolate (log) probs on non-integer inputs."""
     return self._force_probs_to_zero_outside_support
 
-  def _batch_shape_tensor(self, log_rate1=None, log_rate2=None):
-    x1 = self._rate1 if self._log_rate1 is None else self._log_rate1
-    x1 = log_rate1 if log_rate1 is not None else x1
-    x2 = self._rate2 if self._log_rate2 is None else self._log_rate2
-    x2 = log_rate2 if log_rate2 is not None else x2
-    return ps.broadcast_shape(ps.shape(x1), ps.shape(x2))
-
-  def _batch_shape(self):
-    x1 = self._rate1 if self._log_rate1 is None else self._log_rate1
-    x2 = self._rate2 if self._log_rate2 is None else self._log_rate2
-    return tf.broadcast_static_shape(x1.shape, x2.shape)
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 

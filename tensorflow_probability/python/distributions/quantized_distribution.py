@@ -293,12 +293,6 @@ class QuantizedDistribution(distributions.Distribution):
             default_constraining_bijector_fn=parameter_properties
             .BIJECTOR_NOT_IMPLEMENTED,))
 
-  def _batch_shape_tensor(self):
-    return self.distribution.batch_shape_tensor()
-
-  def _batch_shape(self):
-    return self.distribution.batch_shape
-
   def _event_shape_tensor(self):
     return self.distribution.event_shape_tensor()
 
@@ -535,7 +529,8 @@ class QuantizedDistribution(distributions.Distribution):
       return []
 
     sample_shape = tf.concat(
-        [self._batch_shape_tensor(), self._event_shape_tensor()], axis=0)
+        [self.distribution.batch_shape_tensor(),
+         self._event_shape_tensor()], axis=0)
 
     low = None if self._low is None else tf.convert_to_tensor(self._low)
     high = None if self._high is None else tf.convert_to_tensor(self._high)

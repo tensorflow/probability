@@ -252,14 +252,6 @@ class Masked(distribution_lib.Distribution):
   def experimental_is_sharded(self):
     return self.distribution.experimental_is_sharded
 
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.distribution.batch_shape, self.validity_mask.shape)
-
-  def _batch_shape_tensor(self):
-    return ps.broadcast_shape(
-        self.distribution.batch_shape_tensor(), ps.shape(self.validity_mask))
-
   def _event_shape(self):
     return self.distribution.event_shape
 

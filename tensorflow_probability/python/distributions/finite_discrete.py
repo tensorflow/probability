@@ -192,12 +192,6 @@ class FiniteDiscrete(distribution.Distribution):
     """Input argument `probs`."""
     return self._categorical.probs
 
-  def _batch_shape_tensor(self):
-    return self._categorical.batch_shape_tensor()
-
-  def _batch_shape(self):
-    return self._categorical.batch_shape
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 

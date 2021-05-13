@@ -33,7 +33,6 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
@@ -207,18 +206,6 @@ class HalfStudentT(distribution.Distribution):
   def scale(self):
     """Distribution parameter for the scale."""
     return self._scale
-
-  def _batch_shape_tensor(self, df=None, loc=None, scale=None):
-    return ps.broadcast_shape(
-        ps.shape(self.df if df is None else df),
-        ps.broadcast_shape(
-            ps.shape(self.loc if loc is None else loc),
-            ps.shape(self.scale if scale is None else scale)))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        tf.broadcast_static_shape(self.df.shape, self.loc.shape),
-        self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

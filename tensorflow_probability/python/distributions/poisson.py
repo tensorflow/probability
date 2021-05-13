@@ -285,14 +285,6 @@ class Poisson(distribution.Distribution):
     """Return 0 probabilities on non-integer inputs."""
     return self._force_probs_to_zero_outside_support
 
-  def _batch_shape_tensor(self):
-    x = self._rate if self._log_rate is None else self._log_rate
-    return tf.shape(x)
-
-  def _batch_shape(self):
-    x = self._rate if self._log_rate is None else self._log_rate
-    return x.shape
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
