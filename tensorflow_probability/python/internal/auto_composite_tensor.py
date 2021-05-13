@@ -62,6 +62,15 @@ _SENTINEL = object()
 
 _AUTO_COMPOSITE_TENSOR_VERSION = 2
 
+# Cache maps __init__ method to signature
+_sig_cache = {}
+
+
+def _cached_signature(f):
+  if f not in _sig_cache:
+    _sig_cache[f] = tf_inspect.signature(f)
+  return _sig_cache[f]
+
 
 def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
                          prefer_static_value=()):
@@ -72,7 +81,7 @@ def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
   if type(obj).__init__ is AutoCompositeTensor.__init__:
     return {}
 
-  sig = tf_inspect.signature(obj.__init__)
+  sig = _cached_signature(type(obj).__init__)
   if any(v.kind in (tf_inspect.Parameter.VAR_KEYWORD,
                     tf_inspect.Parameter.VAR_POSITIONAL)
          for v in sig.parameters.values()):
@@ -86,19 +95,24 @@ def _extract_init_kwargs(obj, omit_kwargs=(), limit_to=None,
   kwargs = {}
   not_found = object()
   for k in keys:
-    srcs = [
-        getattr(obj, k, not_found), getattr(obj, '_' + k, not_found),
-        getattr(obj, 'parameters', {}).get(k, not_found),
-    ]
-    if any(v is not not_found for v in srcs):
-      kwargs[k] = [v for v in srcs if v is not not_found][0]
+    src1 = getattr(obj, k, not_found)
+    if src1 is not not_found:
+      kwargs[k] = src1
     else:
-      raise ValueError(
-          f'Could not determine an appropriate value for field `{k}` in object '
-          f' `{obj}`. Looked for \n'
-          f' 1. an attr called `{k}`,\n'
-          f' 2. an attr called `_{k}`,\n'
-          f' 3. an entry in `obj.parameters` with key "{k}".')
+      src2 = getattr(obj, '_' + k, not_found)
+      if src2 is not not_found:
+        kwargs[k] = src2
+      else:
+        src3 = getattr(obj, 'parameters', {}).get(k, not_found)
+        if src3 is not not_found:
+          kwargs[k] = src3
+        else:
+          raise ValueError(
+              f'Could not determine an appropriate value for field `{k}` in'
+              f' object `{obj}`. Looked for \n'
+              f' 1. an attr called `{k}`,\n'
+              f' 2. an attr called `_{k}`,\n'
+              f' 3. an entry in `obj.parameters` with key "{k}".')
     if k in prefer_static_value and kwargs[k] is not None:
       if tf.is_tensor(kwargs[k]):
         static_val = tf.get_static_value(kwargs[k])
@@ -137,8 +151,9 @@ def _extract_type_spec_recursively(value):
     return tf.TensorSpec(value.shape, value.dtype)
   if isinstance(value, (list, tuple)):
     specs = [_extract_type_spec_recursively(v) for v in value]
-    has_tensors = any(a is not b for a, b in zip(value, specs))
-    has_only_tensors = all(a is not b for a, b in zip(value, specs))
+    was_tensor = list([a is not b for a, b in zip(value, specs)])
+    has_tensors = any(was_tensor)
+    has_only_tensors = all(was_tensor)
     if has_tensors:
       if has_tensors != has_only_tensors:
         raise NotImplementedError(
