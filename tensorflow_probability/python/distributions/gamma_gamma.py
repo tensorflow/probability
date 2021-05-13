@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -32,7 +31,6 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -174,16 +172,6 @@ class GammaGamma(distribution.Distribution):
   def mixing_rate(self):
     """Rate parameter for the mixing Gamma distribution."""
     return self._mixing_rate
-
-  def _batch_shape_tensor(self):
-    tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
-    return functools.reduce(ps.broadcast_shape,
-                            [ps.shape(tensor) for tensor in tensors])
-
-  def _batch_shape(self):
-    tensors = [self.concentration, self.mixing_concentration, self.mixing_rate]
-    return functools.reduce(tf.broadcast_static_shape,
-                            [tensor.shape for tensor in tensors])
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
@@ -191,7 +192,9 @@ class Independent(distribution_lib.Distribution):
 
     if distribution_batch_shape_tensor is None:
       distribution_batch_shape_tensor = self.distribution.batch_shape_tensor()
-    return tf.maximum(0, tf.size(distribution_batch_shape_tensor) - 1)
+    return ps.cast(
+        ps.maximum(0, ps.size(distribution_batch_shape_tensor) - 1),
+        np.int32)
 
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing

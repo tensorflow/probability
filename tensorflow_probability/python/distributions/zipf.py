@@ -192,12 +192,6 @@ class Zipf(distribution.Distribution):
     """Maximum number of allowable iterations in `sample`."""
     return self._sample_maximum_iterations
 
-  def _batch_shape_tensor(self):
-    return tf.shape(self.power)
-
-  def _batch_shape(self):
-    return self.power.shape
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 

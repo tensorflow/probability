@@ -456,12 +456,16 @@ class IndependentDistributionTest(test_util.TestCase):
         tfd.Logistic(loc=loc, scale=scale, validate_args=True),
         reinterpreted_batch_ndims=None, validate_args=True)
 
-    for method in ('batch_shape_tensor', 'event_shape_tensor',
-                   'mean', 'variance'):
+    for method in ('event_shape_tensor', 'mean', 'variance'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
         getattr(dist, method)()
 
-    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=4):
+    with tfp_hps.assert_no_excessive_var_usage('batch_shape_tensor',
+                                               max_permissible=10):
+      # Automatic inference of batch shape requires additional concretizations.
+      dist.batch_shape_tensor()
+
+    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=6):
       dist.sample(seed=test_util.test_seed())
 
     # In addition to the four reads of `loc`, `scale` described above in

@@ -220,15 +220,6 @@ class Dirichlet(distribution.Distribution):
   def force_probs_to_zero_outside_support(self):
     return self._force_probs_to_zero_outside_support
 
-  def _batch_shape_tensor(self):
-    # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
-    # so we pre-emptively convert-to-tensor.
-    concentration = tf.convert_to_tensor(self.concentration)
-    return ps.shape(concentration)[:-1]
-
-  def _batch_shape(self):
-    return self.concentration.shape[:-1]
-
   def _event_shape_tensor(self):
     # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
     # so we pre-emptively convert-to-tensor.

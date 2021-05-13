@@ -150,16 +150,6 @@ class InverseGaussian(distribution.Distribution):
     """Concentration parameter."""
     return self._concentration
 
-  def _batch_shape_tensor(self, loc=None, concentration=None):
-    return ps.broadcast_shape(
-        ps.shape(self.loc if loc is None else loc),
-        ps.shape(
-            self.concentration if concentration is None else concentration))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.loc.shape, self.concentration.shape)
-
   def _event_shape(self):
     return tf.TensorShape([])
 

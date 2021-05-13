@@ -180,19 +180,6 @@ class Triangular(distribution.Distribution):
     """Pdf evaluated at the peak."""
     return (self.peak - self.low) / (self.high - self.low)
 
-  def _batch_shape_tensor(self, low=None, peak=None, high=None):
-    return ps.broadcast_shape(
-        ps.shape(self.peak if peak is None else peak),
-        ps.broadcast_shape(
-            ps.shape(self.low if low is None else low),
-            ps.shape(self.high if high is None else high)))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.peak.shape,
-        tf.broadcast_static_shape(
-            self.low.shape, self.high.shape))
-
   def _event_shape(self):
     return tf.TensorShape([])
 

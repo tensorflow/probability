@@ -851,9 +851,9 @@ class BatchShapeInferenceTests(test_util.TestCase):
     value = value_fn()  # Defer construction until we're in the right graph.
     self.assertAllEqual(
         expected_batch_shape,
-        value._inferred_batch_shape_tensor())
+        value.batch_shape_tensor())
 
-    batch_shape = value._inferred_batch_shape()
+    batch_shape = value.batch_shape
     self.assertIsInstance(batch_shape, tf.TensorShape)
     self.assertTrue(
         batch_shape.is_compatible_with(expected_batch_shape))
