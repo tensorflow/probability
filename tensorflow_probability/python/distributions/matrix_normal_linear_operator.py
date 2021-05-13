@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
@@ -230,6 +232,20 @@ class MatrixNormalLinearOperator(distribution.Distribution):
   def scale_column(self):
     """Distribution parameter for column scale."""
     return self._scale_column
+
+  def _batch_shape(self):
+    return functools.reduce(tf.broadcast_static_shape, (
+        self.loc.shape[:-2],
+        self.scale_row.shape[:-2],
+        self.scale_column.shape[:-2]))
+
+  def _batch_shape_tensor(self, loc=None, scale_row=None, scale_column=None):
+    return functools.reduce(prefer_static.broadcast_shape, (
+        prefer_static.shape(self.loc if loc is None else loc)[:-2],
+        prefer_static.shape(
+            self.scale_row if scale_row is None else scale_row)[:-2],
+        prefer_static.shape(
+            self.scale_column if scale_column is None else scale_column)[:-2]))
 
   def _event_shape_tensor(self, loc=None):
     return tf.shape(self.loc if loc is None else loc)[-2:]

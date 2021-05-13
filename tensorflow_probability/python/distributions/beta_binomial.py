@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
@@ -29,6 +31,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -231,6 +234,17 @@ class BetaBinomial(distribution.Distribution):
   def _params_list_as_tensors(self):
     return [tf.convert_to_tensor(p) for p in self._params_list()]
 
+  def _batch_shape_tensor(self, params=None):
+    if params is None:
+      params = self._params_list()
+    return functools.reduce(
+        ps.broadcast_shape,
+        [ps.shape(t) for t in params])
+
+  def _batch_shape(self):
+    return functools.reduce(tf.broadcast_static_shape,
+                            [t.shape for t in self._params_list()])
+
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -241,10 +255,9 @@ class BetaBinomial(distribution.Distribution):
     gamma1_seed, gamma2_seed, binomial_seed = samplers.split_seed(
         seed, n=3, salt='beta_binomial')
 
-    total_count, concentration1, concentration0 = self._params_list_as_tensors()
-    batch_shape = self._batch_shape_tensor(total_count=total_count,
-                                           concentration1=concentration1,
-                                           concentration0=concentration0)
+    params = self._params_list_as_tensors()
+    batch_shape = self._batch_shape_tensor(params=params)
+    total_count, concentration1, concentration0 = params
 
     expanded_concentration1 = tf.broadcast_to(concentration1, batch_shape)
     expanded_concentration0 = tf.broadcast_to(concentration0, batch_shape)

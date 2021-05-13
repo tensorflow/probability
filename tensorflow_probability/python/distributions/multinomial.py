@@ -235,6 +235,16 @@ class Multinomial(distribution.Distribution):
     """Input argument `probs`."""
     return self._probs
 
+  def _batch_shape_tensor(self):
+    return tf.broadcast_dynamic_shape(
+        tf.shape(self._probs if self._logits is None else self._logits)[:-1],
+        tf.shape(self.total_count))
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        (self._probs if self._logits is None else self._logits).shape[:-1],
+        self.total_count.shape)
+
   def _event_shape_tensor(self):
     # We will never broadcast the num_categories with total_count.
     return tf.shape(self._probs if self._logits is None else self._logits)[-1:]

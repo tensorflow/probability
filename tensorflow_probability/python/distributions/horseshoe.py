@@ -173,6 +173,12 @@ class Horseshoe(distribution.Distribution):
     """Distribution parameter for scale."""
     return self._scale
 
+  def _batch_shape_tensor(self):
+    return ps.shape(self.scale)
+
+  def _batch_shape(self):
+    return self.scale.shape
+
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 

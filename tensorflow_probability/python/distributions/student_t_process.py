@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import warnings
 
 # Dependency imports
@@ -510,6 +511,25 @@ class StudentTProcess(distribution.Distribution):
 
   def _log_prob(self, value, index_points=None):
     return self.get_marginal_distribution(index_points).log_prob(value)
+
+  def _batch_shape_tensor(self, index_points=None):
+    index_points = self._get_index_points(index_points)
+    return functools.reduce(tf.broadcast_dynamic_shape, [
+        tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
+        self.kernel.batch_shape_tensor(),
+        tf.shape(self.observation_noise_variance),
+        tf.shape(self.df)
+    ])
+
+  def _batch_shape(self, index_points=None):
+    index_points = (
+        index_points if index_points is not None else self._index_points)
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        [index_points.shape[:-(self.kernel.feature_ndims + 1)],
+         self.kernel.batch_shape,
+         self.observation_noise_variance.shape,
+         self.df.shape])
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)

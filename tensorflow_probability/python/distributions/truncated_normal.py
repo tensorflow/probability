@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 
@@ -238,6 +240,19 @@ class TruncatedNormal(distribution.Distribution):
   @property
   def high(self):
     return self._high
+
+  def _batch_shape(self):
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        (self.loc.shape, self.scale.shape, self.low.shape, self.high.shape))
+
+  def _batch_shape_tensor(self, loc=None, scale=None, low=None, high=None):
+    return functools.reduce(
+        ps.broadcast_shape,
+        (ps.shape(self.loc if loc is None else loc),
+         ps.shape(self.scale if scale is None else scale),
+         ps.shape(self.low if low is None else low),
+         ps.shape(self.high if high is None else high)))
 
   def _event_shape(self):
     return tf.TensorShape([])

@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import sys
 
 # Dependency imports
@@ -213,6 +214,16 @@ class Bates(distribution.Distribution):
     return [('total_count', self._total_count),
             ('low', self._low),
             ('high', self._high)]
+
+  def _batch_shape_tensor(self):
+    return functools.reduce(
+        ps.broadcast_shape,
+        [ps.shape(param) for _, param in self._params_list()])
+
+  def _batch_shape(self):
+    return functools.reduce(
+        tf.broadcast_static_shape,
+        [param.shape for _, param in self._params_list()])
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

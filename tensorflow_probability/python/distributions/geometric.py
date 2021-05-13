@@ -140,6 +140,14 @@ class Geometric(distribution.Distribution):
     """Return 0 probabilities on non-integer inputs."""
     return self._force_probs_to_zero_outside_support
 
+  def _batch_shape_tensor(self):
+    x = self._probs if self._logits is None else self._logits
+    return ps.shape(x)
+
+  def _batch_shape(self):
+    x = self._probs if self._logits is None else self._logits
+    return x.shape
+
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 

@@ -217,6 +217,17 @@ class Gamma(distribution.Distribution):
   def force_probs_to_zero_outside_support(self):
     return self._force_probs_to_zero_outside_support
 
+  def _batch_shape_tensor(self, concentration=None, rate=None):
+    return ps.broadcast_shape(
+        ps.shape(
+            self.concentration if concentration is None else concentration),
+        _shape_or_scalar(self.rate, self.log_rate))
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        self.concentration.shape,
+        _tensorshape_or_scalar(self.rate, self.log_rate))
+
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 

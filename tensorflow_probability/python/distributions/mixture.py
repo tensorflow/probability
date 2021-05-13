@@ -227,6 +227,12 @@ class Mixture(distribution.Distribution):
         components=parameter_properties.BatchedComponentProperties(
             event_ndims=lambda self: [0 for _ in self.components]))
 
+  def _batch_shape_tensor(self):
+    return self._cat.batch_shape_tensor()
+
+  def _batch_shape(self):
+    return self._static_batch_shape
+
   def _event_shape_tensor(self):
     return self._components[0].event_shape_tensor()
 

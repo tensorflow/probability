@@ -221,6 +221,17 @@ class Beta(distribution.Distribution):
   def force_probs_to_zero_outside_support(self):
     return self._force_probs_to_zero_outside_support
 
+  def _batch_shape_tensor(self, concentration1=None, concentration0=None):
+    return ps.broadcast_shape(
+        ps.shape(
+            self.concentration1 if concentration1 is None else concentration1),
+        ps.shape(
+            self.concentration0 if concentration0 is None else concentration0))
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        self.concentration1.shape, self.concentration0.shape)
+
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -231,8 +242,7 @@ class Beta(distribution.Distribution):
     seed1, seed2 = samplers.split_seed(seed, salt='beta')
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
-    shape = self._batch_shape_tensor(concentration1=concentration1,
-                                     concentration0=concentration0)
+    shape = self._batch_shape_tensor(concentration1, concentration0)
     expanded_concentration1 = tf.broadcast_to(concentration1, shape)
     expanded_concentration0 = tf.broadcast_to(concentration0, shape)
     log_gamma1 = gamma_lib.random_gamma(

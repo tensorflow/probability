@@ -164,7 +164,7 @@ class ParameterProperties(
   the `event_ndims` of the `bijectors` parameter would be `[0, 0]`, matching
   the structure of the `bijectors` value (note that since this structure is
   instance-dependent, the `event_ndims` would need to be specified using a
-  callable, as detailed above).
+  calalble, as detailed above).
 
   #### Choice of constraining bijectors
 

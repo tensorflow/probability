@@ -196,6 +196,12 @@ class Sample(distribution_lib.Distribution):
     # through slicing to the underlying.
     return self.copy(distribution=self.distribution.__getitem__(slices))
 
+  def _batch_shape_tensor(self):
+    return self.distribution.batch_shape_tensor()
+
+  def _batch_shape(self):
+    return self.distribution.batch_shape
+
   def _event_shape_tensor(self):
     return ps.concat([
         ps.reshape(self.sample_shape, shape=[-1]),

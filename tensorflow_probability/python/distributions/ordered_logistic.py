@@ -260,6 +260,17 @@ class OrderedLogistic(distribution.Distribution):
     return categorical.Categorical(
         logits=self.categorical_log_probs()).sample(n, seed)
 
+  def _batch_shape_tensor(self, cutpoints=None, loc=None):
+    cutpoints = self.cutpoints if cutpoints is None else cutpoints
+    loc = self.loc if loc is None else loc
+    return ps.broadcast_shape(
+        ps.shape(cutpoints)[:-1],
+        ps.shape(loc))
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        self.loc.shape, self.cutpoints.shape[:-1])
+
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 

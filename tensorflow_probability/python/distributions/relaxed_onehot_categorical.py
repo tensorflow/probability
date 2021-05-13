@@ -234,6 +234,19 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
     """Input argument `probs`."""
     return self._probs
 
+  def _batch_shape_tensor(self, temperature=None, logits=None):
+    param = logits
+    if param is None:
+      param = self._logits if self._logits is not None else self._probs
+    if temperature is None:
+      temperature = self.temperature
+    return ps.broadcast_shape(
+        ps.shape(temperature), ps.shape(param)[:-1])
+
+  def _batch_shape(self):
+    param = self._logits if self._logits is not None else self._probs
+    return tf.broadcast_static_shape(self.temperature.shape, param.shape[:-1])
+
   def _event_shape_tensor(self, logits=None):
     param = logits
     if param is None:

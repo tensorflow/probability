@@ -17,6 +17,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 import numpy as np
 import tensorflow.compat.v2 as tf
 
@@ -223,6 +225,18 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
             ),
         loc=parameter_properties.ParameterProperties(event_ndims=1),
         scale=parameter_properties.BatchedComponentProperties())
+
+  def _batch_shape_tensor(self):
+    shape_list = [
+        self.scale.batch_shape_tensor(),
+        tf.shape(self.df),
+        tf.shape(self.loc)[:-1]
+    ]
+    return functools.reduce(tf.broadcast_dynamic_shape, shape_list)
+
+  def _batch_shape(self):
+    shape_list = [self.scale.batch_shape, self.df.shape, self.loc.shape[:-1]]
+    return functools.reduce(tf.broadcast_static_shape, shape_list)
 
   def _event_shape_tensor(self):
     return self.scale.range_dimension_tensor()[tf.newaxis]

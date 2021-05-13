@@ -846,7 +846,7 @@ class MixtureTest(test_util.TestCase):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=2):
         getattr(dist, method)()
 
-    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=4):
+    with tfp_hps.assert_no_excessive_var_usage('sample', max_permissible=2):
       dist.sample(seed=test_util.test_seed())
 
     for method in ('prob', 'log_prob'):

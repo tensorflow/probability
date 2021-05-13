@@ -124,6 +124,15 @@ class Pareto(distribution.Distribution):
     """Concentration parameter for this distribution."""
     return self._concentration
 
+  def _batch_shape_tensor(self, concentration=None, scale=None):
+    return ps.broadcast_shape(
+        ps.shape(
+            self.concentration if concentration is None else concentration),
+        ps.shape(self.scale if scale is None else scale))
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(self.concentration.shape, self.scale.shape)
+
   def _event_shape(self):
     return tf.TensorShape([])
 

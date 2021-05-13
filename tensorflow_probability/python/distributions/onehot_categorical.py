@@ -161,6 +161,14 @@ class OneHotCategorical(distribution.Distribution):
     """Input argument `probs`."""
     return self._probs
 
+  def _batch_shape_tensor(self):
+    param = self._logits if self._logits is not None else self._probs
+    return ps.shape(param)[:-1]
+
+  def _batch_shape(self):
+    param = self._logits if self._logits is not None else self._probs
+    return param.shape[:-1]
+
   def _event_shape_tensor(self):
     param = self._logits if self._logits is not None else self._probs
     # NOTE: If the last dimension of `param.shape` is statically-known, but

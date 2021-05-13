@@ -378,6 +378,12 @@ class LKJ(distribution.Distribution):
     """Boolean indicating if `Tensor` input/outputs are Cholesky factorized."""
     return self._input_output_cholesky
 
+  def _batch_shape_tensor(self):
+    return ps.shape(self.concentration)
+
+  def _batch_shape(self):
+    return self.concentration.shape
+
   def _event_shape_tensor(self):
     return tf.constant([self.dimension, self.dimension], dtype=tf.int32)
 

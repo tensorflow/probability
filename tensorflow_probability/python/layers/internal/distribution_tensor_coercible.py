@@ -25,7 +25,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as tfd
 from tensorflow_probability.python.internal import nest_util
-from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.util.deferred_tensor import TensorMetaClass
 from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
 
@@ -67,16 +66,6 @@ class _TensorCoercible(tfd.Distribution):
                convert_to_tensor_fn=tfd.Distribution.sample):
     self._concrete_value = None  # pylint: disable=protected-access
     self._convert_to_tensor_fn = convert_to_tensor_fn  # pylint: disable=protected-access
-
-  @classmethod
-  def _parameter_properties(cls, dtype, num_classes=None):
-    return dict(distribution=parameter_properties.BatchedComponentProperties())
-
-  def _batch_shape_tensor(self, **parameter_kwargs):
-    # Any parameter kwargs are for the inner distribution, so pass them
-    # to its `_batch_shape_tensor` method instead of handling them directly.
-    return self.parameters['distribution']._batch_shape_tensor(  # pylint: disable=protected-access
-        **parameter_kwargs)
 
   @property
   def shape(self):

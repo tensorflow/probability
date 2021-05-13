@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
@@ -196,6 +198,24 @@ class PERT(distribution.Distribution):
 
   def _event_shape(self):
     return ()
+
+  def _batch_shape(self):
+    return functools.reduce(tf.broadcast_static_shape,
+                            (self.low.shape, self.peak.shape, self.high.shape,
+                             self.temperature.shape))
+
+  def _batch_shape_tensor(self,
+                          low=None,
+                          peak=None,
+                          high=None,
+                          temperature=None):
+    return functools.reduce(
+        ps.broadcast_shape,
+        (ps.shape(self.low if low is None else low),
+         ps.shape(self.peak if peak is None else peak),
+         ps.shape(self.high if high is None else high),
+         ps.shape(
+             self.temperature if temperature is None else temperature)))
 
   def _sample_n(self, n, seed=None):
     return self._transformed_beta().sample(n, seed=seed)

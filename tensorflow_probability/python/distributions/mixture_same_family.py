@@ -252,6 +252,13 @@ class MixtureSameFamily(distribution.Distribution):
         mixture_distribution=sliced_mixture_dist,
         components_distribution=sliced_components_dist)
 
+  def _batch_shape_tensor(self):
+    return self.components_distribution.batch_shape_tensor()[:-1]
+
+  def _batch_shape(self):
+    return tensorshape_util.with_rank_at_least(
+        self.components_distribution.batch_shape, 1)[:-1]
+
   def _event_shape_tensor(self):
     return self.components_distribution.event_shape_tensor()
 

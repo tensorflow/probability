@@ -302,6 +302,16 @@ class Deterministic(_BaseDeterministic):
             .BIJECTOR_NOT_IMPLEMENTED,
             is_preferred=False))
 
+  def _batch_shape_tensor(self, loc=None):
+    return ps.broadcast_shape(
+        ps.shape(self.loc if loc is None else loc),
+        ps.broadcast_shape(ps.shape(self.atol), ps.shape(self.rtol)))
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        self.loc.shape,
+        tf.broadcast_static_shape(self.atol.shape, self.rtol.shape))
+
   def _event_shape_tensor(self, loc=None):
     del loc
     return ps.constant([], dtype=tf.int32)
@@ -426,6 +436,16 @@ class VectorDeterministic(_BaseDeterministic):
             default_constraining_bijector_fn=parameter_properties
             .BIJECTOR_NOT_IMPLEMENTED,
             is_preferred=False))
+
+  def _batch_shape_tensor(self, loc=None):
+    return ps.broadcast_shape(
+        ps.shape(self.loc if loc is None else loc),
+        ps.broadcast_shape(ps.shape(self.atol), ps.shape(self.rtol)))[:-1]
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        self.loc.shape,
+        tf.broadcast_static_shape(self.atol.shape, self.rtol.shape))[:-1]
 
   def _event_shape_tensor(self, loc=None):
     return ps.shape(self.loc if loc is None else loc)[-1:]

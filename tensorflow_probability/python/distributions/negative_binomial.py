@@ -27,6 +27,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -171,6 +172,17 @@ class NegativeBinomial(distribution.Distribution):
     """Input argument `probs`."""
     return self._probs
 
+  def _batch_shape_tensor(self, logits_or_probs=None, total_count=None):
+    if logits_or_probs is None:
+      logits_or_probs = self._logits if self._probs is None else self._logits
+    total_count = self._total_count if total_count is None else total_count
+    return ps.broadcast_shape(
+        ps.shape(logits_or_probs), ps.shape(total_count))
+
+  def _batch_shape(self):
+    x = self._probs if self._logits is None else self._logits
+    return tf.broadcast_static_shape(self._total_count.shape, x.shape)
+
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -199,7 +211,7 @@ class NegativeBinomial(distribution.Distribution):
     logits = self._logits_parameter_no_checks()
     total_count = tf.convert_to_tensor(self.total_count)
     shape = self._batch_shape_tensor(
-        logits=logits, total_count=total_count)
+        logits_or_probs=logits, total_count=total_count)
     safe_x = tf.where(x >= 0, x, 0.)
     answer = tf.math.betainc(
         tf.broadcast_to(total_count, shape),

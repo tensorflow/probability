@@ -252,6 +252,14 @@ class RelaxedBernoulli(distribution.Distribution):
   def _event_shape(self):
     return tf.TensorShape([])
 
+  def _batch_shape_tensor(self):
+    return self._transformed_logistic().batch_shape_tensor()
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        (self._logits if self._probs is None else self._probs).shape,
+        self._temperature.shape)
+
   def _sample_n(self, n, seed=None, **kwargs):
     return self._transformed_logistic().sample(n, seed=seed, **kwargs)
 

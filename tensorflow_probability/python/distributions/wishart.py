@@ -176,9 +176,18 @@ class WishartLinearOperator(distribution.Distribution):
     dimension = self._scale.domain_dimension
     return tf.TensorShape([dimension, dimension])
 
+  def _batch_shape_tensor(self, df=None):
+    df = tf.convert_to_tensor(self.df) if df is None else df
+    return ps.broadcast_shape(
+        ps.shape(df), self._scale.batch_shape_tensor())
+
+  def _batch_shape(self):
+    return tf.broadcast_static_shape(
+        self.df.shape, self._scale.batch_shape)
+
   def _sample_n(self, n, seed):
     df = tf.convert_to_tensor(self.df)
-    batch_shape = self._batch_shape_tensor(df=df)
+    batch_shape = self._batch_shape_tensor(df)
     event_shape = self._event_shape_tensor()
     batch_ndims = ps.shape(batch_shape)[0]
 
@@ -244,7 +253,7 @@ class WishartLinearOperator(distribution.Distribution):
       x_sqrt = tf.linalg.cholesky(x)
 
     df = tf.convert_to_tensor(self.df)
-    batch_shape = self._batch_shape_tensor(df=df)
+    batch_shape = self._batch_shape_tensor(df)
     event_shape = self._event_shape_tensor()
     dimension = self._dimension()
     x_ndims = ps.rank(x_sqrt)
