@@ -1962,7 +1962,6 @@ multi_substrate_py_test(
     name = "soft_clip_test",
     size = "small",
     srcs = ["soft_clip_test.py"],
-    numpy_tags = ["notap"],  # TODO(b/149350565): remove this.
     deps = [
         ":bijectors",
         # numpy dep,

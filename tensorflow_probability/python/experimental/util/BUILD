@@ -34,6 +34,7 @@ exports_files(["LICENSE"])
 multi_substrate_py_library(
     name = "util",
     srcs = ["__init__.py"],
+    numpy_omit_deps = [":jit_public_methods"],
     srcs_version = "PY3",
     substrates_omit_deps = [
         ":deferred_module",
@@ -90,7 +91,7 @@ multi_substrate_py_test(
     name = "jit_public_methods_test",
     size = "small",
     srcs = ["jit_public_methods_test.py"],
-    numpy_tags = ["notap"],
+    disabled_substrates = ["numpy"],
     deps = [
         # numpy dep,
         # tensorflow dep,

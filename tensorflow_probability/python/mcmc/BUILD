@@ -329,7 +329,6 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["replica_exchange_mc_test.py"],
-    numpy_tags = ["notap"],
     shard_count = 11,
     deps = [
         # absl/logging dep,
