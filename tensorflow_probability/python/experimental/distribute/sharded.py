@@ -76,7 +76,10 @@ class Sharded(distribution_lib.Distribution):
     Args:
       distribution: The base distribution instance to transform. Typically an
         instance of `Distribution`.
-      shard_axis_name: `str` for axis name for use in JAX backend.
+      shard_axis_name: `str` or a list of strings for axis name(s). An empty
+        list means that no sharding is actually done. This can be `None` under
+        the TensorFlow backend (meaning a sharded axis is present, but
+        anonymous). Only the JAX backend supports multiple axes names.
       validate_args: Python `bool`.  Whether to validate input with asserts. If
         `validate_args` is `False`, and the inputs are invalid, correct behavior
         is not guaranteed.
@@ -85,12 +88,45 @@ class Sharded(distribution_lib.Distribution):
     """
     parameters = dict(locals())
 
-    if JAX_MODE and shard_axis_name is None:
-      raise ValueError('Cannot provide a `None` axis name in JAX backend.')
+    if shard_axis_name is None:
+      if JAX_MODE:
+        # In JAX, axes names matter and we don't know which axis name the user
+        # might intend, so we bail.
+        raise ValueError('Cannot provide a `None` axis name in JAX backend.')
+      else:
+        # In TF, there are no axes names, so we can pick a reasonable default.
+        shard_axis_name = [True]
+
+    # Use inner axes before outer axes
+    full_shard_axis_name = (
+        distribution.experimental_shard_axis_names +
+        distribute_lib.canonicalize_axis_name(shard_axis_name))
+
+    if not JAX_MODE:
+      if len(full_shard_axis_name) > 1:
+        raise ValueError(
+            'TensorFlow backend does not support multiple shard axes:\n'
+            'inner shard_axis_names: '
+            f'{list(distribution.experimental_shard_axis_names)}\n'
+            f'outer shard_axis_names: {list(shard_axis_name)}')
+
+    if len(set(full_shard_axis_name)) != len(full_shard_axis_name):
+      duplicates = set()
+      seen = set()
+      for axis_name in full_shard_axis_name:
+        if axis_name in seen:
+          duplicates.add(axis_name)
+        seen.add(axis_name)
+      raise ValueError(
+          'Found duplicate axis name(s).\n'
+          'inner shard_axis_names: '
+          f'{list(distribution.experimental_shard_axis_names)}\n'
+          f'outer shard_axis_names: {shard_axis_name}\n'
+          f'duplicates: {list(duplicates)}')
 
     with tf.name_scope(name or 'Sharded' + distribution.name) as name:
       self._distribution = distribution
-      self._shard_axis_name = shard_axis_name
+      self._shard_axis_name = full_shard_axis_name
       super(Sharded, self).__init__(
           dtype=self._distribution.dtype,
           validate_args=validate_args,
@@ -101,18 +137,7 @@ class Sharded(distribution_lib.Distribution):
 
   @property
   def experimental_shard_axis_names(self):
-    if self._shard_axis_name is None:
-      # In TF, we use `True` as the default `axis_name`.
-      if self.distribution.experimental_shard_axis_names:
-        raise ValueError('Cannot nest sharded distributions in TF backend.')
-      return [True]
-    shard_axis_names = distribute_lib.canonicalize_axis_name(
-        self._shard_axis_name)
-    for axis_name in shard_axis_names:
-      if axis_name in self.distribution.experimental_shard_axis_names:
-        raise ValueError(f'Found nested axes with the same name: {axis_name}')
-    # Use inner axes before outer axes
-    return self.distribution.experimental_shard_axis_names + shard_axis_names
+    return self._shard_axis_name
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
