@@ -278,7 +278,6 @@ def make_slow_adapt_kernel(*,
       initial_running_variance=initial_running_variance)
 
 
-@tf.function(autograph=False)
 def _fast_window(*,
                  kind,
                  proposal_kernel_kwargs,
@@ -325,7 +324,6 @@ def _fast_window(*,
   return draws, trace, step_size, weighted_running_variance
 
 
-@tf.function(autograph=False)
 def _slow_window(*,
                  kind,
                  proposal_kernel_kwargs,
@@ -379,7 +377,6 @@ def _slow_window(*,
   return draws, trace, step_size, weighted_running_variance, momentum_distribution
 
 
-@tf.function(autograph=False)
 def _do_sampling(*,
                  kind,
                  proposal_kernel_kwargs,
@@ -743,33 +740,64 @@ def _windowed_adaptive_impl(n_draws,
       num_adaptation_steps)
 
   all_traces = []
-  draws, trace, step_size, running_variances = _fast_window(
-      kind=kind,
+  # Using tf.function here and on _slow_window_closure caches tracing
+  # of _fast_window and _slow_window, respectively, within a single
+  # call to windowed sampling.  Why not annotate _fast_window and
+  # _slow_window directly?  Two reasons:
+  # - Caching across calls to windowed sampling is probably futile,
+  #   because the trace function and bijector will be different Python
+  #   objects, preventing cache hits.
+  # - The cache of a global tf.function sticks around for the lifetime
+  #   of the Python process, potentially leaking memory.
+  @tf.function(autograph=False)
+  def _fast_window_closure(proposal_kernel_kwargs,
+                           window_size,
+                           initial_position,
+                           seed):
+    return _fast_window(
+        kind=kind,
+        proposal_kernel_kwargs=proposal_kernel_kwargs,
+        dual_averaging_kwargs=dual_averaging_kwargs,
+        num_draws=window_size,
+        initial_position=initial_position,
+        bijector=bijector,
+        trace_fn=trace_fn,
+        seed=seed)
+  draws, trace, step_size, running_variances = _fast_window_closure(
       proposal_kernel_kwargs=proposal_kernel_kwargs,
-      dual_averaging_kwargs=dual_averaging_kwargs,
-      num_draws=first_window_size,
+      window_size=first_window_size,
       initial_position=initial_transformed_position,
-      bijector=bijector,
-      trace_fn=trace_fn,
       seed=init_seed)
   proposal_kernel_kwargs.update({'step_size': step_size})
 
   all_draws = [[d] for d in draws]
   all_traces.append(trace)
   *slow_seeds, seed = samplers.split_seed(seed, n=5)
-  for idx, slow_seed in enumerate(slow_seeds):
-    window_size = slow_window_size * (2**idx)
-
-    # TODO(b/180011931): if num_adaptation_steps is small, this throws an error.
-    draws, trace, step_size, running_variances, momentum_distribution = _slow_window(
+  @tf.function(autograph=False)
+  def _slow_window_closure(proposal_kernel_kwargs,
+                           window_size,
+                           initial_position,
+                           running_variances,
+                           seed):
+    return _slow_window(
         kind=kind,
         proposal_kernel_kwargs=proposal_kernel_kwargs,
         dual_averaging_kwargs=dual_averaging_kwargs,
         num_draws=window_size,
-        initial_position=[d[-1] for d in draws],
+        initial_position=initial_position,
         initial_running_variance=running_variances,
         bijector=bijector,
         trace_fn=trace_fn,
+        seed=seed)
+  for idx, slow_seed in enumerate(slow_seeds):
+    window_size = slow_window_size * (2**idx)
+
+    # TODO(b/180011931): if num_adaptation_steps is small, this throws an error.
+    draws, trace, step_size, running_variances, momentum_distribution = _slow_window_closure(
+        proposal_kernel_kwargs=proposal_kernel_kwargs,
+        window_size=window_size,
+        initial_position=[d[-1] for d in draws],
+        running_variances=running_variances,
         seed=slow_seed)
     for all_d, d in zip(all_draws, draws):
       all_d.append(d)
@@ -779,14 +807,10 @@ def _windowed_adaptive_impl(n_draws,
          'momentum_distribution': momentum_distribution})
 
   fast_seed, sample_seed = samplers.split_seed(seed)
-  draws, trace, step_size, _ = _fast_window(
-      kind=kind,
+  draws, trace, step_size, _ = _fast_window_closure(
       proposal_kernel_kwargs=proposal_kernel_kwargs,
-      dual_averaging_kwargs=dual_averaging_kwargs,
-      num_draws=last_window_size,
+      window_size=last_window_size,
       initial_position=[d[-1] for d in draws],
-      bijector=bijector,
-      trace_fn=trace_fn,
       seed=fast_seed)
   proposal_kernel_kwargs.update({'step_size': step_size})
   for all_d, d in zip(all_draws, draws):
