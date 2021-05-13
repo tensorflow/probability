@@ -87,6 +87,45 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "distribute_lib",
+    srcs = ["distribute_lib.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":custom_gradient",
+        ":samplers",
+        # tensorflow dep,
+        "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "distribute_lib_test",
+    srcs = ["distribute_lib_test.py"],
+    disabled_substrates = ["numpy"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":distribute_lib",
+        ":distribute_test_lib",
+        ":test_util",
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "distribute_test_lib",
+    testonly = 1,
+    srcs = ["distribute_test_lib.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":distribution_util",
+        ":test_util",
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_library(
     name = "batched_rejection_sampler",
     srcs = ["batched_rejection_sampler.py"],
     deps = [

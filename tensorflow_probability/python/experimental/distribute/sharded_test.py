@@ -19,10 +19,10 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.distribute import distribute_test_lib as test_lib
 from tensorflow_probability.python.experimental.distribute import sharded
 from tensorflow_probability.python.experimental.distributions import increment_log_prob
 from tensorflow_probability.python.experimental.distributions import joint_density_coroutine
+from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions

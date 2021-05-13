@@ -33,20 +33,9 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
-        ":distribute_lib",
         ":joint_distribution",
         ":sharded",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "distribute_lib",
-    srcs = ["distribute_lib.py"],
-    srcs_version = "PY3",
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:custom_gradient",
-        "//tensorflow_probability/python/math:gradient",
+        "//tensorflow_probability/python/internal:distribute_lib",
     ],
 )
 
@@ -54,10 +43,10 @@ multi_substrate_py_library(
     name = "sharded",
     srcs = ["sharded.py"],
     deps = [
-        ":distribute_lib",
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:samplers",
     ],
@@ -70,12 +59,13 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     python_version = "PY3",
     deps = [
-        ":distribute_test_lib",
         ":joint_distribution",
         ":sharded",
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -84,23 +74,11 @@ multi_substrate_py_library(
     name = "joint_distribution",
     srcs = ["joint_distribution.py"],
     deps = [
-        ":distribute_lib",
         ":sharded",
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "distribute_test_lib",
-    testonly = 1,
-    srcs = ["distribute_test_lib.py"],
-    srcs_version = "PY3",
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:distribution_util",
-        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:distribute_lib",
     ],
 )
 
@@ -111,11 +89,11 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     python_version = "PY3",
     deps = [
-        ":distribute_lib",
-        ":distribute_test_lib",
         ":sharded",
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -128,28 +106,13 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     python_version = "PY3",
     deps = [
-        ":distribute_test_lib",
         ":joint_distribution",
         ":sharded",
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
         "//tensorflow_probability/python/internal:samplers",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "distribute_lib_test",
-    srcs = ["distribute_lib_test.py"],
-    disabled_substrates = ["numpy"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        ":distribute_lib",
-        ":distribute_test_lib",
-        # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

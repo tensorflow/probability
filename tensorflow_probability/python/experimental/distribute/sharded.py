@@ -24,7 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import log_prob_ratio
-from tensorflow_probability.python.experimental.distribute import distribute_lib
+from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import samplers
 

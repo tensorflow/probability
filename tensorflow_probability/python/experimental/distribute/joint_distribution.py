@@ -23,7 +23,7 @@ import functools
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as distribution_lib
 from tensorflow_probability.python.distributions import log_prob_ratio as lp_ratio
-from tensorflow_probability.python.experimental.distribute import distribute_lib
+from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import samplers
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import

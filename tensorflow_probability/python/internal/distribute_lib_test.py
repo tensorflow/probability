@@ -19,8 +19,8 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.distribute import distribute_lib
-from tensorflow_probability.python.experimental.distribute import distribute_test_lib as test_lib
+from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
