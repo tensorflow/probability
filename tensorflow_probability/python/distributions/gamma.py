@@ -547,12 +547,12 @@ def _random_gamma_fwd(shape, concentration, rate, log_rate, seed, log_space):
   samples, impl = _random_gamma_no_gradient(
       shape, concentration, rate, log_rate, seed, log_space)
   return ((samples, impl),
-          (samples, shape, concentration, rate, log_rate, log_space))
+          (samples, concentration, rate, log_rate))
 
 
-def _random_gamma_bwd(aux, g):
+def _random_gamma_bwd(shape, log_space, aux, g):
   """The gradient of the gamma samples."""
-  samples, shape, concentration, rate, log_rate, log_space = aux
+  samples, concentration, rate, log_rate = aux
   dsamples, dimpl = g
   # Ignore any gradient contributions that come from the implementation enum.
   del dimpl

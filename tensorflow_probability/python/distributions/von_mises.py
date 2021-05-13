@@ -582,7 +582,7 @@ def _von_mises_sample_fwd(shape, concentration, seed):
   return samples, (concentration, samples)
 
 
-def _von_mises_sample_bwd(aux, dy):
+def _von_mises_sample_bwd(_, aux, dy):
   """The gradient of the von Mises samples w.r.t. concentration."""
   concentration, samples = aux
   broadcast_concentration = tf.broadcast_to(concentration, ps.shape(samples))

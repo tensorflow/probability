@@ -268,7 +268,7 @@ def _random_inverse_gaussian_fwd(shape, loc, concentration, seed):
   """Compute output, aux (collaborates with _random_inverse_gaussian_bwd)."""
   samples = _random_inverse_gaussian_no_gradient(
       shape, loc, concentration, seed)
-  return samples, (samples, shape, loc, concentration)
+  return samples, (samples, loc, concentration)
 
 
 def _compute_partials(samples, loc, concentration):
@@ -300,9 +300,9 @@ def _compute_partials(samples, loc, concentration):
   return partial_c, partial_l
 
 
-def _random_inverse_gaussian_bwd(aux, g):
+def _random_inverse_gaussian_bwd(shape, aux, g):
   """The gradient of the inverse gaussian samples."""
-  samples, shape, loc, concentration = aux
+  samples, loc, concentration = aux
   partial_concentration, partial_loc = _compute_partials(
       samples, loc, concentration)
   dsamples = g
