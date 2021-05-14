@@ -17,8 +17,16 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import util
+from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import fill_scale_tril
+from tensorflow_probability.python.bijectors import fill_triangular
+from tensorflow_probability.python.bijectors import pad
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import transform_diagonal
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -61,17 +69,18 @@ def build_highway_flow_layer(width,
 
   bias_seed, upper_seed, lower_seed = samplers.split_seed(
     seed, n=3)
-  lower_bijector = tfb.Chain(
-    [tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
-     tfb.Pad(paddings=[(1, 0), (0, 1)]),
-     tfb.FillTriangular()])
+  lower_bijector = chain.Chain(
+    [transform_diagonal.TransformDiagonal(diag_bijector=shift.Shift(1.)),
+     pad.Pad(paddings=[(1, 0), (0, 1)]),
+     fill_triangular.FillTriangular()])
   unconstrained_lower_initial_values = samplers.normal(
     shape=lower_bijector.inverse_event_shape([width, width]),
     mean=0.,
     stddev=.01,
     seed=lower_seed)
-  upper_bijector = tfb.FillScaleTriL(diag_bijector=tfb.Softplus(),
-                                     diag_shift=None)
+  upper_bijector = fill_scale_tril.FillScaleTriL(
+    diag_bijector=softplus.Softplus(),
+    diag_shift=None)
   unconstrained_upper_initial_values = samplers.normal(
     shape=upper_bijector.inverse_event_shape([width, width]),
     mean=0.,
@@ -81,7 +90,7 @@ def build_highway_flow_layer(width,
   return HighwayFlow(
     residual_fraction=util.TransformedVariable(
       initial_value=residual_fraction_initial_value,
-      bijector=tfb.Sigmoid(),
+      bijector=sigmoid.Sigmoid(),
       dtype=dtype),
     activation_fn=activation_fn,
     bias=tf.Variable(
@@ -99,7 +108,7 @@ def build_highway_flow_layer(width,
   )
 
 
-class HighwayFlow(tfb.Bijector):
+class HighwayFlow(bijector.Bijector):
   """Implements an Highway Flow bijector [1].
 
   HighwayFlow interpolates the input `X` with the transformations at each step
@@ -193,12 +202,14 @@ class HighwayFlow(tfb.Bijector):
         residual_fraction, dtype=dtype, name='residual_fraction')
       # The upper matrix is still lower triangular, transpose is done in
       # _inverse and _forwars metowds.
-      self._upper_diagonal_weights_matrix = tensor_util.convert_nonref_to_tensor(
-        upper_diagonal_weights_matrix, dtype=dtype,
-        name='upper_diagonal_weights_matrix')
-      self._lower_diagonal_weights_matrix = tensor_util.convert_nonref_to_tensor(
-        lower_diagonal_weights_matrix, dtype=dtype,
-        name='lower_diagonal_weights_matrix')
+      self._upper_diagonal_weights_matrix = \
+        tensor_util.convert_nonref_to_tensor(
+          upper_diagonal_weights_matrix, dtype=dtype,
+          name='upper_diagonal_weights_matrix')
+      self._lower_diagonal_weights_matrix = \
+        tensor_util.convert_nonref_to_tensor(
+          lower_diagonal_weights_matrix, dtype=dtype,
+          name='lower_diagonal_weights_matrix')
       self._activation_fn = activation_fn
       self._gate_first_n = gate_first_n if gate_first_n else self.width
 
