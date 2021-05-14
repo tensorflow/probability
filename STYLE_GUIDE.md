@@ -6,10 +6,11 @@ number of errors, and promote consistency.
 
 ## TensorFlow Style
 
-Follow the [TensorFlow style
-guide](https://www.tensorflow.org/community/style_guide) and [documentation
-guide](https://www.tensorflow.org/community/documentation), and in particular
-the [TensorFlow code
+Follow the [TensorFlow style 
+guide](https://www.tensorflow.org/community/contribute/code_style) and
+[documentation 
+guide](https://www.tensorflow.org/community/contribute/docs_style), and in
+particular the [TensorFlow code 
 lint](https://github.com/tensorflow/tensorflow/blob/master/CONTRIBUTING.md#python-coding-style).
 Below are additional TensorFlow conventions not noted in those guides. (In the
 future, these noted conventions may be moved upstream.)
