@@ -1996,7 +1996,7 @@ def _get_base_shape_tensor(x):
 def _get_base_shape(x):
   """Extracts an object's shape for batch shape inference."""
   if hasattr(x, 'batch_shape'):  # `x` is a distribution.
-    return x.batch_shape
+    return tf.TensorShape(x.batch_shape)
   elif hasattr(x, 'shape'):  # `x` is a Tensor or ndarray.
     return tf.TensorShape(x.shape)
   elif hasattr(x, 'forward'):  # `x` is a bijector.
