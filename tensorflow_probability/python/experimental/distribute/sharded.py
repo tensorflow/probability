@@ -150,9 +150,8 @@ class Sharded(distribution_lib.Distribution):
 
   def _sample_n(self, n, seed, **kwargs):
     seed = samplers.sanitize_seed(seed, salt='sharded_sample')
-    for axis_name in self.experimental_shard_axis_names:
-      axis_index = distribute_lib.get_axis_index(axis_name)
-      seed = samplers.fold_in(seed, tf.cast(axis_index, tf.int32))
+    seed = distribute_lib.fold_in_axis_index(
+        seed, self.experimental_shard_axis_names)
     return self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
 
   _log_prob = _implement_sharded_lp_fn('log_prob')

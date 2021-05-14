@@ -23,6 +23,7 @@ import functools
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
+from tensorflow_probability.python.internal import samplers
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -92,6 +93,21 @@ def _rwb_psum_fwd(x, axis_name):
 
 def _rwb_psum_bwd(axis_name, _, cts):
   return (rwb_pbroadcast(cts, axis_name),)
+
+
+def fold_in_axis_index(seed, axis_name=None):
+  """Folds the active axis index into a seed according to its axis name."""
+  if axis_name is None:
+    return seed
+  nest.assert_shallow_structure(seed, axis_name)
+  axis_names = nest.map_structure_up_to(
+      seed, canonicalize_axis_name, axis_name)
+  def fold_in(seed, axes):
+    for name in axes:
+      axis_index = get_axis_index(name)
+      seed = samplers.fold_in(seed, tf.cast(axis_index, tf.int32))
+    return seed
+  return nest.map_structure_up_to(seed, fold_in, seed, axis_names)
 
 
 @tfp_custom_gradient.custom_gradient(

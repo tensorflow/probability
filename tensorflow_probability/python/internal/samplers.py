@@ -184,7 +184,7 @@ def split_seed(seed, n=2, salt=None, name=None):
     seed = sanitize_seed(seed, salt=salt)
     if JAX_MODE:
       from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
-      return jaxrand.split(seed, n)
+      return list(jaxrand.split(seed, n))
     seeds = tf.random.stateless_uniform(
         [n, 2], seed=seed, minval=None, maxval=None, dtype=SEED_DTYPE)
     if isinstance(n, six.integer_types):

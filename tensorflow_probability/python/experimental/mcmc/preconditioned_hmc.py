@@ -157,6 +157,7 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
                state_gradients_are_stopped=False,
                step_size_update_fn=None,
                store_parameters_in_results=False,
+               experimental_shard_axis_names=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -193,6 +194,8 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
         `tfp.experimental.as_composite` and `tfp.experimental.auto_composite`.
         This is incompatible with `step_size_update_fn`, which must be set to
         `None`.
+      experimental_shard_axis_names: A structure of string names indicating how
+        members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'phmc_kernel').
     """
@@ -208,6 +211,7 @@ class PreconditionedHamiltonianMonteCarlo(hmc.HamiltonianMonteCarlo):
             state_gradients_are_stopped=state_gradients_are_stopped,
             momentum_distribution=momentum_distribution,
             name=name or 'phmc_kernel',
+            experimental_shard_axis_names=experimental_shard_axis_names,
             store_parameters_in_results=store_parameters_in_results))
     self._parameters = self._impl.inner_kernel.parameters.copy()
     self._parameters.pop('seed', None)  # TODO(b/159636942): Remove this line.
@@ -235,6 +239,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
                momentum_distribution=None,
                state_gradients_are_stopped=False,
                store_parameters_in_results=False,
+               experimental_shard_axis_names=None,
                name=None):
     super(UncalibratedPreconditionedHamiltonianMonteCarlo, self).__init__(
         target_log_prob_fn,
@@ -242,6 +247,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
         num_leapfrog_steps,
         state_gradients_are_stopped=state_gradients_are_stopped,
         store_parameters_in_results=store_parameters_in_results,
+        experimental_shard_axis_names=experimental_shard_axis_names,
         name=name)
     self._parameters['momentum_distribution'] = momentum_distribution
     self._parameters.pop('seed', None)  # TODO(b/159636942): Remove this line.

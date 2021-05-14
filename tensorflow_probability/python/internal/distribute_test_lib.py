@@ -22,6 +22,7 @@ from tensorflow_probability.python.internal import test_util
 
 tf.enable_v2_behavior()
 JAX_MODE = False
+NUMPY_MODE = False
 NUM_DEVICES = 4
 
 if JAX_MODE:
@@ -38,6 +39,8 @@ class DistributedTest(test_util.TestCase):
           '--xla_force_host_platform_device_count={}'.format(NUM_DEVICES))
       assert jax.device_count() == NUM_DEVICES
       self.key = jax.random.PRNGKey(0)
+    elif NUMPY_MODE:
+      pass
     else:
       physical_devices = tf.config.experimental.list_physical_devices()
 

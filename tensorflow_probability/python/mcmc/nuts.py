@@ -43,6 +43,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import broadcast_util as bu
+from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
@@ -205,6 +206,7 @@ class NoUTurnSampler(TransitionKernel):
                max_energy_diff=1000.,
                unrolled_leapfrog_steps=1,
                parallel_iterations=10,
+               experimental_shard_axis_names=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -230,6 +232,8 @@ class NoUTurnSampler(TransitionKernel):
         trajectory length implied by max_tree_depth. Defaults to 1.
       parallel_iterations: The number of iterations allowed to run in parallel.
         It must be a positive integer. See `tf.while_loop` for more details.
+      experimental_shard_axis_names: A structure of string names indicating how
+        members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'NoUTurnSampler').
     """
@@ -269,6 +273,7 @@ class NoUTurnSampler(TransitionKernel):
           max_energy_diff=max_energy_diff,
           unrolled_leapfrog_steps=unrolled_leapfrog_steps,
           parallel_iterations=parallel_iterations,
+          experimental_shard_axis_names=experimental_shard_axis_names,
           name=name,
       )
       self._parallel_iterations = parallel_iterations
@@ -501,22 +506,35 @@ class NoUTurnSampler(TransitionKernel):
           has_divergence=tf.zeros_like(current_target_log_prob,
                                        dtype=tf.bool,
                                        name='has_divergence'),
-          energy=compute_hamiltonian(current_target_log_prob, dummy_momentum),
+          energy=compute_hamiltonian(
+              current_target_log_prob, dummy_momentum,
+              shard_axis_names=self.experimental_shard_axis_names),
           # Allow room for one_step's seed.
           seed=samplers.zeros_seed(),
       )
+
+  @property
+  def experimental_shard_axis_names(self):
+    return self._parameters['experimental_shard_axis_names']
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(experimental_shard_axis_names=shard_axis_names)
 
   def _start_trajectory_batched(self, state, target_log_prob, seed):
     """Computations needed to start a trajectory."""
     with tf.name_scope('start_trajectory_batched'):
       seeds = samplers.split_seed(seed, n=len(state) + 1)
+      momentum_seeds = distribute_lib.fold_in_axis_index(
+          seeds[:-1], self.experimental_shard_axis_names)
       momentum = [
           samplers.normal(  # pylint: disable=g-complex-comprehension
               shape=ps.shape(x),
               dtype=x.dtype,
-              seed=seeds[i]) for (i, x) in enumerate(state)
+              seed=momentum_seeds[i]) for (i, x) in enumerate(state)
       ]
-      init_energy = compute_hamiltonian(target_log_prob, momentum)
+      init_energy = compute_hamiltonian(
+          target_log_prob, momentum,
+          shard_axis_names=self.experimental_shard_axis_names)
 
       if MULTINOMIAL_SAMPLE:
         return momentum, init_energy, None
@@ -687,7 +705,8 @@ class NoUTurnSampler(TransitionKernel):
           state_diff,
           [m[0] for m in new_step_state.momentum],
           [m[1] for m in new_step_state.momentum],
-          log_prob_rank=ps.rank_from_shape(batch_shape))
+          log_prob_rank=ps.rank_from_shape(batch_shape),
+          shard_axis_names=self.experimental_shard_axis_names)
 
       new_step_metastate = TreeDoublingMetaState(
           candidate_state=new_candidate_state,
@@ -842,7 +861,8 @@ class NoUTurnSampler(TransitionKernel):
           next_momentum_parts,
           state_to_check,
           has_not_u_turn_init,
-          log_prob_rank=ps.rank(next_target))
+          log_prob_rank=ps.rank(next_target),
+          shard_axis_names=self.experimental_shard_axis_names)
 
       # Get index to write state into memory swap
       write_index = write_instruction.gather([iter_])
@@ -858,7 +878,9 @@ class NoUTurnSampler(TransitionKernel):
                                   state_to_write)
           ])
 
-      energy = compute_hamiltonian(next_target, next_momentum_parts)
+      energy = compute_hamiltonian(
+          next_target, next_momentum_parts,
+          shard_axis_names=self.experimental_shard_axis_names)
       current_energy = tf.where(tf.math.is_nan(energy),
                                 tf.constant(-np.inf, dtype=energy.dtype),
                                 energy)
@@ -935,7 +957,8 @@ class NoUTurnSampler(TransitionKernel):
 
 def has_not_u_turn_at_all_index(read_indexes, direction, momentum_state_memory,
                                 momentum_right, state_right,
-                                no_u_turns_within_tree, log_prob_rank):
+                                no_u_turns_within_tree, log_prob_rank,
+                                shard_axis_names=None):
   """Check u turn for early stopping."""
 
   def _get_left_state_and_check_u_turn(left_current_index, no_u_turns_last):
@@ -958,7 +981,8 @@ def has_not_u_turn_at_all_index(read_indexes, direction, momentum_state_memory,
         state_diff,
         momentum_left,
         momentum_right,
-        log_prob_rank)
+        log_prob_rank,
+        shard_axis_names=shard_axis_names)
     return left_current_index + 1, no_u_turns_current & no_u_turns_last
 
   _, no_u_turns_within_tree = tf.while_loop(
@@ -972,20 +996,25 @@ def has_not_u_turn_at_all_index(read_indexes, direction, momentum_state_memory,
 def has_not_u_turn(state_diff,
                    momentum_left,
                    momentum_right,
-                   log_prob_rank):
+                   log_prob_rank,
+                   shard_axis_names=None):
   """If the trajectory does not exhibit a U-turn pattern."""
+  shard_axis_names = (shard_axis_names or ([None] * len(state_diff)))
+  def reduce_sum(x, m, shard_axes):
+    out = tf.reduce_sum(x, axis=tf.range(log_prob_rank, ps.rank(m)))
+    if shard_axes is not None:
+      out = distribute_lib.psum(out, shard_axes)
+    return out
   with tf.name_scope('has_not_u_turn'):
     batch_dot_product_left = sum([
-        tf.reduce_sum(  # pylint: disable=g-complex-comprehension
-            s_diff * m,
-            axis=ps.range(log_prob_rank, ps.rank(m)))
-        for s_diff, m in zip(state_diff, momentum_left)
+        reduce_sum(s_diff * m, m, axes)
+        for s_diff, m, axes in zip(state_diff, momentum_left,
+                                   shard_axis_names)
     ])
     batch_dot_product_right = sum([
-        tf.reduce_sum(  # pylint: disable=g-complex-comprehension
-            s_diff * m,
-            axis=ps.range(log_prob_rank, ps.rank(m)))
-        for s_diff, m in zip(state_diff, momentum_right)
+        reduce_sum(s_diff * m, m, axes)
+        for s_diff, m, axes in zip(state_diff, momentum_right,
+                                   shard_axis_names)
     ])
     return (batch_dot_product_left >= 0) & (batch_dot_product_right >= 0)
 
@@ -1051,14 +1080,21 @@ def generate_efficient_write_read_instruction(instruction_array):
   return write_instruction, np.asarray(read_instruction)
 
 
-def compute_hamiltonian(target_log_prob, momentum_parts):
+def compute_hamiltonian(target_log_prob, momentum_parts,
+                        shard_axis_names=None):
   """Compute the Hamiltonian of the current system."""
+  shard_axis_names = (shard_axis_names or ([None] * len(momentum_parts)))
   independent_chain_ndims = ps.rank(target_log_prob)
+  def compute_sum_sq(v, shard_axes):
+    sum_sq = tf.reduce_sum(v ** 2., axis=ps.range(
+        independent_chain_ndims, ps.rank(v)))
+    if shard_axes is not None:
+      sum_sq = distribute_lib.psum(sum_sq, shard_axes)
+    return sum_sq
   momentum_sq_parts = (
       tf.cast(  # pylint: disable=g-complex-comprehension
-          tf.reduce_sum(
-              tf.square(m),
-              axis=ps.range(independent_chain_ndims, ps.rank(m))),
-          dtype=target_log_prob.dtype) for m in momentum_parts)
+          compute_sum_sq(m, axes),
+          dtype=target_log_prob.dtype)
+      for m, axes in zip(momentum_parts, shard_axis_names))
   # TODO(jvdillon): Verify no broadcasting happening.
   return target_log_prob - 0.5 * sum(momentum_sq_parts)
