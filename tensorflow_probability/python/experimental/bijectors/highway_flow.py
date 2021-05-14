@@ -162,7 +162,7 @@ class HighwayFlow(tfb.Bijector):
   def __init__(self, residual_fraction, activation_fn, bias,
                upper_diagonal_weights_matrix,
                lower_diagonal_weights_matrix,
-               gate_first_n,
+               gate_first_n=None,
                validate_args=False,
                name=None):
     """Initializes the HighwayFlow.
@@ -258,8 +258,7 @@ class HighwayFlow(tfb.Bijector):
                                        num_columns=self.width,
                                        dtype=self.dtype),
        tf.zeros([self.num_ungated, self.width], dtype=self.dtype)],
-      axis=0) + tf.concat([(
-                               1. - self.residual_fraction) * tf.ones(
+      axis=0) + tf.concat([(1. - self.residual_fraction) * tf.ones(
       self.gate_first_n, dtype=self.dtype),
                            tf.ones(self.num_ungated, dtype=self.dtype)],
                           axis=0) * weights_matrix
@@ -294,7 +293,7 @@ class HighwayFlow(tfb.Bijector):
     # Log determinant term from the upper matrix. Note that the log determinant
     # of the lower matrix is zero.
 
-    fldj = tf.zeros(x.shape[:-1], dtype=self.dtype) + tf.reduce_sum(
+    fldj = tf.zeros(ps.shape(x)[:-1], dtype=self.dtype) + tf.reduce_sum(
       tf.math.log(tf.concat([(self.residual_fraction) * tf.ones(
         self.gate_first_n, dtype=self.dtype),
                              tf.zeros(self.num_ungated, dtype=self.dtype)],
@@ -317,7 +316,7 @@ class HighwayFlow(tfb.Bijector):
 
     if self.activation_fn:
       fldj += tf.reduce_sum(tf.math.log(self._derivative_of_softplus(x[0])),
-                            -1)
+                            axis=-1)
       x = tf.concat([(self.residual_fraction) * tf.ones(
         self.gate_first_n, dtype=self.dtype),
                      tf.zeros(self.num_ungated, dtype=self.dtype)],
@@ -340,7 +339,7 @@ class HighwayFlow(tfb.Bijector):
       determinant of the jacobian.
     """
 
-    ildj = tf.zeros(y.shape[:-1], dtype=self.dtype) - tf.reduce_sum(
+    ildj = tf.zeros(ps.shape(y)[:-1], dtype=self.dtype) - tf.reduce_sum(
       tf.math.log(tf.concat([(self.residual_fraction) * tf.ones(
         self.gate_first_n, dtype=self.dtype),
                              tf.zeros(self.num_ungated, dtype=self.dtype)],
@@ -354,7 +353,7 @@ class HighwayFlow(tfb.Bijector):
     if self.activation_fn:
       y = self._inverse_of_softplus(y)
       ildj -= tf.reduce_sum(tf.math.log(self._derivative_of_softplus(y)),
-                            -1)
+                            axis=-1)
 
     y = y[..., tf.newaxis]
 
@@ -368,7 +367,7 @@ class HighwayFlow(tfb.Bijector):
     y = tf.linalg.triangular_solve(
       self._convex_update(self.lower_diagonal_weights_matrix), y)
 
-    return tf.squeeze(y, -1), {'ildj': ildj, 'fldj': -ildj}
+    return tf.squeeze(y, axis=-1), {'ildj': ildj, 'fldj': -ildj}
 
   def _forward(self, x):
     y, _ = self._augmented_forward(x)
