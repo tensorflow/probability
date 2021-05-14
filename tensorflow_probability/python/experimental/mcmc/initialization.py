@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import batched_rejection_sampler as brs
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
@@ -33,7 +34,8 @@ __all__ = [
 
 def init_near_unconstrained_zero(
     model=None, constraining_bijector=None, event_shapes=None,
-    event_shape_tensors=None, dtypes=None):
+    event_shape_tensors=None, batch_shapes=None, batch_shape_tensors=None,
+    dtypes=None):
   """Returns an initialization Distribution for starting a Markov chain.
 
   This initialization scheme follows Stan: we sample every latent
@@ -71,6 +73,12 @@ def init_near_unconstrained_zero(
       input to `constraining_bijector.inverse_event_shape_tensor`.  If
       supplied together with `model`, acts as an override. Required if any of
       `event_shapes` are not fully-defined.
+    batch_shapes: A structure of shapes giving the batch shape of the desired
+      samples.  If supplied together with `model`, acts as an override.  If
+      unspecified, we assume scalar batch `[]`.
+    batch_shape_tensors: A structure of tensors giving the batch shape of the
+      desired samples.  If supplied together with `model`, acts as an override.
+      Required if any of `batch_shapes` are not fully-defined.
     dtypes: A structure of dtypes giving the (unconstrained) dtypes of
       the desired samples.  Must be an acceptable input to
       `constraining_bijector.inverse_dtype`.  If supplied together
@@ -113,6 +121,11 @@ def init_near_unconstrained_zero(
       event_shape_tensors = model.event_shape_tensor()
     if dtypes is None:
       dtypes = model.dtype
+    if batch_shapes is None:
+      batch_shapes = nest_util.broadcast_structure(dtypes, model.batch_shape)
+    if batch_shape_tensors is None:
+      batch_shape_tensors = nest_util.broadcast_structure(
+          dtypes, model.batch_shape_tensor())
 
   else:
     if constraining_bijector is None or event_shapes is None or dtypes is None:
@@ -125,19 +138,40 @@ def init_near_unconstrained_zero(
     if not event_shapes_fully_defined and event_shape_tensors is None:
       raise ValueError('Must specify `event_shape_tensors` when `event_shapes` '
                        f'are not fully-defined: {event_shapes}')
+    if batch_shapes is None:
+      batch_shapes = tf.TensorShape([])
+    batch_shapes = nest_util.broadcast_structure(dtypes, batch_shapes)
+    batch_shapes_fully_defined = all(tensorshape_util.is_fully_defined(s)
+                                     for s in tf.nest.flatten(batch_shapes))
+    if batch_shape_tensors is None:
+      if not batch_shapes_fully_defined:
+        raise ValueError(
+            'Must specify `batch_shape_tensors` when `batch_shapes` are not '
+            f'fully-defined: {batch_shapes}')
+      batch_shape_tensors = tf.nest.map_structure(
+          tf.convert_to_tensor, batch_shapes)
 
   # Interpret a structure of Bijectors as the joint multipart bijector.
   if not isinstance(constraining_bijector, tfb.Bijector):
     constraining_bijector = tfb.JointMap(constraining_bijector)
 
   # Actually initialize
-  def one_term(shape, shape_tensor, dtype):
-    if not tensorshape_util.is_fully_defined(shape):
-      shape = shape_tensor
-    return tfd.Sample(
+  def one_term(event_shape, event_shape_tensor, batch_shape, batch_shape_tensor,
+               dtype):
+    if not tensorshape_util.is_fully_defined(event_shape):
+      event_shape = event_shape_tensor
+    result = tfd.Sample(
         tfd.Uniform(low=tf.constant(-2., dtype=dtype),
                     high=tf.constant(2., dtype=dtype)),
-        sample_shape=shape)
+        sample_shape=event_shape)
+    if not tensorshape_util.is_fully_defined(batch_shape):
+      batch_shape = batch_shape_tensor
+      needs_bcast = True
+    else:  # Only batch broadcast when batch ndims > 0.
+      needs_bcast = bool(tensorshape_util.as_list(batch_shape))
+    if needs_bcast:
+      result = tfd.BatchBroadcast(result, batch_shape)
+    return result
 
   inv_shapes = constraining_bijector.inverse_event_shape(event_shapes)
   if event_shape_tensors is not None:
@@ -147,7 +181,8 @@ def init_near_unconstrained_zero(
     inv_shape_tensors = tf.nest.map_structure(lambda _: None, inv_shapes)
   inv_dtypes = constraining_bijector.inverse_dtype(dtypes)
   terms = tf.nest.map_structure(
-      one_term, inv_shapes, inv_shape_tensors, inv_dtypes)
+      one_term, inv_shapes, inv_shape_tensors, batch_shapes,
+      batch_shape_tensors, inv_dtypes)
   unconstrained = tfb.pack_sequence_as(inv_shapes)(
       tfd.JointDistributionSequential(tf.nest.flatten(terms)))
   return tfd.TransformedDistribution(
