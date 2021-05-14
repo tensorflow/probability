@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import warnings
 
 import tensorflow.compat.v1 as tf1
@@ -201,7 +202,7 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     init_position: Optional
       Structure of tensors at which to initialize sampling. Should have the
       same shape and structure as
-      `model.experimental_pin(**pins).sample(n_chains)`.
+      `model.experimental_pin(**pins).sample_unpinned(n_chains)`.
     seed: A seed for reproducible sampling.
     **pins:
       Values passed to `model.experimental_pin`.
@@ -211,6 +212,8 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     target_log_prob_fn: Callable on the transformed space.
     initial_transformed_position: `tf.Tensor`, sampled from a uniform (-2, 2).
     bijector: `tfb.Bijector` instance, which unconstrains and flattens.
+    step_broadcast_fn: Callable to broadcast step size over latent structure.
+    batch_shape: Batch shape of the model.
   """
   pinned_model = model.experimental_pin(**pins) if pins else model
   bijector, step_bijector = _get_flat_unconstraining_bijector(pinned_model)
@@ -226,13 +229,26 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
   initial_transformed_position = tf.nest.map_structure(
       tf.identity, bijector.forward(init_position))
 
+  batch_shape = pinned_model.batch_shape
+  if tf.nest.is_nested(batch_shape):
+    batch_shape = functools.reduce(tf.broadcast_static_shape,
+                                   tf.nest.flatten(batch_shape))
+
+  lp_static_shape = tensorshape_util.concatenate([n_chains], batch_shape)
+
+  if not tensorshape_util.is_fully_defined(batch_shape):
+    batch_shape = pinned_model.batch_shape_tensor()
+    if tf.nest.is_nested(batch_shape):
+      batch_shape = functools.reduce(tf.broadcast_dynamic_shape,
+                                     tf.nest.flatten(batch_shape))
+
   # This tf.function is not redundant with the ones on _fast_window
   # and _slow_window because the various kernels (like HMC) may invoke
   # `target_log_prob_fn` multiple times within one window.
   @tf.function(autograph=False)
   def target_log_prob_fn(*args):
     lp = pinned_model.unnormalized_log_prob(bijector.inverse(args))
-    tensorshape_util.set_shape(lp, [n_chains])
+    tensorshape_util.set_shape(lp, lp_static_shape)
     ldj = bijector.inverse_log_det_jacobian(
         args, event_ndims=[1 for _ in initial_transformed_position])
     return lp + ldj
@@ -241,7 +257,12 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     return step_bijector(
         nest_util.broadcast_structure(pinned_model.event_shape_tensor(),
                                       step_size))
-  return target_log_prob_fn, initial_transformed_position, bijector, step_broadcast
+
+  return (target_log_prob_fn,
+          initial_transformed_position,
+          bijector,
+          step_broadcast,
+          ps.convert_to_shape_tensor(batch_shape, name='batch_shape'))
 
 
 def _make_base_kernel(*, kind, proposal_kernel_kwargs):
@@ -717,24 +738,31 @@ def _windowed_adaptive_impl(n_draws,
 
   setup_seed, init_seed, seed = samplers.split_seed(
       samplers.sanitize_seed(seed), n=3)
-  target_log_prob_fn, initial_transformed_position, bijector, step_broadcast = _setup_mcmc(
-      joint_dist,
-      n_chains=n_chains,
-      init_position=current_state,
-      seed=setup_seed,
-      **pins)
+  (target_log_prob_fn, initial_transformed_position, bijector,
+   step_broadcast, batch_shape) = _setup_mcmc(
+       joint_dist,
+       n_chains=n_chains,
+       init_position=current_state,
+       seed=setup_seed,
+       **pins)
 
   if proposal_kernel_kwargs.get('step_size') is None:
+    if batch_shape.shape != (0,):  # Scalar batch has a 0-vector shape.
+      raise ValueError('Batch target density must specify init_step_size. Got '
+                       f'batch shape {batch_shape} from joint {joint_dist}.')
+
     init_step_size = _get_step_size(initial_transformed_position,
                                     target_log_prob_fn)
+
   else:
     init_step_size = step_broadcast(proposal_kernel_kwargs['step_size'])
 
   proposal_kernel_kwargs.update({
       'target_log_prob_fn': target_log_prob_fn,
       'step_size': init_step_size,
-      'momentum_distribution': _init_momentum(initial_transformed_position,
-                                              batch_shape=[n_chains])})
+      'momentum_distribution': _init_momentum(
+          initial_transformed_position,
+          batch_shape=ps.concat([[n_chains], batch_shape], axis=0))})
 
   first_window_size, slow_window_size, last_window_size = _get_window_sizes(
       num_adaptation_steps)
@@ -793,12 +821,13 @@ def _windowed_adaptive_impl(n_draws,
     window_size = slow_window_size * (2**idx)
 
     # TODO(b/180011931): if num_adaptation_steps is small, this throws an error.
-    draws, trace, step_size, running_variances, momentum_distribution = _slow_window_closure(
-        proposal_kernel_kwargs=proposal_kernel_kwargs,
-        window_size=window_size,
-        initial_position=[d[-1] for d in draws],
-        running_variances=running_variances,
-        seed=slow_seed)
+    (draws, trace, step_size, running_variances, momentum_distribution
+     ) = _slow_window_closure(
+         proposal_kernel_kwargs=proposal_kernel_kwargs,
+         window_size=window_size,
+         initial_position=[d[-1] for d in draws],
+         running_variances=running_variances,
+         seed=slow_seed)
     for all_d, d in zip(all_draws, draws):
       all_d.append(d)
     all_traces.append(trace)

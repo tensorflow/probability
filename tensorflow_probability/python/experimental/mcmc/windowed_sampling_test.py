@@ -264,7 +264,7 @@ class WindowedSamplingTest(test_util.TestCase):
         [tfd.HalfNormal(1., name=f'dist_{idx}') for idx in range(4)])
 
     explicit_init = [tf.ones(20) for _ in range(3)]
-    _, init, bijector, _ = windowed_sampling._setup_mcmc(
+    _, init, bijector, _, _ = windowed_sampling._setup_mcmc(
         model=sample_dist,
         n_chains=20,
         init_position=explicit_init,
@@ -311,7 +311,7 @@ class WindowedSamplingTest(test_util.TestCase):
 
     # Twenty chains with three parameters gives a 1 / 2^60 chance of
     # initializing with a finite log probability by chance.
-    _, init, _, _ = windowed_sampling._setup_mcmc(
+    _, init, _, _, _ = windowed_sampling._setup_mcmc(
         model=tough_dist,
         n_chains=20,
         seed=test_util.test_seed(),
@@ -327,7 +327,7 @@ class WindowedSamplingTest(test_util.TestCase):
     pinned = model.experimental_pin(y=4.2)
 
     # No explicit pins are passed, since the model is already pinned.
-    _, init, _, _ = windowed_sampling._setup_mcmc(
+    _, init, _, _, _ = windowed_sampling._setup_mcmc(
         model=pinned, n_chains=20,
         seed=test_util.test_seed())
     self.assertLen(init, 1)
@@ -396,12 +396,69 @@ class WindowedSamplingTest(test_util.TestCase):
             tf.constant(0., dtype=tf.float64),
             tf.constant(1., dtype=tf.float64))
     ])
-    target_log_prob_fn, initial_transformed_position, _, _ = windowed_sampling._setup_mcmc(
-        dist, n_chains=5, init_position=None, seed=test_util.test_seed())
+    (target_log_prob_fn, initial_transformed_position, _, _, _
+     ) = windowed_sampling._setup_mcmc(
+         dist, n_chains=5, init_position=None, seed=test_util.test_seed())
     init_step_size = windowed_sampling._get_step_size(
         initial_transformed_position, target_log_prob_fn)
     self.assertDTypeEqual(init_step_size, np.float64)
     self.assertAllFinite(init_step_size)
+
+  def test_batch_of_problems_autobatched(self):
+    use_multinomial = tf.executing_eagerly()
+
+    def model_fn():
+      x = yield tfd.MultivariateNormalDiag(
+          tf.zeros([10, 3]), tf.ones(3), name='x')
+      if use_multinomial:
+        # TODO(b/188215322): Use Multinomial in graph mode.
+        yield tfd.Multinomial(
+            logits=tfb.Pad([(0, 1)])(x), total_count=10, name='y')
+      else:
+        yield tfd.MultivariateNormalDiag(
+            tfb.Pad([(0, 1)])(x), tf.ones(4), name='y')
+
+    model = tfd.JointDistributionCoroutineAutoBatched(model_fn, batch_ndims=1)
+    samp = model.sample(seed=test_util.test_seed())
+    self.assertEqual((10, 3), samp.x.shape)
+    self.assertEqual((10, 4), samp.y.shape)
+
+    states, trace = self.evaluate(tfp.experimental.mcmc.windowed_adaptive_hmc(
+        2, model.experimental_pin(y=samp.y), num_leapfrog_steps=3,
+        num_adaptation_steps=100, init_step_size=tf.ones([10, 1]),
+        seed=test_util.test_seed()))
+    self.assertEqual((2, 64, 10, 3), states.x.shape)
+    self.assertLen(trace['step_size'], 1)
+    self.assertEqual((2, 10, 1), trace['step_size'][0].shape)
+
+  def test_batch_of_problems_named(self):
+    use_multinomial = tf.executing_eagerly()
+
+    def mk_y(x):
+      if use_multinomial:
+        # TODO(b/188215322): Use Multinomial in graph mode.
+        return tfd.Multinomial(logits=tfb.Pad([(0, 1)])(x), total_count=10)
+      return tfd.MultivariateNormalDiag(tfb.Pad([(0, 1)])(x), tf.ones(4))
+
+    model = tfd.JointDistributionNamed(dict(
+        x=tfd.MultivariateNormalDiag(tf.zeros([10, 3]), tf.ones(3)),
+        y=mk_y))
+
+    samp = model.sample(seed=test_util.test_seed())
+    self.assertEqual((10, 3), samp['x'].shape)
+    self.assertEqual((10, 4), samp['y'].shape)
+
+    states, trace = self.evaluate(
+        tfp.experimental.mcmc.windowed_adaptive_hmc(
+            2,
+            model.experimental_pin(y=samp['y']),
+            num_leapfrog_steps=3,
+            num_adaptation_steps=100,
+            init_step_size=tf.ones([10, 1]),
+            seed=test_util.test_seed()))
+    self.assertEqual((2, 64, 10, 3), states['x'].shape)
+    self.assertLen(trace['step_size'], 1)
+    self.assertEqual((2, 10, 1), trace['step_size'][0].shape)
 
 
 @test_util.test_graph_and_eager_modes
