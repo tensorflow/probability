@@ -29,6 +29,7 @@ _allowed_symbols = [
     'build_affine_surrogate_posterior',
     'build_affine_surrogate_posterior_from_base_distribution',
     'build_asvi_surrogate_posterior',
+    'builf_cf_surrogate_posterior'
     'build_factored_surrogate_posterior',
     'build_split_flow_surrogate_posterior',
     'build_trainable_location_scale_distribution',
