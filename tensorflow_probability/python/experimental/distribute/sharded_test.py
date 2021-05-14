@@ -25,6 +25,7 @@ from tensorflow_probability.python.experimental.distributions import joint_densi
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 tfde = tfp.experimental.distributions
 tfp_dist = tfp.experimental.distribute
@@ -219,7 +220,7 @@ class ShardTest(test_lib.DistributedTest):
       return tfp.math.value_and_gradient(
           tfd.Sample(tfd.Normal(0., 1.), x.shape).log_prob, (x,))
 
-    x = tf.range(1, 5, dtype=tf.float32)
+    x = tf.range(1, 1 + test_lib.NUM_DEVICES, dtype=tf.float32)
     lp, g = lp_grad(x, axis_name=[])
     sharded_x = self.shard_values(x)
     sharded_lp, sharded_g = self.per_replica_to_tensor(
@@ -250,8 +251,8 @@ class ShardTest(test_lib.DistributedTest):
       return tfp.math.value_and_gradient(
           lambda x0, x1: tfde.log_prob_ratio(dist0, x0, dist1, x1), (x0, x1))
 
-    x0 = tf.range(1, 5, dtype=tf.float32)
-    x1 = tf.range(5, 9, dtype=tf.float32)
+    x0 = tf.range(1, 1 + test_lib.NUM_DEVICES, dtype=tf.float32)
+    x1 = tf.range(5, 5 + test_lib.NUM_DEVICES, dtype=tf.float32)
     lp_ratio, (g0, g1) = lp_ratio_grad(x0, x1, axis_name=[])
     sharded_x0 = self.shard_values(x0)
     sharded_x1 = self.shard_values(x1)
@@ -400,6 +401,30 @@ class ShardTest(test_lib.DistributedTest):
         tfd.Normal(loc=tf.zeros([x_size]),
                    scale=tf.ones([x_size])).sample(seed=self.key))
     test_w_x(w, random_x)
+
+  def test_default_event_space_bijector(self):
+    def sharded_lp_grad(x):
+      dist = tfp_dist.Sharded(
+          tfd.Sample(tfd.Exponential(1.), x.shape),
+          shard_axis_name=self.axis_name)
+      bij = dist.experimental_default_event_space_bijector()
+      dist2 = tfd.TransformedDistribution(dist, tfb.Invert(bij))
+      return tfp.math.value_and_gradient(dist2.log_prob, (x,))
+
+    def lp_grad(x):
+      dist = tfd.Sample(tfd.Exponential(1.), x.shape)
+      bij = dist.experimental_default_event_space_bijector()
+      dist2 = tfd.TransformedDistribution(dist, tfb.Invert(bij))
+      return tfp.math.value_and_gradient(dist2.log_prob, (x,))
+
+    x = tf.range(1, 1 + test_lib.NUM_DEVICES, dtype=tf.float32)
+    sharded_x = self.shard_values(x)
+    sharded_lp, sharded_g = self.per_replica_to_tensor(
+        self.strategy_run(sharded_lp_grad, (sharded_x,)))
+    true_lp, true_g = lp_grad(x)
+
+    self.assertAllClose(true_lp, sharded_lp[0])
+    self.assertAllClose(true_g, sharded_g)
 
   def test_none_axis_in_jax_error(self):
     if not JAX_MODE:

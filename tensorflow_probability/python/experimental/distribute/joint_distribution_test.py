@@ -23,9 +23,11 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.distribute import joint_distribution as jd
 from tensorflow_probability.python.experimental.distribute import sharded
+from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -137,7 +139,8 @@ class JointDistributionTest(test_lib.DistributedTest):
         true_log_prob_fn, (w, x, data))
 
     self.assertAllClose(
-        self.evaluate(log_prob), self.evaluate(tf.ones(4) * true_log_prob))
+        self.evaluate(log_prob),
+        self.evaluate(tf.ones(test_lib.NUM_DEVICES) * true_log_prob))
     self.assertAllCloseNested(
         self.evaluate(log_prob_grads), self.evaluate(true_log_prob_grads))
 
@@ -188,6 +191,155 @@ class JointDistributionTest(test_lib.DistributedTest):
     self.assertAllClose(
         self.evaluate(true_lp_diff), self.evaluate(dist_lp_diff[0]))
 
+  def test_default_event_space_bijector_non_interacting(self):
+
+    root = jd.JointDistributionCoroutine.Root
+
+    @tfd.JointDistributionCoroutine
+    def model():
+      x = yield root(tfd.LogNormal(0., 1., name='x'))
+      yield tfd.Sample(tfd.LogNormal(0., x), test_lib.NUM_DEVICES, name='y')
+      yield tfd.Sample(
+          tfb.Scale(2.)(tfd.Normal(0., 1.)), test_lib.NUM_DEVICES, name='z')
+
+    @jd.JointDistributionCoroutine
+    def sharded_model():
+      x = yield root(tfd.LogNormal(0., 1., name='x'))
+      yield sharded.Sharded(
+          tfd.LogNormal(0., x), shard_axis_name=self.axis_name, name='y')
+      yield sharded.Sharded(
+          tfb.Scale(2.)(tfd.Normal(0., 1.)),
+          shard_axis_name=self.axis_name,
+          name='z')
+
+    sample = self.evaluate(model.sample(seed=self.key))
+    unconstrained_sample = (
+        model.experimental_default_event_space_bijector().inverse(sample))
+
+    def unconstrained_lp(model, unconstrained_sample):
+      unconstrained_sample = tf.nest.map_structure(tf.identity,
+                                                   unconstrained_sample)
+      bij = model.experimental_default_event_space_bijector()
+      sample = bij(unconstrained_sample)
+      lp = model.log_prob(sample)
+      fldj = bij.forward_log_det_jacobian(unconstrained_sample)
+      return lp + fldj
+
+    true_lp, (true_g,) = tfp.math.value_and_gradient(
+        lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
+            model, unconstrained_sample), (unconstrained_sample,))
+
+    def run(unconstrained_sample):
+      return tfp.math.value_and_gradient(
+          lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
+              sharded_model, unconstrained_sample), (unconstrained_sample,))
+
+    sharded_unconstrained_sample = unconstrained_sample._replace(
+        y=self.shard_values(unconstrained_sample.y),
+        z=self.shard_values(unconstrained_sample.z))
+
+    lp, (g,) = self.per_replica_to_tensor(
+        self.strategy_run(
+            run, (sharded_unconstrained_sample,),
+            in_axes=(model.dtype._replace(x=None, y=0, z=0),)))
+    lp = lp[0]
+    g = g._replace(x=g.x[0])
+
+    self.assertAllClose(true_lp, lp)
+    self.assertAllCloseNested(true_g, g)
+
+  def test_default_event_space_bijector_interacting(self):
+    root = jd.JointDistributionCoroutine.Root
+
+    @tfd.JointDistributionCoroutine
+    def model():
+      x = yield root(tfd.LogNormal(0., 1., name='x'))
+      # Uniform's bijector depends on the global parameter.
+      yield tfd.Sample(tfd.Uniform(0., x), test_lib.NUM_DEVICES, name='y')
+      # TransformedDistribution's bijector explicitly depends on the global
+      # parameter.
+      yield tfd.Sample(
+          tfb.Scale(x)(tfd.Normal(0., 1.)), test_lib.NUM_DEVICES, name='z')
+
+    @jd.JointDistributionCoroutine
+    def sharded_model():
+      x = yield root(tfd.LogNormal(0., 1., name='x'))
+      yield sharded.Sharded(
+          tfd.Uniform(0., x), shard_axis_name=self.axis_name, name='y')
+      yield sharded.Sharded(
+          tfb.Scale(x)(tfd.Normal(0., 1.)),
+          shard_axis_name=self.axis_name,
+          name='z')
+
+    @tfd.JointDistributionCoroutine
+    def manual_sharded_model():
+      # This one has manual pbroadcasts; the goal is to get sharded_model above
+      # to do this automatically.
+      x = yield root(tfd.LogNormal(0., 1., name='x'))
+      x = distribute_lib.pbroadcast(x, axis_name=self.axis_name)
+      yield sharded.Sharded(
+          tfd.Uniform(0., x), shard_axis_name=self.axis_name, name='y')
+      yield sharded.Sharded(
+          tfb.Scale(x)(tfd.Normal(0., 1.)),
+          shard_axis_name=self.axis_name,
+          name='z')
+
+    sample = model.sample(seed=self.key)
+    unconstrained_sample = (
+        model.experimental_default_event_space_bijector().inverse(sample))
+
+    def unconstrained_lp(model, unconstrained_sample):
+      unconstrained_sample = tf.nest.map_structure(tf.identity,
+                                                   unconstrained_sample)
+      bij = model.experimental_default_event_space_bijector()
+      sample = bij(unconstrained_sample)
+      lp = model.log_prob(sample)
+      fldj = bij.forward_log_det_jacobian(unconstrained_sample)
+      return lp + fldj
+
+    true_lp, (true_g,) = tfp.math.value_and_gradient(
+        lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
+            model, unconstrained_sample), (unconstrained_sample,))
+
+    def run(unconstrained_sample):
+      return tfp.math.value_and_gradient(
+          lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
+              sharded_model, unconstrained_sample), (unconstrained_sample,))
+
+    def manual_run(unconstrained_sample):
+      return tfp.math.value_and_gradient(
+          lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
+              manual_sharded_model, unconstrained_sample),
+          (unconstrained_sample,))
+
+    sharded_unconstrained_sample = unconstrained_sample._replace(
+        y=self.shard_values(unconstrained_sample.y),
+        z=self.shard_values(unconstrained_sample.z))
+
+    lp, (g,) = self.per_replica_to_tensor(
+        self.strategy_run(
+            run, (sharded_unconstrained_sample,),
+            in_axes=(model.dtype._replace(x=None, y=0, z=0),)))
+    lp = lp[0]
+    g = g._replace(x=g.x[0])
+
+    manual_lp, (manual_g,) = self.per_replica_to_tensor(
+        self.strategy_run(
+            manual_run, (sharded_unconstrained_sample,),
+            in_axes=(model.dtype._replace(x=None, y=0, z=0),)))
+    manual_lp = manual_lp[0]
+    manual_g = manual_g._replace(x=manual_g.x[0])
+
+    self.assertAllClose(true_lp, lp)
+    # TODO(b/175084455): This will fail because there are sharded <->
+    # non-sharded edges in the gradient graph not accounted for. The edges arise
+    # because the sharded bijectors' parameterizations depend non-sharded
+    # parameters.
+    with self.assertRaises(AssertionError):
+      self.assertAllCloseNested(true_g, g)
+
+    self.assertAllClose(true_lp, manual_lp)
+    self.assertAllCloseNested(true_g, manual_g)
 
 if __name__ == '__main__':
   tf.test.main()
