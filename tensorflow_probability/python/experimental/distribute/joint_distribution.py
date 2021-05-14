@@ -101,9 +101,7 @@ def _dist_jd_log_prob_ratio(p, x, q, y, name=None):
       raise ValueError('p and q must use the same sharding. '
                        f'Saw: p: {p}, {p_axis_names}, q: {q}, {q_axis_names}')
 
-    def log_prob_ratio_parts_fn(x_y):
-      x = tf.nest.map_structure(lambda part: part[0], x_y)
-      y = tf.nest.map_structure(lambda part: part[1], x_y)
+    def log_prob_ratio_parts_fn(x, y):
       p_dists = p.sample_distributions(value=x, seed=samplers.zeros_seed())[0]
       q_dists = q.sample_distributions(value=y, seed=samplers.zeros_seed())[0]
       # Ensure sharded distributions defer reductions.
@@ -115,12 +113,8 @@ def _dist_jd_log_prob_ratio(p, x, q, y, name=None):
 
     return tf.add_n(
         tf.nest.flatten(
-            distribute_lib.make_sharded_log_prob_parts(
+            distribute_lib.make_psum_function(
                 log_prob_ratio_parts_fn,
-                # Stack, because make_sharded_log_prob_parts expects
-                # inputs/outputs to be 1 to 1. TODO(b/175084455): revisit this
-                # after the distributed bijectors are done, as it is likely that
-                # make_sharded_log_prob_parts will be adjusted then to not have
-                # this limitation.
-                p_axis_names)(tf.nest.map_structure(
-                    lambda x, y: tf.stack([x, y], axis=0), x, y))))
+                in_axes=(p_axis_names, p_axis_names),
+                out_axes=p_axis_names,
+                out_dtype=x)(x, y)))

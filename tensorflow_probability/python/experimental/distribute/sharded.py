@@ -36,16 +36,14 @@ def _implement_sharded_lp_fn(fn_name):
   """Implements log_prob or unnormalized_log_prob."""
   def lp_fn(self, x, reduce_over_shards=True, **kwargs):
 
-    def impl(value):
-      new_kwargs = dict(kwargs)
-      if self.distribution.experimental_shard_axis_names:
-        new_kwargs['reduce_over_shards'] = reduce_over_shards
-      return getattr(self.distribution, fn_name)(value, **new_kwargs)
-
+    new_kwargs = dict(kwargs)
+    if self.distribution.experimental_shard_axis_names:
+      new_kwargs['reduce_over_shards'] = reduce_over_shards
+    lp = getattr(self.distribution, fn_name)(x, **new_kwargs)
     if reduce_over_shards:
-      impl = distribute_lib.make_sharded_log_prob_parts(
-          impl, self.experimental_shard_axis_names)
-    return impl(x)
+      lp = distribute_lib.psum(lp, self.experimental_shard_axis_names)
+
+    return lp
 
   lp_fn.__name__ = f'_{fn_name}'
   return lp_fn
@@ -191,17 +189,14 @@ def _sharded_log_prob_ratio(p, x, q, y, name=None, reduce_over_shards=True):
           f'"{p.experimental_shard_axis_names}" vs "'
           f'"{q.experimental_shard_axis_names}"')
 
-    def log_prob_ratio_fn(x_y):
-      return log_prob_ratio.log_prob_ratio(p.distribution, x_y[0],
-                                           q.distribution, x_y[1])
+    def log_prob_ratio_fn(x, y):
+      return log_prob_ratio.log_prob_ratio(p.distribution, x,
+                                           q.distribution, y)
 
     if reduce_over_shards:
-      return distribute_lib.make_sharded_log_prob_parts(
-          # Stack, because make_sharded_log_prob_parts expects inputs/outputs to
-          # be 1 to 1. TODO(b/175084455): revisit this after the distributed
-          # bijectors are done, as it is likely that make_sharded_log_prob_parts
-          # will be adjusted then to not have this limitation.
-          log_prob_ratio_fn,
-          p.experimental_shard_axis_names)(
-              tf.stack([x, y], axis=0))
-    return log_prob_ratio_fn([x, y])
+      axes = p.experimental_shard_axis_names
+
+      return distribute_lib.make_psum_function(
+          log_prob_ratio_fn, in_axes=(axes, axes), out_axes=axes,
+          out_dtype=x)(x, y)
+    return log_prob_ratio_fn(x, y)
