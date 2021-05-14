@@ -178,6 +178,7 @@ class HighwayFlow(tfb.Bijector):
       lower_diagonal_weights_matrix: Lower diagonal matrix with ones on the main
         diagional.
       gate_first_n: Integer that decides what part of the input is gated.
+        Default: `None`. When None, the whole input is gated.
     """
     parameters = dict(locals())
     name = name or 'highway_flow'
