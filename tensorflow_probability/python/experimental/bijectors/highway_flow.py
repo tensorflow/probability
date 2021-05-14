@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
+
 def build_highway_flow_layer(width,
                              residual_fraction_initial_value=0.5,
                              activation_fn=False,
