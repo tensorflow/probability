@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -172,6 +173,15 @@ class VariableTrackingUtils(test_util.TestCase):
     m = FakeModule(1.)
     self.assertTrue(tensor_util.is_module(m))
     self.assertFalse(tensor_util.is_module(tf.Variable(0.)))
+
+  def test_identity_as_tensor(self):
+    for v in (tf.constant([4., 3.]),
+              tf.Variable(0.),
+              tfp.util.DeferredTensor(tf.Variable(1.), tf.math.exp),
+              tfp.util.TransformedVariable(2., tfb.Scale(tf.Variable(4.)))):
+      v_ = tensor_util.identity_as_tensor(v)
+      self.assertIsNot(v, v_)
+      self.assertIsInstance(v_, tf.Tensor)
 
 
 if __name__ == '__main__':

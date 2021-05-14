@@ -317,7 +317,7 @@ class Deterministic(_BaseDeterministic):
     return tf.cast(tf.abs(x - loc) <= self._slack(loc), dtype=prob_dtype)
 
   def _cdf(self, x):
-    loc = tf.identity(self.loc)
+    loc = tensor_util.identity_as_tensor(self.loc)
     return tf.cast(x >= loc - self._slack(loc), dtype=self.dtype)
 
 
