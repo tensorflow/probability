@@ -194,8 +194,8 @@ class BatchBroadcast(distribution_lib.Distribution):
     return self._to_shape
 
   @property
-  def experimental_is_sharded(self):
-    return self.distribution.experimental_is_sharded
+  def experimental_shard_axis_names(self):
+    return self.distribution.experimental_shard_axis_names
 
   def __getitem__(self, slices):
     # Implementing this method would require logic similar to
