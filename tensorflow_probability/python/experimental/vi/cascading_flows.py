@@ -39,8 +39,7 @@ from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import half_normal
 from tensorflow_probability.python.distributions import independent
-from tensorflow_probability.python.distributions import \
-  joint_distribution_auto_batched
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import \
   joint_distribution_coroutine
 from tensorflow_probability.python.distributions import normal
@@ -422,11 +421,10 @@ def _cf_surrogate_for_joint_distribution(
           posterior_generator, seed=seed)))
 
   # Temporary workaround for bijector caching issues with autobatched JDs.
-  surrogate_type = joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched
-  if not hasattr(dist, 'use_vectorized_map'):
-    surrogate_type = joint_distribution_coroutine.JointDistributionCoroutine
-  surrogate_posterior = surrogate_type(posterior_generator,
-                                       name=_get_name(dist))
+  surrogate_posterior = joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched(
+    posterior_generator,
+    use_vectorized_map=dist.use_vectorized_map,
+    name=_get_name(dist))
 
   # Ensure that the surrogate posterior structure matches that of the prior.
   # todo: check me, do we need this? in case needs to be modified
