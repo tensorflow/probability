@@ -16,11 +16,10 @@
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 @test_util.test_all_tf_execution_regimes
 class HighwayFlowTests(test_util.TestCase):
@@ -116,8 +115,8 @@ class HighwayFlowTests(test_util.TestCase):
       lower_diagonal_weights_matrix=tf.eye(width),
       gate_first_n=width
     )
-    target = tfd.MultivariateNormalDiag(loc=tf.zeros(width),
-                                        scale_diag=tf.ones(width))
+    target = mvn_diag.MultivariateNormalDiag(loc=tf.zeros(width),
+                                             scale_diag=tf.ones(width))
     x = tf.ones((batch_size, width))
     with tf.GradientTape() as g:
       g.watch(bijector.residual_fraction)

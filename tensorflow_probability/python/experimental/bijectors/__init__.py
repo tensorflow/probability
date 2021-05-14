@@ -22,8 +22,8 @@ from tensorflow_probability.python.experimental.bijectors.highway_flow import bu
 from tensorflow_probability.python.experimental.bijectors.highway_flow import HighwayFlow
 __all__ = [
     'build_highway_flow_layer',
-    'HighwayFlow',
     'forward_log_det_jacobian_ratio',
+    'HighwayFlow',
     'inverse_log_det_jacobian_ratio',
     'make_distribution_bijector',
     'ScalarFunctionWithInferredInverse',
