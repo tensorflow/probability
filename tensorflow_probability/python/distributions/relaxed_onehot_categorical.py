@@ -297,7 +297,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
   def _logits_parameter_no_checks(self):
     if self._logits is None:
       return tf.math.log(self._probs)
-    return tf.identity(self._logits)
+    return tensor_util.identity_as_tensor(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
@@ -306,7 +306,7 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
 
   def _probs_parameter_no_checks(self):
     if self._logits is None:
-      return tf.identity(self._probs)
+      return tensor_util.identity_as_tensor(self._probs)
     return tf.math.softmax(self._logits)
 
   def _sample_control_dependencies(self, x):

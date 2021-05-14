@@ -1053,7 +1053,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
           sigma.pretransformed_input
       ]])
 
-      weights_prior_estimated_scale = tf.identity(sigma)
+      weights_prior_estimated_scale = tf.convert_to_tensor(sigma)
       return (weights_prior_estimated_scale, weights[-1], loss,
               step_size[-1], avg_acceptance_ratio)
 

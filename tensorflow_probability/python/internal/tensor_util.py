@@ -27,6 +27,7 @@ __all__ = [
     'convert_nonref_to_tensor',
     'discover_trainable_variables',
     'discover_variables',
+    'identity_as_tensor',
     'is_module',
     'is_ref',
     'is_trainable_variable',
@@ -121,6 +122,14 @@ def convert_nonref_to_tensor(value, dtype=None, dtype_hint=None,
         value, dtype=dtype, dtype_hint=dtype_hint, name=name)
   return tf.convert_to_tensor(
       value, dtype=dtype, dtype_hint=dtype_hint, name=name)
+
+
+def identity_as_tensor(value):
+  """Converts `value` to `Tensor` while ensuring an op is added to the graph."""
+  t = tf.convert_to_tensor(value)
+  if t is value:
+    t = tf.identity(value)
+  return t
 
 
 def is_ref(x):

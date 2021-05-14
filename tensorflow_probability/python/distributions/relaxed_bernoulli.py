@@ -234,7 +234,7 @@ class RelaxedBernoulli(distribution.Distribution):
     if self._logits is None:
       probs = tf.convert_to_tensor(self._probs)
       return tf.math.log(probs) - tf.math.log1p(-probs)
-    return tf.identity(self._logits)
+    return tensor_util.identity_as_tensor(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs computed from non-`None` input arg (`probs` or `logits`)."""
@@ -243,7 +243,7 @@ class RelaxedBernoulli(distribution.Distribution):
 
   def _probs_parameter_no_checks(self):
     if self._logits is None:
-      return tf.identity(self._probs)
+      return tensor_util.identity_as_tensor(self._probs)
     return tf.math.sigmoid(self._logits)
 
   def _event_shape_tensor(self):

@@ -170,7 +170,7 @@ class ProbitBernoulli(distribution.Distribution):
     if self._probits is None:
       probs = tf.convert_to_tensor(self._probs)
       return tf.math.ndtri(probs)
-    return tf.identity(self._probits)
+    return tensor_util.identity_as_tensor(self._probits)
 
   def probs_parameter(self, name=None):
     """Probs computed from non-`None` input arg (`probs` or `probits`)."""
@@ -179,7 +179,7 @@ class ProbitBernoulli(distribution.Distribution):
 
   def _probs_parameter_no_checks(self):
     if self._probits is None:
-      return tf.identity(self._probs)
+      return tensor_util.identity_as_tensor(self._probs)
     return special_math.ndtr(self._probits)
 
   def _default_event_space_bijector(self):
