@@ -192,7 +192,7 @@ class HighwayFlow(tfb.Bijector):
       self._residual_fraction = tensor_util.convert_nonref_to_tensor(
         residual_fraction, dtype=dtype, name='residual_fraction')
       # The upper matrix is still lower triangular, transpose is done in
-      # _inverse and _forwars metowds, within matvec.
+      # _inverse and _forwars metowds.
       self._upper_diagonal_weights_matrix = tensor_util.convert_nonref_to_tensor(
         upper_diagonal_weights_matrix, dtype=dtype,
         name='upper_diagonal_weights_matrix')
