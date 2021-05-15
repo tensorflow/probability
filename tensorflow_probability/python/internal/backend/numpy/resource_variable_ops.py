@@ -12,31 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Numpy stub for `type_spec`."""
+"""Numpy stub for `resource_variable_ops`."""
 
 __all__ = [
-    'lookup',
-    'register',
-    'BatchableTypeSpec',
-    'TypeSpec',
+    'VariableSpec',
 ]
 
 
-def register(_):
-  """No-op for registering a `tf.TypeSpec` for `saved_model`."""
-  def decorator_fn(cls):
-    return cls
-  return decorator_fn
+class VariableSpec(object):
 
-
-def lookup(_):
-  # Raise ValueError instead of NotImplementedError to conform to TF.
-  raise ValueError('`TypeSpec`s are not registered in Numpy/JAX.')
-
-
-class TypeSpec(object):
-  pass
-
-
-class BatchableTypeSpec(TypeSpec):
-  pass
+  def __init__(self, *args, **kwargs):
+    del args, kwargs
+    self.dtype = None
