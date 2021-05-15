@@ -27,6 +27,7 @@ except ImportError:
 # Although `inspect` is different between Python 2 and 3, we should only ever
 # be using Python 3's inspect because JAX is Python 3 only and if TF is present
 # we will use `tf_inspect` which is compatible with both Python 2 and 3.
+Parameter = inspect.Parameter
 getfullargspec = inspect.getfullargspec
 getcallargs = inspect.getcallargs
 getframeinfo = inspect.getframeinfo
@@ -46,4 +47,5 @@ isgeneratorfunction = inspect.isgeneratorfunction
 ismethod = inspect.ismethod
 ismodule = inspect.ismodule
 isroutine = inspect.isroutine
+signature = inspect.signature
 stack = inspect.stack
