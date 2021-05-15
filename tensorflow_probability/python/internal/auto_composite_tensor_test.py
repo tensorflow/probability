@@ -411,6 +411,14 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
 class _TestTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):
 
+  def __init__(self, param_specs, non_tensor_params=None, omit_kwargs=(),
+               prefer_static_value=(), callable_params=None):
+    non_tensor_params = {} if non_tensor_params is None else non_tensor_params
+    super(_TestTypeSpec, self).__init__(
+        param_specs, non_tensor_params=non_tensor_params,
+        omit_kwargs=omit_kwargs, prefer_static_value=prefer_static_value,
+        callable_params=callable_params)
+
   @property
   def value_type(self):
     """Unused `value_type` to allow the `TypeSpec` to be instantiated."""
@@ -436,17 +444,15 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
                         'b': tfb.Scale(3.)._type_spec},
-           non_tensor_params={},
            omit_kwargs=('name', 'foo'),
            prefer_static_value=('a',),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
                         'b': tfb.Scale(3.)._type_spec},
-           non_tensor_params={},
            omit_kwargs=('name', 'foo'),
            prefer_static_value=('a',),
-           callable_params={'f': tf.math.exp})),
+           callable_params={'f': tf.math.exp}))
       )
   def testEquality(self, v1, v2):
     # pylint: disable=g-generic-assert
@@ -461,25 +467,19 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, 2], tf.float32)},
            non_tensor_params={'validate_args': True},
-           omit_kwargs=('name',),
-           prefer_static_value=()),
+           omit_kwargs=('name',)),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32)},
            non_tensor_params={'validate_args': True},
-           omit_kwargs=('name',),
-           prefer_static_value=())),
+           omit_kwargs=('name',))),
       ('DifferentCallables',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32)},
-           non_tensor_params={},
            omit_kwargs=('name', 'foo'),
-           prefer_static_value=(),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32)},
-           non_tensor_params={},
            omit_kwargs=('name', 'foo'),
-           prefer_static_value=(),
            callable_params={'f': tf.math.sigmoid}))
       )
   def testInequality(self, v1, v2):
@@ -506,16 +506,12 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
                         'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
-           non_tensor_params={},
            omit_kwargs=('name', 'foo'),
-           prefer_static_value=(),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
                         'b': tfb.Scale(3.)._type_spec},
-           non_tensor_params={},
            omit_kwargs=('name', 'foo'),
-           prefer_static_value=(),
            callable_params={'f': tf.math.exp}))
       )
   def testIsCompatibleWith(self, v1, v2):
@@ -539,29 +535,23 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
            param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
            non_tensor_params={'validate_args': True},
            omit_kwargs=('name',),
-           prefer_static_value=(),
            callable_params={'g': tf.math.softplus}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
            non_tensor_params={'validate_args': False},
            omit_kwargs=('name',),
-           prefer_static_value=(),
            callable_params={'g': tf.math.softplus})),
       ('DifferentCallables',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
                         'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
-           non_tensor_params={},
            omit_kwargs=('name', 'foo'),
-           prefer_static_value=(),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
                         'b': tfb.Scale(3.)._type_spec},
-           non_tensor_params={},
            omit_kwargs=('name', 'foo'),
-           prefer_static_value=(),
            callable_params={'f': tf.math.sigmoid}))
       )
   def testIsNotCompatibleWith(self, v1, v2):
@@ -572,42 +562,27 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('WithoutCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
-           non_tensor_params={},
-           omit_kwargs=('name',),
-           prefer_static_value=()),
+           omit_kwargs=('name',)),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
-           non_tensor_params={},
-           omit_kwargs=('name',),
-           prefer_static_value=()),
+           omit_kwargs=('name',)),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
-           non_tensor_params={},
-           omit_kwargs=('name',),
-           prefer_static_value=())),
+           omit_kwargs=('name',))),
       ('WithCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec(None, tf.float32),
                         'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
-           non_tensor_params={},
-           omit_kwargs=(),
-           prefer_static_value=(),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
                         'b': tfb.Scale(tf.Variable(3.))._type_spec},
-           non_tensor_params={},
-           omit_kwargs=(),
-           prefer_static_value=(),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec(None, tf.float32),
                         'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
-           non_tensor_params={},
-           omit_kwargs=(),
-           prefer_static_value=(),
            callable_params={'f': tf.math.exp})),
       )
   def testMostSpecificCompatibleType(self, v1, v2, expected):
@@ -618,40 +593,26 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('DifferentParamSpecs',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
-           non_tensor_params={},
-           omit_kwargs=('foo',),
-           prefer_static_value=()),
+           omit_kwargs=('foo',)),
        _TestTypeSpec(
            param_specs={'b': tf.TensorSpec([5, None], tf.float32)},
-           non_tensor_params={},
-           omit_kwargs=('foo',),
-           prefer_static_value=())),
+           omit_kwargs=('foo',))),
       ('DifferentMetadata',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
-           non_tensor_params={},
-           omit_kwargs=('foo',),
-           prefer_static_value=()),
+           omit_kwargs=('foo',)),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, None], tf.float32)},
-           non_tensor_params={},
-           omit_kwargs=('bar',),
-           prefer_static_value=())),
+           omit_kwargs=('bar',))),
       ('DifferentCallables',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec(None, tf.float32),
                         'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
-           non_tensor_params={},
-           omit_kwargs=(),
-           prefer_static_value=(),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
                         'b': tfb.Scale(tf.Variable(3.))._type_spec},
-           non_tensor_params={},
-           omit_kwargs=(),
-           prefer_static_value=(),
            callable_params={'f': tf.math.softplus})),
       )
   def testMostSpecificCompatibleTypeException(self, v1, v2):
@@ -664,17 +625,12 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('WithoutCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([4, 2], tf.float32)},
-           non_tensor_params={},
-           omit_kwargs=('name',),
-           prefer_static_value=())),
+           omit_kwargs=('name',))),
       ('WithCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec(None, tf.float32),
                         'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
-           non_tensor_params={},
-           omit_kwargs=(),
-           prefer_static_value=(),
            callable_params={'f': tf.math.exp})),
       )
   def testRepr(self, spec):
