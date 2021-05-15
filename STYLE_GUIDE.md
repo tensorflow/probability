@@ -6,7 +6,6 @@ number of errors, and promote consistency.
 
 ## TensorFlow Style
 
-
 Follow the [TensorFlow style 
 guide](https://www.tensorflow.org/community/contribute/code_style) and
 [documentation 
