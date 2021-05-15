@@ -132,6 +132,23 @@ class TransitionKernel(object):
     """
     return []
 
+  @property
+  def experimental_shard_axis_names(self):
+    """The shard axis names for members of the state."""
+    return []
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    """Returns a copy of the kernel with the provided shard axis names.
+
+    Args:
+      shard_axis_names: a structure of strings indicating the shard axis names
+        for each component of this kernel's state.
+    Returns:
+      A copy of the current kernel with the shard axis information.
+    """
+    del shard_axis_names
+    return self
+
   def copy(self, **override_parameter_kwargs):
     """Non-destructively creates a deep copy of the kernel.
 

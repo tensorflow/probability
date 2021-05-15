@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -111,13 +112,13 @@ class Exponential(gamma.Gamma):
           rate,
           name="rate",
           dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))
-      self._force_probs_to_zero_outside_support = (
-          force_probs_to_zero_outside_support)
       super(Exponential, self).__init__(
           concentration=1.,
           rate=self._rate,
           allow_nan_stats=allow_nan_stats,
           validate_args=validate_args,
+          force_probs_to_zero_outside_support=(
+              force_probs_to_zero_outside_support),
           name=name)
       self._parameters = parameters
 
@@ -134,19 +135,10 @@ class Exponential(gamma.Gamma):
   def rate(self):
     return self._rate
 
-  @property
-  def force_probs_to_zero_outside_support(self):
-    """Return 0 probabilities on non-integer inputs."""
-    return self._force_probs_to_zero_outside_support
-
   def _cdf(self, value):
     cdf = -tf.math.expm1(-self.rate * value)
-
-    if self.force_probs_to_zero_outside_support:
-      # Set cdf = 0 when value is less than 0.
-      cdf = tf.where(value < 0., tf.zeros_like(cdf), cdf)
-
-    return cdf
+    # Set cdf = 0 when value is less than 0.
+    return distribution_util.extend_cdf_outside_support(value, cdf, low=0.)
 
   def _log_survival_function(self, value):
     rate = tf.convert_to_tensor(self._rate)

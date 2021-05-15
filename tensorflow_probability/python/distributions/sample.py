@@ -175,7 +175,8 @@ class Sample(distribution_lib.Distribution):
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
-        distribution=parameter_properties.BatchedComponentProperties())
+        distribution=parameter_properties.BatchedComponentProperties(),
+        sample_shape=parameter_properties.ShapeParameterProperties())
 
   @property
   def sample_shape(self):
@@ -194,12 +195,6 @@ class Sample(distribution_lib.Distribution):
     # Since this distribution only modifies the event shape, we can simply pass
     # through slicing to the underlying.
     return self.copy(distribution=self.distribution.__getitem__(slices))
-
-  def _batch_shape_tensor(self):
-    return self.distribution.batch_shape_tensor()
-
-  def _batch_shape(self):
-    return self.distribution.batch_shape
 
   def _event_shape_tensor(self):
     return ps.concat([
@@ -362,10 +357,6 @@ class Sample(distribution_lib.Distribution):
             sample_shape, -1, message=msg))
 
     return assertions
-
-  _composite_tensor_nonshape_params = ('distribution',)
-
-  _composite_tensor_shape_params = ('sample_shape',)
 
 
 class _DefaultSampleBijector(bijector_lib.Bijector):

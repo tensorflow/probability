@@ -203,8 +203,10 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # This model's broadcasting behavior is a footgun (it can break inference
     # routines and cause silently incorrect optimization); it should be
     # disallowed by `validate_args`.
-    with self.assertRaisesRegexp(Exception,
-                                 'Component batch shapes are inconsistent'):
+    with self.assertRaisesRegexp(
+        Exception,
+        ('Component batch shapes are inconsistent|'
+         'Broadcasting probably indicates an error in model specification')):
       jda_invalid = jda_class(jd_auto_models[jda_class],
                               batch_ndims=1, validate_args=True)
       _ = self.evaluate(jda_invalid.log_prob(

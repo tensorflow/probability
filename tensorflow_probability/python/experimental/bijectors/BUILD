@@ -37,6 +37,7 @@ multi_substrate_py_library(
     deps = [
         ":distribution_bijectors",
         ":scalar_function_with_inferred_inverse",
+        ":sharded",
         "//tensorflow_probability/python/bijectors:ldj_ratio",
     ],
 )
@@ -99,6 +100,35 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "sharded",
+    srcs = ["sharded.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:log_prob_ratio",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:samplers",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "sharded_test",
+    size = "medium",
+    srcs = ["sharded_test.py"],
+    disabled_substrates = ["numpy"],
+    python_version = "PY3",
+    deps = [
+        ":sharded",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

@@ -325,19 +325,6 @@ class StudentT(distribution.Distribution):
     """Scaling factors of these Student's t distribution(s)."""
     return self._scale
 
-  def _batch_shape_tensor(self, df=None, loc=None, scale=None):
-    return ps.broadcast_shape(
-        ps.shape(self.df if df is None else df),
-        ps.broadcast_shape(
-            ps.shape(self.loc if loc is None else loc),
-            ps.shape(self.scale if scale is None else scale)))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        tf.broadcast_static_shape(self.df.shape,
-                                  self.loc.shape),
-        self.scale.shape)
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 

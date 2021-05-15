@@ -61,9 +61,7 @@ __all__ = [
     'Module',
     'Tensor',
     'TensorSpec',
-    'TypeSpec',
     'Variable',
-    'VariableSpec',
     # 'gradients',
 ]
 
@@ -696,15 +694,10 @@ class Tensor(six.with_metaclass(_TensorMeta)):
 
 
 class TensorSpec(object):
-  pass
 
-
-class TypeSpec(object):
-  pass
-
-
-class VariableSpec(object):
-  pass
+  def __init__(self, *args, **kwargs):
+    del args, kwargs
+    self.dtype = None
 
 
 class Module(object):

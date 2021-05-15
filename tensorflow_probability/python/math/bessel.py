@@ -319,13 +319,13 @@ def _bessel_iv_ratio_bwd(aux, g):
   grad_z = pz * g
   _, grad_z = _fix_gradient_for_broadcasting(
       v, z, tf.ones_like(grad_z), grad_z)
-  return grad_z
+  return None, grad_z
 
 
-def _bessel_iv_ratio_jvp(v, primals, tangents):
+def _bessel_iv_ratio_jvp(primals, tangents):
   """Computes JVP for bessel_iv_ratio (supports JAX custom derivative)."""
-  z, = primals
-  dz, = tangents
+  v, z = primals
+  _, dz = tangents
 
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
   bc_shp = ps.broadcast_shape(ps.shape(v), ps.shape(dz))
@@ -347,8 +347,7 @@ def _bessel_iv_ratio_jvp(v, primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_bessel_iv_ratio_fwd,
     vjp_bwd=_bessel_iv_ratio_bwd,
-    jvp_fn=_bessel_iv_ratio_jvp,
-    nondiff_argnums=(0,))
+    jvp_fn=_bessel_iv_ratio_jvp)
 def _bessel_iv_ratio_custom_gradient(v, z):
   return _bessel_iv_ratio_naive(v, z)
 
@@ -963,16 +962,16 @@ def _bessel_ive_bwd(aux, g):
   # TODO(b/169357627): Implement gradients of modified bessel functions with
   # respect to parameters.
 
-  return grad_z
+  return None, grad_z
 
 
-def _bessel_ive_jvp(v, primals, tangents):
+def _bessel_ive_jvp(primals, tangents):
   """Computes JVP for bessel_ive (supports JAX custom derivative)."""
-  z, = primals
-  dz, = tangents
+  v, z = primals
+  dv, dz = tangents
 
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = ps.broadcast_shape(ps.shape(v), ps.shape(dz))
+  bc_shp = ps.broadcast_shape(ps.shape(dv), ps.shape(dz))
   dz = tf.broadcast_to(dz, bc_shp)
 
   ive = _bessel_ive_custom_gradient(v, z)
@@ -991,8 +990,7 @@ def _bessel_ive_jvp(v, primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_bessel_ive_fwd,
     vjp_bwd=_bessel_ive_bwd,
-    jvp_fn=_bessel_ive_jvp,
-    nondiff_argnums=(0,))
+    jvp_fn=_bessel_ive_jvp)
 def _bessel_ive_custom_gradient(v, z):
   return _bessel_ive_naive(v, z)
 
@@ -1078,13 +1076,13 @@ def _bessel_kve_bwd(aux, g):
   # TODO(b/169357627): Implement gradients of modified bessel functions with
   # respect to parameters.
 
-  return grad_z
+  return None, grad_z
 
 
-def _bessel_kve_jvp(v, primals, tangents):
+def _bessel_kve_jvp(primals, tangents):
   """Computes JVP for bessel_kve (supports JAX custom derivative)."""
-  z, = primals
-  dz, = tangents
+  v, z, = primals
+  _, dz = tangents
 
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
   bc_shp = ps.broadcast_shape(ps.shape(v), ps.shape(dz))
@@ -1106,8 +1104,7 @@ def _bessel_kve_jvp(v, primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_bessel_kve_fwd,
     vjp_bwd=_bessel_kve_bwd,
-    jvp_fn=_bessel_kve_jvp,
-    nondiff_argnums=(0,))
+    jvp_fn=_bessel_kve_jvp)
 def _bessel_kve_custom_gradient(v, z):
   return _bessel_kve_naive(v, z)
 
@@ -1165,13 +1162,13 @@ def _log_bessel_ive_bwd(aux, g):
   # TODO(b/169357627): Implement gradients of modified bessel functions with
   # respect to parameters.
 
-  return grad_z
+  return None, grad_z
 
 
-def _log_bessel_ive_jvp(v, primals, tangents):
+def _log_bessel_ive_jvp(primals, tangents):
   """Computes JVP for log_bessel_ive (supports JAX custom derivative)."""
-  z, = primals
-  dz, = tangents
+  v, z = primals
+  _, dz = tangents
 
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
   bc_shp = ps.broadcast_shape(ps.shape(v), ps.shape(dz))
@@ -1194,8 +1191,7 @@ def _log_bessel_ive_jvp(v, primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_log_bessel_ive_fwd,
     vjp_bwd=_log_bessel_ive_bwd,
-    jvp_fn=_log_bessel_ive_jvp,
-    nondiff_argnums=(0,))
+    jvp_fn=_log_bessel_ive_jvp)
 def _log_bessel_ive_custom_gradient(v, z):
   return _log_bessel_ive_naive(v, z)
 
@@ -1243,7 +1239,6 @@ def _log_bessel_kve_fwd(v, z):
 def _log_bessel_kve_bwd(aux, g):
   """Reverse mode impl for bessel_kve."""
   v, z = aux
-
   dtype = dtype_util.common_dtype([v, z], tf.float32)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
 
@@ -1263,13 +1258,13 @@ def _log_bessel_kve_bwd(aux, g):
   # TODO(b/169357627): Implement gradients of modified bessel functions with
   # respect to parameters.
 
-  return grad_z
+  return None, grad_z
 
 
-def _log_bessel_kve_jvp(v, primals, tangents):
+def _log_bessel_kve_jvp(primals, tangents):
   """Computes JVP for bessel_kve (supports JAX custom derivative)."""
-  z, = primals
-  dz, = tangents
+  v, z = primals
+  _, dz = tangents
 
   dtype = dtype_util.common_dtype([v, z], tf.float32)
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
@@ -1298,8 +1293,7 @@ def _log_bessel_kve_jvp(v, primals, tangents):
 @tfp_custom_gradient.custom_gradient(
     vjp_fwd=_log_bessel_kve_fwd,
     vjp_bwd=_log_bessel_kve_bwd,
-    jvp_fn=_log_bessel_kve_jvp,
-    nondiff_argnums=(0,))
+    jvp_fn=_log_bessel_kve_jvp)
 def _log_bessel_kve_custom_gradient(v, z):
   return _log_bessel_kve_naive(v, z)
 

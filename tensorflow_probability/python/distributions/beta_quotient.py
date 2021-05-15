@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -33,7 +31,6 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -180,28 +177,6 @@ class BetaQuotient(distribution.Distribution):
     """Concentration parameter associated with a `0` outcome."""
     return self._concentration0_denominator
 
-  def _batch_shape_tensor(
-      self,
-      alpha0=None,
-      beta0=None,
-      alpha1=None,
-      beta1=None):
-    return functools.reduce(
-        ps.broadcast_shape,
-        [ps.shape(self.concentration1_numerator if alpha0 is None else alpha0),
-         ps.shape(self.concentration0_numerator if beta0 is None else beta0),
-         ps.shape(
-             self.concentration1_denominator if alpha1 is None else alpha1),
-         ps.shape(self.concentration0_denominator if beta1 is None else beta1)])
-
-  def _batch_shape(self):
-    return functools.reduce(
-        tf.broadcast_static_shape, [
-            self.concentration1_numerator.shape,
-            self.concentration0_numerator.shape,
-            self.concentration1_denominator.shape,
-            self.concentration0_denominator.shape])
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -214,7 +189,11 @@ class BetaQuotient(distribution.Distribution):
     alpha1 = tf.convert_to_tensor(self.concentration1_denominator)
     beta1 = tf.convert_to_tensor(self.concentration0_denominator)
 
-    batch_shape = self._batch_shape_tensor(alpha0, beta0, alpha1, beta1)
+    batch_shape = self._batch_shape_tensor(
+        concentration1_numerator=alpha0,
+        concentration0_numerator=beta0,
+        concentration1_denominator=alpha1,
+        concentration0_denominator=beta1)
 
     broadcasted_alpha0 = tf.broadcast_to(alpha0, batch_shape)
     broadcasted_alpha1 = tf.broadcast_to(alpha1, batch_shape)

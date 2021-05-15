@@ -815,8 +815,11 @@ NUMPY_TEST_CASES = [
              post_processor=_eig_post_process, xla_disabled=True),
     TestCase('linalg.eigvalsh', [pd_matrices()],
              post_processor=_eig_post_process),
-    TestCase('linalg.det', [nonsingular_matrices()],
-             xla_disabled=True),  # TODO(b/162937268): missing kernel.
+    TestCase(
+        'linalg.det',
+        [nonsingular_matrices()],
+        rtol=1e-3,
+        xla_disabled=True),  # TODO(b/162937268): missing kernel.
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
     TestCase('linalg.matrix_transpose',

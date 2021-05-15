@@ -175,18 +175,6 @@ class Skellam(distribution.Distribution):
     """Interpolate (log) probs on non-integer inputs."""
     return self._force_probs_to_zero_outside_support
 
-  def _batch_shape_tensor(self, log_rate1=None, log_rate2=None):
-    x1 = self._rate1 if self._log_rate1 is None else self._log_rate1
-    x1 = log_rate1 if log_rate1 is not None else x1
-    x2 = self._rate2 if self._log_rate2 is None else self._log_rate2
-    x2 = log_rate2 if log_rate2 is not None else x2
-    return ps.broadcast_shape(ps.shape(x1), ps.shape(x2))
-
-  def _batch_shape(self):
-    x1 = self._rate1 if self._log_rate1 is None else self._log_rate1
-    x2 = self._rate2 if self._log_rate2 is None else self._log_rate2
-    return tf.broadcast_static_shape(x1.shape, x2.shape)
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -248,7 +236,7 @@ class Skellam(distribution.Distribution):
   def _rate1_parameter_no_checks(self):
     if self._rate1 is None:
       return tf.exp(self._log_rate1)
-    return tf.identity(self._rate1)
+    return tensor_util.identity_as_tensor(self._rate1)
 
   def log_rate1_parameter(self, name=None):
     """Log-rate computed from non-`None` input arg (`rate1`, `log_rate1`)."""
@@ -258,7 +246,7 @@ class Skellam(distribution.Distribution):
   def _log_rate1_parameter_no_checks(self):
     if self._log_rate1 is None:
       return tf.math.log(self._rate1)
-    return tf.identity(self._log_rate1)
+    return tensor_util.identity_as_tensor(self._log_rate1)
 
   def rate2_parameter(self, name=None):
     """Rate computed from non-`None` input arg (`rate2` or `log_rate2`)."""
@@ -268,7 +256,7 @@ class Skellam(distribution.Distribution):
   def _rate2_parameter_no_checks(self):
     if self._rate2 is None:
       return tf.exp(self._log_rate2)
-    return tf.identity(self._rate2)
+    return tensor_util.identity_as_tensor(self._rate2)
 
   def log_rate2_parameter(self, name=None):
     """Log-rate computed from non-`None` input arg (`rate2`, `log_rate2`)."""
@@ -278,7 +266,7 @@ class Skellam(distribution.Distribution):
   def _log_rate2_parameter_no_checks(self):
     if self._log_rate2 is None:
       return tf.math.log(self._rate2)
-    return tf.identity(self._log_rate2)
+    return tensor_util.identity_as_tensor(self._log_rate2)
 
   def _all_rate_parameters(self):
     rate1 = None

@@ -203,6 +203,7 @@ class JointDistributionNamed(
     return self._dist_fn_name
 
   _composite_tensor_nonshape_params = ('model',)
+  _composite_tensor_shape_params = ()
 
 
 class _Node(object):

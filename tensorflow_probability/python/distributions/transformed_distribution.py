@@ -243,17 +243,6 @@ class TransformedDistribution(distribution_lib.Distribution):
   def experimental_is_sharded(self):
     raise NotImplementedError  # TODO(b/175084455): Handle bijector sharding.
 
-  @property
-  def _composite_tensor_nonshape_params(self):
-    if type(self).__init__ is not TransformedDistribution.__init__:
-      # Handles subclasses of TransformedDistribution
-      return super(
-          TransformedDistribution, self)._composite_tensor_nonshape_params
-    # TODO(b/167634378): Enable flattening for bijectors. Right now bijectors
-    # are not registered as pytrees. After they are registered, we can add
-    # the bijector for the TransformedDistribution into the flattened pytree.
-    return ('distribution', 'bijector')
-
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing
     # for instances of TD, not subclasses thereof.
@@ -542,8 +531,6 @@ class TransformedDistribution(distribution_lib.Distribution):
     return self.bijector(
         self.distribution.experimental_default_event_space_bijector())
   # pylint: enable=not-callable
-
-  _composite_tensor_shape_params = ()
 
 
 @kullback_leibler.RegisterKL(TransformedDistribution, TransformedDistribution)

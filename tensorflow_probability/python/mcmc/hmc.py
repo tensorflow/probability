@@ -23,6 +23,7 @@ import collections
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -411,6 +412,7 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
                state_gradients_are_stopped=False,
                step_size_update_fn=None,
                store_parameters_in_results=False,
+               experimental_shard_axis_names=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -441,6 +443,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
         `bootstrap_results`. This allows wrapper kernels to adjust those
         parameters on the fly. This is incompatible with `step_size_update_fn`,
         which must be set to `None`.
+      experimental_shard_axis_names: A structure of string names indicating how
+        members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'hmc_kernel').
     """
@@ -455,7 +459,8 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
             num_leapfrog_steps=num_leapfrog_steps,
             state_gradients_are_stopped=state_gradients_are_stopped,
             name=name or 'hmc_kernel',
-            store_parameters_in_results=store_parameters_in_results))
+            store_parameters_in_results=store_parameters_in_results,
+        )).experimental_with_shard_axes(experimental_shard_axis_names)
     self._parameters = self._impl.inner_kernel.parameters.copy()
     self._parameters['step_size_update_fn'] = step_size_update_fn
 
@@ -565,6 +570,13 @@ class HamiltonianMonteCarlo(kernel_base.TransitionKernel):
               step_size_assign=step_size_assign))
     return kernel_results
 
+  @property
+  def experimental_shard_axis_names(self):
+    return self._parameters['experimental_shard_axis_names']
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(experimental_shard_axis_names=shard_axis_names)
+
 
 class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
   """Runs one step of Uncalibrated Hamiltonian Monte Carlo.
@@ -583,6 +595,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                num_leapfrog_steps,
                state_gradients_are_stopped=False,
                store_parameters_in_results=False,
+               experimental_shard_axis_names=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -608,6 +621,8 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
         the kernel results objects returned from `one_step` and
         `bootstrap_results`. This allows wrapper kernels to adjust those
         parameters on the fly.
+      experimental_shard_axis_names: A structure of string names indicating how
+        members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'hmc_kernel').
     """
@@ -620,6 +635,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
         num_leapfrog_steps=num_leapfrog_steps,
         state_gradients_are_stopped=state_gradients_are_stopped,
         name=name,
+        experimental_shard_axis_names=experimental_shard_axis_names,
         store_parameters_in_results=store_parameters_in_results,
     )
     self._momentum_dtype = None
@@ -705,6 +721,8 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
       seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
       seeds = samplers.split_seed(seed, n=len(current_state_parts))
+      seeds = distribute_lib.fold_in_axis_index(
+          seeds, self.experimental_shard_axis_names)
 
       current_momentum_parts = []
       for part_seed, x in zip(seeds, current_state_parts):
@@ -737,7 +755,8 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       new_kernel_results = previous_kernel_results._replace(
           log_acceptance_correction=_compute_log_acceptance_correction(
               current_momentum_parts, next_momentum_parts,
-              independent_chain_ndims),
+              independent_chain_ndims,
+              shard_axis_names=self.experimental_shard_axis_names),
           target_log_prob=next_target_log_prob,
           grads_target_log_prob=next_target_log_prob_grad_parts,
           initial_momentum=current_momentum_parts,
@@ -788,10 +807,18 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
                 name='num_leapfrog_steps'))
       return result
 
+  @property
+  def experimental_shard_axis_names(self):
+    return self._parameters['experimental_shard_axis_names']
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(experimental_shard_axis_names=shard_axis_names)
+
 
 def _compute_log_acceptance_correction(current_momentums,
                                        proposed_momentums,
                                        independent_chain_ndims,
+                                       shard_axis_names=None,
                                        name=None):
   """Helper to `kernel` which computes the log acceptance-correction.
 
@@ -860,6 +887,8 @@ def _compute_log_acceptance_correction(current_momentums,
       momentum(s) of the state (parts).
     independent_chain_ndims: Scalar `int` `Tensor` representing the number of
       leftmost `Tensor` dimensions which index independent chains.
+    shard_axis_names: A structure of string names indicating how
+      members of the state are sharded.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'compute_log_acceptance_correction').
 
@@ -868,10 +897,19 @@ def _compute_log_acceptance_correction(current_momentums,
       acceptance-correction.  (See docstring for mathematical definition.)
   """
   with tf.name_scope(name or 'compute_log_acceptance_correction'):
-    sum_sq = lambda v: tf.reduce_sum(v**2., axis=ps.range(  # pylint: disable=g-long-lambda
-        independent_chain_ndims, ps.rank(v)))
-    current_kinetic = tf.add_n([sum_sq(v) for v in current_momentums])
-    proposed_kinetic = tf.add_n([sum_sq(v) for v in proposed_momentums])
+    def compute_sum_sq(v, shard_axes):
+      sum_sq = tf.reduce_sum(v ** 2., axis=ps.range(
+          independent_chain_ndims, ps.rank(v)))
+      if shard_axes is not None:
+        sum_sq = distribute_lib.psum(sum_sq, shard_axes)
+      return sum_sq
+    shard_axis_names = (shard_axis_names or ([None] * len(current_momentums)))
+    current_kinetic = tf.add_n([
+        compute_sum_sq(v, axes) for v, axes
+        in zip(current_momentums, shard_axis_names)])
+    proposed_kinetic = tf.add_n([
+        compute_sum_sq(v, axes) for v, axes
+        in zip(proposed_momentums, shard_axis_names)])
     return 0.5 * mcmc_util.safe_sum([current_kinetic, -proposed_kinetic])
 
 

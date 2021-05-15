@@ -17,11 +17,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow_probability.python.experimental.distribute.distribute_lib import make_sharded_log_prob_parts
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionCoroutine
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionNamed
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionSequential
 from tensorflow_probability.python.experimental.distribute.sharded import Sharded
+from tensorflow_probability.python.internal.distribute_lib import make_psum_function
+from tensorflow_probability.python.internal.distribute_lib import make_sharded_log_prob_parts
 
 __all__ = [
     'JointDistributionCoroutine',

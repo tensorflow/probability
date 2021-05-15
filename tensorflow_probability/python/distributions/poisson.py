@@ -285,14 +285,6 @@ class Poisson(distribution.Distribution):
     """Return 0 probabilities on non-integer inputs."""
     return self._force_probs_to_zero_outside_support
 
-  def _batch_shape_tensor(self):
-    x = self._rate if self._log_rate is None else self._log_rate
-    return tf.shape(x)
-
-  def _batch_shape(self):
-    x = self._rate if self._log_rate is None else self._log_rate
-    return x.shape
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -376,7 +368,7 @@ class Poisson(distribution.Distribution):
   def _rate_parameter_no_checks(self):
     if self._rate is None:
       return tf.exp(self._log_rate)
-    return tf.identity(self._rate)
+    return tensor_util.identity_as_tensor(self._rate)
 
   def log_rate_parameter(self, name=None):
     """Log-rate vec computed from non-`None` input arg (`rate`, `log_rate`)."""
@@ -386,7 +378,7 @@ class Poisson(distribution.Distribution):
   def _log_rate_parameter_no_checks(self):
     if self._log_rate is None:
       return tf.math.log(self._rate)
-    return tf.identity(self._log_rate)
+    return tensor_util.identity_as_tensor(self._log_rate)
 
   def _default_event_space_bijector(self):
     return

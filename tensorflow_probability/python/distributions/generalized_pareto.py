@@ -19,8 +19,6 @@ from __future__ import division
 # [internal] enable type annotations
 from __future__ import print_function
 
-import functools
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import generalized_pareto as generalized_pareto_bijector
@@ -201,19 +199,6 @@ class GeneralizedPareto(distribution.Distribution):
 
   def _event_shape(self):
     return []
-
-  def _batch_shape(self):
-    return functools.reduce(
-        tf.broadcast_static_shape,
-        (self.loc.shape, self.scale.shape, self.concentration.shape))
-
-  def _batch_shape_tensor(self, loc=None, scale=None, concentration=None):
-    return functools.reduce(
-        ps.broadcast_shape,
-        (ps.shape(self.loc if loc is None else loc),
-         ps.shape(self.scale if scale is None else scale),
-         ps.shape(
-             self.concentration if concentration is None else concentration)))
 
   def _sample_n(self, n, seed=None):
     # Inversion samples via inverse CDF.

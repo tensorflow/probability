@@ -61,7 +61,7 @@ TF_REPLACEMENTS = {
     ('from tensorflow.python.ops import '
      'resource_variable_ops'):
         ('from tensorflow_probability.python.internal.backend.numpy '
-         'import ops'),
+         'import resource_variable_ops'),
     'from tensorflow.python.util import':
         'from tensorflow_probability.python.internal.backend.numpy import',
     'from tensorflow.python.util.all_util':
@@ -99,6 +99,7 @@ LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
 INTERNALS = ('assert_util', 'auto_composite_tensor',
              'batched_rejection_sampler', 'broadcast_util', 'cache_util',
              'callable_util', 'custom_gradient', 'distribution_util',
+             'distribute_lib', 'distribute_test_lib',
              'dtype_util', 'hypothesis_testlib', 'implementation_selection',
              'monte_carlo', 'name_util', 'nest_util', 'numerics_testing',
              'parameter_properties', 'prefer_static', 'samplers',

@@ -1,5 +1,4 @@
 # Copyright 2020 The TensorFlow Probability Authors.
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -22,6 +21,7 @@ from tensorflow_probability.python.internal import test_util
 
 tf.enable_v2_behavior()
 JAX_MODE = False
+NUMPY_MODE = False
 NUM_DEVICES = 4
 
 if JAX_MODE:
@@ -33,17 +33,13 @@ class DistributedTest(test_util.TestCase):
 
   def setUp(self):
     super(DistributedTest, self).setUp()
+    distributed_set_up()
     if JAX_MODE:
-      os.environ['XLA_FLAGS'] = (
-          '--xla_force_host_platform_device_count={}'.format(NUM_DEVICES))
-      assert jax.device_count() == NUM_DEVICES
       self.key = jax.random.PRNGKey(0)
+      assert jax.device_count() == NUM_DEVICES
+    elif NUMPY_MODE:
+      pass
     else:
-      physical_devices = tf.config.experimental.list_physical_devices()
-
-      tf.config.experimental.set_virtual_device_configuration(
-          physical_devices[0],
-          [tf.config.experimental.VirtualDeviceConfiguration()] * NUM_DEVICES)
       self.strategy = tf.distribute.MirroredStrategy(
           devices=tf.config.list_logical_devices())
       self.key = [0, 0]
@@ -91,3 +87,24 @@ class DistributedTest(test_util.TestCase):
       return values[ctx.replica_id_in_sync_group]
 
     return self.strategy.experimental_distribute_values_from_function(value_fn)
+
+
+def distributed_set_up():
+  """Sets up virtual devices to be used for testing distributed code."""
+  if JAX_MODE:
+    os.environ['XLA_FLAGS'] = (
+        f'{os.environ.get("XLA_FLAGS", "")} '
+        f'--xla_force_host_platform_device_count={NUM_DEVICES}')
+  elif NUMPY_MODE:
+    return
+  else:
+    physical_devices = tf.config.experimental.list_physical_devices()
+
+    tf.config.experimental.set_virtual_device_configuration(
+        physical_devices[0],
+        [tf.config.experimental.VirtualDeviceConfiguration()] * NUM_DEVICES)
+
+
+def main():
+  distributed_set_up()
+  tf.test.main()

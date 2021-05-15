@@ -73,7 +73,7 @@ class OptimizationTests(test_util.TestCase):
     with tf.control_dependencies([loss_curve]):
       final_q_loc = tf.identity(q.mean())
       final_q_scale = tf.identity(q.stddev())
-      final_likelihood_scale = tf.identity(likelihood_scale)
+      final_likelihood_scale = tf.convert_to_tensor(likelihood_scale)
 
     # We expect to recover the true posterior because the variational family
     # includes the true posterior, and the true parameters because we observed

@@ -46,6 +46,8 @@ from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylin
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_math import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.ops import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.type_spec import BatchableTypeSpec
+from tensorflow_probability.python.internal.backend.numpy.type_spec import TypeSpec
 
 
 Assert = debugging.Assert

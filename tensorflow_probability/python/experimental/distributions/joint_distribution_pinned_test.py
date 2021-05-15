@@ -15,6 +15,7 @@
 """Tests for JointDistributionPinned."""
 
 import collections
+import functools
 
 from absl.testing import parameterized
 
@@ -27,8 +28,10 @@ from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 tfde = tfp.experimental.distributions
+Root = tfd.JointDistributionCoroutine.Root
 
 
 def part_dists():
@@ -406,7 +409,7 @@ class JointDistributionPinnedTest(test_util.TestCase):
     if not tf2.enabled():
       self.skipTest('b/183994961')
 
-    @ tfd.JointDistributionCoroutineAutoBatched
+    @tfd.JointDistributionCoroutineAutoBatched
     def model():
       a = yield tfd.Normal(0., 1., name='a')
       yield tfd.Uniform(low=0., high=tf.exp(a * tf.ones([2])), name='b')
@@ -427,6 +430,37 @@ class JointDistributionPinnedTest(test_util.TestCase):
             tf.nest.map_structure(
                 tf.identity,  # Bypass bijector cache.
                 bij.inverse(ys))))
+
+  def test_str(self):
+    @tfd.JointDistributionCoroutine
+    def model():
+      x = yield Root(tfd.MultivariateNormalDiag(
+          tf.zeros([10, 3]), tf.ones(3), name='x'))
+      yield tfd.Multinomial(
+          logits=tfb.Pad([[0, 1]])(x), total_count=13, name='y')
+
+    self.assertEqual('tfp.distributions.JointDistributionPinned('
+                     '"PinnedJointDistributionCoroutine", '
+                     'batch_shape=StructTuple(\n  x=[10]\n), '
+                     'event_shape=StructTuple(\n  x=[3]\n), '
+                     'dtype=StructTuple(\n  x=float32\n))',
+                     str(tfde.JointDistributionPinned(
+                         model, y=tf.zeros([10, 4]))))
+
+    @functools.partial(tfd.JointDistributionCoroutineAutoBatched, batch_ndims=1)
+    def model_ab():
+      x = yield Root(tfd.MultivariateNormalDiag(
+          tf.zeros([10, 3]), tf.ones(3), name='x'))
+      yield tfd.Multinomial(
+          logits=tfb.Pad([[0, 1]])(x), total_count=13, name='y')
+
+    self.assertEqual('tfp.distributions.JointDistributionPinned('
+                     '"PinnedJointDistributionCoroutineAutoBatched", '
+                     'batch_shape=[10], '
+                     'event_shape=StructTuple(\n  x=[3]\n), '
+                     'dtype=StructTuple(\n  x=float32\n))',
+                     str(tfde.JointDistributionPinned(
+                         model_ab, y=tf.zeros([10, 4]))))
 
 
 if __name__ == '__main__':

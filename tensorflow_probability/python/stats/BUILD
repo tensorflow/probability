@@ -147,7 +147,6 @@ multi_substrate_py_test(
     name = "sample_stats_test",
     size = "small",
     srcs = ["sample_stats_test.py"],
-    numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
         # numpy dep,
@@ -231,7 +230,6 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "kendalls_tau_test",
     srcs = ["kendalls_tau_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         ":kendalls_tau",
         "//tensorflow_probability",

@@ -133,17 +133,18 @@ def _kahan_reduction(x, y):
   return s, c
 
 
-def _kahan_reduce_bwd(aux, grads):
-  operands, inits, axis, unsqueezed_shape = aux
-  del inits, axis  # unused
+def _kahan_reduce_bwd(axis, reducer, unsqueezed_shape, aux, grads):
+  operands, inits = aux
+  del axis, inits, reducer  # unused
+  # Return (None, None) for gradients w.r.t. inits
   return (tf.broadcast_to(tf.reshape(grads[0], unsqueezed_shape),
                           ps.shape(operands[0])),
-          None)
+          None), (None, None)
 
 
-def _kahan_reduce_tangents(inits, axis, primals, tangents):
-  del inits, primals  # unused
-  doperands, = tangents
+def _kahan_reduce_tangents(axis, primals, tangents):
+  del primals  # unused
+  doperands, _ = tangents
   reduced_tangent = tf.reduce_sum(doperands[0], axis)
   return (reduced_tangent, tf.zeros_like(reduced_tangent))
 

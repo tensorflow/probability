@@ -200,16 +200,6 @@ class Empirical(distribution.Distribution):
         dtype_hint=tf.int32,
         name='num_samples')
 
-  def _batch_shape_tensor(self, samples=None):
-    if samples is None:
-      samples = tf.convert_to_tensor(self.samples)
-    return ps.shape(samples)[:self._samples_axis]
-
-  def _batch_shape(self):
-    if tensorshape_util.rank(self.samples.shape) is None:
-      return tf.TensorShape(None)
-    return self.samples.shape[:self._samples_axis]
-
   def _event_shape_tensor(self, samples=None):
     if samples is None:
       samples = tf.convert_to_tensor(self.samples)
@@ -272,12 +262,12 @@ class Empirical(distribution.Distribution):
     # Flatten samples for each batch.
     if self._event_ndims == 0:
       flattened_samples = tf.reshape(samples, [-1, num_samples])
-      mode_shape = self._batch_shape_tensor(samples)
+      mode_shape = self._batch_shape_tensor(samples=samples)
     else:
       event_size = tf.reduce_prod(self._event_shape_tensor(samples))
       mode_shape = ps.concat(
-          [self._batch_shape_tensor(samples),
-           self._event_shape_tensor(samples)],
+          [self._batch_shape_tensor(samples=samples),
+           self._event_shape_tensor(samples=samples)],
           axis=0)
       flattened_samples = tf.reshape(samples, [-1, num_samples, event_size])
 
@@ -292,7 +282,7 @@ class Empirical(distribution.Distribution):
   def _entropy(self):
     samples = tf.convert_to_tensor(self.samples)
     num_samples = self._compute_num_samples(samples)
-    entropy_shape = self._batch_shape_tensor(samples)
+    entropy_shape = self._batch_shape_tensor(samples=samples)
 
     # Flatten samples for each batch.
     if self._event_ndims == 0:

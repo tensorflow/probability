@@ -51,7 +51,6 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["parallel_kalman_filter_test.py"],
     jax_size = "large",
-    numpy_tags = ["notap"],  # TODO(b/169108316): Sample stats test failure in numpy backend.
     deps = [
         ":parallel_kalman_filter_lib",
         # numpy dep,

@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
@@ -31,6 +32,8 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 class Independent(distribution_lib.Distribution):
@@ -96,6 +99,12 @@ class Independent(distribution_lib.Distribution):
 
   """
 
+  @deprecation.deprecated_arg_values(
+      '2022-03-01',
+      'Please pass an integer value for `reinterpreted_batch_ndims`. The '
+      'current behavior corresponds to `reinterpreted_batch_ndims=tf.size('
+      'distribution.batch_shape_tensor()) - 1`.',
+      reinterpreted_batch_ndims=None)
   def __init__(self,
                distribution,
                reinterpreted_batch_ndims=None,
@@ -183,7 +192,9 @@ class Independent(distribution_lib.Distribution):
 
     if distribution_batch_shape_tensor is None:
       distribution_batch_shape_tensor = self.distribution.batch_shape_tensor()
-    return tf.maximum(0, tf.size(distribution_batch_shape_tensor) - 1)
+    return ps.cast(
+        ps.maximum(0, ps.size(distribution_batch_shape_tensor) - 1),
+        np.int32)
 
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing
@@ -208,7 +219,11 @@ class Independent(distribution_lib.Distribution):
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
         distribution=parameter_properties.BatchedComponentProperties(
-            event_ndims=lambda self: self.reinterpreted_batch_ndims))
+            # TODO(davmre): replace with `self.reinterpreted_batch_ndims` once
+            # support for `reinterpreted_batch_ndims=None` has been removed.
+            event_ndims=lambda self: self._get_reinterpreted_batch_ndims()),  # pylint: disable=protected-access
+        reinterpreted_batch_ndims=(
+            parameter_properties.ShapeParameterProperties()))
 
   def _batch_shape_tensor(self):
     batch_shape = self.distribution.batch_shape_tensor()
@@ -322,10 +337,6 @@ class Independent(distribution_lib.Distribution):
   def _reduce(self, op, stat):
     axis = 1 + ps.range(self._get_reinterpreted_batch_ndims())
     return op(stat, axis=-axis)
-
-  _composite_tensor_nonshape_params = ('distribution',)
-
-  _composite_tensor_shape_params = ('reinterpreted_batch_ndims',)
 
 
 @kullback_leibler.RegisterKL(Independent, Independent)
