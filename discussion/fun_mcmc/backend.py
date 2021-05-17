@@ -33,6 +33,7 @@ from discussion.fun_mcmc import rewrite  # pylint: disable=unused-import
 from discussion.fun_mcmc import tf_on_jax
 from discussion.fun_mcmc import util_jax
 from discussion.fun_mcmc import util_tf
+from tensorflow_probability.python.internal import prefer_static as prefer_static_tf
 from tensorflow_probability.substrates import jax as tfp_jax
 
 __all__ = [
@@ -104,11 +105,13 @@ TENSORFLOW = types.ModuleType('tensorflow_backend', 'The TensorFlow backend.')
 TENSORFLOW.tf = real_tf
 TENSORFLOW.util = util_tf
 TENSORFLOW.tfp = tfp_tf
+TENSORFLOW.prefer_static = prefer_static_tf
 
 JAX = types.ModuleType('jax_backend', 'The JAX backend.')
 JAX.tf = tf_on_jax.tf
 JAX.util = util_jax
 JAX.tfp = tfp_jax
+JAX.prefer_static = tfp_jax.internal.prefer_static
 
 _BACKEND = (TENSORFLOW, MANUAL_TRANSFORMS)
 BACKEND_NAME = 'dynamic'
