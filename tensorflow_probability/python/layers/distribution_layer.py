@@ -68,8 +68,11 @@ __all__ = [
     'VariationalGaussianProcess',
 ]
 
-
-tf.keras.__internal__.utils.register_symbolic_tensor_type(dtc._TensorCoercible)  # pylint: disable=protected-access
+try:
+  k_u = tf.keras.__internal__.utils
+except:
+  from keras.utils import tf_utils as k_u
+k_u.register_symbolic_tensor_type(dtc._TensorCoercible)  # pylint: disable=protected-access
 
 
 def _event_size(event_shape, name=None):
