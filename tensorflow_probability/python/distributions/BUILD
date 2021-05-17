@@ -543,6 +543,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions/internal:slicing",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:batch_shape_lib",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",

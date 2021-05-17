@@ -87,6 +87,27 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "batch_shape_lib",
+    srcs = ["batch_shape_lib.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "batch_shape_lib_test",
+    size = "small",
+    srcs = ["batch_shape_lib_test.py"],
+    deps = [
+        ":test_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+    ],
+)
+
+multi_substrate_py_library(
     name = "distribute_lib",
     srcs = ["distribute_lib.py"],
     srcs_version = "PY3",

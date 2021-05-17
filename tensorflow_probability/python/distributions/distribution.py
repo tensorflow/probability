@@ -25,9 +25,7 @@ import functools
 import inspect
 import types
 
-from absl import logging
 import decorator
-import numpy as np
 import six
 import tensorflow.compat.v2 as tf
 
@@ -35,6 +33,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
@@ -957,52 +956,14 @@ class Distribution(_BaseDistribution):
     Returns:
       batch_shape_tensor: `Tensor` broadcast batch shape of all parameters.
     """
-    # TODO(davmre): support parameters with structured batch shape, like
-    # non-autobatched JDs, in cases where there's an 'obvious' semantics.
-    # For example, if there's only one parameter, we can probably just pass
-    # through its batch shape.
-    batch_shape_parts = {}
     try:
-      parameter_properties = type(self).parameter_properties()
+      return batch_shape_lib.inferred_batch_shape_tensor(
+          self, **parameter_kwargs)
     except NotImplementedError:
       raise NotImplementedError('Cannot compute batch shape of distribution '
                                 '{}: you must implement at least one of '
                                 '`_batch_shape_tensor` or '
                                 '`_parameter_properties`.'.format(self))
-
-    for kwarg in parameter_kwargs:
-      if kwarg not in parameter_properties:
-        logging.warning(
-            '`batch_shape_tensor` received unrecognized keyword argument `%s`, '
-            'which will be ignored. Expected any of the parameters: %s. Any of '
-            'these not passed as arguments will be read from '
-            '`self.parameters`, resulting in redundant Tensor '
-            'conversions if they were not already specified as Tensors.',
-            kwarg, parameter_properties.keys())
-
-    for param_name, param in dict(self.parameters, **parameter_kwargs).items():
-      if param is None:
-        continue
-      if param_name not in parameter_properties:
-        continue
-      properties = parameter_properties[param_name]
-
-      ndims = properties.instance_event_ndims(self)
-      if ndims is None:
-        continue
-
-      batch_shape_parts[param_name] = nest.flatten_up_to(
-          ndims,
-          nest.map_structure_up_to(
-              ndims,
-              lambda p, nd: _parameter_batch_shape_tensor(  # pylint: disable=g-long-lambda
-                  base_shape=_get_base_shape_tensor(p),
-                  event_ndims=nd),
-              param,
-              ndims))
-    return functools.reduce(ps.broadcast_shape,
-                            tf.nest.flatten(batch_shape_parts),
-                            [])
 
   def batch_shape_tensor(self, name='batch_shape_tensor'):
     """Shape of a single sample from a single event index as a 1-D `Tensor`.
@@ -1068,40 +1029,12 @@ class Distribution(_BaseDistribution):
       batch_shape: `tf.TensorShape` broadcast batch shape of all parameters; may
         be partially defined or unknown.
     """
-    batch_shape_parts = {}
     try:
-      parameter_properties = type(self).parameter_properties()
+      return batch_shape_lib.inferred_batch_shape(self)
     except NotImplementedError:
       # If a distribution doesn't implement `_parameter_properties` or its own
       # `_batch_shape` method, we can only return the most general shape.
       return tf.TensorShape(None)
-
-    for param_name, param in self.parameters.items():
-      if param is None:
-        continue
-      if param_name not in parameter_properties:
-        continue
-      properties = parameter_properties[param_name]
-
-      # Note that `ndims` may be returned here as a Tensor, but
-      # `_parameter_batch_shape` is smart about avoiding graph side effects
-      # (returns `TensorShape(None)` if a static value is not available).
-      ndims = properties.instance_event_ndims(self)
-      if ndims is None:
-        continue
-
-      batch_shape_parts[param_name] = nest.flatten_up_to(
-          ndims,
-          nest.map_structure_up_to(
-              ndims,
-              lambda p, nd: _parameter_batch_shape(  # pylint: disable=g-long-lambda
-                  base_shape=_get_base_shape(p),
-                  event_ndims=nd),
-              param,
-              ndims))
-    return functools.reduce(tf.broadcast_static_shape,
-                            tf.nest.flatten(batch_shape_parts),
-                            tf.TensorShape([]))
 
   @property
   def batch_shape(self):
@@ -1979,52 +1912,3 @@ def _str_dtype(x):
   # `PrettyDict`s so __str__, __repr__ are deterministic.
   x = _recursively_replace_dict_for_pretty_dict(x)
   return str(tf.nest.map_structure(_str, x)).replace('\'', '')
-
-
-def _get_base_shape_tensor(x):
-  """Extracts an object's runtime (Tensor) shape for batch shape inference."""
-  if hasattr(x, 'batch_shape_tensor'):  # `x` is a distribution.
-    return x.batch_shape_tensor()
-  elif hasattr(x, 'forward'):  # `x` is a bijector.
-    # TODO(b/174778703): annotate batch shapes for bijectors.
-    raise NotImplementedError('Bijector batch shapes are not implemented.')
-  elif hasattr(x, 'shape') and tensorshape_util.is_fully_defined(x.shape):
-    return x.shape
-  return tf.shape(x)
-
-
-def _get_base_shape(x):
-  """Extracts an object's shape for batch shape inference."""
-  if hasattr(x, 'batch_shape'):  # `x` is a distribution.
-    return tf.TensorShape(x.batch_shape)
-  elif hasattr(x, 'shape'):  # `x` is a Tensor or ndarray.
-    return tf.TensorShape(x.shape)
-  elif hasattr(x, 'forward'):  # `x` is a bijector.
-    # TODO(b/174778703): annotate batch shapes for bijectors.
-    return tf.TensorShape(None)
-  # `x` is a Python list, tuple, or literal.
-  return tf.TensorShape(np.array(x).shape)
-
-
-def _parameter_batch_shape_tensor(base_shape, event_ndims):
-  base_shape = ps.convert_to_shape_tensor(base_shape, dtype_hint=tf.int32)
-  base_rank = ps.rank_from_shape(base_shape)
-  return base_shape[:(base_rank -
-                      # Don't try to slice away more ndims than the parameter
-                      # actually has, if that's fewer than `event_ndims` (i.e.,
-                      # if it relies on broadcasting).
-                      ps.minimum(event_ndims, base_rank))]
-
-
-def _parameter_batch_shape(base_shape, event_ndims):
-  if tensorshape_util.rank(base_shape) is None:
-    return tf.TensorShape(None)
-  if tf.is_tensor(event_ndims):
-    event_ndims = tf.get_static_value(event_ndims)
-    if event_ndims is None:
-      return tf.TensorShape(None)
-  return base_shape[:(len(base_shape) -
-                      # Don't try to slice away more ndims than the parameter
-                      # actually has, if that's fewer than `event_ndims` (i.e.,
-                      # if it relies on broadcasting).
-                      min(event_ndims, len(base_shape)))]

@@ -97,7 +97,8 @@ DISABLED_BY_PKG = {
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'optimizer', 'random', 'stats', 'util')
 INTERNALS = ('assert_util', 'auto_composite_tensor',
-             'batched_rejection_sampler', 'broadcast_util', 'cache_util',
+             'batched_rejection_sampler',
+             'batch_shape_lib', 'broadcast_util', 'cache_util',
              'callable_util', 'custom_gradient', 'distribution_util',
              'distribute_lib', 'distribute_test_lib',
              'dtype_util', 'hypothesis_testlib', 'implementation_selection',
