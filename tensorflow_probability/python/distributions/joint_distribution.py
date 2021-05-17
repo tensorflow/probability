@@ -447,7 +447,7 @@ class JointDistribution(distribution_lib.Distribution):
           maybe_check_wont_broadcast(xs, self.validate_args))
 
   def prob_parts(self, value, name='prob_parts'):
-    """Log probability density/mass function.
+    """Probability density/mass function.
 
     Args:
       value: `list` of `Tensor`s in `distribution_fn` order for which we compute
@@ -461,6 +461,47 @@ class JointDistribution(distribution_lib.Distribution):
     """
     with self._name_and_control_scope(name):
       xs = self._map_measure_over_dists('prob', value)
+      return self._model_unflatten(
+          maybe_check_wont_broadcast(xs, self.validate_args))
+
+  def unnormalized_log_prob_parts(
+      self, value, name='unnormalized_log_prob_parts'):
+    """Unnormalized log probability density/mass function.
+
+    Args:
+      value: `list` of `Tensor`s in `distribution_fn` order for which
+        we compute the `unnormalized_log_prob_parts` and to
+        parameterize other ("downstream") distributions.
+      name: name prepended to ops created by this function.
+        Default value: `"unnormalized_log_prob_parts"`.
+
+    Returns:
+      unnormalized_log_prob_parts: a `tuple` of `Tensor`s representing
+        the `unnormalized_log_prob` for each `distribution_fn`
+        evaluated at each corresponding `value`.
+    """
+    with self._name_and_control_scope(name):
+      xs = self._map_measure_over_dists('unnormalized_log_prob', value)
+      return self._model_unflatten(
+          maybe_check_wont_broadcast(xs, self.validate_args))
+
+  def unnormalized_prob_parts(self, value, name='unnormalized_prob_parts'):
+    """Unnormalized probability density/mass function.
+
+    Args:
+      value: `list` of `Tensor`s in `distribution_fn` order for which
+        we compute the `unnormalized_prob_parts` and to parameterize
+        other ("downstream") distributions.
+      name: name prepended to ops created by this function.
+        Default value: `"unnormalized_prob_parts"`.
+
+    Returns:
+      unnormalized_prob_parts: a `tuple` of `Tensor`s representing the
+        `unnormalized_prob` for each `distribution_fn` evaluated at
+        each corresponding `value`.
+    """
+    with self._name_and_control_scope(name):
+      xs = self._map_measure_over_dists('unnormalized_prob', value)
       return self._model_unflatten(
           maybe_check_wont_broadcast(xs, self.validate_args))
 

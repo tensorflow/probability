@@ -462,6 +462,19 @@ class JointDistributionPinnedTest(test_util.TestCase):
                      str(tfde.JointDistributionPinned(
                          model_ab, y=tf.zeros([10, 4]))))
 
+  def test_log_prob_parts_with_improper_base_dists(self):
+    root = tfd.JointDistributionCoroutine.Root
+    @tfd.JointDistributionCoroutine
+    def model():
+      x = yield root(tfd.Normal(0., 1., name='x'))
+      yield tfde.IncrementLogProb(tfd.Normal(x, 2.).log_prob(0.), name='y')
+
+    p = model.experimental_pin(y=tf.zeros([1, 0]))
+
+    parts = p.unnormalized_log_prob_parts(x=2.)
+    self.assertAllCloseNested(tfd.Normal(0., 1.).log_prob(2.), parts.unpinned.x)
+    self.assertAllCloseNested(tfd.Normal(2., 2.).log_prob(0.), parts.pinned.y)
+
 
 if __name__ == '__main__':
   tf.test.main()

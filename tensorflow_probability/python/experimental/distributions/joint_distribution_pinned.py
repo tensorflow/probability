@@ -589,7 +589,7 @@ class JointDistributionPinned(object):
       unpinned: partial log-prob of each unpinned part
     """
     xs = _to_pins(self, *args, **kwargs)
-    parts = self.distribution.log_prob_parts(self._add_pins(**xs))
+    parts = self.distribution.unnormalized_log_prob_parts(self._add_pins(**xs))
     return UnnormalizedLogProbParts(
         pinned=self._prune(parts, retain='pinned'),
         unpinned=self._prune(parts, retain='unpinned'))
