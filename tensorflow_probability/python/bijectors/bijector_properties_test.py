@@ -185,9 +185,7 @@ AUTOVECTORIZATION_ATOL.update({
 
 COMPOSITE_TENSOR_IS_BROKEN = [
     'BatchNormalization',  # tf.layers arg
-    'Inline',  # callable
     'RationalQuadraticSpline',  # TODO(b/185628453): Debug loss of static info.
-    'TransformDiagonal',  # callable
 ]
 
 COMPOSITE_TENSOR_RTOL = collections.defaultdict(lambda: 2e-6)
@@ -245,12 +243,14 @@ def broadcasting_params(draw,
           mutex_params=MUTEX_PARAMS))
 
 
-class CallableModule(tf.Module):  # TODO(b/141098791): Eliminate this.
+# TODO(b/141098791): Eliminate this.
+@experimental.auto_composite_tensor
+class CallableModule(tf.Module, experimental.AutoCompositeTensor):
   """Convenience object for capturing variables closed over by Inline."""
 
   def __init__(self, fn, varobj):
     self._fn = fn
-    self._vars = varobj
+    self._varobj = varobj
 
   def __call__(self, *args, **kwargs):
     return self._fn(*args, **kwargs)
@@ -727,6 +727,7 @@ class BijectorPropertiesTest(test_util.TestCase):
         'perm',  # Transpose.
         'rightmost_transposed_ndims',  # Transpose.
         'diag_bijector',  # TransformDiagonal.
+        'diag_shift'  # FillScaleTriL (doesn't support batch shape).
     )
     bijector, event_dim = self._draw_bijector(
         bijector_name, data,
@@ -749,6 +750,9 @@ class BijectorPropertiesTest(test_util.TestCase):
     seeds = samplers.split_seed(test_util.test_seed(), n=len(params))
     new_parameters = {}
     for i, (param_name, param) in enumerate(params.items()):
+      if param_name in non_trainable_params:
+        continue
+
       # Check that the shape_fn is consistent with event_ndims.
       try:
         param_shape = param.shape_fn(sample_shape=output_shape)

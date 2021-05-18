@@ -139,7 +139,9 @@ def make_trainable(cls,
         dtype=parameter_dtype).items():
       if parameter_name in init_kwargs:  # Prefer user-provided values.
         continue
-      if not properties.is_preferred:
+      if not (properties.is_tensor and properties.is_preferred):
+        continue
+      if properties.specifies_shape or (properties.event_ndims is None):
         continue
 
       parameter_shape = properties.shape_fn(batch_and_event_shape)

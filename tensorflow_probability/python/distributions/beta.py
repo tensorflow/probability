@@ -156,6 +156,7 @@ class Beta(distribution.Distribution):
                concentration0,
                validate_args=False,
                allow_nan_stats=True,
+               force_probs_to_zero_outside_support=False,
                name='Beta'):
     """Initialize a batch of Beta distributions.
 
@@ -172,9 +173,13 @@ class Beta(distribution.Distribution):
         (e.g., mean, mode, variance) use the value '`NaN`' to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
+      force_probs_to_zero_outside_support: If `True`, force `prob(x) == 0` and
+        `log_prob(x) == -inf` for values of x outside the distribution support.
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
+    self._force_probs_to_zero_outside_support = (
+        force_probs_to_zero_outside_support)
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration1, concentration0],
                                       dtype_hint=tf.float32)
@@ -212,16 +217,9 @@ class Beta(distribution.Distribution):
     """Concentration parameter associated with a `0` outcome."""
     return self._concentration0
 
-  def _batch_shape_tensor(self, concentration1=None, concentration0=None):
-    return ps.broadcast_shape(
-        ps.shape(
-            self.concentration1 if concentration1 is None else concentration1),
-        ps.shape(
-            self.concentration0 if concentration0 is None else concentration0))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.concentration1.shape, self.concentration0.shape)
+  @property
+  def force_probs_to_zero_outside_support(self):
+    return self._force_probs_to_zero_outside_support
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -233,7 +231,8 @@ class Beta(distribution.Distribution):
     seed1, seed2 = samplers.split_seed(seed, salt='beta')
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
-    shape = self._batch_shape_tensor(concentration1, concentration0)
+    shape = self._batch_shape_tensor(concentration1=concentration1,
+                                     concentration0=concentration0)
     expanded_concentration1 = tf.broadcast_to(concentration1, shape)
     expanded_concentration0 = tf.broadcast_to(concentration0, shape)
     log_gamma1 = gamma_lib.random_gamma(
@@ -248,8 +247,11 @@ class Beta(distribution.Distribution):
   def _log_prob(self, x):
     concentration0 = tf.convert_to_tensor(self.concentration0)
     concentration1 = tf.convert_to_tensor(self.concentration1)
-    return (self._log_unnormalized_prob(x, concentration1, concentration0) -
-            self._log_normalization(concentration1, concentration0))
+    lp = (self._log_unnormalized_prob(x, concentration1, concentration0) -
+          self._log_normalization(concentration1, concentration0))
+    if self.force_probs_to_zero_outside_support:
+      return tf.where((x >= 0) & (x <= 1), lp, -float('inf'))
+    return lp
 
   @distribution_util.AppendDocstring(_beta_sample_note)
   def _prob(self, x):

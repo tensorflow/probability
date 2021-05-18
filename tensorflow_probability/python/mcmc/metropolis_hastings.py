@@ -291,6 +291,15 @@ class MetropolisHastings(kernel_base.TransitionKernel):
           seed=samplers.zeros_seed(),
       )
 
+  @property
+  def experimental_shard_axis_names(self):
+    return self.inner_kernel.experimental_shard_axis_names
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(
+        inner_kernel=self.inner_kernel.experimental_with_shard_axes(
+            shard_axis_names))
+
 
 def has_target_log_prob(kernel_results):
   """Returns `True` if `target_log_prob` is a member of input."""

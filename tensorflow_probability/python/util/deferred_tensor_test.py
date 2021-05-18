@@ -25,10 +25,14 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.util import deferred_tensor
+from tensorflow.python.ops import resource_variable_ops  # pylint: disable=g-direct-tensorflow-import
 
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+JAX_MODE = False
 
 
 @test_util.test_all_tf_execution_regimes
@@ -406,6 +410,221 @@ class DeferredTensorBehavesLikeTensorInXLATest(test_util.TestCase):
     self.assertAllClose([op(2., 1.), op(1., 3.)],
                         self.evaluate([y1, y2]),
                         atol=0., rtol=1e-5)
+
+
+def _make_transformed_variable_spec(
+    input_spec, transform_or_spec, dtype=None, name=None):
+  """Returns a `_TransformedVariableSpec` instance."""
+  dtype = dtype or input_spec.dtype
+  return deferred_tensor._TransformedVariableSpec(
+      input_spec=input_spec, transform_or_spec=transform_or_spec, dtype=dtype,
+      name=name)
+
+
+def _make_bijector_spec(
+    bijector_class, param, use_variable=False, variable_shape=None):
+  """Returns the `TypeSpec` of a Bijector with one Tensor-valued parameter.
+
+  This utility avoids errors in the JAX backend due to instantiation of a
+  bijector before `app.run` is called.
+
+  Args:
+    bijector_class: Subclass of `tfp.bijectors.Bijector`.
+    param: `Tensor`-like parameter of the bijector.
+    use_variable: Python `bool`. If True, `param` is converted to a
+      `tf.Variable`.
+    variable_shape: `tf.TensorShape` or list of `int`s. Static shape of the
+      `tf.Variable`, if `use_variable` is True.
+
+  Returns:
+    bijector_spec: `TypeSpec` for a `Bijector` instance, or None if the test is
+      running in JAX mode.
+  """
+  if JAX_MODE:
+    return None
+  if use_variable:
+    param = tf.Variable(param, shape=variable_shape)
+  return bijector_class(param)._type_spec
+
+
+@test_util.test_all_tf_execution_regimes
+@test_util.disable_test_for_backend(
+    disable_numpy=True, disable_jax=True,
+    reason='JAX and Numpy have no notion of `TypeSpec`.')
+class DeferredTensorSpecTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      ('TransformedVariableBijector',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, None], tf.float32),
+           transform_or_spec=_make_bijector_spec(tfb.Scale, [3.])),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, None], tf.float32),
+           transform_or_spec=_make_bijector_spec(tfb.Scale, [3.]))),
+      ('TranformedVariableCallable',
+       _make_transformed_variable_spec(
+           input_spec=resource_variable_ops.VariableSpec(None, tf.float64),
+           transform_or_spec=tf.math.sigmoid,
+           dtype=tf.float64,
+           name='one'),
+       _make_transformed_variable_spec(
+           input_spec=resource_variable_ops.VariableSpec(None, tf.float64),
+           transform_or_spec=tf.math.sigmoid,
+           dtype=tf.float64,
+           name='two')),
+      )
+  def testEquality(self, v1, v2):
+    # pylint: disable=g-generic-assert
+    self.assertEqual(v1, v2)
+    self.assertEqual(v2, v1)
+    self.assertFalse(v1 != v2)
+    self.assertFalse(v2 != v1)
+    self.assertEqual(hash(v1), hash(v2))
+
+  @parameterized.named_parameters(
+      ('DifferentDtypes',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float64),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
+           dtype=tf.float64),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+      ('DifferentCallables',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float64),
+           transform_or_spec=tf.math.sigmoid,
+           dtype=tf.float64,
+           name='one'),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float64),
+           transform_or_spec=tf.math.softplus,
+           dtype=tf.float64,
+           name='two')),
+      )
+  def testInequality(self, v1, v2):
+    # pylint: disable=g-generic-assert
+    self.assertNotEqual(v1, v2)
+    self.assertNotEqual(v2, v1)
+    self.assertFalse(v1 == v2)
+    self.assertFalse(v2 == v1)
+
+  @parameterized.named_parameters(
+      ('TransformedVariableBijector',
+       _make_transformed_variable_spec(
+           input_spec=resource_variable_ops.VariableSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec),
+       _make_transformed_variable_spec(
+           input_spec=resource_variable_ops.VariableSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+      ('TransformedVariableCallable',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid,
+           name='one'),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid,
+           name='two')),
+      )
+  def testIsCompatibleWith(self, v1, v2):
+    self.assertTrue(v1.is_compatible_with(v2))
+    self.assertTrue(v2.is_compatible_with(v1))
+
+  @parameterized.named_parameters(
+      ('DifferentDtypes',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
+           dtype=tf.float64),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+      ('DifferentCallables',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float64),
+           transform_or_spec=tf.math.sigmoid,
+           dtype=tf.float64,
+           name='one'),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float64),
+           transform_or_spec=tf.math.softplus,
+           dtype=tf.float64,
+           name='two')),
+      )
+  def testIsNotCompatibleWith(self, v1, v2):
+    self.assertFalse(v1.is_compatible_with(v2))
+    self.assertFalse(v2.is_compatible_with(v1))
+
+  @parameterized.named_parameters(
+      ('TransformedVariableBijector',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=_make_bijector_spec(
+               tfb.Shift, [[2.]], use_variable=True, variable_shape=[1, 1])),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=_make_bijector_spec(
+               tfb.Shift, [[3.]], use_variable=True, variable_shape=[1, None])),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=_make_bijector_spec(
+               tfb.Shift, [[3.]], use_variable=True, variable_shape=[1, None]))
+       ),
+      ('TransformedVariableCallable',
+       _make_transformed_variable_spec(
+           input_spec=resource_variable_ops.VariableSpec([4, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid),
+       _make_transformed_variable_spec(
+           input_spec=resource_variable_ops.VariableSpec(None, tf.float32),
+           transform_or_spec=tf.math.sigmoid),
+       _make_transformed_variable_spec(
+           input_spec=resource_variable_ops.VariableSpec(None, tf.float32),
+           transform_or_spec=tf.math.sigmoid))
+      )
+  def testMostSpecificCompatibleType(self, v1, v2, expected):
+    self.assertEqual(v1.most_specific_compatible_type(v2), expected)
+    self.assertEqual(v2.most_specific_compatible_type(v1), expected)
+
+  @parameterized.named_parameters(
+      ('DifferentDtypes',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tfb.Sigmoid()._type_spec,
+           dtype=tf.float64),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tfb.Sigmoid()._type_spec)),
+      ('DifferentCallables',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float64),
+           transform_or_spec=tf.math.sigmoid,
+           dtype=tf.float64,
+           name='one'),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float64),
+           transform_or_spec=tf.math.softplus,
+           dtype=tf.float64,
+           name='two')),
+      )
+  def testMostSpecificCompatibleTypeException(self, v1, v2):
+    with self.assertRaises(ValueError):
+      v1.most_specific_compatible_type(v2)
+    with self.assertRaises(ValueError):
+      v2.most_specific_compatible_type(v1)
+
+  def testRepr(self):
+    spec = _make_transformed_variable_spec(
+        input_spec=tf.TensorSpec([4, 2], tf.float32),
+        transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
+        dtype=tf.float64)
+    expected = (
+        "_TransformedVariableSpec(input_spec=TensorSpec(shape=(4, 2), "
+        "dtype=tf.float32, name=None), "
+        "transform_or_spec=Sigmoid_ACTTypeSpec(2, {}, "
+        "{'low': None, 'high': None, 'validate_args': True}, ('name',), (), "
+        "{}), dtype=<dtype: 'float64'>, name=None)")
+    self.assertEqual(repr(spec), expected)
 
 
 if __name__ == '__main__':

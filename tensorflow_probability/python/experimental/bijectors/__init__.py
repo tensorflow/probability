@@ -20,6 +20,8 @@ from tensorflow_probability.python.experimental.bijectors.distribution_bijectors
 from tensorflow_probability.python.experimental.bijectors.scalar_function_with_inferred_inverse import ScalarFunctionWithInferredInverse
 from tensorflow_probability.python.experimental.bijectors.highway_flow import build_highway_flow_layer
 from tensorflow_probability.python.experimental.bijectors.highway_flow import HighwayFlow
+from tensorflow_probability.python.experimental.bijectors.sharded import Sharded
+
 __all__ = [
     'build_highway_flow_layer',
     'forward_log_det_jacobian_ratio',
@@ -27,4 +29,5 @@ __all__ = [
     'inverse_log_det_jacobian_ratio',
     'make_distribution_bijector',
     'ScalarFunctionWithInferredInverse',
+    'Sharded',
 ]

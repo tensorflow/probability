@@ -502,32 +502,6 @@ class JointDistributionNamedTest(test_util.TestCase):
     lp = d.log_prob(x)
     self.assertEqual((2, 3), lp.shape)
 
-  def test_sample_shape_propagation_nondefault_behavior(self):
-    # pylint: disable=bad-whitespace
-    d = tfd.JointDistributionNamed(dict(
-        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
-        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
-        s    =          tfd.HalfNormal(2.5),
-        loc  =lambda s: tfd.Normal(loc=0, scale=s),
-        df   =          tfd.Exponential(2),
-        x    =          tfd.StudentT),
-                                   validate_args=False)
-    # pylint: enable=bad-whitespace
-    # The following enables the nondefault sample shape behavior.
-    d._always_use_specified_sample_shape = True
-    sample_shape = (2, 3)
-    x = d.sample(sample_shape, seed=test_util.test_seed())
-    self.assertLen(x, 6)
-    self.assertEqual(sample_shape + (2,), x['e'].shape)
-    self.assertEqual(sample_shape * 2, x['scale'].shape)  # Has 1 arg.
-    self.assertEqual(sample_shape * 1, x['s'].shape)      # Has 0 args.
-    self.assertEqual(sample_shape * 2, x['loc'].shape)    # Has 1 arg.
-    self.assertEqual(sample_shape * 1, x['df'].shape)     # Has 0 args.
-    # Has 3 args, one being scalar.
-    self.assertEqual(sample_shape * 3, x['x'].shape)
-    lp = d.log_prob(x)
-    self.assertEqual(sample_shape * 3, lp.shape)
-
   def test_sample_complex_dependency(self):
     # pylint: disable=bad-whitespace
     d = tfd.JointDistributionNamed(

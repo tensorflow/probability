@@ -286,13 +286,12 @@ class QuantizedDistribution(distributions.Distribution):
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
-        distribution=parameter_properties.BatchedComponentProperties())
-
-  def _batch_shape_tensor(self):
-    return self.distribution.batch_shape_tensor()
-
-  def _batch_shape(self):
-    return self.distribution.batch_shape
+        distribution=parameter_properties.BatchedComponentProperties(),
+        low=parameter_properties.ParameterProperties(),
+        # TODO(b/169874884): Support decoupled parameterization.
+        high=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=parameter_properties
+            .BIJECTOR_NOT_IMPLEMENTED,))
 
   def _event_shape_tensor(self):
     return self.distribution.event_shape_tensor()
@@ -530,7 +529,8 @@ class QuantizedDistribution(distributions.Distribution):
       return []
 
     sample_shape = tf.concat(
-        [self._batch_shape_tensor(), self._event_shape_tensor()], axis=0)
+        [self.distribution.batch_shape_tensor(),
+         self._event_shape_tensor()], axis=0)
 
     low = None if self._low is None else tf.convert_to_tensor(self._low)
     high = None if self._high is None else tf.convert_to_tensor(self._high)
@@ -574,8 +574,6 @@ class QuantizedDistribution(distributions.Distribution):
     assertions.append(distribution_util.assert_integer_form(
         x, message='Sample has non-integer components.'))
     return assertions
-
-  _composite_tensor_nonshape_params = ('distribution', 'low', 'high')
 
 
 def _logsum_expbig_minus_expsmall(big, small):

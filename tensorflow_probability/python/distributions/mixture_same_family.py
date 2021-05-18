@@ -200,10 +200,6 @@ class MixtureSameFamily(distribution.Distribution):
         self.components_distribution.event_shape)
 
   @property
-  def _composite_tensor_nonshape_params(self):
-    return ('mixture_distribution', 'components_distribution')
-
-  @property
   def mixture_distribution(self):
     return self._mixture_distribution
 
@@ -255,13 +251,6 @@ class MixtureSameFamily(distribution.Distribution):
     return self.copy(
         mixture_distribution=sliced_mixture_dist,
         components_distribution=sliced_components_dist)
-
-  def _batch_shape_tensor(self):
-    return self.components_distribution.batch_shape_tensor()[:-1]
-
-  def _batch_shape(self):
-    return tensorshape_util.with_rank_at_least(
-        self.components_distribution.batch_shape, 1)[:-1]
 
   def _event_shape_tensor(self):
     return self.components_distribution.event_shape_tensor()

@@ -52,6 +52,7 @@ py_library(
         ":private",
         ":random_generators",
         ":raw_ops",
+        ":resource_variable_ops",
         ":sets_lib",
         ":sparse_lib",
         ":static_rewrites",
@@ -330,6 +331,11 @@ py_library(
         ":ops",
         # numpy dep,
     ],
+)
+
+py_library(
+    name = "resource_variable_ops",
+    srcs = ["resource_variable_ops.py"],
 )
 
 py_library(

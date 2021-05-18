@@ -16,7 +16,9 @@
 
 __all__ = [
     'lookup',
-    'register'
+    'register',
+    'BatchableTypeSpec',
+    'TypeSpec',
 ]
 
 
@@ -30,3 +32,11 @@ def register(_):
 def lookup(_):
   # Raise ValueError instead of NotImplementedError to conform to TF.
   raise ValueError('`TypeSpec`s are not registered in Numpy/JAX.')
+
+
+class TypeSpec(object):
+  pass
+
+
+class BatchableTypeSpec(TypeSpec):
+  pass

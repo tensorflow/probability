@@ -195,14 +195,6 @@ class PlackettLuce(distribution.Distribution):
     """
     return self._scores
 
-  def _batch_shape_tensor(self, scores=None):
-    scores = self._scores if scores is None else scores
-    return ps.shape(scores)[:-1]
-
-  def _batch_shape(self, scores=None):
-    scores = self._scores if scores is None else scores
-    return scores.shape[:-1]
-
   def _event_shape_tensor(self, scores=None):
     scores = self._scores if scores is None else scores
     return ps.shape(scores)[-1:]

@@ -27,6 +27,8 @@ from tensorflow_probability.python.internal import test_util
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
+Root = tfd.JointDistributionCoroutine.Root
+
 
 @test_util.test_all_tf_execution_regimes
 class InitializationTest(test_util.TestCase):
@@ -123,6 +125,37 @@ class InitializationTest(test_util.TestCase):
           model_dist).sample(seed=test_util.test_seed())
     g = f.get_concrete_function(tf.TensorSpec([None, 3], tf.float32))
     self.evaluate(g(tf.ones([7, 3])))
+
+  def testBatchShapeJDCoro(self):
+    @tfd.JointDistributionCoroutine
+    def model():
+      x = yield Root(tfd.MultivariateNormalDiag(
+          tf.zeros([10, 3]), tf.ones(3), name='x'))
+      yield tfd.Multinomial(
+          logits=tfb.Pad([[0, 1]])(x), total_count=10, name='y')
+
+    p = model.experimental_pin(y=model.sample(seed=test_util.test_seed()).y)
+
+    self.assertEqual(
+        (10, 3),
+        tfp.experimental.mcmc.init_near_unconstrained_zero(p).sample(
+            seed=test_util.test_seed()).x.shape)
+
+  @test_util.numpy_disable_test_missing_functionality('vmap')
+  def testBatchShapeJDCoroAB(self):
+    def model():
+      x = yield tfd.MultivariateNormalDiag(
+          tf.zeros([10, 3]), tf.ones(3), name='x')
+      yield tfd.Multinomial(
+          logits=tfb.Pad([[0, 1]])(x), total_count=10, name='y')
+
+    jd = tfd.JointDistributionCoroutineAutoBatched(model, batch_ndims=1)
+    p = jd.experimental_pin(y=jd.sample(seed=test_util.test_seed()).y)
+
+    self.assertEqual(
+        (10, 3),
+        tfp.experimental.mcmc.init_near_unconstrained_zero(p).sample(
+            seed=test_util.test_seed()).x.shape)
 
 
 if __name__ == '__main__':

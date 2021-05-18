@@ -661,7 +661,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     transition_noise = self.get_transition_noise_for_timestep(t)
     observation_noise = self.get_observation_noise_for_timestep(t)
     return tf.nest.map_structure(
-        tf.identity,
+        tensor_util.identity_as_tensor,
         {'transition_matrix': (
             self.get_transition_matrix_for_timestep(t).to_dense()),
          'observation_matrix': (

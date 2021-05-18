@@ -102,6 +102,7 @@ class _SoftClipBijectorBase(tfp_test_util.TestCase):
       self.evaluate(x)
 
   @tfp_test_util.jax_disable_variable_test
+  @tfp_test_util.numpy_disable_gradient_test
   def test_variable_gradients(self):
     b = tfb.SoftClip(low=tf.Variable(2.), high=tf.Variable(6.))
     with tf.GradientTape() as tape:

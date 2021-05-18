@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -173,6 +174,13 @@ class BatchBroadcast(distribution_lib.Distribution):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties(),
+        to_shape=parameter_properties.ShapeParameterProperties(),
+        with_shape=parameter_properties.ShapeParameterProperties())
+
   @property
   def distribution(self):
     return self._distribution
@@ -186,8 +194,8 @@ class BatchBroadcast(distribution_lib.Distribution):
     return self._to_shape
 
   @property
-  def experimental_is_sharded(self):
-    return self.distribution.experimental_is_sharded
+  def experimental_shard_axis_names(self):
+    return self.distribution.experimental_shard_axis_names
 
   def __getitem__(self, slices):
     # Implementing this method would require logic similar to
@@ -324,9 +332,6 @@ class BatchBroadcast(distribution_lib.Distribution):
 
   def _sample_control_dependencies(self, value, **kwargs):
     return self.distribution._sample_control_dependencies(value, **kwargs)  # pylint: disable=protected-access
-
-  _composite_tensor_nonshape_params = ('distribution',)
-  _composite_tensor_shape_params = ('with_shape', 'to_shape')
 
 
 class _BroadcastingBijector(bijector_lib.Bijector):

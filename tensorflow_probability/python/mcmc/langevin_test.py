@@ -24,7 +24,13 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import distribute_test_lib
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+
+
+JAX_MODE = False
 
 
 @test_util.test_graph_and_eager_modes
@@ -227,6 +233,82 @@ class LangevinTest(test_util.TestCase):
         step_size=0.1,
     )
     self.assertFalse(uncal_langevin.is_calibrated)
+
+
+@test_util.test_all_tf_execution_regimes
+class DistributedLangevinTest(distribute_test_lib.DistributedTest):
+
+  def test_langevin_kernel_tracks_axis_names(self):
+    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+        tfd.Normal(0, 1).log_prob, step_size=1.9)
+    self.assertIsNone(kernel.experimental_shard_axis_names)
+    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+        tfd.Normal(0, 1).log_prob, step_size=1.9,
+        experimental_shard_axis_names=['a'])
+    self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
+    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(
+        tfd.Normal(0, 1).log_prob, step_size=1.9
+    ).experimental_with_shard_axes(['a'])
+    self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
+
+  def test_computes_same_log_acceptance_correction_with_sharded_state(self):
+
+    if not JAX_MODE:
+      self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
+
+    def target_log_prob(a, b):
+      return (
+          tfd.Normal(0., 1.).log_prob(a)
+          + distribute_lib.psum(tfd.Normal(
+              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+
+    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(target_log_prob,
+                                                          step_size=1.9)
+    sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
+
+    def run(seed):
+      state = [tf.convert_to_tensor(0.), tf.convert_to_tensor(0.)]
+      kr = sharded_kernel.bootstrap_results(state)
+      _, kr = sharded_kernel.one_step(state, kr, seed=seed)
+      return kr.proposed_results.log_acceptance_correction
+
+    log_acceptance_correction = self.evaluate(self.per_replica_to_tensor(
+        self.strategy_run(run, args=(samplers.zeros_seed(),),
+                          in_axes=None, axis_name='foo'), 0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(log_acceptance_correction[i],
+                          log_acceptance_correction[0])
+
+  def test_unsharded_state_remains_synchronized_across_devices(self):
+
+    if not JAX_MODE:
+      self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
+
+    def target_log_prob(a, b):
+      return (
+          tfd.Normal(0., 1.).log_prob(a)
+          + distribute_lib.psum(tfd.Normal(
+              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+
+    kernel = tfp.mcmc.MetropolisAdjustedLangevinAlgorithm(target_log_prob,
+                                                          step_size=1e-1)
+    sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
+
+    def run(seed):
+      state = [tf.convert_to_tensor(-10.),
+               tf.convert_to_tensor(-10.)]
+      kr = sharded_kernel.bootstrap_results(state)
+      state, _ = sharded_kernel.one_step(state, kr, seed=seed)
+      return state
+
+    state = self.evaluate(self.per_replica_to_tensor(
+        self.strategy_run(run, args=(samplers.zeros_seed(),),
+                          in_axes=None, axis_name='foo'), 0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(state[0][i],
+                          state[0][0])
 
 
 if __name__ == '__main__':

@@ -472,6 +472,9 @@ class ParameterPropertiesTest(test_util.TestCase):
                                     'TruncatedNormal', 'Uniform')
     not_annotated_dists = ('Empirical|event_ndims=0', 'Empirical|event_ndims=1',
                            'Empirical|event_ndims=2', 'FiniteDiscrete',
+                           # cov_perturb_factor is not annotated since its shape
+                           # could be a vector or a matrix.
+                           'MultivariateNormalDiagPlusLowRankCovariance',
                            'MultivariateStudentTLinearOperator',
                            'PoissonLogNormalQuadratureCompound',
                            'StoppingRatioLogistic',)
@@ -542,18 +545,17 @@ class ParameterPropertiesTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
-      for dname in sorted(list(set(dhps.INSTANTIABLE_META_DISTS))))
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                          list(dhps.INSTANTIABLE_META_DISTS)))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testInferredBatchShapeMatchesTrueBatchShape(self, dist_name, data):
-    dist = data.draw(dhps.distributions(dist_name=dist_name))
-    try:
-      self.assertAllEqual(dist.batch_shape_tensor(),
-                          dist._inferred_batch_shape_tensor())
-      self.assertAllEqual(dist.batch_shape,
-                          dist._inferred_batch_shape())
-    except NotImplementedError as e:
-      self.skipTest(str(e))
+    dist = data.draw(
+        dhps.distributions(dist_name=dist_name, validate_args=False))
+    lp = dist.log_prob(dist.sample(seed=test_util.test_seed()))
+
+    self.assertAllEqual(dist.batch_shape_tensor(), tf.shape(lp))
+    self.assertAllEqual(dist.batch_shape, tf.shape(lp))
 
 
 def _all_shapes(thing):

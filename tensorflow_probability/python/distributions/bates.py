@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
 import sys
 
 # Dependency imports
@@ -180,12 +179,20 @@ class Bates(distribution.Distribution):
     return dict(
         total_count=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED),
+            .BIJECTOR_NOT_IMPLEMENTED,
+            # The method `_sample_bates` currently constructs intermediate
+            # samples with a shape that depends on `total_count`, so, although
+            # `total_count` is not *inherently* a shape parameter, we annotate
+            # it as one in the current implementation (making it the rare case
+            # of a shape parameter that also has batch semantics). This could
+            # be removed if a different sampling method (eg, rejection sampling)
+            # were used.
+            specifies_shape=True),
         low=parameter_properties.ParameterProperties(),
         # TODO(b/169874884): Support decoupled parameterization.
         high=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED,))
+            .BIJECTOR_NOT_IMPLEMENTED))
 
   @property
   def total_count(self):
@@ -206,16 +213,6 @@ class Bates(distribution.Distribution):
     return [('total_count', self._total_count),
             ('low', self._low),
             ('high', self._high)]
-
-  def _batch_shape_tensor(self):
-    return functools.reduce(
-        ps.broadcast_shape,
-        [ps.shape(param) for _, param in self._params_list()])
-
-  def _batch_shape(self):
-    return functools.reduce(
-        tf.broadcast_static_shape,
-        [param.shape for _, param in self._params_list()])
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -297,10 +294,6 @@ class Bates(distribution.Distribution):
           self.low, self.high, message='`low` must be less than `high`.'))
 
     return assertions
-
-  _composite_tensor_nonshape_params = ('low', 'high')
-
-  _composite_tensor_shape_params = ('total_count',)
 
 
 # TODO(b/157665707): Investigate alternative PDF formulas / computations.

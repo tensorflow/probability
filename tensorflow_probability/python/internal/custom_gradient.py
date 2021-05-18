@@ -93,8 +93,9 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None,
           val, aux = vjp_fwd(*reconstruct_args, **kwargs)
 
           def vjp_bwd_wrapped(*g):
+            nondiff_args = [closure[i] for i in nondiff_argnums]
             result = tf.nest.flatten(
-                vjp_bwd(aux, tf.nest.pack_sequence_as(val, g)))
+                vjp_bwd(*nondiff_args, aux, tf.nest.pack_sequence_as(val, g)))
             for i in nondiff_argnums:
               result = tuple(result[:i]) + (None,) + tuple(result[i:])
             result = [a for i, a in enumerate(result) if i not in closure]

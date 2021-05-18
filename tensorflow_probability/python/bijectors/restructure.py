@@ -26,6 +26,7 @@ from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -190,7 +191,9 @@ class Restructure(bijector.AutoCompositeTensorBijector):
 
   @classmethod
   def _parameter_properties(cls, dtype):
-    return dict()
+    return dict(
+        input_structure=parameter_properties.ShapeParameterProperties(),
+        output_structure=parameter_properties.ShapeParameterProperties())
 
   @property
   def _is_permutation(self):
@@ -264,10 +267,6 @@ class Restructure(bijector.AutoCompositeTensorBijector):
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
     with self._name_and_control_scope(name):
       return tf.zeros([], tf.float32)
-
-  @property
-  def _composite_tensor_shape_params(self):
-    return ('output_structure', 'input_structure')
 
 
 def tree_flatten(example, name='restructure'):

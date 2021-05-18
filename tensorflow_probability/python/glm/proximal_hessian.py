@@ -267,7 +267,7 @@ def fit_sparse(model_matrix,
       coefficients for the GLM regression.  Has shape `[n]` where `model_matrix`
       has shape `[N, n]`.
     tolerance: scalar, `float` `Tensor` representing the tolerance for each
-      optiization step; see the `tolerance` argument of `fit_sparse_one_step`.
+      optimization step; see the `tolerance` argument of `fit_sparse_one_step`.
     l1_regularizer: scalar, `float` `Tensor` representing the weight of the L1
       regularization term.
     l2_regularizer: scalar, `float` `Tensor` representing the weight of the L2

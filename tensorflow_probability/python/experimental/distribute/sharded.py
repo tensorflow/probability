@@ -24,7 +24,9 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import log_prob_ratio
-from tensorflow_probability.python.experimental.distribute import distribute_lib
+from tensorflow_probability.python.experimental.bijectors import sharded as sharded_bij
+from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import samplers
 
 
@@ -35,16 +37,14 @@ def _implement_sharded_lp_fn(fn_name):
   """Implements log_prob or unnormalized_log_prob."""
   def lp_fn(self, x, reduce_over_shards=True, **kwargs):
 
-    def impl(value):
-      new_kwargs = dict(kwargs)
-      if self.distribution.experimental_shard_axis_names:
-        new_kwargs['reduce_over_shards'] = reduce_over_shards
-      return getattr(self.distribution, fn_name)(value, **new_kwargs)
-
+    new_kwargs = dict(kwargs)
+    if self.distribution.experimental_shard_axis_names:
+      new_kwargs['reduce_over_shards'] = reduce_over_shards
+    lp = getattr(self.distribution, fn_name)(x, **new_kwargs)
     if reduce_over_shards:
-      impl = distribute_lib.make_sharded_log_prob_parts(
-          impl, self.experimental_shard_axis_names)
-    return impl(x)
+      lp = distribute_lib.psum(lp, self.experimental_shard_axis_names)
+
+    return lp
 
   lp_fn.__name__ = f'_{fn_name}'
   return lp_fn
@@ -75,7 +75,10 @@ class Sharded(distribution_lib.Distribution):
     Args:
       distribution: The base distribution instance to transform. Typically an
         instance of `Distribution`.
-      shard_axis_name: `str` for axis name for use in JAX backend.
+      shard_axis_name: `str` or a list of strings for axis name(s). An empty
+        list means that no sharding is actually done. This can be `None` under
+        the TensorFlow backend (meaning a sharded axis is present, but
+        anonymous). Only the JAX backend supports multiple axes names.
       validate_args: Python `bool`.  Whether to validate input with asserts. If
         `validate_args` is `False`, and the inputs are invalid, correct behavior
         is not guaranteed.
@@ -84,12 +87,45 @@ class Sharded(distribution_lib.Distribution):
     """
     parameters = dict(locals())
 
-    if JAX_MODE and shard_axis_name is None:
-      raise ValueError('Cannot provide a `None` axis name in JAX backend.')
+    if shard_axis_name is None:
+      if JAX_MODE:
+        # In JAX, axes names matter and we don't know which axis name the user
+        # might intend, so we bail.
+        raise ValueError('Cannot provide a `None` axis name in JAX backend.')
+      else:
+        # In TF, there are no axes names, so we can pick a reasonable default.
+        shard_axis_name = [True]
+
+    # Use inner axes before outer axes
+    full_shard_axis_name = (
+        distribution.experimental_shard_axis_names +
+        distribute_lib.canonicalize_axis_name(shard_axis_name))
+
+    if not JAX_MODE:
+      if len(full_shard_axis_name) > 1:
+        raise ValueError(
+            'TensorFlow backend does not support multiple shard axes:\n'
+            'inner shard_axis_names: '
+            f'{list(distribution.experimental_shard_axis_names)}\n'
+            f'outer shard_axis_names: {list(shard_axis_name)}')
+
+    if len(set(full_shard_axis_name)) != len(full_shard_axis_name):
+      duplicates = set()
+      seen = set()
+      for axis_name in full_shard_axis_name:
+        if axis_name in seen:
+          duplicates.add(axis_name)
+        seen.add(axis_name)
+      raise ValueError(
+          'Found duplicate axis name(s).\n'
+          'inner shard_axis_names: '
+          f'{list(distribution.experimental_shard_axis_names)}\n'
+          f'outer shard_axis_names: {shard_axis_name}\n'
+          f'duplicates: {list(duplicates)}')
 
     with tf.name_scope(name or 'Sharded' + distribution.name) as name:
       self._distribution = distribution
-      self._shard_axis_name = shard_axis_name
+      self._shard_axis_name = full_shard_axis_name
       super(Sharded, self).__init__(
           dtype=self._distribution.dtype,
           validate_args=validate_args,
@@ -100,18 +136,12 @@ class Sharded(distribution_lib.Distribution):
 
   @property
   def experimental_shard_axis_names(self):
-    if self._shard_axis_name is None:
-      # In TF, we use `True` as the default `axis_name`.
-      if self.distribution.experimental_shard_axis_names:
-        raise ValueError('Cannot nest sharded distributions in TF backend.')
-      return [True]
-    shard_axis_names = distribute_lib.canonicalize_axis_name(
-        self._shard_axis_name)
-    for axis_name in shard_axis_names:
-      if axis_name in self.distribution.experimental_shard_axis_names:
-        raise ValueError(f'Found nested axes with the same name: {axis_name}')
-    # Use inner axes before outer axes
-    return self.distribution.experimental_shard_axis_names + shard_axis_names
+    return self._shard_axis_name
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties())
 
   @property
   def distribution(self):
@@ -119,9 +149,8 @@ class Sharded(distribution_lib.Distribution):
 
   def _sample_n(self, n, seed, **kwargs):
     seed = samplers.sanitize_seed(seed, salt='sharded_sample')
-    for axis_name in self.experimental_shard_axis_names:
-      axis_index = distribute_lib.get_axis_index(axis_name)
-      seed = samplers.fold_in(seed, tf.cast(axis_index, tf.int32))
+    seed = distribute_lib.fold_in_axis_index(
+        seed, self.experimental_shard_axis_names)
     return self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
 
   _log_prob = _implement_sharded_lp_fn('log_prob')
@@ -145,12 +174,10 @@ class Sharded(distribution_lib.Distribution):
     return self.distribution._parameter_control_dependencies(is_init=is_init)  # pylint: disable=protected-access
 
   def _default_event_space_bijector(self, *args, **kwargs):
-    # TODO(b/175084455): This should likely be wrapped in a `tfb.Sharded`-like
-    # construct.
-    return self.distribution.experimental_default_event_space_bijector(
-        *args, **kwargs)
-
-  _composite_tensor_nonshape_params = ('distribution',)
+    return sharded_bij.Sharded(
+        self.distribution.experimental_default_event_space_bijector(
+            *args, **kwargs),
+        shard_axis_name=self.experimental_shard_axis_names)
 
 
 @log_prob_ratio.RegisterLogProbRatio(Sharded)
@@ -163,17 +190,14 @@ def _sharded_log_prob_ratio(p, x, q, y, name=None, reduce_over_shards=True):
           f'"{p.experimental_shard_axis_names}" vs "'
           f'"{q.experimental_shard_axis_names}"')
 
-    def log_prob_ratio_fn(x_y):
-      return log_prob_ratio.log_prob_ratio(p.distribution, x_y[0],
-                                           q.distribution, x_y[1])
+    def log_prob_ratio_fn(x, y):
+      return log_prob_ratio.log_prob_ratio(p.distribution, x,
+                                           q.distribution, y)
 
     if reduce_over_shards:
-      return distribute_lib.make_sharded_log_prob_parts(
-          # Stack, because make_sharded_log_prob_parts expects inputs/outputs to
-          # be 1 to 1. TODO(b/175084455): revisit this after the distributed
-          # bijectors are done, as it is likely that make_sharded_log_prob_parts
-          # will be adjusted then to not have this limitation.
-          log_prob_ratio_fn,
-          p.experimental_shard_axis_names)(
-              tf.stack([x, y], axis=0))
-    return log_prob_ratio_fn([x, y])
+      axes = p.experimental_shard_axis_names
+
+      return distribute_lib.make_psum_function(
+          log_prob_ratio_fn, in_axes=(axes, axes), out_axes=axes,
+          out_dtype=x)(x, y)
+    return log_prob_ratio_fn(x, y)

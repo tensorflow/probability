@@ -21,7 +21,10 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import invert as invert_bijector
+from tensorflow_probability.python.bijectors import ordered as ordered_bijector
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
@@ -147,14 +150,31 @@ class FiniteDiscrete(distribution.Distribution):
   def _parameter_properties(cls, dtype, num_classes=None):
     # pylint: disable=g-long-lambda
     return dict(
+        outcomes=parameter_properties.ParameterProperties(
+            event_ndims=None,
+            shape_fn=lambda sample_shape: [num_classes],
+            default_constraining_bijector_fn=invert_bijector.Invert(
+                ordered_bijector.Ordered())),
         logits=parameter_properties.ParameterProperties(
             event_ndims=1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, [num_classes]], axis=0)),
         probs=parameter_properties.ParameterProperties(
             event_ndims=1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+            shape_fn=lambda sample_shape: ps.concat(
+                [sample_shape, [num_classes]], axis=0),
             default_constraining_bijector_fn=softmax_centered_bijector
             .SoftmaxCentered,
+            is_preferred=False),
+        rtol=parameter_properties.ParameterProperties(
+            event_ndims=None,  # TODO(b/187469130): standardize batch semantics.
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            is_preferred=False),
+        atol=parameter_properties.ParameterProperties(
+            event_ndims=None,  # TODO(b/187469130): standardize batch semantics.
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
             is_preferred=False))
     # pylint: enable=g-long-lambda
 
@@ -171,12 +191,6 @@ class FiniteDiscrete(distribution.Distribution):
   def probs(self):
     """Input argument `probs`."""
     return self._categorical.probs
-
-  def _batch_shape_tensor(self):
-    return self._categorical.batch_shape_tensor()
-
-  def _batch_shape(self):
-    return self._categorical.batch_shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -342,7 +356,3 @@ class FiniteDiscrete(distribution.Distribution):
               message='outcomes is not strictly increasing.'))
 
     return assertions
-
-  _composite_tensor_nonshape_params = ('outcomes', 'logits', 'probs', 'rtol',
-                                       'atol')
-  # 'outcomes' is not in _params_event_ndims(), so we expose this manually

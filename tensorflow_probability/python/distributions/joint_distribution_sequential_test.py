@@ -291,32 +291,6 @@ class JointDistributionSequentialTest(test_util.TestCase):
     lp = d.log_prob(x)
     self.assertEqual((2, 3), lp.shape)
 
-  def test_sample_shape_propagation_nondefault_behavior(self):
-    d = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),          # 0
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),  # 1
-            tfd.HalfNormal(2.5),                                           # 2
-            lambda s: tfd.Normal(loc=0, scale=s),                          # 3
-            tfd.Exponential(2),                                            # 4
-            lambda df, loc, _, scale: tfd.StudentT(df, loc, scale),        # 5
-        ],
-        validate_args=False)  # So log_prob doesn't complain.
-    # The following enables the nondefault sample shape behavior.
-    d._always_use_specified_sample_shape = True
-    sample_shape = (2, 3)
-    x = d.sample(sample_shape, seed=test_util.test_seed())
-    self.assertLen(x, 6)
-    self.assertEqual(sample_shape + (2,), x[0].shape)
-    self.assertEqual(sample_shape * 2, x[1].shape)  # Has 1 arg.
-    self.assertEqual(sample_shape * 1, x[2].shape)  # Has 0 args.
-    self.assertEqual(sample_shape * 2, x[3].shape)  # Has 1 arg.
-    self.assertEqual(sample_shape * 1, x[4].shape)  # Has 0 args.
-    # Has 3 args, one being scalar.
-    self.assertEqual(sample_shape * 3, x[5].shape)
-    lp = d.log_prob(x)
-    self.assertEqual(sample_shape * 3, lp.shape)
-
   def test_argspec(self):
     argspec = tf_inspect.getfullargspec(Dummy)
     self.assertAllEqual(['me', 'arg1', 'arg2', 'arg3'], argspec.args)

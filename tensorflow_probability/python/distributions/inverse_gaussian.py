@@ -150,16 +150,6 @@ class InverseGaussian(distribution.Distribution):
     """Concentration parameter."""
     return self._concentration
 
-  def _batch_shape_tensor(self, loc=None, concentration=None):
-    return ps.broadcast_shape(
-        ps.shape(self.loc if loc is None else loc),
-        ps.shape(
-            self.concentration if concentration is None else concentration))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.loc.shape, self.concentration.shape)
-
   def _event_shape(self):
     return tf.TensorShape([])
 
@@ -278,7 +268,7 @@ def _random_inverse_gaussian_fwd(shape, loc, concentration, seed):
   """Compute output, aux (collaborates with _random_inverse_gaussian_bwd)."""
   samples = _random_inverse_gaussian_no_gradient(
       shape, loc, concentration, seed)
-  return samples, (samples, shape, loc, concentration)
+  return samples, (samples, loc, concentration)
 
 
 def _compute_partials(samples, loc, concentration):
@@ -310,9 +300,9 @@ def _compute_partials(samples, loc, concentration):
   return partial_c, partial_l
 
 
-def _random_inverse_gaussian_bwd(aux, g):
+def _random_inverse_gaussian_bwd(shape, aux, g):
   """The gradient of the inverse gaussian samples."""
-  samples, shape, loc, concentration = aux
+  samples, loc, concentration = aux
   partial_concentration, partial_loc = _compute_partials(
       samples, loc, concentration)
   dsamples = g

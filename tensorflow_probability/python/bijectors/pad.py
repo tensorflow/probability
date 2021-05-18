@@ -160,11 +160,9 @@ class Pad(bijector.AutoCompositeTensorBijector):
   @classmethod
   def _parameter_properties(cls, dtype):
     return dict(
-        paddings=parameter_properties.ParameterProperties(
-            event_ndims=1,
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED),
-        constant_values=parameter_properties.ParameterProperties())
+        paddings=parameter_properties.ShapeParameterProperties(),
+        constant_values=parameter_properties.ParameterProperties(),
+        axis=parameter_properties.ShapeParameterProperties())
 
   @property
   def paddings(self):
@@ -351,7 +349,3 @@ class Pad(bijector.AutoCompositeTensorBijector):
             len_axis, len_paddings, message=msg))
 
     return assertions
-
-  @property
-  def _composite_tensor_shape_params(self):
-    return ('paddings', 'axis')
