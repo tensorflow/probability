@@ -363,6 +363,7 @@ def _cf_surrogate_for_joint_distribution(
       global_auxiliary_variables = value_out
 
     else:
+      global_auxiliary_variables = None
       i = 0
 
     try:
