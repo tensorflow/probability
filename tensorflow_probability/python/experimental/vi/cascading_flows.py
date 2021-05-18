@@ -39,16 +39,17 @@ from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import half_normal
 from tensorflow_probability.python.distributions import independent
-from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import \
-  joint_distribution_coroutine
+    joint_distribution_auto_batched
+from tensorflow_probability.python.distributions import \
+    joint_distribution_coroutine
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import truncated_normal
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.experimental.bijectors import \
-  build_highway_flow_layer
+    build_highway_flow_layer
 from tensorflow_probability.python.internal import samplers
 
 __all__ = [
@@ -157,6 +158,7 @@ def build_cf_surrogate_posterior(
     prior,
     num_auxiliary_variables=0,
     initial_prior_weight=0.98,
+    num_layers=3,
     seed=None,
     name=None):
   # todo: change docstrings
@@ -254,8 +256,10 @@ def build_cf_surrogate_posterior(
       base_distribution_surrogate_fn=functools.partial(
         _cf_convex_update_for_base_distribution,
         initial_prior_weight=initial_prior_weight,
-        num_auxiliary_variables=num_auxiliary_variables),
+        num_auxiliary_variables=num_auxiliary_variables,
+        num_layers=num_layers),
       num_auxiliary_variables=num_auxiliary_variables,
+      num_layers=num_layers,
       seed=seed)
     surrogate_posterior.also_track = variables
     return surrogate_posterior
@@ -263,9 +267,10 @@ def build_cf_surrogate_posterior(
 
 def _cf_surrogate_for_distribution(dist,
                                    base_distribution_surrogate_fn,
+                                   num_auxiliary_variables,
+                                   num_layers,
                                    sample_shape=None,
                                    variables=None,
-                                   num_auxiliary_variables=0,
                                    global_auxiliary_variables=None,
                                    seed=None):
   # todo: change docstrings
@@ -307,16 +312,22 @@ def _cf_surrogate_for_distribution(dist,
       base_distribution_surrogate_fn=base_distribution_surrogate_fn,
       variables=variables,
       num_auxiliary_variables=num_auxiliary_variables,
+      num_layers=num_layers,
       global_auxiliary_variables=global_auxiliary_variables,
       seed=seed)
   else:
     surrogate_posterior, variables = base_distribution_surrogate_fn(
-      dist=dist, sample_shape=sample_shape, variables=variables, global_auxiliary_variables=global_auxiliary_variables, seed=seed)
+      dist=dist, sample_shape=sample_shape, variables=variables,
+      global_auxiliary_variables=global_auxiliary_variables,
+      num_layers=num_layers,
+      seed=seed)
   return surrogate_posterior, variables
 
 
 def _cf_surrogate_for_joint_distribution(
-    dist, base_distribution_surrogate_fn, variables=None, num_auxiliary_variables=0, global_auxiliary_variables=None, seed=None):
+    dist, base_distribution_surrogate_fn, variables,
+    num_auxiliary_variables, num_layers, global_auxiliary_variables,
+    seed=None):
   """Builds a structured joint surrogate posterior for a joint model."""
 
   # Probabilistic program for CF surrogate posterior.
@@ -335,18 +346,17 @@ def _cf_surrogate_for_joint_distribution(
         variables = flat_variables[0]
 
       else:
-        layers = 3
         bijectors = []
 
-        for _ in range(0, layers - 1):
+        for _ in range(0, num_layers - 1):
           bijectors.append(
             build_highway_flow_layer(num_auxiliary_variables,
-              residual_fraction_initial_value=0.98,
-              activation_fn=True, gate_first_n=0, seed=seed))
+                                     activation_fn=True,
+                                     gate_first_n=0, seed=seed))
         bijectors.append(
           build_highway_flow_layer(num_auxiliary_variables,
-            residual_fraction_initial_value=0.98,
-            activation_fn=False, gate_first_n=0, seed=seed))
+                                   activation_fn=False,
+                                   gate_first_n=0, seed=seed))
 
         variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
@@ -376,8 +386,10 @@ def _cf_surrogate_for_joint_distribution(
         surrogate_posterior, variables = _cf_surrogate_for_distribution(
           dist,
           base_distribution_surrogate_fn=base_distribution_surrogate_fn,
+          num_auxiliary_variables=num_auxiliary_variables,
+          num_layers=num_layers,
           variables=flat_variables[i] if flat_variables else None,
-          global_auxiliary_variables = global_auxiliary_variables,
+          global_auxiliary_variables=global_auxiliary_variables,
           seed=init_seed)
 
         if was_root and num_auxiliary_variables == 0:
@@ -412,16 +424,18 @@ def _cf_surrogate_for_joint_distribution(
       dist=dist,
       base_distribution_surrogate_fn=base_distribution_surrogate_fn,
       num_auxiliary_variables=num_auxiliary_variables,
+      num_layers=num_layers,
       global_auxiliary_variables=global_auxiliary_variables,
-      variables=dist._model_unflatten(  # pylint: disable=protected-access
+      variables=dist._model_unflatten(
+        # pylint: disable=protected-access
         _extract_variables_from_coroutine_model(
           posterior_generator, seed=seed)))
 
   # Temporary workaround for bijector caching issues with autobatched JDs.
   surrogate_posterior = joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched(
-      posterior_generator,
-      use_vectorized_map=dist.use_vectorized_map,
-      name=_get_name(dist))
+    posterior_generator,
+    use_vectorized_map=dist.use_vectorized_map,
+    name=_get_name(dist))
 
   # Ensure that the surrogate posterior structure matches that of the prior.
   # todo: check me, do we need this? in case needs to be modified
@@ -445,10 +459,11 @@ def _cf_surrogate_for_joint_distribution(
 # todo: sample_shape and seed are not used.. maybe they should?
 def _cf_convex_update_for_base_distribution(dist,
                                             initial_prior_weight,
-                                            num_auxiliary_variables=0,
-                                            global_auxiliary_variables=None,
+                                            num_auxiliary_variables,
+                                            num_layers,
+                                            global_auxiliary_variables,
+                                            variables,
                                             sample_shape=None,
-                                            variables=None,
                                             seed=None):
   """Creates a trainable surrogate for a (non-meta, non-joint) distribution."""
 
@@ -456,23 +471,27 @@ def _cf_convex_update_for_base_distribution(dist,
     actual_event_shape = dist.event_shape_tensor()
     int_event_shape = int(actual_event_shape) if \
       actual_event_shape.shape.as_list()[0] > 0 else 1
-    layers = 3
     bijectors = [reshape.Reshape([-1],
-                             event_shape_in=actual_event_shape +
-                                            num_auxiliary_variables)]
+                                 event_shape_in=actual_event_shape +
+                                                num_auxiliary_variables)]
 
-    for _ in range(0, layers - 1):
+    for _ in range(0, num_layers - 1):
       bijectors.append(
         build_highway_flow_layer(
-          tf.reduce_prod(actual_event_shape + num_auxiliary_variables),
+          tf.reduce_prod(
+            actual_event_shape + num_auxiliary_variables),
           residual_fraction_initial_value=initial_prior_weight,
-          activation_fn=True, gate_first_n=int_event_shape, seed=seed))
+          activation_fn=True, gate_first_n=int_event_shape,
+          seed=seed))
     bijectors.append(
       build_highway_flow_layer(
-        tf.reduce_prod(actual_event_shape + num_auxiliary_variables),
+        tf.reduce_prod(
+          actual_event_shape + num_auxiliary_variables),
         residual_fraction_initial_value=initial_prior_weight,
-        activation_fn=False, gate_first_n=int_event_shape, seed=seed))
-    bijectors.append(reshape.Reshape(actual_event_shape + num_auxiliary_variables))
+        activation_fn=False, gate_first_n=int_event_shape,
+        seed=seed))
+    bijectors.append(
+      reshape.Reshape(actual_event_shape + num_auxiliary_variables))
 
     variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
@@ -485,7 +504,7 @@ def _cf_convex_update_for_base_distribution(dist,
       transformed_distribution.TransformedDistribution(
         distribution=blockwise.Blockwise([
           batch_broadcast.BatchBroadcast(dist,
-                                        to_shape=batch_shape),
+                                         to_shape=batch_shape),
           independent.Independent(
             deterministic.Deterministic(
               global_auxiliary_variables),
