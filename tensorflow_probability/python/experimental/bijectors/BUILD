@@ -148,6 +148,20 @@ multi_substrate_py_library(
     ],
 )
 
+multi_substrate_py_library(
+    name = "highway_flow",
+    srcs = ["highway_flow.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":scalar_function_with_inferred_inverse",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
+        "//tensorflow_probability/python/util",
+        "//tensorflow_probability/python/internal:samplers",
+    ],
+)
+
 multi_substrate_py_test(
     name = "sharded_test",
     size = "medium",
@@ -161,6 +175,21 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:distribute_test_lib",
         "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "highway_flow_test",
+    size = "medium",
+    srcs = ["highway_flow_test.py"],
+    jax_size = "medium",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep
+        # tensorflow dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
