@@ -71,7 +71,10 @@ __all__ = [
 try:
   k_u = tf.keras.__internal__.utils
 except:
-  from keras.utils import tf_utils as k_u
+  try:
+    from tensorflow.python.keras.utils import tf_utils as k_u
+  except:
+    from keras.utils import tf_utils as k_u
 k_u.register_symbolic_tensor_type(dtc._TensorCoercible)  # pylint: disable=protected-access
 
 
