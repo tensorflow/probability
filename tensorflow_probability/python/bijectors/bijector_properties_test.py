@@ -28,6 +28,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import experimental
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.bijectors import invert as invert_lib
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
@@ -197,14 +198,13 @@ COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
 # TODO(b/182603117): Enable AutoCT for meta-bijectors and LinearOperator.
 AUTO_COMPOSITE_TENSOR_IS_BROKEN = [
     'FillScaleTriL',
-    'Invert',
     'ScaleMatvecDiag',
     'ScaleMatvecTriL',
 ]
 
 
 def is_invert(bijector):
-  return isinstance(bijector, tfb.Invert)
+  return isinstance(bijector, (tfb.Invert, invert_lib._Invert))
 
 
 def is_transform_diagonal(bijector):
@@ -630,7 +630,7 @@ class BijectorPropertiesTest(test_util.TestCase):
         return False
       if isinstance(bijector, tfb.Softfloor):
         return True
-      if isinstance(bijector, tfb.Invert):
+      if is_invert(bijector):
         return exception(bijector.bijector)
       return False
     if (bijector.forward_min_event_ndims == 0 and
@@ -894,6 +894,12 @@ class BijectorPropertiesTest(test_util.TestCase):
         validate_args=True,
         allowed_bijectors=(set(TF2_FRIENDLY_BIJECTORS) -
                            set(COMPOSITE_TENSOR_IS_BROKEN)))
+
+    if type(bijector) is invert_lib._Invert:  # pylint: disable=unidiomatic-typecheck
+      if isinstance(bijector.bijector, tf.__internal__.CompositeTensor):
+        raise TypeError('`_Invert` should wrap only non-`CompositeTensor` '
+                        'bijectors.')
+      self.skipTest('`_Invert` bijectors are not `CompositeTensor`s.')
 
     # TODO(b/182603117): Remove "if" condition and s/composite_bij/bijector
     # when AutoCT is enabled for meta-bijectors and LinearOperator.
