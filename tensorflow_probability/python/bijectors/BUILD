@@ -593,6 +593,7 @@ multi_substrate_py_library(
     srcs = ["invert.py"],
     deps = [
         ":bijector",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
     ],
 )
 
