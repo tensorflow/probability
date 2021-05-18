@@ -592,6 +592,15 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
   def is_calibrated(self):
     return self.inner_kernel.is_calibrated
 
+  @property
+  def experimental_shard_axis_names(self):
+    return self.inner_kernel.experimental_shard_axis_names
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(
+        inner_kernel=self.inner_kernel.experimental_with_shard_axes(
+            shard_axis_names))
+
 
 def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):
   """Validates that target_accept_prob is in (0, 1)."""

@@ -54,6 +54,7 @@ class FakeMHKernel(tfp.mcmc.TransitionKernel):
                inner_kernel,
                log_accept_ratio,
                store_parameters_in_results=False):
+    self.inner_kernel = inner_kernel
     self.parameters = dict(
         inner_kernel=inner_kernel,
         log_accept_ratio=log_accept_ratio,
@@ -75,6 +76,14 @@ class FakeMHKernel(tfp.mcmc.TransitionKernel):
     )
 
   @property
+  def experimental_shard_axis_names(self):
+    return self.inner_kernel.experimental_shard_axis_names
+
+  def experimental_with_shard_axes(self, shard_axes):
+    return self.copy(
+        inner_kernel=self.inner_kernel.experimental_with_shard_axes(shard_axes))
+
+  @property
   def is_calibrated(self):
     return True
 
@@ -85,10 +94,12 @@ FakeSteppedKernelResults = collections.namedtuple('FakeSteppedKernelResults',
 
 class FakeSteppedKernel(tfp.mcmc.TransitionKernel):
 
-  def __init__(self, step_size, store_parameters_in_results=False):
+  def __init__(self, step_size, store_parameters_in_results=False,
+               experimental_shard_axis_names=None):
     self.parameters = dict(
         step_size=step_size,
-        store_parameters_in_results=store_parameters_in_results)
+        store_parameters_in_results=store_parameters_in_results,
+        experimental_shard_axis_names=experimental_shard_axis_names)
 
   def one_step(self, current_state, previous_kernel_results, seed=None):
     return current_state, previous_kernel_results
@@ -97,6 +108,13 @@ class FakeSteppedKernel(tfp.mcmc.TransitionKernel):
     return FakeSteppedKernelResults(
         step_size=tf.nest.map_structure(tf.convert_to_tensor,
                                         self.parameters['step_size']))
+
+  @property
+  def experimental_shard_axis_names(self):
+    return self.parameters['experimental_shard_axis_names']
+
+  def experimental_with_shard_axes(self, shard_axes):
+    return self.copy(experimental_shard_axis_names=shard_axes)
 
   @property
   def is_calibrated(self):
@@ -562,6 +580,21 @@ class DualAveragingStepSizeAdaptationTest(test_util.TestCase):
     # If reduce_fn was left at default, this would have decreased.
     self.assertAllClose(_UPDATE_01, step_size)
 
+  def testShouldPropagateShardAxisNames(self):
+    test_kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+        FakeMHKernel(FakeSteppedKernel(step_size=1.), log_accept_ratio=0.),
+        num_adaptation_steps=1)
+    self.assertIsNone(test_kernel.experimental_shard_axis_names)
+    sharded_test_kernel = test_kernel.experimental_with_shard_axes(['foo'])
+    self.assertListEqual(
+        sharded_test_kernel.experimental_shard_axis_names, ['foo'])
+    sharded_inner_kernel = sharded_test_kernel.inner_kernel
+    self.assertListEqual(
+        sharded_inner_kernel.experimental_shard_axis_names, ['foo'])
+    self.assertListEqual(
+        sharded_inner_kernel.inner_kernel.experimental_shard_axis_names,
+        ['foo'])
+
 
 @test_util.test_all_tf_execution_regimes
 class DualAveragingStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
@@ -662,6 +695,22 @@ class TfFunctionTest(test_util.TestCase):
     tf.function(
         lambda: adaptive_kernel.one_step(init, extra, seed=seed_stream()))()
 
+  @parameterized.named_parameters(
+      dict(testcase_name='_nuts', preconditioned=False),
+      dict(testcase_name='_pnuts', preconditioned=True))
+  def test_nuts_f64(self, preconditioned):
+    target_log_prob_fn = lambda x: -x**2
+    if preconditioned:
+      nuts_kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler
+    else:
+      nuts_kernel = tfp.mcmc.NoUTurnSampler
+    kernel = nuts_kernel(target_log_prob_fn, step_size=1.)
+    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(kernel,
+                                                      num_adaptation_steps=50)
+    init = tf.constant(0., dtype=tf.float64)
+    extra = kernel.bootstrap_results(init)
+    seed_stream = test_util.test_seed_stream()
+    tf.function(lambda: kernel.one_step(init, extra, seed=seed_stream()))()
 
 if __name__ == '__main__':
   tf.test.main()

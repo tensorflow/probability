@@ -22,6 +22,7 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import joint_distribution
 from tensorflow_probability.python.distributions import joint_distribution_vmap_mixin
 from tensorflow_probability.python.internal import docstring_util
@@ -443,6 +444,22 @@ class JointDistributionPinned(object):
     return self._prune(self.distribution.event_shape_tensor(),
                        retain='unpinned')
 
+  @property
+  def batch_shape(self):
+    batch_shape = self.distribution.batch_shape
+    if tf.nest.is_nested(batch_shape):
+      return self._prune(batch_shape, retain='unpinned')
+    return batch_shape
+
+  def batch_shape_tensor(self):
+    batch_shape = self.distribution.batch_shape_tensor()
+    if tf.nest.is_nested(batch_shape):
+      return self._prune(batch_shape, retain='unpinned')
+    return batch_shape
+
+  __str__ = distribution_lib.Distribution.__str__
+  __repr__ = distribution_lib.Distribution.__repr__
+
   def experimental_default_event_space_bijector(self, *args, **kwargs):
     """A bijector to pull back unpinned values to unconstrained reals."""
     if args or kwargs:
@@ -572,7 +589,7 @@ class JointDistributionPinned(object):
       unpinned: partial log-prob of each unpinned part
     """
     xs = _to_pins(self, *args, **kwargs)
-    parts = self.distribution.log_prob_parts(self._add_pins(**xs))
+    parts = self.distribution.unnormalized_log_prob_parts(self._add_pins(**xs))
     return UnnormalizedLogProbParts(
         pinned=self._prune(parts, retain='pinned'),
         unpinned=self._prune(parts, retain='unpinned'))

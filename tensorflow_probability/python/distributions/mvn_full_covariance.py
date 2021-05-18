@@ -214,5 +214,3 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
                     diag_shift=dtype_util.eps(dtype))
             ]))))
     # pylint: enable=g-long-lambda
-
-  _composite_tensor_nonshape_params = ('loc', 'covariance_matrix')

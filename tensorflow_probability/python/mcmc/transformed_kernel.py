@@ -153,7 +153,8 @@ def _update_target_log_prob(kernel, new_target_log_prob):
   kernel_stack = _make_kernel_stack(kernel)
   # Update to target_log_prob to `new_target_log_prob`.
   with deprecation.silence():
-    prev_kernel = kernel_stack.pop().copy(
+    prev_kernel = kernel_stack.pop()
+    prev_kernel = prev_kernel.copy(
         target_log_prob_fn=new_target_log_prob)
 
     # Propagate the change upwards by reconstructing wrapper kernels.
@@ -495,3 +496,12 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
           inner_results=self._inner_kernel.bootstrap_results(
               transformed_init_state))
       return kernel_results
+
+  @property
+  def experimental_shard_axis_names(self):
+    return self.inner_kernel.experimental_shard_axis_names
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(
+        inner_kernel=self.inner_kernel.experimental_with_shard_axes(
+            shard_axis_names))

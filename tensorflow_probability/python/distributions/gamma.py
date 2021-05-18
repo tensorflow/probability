@@ -131,6 +131,7 @@ class Gamma(distribution.Distribution):
                log_rate=None,
                validate_args=False,
                allow_nan_stats=True,
+               force_probs_to_zero_outside_support=False,
                name='Gamma'):
     """Construct Gamma with `concentration` and `rate` parameters.
 
@@ -153,12 +154,16 @@ class Gamma(distribution.Distribution):
         (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
+      force_probs_to_zero_outside_support: If `True`, force `prob(x) == 0` and
+        `log_prob(x) == -inf` for values of x outside the distribution support.
       name: Python `str` name prefixed to Ops created by this class.
 
     Raises:
       TypeError: if `concentration` and `rate` are different dtypes.
     """
     parameters = dict(locals())
+    self._force_probs_to_zero_outside_support = (
+        force_probs_to_zero_outside_support)
     if (rate is None) == (log_rate is None):
       raise ValueError('Exactly one of `rate` or `log_rate` must be specified.')
     with tf.name_scope(name) as name:
@@ -208,16 +213,9 @@ class Gamma(distribution.Distribution):
     """Log-rate parameter."""
     return self._log_rate
 
-  def _batch_shape_tensor(self, concentration=None, rate=None):
-    return ps.broadcast_shape(
-        ps.shape(
-            self.concentration if concentration is None else concentration),
-        _shape_or_scalar(self.rate, self.log_rate))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.concentration.shape,
-        _tensorshape_or_scalar(self.rate, self.log_rate))
+  @property
+  def force_probs_to_zero_outside_support(self):
+    return self._force_probs_to_zero_outside_support
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -262,12 +260,16 @@ class Gamma(distribution.Distribution):
       log_rate = tf.math.log(rate)
     log_unnormalized_prob = tf.math.xlogy(concentration - 1., x) - rate * x
     log_normalization = tf.math.lgamma(concentration) - concentration * log_rate
-    return log_unnormalized_prob - log_normalization
+    lp = log_unnormalized_prob - log_normalization
+    if self.force_probs_to_zero_outside_support:
+      return tf.where(x >= 0, lp, -float('inf'))
+    return lp
 
   def _cdf(self, x):
     # Note that igamma returns the regularized incomplete gamma function,
     # which is what we want for the CDF.
-    return tf.math.igamma(self.concentration, self._rate_parameter() * x)
+    cdf = tf.math.igamma(self.concentration, self._rate_parameter() * x)
+    return distribution_util.extend_cdf_outside_support(x, cdf, low=0.)
 
   def _quantile(self, p):
     return tfp_math.igammainv(self.concentration, p) / self._rate_parameter()
@@ -545,12 +547,12 @@ def _random_gamma_fwd(shape, concentration, rate, log_rate, seed, log_space):
   samples, impl = _random_gamma_no_gradient(
       shape, concentration, rate, log_rate, seed, log_space)
   return ((samples, impl),
-          (samples, shape, concentration, rate, log_rate, log_space))
+          (samples, concentration, rate, log_rate))
 
 
-def _random_gamma_bwd(aux, g):
+def _random_gamma_bwd(shape, log_space, aux, g):
   """The gradient of the gamma samples."""
-  samples, shape, concentration, rate, log_rate, log_space = aux
+  samples, concentration, rate, log_rate = aux
   dsamples, dimpl = g
   # Ignore any gradient contributions that come from the implementation enum.
   del dimpl

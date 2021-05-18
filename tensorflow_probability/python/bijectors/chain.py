@@ -22,6 +22,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import ldj_ratio
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 
 
@@ -134,7 +135,9 @@ class Chain(composition.Composition):
 
   @classmethod
   def _parameter_properties(cls, dtype):
-    return dict()
+    return dict(
+        bijectors=parameter_properties.BatchedComponentProperties(
+            event_ndims=lambda self: [None for _ in self.bijectors]))
 
   def _is_increasing(self, **kwargs):
     # desc(desc)=>asc, asc(asc)=>asc, other cases=>desc.
@@ -155,18 +158,6 @@ class Chain(composition.Composition):
     for bij in self._bijectors:
       y = step_fn(bij, y, **kwargs.get(bij.name, {}))
     return y  # Now `x`
-
-  @property
-  def _composite_tensor_nonshape_params(self):
-    """A tuple describing which parameters are non-shape-related tensors.
-
-    Flattening in JAX involves many of the same considerations with regards to
-    identifying tensor arguments for the purposes of CompositeTensor, except
-    that shape-related items will be considered metadata.  This property
-    identifies the keys of parameters that are expected to be tensors, except
-    those that are shape-related.
-    """
-    return ('bijectors',)
 
 
 @ldj_ratio.RegisterFLDJRatio(Chain)

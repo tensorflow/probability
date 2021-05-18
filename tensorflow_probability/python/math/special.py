@@ -1318,6 +1318,7 @@ def _lbeta_custom_gradient(x, y):
   return _lbeta_naive_gradient(x, y)
 
 
+@tf.function(autograph=False)
 def lbeta(x, y, name=None):
   """Returns log(Beta(x, y)).
 

@@ -102,23 +102,61 @@ class GibbsSamplerTests(test_util.TestCase):
     return model, time_series, is_missing
 
   @parameterized.named_parameters(
-      {'testcase_name': 'LocalLinearTrend', 'use_slope': True},
-      {'testcase_name': 'LocalLevel', 'use_slope': False})
-  def test_forecasts_match_reference(self, use_slope):
+      {
+          'testcase_name': 'LocalLinearTrend',
+          'use_slope': True,
+          'num_chains': ()
+      }, {
+          'testcase_name': 'LocalLinearTrend_4chains',
+          'use_slope': True,
+          'num_chains': 4
+      }, {
+          'testcase_name': 'LocalLevel',
+          'use_slope': False,
+          'num_chains': ()
+      }, {
+          'testcase_name': 'LocalLevel_4chains',
+          'use_slope': False,
+          'num_chains': 4
+      })
+  def test_forecasts_match_reference(self, use_slope, num_chains):
     seed = test_util.test_seed()
     num_observed_steps = 5
     num_forecast_steps = 4
+    num_results = 10000
+
+    # Dividing the number of results with number of chains so we sample the same
+    # total number of MCMC samples.
+    if not tf.nest.is_nested(num_chains):
+      num_results = num_results // num_chains
+
     model, observed_time_series, is_missing = self._build_test_model(
         num_timesteps=num_observed_steps + num_forecast_steps,
         true_slope_scale=0.5 if use_slope else None,
         batch_shape=[3])
 
-    samples = tf.function(
-        lambda: gibbs_sampler.fit_with_gibbs_sampling(  # pylint: disable=g-long-lambda
-            model, tfp.sts.MaskedTimeSeries(
-                observed_time_series[..., :num_observed_steps, tf.newaxis],
-                is_missing[..., :num_observed_steps]),
-            num_results=10000, num_warmup_steps=100, seed=seed))()
+    @tf.function(autograph=False)
+    def do_sampling():
+      return gibbs_sampler.fit_with_gibbs_sampling(
+          model,
+          tfp.sts.MaskedTimeSeries(
+              observed_time_series[..., :num_observed_steps, tf.newaxis],
+              is_missing[..., :num_observed_steps]),
+          num_chains=num_chains,
+          num_results=num_results,
+          num_warmup_steps=100,
+          seed=seed)
+
+    samples = self.evaluate(do_sampling())
+
+    def reshape_chain_and_sample(x):
+      if np.ndim(x) > 2:
+        return np.reshape(x, [x.shape[0] * x.shape[1], *x.shape[2:]])
+      return x
+
+    if not tf.nest.is_nested(num_chains):
+      samples = tf.nest.map_structure(reshape_chain_and_sample, samples)
+
     predictive_dist = gibbs_sampler.one_step_predictive(
         model, samples, num_forecast_steps=num_forecast_steps,
         thin_every=1)
@@ -151,10 +189,9 @@ class GibbsSamplerTests(test_util.TestCase):
         parameter_samples=parameter_samples,
         num_steps_forecast=num_forecast_steps)
 
-    reference_forecast_mean = self.evaluate(
-        reference_forecast_dist.mean()[..., 0])
-    reference_forecast_stddev = self.evaluate(
-        reference_forecast_dist.stddev()[..., 0])
+    reference_forecast_mean, reference_forecast_stddev = self.evaluate((
+        reference_forecast_dist.mean()[..., 0],
+        reference_forecast_dist.stddev()[..., 0]))
 
     self.assertAllClose(predictive_mean[..., -num_forecast_steps:],
                         reference_forecast_mean,

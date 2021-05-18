@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 
 __all__ = [
@@ -28,7 +29,9 @@ __all__ = [
 ]
 
 
-class Inline(bijector.Bijector):
+@auto_composite_tensor.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='tfp.bijectors')
+class Inline(bijector.AutoCompositeTensorBijector):
   """Bijector constructed from custom callables.
 
   Example Use:

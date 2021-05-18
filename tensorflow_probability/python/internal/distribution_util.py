@@ -189,6 +189,12 @@ def get_broadcast_shape(*tensors):
   return d_shape
 
 
+def shape_may_be_nontrivial(shape):
+  """Returns `True` if it's possible that `shape` describes a non-scalar."""
+  static_size = tf.get_static_value(tf.size(shape))
+  return (static_size is None) or static_size >= 1
+
+
 def is_diagonal_scale(scale):
   """Returns `True` if `scale` is a `LinearOperator` that is known to be diag.
 

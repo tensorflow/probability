@@ -435,6 +435,28 @@ class BetaTest(test_util.TestCase):
       return tfd.Beta(a, 10).log_prob(.5)
     self.evaluate(tfp.math.value_and_gradient(f, [100.0]))
 
+  def testPdfOutsideSupport(self):
+    def mk_beta(c1, c0):
+      return tfd.Beta(c1, c0, force_probs_to_zero_outside_support=True)
+
+    # One or more boundary is +inf for c1<1 | c0<1.
+    self.assertAllFinite(mk_beta(1., .9).log_prob(0.))
+    self.assertAllEqual(mk_beta(1., .9).log_prob(1.), float('inf'))
+
+    self.assertAllEqual(mk_beta(.9, 1.).log_prob(0.), float('inf'))
+    self.assertAllFinite(mk_beta(.9, 1.).log_prob(1.))
+
+    self.assertAllEqual(mk_beta(.9, .7).log_prob(0.), float('inf'))
+    self.assertAllEqual(mk_beta(.9, .7).log_prob(1.), float('inf'))
+
+    # Both boundaries are non-inf for c1>=1 & c0>=1.
+    self.assertAllFinite(mk_beta(1., 1.).log_prob(0.))
+    self.assertAllFinite(mk_beta(1., 1.).log_prob(1.))
+
+    # Values outside [0,1] are always out of support.
+    self.assertAllEqual(mk_beta(1.1, 1.).log_prob(-.1), -float('inf'))
+    self.assertAllEqual(mk_beta(1., 1.1).log_prob(1.1), -float('inf'))
+
 
 if __name__ == '__main__':
   tf.test.main()

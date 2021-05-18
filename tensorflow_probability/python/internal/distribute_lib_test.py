@@ -19,8 +19,8 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.distribute import distribute_lib
-from tensorflow_probability.python.experimental.distribute import distribute_test_lib as test_lib
+from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
@@ -39,7 +39,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     def f(x):
       return x
 
-    f = distribute_lib.make_psum_function(f, self.axis_name, self.axis_name)
+    f = distribute_lib.make_psum_function(f, self.axis_name, self.axis_name,
+                                          out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     out_parts = self.per_replica_to_tensor(self.strategy_run(f, (x,)))
@@ -53,7 +54,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
 
     f_psum = distribute_lib.make_psum_function(f,
                                                (self.axis_name, self.axis_name),
-                                               self.axis_name)
+                                               self.axis_name,
+                                               out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     y = self.shard_values(2 * tf.ones(4))
@@ -64,7 +66,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
 
     f_psum = distribute_lib.make_psum_function(f,
                                                (self.axis_name, self.axis_name),
-                                               None)
+                                               None,
+                                               out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     y = self.shard_values(2 * tf.ones(4))
@@ -74,7 +77,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
 
     f_psum = distribute_lib.make_psum_function(f,
                                                (self.axis_name, self.axis_name),
-                                               None)
+                                               None,
+                                               out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     y = self.shard_values(2 * tf.ones(4))
@@ -83,7 +87,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
 
     self.assertAllEqual(self.evaluate(out_parts), self.evaluate(3 * tf.ones(4)))
 
-    f_psum = distribute_lib.make_psum_function(f, (self.axis_name, None), None)
+    f_psum = distribute_lib.make_psum_function(f, (self.axis_name, None), None,
+                                               out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     y = 2.
@@ -99,7 +104,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
 
     f_psum = distribute_lib.make_psum_function(f,
                                                (self.axis_name, self.axis_name),
-                                               self.axis_name)
+                                               self.axis_name,
+                                               out_dtype=tf.float32)
 
     def f_grad(x, y):
       return tfp.math.value_and_gradient(f_psum, (x, y))[1]
@@ -112,7 +118,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     self.assertAllEqual(self.evaluate(out_grads[1]), tf.ones(4))
 
     f_psum = distribute_lib.make_psum_function(f, (self.axis_name, None),
-                                               self.axis_name)
+                                               self.axis_name,
+                                               out_dtype=tf.float32)
 
     def f_grad2(x, y):
       return tfp.math.value_and_gradient(f_psum, (x, y))[1]
@@ -127,7 +134,7 @@ class ShardedFunctionTest(test_lib.DistributedTest):
 
     f_psum = distribute_lib.make_psum_function(f,
                                                (self.axis_name, self.axis_name),
-                                               None)
+                                               None, out_dtype=tf.float32)
 
     def f_grad3(x, y):
       return tfp.math.value_and_gradient(f_psum, (x, y))[1]
@@ -139,7 +146,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     self.assertAllEqual(self.evaluate(out_grads[0]), tf.ones(4))
     self.assertAllEqual(self.evaluate(out_grads[1]), tf.range(4.))
 
-    f_psum = distribute_lib.make_psum_function(f, (self.axis_name, None), None)
+    f_psum = distribute_lib.make_psum_function(f, (self.axis_name, None), None,
+                                               out_dtype=tf.float32)
 
     def f_grad4(x, y):
       return tfp.math.value_and_gradient(f_psum, (x, y))[1]

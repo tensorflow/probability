@@ -183,6 +183,7 @@ multi_substrate_py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
@@ -197,6 +198,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -541,6 +543,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions/internal:slicing",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:batch_shape_lib",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
@@ -651,7 +654,10 @@ multi_substrate_py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/bijectors:ordered",
         "//tensorflow_probability/python/bijectors:softmax_centered",
+        "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -2344,7 +2350,6 @@ multi_substrate_py_test(
     name = "batch_reshape_test",
     size = "medium",
     srcs = ["batch_reshape_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2401,7 +2406,6 @@ multi_substrate_py_test(
     name = "beta_binomial_test",
     size = "medium",
     srcs = ["beta_binomial_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2417,7 +2421,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["beta_quotient_test.py"],
     jax_size = "large",
-    jax_tags = ["notap"],
     shard_count = 3,
     deps = [
         # numpy dep,
@@ -2578,7 +2581,6 @@ multi_substrate_py_test(
     name = "dirichlet_multinomial_test",
     size = "medium",
     srcs = ["dirichlet_multinomial_test.py"],
-    numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
         # numpy dep,
@@ -2647,7 +2649,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["dpp_test.py"],
     shard_count = 5,
-    tags = ["notap"],
+    tf_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -2677,7 +2679,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["exp_gamma_test.py"],
     jax_size = "large",
-    numpy_tags = ["notap"],
     shard_count = 2,
     deps = [
         ":exp_gamma",
@@ -2804,7 +2805,6 @@ multi_substrate_py_test(
     name = "gaussian_process_regression_model_test",
     srcs = ["gaussian_process_regression_model_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     shard_count = 2,
     deps = [
         ":distributions",
@@ -3039,7 +3039,6 @@ multi_substrate_py_test(
     name = "joint_distribution_coroutine_test",
     size = "medium",
     srcs = ["joint_distribution_coroutine_test.py"],
-    numpy_tags = ["notap"],
     shard_count = 2,
     deps = [
         # numpy dep,
@@ -3081,7 +3080,6 @@ multi_substrate_py_test(
     name = "joint_distribution_util_test",
     size = "medium",
     srcs = ["joint_distribution_util_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -3224,7 +3222,6 @@ multi_substrate_py_test(
     name = "matrix_normal_linear_operator_test",
     size = "medium",
     srcs = ["matrix_normal_linear_operator_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3239,7 +3236,6 @@ multi_substrate_py_test(
     name = "matrix_t_linear_operator_test",
     size = "medium",
     srcs = ["matrix_t_linear_operator_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3303,8 +3299,6 @@ multi_substrate_py_test(
     name = "moyal_test",
     size = "medium",
     srcs = ["moyal_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3389,7 +3383,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "mvn_full_covariance_test",
     srcs = ["mvn_full_covariance_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3475,7 +3468,6 @@ multi_substrate_py_test(
     name = "normal_inverse_gaussian_test",
     size = "medium",
     srcs = ["normal_inverse_gaussian_test.py"],
-    jax_tags = ["notap"],
     shard_count = 2,
     tags = ["tf1-broken"],
     deps = [
@@ -3633,7 +3625,6 @@ multi_substrate_py_test(
     name = "poisson_lognormal_test",
     size = "medium",
     srcs = ["poisson_lognormal_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -3910,7 +3901,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["sigmoid_beta_test.py"],
     jax_size = "large",
-    numpy_tags = ["notap"],
     shard_count = 2,
     deps = [
         ":sigmoid_beta",
@@ -3944,7 +3934,6 @@ multi_substrate_py_test(
     name = "variational_gaussian_process_test",
     size = "medium",
     srcs = ["variational_gaussian_process_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -4031,7 +4020,6 @@ multi_substrate_py_test(
     name = "zipf_test",
     size = "medium",
     srcs = ["zipf_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # numpy dep,
@@ -4047,7 +4035,7 @@ py_test(
     size = "large",
     srcs = ["distribution_properties_test.py"],
     python_version = "PY3",
-    shard_count = 40,
+    shard_count = 50,
     srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
@@ -4201,6 +4189,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:samplers",

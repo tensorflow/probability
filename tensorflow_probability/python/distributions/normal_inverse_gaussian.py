@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -202,22 +200,6 @@ class NormalInverseGaussian(distribution.Distribution):
   def skewness(self):
     """Skewness parameter."""
     return self._skewness
-
-  def _batch_shape_tensor(
-      self, loc=None, scale=None, tailweight=None, skewness=None):
-    loc = self.loc if loc is None else loc
-    scale = self.scale if scale is None else scale
-    tailweight = self.tailweight if tailweight is None else tailweight
-    skewness = self.skewness if skewness is None else skewness
-    return functools.reduce(
-        ps.broadcast_shape,
-        [ps.shape(t) for t in [loc, scale, tailweight, skewness]])
-
-  def _batch_shape(self):
-    tensors = [self.loc, self.scale, self.tailweight, self.skewness]
-    return functools.reduce(
-        ps.broadcast_shape,
-        [ps.shape(t) for t in tensors])
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

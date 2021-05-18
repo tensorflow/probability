@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib
 from tensorflow_probability.python.distributions import categorical as categorical_lib
+from tensorflow_probability.python.distributions import joint_distribution as jd_lib
 from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc_lib
 from tensorflow_probability.python.distributions import sample as sample_lib
 from tensorflow_probability.python.experimental.marginalize.logeinsumexp import logeinsumexp
@@ -216,7 +217,8 @@ class Marginalizable(object):
     num_variables = 0
 
     with tf.name_scope(name):
-      ds, _ = self._flat_sample_distributions()
+      ds = self._call_execute_model(
+          sample_and_trace_fn=jd_lib.trace_distributions_only)
 
       # Both 'marginalize' and 'tabulate' indicate that
       # instead of using samples provided by the user, this method

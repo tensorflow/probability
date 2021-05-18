@@ -468,15 +468,6 @@ class DeterminantalPointProcess(distribution.Distribution):
   def _default_event_space_bijector(self, *args, **kwargs):
     return  # Distribution is discrete.
 
-  def _batch_shape_tensor(self, eigvals=None, eigvecs=None):
-    return ps.broadcast_shape(
-        ps.shape(self.eigenvalues if eigvals is None else eigvals)[:-1],
-        ps.shape(self.eigenvectors if eigvecs is None else eigvecs)[:-2])
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(self.eigenvalues.shape[:-1],
-                                     self.eigenvectors.shape[:-2])
-
   def _event_shape_tensor(self):
     return ps.shape(self._eigenvectors)[-2:-1]
 
@@ -537,7 +528,8 @@ class DeterminantalPointProcess(distribution.Distribution):
     eigvals = tf.convert_to_tensor(self.eigenvalues)
     eigvecs = tf.convert_to_tensor(self.eigenvectors)
 
-    batch_shape = self._batch_shape_tensor(eigvals=eigvals, eigvecs=eigvecs)
+    batch_shape = self._batch_shape_tensor(
+        eigenvalues=eigvals, eigenvectors=eigvecs)
     ground_set_size = ps.shape(eigvecs)[-2]
     vecs_size = ps.shape(eigvecs)[-1]
 

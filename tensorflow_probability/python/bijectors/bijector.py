@@ -1567,13 +1567,18 @@ class Bijector(tf.Module):
     identifies the keys of parameters that are expected to be tensors, except
     those that are shape-related.
     """
-    pnames = ()
-    for p in self.parameters.keys():
-      if p in self._composite_tensor_shape_params:
-        continue
-      if tf.is_tensor(getattr(self, p, None)):
-        pnames += (p,)
-    return pnames
+    try:
+      return tuple(k for k, v in self.parameter_properties().items()
+                   if not v.specifies_shape)
+    except NotImplementedError:
+      # Attempt to find parameters heuristically.
+      pnames = ()
+      for p in self.parameters.keys():
+        if p in self._composite_tensor_shape_params:
+          continue
+        if tf.is_tensor(getattr(self, p, None)):
+          pnames += (p,)
+      return pnames
 
   @property
   def _composite_tensor_shape_params(self):
@@ -1586,7 +1591,11 @@ class Bijector(tf.Module):
     tensors, so that they can be collected appropriately in CompositeTensor but
     not in JAX applications.
     """
-    return ()
+    try:
+      return tuple(k for k, v in self.parameter_properties().items()
+                   if v.specifies_shape)
+    except NotImplementedError:
+      return ()
 
 
 class AutoCompositeTensorBijector(

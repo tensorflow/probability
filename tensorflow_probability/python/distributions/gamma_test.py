@@ -890,6 +890,19 @@ class GammaSamplingTest(test_util.TestCase):
             concentration_np,
             rate_np), axis=(0, 2))[..., np.newaxis], rtol=1e-3)
 
+  def testPdfOutsideSupport(self):
+    def mk_gamma(c):
+      return tfd.Gamma(c, 1, force_probs_to_zero_outside_support=True)
+    self.assertAllEqual(mk_gamma(.99).log_prob(-.1), -float('inf'))
+    self.assertAllEqual(mk_gamma(.99).log_prob(0), float('inf'))
+    self.assertAllGreater(mk_gamma(.99).log_prob(0.1), -float('inf'))
+    self.assertAllEqual(mk_gamma(1).log_prob(-.1), -float('inf'))
+    self.assertAllClose(mk_gamma(1).log_prob(0), 0.)
+    self.assertAllGreater(mk_gamma(1).log_prob(.1), -float('inf'))
+    self.assertAllEqual(mk_gamma(1.01).log_prob(-.1), -float('inf'))
+    self.assertAllEqual(mk_gamma(1.01).log_prob(0), -float('inf'))
+    self.assertAllGreater(mk_gamma(1.01).log_prob(.1), -float('inf'))
+
 
 if __name__ == '__main__':
   tf.test.main()

@@ -903,6 +903,11 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           potential_energy=tf.zeros_like(pre_swap_replica_target_log_prob),
       )
 
+  def experimental_with_shard_axes(self, shard_axes):
+    def new_make_kernel_fn(tlp):
+      return self.make_kernel_fn(tlp).experimental_with_shard_axes(shard_axes)
+    return self.copy(make_kernel_fn=new_make_kernel_fn)
+
 
 def _make_replica_target_log_prob_fn(
     target_log_prob_fn,

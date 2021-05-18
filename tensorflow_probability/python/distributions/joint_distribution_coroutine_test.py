@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 import warnings
 
 # Dependency imports
@@ -759,6 +760,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertEqual(lp.shape, [7, 9])
 
   @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 
@@ -822,8 +824,8 @@ class JointDistributionCoroutineTest(test_util.TestCase):
                         (grads[0].shape, grads[1].shape))
     self.assertAllNotNone(grads)
 
-  @test_util.jax_disable_test_missing_functionality(
-      'Graph tensors are unsupported in JAX backend.')
+  @test_util.jax_disable_test_missing_functionality('Graph tensors')
+  @test_util.numpy_disable_test_missing_functionality('Graph tensors')
   def test_cache_doesnt_leak_graph_tensors(self):
     if not tf.executing_eagerly():
       return
@@ -1187,6 +1189,89 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     samp = self.evaluate(d.experimental_pin([None, 7.5]).sample_unpinned(
         seed=test_util.test_seed()))
     self.assertAllClose(samp.c + 7.5, samp.a, atol=3e-3)
+
+  @test_util.numpy_disable_gradient_test
+  def test_unnormalized_log_prob(self):
+    def model_fn():
+      c1 = yield Root(tfd.Gamma(1.2, 1.3, name='c1'))
+      c0 = yield Root(tfd.Gamma(1.4, 1.5, name='c0'))
+      yield tfd.BetaBinomial(concentration1=c1, concentration0=c0,
+                             total_count=100, name='successes')
+
+    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+
+    c1 = tf.constant(2.1)
+    c0 = tf.constant(3.1)
+    successes = tf.constant(30.)  # Treated as conditioning.
+
+    def desired_unnorm_lp(c1, c0):
+      c1_unnorm = tf.math.xlogy(1.2 - 1., c1) - 1.3 * c1
+      c0_unnorm = tf.math.xlogy(1.4 - 1., c0) - 1.5 * c0
+      bb_unnorm = (tfp.math.lbeta(c1 + successes, 100 + c0 - successes)
+                   - tfp.math.lbeta(c1, c0))
+      return c1_unnorm + c0_unnorm + bb_unnorm
+
+    self.assertAllCloseNested(
+        tfp.math.value_and_gradient(
+            lambda c1, c0: d.log_prob(c1, c0, successes), (c1, c0))[1],
+        tfp.math.value_and_gradient(
+            desired_unnorm_lp, (c1, c0))[1])
+
+    # TODO(b/187925322): This portion is aspirational.
+    # actual = d.unnormalized_log_prob(c1=c1, c0=c0, successes=successes)
+    # self.assertAllClose(desired_unnorm_lp(c1, c0), actual)
+
+    self.assertAllCloseNested(
+        tfp.math.value_and_gradient(
+            lambda c1, c0: d.log_prob(c1, c0, successes),
+            (c1, c0))[1],
+        tfp.math.value_and_gradient(
+            lambda c1, c0: d.unnormalized_log_prob(c1, c0, successes),
+            (c1, c0))[1])
+
+  @test_util.numpy_disable_gradient_test
+  def test_unnormalized_log_prob_trainable_prior(self):
+
+    def model_fn(cprior):
+      c1 = yield Root(tfd.Gamma(cprior, 1.3, name='c1'))
+      c0 = yield Root(tfd.Gamma(cprior, 1.5, name='c0'))
+      yield tfd.BetaBinomial(concentration1=c1, concentration0=c0,
+                             total_count=100, name='successes')
+
+    successes = tf.constant(30.)  # Treated as conditioning.
+
+    def lp_fn(cprior, c1, c0):
+      d = tfd.JointDistributionCoroutine(functools.partial(model_fn, cprior),
+                                         validate_args=True)
+      return d.log_prob(c1, c0, successes)
+
+    def ulp_fn(cprior, c1, c0):
+      d = tfd.JointDistributionCoroutine(functools.partial(model_fn, cprior),
+                                         validate_args=True)
+      return d.unnormalized_log_prob(c1, c0, successes)
+
+    cprior = tf.constant(1.2)
+    c1 = tf.constant(2.1)
+    c0 = tf.constant(3.1)
+
+    def desired_unnorm_lp(cprior, c1, c0):
+      c1_unnorm = tfd.Gamma(cprior, 1.3).log_prob(c1)
+      c0_unnorm = tfd.Gamma(cprior, 1.5).log_prob(c0)
+      bb_unnorm = (tfp.math.lbeta(c1 + successes, 100 + c0 - successes)
+                   - tfp.math.lbeta(c1, c0))
+      return c1_unnorm + c0_unnorm + bb_unnorm
+
+    self.assertAllCloseNested(
+        tfp.math.value_and_gradient(lp_fn, (cprior, c1, c0))[1],
+        tfp.math.value_and_gradient(desired_unnorm_lp, (cprior, c1, c0))[1])
+
+    # TODO(b/187925322): This portion is aspirational.
+    # actual = d.unnormalized_log_prob(c1=c1, c0=c0, successes=successes)
+    # self.assertAllClose(desired_unnorm_lp(cprior, c1, c0), actual)
+
+    self.assertAllCloseNested(
+        tfp.math.value_and_gradient(lp_fn, (cprior, c1, c0))[1],
+        tfp.math.value_and_gradient(ulp_fn, (cprior, c1, c0))[1])
 
 
 if __name__ == '__main__':

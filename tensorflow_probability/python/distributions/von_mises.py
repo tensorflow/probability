@@ -170,15 +170,6 @@ class VonMises(distribution.Distribution):
     """Distribution parameter for the concentration."""
     return self._concentration
 
-  def _batch_shape_tensor(self, loc=None, concentration=None):
-    return ps.broadcast_shape(
-        ps.shape(self.loc if loc is None else loc),
-        ps.shape(self.concentration if concentration is None
-                 else concentration))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.shape, self.concentration.shape)
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -591,7 +582,7 @@ def _von_mises_sample_fwd(shape, concentration, seed):
   return samples, (concentration, samples)
 
 
-def _von_mises_sample_bwd(aux, dy):
+def _von_mises_sample_bwd(_, aux, dy):
   """The gradient of the von Mises samples w.r.t. concentration."""
   concentration, samples = aux
   broadcast_concentration = tf.broadcast_to(concentration, ps.shape(samples))

@@ -53,6 +53,7 @@ FILENAMES = [
     "private",
     "random_generators",
     "raw_ops",
+    "resource_variable_ops",
     "sets_lib",
     "sparse_lib",
     "tensor_array_ops",
