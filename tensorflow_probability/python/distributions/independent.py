@@ -99,12 +99,12 @@ class Independent(distribution_lib.Distribution):
 
   """
 
-  @deprecation.deprecated_arg_values(
-      '2022-03-01',
-      'Please pass an integer value for `reinterpreted_batch_ndims`. The '
-      'current behavior corresponds to `reinterpreted_batch_ndims=tf.size('
-      'distribution.batch_shape_tensor()) - 1`.',
-      reinterpreted_batch_ndims=None)
+  # @deprecation.deprecated_arg_values(
+  #     '2022-03-01',
+  #     'Please pass an integer value for `reinterpreted_batch_ndims`. The '
+  #     'current behavior corresponds to `reinterpreted_batch_ndims=tf.size('
+  #     'distribution.batch_shape_tensor()) - 1`.',
+  #     reinterpreted_batch_ndims=None)
   def __init__(self,
                distribution,
                reinterpreted_batch_ndims=None,
