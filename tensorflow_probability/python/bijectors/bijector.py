@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import abc
 import contextlib
+import functools
 
 # Dependency imports
 import numpy as np
@@ -1618,6 +1619,13 @@ class AutoCompositeTensorBijector(
   ```
   """
   pass
+
+
+auto_composite_tensor_bijector = functools.partial(
+    auto_composite_tensor.auto_composite_tensor,
+    omit_kwargs=('parameters',),
+    non_identifying_kwargs=('name',),
+    module_name='tfp.bijectors')
 
 
 def check_valid_ndims(ndims, validate=True):

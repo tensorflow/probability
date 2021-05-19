@@ -138,8 +138,7 @@ class _Invert(bijector_lib.Bijector):
     return self.bijector.inverse_event_ndims(event_ndims, **kwargs)
 
 
-@auto_composite_tensor.auto_composite_tensor(
-    omit_kwargs=('name', 'parameters'), module_name='tfp.bijectors')
+@bijector_lib.auto_composite_tensor_bijector
 class Invert(_Invert, auto_composite_tensor.AutoCompositeTensor):
 
   def __new__(cls, *args, **kwargs):

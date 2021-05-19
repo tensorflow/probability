@@ -24,7 +24,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import invert
-from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -45,8 +44,7 @@ def unique_token_set(source_structure):
   return flat_token_set
 
 
-@auto_composite_tensor.auto_composite_tensor(
-    omit_kwargs=('name',), module_name='tfp.bijectors')
+@bijector.auto_composite_tensor_bijector
 class Restructure(bijector.AutoCompositeTensorBijector):
   """Converts between nested structures of Tensors.
 

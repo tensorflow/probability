@@ -30,8 +30,7 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(
-    omit_kwargs=('name',), module_name='tfp.bijectors')
+@bijector.auto_composite_tensor_bijector
 class Expm1(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = exp(X) - 1`.
 
@@ -95,8 +94,7 @@ class Expm1(bijector.AutoCompositeTensorBijector):
 
 # TODO(b/182603117): Remove `AutoCompositeTensor` when `Invert` subclasses
 # `AutoCompositeTensor`.
-@auto_composite_tensor.auto_composite_tensor(
-    omit_kwargs=('name',), module_name='tfp.bijectors')
+@bijector.auto_composite_tensor_bijector
 class Log1p(invert.Invert, auto_composite_tensor.AutoCompositeTensor):
   """Compute `Y = log1p(X)`. This is `Invert(Expm1())`."""
 
