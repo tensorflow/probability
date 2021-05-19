@@ -30,6 +30,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -493,7 +494,9 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     @tfd.JointDistributionCoroutineAutoBatched
     def dist():
       x = yield tfd.Normal(loc=tf.zeros([3]), scale=1., name='x')
-      yield tfd.Bernoulli(logits=tf.einsum('n->', x), name='y')
+      if ps.rank(x) != 1:
+        raise ValueError('Unexpected shape.')
+      yield tfd.Bernoulli(logits=tf.reduce_sum(x), name='y')
 
     for sample_shape in [(), 1, [1], [1, 1], [2]]:
       self.assertAllEqual(
