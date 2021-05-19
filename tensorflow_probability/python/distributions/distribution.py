@@ -23,6 +23,7 @@ import collections
 import contextlib
 import functools
 import inspect
+import logging
 import types
 
 import decorator
@@ -275,40 +276,61 @@ class _DistributionMeta(abc.ABCMeta):
       return super(_DistributionMeta, mcs).__new__(
           mcs, classname, baseclasses, attrs)
 
-    # Subclasses shouldn't inherit their parents' `_parameter_properties`,
-    # since (in general) they'll have different parameters. Exceptions (for
-    # convenience) are:
+    # Warn when a subclass inherits `_parameter_properties` from its parent
+    # (this is unsafe, since the subclass will in general have different
+    # parameters). Exceptions are:
     #  - Subclasses that don't define their own `__init__` (handled above by
     #    the short-circuit when `default_init is None`).
     #  - Subclasses that define a passthrough `__init__(self, *args, **kwargs)`.
-    #  - Direct children of `Distribution`, since the inherited method just
-    #    raises a NotImplementedError.
+    # pylint: disable=protected-access
     init_argspec = tf_inspect.getfullargspec(default_init)
     if ('_parameter_properties' not in attrs
-        and base != Distribution
         # Passthrough exception: may only take `self` and at least one of
         # `*args` and `**kwargs`.
         and (len(init_argspec.args) > 1
              or not (init_argspec.varargs or init_argspec.varkw))):
-      # TODO(b/183457779) remove warning and raise `NotImplementedError`.
-      attrs['_parameter_properties'] = deprecation.deprecated(
-          date='2021-07-01',
-          instructions="""
-Calling `_parameter_properties` on subclass {classname} that redefines the
-parent ({basename}) `__init__` is unsafe and will raise an error in the future.
-Please implement an explicit `_parameter_properties` for the subclass. If the
-subclass `__init__` takes the same parameters as the parent, you may use the
-placeholder implementation:
 
-  @classmethod
-  def _parameter_properties(cls, dtype, num_classes=None):
-    return {basename}._parameter_properties(
-        dtype=dtype, num_classes=num_classes)
+      @functools.wraps(base._parameter_properties)
+      def wrapped_properties(*args, **kwargs):  # pylint: disable=missing-docstring
+        """Wrapper to warn if `parameter_properties` is inherited."""
+        properties = base._parameter_properties(*args, **kwargs)
+        # Warn *after* calling the base method, so that we don't bother warning
+        # if it just raised NotImplementedError anyway.
+        logging.warning("""
+Distribution subclass %s inherits `_parameter_properties from its parent (%s)
+while also redefining `__init__`. The inherited annotations cover the following
+parameters: %s. It is likely that these do not match the subclass parameters.
+This may lead to errors when computing batch shapes, slicing into batch
+dimensions, calling `.copy()`, flattening the distribution as a CompositeTensor
+(e.g., when it is passed or returned from a `tf.function`), and possibly other
+cases. The recommended pattern for distribution subclasses is to define a new
+`_parameter_properties` method with the subclass parameters, and to store the
+corresponding parameter values as `self._parameters` in `__init__`, after
+calling the superclass constructor:
 
-""".format(classname=classname,
-           basename=base.__name__))(base._parameter_properties)
+```
+class MySubclass(tfd.SomeDistribution):
 
-    # pylint: disable=protected-access
+  def __init__(self, param_a, param_b):
+    parameters = dict(locals())
+    # ... do subclass initialization ...
+    super(MySubclass, self).__init__(**base_class_params)
+    # Ensure that the subclass (not base class) parameters are stored.
+    self._parameters = parameters
+
+  def _parameter_properties(self, dtype, num_classes=None):
+    return dict(
+      # Annotations may optionally specify properties, such as `event_ndims`,
+      # `default_constraining_bijector_fn`, `specifies_shape`, etc.; see
+      # the `ParameterProperties` documentation for details.
+      param_a=tfp.util.ParameterProperties(),
+      param_b=tfp.util.ParameterProperties())
+```
+""", classname, base.__name__, str(properties.keys()))
+        return properties
+
+      attrs['_parameter_properties'] = wrapped_properties
+
     # For a comparison of different methods for wrapping functions, see:
     # https://hynek.me/articles/decorators/
     @decorator.decorator
@@ -656,10 +678,7 @@ class Distribution(_BaseDistribution):
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     raise NotImplementedError(
-        '_parameter_properties` is not implemented: {}. '
-        'Note that subclasses that redefine `__init__` are not assumed to '
-        'share parameters with their parent class and must provide a separate '
-        'implementation.'.format(cls.__name__))
+        '_parameter_properties` is not implemented: {}.'.format(cls.__name__))
 
   @classmethod
   def parameter_properties(cls, dtype=tf.float32, num_classes=None):
