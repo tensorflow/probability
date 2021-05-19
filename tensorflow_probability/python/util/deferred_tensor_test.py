@@ -621,9 +621,9 @@ class DeferredTensorSpecTest(test_util.TestCase):
     expected = (
         "_TransformedVariableSpec(input_spec=TensorSpec(shape=(4, 2), "
         "dtype=tf.float32, name=None), "
-        "transform_or_spec=Sigmoid_ACTTypeSpec(2, {}, "
-        "{'low': None, 'high': None, 'validate_args': True}, ('name',), (), "
-        "{}), dtype=<dtype: 'float64'>, name=None)")
+        "transform_or_spec=Sigmoid_ACTTypeSpec(3, {}, {'low': None, 'high': "
+        "None, 'validate_args': True}, ('name',), (), (), {}), dtype=<dtype: "
+        "'float64'>, name=None)")
     self.assertEqual(repr(spec), expected)
 
 
