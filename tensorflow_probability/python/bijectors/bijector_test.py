@@ -25,7 +25,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
@@ -768,7 +768,7 @@ class ConditionalBijectorTest(test_util.TestCase):
       mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@bijector_lib.auto_composite_tensor_bijector
 class CompositeForwardBijector(tfb.AutoCompositeTensorBijector):
 
   def __init__(self, scale=2., validate_args=False, name=None):
