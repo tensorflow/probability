@@ -21,7 +21,6 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import invert
-from tensorflow_probability.python.internal import auto_composite_tensor
 
 
 __all__ = [
@@ -95,7 +94,7 @@ class Expm1(bijector.AutoCompositeTensorBijector):
 # TODO(b/182603117): Remove `AutoCompositeTensor` when `Invert` subclasses
 # `AutoCompositeTensor`.
 @bijector.auto_composite_tensor_bijector
-class Log1p(invert.Invert, auto_composite_tensor.AutoCompositeTensor):
+class Log1p(invert.Invert):
   """Compute `Y = log1p(X)`. This is `Invert(Expm1())`."""
 
   def __init__(self, validate_args=False, name='log1p'):

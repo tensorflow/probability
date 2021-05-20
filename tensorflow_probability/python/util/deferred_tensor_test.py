@@ -24,6 +24,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.util import deferred_tensor
 from tensorflow.python.ops import resource_variable_ops  # pylint: disable=g-direct-tensorflow-import
@@ -75,7 +76,7 @@ class DeferredTensorTest(test_util.TestCase):
   @test_util.numpy_disable_variable_test
   def test_retains_trainable_variables_from_bijector(self):
     m = tf.Variable(0., name='m')
-    x = tfp.util.DeferredTensor(1., tfb.Scale(m))
+    x = tfp.util.DeferredTensor(1., AutoScale(m))
     self.assertIn(m, x.trainable_variables)
 
   @test_util.jax_disable_variable_test
@@ -447,6 +448,17 @@ def _make_bijector_spec(
   return bijector_class(param)._type_spec
 
 
+AutoScale = auto_composite_tensor.auto_composite_tensor(
+    tfb.Scale, omit_kwargs=('parameters',), non_identifying_kwargs=('name',),
+    module_name=('tfp.bijectors'))
+AutoSigmoid = auto_composite_tensor.auto_composite_tensor(
+    tfb.Sigmoid, omit_kwargs=('parameters',), non_identifying_kwargs=('name',),
+    module_name=('tfp.bijectors'))
+AutoShift = auto_composite_tensor.auto_composite_tensor(
+    tfb.Shift, omit_kwargs=('parameters',), non_identifying_kwargs=('name',),
+    module_name=('tfp.bijectors'))
+
+
 @test_util.test_all_tf_execution_regimes
 @test_util.disable_test_for_backend(
     disable_numpy=True, disable_jax=True,
@@ -457,10 +469,10 @@ class DeferredTensorSpecTest(test_util.TestCase):
       ('TransformedVariableBijector',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, None], tf.float32),
-           transform_or_spec=_make_bijector_spec(tfb.Scale, [3.])),
+           transform_or_spec=_make_bijector_spec(AutoScale, [3.])),
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, None], tf.float32),
-           transform_or_spec=_make_bijector_spec(tfb.Scale, [3.]))),
+           transform_or_spec=_make_bijector_spec(AutoScale, [3.]))),
       ('TranformedVariableCallable',
        _make_transformed_variable_spec(
            input_spec=resource_variable_ops.VariableSpec(None, tf.float64),
@@ -485,11 +497,11 @@ class DeferredTensorSpecTest(test_util.TestCase):
       ('DifferentDtypes',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float64),
-           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
+           transform_or_spec=AutoSigmoid(validate_args=True)._type_spec,
            dtype=tf.float64),
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float32),
-           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+           transform_or_spec=AutoSigmoid(validate_args=True)._type_spec)),
       ('DifferentCallables',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float64),
@@ -513,10 +525,10 @@ class DeferredTensorSpecTest(test_util.TestCase):
       ('TransformedVariableBijector',
        _make_transformed_variable_spec(
            input_spec=resource_variable_ops.VariableSpec([4, 2], tf.float32),
-           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec),
+           transform_or_spec=AutoSigmoid(validate_args=True)._type_spec),
        _make_transformed_variable_spec(
            input_spec=resource_variable_ops.VariableSpec([4, 2], tf.float32),
-           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+           transform_or_spec=AutoSigmoid(validate_args=True)._type_spec)),
       ('TransformedVariableCallable',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float32),
@@ -535,11 +547,11 @@ class DeferredTensorSpecTest(test_util.TestCase):
       ('DifferentDtypes',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float32),
-           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
+           transform_or_spec=AutoSigmoid(validate_args=True)._type_spec,
            dtype=tf.float64),
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float32),
-           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+           transform_or_spec=AutoSigmoid(validate_args=True)._type_spec)),
       ('DifferentCallables',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float64),
@@ -561,15 +573,15 @@ class DeferredTensorSpecTest(test_util.TestCase):
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float32),
            transform_or_spec=_make_bijector_spec(
-               tfb.Shift, [[2.]], use_variable=True, variable_shape=[1, 1])),
+               AutoShift, [[2.]], use_variable=True, variable_shape=[1, 1])),
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float32),
            transform_or_spec=_make_bijector_spec(
-               tfb.Shift, [[3.]], use_variable=True, variable_shape=[1, None])),
+               AutoShift, [[3.]], use_variable=True, variable_shape=[1, None])),
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float32),
            transform_or_spec=_make_bijector_spec(
-               tfb.Shift, [[3.]], use_variable=True, variable_shape=[1, None]))
+               AutoShift, [[3.]], use_variable=True, variable_shape=[1, None]))
        ),
       ('TransformedVariableCallable',
        _make_transformed_variable_spec(
@@ -590,11 +602,11 @@ class DeferredTensorSpecTest(test_util.TestCase):
       ('DifferentDtypes',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([], tf.float32),
-           transform_or_spec=tfb.Sigmoid()._type_spec,
+           transform_or_spec=AutoSigmoid()._type_spec,
            dtype=tf.float64),
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([], tf.float32),
-           transform_or_spec=tfb.Sigmoid()._type_spec)),
+           transform_or_spec=AutoSigmoid()._type_spec)),
       ('DifferentCallables',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float64),
@@ -613,18 +625,19 @@ class DeferredTensorSpecTest(test_util.TestCase):
     with self.assertRaises(ValueError):
       v2.most_specific_compatible_type(v1)
 
-  def testRepr(self):
-    spec = _make_transformed_variable_spec(
-        input_spec=tf.TensorSpec([4, 2], tf.float32),
-        transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
-        dtype=tf.float64)
-    expected = (
-        "_TransformedVariableSpec(input_spec=TensorSpec(shape=(4, 2), "
-        "dtype=tf.float32, name=None), "
-        "transform_or_spec=Sigmoid_ACTTypeSpec(3, {}, {'low': None, 'high': "
-        "None, 'validate_args': True, 'name': 'sigmoid'}, ('parameters',), (), "
-        "('name',), {}), dtype=<dtype: 'float64'>, name=None)")
-    self.assertEqual(repr(spec), expected)
+      # Disable test for TFP 0.13 release, in which bijectors are not AutoCT.
+  # def testRepr(self):
+  #   spec = _make_transformed_variable_spec(
+  #       input_spec=tf.TensorSpec([4, 2], tf.float32),
+  #       transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
+  #       dtype=tf.float64)
+  #   expected = (
+  #       "_TransformedVariableSpec(input_spec=TensorSpec(shape=(4, 2), "
+  #       "dtype=tf.float32, name=None), "
+  #       "transform_or_spec=Sigmoid_ACTTypeSpec(3, {}, {'low': None, 'high': "
+  #       "None, 'validate_args': True, 'name': 'sigmoid'}, ('parameters',), (), "  # pylint: disable=line-too-long
+  #       "('name',), {}), dtype=<dtype: 'float64'>, name=None)")
+  #   self.assertEqual(repr(spec), expected)
 
 
 if __name__ == '__main__':
