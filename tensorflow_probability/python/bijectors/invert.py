@@ -21,14 +21,14 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
-# from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 __all__ = [
     'Invert',
 ]
 
 
-class Invert(bijector_lib.Bijector):
+class _Invert(bijector_lib.Bijector):
   """Bijector which inverts another Bijector.
 
   Example Use: [ExpGammaDistribution (see Background & Context)](
@@ -73,7 +73,7 @@ class Invert(bijector_lib.Bijector):
     name = name or '_'.join(['invert', bijector.name])
     with tf.name_scope(name) as name:
       self._bijector = bijector
-      super(Invert, self).__init__(
+      super(_Invert, self).__init__(
           forward_min_event_ndims=bijector.inverse_min_event_ndims,
           inverse_min_event_ndims=bijector.forward_min_event_ndims,
           dtype=bijector.dtype,
@@ -138,28 +138,26 @@ class Invert(bijector_lib.Bijector):
     return self.bijector.inverse_event_ndims(event_ndims, **kwargs)
 
 
-# Temporarily removing AutoCompositeTensor for TFP 0.13 release.
-# pylint: disable=line-too-long
-# @bijector_lib.auto_composite_tensor_bijector
-# class Invert(_Invert, auto_composite_tensor.AutoCompositeTensor):
+@bijector_lib.auto_composite_tensor_bijector
+class Invert(_Invert, auto_composite_tensor.AutoCompositeTensor):
 
-#   def __new__(cls, *args, **kwargs):
-#     """Returns an `_Invert` instance if `bijector` is not a `CompositeTensor."""
-#     if cls is Invert:
-#       if args:
-#         bijector = args[0]
-#       elif 'bijector' in kwargs:
-#         bijector = kwargs['bijector']
-#       else:
-#         raise TypeError('`Invert.__new__()` is missing argument `bijector`.')
+  def __new__(cls, *args, **kwargs):
+    """Returns an `_Invert` instance if `bijector` is not a `CompositeTensor."""
+    if cls is Invert:
+      if args:
+        bijector = args[0]
+      elif 'bijector' in kwargs:
+        bijector = kwargs['bijector']
+      else:
+        raise TypeError('`Invert.__new__()` is missing argument `bijector`.')
 
-#       if not isinstance(bijector, tf.__internal__.CompositeTensor):
-#         return _Invert(*args, **kwargs)
-#     return super(Invert, cls).__new__(cls)
+      if not isinstance(bijector, tf.__internal__.CompositeTensor):
+        return _Invert(*args, **kwargs)
+    return super(Invert, cls).__new__(cls)
 
 
-# Invert.__doc__ = _Invert.__doc__ + '/n' + (
-#     'When an `Invert` bijector is constructed, if its `bijector` arg is not a '
-#     '`CompositeTensor` instance, an `_Invert` instance is returned instead. '
-#     'Bijectors subclasses that inherit from `Invert` will also inherit from '
-#     ' `CompositeTensor`.')
+Invert.__doc__ = _Invert.__doc__ + '/n' + (
+    'When an `Invert` bijector is constructed, if its `bijector` arg is not a '
+    '`CompositeTensor` instance, an `_Invert` instance is returned instead. '
+    'Bijectors subclasses that inherit from `Invert` will also inherit from '
+    ' `CompositeTensor`.')

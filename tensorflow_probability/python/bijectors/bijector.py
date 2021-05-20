@@ -20,7 +20,7 @@ from __future__ import print_function
 
 import abc
 import contextlib
-# import functools
+import functools
 
 # Dependency imports
 import numpy as np
@@ -1599,39 +1599,33 @@ class Bijector(tf.Module):
       return ()
 
 
-# Temporarily disable AutoCT for TFP 0.13 release
-# class AutoCompositeTensorBijector(
-#     Bijector, auto_composite_tensor.AutoCompositeTensor):
-#   r"""Base for `CompositeTensor` bijectors with auto-generated `TypeSpec`s.
+class AutoCompositeTensorBijector(
+    Bijector, auto_composite_tensor.AutoCompositeTensor):
+  r"""Base for `CompositeTensor` bijectors with auto-generated `TypeSpec`s.
 
-#   `CompositeTensor` objects are able to pass in and out of `tf.function` and
-#   `tf.while_loop`, or serve as part of the signature of a TF saved model.
-#   `Bijector` subclasses that follow the contract of
-#   `tfp.experimental.auto_composite_tensor` may be defined as `CompositeTensor`s  # pylint: disable=line-too-long
-#   by inheriting from `AutoCompositeTensorBijector` and applying a class
-#   decorator as shown here:
+  `CompositeTensor` objects are able to pass in and out of `tf.function` and
+  `tf.while_loop`, or serve as part of the signature of a TF saved model.
+  `Bijector` subclasses that follow the contract of
+  `tfp.experimental.auto_composite_tensor` may be defined as `CompositeTensor`s
+  by inheriting from `AutoCompositeTensorBijector` and applying a class
+  decorator as shown here:
 
-#   ```python
-#   @tfp.experimental.auto_composite_tensor(
-#     omit_kwargs=('name',), module_name='my_module')
-#   class MyBijector(tfb.AutoCompositeTensorBijector):
+  ```python
+  @tfp.experimental.auto_composite_tensor(
+    omit_kwargs=('name',), module_name='my_module')
+  class MyBijector(tfb.AutoCompositeTensorBijector):
 
-#     # The remainder of the subclass implementation is unchanged.
-#   ```
-#   """
-#   pass
-
-
-# auto_composite_tensor_bijector = functools.partial(
-#     auto_composite_tensor.auto_composite_tensor,
-#     omit_kwargs=('parameters',),
-#     non_identifying_kwargs=('name',),
-#     module_name='tfp.bijectors')
-
-AutoCompositeTensorBijector = Bijector
+    # The remainder of the subclass implementation is unchanged.
+  ```
+  """
+  pass
 
 
-auto_composite_tensor_bijector = lambda cls, **kwargs: cls
+auto_composite_tensor_bijector = functools.partial(
+    auto_composite_tensor.auto_composite_tensor,
+    omit_kwargs=('parameters',),
+    non_identifying_kwargs=('name',),
+    module_name='tfp.bijectors')
 
 
 def check_valid_ndims(ndims, validate=True):

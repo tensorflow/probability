@@ -28,13 +28,14 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import experimental
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.bijectors import invert as invert_lib
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-# from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
 TF2_FRIENDLY_BIJECTORS = (
@@ -185,7 +186,6 @@ AUTOVECTORIZATION_ATOL.update({
 
 COMPOSITE_TENSOR_IS_BROKEN = [
     'BatchNormalization',  # tf.layers arg
-    'Inline',  # callable
     'RationalQuadraticSpline',  # TODO(b/185628453): Debug loss of static info.
 ]
 
@@ -204,7 +204,7 @@ AUTO_COMPOSITE_TENSOR_IS_BROKEN = [
 
 
 def is_invert(bijector):
-  return isinstance(bijector, tfb.Invert)
+  return isinstance(bijector, (tfb.Invert, invert_lib._Invert))
 
 
 def is_transform_diagonal(bijector):
@@ -244,8 +244,8 @@ def broadcasting_params(draw,
 
 
 # TODO(b/141098791): Eliminate this.
-# @experimental.auto_composite_tensor
-class CallableModule(tf.Module):  # , experimental.AutoCompositeTensor):
+@experimental.auto_composite_tensor
+class CallableModule(tf.Module, experimental.AutoCompositeTensor):
   """Convenience object for capturing variables closed over by Inline."""
 
   def __init__(self, fn, varobj):
@@ -887,16 +887,38 @@ class BijectorPropertiesTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testCompositeTensor(self, bijector_name, data):
-    # Test that making a composite tensor of this bijector doesn't throw any
-    # errors.
+
     bijector, event_dim = self._draw_bijector(
-        bijector_name, data, batch_shape=[],
+        bijector_name, data,
+        batch_shape=[],
+        validate_args=True,
         allowed_bijectors=(set(TF2_FRIENDLY_BIJECTORS) -
                            set(COMPOSITE_TENSOR_IS_BROKEN)))
-    composite_bij = experimental.as_composite(bijector)
+
+    if type(bijector) is invert_lib._Invert:  # pylint: disable=unidiomatic-typecheck
+      if isinstance(bijector.bijector, tf.__internal__.CompositeTensor):
+        raise TypeError('`_Invert` should wrap only non-`CompositeTensor` '
+                        'bijectors.')
+      self.skipTest('`_Invert` bijectors are not `CompositeTensor`s.')
+
+    # TODO(b/182603117): Remove "if" condition and s/composite_bij/bijector
+    # when AutoCT is enabled for meta-bijectors and LinearOperator.
+    if type(bijector).__name__ in AUTO_COMPOSITE_TENSOR_IS_BROKEN:
+      composite_bij = experimental.as_composite(bijector)
+    else:
+      composite_bij = bijector
+
+    if not tf.executing_eagerly():
+      composite_bij = tf.nest.map_structure(
+          lambda x: (tf.convert_to_tensor(x)  # pylint: disable=g-long-lambda
+                     if isinstance(x, DeferredTensor) else x),
+          composite_bij,
+          expand_composites=True)
+
+    self.assertIsInstance(composite_bij, tf.__internal__.CompositeTensor)
     flat = tf.nest.flatten(composite_bij, expand_composites=True)
-    unflat = tf.nest.pack_sequence_as(composite_bij, flat,
-                                      expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        composite_bij, flat, expand_composites=True)
 
     # Compare forward maps before and after compositing.
     n = 3
@@ -910,6 +932,26 @@ class BijectorPropertiesTest(test_util.TestCase):
     before_xs = bijector.inverse(ys)
     after_xs = unflat.inverse(ys)
     self.assertAllClose(*self.evaluate((before_xs, after_xs)))
+
+    # Input to tf.function
+    self.assertAllClose(
+        before_ys,
+        tf.function(lambda b: b.forward(xs))(composite_bij),
+        rtol=COMPOSITE_TENSOR_RTOL[bijector_name],
+        atol=COMPOSITE_TENSOR_ATOL[bijector_name])
+
+    # Forward mapping: Check differentiation through forward mapping with
+    # respect to the input and parameter variables.  Also check that any
+    # variables are not referenced overmuch.
+    xs = self._draw_domain_tensor(bijector, data, event_dim)
+    wrt_vars = [xs] + [v for v in composite_bij.trainable_variables
+                       if v.dtype.is_floating]
+    with tf.GradientTape() as tape:
+      tape.watch(wrt_vars)
+      # TODO(b/73073515): Fix graph mode gradients with bijector caching.
+      ys = bijector.forward(xs + 0)
+    grads = tape.gradient(ys, wrt_vars)
+    assert_no_none_grad(bijector, 'forward', wrt_vars, grads)
 
 
 def ensure_nonzero(x):

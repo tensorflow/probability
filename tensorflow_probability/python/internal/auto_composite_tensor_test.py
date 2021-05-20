@@ -22,7 +22,7 @@ import functools
 import os
 
 from absl import flags
-# from absl.testing import absltest
+from absl.testing import absltest
 from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf
@@ -63,10 +63,6 @@ AutoIndependent = tfp.experimental.auto_composite_tensor(
     tfd.Independent, non_identifying_kwargs=('name',))
 AutoReshape = tfp.experimental.auto_composite_tensor(
     tfb.Reshape, non_identifying_kwargs=('name',))
-AutoScale = tfp.experimental.auto_composite_tensor(
-    tfb.Scale, non_identifying_kwargs=('name',))
-AutoTransformDiagonal = tfp.experimental.auto_composite_tensor(
-    tfb.TransformDiagonal, non_identifying_kwargs=('name',))
 
 
 class Model(tf.Module):
@@ -75,9 +71,9 @@ class Model(tf.Module):
     self.scale = tf.Variable([0., 1.], shape=[None])
 
   @tf.function(input_signature=(
-      AutoScale([1., 2.], validate_args=True)._type_spec,))
+      tfb.Scale([1., 2.], validate_args=True)._type_spec,))
   def make_bij(self, b):
-    return AutoScale(
+    return tfb.Scale(
         tf.convert_to_tensor(self.scale) + b.scale,
         validate_args=True)
 
@@ -318,7 +314,7 @@ class AutoCompositeTensorTest(test_util.TestCase):
     tf.saved_model.save(m1, os.path.join(path, 'saved_model1'))
     m2 = tf.saved_model.load(os.path.join(path, 'saved_model1'))
     self.evaluate(m2.scale.initializer)
-    b = AutoScale([5., 9.], validate_args=True)
+    b = tfb.Scale([5., 9.], validate_args=True)
     self.evaluate(m2.make_bij(b).forward(2.))
     self.evaluate(m2.scale.assign(m2.scale + [1., 2.]))
     self.evaluate(m2.make_bij(b).forward(2.))
@@ -330,20 +326,19 @@ class AutoCompositeTensorTest(test_util.TestCase):
     with self.assertRaisesOpError('compatible shape'):
       self.evaluate(m3.make_bij(b).forward([3.]))
 
-      # Test disabled for 0.13 release.
-#   def test_saved_model_from_disk(self):
+  def test_saved_model_from_disk(self):
 
-#     test_srcdir = absltest.get_default_test_srcdir()
-#     relative_testdata_path = os.path.join(
-#         TFP_PYTHON_DIR, 'internal/testdata/auto_composite_tensor')
-#     absolute_testdata_path = os.path.join(test_srcdir, relative_testdata_path)
+    test_srcdir = absltest.get_default_test_srcdir()
+    relative_testdata_path = os.path.join(
+        TFP_PYTHON_DIR, 'internal/testdata/auto_composite_tensor')
+    absolute_testdata_path = os.path.join(test_srcdir, relative_testdata_path)
 
-#     m = tf.saved_model.load(absolute_testdata_path)
-#     self.evaluate(m.scale.initializer)
-#     b = tfb.Scale([5., 9.], validate_args=True)
-#     self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [10., 20.])
-#     self.evaluate(m.scale.assign(m.scale + [1., 2.]))
-#     self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [12., 24.])
+    m = tf.saved_model.load(absolute_testdata_path)
+    self.evaluate(m.scale.initializer)
+    b = tfb.Scale([5., 9.], validate_args=True)
+    self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [10., 20.])
+    self.evaluate(m.scale.assign(m.scale + [1., 2.]))
+    self.assertAllClose(self.evaluate(m.make_bij(b).forward(2.)), [12., 24.])
 
   def test_callable_arg(self):
 
@@ -389,8 +384,8 @@ class AutoCompositeTensorTest(test_util.TestCase):
   def test_composite_tensor_callable_arg(self):
     # Parameters that are both `CompositeTensor` and callable should be
     # handled by the `_type_spec` as `CompositeTensor`.
-    inner_bij = AutoScale([[1., 3.]], validate_args=True)
-    bij = AutoTransformDiagonal(inner_bij, validate_args=True)
+    inner_bij = tfb.Scale([[1., 3.]], validate_args=True)
+    bij = tfb.TransformDiagonal(inner_bij, validate_args=True)
     self.assertLen(tf.nest.flatten(bij), 1)
     self.assertLen(bij._type_spec._callable_params, 0)  # pylint: disable=protected-access
     self.assertIn('diag_bijector', bij._type_spec._param_specs)  # pylint: disable=protected-access
@@ -459,13 +454,13 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('WithCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': AutoScale(3.)._type_spec},
+                        'b': tfb.Scale(3.)._type_spec},
            omit_kwargs=('name', 'foo'),
            prefer_static_value=('a',),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': AutoScale(3.)._type_spec},
+                        'b': tfb.Scale(3.)._type_spec},
            omit_kwargs=('name', 'foo'),
            prefer_static_value=('a',),
            callable_params={'f': tf.math.exp})),
@@ -537,13 +532,13 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('WithCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': AutoScale(
+                        'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
            omit_kwargs=('name', 'foo'),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': AutoScale(3.)._type_spec},
+                        'b': tfb.Scale(3.)._type_spec},
            omit_kwargs=('name', 'foo'),
            callable_params={'f': tf.math.exp})),
       ('DifferentNonIdentifyingKwargsValues',
@@ -586,13 +581,13 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('DifferentCallables',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': AutoScale(
+                        'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
            omit_kwargs=('name', 'foo'),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': AutoScale(3.)._type_spec},
+                        'b': tfb.Scale(3.)._type_spec},
            omit_kwargs=('name', 'foo'),
            callable_params={'f': tf.math.sigmoid}))
       )
@@ -614,16 +609,16 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('WithCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec(None, tf.float32),
-                        'b': AutoScale(
+                        'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': AutoScale(tf.Variable(3.))._type_spec},
+                        'b': tfb.Scale(tf.Variable(3.))._type_spec},
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec(None, tf.float32),
-                        'b': AutoScale(
+                        'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
            callable_params={'f': tf.math.exp})),
       )
@@ -649,12 +644,12 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('DifferentCallables',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec(None, tf.float32),
-                        'b': AutoScale(
+                        'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': AutoScale(tf.Variable(3.))._type_spec},
+                        'b': tfb.Scale(tf.Variable(3.))._type_spec},
            callable_params={'f': tf.math.softplus})),
       )
   def testMostSpecificCompatibleTypeException(self, v1, v2):
@@ -671,7 +666,7 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('WithCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec(None, tf.float32),
-                        'b': AutoScale(
+                        'b': tfb.Scale(
                             tf.Variable(2., shape=None))._type_spec},
            callable_params={'f': tf.math.exp})),
       )
