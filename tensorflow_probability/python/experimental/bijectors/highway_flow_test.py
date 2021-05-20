@@ -51,6 +51,23 @@ class HighwayFlowTests(test_util.TestCase):
         -bijector.inverse_log_det_jacobian(
           tf.identity(bijector.forward(x)), event_ndims=dim + 1))
 
+  def testBijectorIsDeterministicGivenSeed(self):
+    width = 2
+
+    x = samplers.uniform((width,), minval=-1.,
+                         maxval=1.,
+                         seed=test_util.test_seed(sampler_type='stateless'))
+
+    bijector1 = tfp.experimental.bijectors.build_highway_flow_layer(
+      width, activation_fn=True, seed=test_util.test_seed(sampler_type='stateless'))
+    bijector2 = tfp.experimental.bijectors.build_highway_flow_layer(
+      width, activation_fn=True, seed=test_util.test_seed(sampler_type='stateless'))
+    self.evaluate(
+      [v.initializer for v in bijector1.trainable_variables])
+    self.evaluate(
+      [v.initializer for v in bijector2.trainable_variables])
+    self.assertAllClose(bijector1.forward(x), bijector2.forward(x))
+
   def testBijectorWithoutActivation(self):
     width = 4
     x = samplers.uniform((2, width, width),
