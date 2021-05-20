@@ -37,6 +37,7 @@ py_library(
         ":sp500_closing_prices",
         ":synthetic_item_response_theory",
         ":synthetic_log_gaussian_cox_process",
+        ":synthetic_plasma_spectroscopy",
     ],
 )
 
@@ -84,6 +85,16 @@ py_library(
 py_library(
     name = "convection_lorenz_bridge",
     srcs = ["convection_lorenz_bridge.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "synthetic_plasma_spectroscopy",
+    srcs = ["synthetic_plasma_spectroscopy.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,

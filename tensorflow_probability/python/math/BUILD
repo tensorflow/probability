@@ -273,7 +273,6 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["interpolation_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
