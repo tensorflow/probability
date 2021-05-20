@@ -29,11 +29,13 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import gradient
 # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation
@@ -1069,6 +1071,151 @@ class Bijector(tf.Module):
         self.forward_min_event_ndims, tf.TensorShape,
         self._inverse_event_shape(output_shape))
 
+  def _get_x_event_ndims(self, x_event_ndims=None, y_event_ndims=None):
+    if x_event_ndims is None:
+      if y_event_ndims is not None:
+        x_event_ndims = self.inverse_event_ndims(y_event_ndims)
+      else:  # Default to `min_event_ndims` if not explicitly specified.
+        return self.forward_min_event_ndims
+    elif y_event_ndims is not None:
+      raise ValueError(
+          'Only one of `x_event_ndims` and `y_event_ndims` may be specified.')
+    return x_event_ndims
+
+  def _batch_shape(self, x_event_ndims):
+    if not self._params_event_ndims():
+      # Skip requirement for a unique difference in event ndims if this bijector
+      # wouldn't have batch shape anyway.
+      return tensorshape_util.constant_value_as_shape([])
+
+    # Infer batch shape from annotations returned by `_parameter_properties()`.
+    # Batch shape inference assumes that the provided and minimum event ndims
+    # differ by the same amount in all parts. Bijectors with multiple
+    # independent parts will need to override this method, or inherit from a
+    # class (such as Composition) that does so.
+    return batch_shape_lib.inferred_batch_shape(
+        self,
+        additional_event_ndims=_unique_difference(x_event_ndims,
+                                                  self.forward_min_event_ndims))
+
+  def experimental_batch_shape(self, x_event_ndims=None, y_event_ndims=None):
+    """Returns the batch shape of this bijector for inputs of the given rank.
+
+    The batch shape of a bijector decribes the set of distinct
+    transformations it represents on events of a given size. For example: the
+    bijector `tfb.Scale([1., 2.])` has batch shape `[2]` for scalar events
+    (`event_ndims = 0`), because applying it to a scalar event produces
+    two scalar outputs, the result of two different scaling transformations.
+    The same bijector has batch shape `[]` for vector events, because applying
+    it to a vector produces (via elementwise multiplication) a single vector
+    output.
+
+    Bijectors that operate independently on multiple state parts, such as
+    `tfb.JointMap`, must broadcast to a coherent batch shape. Some events may
+    not be valid: for example, the bijector
+    `tfd.JointMap([tfb.Scale([1., 2.]), tfb.Scale([1., 2., 3.])])` does not
+    produce a valid batch shape when `event_ndims = [0, 0]`, since the batch
+    shapes of the two parts are inconsistent. The same bijector
+    does define valid batch shapes of `[]`, `[2]`, and `[3]` if `event_ndims`
+    is `[1, 1]`, `[0, 1]`, or `[1, 0]`, respectively.
+
+    Since transforming a single event produces a scalar log-det-Jacobian, the
+    batch shape of a bijector with non-constant Jacobian is expected to equal
+    the shape of `forward_log_det_jacobian(x, event_ndims=x_event_ndims)`
+    or `inverse_log_det_jacobian(y, event_ndims=y_event_ndims)`, for `x`
+    or `y` of the specified `ndims`.
+
+    Args:
+      x_event_ndims: Optional Python `int` (structure) number of dimensions in
+        a probabilistic event passed to `forward`; this must be greater than
+        or equal to `self.forward_min_event_ndims`. If `None`, defaults to
+        `self.forward_min_event_ndims`. Mutually exclusive with `y_event_ndims`.
+        Default value: `None`.
+      y_event_ndims: Optional Python `int` (structure) number of dimensions in
+        a probabilistic event passed to `inverse`; this must be greater than
+        or equal to `self.inverse_min_event_ndims`. Mutually exclusive with
+        `x_event_ndims`.
+        Default value: `None`.
+    Returns:
+      batch_shape: `TensorShape` batch shape of this bijector for a
+        value with the given event rank. May be unknown or partially defined.
+    """
+    x_event_ndims = self._get_x_event_ndims(x_event_ndims, y_event_ndims)
+    # Cache batch shape to avoid the overhead of recomputing it.
+    if not hasattr(self, '_cached_batch_shapes'):
+      self._cached_batch_shapes = self._no_dependency({})
+    key = _deep_tuple(x_event_ndims)  # Avoid hashing lists/dicts.
+    if key not in self._cached_batch_shapes:
+      self._cached_batch_shapes[key] = self._batch_shape(x_event_ndims)
+    return self._cached_batch_shapes[key]
+
+  def _batch_shape_tensor(self, x_event_ndims):
+    if not self._params_event_ndims():
+      # Skip requirement for a unique difference in event ndims if this bijector
+      # wouldn't have batch shape anyway.
+      return []
+
+    # Infer batch shape from annotations returned by `_parameter_properties()`.
+    # Batch shape inference assumes that the provided and minimum event ndims
+    # differ by the same amount in all parts. Bijectors with multiple
+    # independent parts will need to override this method, or inherit from a
+    # class (such as Composition) that does so.
+    return batch_shape_lib.inferred_batch_shape_tensor(
+        self, additional_event_ndims=_unique_difference(
+            x_event_ndims, self.forward_min_event_ndims))
+
+  def experimental_batch_shape_tensor(self,
+                                      x_event_ndims=None,
+                                      y_event_ndims=None):
+    """Returns the batch shape of this bijector for inputs of the given rank.
+
+    The batch shape of a bijector decribes the set of distinct
+    transformations it represents on events of a given size. For example: the
+    bijector `tfb.Scale([1., 2.])` has batch shape `[2]` for scalar events
+    (`event_ndims = 0`), because applying it to a scalar event produces
+    two scalar outputs, the result of two different scaling transformations.
+    The same bijector has batch shape `[]` for vector events, because applying
+    it to a vector produces (via elementwise multiplication) a single vector
+    output.
+
+    Bijectors that operate independently on multiple state parts, such as
+    `tfb.JointMap`, must broadcast to a coherent batch shape. Some events may
+    not be valid: for example, the bijector
+    `tfd.JointMap([tfb.Scale([1., 2.]), tfb.Scale([1., 2., 3.])])` does not
+    produce a valid batch shape when `event_ndims = [0, 0]`, since the batch
+    shapes of the two parts are inconsistent. The same bijector
+    does define valid batch shapes of `[]`, `[2]`, and `[3]` if `event_ndims`
+    is `[1, 1]`, `[0, 1]`, or `[1, 0]`, respectively.
+
+    Since transforming a single event produces a scalar log-det-Jacobian, the
+    batch shape of a bijector with non-constant Jacobian is expected to equal
+    the shape of `forward_log_det_jacobian(x, event_ndims=x_event_ndims)`
+    or `inverse_log_det_jacobian(y, event_ndims=y_event_ndims)`, for `x`
+    or `y` of the specified `ndims`.
+
+    Args:
+      x_event_ndims: Optional Python `int` (structure) number of dimensions in
+        a probabilistic event passed to `forward`; this must be greater than
+        or equal to `self.forward_min_event_ndims`. If `None`, defaults to
+        `self.forward_min_event_ndims`. Mutually exclusive with `y_event_ndims`.
+        Default value: `None`.
+      y_event_ndims: Optional Python `int` (structure) number of dimensions in
+        a probabilistic event passed to `inverse`; this must be greater than
+        or equal to `self.inverse_min_event_ndims`. Mutually exclusive with
+        `x_event_ndims`.
+        Default value: `None`.
+    Returns:
+      batch_shape_tensor: integer `Tensor` batch shape of this bijector for a
+        value with the given event rank.
+    """
+    with tf.name_scope('experimental_batch_shape_tensor'):
+      x_event_ndims = self._get_x_event_ndims(x_event_ndims, y_event_ndims)
+      # Try to get the static batch shape.
+      batch_shape = self.experimental_batch_shape(x_event_ndims=x_event_ndims)
+      if not tensorshape_util.is_fully_defined(batch_shape):
+        batch_shape = self._batch_shape_tensor(x_event_ndims)
+      return batch_shape
+
   @classmethod
   def _parameter_properties(cls, dtype):
     raise NotImplementedError(
@@ -1108,6 +1255,7 @@ class Bijector(tf.Module):
     return {
         param_name: param.event_ndims
         for param_name, param in cls.parameter_properties().items()
+        if param.event_ndims is not None
     }
 
   def _forward(self, x):
@@ -1968,3 +2116,22 @@ def _autodiff_log_det_jacobian(fn, x):
     raise ValueError('Cannot compute log det jacobian; function {} has `None` '
                      'gradient.'.format(fn))
   return tf.math.log(tf.abs(grads))
+
+
+def _unique_difference(structure1, structure2):
+  differences = [a - b
+                 for a, b in
+                 zip(tf.nest.flatten(structure1), tf.nest.flatten(structure2))]
+  if all([d == differences[0] for d in differences]):
+    return differences[0]
+  raise ValueError('Could not find unique difference between {} and {}'
+                   .format(structure1, structure2))
+
+
+def _deep_tuple(x):
+  """Converts nested `tuple`, `list`, or `dict` to nested `tuple`."""
+  if hasattr(x, 'keys'):
+    return _deep_tuple(tuple(x.items()))
+  elif isinstance(x, (list, tuple)):
+    return tuple(map(_deep_tuple, x))
+  return x

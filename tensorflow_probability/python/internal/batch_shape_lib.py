@@ -32,7 +32,7 @@ __all__ = [
 ]
 
 
-def inferred_batch_shape(batch_object):
+def inferred_batch_shape(batch_object, additional_event_ndims=0):
   """Infers an object's batch shape from its  parameters.
 
   Each parameter contributes a batch shape of
@@ -51,12 +51,19 @@ def inferred_batch_shape(batch_object):
       `batched_object.parameter_properties()` and expose a dict
       `batched_object.parameters` of the parameters passed to its
       constructor.
+    additional_event_ndims: Optional integer value to add to the
+      annotated `event_ndims` property for all parameters. For Bijectors, this
+      is the unique difference between the user-provided `event_ndims` and
+      the bijector's inherent `min_event_ndims` (on which the parameter
+      annotations are based).
+      Default value: `0`.
   Returns:
     batch_shape: `tf.TensorShape` broadcast batch shape of all parameters; may
         be partially defined or unknown.
   """
   batch_shapes = batch_shape_parts(
       batch_object,
+      additional_event_ndims=additional_event_ndims,
       get_base_shape_fn=get_base_shape,
       slice_batch_shape_fn=slice_batch_shape)
   return functools.reduce(tf.broadcast_static_shape,
@@ -64,7 +71,9 @@ def inferred_batch_shape(batch_object):
                           tf.TensorShape([]))
 
 
-def inferred_batch_shape_tensor(batch_object, **parameter_kwargs):
+def inferred_batch_shape_tensor(batch_object,
+                                additional_event_ndims=0,
+                                **parameter_kwargs):
   """Infers an object's batch shape from its  parameters.
 
   Each parameter contributes a batch shape of
@@ -83,6 +92,12 @@ def inferred_batch_shape_tensor(batch_object, **parameter_kwargs):
       `batched_object.parameter_properties()` and expose a dict
       `batched_object.parameters` of the parameters passed to its
       constructor.
+    additional_event_ndims: Optional integer value to add to the
+      annotated `event_ndims` property for all parameters. For Bijectors, this
+      is the unique difference between the user-provided `event_ndims` and
+      the bijector's inherent `min_event_ndims` (on which the parameter
+      annotations are based).
+      Default value: `0`.
     **parameter_kwargs: Optional keyword arguments overriding parameter
       values in `batch_object.parameters`. Typically this is used to avoid
       multiple Tensor conversions of the same value.
@@ -94,6 +109,7 @@ def inferred_batch_shape_tensor(batch_object, **parameter_kwargs):
       tf.nest.flatten(
           batch_shape_parts(
               batch_object,
+              additional_event_ndims=additional_event_ndims,
               get_base_shape_fn=get_base_shape_tensor,
               slice_batch_shape_fn=slice_batch_shape_tensor,
               **parameter_kwargs)),
@@ -104,9 +120,6 @@ def get_base_shape_tensor(x):
   """Extracts an object's runtime (Tensor) shape for batch shape inference."""
   if hasattr(x, 'batch_shape_tensor'):  # `x` is a distribution or linop.
     return x.batch_shape_tensor()
-  elif hasattr(x, 'forward'):  # `x` is a bijector.
-    # TODO(b/174778703): annotate batch shapes for bijectors.
-    raise NotImplementedError('Bijector batch shapes are not implemented.')
   elif hasattr(x, 'shape') and tensorshape_util.is_fully_defined(x.shape):
     return x.shape
   return tf.shape(x)
@@ -118,9 +131,6 @@ def get_base_shape(x):
     return tf.TensorShape(x.batch_shape)
   elif hasattr(x, 'shape'):  # `x` is a Tensor or ndarray.
     return tf.TensorShape(x.shape)
-  elif hasattr(x, 'forward'):  # `x` is a bijector.
-    # TODO(b/174778703): annotate batch shapes for bijectors.
-    return tf.TensorShape(None)
   # `x` is a Python list, tuple, or literal.
   return tf.TensorShape(np.array(x).shape)
 
@@ -150,6 +160,7 @@ def slice_batch_shape(base_shape, event_ndims):
 
 
 def batch_shape_parts(batch_object,
+                      additional_event_ndims=0,
                       get_base_shape_fn=get_base_shape,
                       slice_batch_shape_fn=slice_batch_shape,
                       **parameter_kwargs):
@@ -175,6 +186,12 @@ def batch_shape_parts(batch_object,
       `batched_object.parameter_properties()` and expose a dict
       `batched_object.parameters` of the parameters passed to its
       constructor.
+    additional_event_ndims: Optional integer value to add to the
+      annotated `event_ndims` property for all parameters. For Bijectors, this
+      is the unique difference between the user-provided `event_ndims` and
+      the bijector's inherent `min_event_ndims` (on which the parameter
+      annotations are based).
+      Default value: `0`.
     get_base_shape_fn: Optional `callable` taking a parameter value (which
       may be a `Tensor`, or an instance of `tfd.Distribution`, `tfb.Bijector`,
       etc.) and returning its batch shape, if it has one, and otherwise its
@@ -229,7 +246,7 @@ def batch_shape_parts(batch_object,
         event_ndims,
         lambda p, nd: slice_batch_shape_fn(  # pylint: disable=g-long-lambda
             base_shape=get_base_shape_fn(p),
-            event_ndims=nd),
+            event_ndims=nd + additional_event_ndims),
         param,
         event_ndims)
 

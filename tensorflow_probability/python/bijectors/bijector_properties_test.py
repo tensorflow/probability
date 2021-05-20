@@ -30,13 +30,14 @@ from tensorflow_probability.python import experimental
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.bijectors import invert as invert_lib
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 TF2_FRIENDLY_BIJECTORS = (
     'Ascending',
@@ -701,6 +702,21 @@ class BijectorPropertiesTest(test_util.TestCase):
       self.assertTrue(bijector._is_constant_jacobian)
       self.assertAllEqual(ldj, 0.)
 
+    # Verify correctness of batch shape.
+    xs_batch_shapes = tf.nest.map_structure(
+        lambda x, nd: ps.shape(x)[:ps.rank(x) - nd],
+        xs,
+        bijector.inverse_event_ndims(event_ndims))
+    empirical_batch_shape = functools.reduce(
+        ps.broadcast_shape,
+        nest.flatten_up_to(bijector.forward_min_event_ndims, xs_batch_shapes))
+    batch_shape = bijector.experimental_batch_shape(y_event_ndims=event_ndims)
+    if tensorshape_util.is_fully_defined(batch_shape):
+      self.assertAllEqual(empirical_batch_shape, batch_shape)
+    self.assertAllEqual(empirical_batch_shape,
+                        bijector.experimental_batch_shape_tensor(
+                            y_event_ndims=event_ndims))
+
     # Check that the outputs of forward_dtype and inverse_dtype match the dtypes
     # of the outputs of forward and inverse.
     self.assertAllEqualNested(ys.dtype, bijector.forward_dtype(xs.dtype))
@@ -737,8 +753,8 @@ class BijectorPropertiesTest(test_util.TestCase):
     # Extract the full shape of an output from this bijector.
     xs = self._draw_domain_tensor(bijector, data, event_dim)
     ys = bijector.forward(xs)
-    output_shape = prefer_static.shape(ys)
-    sample_and_batch_ndims = (prefer_static.rank_from_shape(output_shape) -
+    output_shape = ps.shape(ys)
+    sample_and_batch_ndims = (ps.rank_from_shape(output_shape) -
                               bijector.inverse_min_event_ndims)
 
     try:
@@ -761,7 +777,7 @@ class BijectorPropertiesTest(test_util.TestCase):
                       'parameter {}.'.format(bijector_name, param_name))
       self.assertGreaterEqual(
           param.event_ndims,
-          prefer_static.rank_from_shape(param_shape) - sample_and_batch_ndims)
+          ps.rank_from_shape(param_shape) - sample_and_batch_ndims)
 
       if param.is_preferred:
         try:
@@ -827,7 +843,7 @@ class BijectorPropertiesTest(test_util.TestCase):
     event_ndims = data.draw(
         hps.integers(
             min_value=bijector.forward_min_event_ndims,
-            max_value=prefer_static.rank_from_shape(xs.shape) - 1))
+            max_value=ps.rank_from_shape(xs.shape) - 1))
     fldj_fn = functools.partial(bijector.forward_log_det_jacobian,
                                 event_ndims=event_ndims)
     vectorized_fldj = tf.vectorized_map(fldj_fn, xs,
@@ -848,7 +864,7 @@ class BijectorPropertiesTest(test_util.TestCase):
     event_ndims = data.draw(
         hps.integers(
             min_value=bijector.inverse_min_event_ndims,
-            max_value=prefer_static.rank_from_shape(ys.shape) - 1))
+            max_value=ps.rank_from_shape(ys.shape) - 1))
     ildj_fn = functools.partial(bijector.inverse_log_det_jacobian,
                                 event_ndims=event_ndims)
     vectorized_ildj = tf.vectorized_map(ildj_fn, ys,
