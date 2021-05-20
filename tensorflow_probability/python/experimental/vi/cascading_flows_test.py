@@ -35,73 +35,59 @@ tfd = tfp.distributions
 @test_util.test_all_tf_execution_regimes
 class _TrainableCFSurrogate(object):
 
-  def _expected_num_trainable_variables(self, prior_dist):
+  def _expected_num_trainable_variables(self, prior_dist, num_layers):
     """Infers the expected number of trainable variables for a non-nested JD."""
     prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
     expected_num_trainable_variables = 0
+
+    # For each distribution in the prior, we will have one highway flow with
+    # `num_layers` blocks, and each block has 4 trainable variables:
+    # `residual_fraction`, `lower_diagonal_weights_matrix`,
+    # `upper_diagonal_weights_matrix` and `bias`.
     for original_dist in prior_dists:
-      try:
-        original_dist = original_dist.distribution
-      except AttributeError:
-        pass
-      dist = cascading_flows._as_substituted_distribution(original_dist)
-      dist_params = dist.parameters
-      for param, value in dist_params.items():
-        if (param not in cascading_flows._NON_STATISTICAL_PARAMS
-            and value is not None and param not in ('low', 'high')):
-          # One variable each for prior_weight, mean_field_parameter.
-          expected_num_trainable_variables += 2
+      expected_num_trainable_variables += (4 * num_layers)
     return expected_num_trainable_variables
 
   def test_dims_and_gradients(self):
 
     prior_dist = self.make_prior_dist()
-
+    num_layers = 3
     surrogate_posterior = tfp.experimental.vi.build_cf_surrogate_posterior(
-        prior=prior_dist)
+        prior=prior_dist, num_layers=num_layers)
 
     # Test that the correct number of trainable variables are being tracked
     self.assertLen(surrogate_posterior.trainable_variables,
-                   self._expected_num_trainable_variables(prior_dist))
+                   self._expected_num_trainable_variables(prior_dist, num_layers))
 
     # Test that the sample shape is correct
-    '''three_posterior_samples = surrogate_posterior.sample(
-        3, seed=test_util.test_seed(sampler_type='stateless'))
+    three_posterior_samples = surrogate_posterior.sample(
+        3, seed=1)
     three_prior_samples = prior_dist.sample(
-        3, seed=test_util.test_seed(sampler_type='stateless'))
+        3, seed=1)
     self.assertAllEqualNested(
         [s.shape for s in tf.nest.flatten(three_prior_samples)],
         [s.shape for s in tf.nest.flatten(three_posterior_samples)])
 
-    # Test that gradients are available wrt the variational parameters.
-   posterior_sample = surrogate_posterior.sample(
-        seed=1)
-    with tf.GradientTape() as tape:
-      posterior_logprob = surrogate_posterior.log_prob(posterior_sample)
-    grad = tape.gradient(posterior_logprob,
-                         surrogate_posterior.trainable_variables)
-    self.assertTrue(all(g is not None for g in grad))'''
-
-  '''def test_initialization_is_deterministic_following_seed(self):
+  def test_initialization_is_deterministic_following_seed(self):
     prior_dist = self.make_prior_dist()
 
     surrogate_posterior = tfp.experimental.vi.build_cf_surrogate_posterior(
         prior=prior_dist,
-        seed=test_util.test_seed(sampler_type='stateless'))
+        seed=1)
     self.evaluate(
         [v.initializer for v in surrogate_posterior.trainable_variables])
     posterior_sample = surrogate_posterior.sample(
-        seed=test_util.test_seed(sampler_type='stateless'))
+        seed=1)
 
     surrogate_posterior2 = tfp.experimental.vi.build_cf_surrogate_posterior(
         prior=prior_dist,
-        seed=test_util.test_seed(sampler_type='stateless'))
+        seed=1)
     self.evaluate(
         [v.initializer for v in surrogate_posterior2.trainable_variables])
     posterior_sample2 = surrogate_posterior2.sample(
-        seed=test_util.test_seed(sampler_type='stateless'))
+        seed=1)
 
-    self.assertAllEqualNested(posterior_sample, posterior_sample2)'''
+    self.assertAllEqualNested(posterior_sample, posterior_sample2)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -172,7 +158,6 @@ class CFSurrogatePosteriorTestBrownianMotion(test_util.TestCase,
     _ = self.evaluate(posterior_mean)
     _ = self.evaluate(posterior_stddev)'''
 
-
 @test_util.test_all_tf_execution_regimes
 class CFSurrogatePosteriorTestEightSchools(test_util.TestCase,
                                              _TrainableCFSurrogate):
@@ -235,7 +220,7 @@ class CFSurrogatePosteriorTestHalfNormal(test_util.TestCase,
     return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
 
 
-@test_util.test_all_tf_execution_regimes
+'''@test_util.test_all_tf_execution_regimes
 class CFSurrogatePosteriorTestDiscreteLatent(
     test_util.TestCase, _TrainableCFSurrogate):
 
@@ -344,7 +329,7 @@ class TestCFDistributionSubstitution(test_util.TestCase):
                           tfd.Normal)
     self.assertIsInstance(surrogate_dists.local_scale.distribution,
                           tfd.Normal)
-    self.assertIsInstance(surrogate_dists.weights, tfd.Normal)
+    self.assertIsInstance(surrogate_dists.weights, tfd.Normal)'''
 
 # TODO(kateslin): Add an ASVI surrogate posterior test for gamma distributions.
 # TODO(kateslin): Add an ASVI surrogate posterior test with for a model with
