@@ -50,6 +50,7 @@ __all__ = ["LinearOperatorComposition"]
 
 
 # @tf_export("linalg.LinearOperatorComposition")
+# @linear_operator.make_composite_tensor
 class LinearOperatorComposition(linear_operator.LinearOperator):
   """Composes one or more `LinearOperators`.
 
@@ -304,6 +305,10 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
     for operator in solve_order_list[1:]:
       solution = operator.solve(solution, adjoint=adjoint)
     return solution
+
+  @property
+  def _composite_tensor_fields(self):
+    return ("operators",)
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg

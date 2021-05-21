@@ -43,21 +43,28 @@ import contextlib
 import numpy as np
 import six
 
+from tensorflow_probability.python.internal.backend.numpy import composite_tensor
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
+from tensorflow_probability.python.internal.backend.numpy import tensor_spec
 # from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python.internal.backend.numpy import type_spec
 from tensorflow_probability.python.internal.backend.numpy import ops as module
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as linalg_ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math_ops
+from tensorflow_probability.python.internal.backend.numpy import resource_variable_ops
+from tensorflow_probability.python.internal.backend.numpy import variables
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as linalg
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_algebra
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_util
 from absl import logging as logging
+from tensorflow_probability.python.internal.backend.numpy import data_structures
 from tensorflow_probability.python.internal.backend.numpy import deprecation
 # from tensorflow_probability.python.internal.backend.numpy import dispatch
+from tensorflow_probability.python.internal.backend.numpy import nest
 # from tensorflow.python.util.tf_export import tf_export
 
 __all__ = ["LinearOperator"]
@@ -66,7 +73,7 @@ __all__ = ["LinearOperator"]
 # TODO(langmore) Use matrix_solve_ls for singular or non-square matrices.
 # @tf_export("linalg.LinearOperator")
 @six.add_metaclass(abc.ABCMeta)
-class LinearOperator(module.Module):
+class LinearOperator(module.Module, composite_tensor.CompositeTensor):
   """Base class defining a [batch of] linear operator[s].
 
   Subclasses of `LinearOperator` provide access to common methods on a
@@ -1175,6 +1182,201 @@ class LinearOperator(module.Module):
                            ops.is_tensor(t)):
         raise ValueError("Graph parent item %d is not a Tensor; %s." % (i, t))
     self._graph_parents = graph_parents
+
+  @property
+  def _composite_tensor_fields(self):
+    """A tuple of parameter names to rebuild the `LinearOperator`.
+
+    The tuple contains the names of kwargs to the `LinearOperator`'s constructor
+    that the `TypeSpec` needs to rebuild the `LinearOperator` instance.
+
+    "is_non_singular", "is_self_adjoint", "is_positive_definite", and
+    "is_square" are common to all `LinearOperator` subclasses and may be
+    omitted.
+    """
+    return ()
+
+  @property
+  def _composite_tensor_prefer_static_fields(self):
+    """A tuple of names referring to parameters that may be treated statically.
+
+    This is a subset of `_composite_tensor_fields`, and contains the names of
+    of `Tensor`-like args to the `LinearOperator`s constructor that may be
+    stored as static values, if they are statically known. These are typically
+    shapes or axis values.
+    """
+    return ()
+
+  @property
+  def _type_spec(self):
+    # This property will be overwritten by the `@make_composite_tensor`
+    # decorator. However, we need it so that a valid subclass of the `ABCMeta`
+    # class `CompositeTensor` can be constructed and passed to the
+    # `@make_composite_tensor` decorator.
+    pass
+
+
+class _LinearOperatorSpec(type_spec.TypeSpec):
+  """A tf.TypeSpec for `LinearOperator` objects."""
+
+  __slots__ = ("_param_specs", "_non_tensor_params", "_prefer_static_fields")
+
+  def __init__(self, param_specs, non_tensor_params, prefer_static_fields):
+    """Initializes a new `_LinearOperatorSpec`.
+
+    Args:
+      param_specs: Python `dict` of `tf.TypeSpec` instances that describe
+        kwargs to the `LinearOperator`'s constructor that are `Tensor`-like or
+        `CompositeTensor` subclasses.
+      non_tensor_params: Python `dict` containing non-`Tensor` and non-
+        `CompositeTensor` kwargs to the `LinearOperator`'s constructor.
+      prefer_static_fields: Python `tuple` of strings corresponding to the names
+        of `Tensor`-like args to the `LinearOperator`s constructor that may be
+        stored as static values, if known. These are typically shapes, indices,
+        or axis values.
+    """
+    self._param_specs = param_specs
+    self._non_tensor_params = non_tensor_params
+    self._prefer_static_fields = prefer_static_fields
+
+  @classmethod
+  def from_operator(cls, operator):
+    """Builds a `_LinearOperatorSpec` from a `LinearOperator` instance.
+
+    Args:
+      operator: An instance of `LinearOperator`.
+
+    Returns:
+      linear_operator_spec: An instance of `_LinearOperatorSpec` to be used as
+        the `TypeSpec` of `operator`.
+    """
+    validation_fields = ("is_non_singular", "is_self_adjoint",
+                         "is_positive_definite", "is_square")
+    kwargs = _extract_attrs(
+        operator,
+        keys=set(operator._composite_tensor_fields + validation_fields))  # pylint: disable=protected-access
+
+    non_tensor_params = {}
+    param_specs = {}
+    for k, v in list(kwargs.items()):
+      type_spec_or_v = _extract_type_spec_recursively(v)
+      is_tensor = [isinstance(x, type_spec.TypeSpec)
+                   for x in nest.flatten(type_spec_or_v)]
+      if all(is_tensor):
+        param_specs[k] = type_spec_or_v
+      elif not any(is_tensor):
+        non_tensor_params[k] = v
+      else:
+        raise NotImplementedError(f"Field {k} contains a mix of `Tensor` and "
+                                  f" non-`Tensor` values.")
+
+    return cls(
+        param_specs=param_specs,
+        non_tensor_params=non_tensor_params,
+        prefer_static_fields=operator._composite_tensor_prefer_static_fields)  # pylint: disable=protected-access
+
+  def _to_components(self, obj):
+    return _extract_attrs(obj, keys=list(self._param_specs))
+
+  def _from_components(self, components):
+    kwargs = dict(self._non_tensor_params, **components)
+    return self.value_type(**kwargs)
+
+  @property
+  def _component_specs(self):
+    return self._param_specs
+
+  def _serialize(self):
+    return (self._param_specs,
+            self._non_tensor_params,
+            self._prefer_static_fields)
+
+
+def make_composite_tensor(cls, module_name="tf.linalg"):
+  """Class decorator to convert `LinearOperator`s to `CompositeTensor`."""
+
+  spec_name = "{}Spec".format(cls.__name__)
+  spec_type = type(spec_name, (_LinearOperatorSpec,), {"value_type": cls})
+  type_spec.register("{}.{}".format(module_name, spec_name))(spec_type)
+  cls._type_spec = property(spec_type.from_operator)  # pylint: disable=protected-access
+  return cls
+
+
+def _extract_attrs(op, keys):
+  """Extract constructor kwargs to reconstruct `op`.
+
+  Args:
+    op: A `LinearOperator` instance.
+    keys: A Python `tuple` of strings indicating the names of the constructor
+      kwargs to extract from `op`.
+
+  Returns:
+    kwargs: A Python `dict` of kwargs to `op`'s constructor, keyed by `keys`.
+  """
+
+  kwargs = {}
+  not_found = object()
+  for k in keys:
+    srcs = [
+        getattr(op, k, not_found), getattr(op, "_" + k, not_found),
+        getattr(op, "parameters", {}).get(k, not_found),
+    ]
+    if any(v is not not_found for v in srcs):
+      kwargs[k] = [v for v in srcs if v is not not_found][0]
+    else:
+      raise ValueError(
+          f"Could not determine an appropriate value for field `{k}` in object "
+          f" `{op}`. Looked for \n"
+          f" 1. an attr called `{k}`,\n"
+          f" 2. an attr called `_{k}`,\n"
+          f" 3. an entry in `op.parameters` with key '{k}'.")
+    if k in op._composite_tensor_prefer_static_fields and kwargs[k] is not None:  # pylint: disable=protected-access
+      if ops.is_tensor(kwargs[k]):
+        static_val = (kwargs[k])
+        if static_val is not None:
+          kwargs[k] = static_val
+    if isinstance(kwargs[k], (np.ndarray, np.generic)):
+      kwargs[k] = kwargs[k].tolist()
+  return kwargs
+
+
+def _extract_type_spec_recursively(value):
+  """Return (collection of) `TypeSpec`(s) for `value` if it includes `Tensor`s.
+
+  If `value` is a `Tensor` or `CompositeTensor`, return its `TypeSpec`. If
+  `value` is a collection containing `Tensor` values, recursively supplant them
+  with their respective `TypeSpec`s in a collection of parallel stucture.
+
+  If `value` is none of the above, return it unchanged.
+
+  Args:
+    value: a Python `object` to (possibly) turn into a (collection of)
+    `tf.TypeSpec`(s).
+
+  Returns:
+    spec: the `TypeSpec` or collection of `TypeSpec`s corresponding to `value`
+    or `value`, if no `Tensor`s are found.
+  """
+  if isinstance(value, composite_tensor.CompositeTensor):
+    return value._type_spec  # pylint: disable=protected-access
+  if isinstance(value, variables.Variable):
+    return resource_variable_ops.VariableSpec(
+        tensor_shape.TensorShape(value.shape), dtype=value.dtype, trainable=value.trainable)
+  if ops.is_tensor(value):
+    return tensor_spec.TensorSpec(tensor_shape.TensorShape(value.shape), value.dtype)
+  # Unwrap trackable data structures to comply with `Type_Spec._serialize`
+  # requirements. `ListWrapper`s are converted to `list`s, and for other
+  # trackable data structures, the `__wrapped__` attribute is used.
+  if isinstance(value, list):
+    return list(_extract_type_spec_recursively(v) for v in value)
+  if isinstance(value, data_structures.TrackableDataStructure):
+    return _extract_type_spec_recursively(value.__wrapped__)
+  if isinstance(value, tuple):
+    return type(value)(_extract_type_spec_recursively(x) for x in value)
+  if isinstance(value, dict):
+    return type(value)((k, _extract_type_spec_recursively(v))
+                       for k, v in value.items())
+  return value
 
 
 # Overrides for tf.linalg functions. This allows a LinearOperator to be used in

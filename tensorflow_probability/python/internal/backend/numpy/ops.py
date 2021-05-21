@@ -60,7 +60,6 @@ __all__ = [
     'GradientTape',
     'Module',
     'Tensor',
-    'TensorSpec',
     'Variable',
     # 'gradients',
 ]
@@ -691,13 +690,6 @@ class Tensor(six.with_metaclass(_TensorMeta)):
       '__matmul__',
       '__rmatmul__'
   ))
-
-
-class TensorSpec(object):
-
-  def __init__(self, *args, **kwargs):
-    del args, kwargs
-    self.dtype = None
 
 
 class Module(object):

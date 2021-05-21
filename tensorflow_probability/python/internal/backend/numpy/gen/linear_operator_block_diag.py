@@ -53,6 +53,7 @@ __all__ = ["LinearOperatorBlockDiag"]
 
 
 # @tf_export("linalg.LinearOperatorBlockDiag")
+# @linear_operator.make_composite_tensor
 class LinearOperatorBlockDiag(linear_operator.LinearOperator):
   """Combines one or more `LinearOperators` in to a Block Diagonal matrix.
 
@@ -264,7 +265,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
           is_non_singular=is_non_singular,
           is_self_adjoint=is_self_adjoint,
           is_positive_definite=is_positive_definite,
-          is_square=True,
+          is_square=is_square,
           parameters=parameters,
           name=name)
 
@@ -726,6 +727,10 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
     eig_list = linear_operator_util.broadcast_matrix_batch_dims(eig_list)
     eigs = array_ops.concat(eig_list, axis=-2)
     return array_ops.squeeze(eigs, axis=-1)
+
+  @property
+  def _composite_tensor_fields(self):
+    return ("operators",)
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg
