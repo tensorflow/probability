@@ -259,6 +259,41 @@ class TransformedDistributionTest(test_util.TestCase):
     identity_log_normal.log_prob(
         identity_log_normal.sample([2, 3], seed=test_util.test_seed()))
 
+  def testSampleAndLogprob(self):
+    class ExpForwardOnly(tfb.Bijector):
+
+      def __init__(self):
+        super(ExpForwardOnly, self).__init__(forward_min_event_ndims=0)
+
+      def _forward(self, x):
+        return tf.exp(x)
+
+      def _forward_log_det_jacobian(self, x):
+        return tf.convert_to_tensor(value=x)
+
+    exp_forward_only = ExpForwardOnly()
+
+    mu = 3.0
+    sigma = 0.02
+    log_normal = tfd.TransformedDistribution(
+        distribution=tfd.Normal(loc=mu, scale=sigma),
+        bijector=exp_forward_only)
+
+    sample, log_pdf = self.evaluate(log_normal.experimental_sample_and_log_prob(
+        [2, 3], seed=test_util.test_seed()))
+    expected_log_pdf = stats.lognorm.logpdf(
+        sample, s=sigma, scale=np.exp(mu))
+    self.assertAllClose(expected_log_pdf, log_pdf, rtol=1e-4, atol=0.)
+
+    sample, log_pdf = self.evaluate(
+        log_normal.experimental_sample_and_log_prob(seed=test_util.test_seed()))
+    expected_log_pdf = stats.lognorm.logpdf(
+        sample, s=sigma, scale=np.exp(mu))
+    self.assertAllClose(expected_log_pdf, log_pdf, rtol=1e-4, atol=0.)
+
+    sample2 = self.evaluate(log_normal.sample(seed=test_util.test_seed()))
+    self.assertAllClose(sample, sample2, rtol=1e-4)
+
   def testCachedSamplesInvert(self):
     class ExpInverseOnly(tfb.Bijector):
 

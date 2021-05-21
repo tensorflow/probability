@@ -449,6 +449,7 @@ class Distribution(_BaseDistribution):
   - `_default_event_space_bijector`.
   - `_parameter_properties` (to support automatic batch shape derivation,
     batch slicing and other features).
+  - `_sample_and_log_prob`.
 
   Note that subclasses of existing Distributions that redefine `__init__` do
   *not* automatically inherit
@@ -1166,22 +1167,21 @@ class Distribution(_BaseDistribution):
     raise NotImplementedError('sample_n is not implemented: {}'.format(
         type(self).__name__))
 
-  def _call_sample_n(self, sample_shape, seed, name, **kwargs):
+  def _call_sample_n(self, sample_shape, seed, **kwargs):
     """Wrapper around _sample_n."""
-    with self._name_and_control_scope(name):
-      if JAX_MODE and seed is None:
-        raise ValueError('Must provide JAX PRNGKey as `dist.sample(seed=.)`')
-      sample_shape = ps.convert_to_shape_tensor(
-          ps.cast(sample_shape, tf.int32), name='sample_shape')
-      sample_shape, n = self._expand_sample_shape_to_vector(
-          sample_shape, 'sample_shape')
-      samples = self._sample_n(
-          n, seed=seed() if callable(seed) else seed, **kwargs)
-      batch_event_shape = ps.shape(samples)[1:]
-      final_shape = ps.concat([sample_shape, batch_event_shape], 0)
-      samples = tf.reshape(samples, final_shape)
-      samples = self._set_sample_static_shape(samples, sample_shape)
-      return samples
+    if JAX_MODE and seed is None:
+      raise ValueError('Must provide JAX PRNGKey as `dist.sample(seed=.)`')
+    sample_shape = ps.convert_to_shape_tensor(
+        ps.cast(sample_shape, tf.int32), name='sample_shape')
+    sample_shape, n = self._expand_sample_shape_to_vector(
+        sample_shape, 'sample_shape')
+    samples = self._sample_n(
+        n, seed=seed() if callable(seed) else seed, **kwargs)
+    batch_event_shape = ps.shape(samples)[1:]
+    final_shape = ps.concat([sample_shape, batch_event_shape], 0)
+    samples = tf.reshape(samples, final_shape)
+    samples = self._set_sample_static_shape(samples, sample_shape)
+    return samples
 
   def sample(self, sample_shape=(), seed=None, name='sample', **kwargs):
     """Generate samples of the specified shape.
@@ -1198,7 +1198,62 @@ class Distribution(_BaseDistribution):
     Returns:
       samples: a `Tensor` with prepended dimensions `sample_shape`.
     """
-    return self._call_sample_n(sample_shape, seed, name, **kwargs)
+    with self._name_and_control_scope(name):
+      return self._call_sample_n(sample_shape, seed, **kwargs)
+
+  def _call_sample_and_log_prob(self, sample_shape, seed, **kwargs):
+    """Wrapper around `_sample_and_log_prob`."""
+    if hasattr(self, '_sample_and_log_prob'):
+      sample_shape = ps.convert_to_shape_tensor(
+          ps.cast(sample_shape, tf.int32), name='sample_shape')
+      return self._sample_and_log_prob(
+          distribution_util.expand_to_vector(
+              sample_shape, tensor_name='sample_shape'),
+          seed=seed, **kwargs)
+
+    # Naive default implementation. This calls private, rather than public,
+    # methods, to avoid duplicating the name_and_control_scope.
+    value = self._call_sample_n(sample_shape, seed=seed, **kwargs)
+    if hasattr(self, '_log_prob'):
+      log_prob = self._log_prob(value, **kwargs)
+    elif hasattr(self, '_prob'):
+      log_prob = tf.math.log(self._prob(value, **kwargs))
+    else:
+      raise NotImplementedError('log_prob is not implemented: {}'.format(
+          type(self).__name__))
+    return value, log_prob
+
+  def experimental_sample_and_log_prob(self, sample_shape=(), seed=None,
+                                       name='sample_and_log_prob', **kwargs):
+    """Samples from this distribution and returns the log density of the sample.
+
+    The default implementation simply calls `sample` and `log_prob`:
+
+    ```
+    def _sample_and_log_prob(self, sample_shape, seed, **kwargs):
+      x = self.sample(sample_shape=sample_shape, seed=seed, **kwargs)
+      return x, self.log_prob(x, **kwargs)
+    ```
+
+    However, some subclasses may provide more efficient and/or numerically
+    stable implementations.
+
+    Args:
+      sample_shape: integer `Tensor` desired shape of samples to draw.
+        Default value: `()`.
+      seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+        Default value: `None`.
+      name: name to give to the op.
+        Default value: `'sample_and_log_prob'`.
+      **kwargs: Named arguments forwarded to subclass implementation.
+    Returns:
+      samples: a `Tensor`, or structure of `Tensor`s, with prepended dimensions
+        `sample_shape`.
+      log_prob: a `Tensor` of shape `sample_shape(x) + self.batch_shape` with
+        values of type `self.dtype`.
+    """
+    with self._name_and_control_scope(name):
+      return self._call_sample_and_log_prob(sample_shape, seed=seed, **kwargs)
 
   def _call_log_prob(self, value, name, **kwargs):
     """Wrapper around _log_prob."""

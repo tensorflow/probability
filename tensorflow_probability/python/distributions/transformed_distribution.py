@@ -318,21 +318,41 @@ class TransformedDistribution(distribution_lib.Distribution):
           tf.broadcast_static_shape, tf.nest.flatten(batch_shape))
     return batch_shape
 
-  def _call_sample_n(self, sample_shape, seed, name, **kwargs):
+  def _call_sample_n(self, sample_shape, seed, **kwargs):
     # We override `_call_sample_n` rather than `_sample_n` so we can ensure that
     # the result of `self.bijector.forward` is not modified (and thus caching
     # works).
-    with self._name_and_control_scope(name):
-      distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
-      # First, generate samples from the base distribution.
-      x = self.distribution.sample(sample_shape=sample_shape,
-                                   seed=seed,
-                                   **distribution_kwargs)
-      # Apply the bijector's forward transformation. For caching to
-      # work, it is imperative that this is the last modification to the
-      # returned result.
-      return self.bijector.forward(x, **bijector_kwargs)
+    # First, generate samples from the base distribution.
+    x = self.distribution.sample(sample_shape=sample_shape,
+                                 seed=seed,
+                                 **distribution_kwargs)
+    # Apply the bijector's forward transformation. For caching to
+    # work, it is imperative that this is the last modification to the
+    # returned result.
+    return self.bijector.forward(x, **bijector_kwargs)
+
+  def _sample_and_log_prob(self, sample_shape, seed, **kwargs):
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      # Computing log_prob with a non-injective bijector requires an explicit
+      # inverse to get all points in the inverse image, so we can't get by
+      # with just doing the forward pass.
+      return super()._sample_and_log_prob(sample_shape, seed=seed, **kwargs)
+
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x, base_distribution_log_prob = (
+        self.distribution.experimental_sample_and_log_prob(
+            sample_shape, seed, **distribution_kwargs))
+    y = self.bijector.forward(x, **bijector_kwargs)
+    fldj = self.bijector.forward_log_det_jacobian(
+        x,
+        event_ndims=tf.nest.map_structure(
+            ps.rank_from_shape,
+            self.distribution.event_shape_tensor()),
+        **bijector_kwargs)
+    return y, (base_distribution_log_prob -
+               tf.cast(fldj, base_distribution_log_prob.dtype))
 
   def _log_prob(self, y, **kwargs):
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)

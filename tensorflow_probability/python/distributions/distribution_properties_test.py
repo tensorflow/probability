@@ -289,6 +289,32 @@ class ReproducibilityTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
+class SampleAndLogProbTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                          list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
+                                        validate_args=False))
+    seed = test_util.test_seed(sampler_type='stateless')
+    sample_shape = [2, 1]
+    with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
+      s1, lp1 = dist.experimental_sample_and_log_prob(sample_shape, seed=seed)
+      s2 = dist.sample(sample_shape, seed=seed)
+      self.assertAllClose(s1, s2, atol=1e-4)
+
+      # Sanity-check the log prob. The actual values may differ arbitrarily (if
+      # the `sample_and_log_prob` implementation is more stable) or be NaN, but
+      # they should at least have the same shape.
+      lp2 = dist.log_prob(s1)
+      self.assertAllEqual(lp1.shape, lp2.shape)
+
+
+@test_util.test_all_tf_execution_regimes
 class NoNansTest(test_util.TestCase, dhps.TestCase):
 
   @parameterized.named_parameters(
