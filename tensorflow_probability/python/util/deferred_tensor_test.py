@@ -35,6 +35,24 @@ tfd = tfp.distributions
 JAX_MODE = False
 
 
+class NonCompositeTensorExp(object):
+
+  name = 'non_composite_exp'
+  dtype = tf.float32
+
+  def forward(self, x):
+    return tf.math.exp(x)
+
+  def inverse(self, y):
+    return tf.math.log(y)
+
+  def forward_event_shape(self, shape):
+    return shape
+
+  def inverse_event_shape(self, shape):
+    return shape
+
+
 @test_util.test_all_tf_execution_regimes
 class DeferredTensorTest(test_util.TestCase):
 
@@ -148,6 +166,55 @@ class DeferredTensorTest(test_util.TestCase):
           tf.convert_to_tensor(x)])
       self.assertAllEqual([[-1.], [-2.], [-3.]], v_)
       self.assertAllEqual([[-1., 0.], [-2., 0.], [-3., 0.]], y_)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='JAX and Numpy do not have `CompositeTensor`.')
+  @parameterized.named_parameters(
+      ('transform_fn_is_bijector', tfb.Exp),
+      ('transform_fn_is_bijector_like', NonCompositeTensorExp),
+      ('transform_fn_is_callable', lambda: tf.math.exp))
+  def test_composite_tensor(self, make_transform_fn):
+    initial_value = [0.2, 3.]
+    pretransformed_input = tf.Variable(initial_value, dtype=tf.float32)
+    x = tfp.util.DeferredTensor(pretransformed_input, make_transform_fn())
+
+    @tf.function
+    def f(x_):
+      self.assertLen(x_.trainable_variables, 1)
+      return x_
+
+    y = f(x)
+    self.evaluate([v.initializer for v in x.trainable_variables])
+    self.assertAllClose(self.evaluate(tf.convert_to_tensor(y)),
+                        self.evaluate(tf.math.exp(initial_value)))
+    self.assertLen(x.trainable_variables, 1)
+    self.assertLen(y.trainable_variables,
+                   1 if tf.config.functions_run_eagerly() else 0)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason=('vectorized_map not implemented in Numpy; '
+              '`DeferredTensor` is not a valid JAX type.'))
+  def test_vectorized_map(self):
+    pretransformed_input = tf.Variable(tf.ones([5, 3]))
+    x = tfp.util.DeferredTensor(pretransformed_input, tfb.Scale([5]))
+    y = tf.vectorized_map(lambda v: v + 2., x)
+    self.evaluate([v.initializer for v in x.trainable_variables])
+    self.assertAllClose(self.evaluate(y), 5. * pretransformed_input + 2.)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='JAX and Numpy have no notion of `CompositeTensor`.')
+  def test_also_track_through_flatten_unflatten(self):
+    pretransformed_input = tf.Variable(3.)
+    also_track = tfd.Normal(tf.Variable(0.), scale=1.)
+    x = tfp.util.DeferredTensor(pretransformed_input,
+                                tfb.Shift(tf.Variable(2.)),
+                                also_track=also_track)
+    flat = tf.nest.flatten(x, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(x, flat, expand_composites=True)
+    self.assertLen(unflat.trainable_variables, 3)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -273,6 +340,41 @@ class TransformedVariableTest(test_util.TestCase):
     self.assertNear(0.25, y_, err=1e-3)
     self.assertIsNot(x.pretransformed_input, y.pretransformed_input)
     # Different vars have no deps so we needn't test cross-talk.
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='JAX and Numpy do not have `CompositeTensor`.')
+  @parameterized.named_parameters(
+      ('composite_bijector', tfb.Softplus),
+      ('non_composite_bijector', NonCompositeTensorExp))
+  def test_composite_tensor(self, make_bijector):
+    x = tfp.util.TransformedVariable(5., make_bijector())
+    add_val = 10.
+
+    @tf.function
+    def f(x_):
+      x_.assign_add(add_val)
+      self.assertLen(x_.trainable_variables, 1)
+      return x_
+
+    y = f(x)
+    self.evaluate([v.initializer for v in x.trainable_variables])
+    self.assertAllClose(self.evaluate(tf.convert_to_tensor(y)), 15.)
+    self.assertAllClose(self.evaluate(tf.convert_to_tensor(x)), 15.)
+    self.assertLen(x.trainable_variables, 1)
+    self.assertLen(y.trainable_variables,
+                   1 if tf.config.functions_run_eagerly() else 0)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason=('vectorized_map not implemented in Numpy; '
+              '`DeferredTensor` is not a valid JAX type.'))
+  def test_vectorized_map(self):
+    initial_value = tf.ones([5, 3])
+    x = tfp.util.TransformedVariable(initial_value, tfb.Sigmoid())
+    y = tf.vectorized_map(lambda v: v + 2., x)
+    self.evaluate([v.initializer for v in x.trainable_variables])
+    self.assertAllClose(self.evaluate(y), initial_value + 2.)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -412,6 +514,15 @@ class DeferredTensorBehavesLikeTensorInXLATest(test_util.TestCase):
                         atol=0., rtol=1e-5)
 
 
+def _make_deferred_tensor_spec(
+    input_spec, transform_or_spec, also_track_spec=None, dtype=None, shape=None,
+    name=None):
+  dtype = dtype or input_spec.dtype
+  return deferred_tensor._DeferredTensorSpec(
+      input_spec=input_spec, transform_or_spec=transform_or_spec,
+      also_track_spec=also_track_spec, dtype=dtype, shape=shape, name=name)
+
+
 def _make_transformed_variable_spec(
     input_spec, transform_or_spec, dtype=None, name=None):
   """Returns a `_TransformedVariableSpec` instance."""
@@ -454,6 +565,33 @@ def _make_bijector_spec(
 class DeferredTensorSpecTest(test_util.TestCase):
 
   @parameterized.named_parameters(
+      ('DeferredTensorBijector',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+      ('DeferredTensorCallable',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid,
+           shape=tf.TensorShape([None, 2]),
+           name='one'),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid,
+           shape=tf.TensorShape([None, 2]),
+           name='two')),
+      ('NestedDeferredTensor',
+       _make_deferred_tensor_spec(
+           input_spec=_make_deferred_tensor_spec(
+               tf.TensorSpec([], tf.float32), transform_or_spec=tf.math.exp),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec),
+       _make_deferred_tensor_spec(
+           input_spec=_make_deferred_tensor_spec(
+               tf.TensorSpec([], tf.float32), transform_or_spec=tf.math.exp),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
       ('TransformedVariableBijector',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, None], tf.float32),
@@ -482,6 +620,24 @@ class DeferredTensorSpecTest(test_util.TestCase):
     self.assertEqual(hash(v1), hash(v2))
 
   @parameterized.named_parameters(
+      ('DifferentInputSpecs',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([None, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+      ('DifferentBijectorSpecs',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
+           shape=tf.TensorShape([None, 2]),
+           name='one'),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Exp()._type_spec,
+           shape=tf.TensorShape([None, 2]),
+           name='two')),
       ('DifferentDtypes',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float64),
@@ -501,6 +657,22 @@ class DeferredTensorSpecTest(test_util.TestCase):
            transform_or_spec=tf.math.softplus,
            dtype=tf.float64,
            name='two')),
+      ('DifferentAlsoTrack',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tf.math.exp),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tf.math.exp,
+           also_track_spec=[
+               resource_variable_ops.VariableSpec([3, 2], tf.float32)])),
+      ('DifferentValueType',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tf.math.exp),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tf.math.exp)),
       )
   def testInequality(self, v1, v2):
     # pylint: disable=g-generic-assert
@@ -510,6 +682,24 @@ class DeferredTensorSpecTest(test_util.TestCase):
     self.assertFalse(v2 == v1)
 
   @parameterized.named_parameters(
+      ('DeferredTensorBijector',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+      ('DeferredTensorCallable',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid,
+           shape=tf.TensorShape([4, 2]),
+           name='one'),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid,
+           shape=tf.TensorShape([None, 2]),
+           name='two')),
       ('TransformedVariableBijector',
        _make_transformed_variable_spec(
            input_spec=resource_variable_ops.VariableSpec([4, 2], tf.float32),
@@ -532,6 +722,13 @@ class DeferredTensorSpecTest(test_util.TestCase):
     self.assertTrue(v2.is_compatible_with(v1))
 
   @parameterized.named_parameters(
+      ('IncompatibleInputSpecs',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([None, 3], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
       ('DifferentDtypes',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float32),
@@ -551,12 +748,38 @@ class DeferredTensorSpecTest(test_util.TestCase):
            transform_or_spec=tf.math.softplus,
            dtype=tf.float64,
            name='two')),
+      ('DifferentAlsoTrack',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tf.math.exp),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tf.math.exp,
+           also_track_spec=[
+               resource_variable_ops.VariableSpec([3, 2], tf.float32)])),
+      ('DifferentValueType',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tf.math.exp),
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([], tf.float32),
+           transform_or_spec=tf.math.exp)),
       )
   def testIsNotCompatibleWith(self, v1, v2):
     self.assertFalse(v1.is_compatible_with(v2))
     self.assertFalse(v2.is_compatible_with(v1))
 
   @parameterized.named_parameters(
+      ('DeferredTensor',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([None, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([None, 2], tf.float32),
+           transform_or_spec=tf.math.sigmoid)),
       ('TransformedVariableBijector',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([4, 2], tf.float32),
@@ -587,6 +810,20 @@ class DeferredTensorSpecTest(test_util.TestCase):
     self.assertEqual(v2.most_specific_compatible_type(v1), expected)
 
   @parameterized.named_parameters(
+      ('IncompatibleInputSpecs',
+       _make_deferred_tensor_spec(
+           input_spec=resource_variable_ops.VariableSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([None, 3], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+      ('IncompatibleBijectorSpecs',
+       _make_deferred_tensor_spec(
+           input_spec=resource_variable_ops.VariableSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Exp(validate_args=True)._type_spec),
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([None, 3], tf.float32),
+           transform_or_spec=tfb.Exp(validate_args=False)._type_spec)),
       ('DifferentDtypes',
        _make_transformed_variable_spec(
            input_spec=tf.TensorSpec([], tf.float32),
@@ -613,17 +850,20 @@ class DeferredTensorSpecTest(test_util.TestCase):
     with self.assertRaises(ValueError):
       v2.most_specific_compatible_type(v1)
 
-  def testRepr(self):
-    spec = _make_transformed_variable_spec(
-        input_spec=tf.TensorSpec([4, 2], tf.float32),
-        transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
-        dtype=tf.float64)
-    expected = (
-        "_TransformedVariableSpec(input_spec=TensorSpec(shape=(4, 2), "
-        "dtype=tf.float32, name=None), "
-        "transform_or_spec=Sigmoid_ACTTypeSpec(2, {}, "
-        "{'low': None, 'high': None, 'validate_args': True}, ('name',), (), "
-        "{}), dtype=<dtype: 'float64'>, name=None)")
+  @parameterized.named_parameters(
+      ('DeferredTensor',
+       _make_deferred_tensor_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec)),
+      ('TransformedVariable',
+       _make_transformed_variable_spec(
+           input_spec=tf.TensorSpec([4, 2], tf.float32),
+           transform_or_spec=tfb.Sigmoid(validate_args=True)._type_spec,
+           dtype=tf.float64)))
+  def testRepr(self, spec):
+    kwargs = dict(spec._specs, **spec._unique_id_params, name=spec.name)  # pylint: disable=protected-access
+    kwargs_str = ', '.join(f'{k}={v}' for k, v in kwargs.items())
+    expected = f'{type(spec).__name__}({kwargs_str})'
     self.assertEqual(repr(spec), expected)
 
 

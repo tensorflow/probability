@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import power_transform
 from tensorflow_probability.python.internal import auto_composite_tensor
@@ -31,8 +32,7 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(
-    omit_kwargs=('name',), module_name='tfp.bijectors')
+@bijector_lib.auto_composite_tensor_bijector
 class Exp(power_transform.PowerTransform):
   """Compute `Y = g(X) = exp(X)`.
 
@@ -76,8 +76,7 @@ class Exp(power_transform.PowerTransform):
 
 # TODO(b/182603117): Remove `AutoCompositeTensor` when `Invert` subclasses
 # `AutoCompositeTensor` and ensure `tf.saved_model` still works.
-@auto_composite_tensor.auto_composite_tensor(
-    omit_kwargs=('name',), module_name='tfp.bijectors')
+@bijector_lib.auto_composite_tensor_bijector
 class Log(invert.Invert,
           auto_composite_tensor.AutoCompositeTensor):
   """Compute `Y = log(X)`. This is `Invert(Exp())`."""

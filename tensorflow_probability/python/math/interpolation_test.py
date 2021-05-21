@@ -667,6 +667,8 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     self.assertAllClose(
         self.evaluate(expected_y), self.evaluate(actual_y), atol=0.02)
 
+  @test_util.numpy_disable_test_missing_functionality(
+      '`batch_dims > 0` currently unsupported in NumPy backend.')
   def test_1d_scalar_valued_function_with_batch_dims(self):
     # Shape [2, 1], [2]is the batch shape.
     x_ref_min = np.array([[-2.], [-3.]], dtype=np.float32)
@@ -776,6 +778,8 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     self.assertAllClose(
         self.evaluate(expected_y), self.evaluate(actual_y), atol=0.02)
 
+  @test_util.numpy_disable_test_missing_functionality(
+      '`batch_dims > 0` currently unsupported in NumPy backend.')
   def test_2d_vector_valued_function_with_batch_dims(self):
     # No batch dims, will broadcast.
     x_ref_min = np.array([0., 0.], dtype=np.float32)

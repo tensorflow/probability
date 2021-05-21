@@ -92,6 +92,19 @@ class BatchShapeInferenceTests(test_util.TestCase):
     self.assertIsInstance(batch_shape, tf.TensorShape)
     self.assertTrue(batch_shape.is_compatible_with(expected_batch_shape))
 
+  def test_additional_event_ndims(self):
+    bij = tfb.Sigmoid(low=tf.zeros([2]), high=tf.ones([3, 2]))
+    self.assertAllEqual(batch_shape_lib.inferred_batch_shape(bij), [3, 2])
+    self.assertAllEqual(batch_shape_lib.inferred_batch_shape_tensor(bij),
+                        [3, 2])
+    self.assertAllEqual(
+        batch_shape_lib.inferred_batch_shape(bij, additional_event_ndims=1),
+        [3])
+    self.assertAllEqual(
+        batch_shape_lib.inferred_batch_shape_tensor(
+            bij, additional_event_ndims=1),
+        [3])
+
 
 class ParametersAsKwargsTest(test_util.TestCase):
   # This doesn't really deserve to be a separate test class, but is split

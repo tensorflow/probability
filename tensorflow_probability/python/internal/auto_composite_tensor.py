@@ -60,7 +60,7 @@ _registry = {}  # Mapping from (python pkg, class name) -> class.
 
 _SENTINEL = object()
 
-_AUTO_COMPOSITE_TENSOR_VERSION = 2
+_AUTO_COMPOSITE_TENSOR_VERSION = 3
 
 # Cache maps __init__ method to signature
 _sig_cache = {}
@@ -171,7 +171,8 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
                '_comparable')
 
   def __init__(self, param_specs, non_tensor_params, omit_kwargs,
-               prefer_static_value, callable_params=None):
+               prefer_static_value, non_identifying_kwargs,
+               callable_params=None):
     """Initializes a new `_AutoCompositeTensorTypeSpec`.
 
     Args:
@@ -189,6 +190,11 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
         of `Tensor`-like kwargs to the `AutoCompositeTensor`s constructor that
         may be stored as static values, if known. These are typically shapes or
         axis values.
+      non_identifying_kwargs: Python `tuple` of strings corresponding to the
+        names of kwargs to the `AutoCompositeTensor`s constructor whose values
+        are not relevant to the unique identification of the
+        `_AutoCompositeTensorTypeSpec` instance. Equality/comparison checks and
+        `__hash__` do not depend on these kwargs.
       callable_params: Python `dict` of callable kwargs to the
         `AutoCompositeTensor`'s constructor that do not subclass
         `CompositeTensor`, or `None`. If `callable_params` is a non-empty
@@ -199,6 +205,7 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
     self._non_tensor_params = non_tensor_params
     self._omit_kwargs = omit_kwargs
     self._prefer_static_value = prefer_static_value
+    self._non_identifying_kwargs = non_identifying_kwargs
     self._callable_params = {} if callable_params is None else callable_params
 
     self._serializable = (
@@ -206,15 +213,24 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
         self._param_specs,
         self._non_tensor_params,
         self._omit_kwargs,
-        self._prefer_static_value)
+        self._prefer_static_value,
+        self._non_identifying_kwargs)
 
-    # TODO(b/182603117): Distinguish between `omit_kwargs_from_constructor`
-    # and `omit_kwargs_for_comparison`.
-    self._comparable = self._serializable + (
-        tf.nest.map_structure(id, self._callable_params),)
+    def remove_kwargs(d):
+      return {k: v for k, v in d.items()
+              if k not in self._non_identifying_kwargs}
+
+    self._comparable = (
+        _AUTO_COMPOSITE_TENSOR_VERSION,
+        remove_kwargs(self._param_specs),
+        remove_kwargs(self._non_tensor_params),
+        self._omit_kwargs,
+        self._prefer_static_value,
+        self._non_identifying_kwargs,
+        tf.nest.map_structure(id, remove_kwargs(self._callable_params)))
 
   @classmethod
-  def from_instance(cls, instance, omit_kwargs=()):
+  def from_instance(cls, instance, omit_kwargs=(), non_identifying_kwargs=()):
     cls_value_type = cls.value_type.fget(None)
     if type(instance) is not cls_value_type:  # pylint: disable=unidiomatic-typecheck
       raise ValueError(f'`{type(instance).__name__}` has inherited the '
@@ -245,6 +261,7 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
                non_tensor_params=non_tensor_params,
                omit_kwargs=omit_kwargs,
                prefer_static_value=prefer_static_value,
+               non_identifying_kwargs=non_identifying_kwargs,
                callable_params=callable_params)
 
   def _to_components(self, obj):
@@ -273,6 +290,9 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
     if version == 1:
       encoded = encoded + ((),)
       version = 2
+    if version == 2:
+      encoded = encoded + ((),)
+      version = 3
     if version != _AUTO_COMPOSITE_TENSOR_VERSION:
       raise ValueError(f'Expected version {_AUTO_COMPOSITE_TENSOR_VERSION},'
                        f' but got {version}.')
@@ -375,7 +395,8 @@ class AutoCompositeTensor(composite_tensor.CompositeTensor):
     pass
 
 
-def auto_composite_tensor(cls=None, omit_kwargs=(), module_name=None):
+def auto_composite_tensor(
+    cls=None, omit_kwargs=(), non_identifying_kwargs=(), module_name=None):
   """Automagically generate `CompositeTensor` behavior for `cls`.
 
   `CompositeTensor` objects are able to pass in and out of `tf.function` and
@@ -499,6 +520,8 @@ def auto_composite_tensor(cls=None, omit_kwargs=(), module_name=None):
   Args:
     cls: The class for which to create a CompositeTensor subclass.
     omit_kwargs: Optional sequence of kwarg names to be omitted from the spec.
+    non_identifying_kwargs: Optional sequence of kwarg names to be omitted from
+      equality/comparison checks and the `__hash__` method of the spec.
     module_name: The module name with which to register the `TypeSpec`. If
       `None`, defaults to `cls.__module__`.
 
@@ -508,6 +531,7 @@ def auto_composite_tensor(cls=None, omit_kwargs=(), module_name=None):
   if cls is None:
     return functools.partial(auto_composite_tensor,
                              omit_kwargs=omit_kwargs,
+                             non_identifying_kwargs=non_identifying_kwargs,
                              module_name=module_name)
 
   if module_name is None:
@@ -537,11 +561,15 @@ def auto_composite_tensor(cls=None, omit_kwargs=(), module_name=None):
 
     _AlreadyCTTypeSpec.__name__ = type_spec_class_name
 
-    cls._type_spec = property(  # pylint: disable=protected-access
-        lambda self: _AlreadyCTTypeSpec.from_instance(self, omit_kwargs))
+    def _type_spec(obj):
+      return _AlreadyCTTypeSpec.from_instance(
+          obj, omit_kwargs, non_identifying_kwargs)
+
+    cls._type_spec = property(_type_spec)  # pylint: disable=protected-access
     return cls
 
-  clsid = (cls.__module__, cls.__name__, omit_kwargs)
+  clsid = (cls.__module__, cls.__name__, omit_kwargs,
+           non_identifying_kwargs)
 
   # Check for subclass if retrieving from the _registry, in case the user
   # has redefined the class (e.g. in a REPL/notebook).
@@ -562,7 +590,8 @@ def auto_composite_tensor(cls=None, omit_kwargs=(), module_name=None):
 
     @property
     def _type_spec(self):
-      return _GeneratedCTTypeSpec.from_instance(self, omit_kwargs)
+      return _GeneratedCTTypeSpec.from_instance(
+          self, omit_kwargs, non_identifying_kwargs)
 
   _AutoCompositeTensor.__name__ = cls.__name__
   _registry[clsid] = _AutoCompositeTensor

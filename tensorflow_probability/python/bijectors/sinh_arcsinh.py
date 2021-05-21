@@ -24,7 +24,6 @@ from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -34,8 +33,7 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(
-    omit_kwargs=('name',), module_name='tfp.bijectors')
+@bijector.auto_composite_tensor_bijector
 class SinhArcsinh(bijector.AutoCompositeTensorBijector):
   """`Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight ) * multiplier`.
 

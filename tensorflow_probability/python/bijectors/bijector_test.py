@@ -19,14 +19,17 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+from absl.testing import parameterized
 import mock
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import cache_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
@@ -349,6 +352,101 @@ class BijectorTestEventNdims(test_util.TestCase):
       event_ndims = tf1.placeholder_with_default((1, 2), shape=None)
       self.evaluate(
           bij.inverse_log_det_jacobian(1., event_ndims=event_ndims))
+
+
+@test_util.test_all_tf_execution_regimes
+class BijectorBatchShapesTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      ('exp', tfb.Exp, None),
+      ('scale',
+       lambda: tfb.Scale(tf.ones([4, 2])), None),
+      ('sigmoid',
+       lambda: tfb.Sigmoid(low=tf.zeros([3]), high=tf.ones([4, 1])), None),
+      ('invert',
+       lambda: tfb.Invert(tfb.ScaleMatvecDiag(tf.ones([2, 1]))), None),
+      ('reshape',
+       lambda: tfb.Reshape([1], event_shape_in=[1, 1]), None),
+      ('chain',
+       lambda: tfb.Chain([tfb.Power(power=[[2.], [3.]]),  # pylint: disable=g-long-lambda
+                          tfb.Invert(tfb.Split(2))]),
+       None),
+      ('jointmap_01',
+       lambda: tfb.JointMap([tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [0, 1]),
+      ('jointmap_11',
+       lambda: tfb.JointMap([tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [1, 1]),
+      ('jointmap_20',
+       lambda: tfb.JointMap([tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [2, 0]),
+      ('jointmap_22',
+       lambda: tfb.JointMap([tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [2, 2]),
+      ('restructure_with_ragged_event_ndims',
+       lambda: tfb.Restructure(input_structure=[0, 1],  # pylint: disable=g-long-lambda
+                               output_structure={'a': 0, 'b': 1}),
+       [0, 1]))
+  def test_batch_shape_matches_output_shapes(self,
+                                             bijector_fn,
+                                             override_x_event_ndims=None):
+    bijector = bijector_fn()
+    if override_x_event_ndims is None:
+      x_event_ndims = bijector.forward_min_event_ndims
+      y_event_ndims = bijector.inverse_min_event_ndims
+    else:
+      x_event_ndims = override_x_event_ndims
+      y_event_ndims = bijector.forward_event_ndims(x_event_ndims)
+
+    # All ways of calculating the batch shape should yield the same result.
+    batch_shape_x = bijector.experimental_batch_shape(
+        x_event_ndims=x_event_ndims)
+    batch_shape_y = bijector.experimental_batch_shape(
+        y_event_ndims=y_event_ndims)
+    self.assertEqual(batch_shape_x, batch_shape_y)
+
+    batch_shape_tensor_x = bijector.experimental_batch_shape_tensor(
+        x_event_ndims=x_event_ndims)
+    batch_shape_tensor_y = bijector.experimental_batch_shape_tensor(
+        y_event_ndims=y_event_ndims)
+    self.assertAllEqual(batch_shape_tensor_x, batch_shape_tensor_y)
+    self.assertAllEqual(batch_shape_tensor_x, batch_shape_x)
+
+    # Pushing a value through the bijector should return a Tensor(s) with
+    # the expected batch shape...
+    xs = tf.nest.map_structure(lambda nd: tf.ones([1] * nd), x_event_ndims)
+    ys = bijector.forward(xs)
+    for y_part, nd in zip(tf.nest.flatten(ys), tf.nest.flatten(y_event_ndims)):
+      part_batch_shape = ps.shape(y_part)[:ps.rank(y_part) - nd]
+      self.assertAllEqual(batch_shape_y,
+                          ps.broadcast_shape(batch_shape_y, part_batch_shape))
+
+    # ... which should also be the shape of the fldj.
+    fldj = bijector.forward_log_det_jacobian(xs, event_ndims=x_event_ndims)
+    self.assertAllEqual(batch_shape_y, ps.shape(fldj))
+
+    # Also check the inverse case.
+    xs = bijector.inverse(tf.nest.map_structure(tf.identity, ys))
+    for x_part, nd in zip(tf.nest.flatten(xs), tf.nest.flatten(x_event_ndims)):
+      part_batch_shape = ps.shape(x_part)[:ps.rank(x_part) - nd]
+      self.assertAllEqual(batch_shape_x,
+                          ps.broadcast_shape(batch_shape_x, part_batch_shape))
+    ildj = bijector.inverse_log_det_jacobian(ys, event_ndims=y_event_ndims)
+    self.assertAllEqual(batch_shape_x, ps.shape(ildj))
+
+  @parameterized.named_parameters(
+      ('scale', lambda: tfb.Scale([3.14159])),
+      ('chain', lambda: tfb.Exp()(tfb.Scale([3.14159]))))
+  def test_ndims_specification(self, bijector_fn):
+    bijector = bijector_fn()
+
+    # If no `event_ndims` is passed, should assume min_event_ndims.
+    self.assertAllEqual(bijector.experimental_batch_shape(), [1])
+    self.assertAllEqual(bijector.experimental_batch_shape_tensor(), [1])
+
+    with self.assertRaisesRegex(
+        ValueError, 'Only one of `x_event_ndims` and `y_event_ndims`'):
+      bijector.experimental_batch_shape(x_event_ndims=0, y_event_ndims=0)
+
+    with  self.assertRaisesRegex(
+        ValueError, 'Only one of `x_event_ndims` and `y_event_ndims`'):
+      bijector.experimental_batch_shape_tensor(x_event_ndims=0, y_event_ndims=0)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -768,7 +866,7 @@ class ConditionalBijectorTest(test_util.TestCase):
       mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
 
 
-@auto_composite_tensor.auto_composite_tensor(omit_kwargs=('name',))
+@bijector_lib.auto_composite_tensor_bijector
 class CompositeForwardBijector(tfb.AutoCompositeTensorBijector):
 
   def __init__(self, scale=2., validate_args=False, name=None):

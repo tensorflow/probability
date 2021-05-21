@@ -727,14 +727,13 @@ class JointDistribution(distribution_lib.Distribution):
   # tactically implement the `_call_sample_n` redirector.  We don't want to
   # override the public level because then tfp.layers can't take generic
   # `Distribution.sample` as argument for the `convert_to_tensor_fn` parameter.
-  def _call_sample_n(self, sample_shape, seed, name, value=None, **kwargs):
-    with self._name_and_control_scope(name):
-      return self._sample_n(
-          sample_shape,
-          seed=seed() if callable(seed) else seed,
-          value=self._resolve_value(value=value,
-                                    allow_partially_specified=True,
-                                    **kwargs))
+  def _call_sample_n(self, sample_shape, seed, value=None, **kwargs):
+    return self._sample_n(
+        sample_shape,
+        seed=seed() if callable(seed) else seed,
+        value=self._resolve_value(value=value,
+                                  allow_partially_specified=True,
+                                  **kwargs))
 
   def _execute_model(self,
                      sample_shape=(),

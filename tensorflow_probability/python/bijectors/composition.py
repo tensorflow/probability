@@ -510,6 +510,36 @@ class Composition(bijector.Bijector):
     with tf.control_dependencies([x for x in assertions if x is not None]):
       return tf.identity(ldj_sum, name='ildj')
 
+  def _batch_shape(self, x_event_ndims):
+    """Broadcasts the batch shapes of component bijectors."""
+    batch_shapes_at_components = []
+
+    def _accumulate_batch_shapes_forward(bij, event_ndims):
+      batch_shapes_at_components.append(
+          bij.experimental_batch_shape(x_event_ndims=event_ndims))
+      return bij.forward_event_ndims(event_ndims)
+
+    # Populate 'batch_shapes_at_components' by walking forwards.
+    self._walk_forward(_accumulate_batch_shapes_forward, x_event_ndims)
+    return functools.reduce(tf.broadcast_static_shape,
+                            batch_shapes_at_components,
+                            tf.TensorShape([]))
+
+  def _batch_shape_tensor(self, x_event_ndims):
+    """Broadcasts the batch shapes of component bijectors."""
+    batch_shapes_at_components = []
+
+    def _accumulate_batch_shapes_forward(bij, event_ndims):
+      batch_shapes_at_components.append(
+          bij.experimental_batch_shape_tensor(x_event_ndims=event_ndims))
+      return bij.forward_event_ndims(event_ndims)
+
+    # Populate 'batch_shapes_at_components' by walking forwards.
+    self._walk_forward(_accumulate_batch_shapes_forward, x_event_ndims)
+    return functools.reduce(ps.broadcast_shape,
+                            batch_shapes_at_components,
+                            [])
+
   def _maybe_warn_increased_dof(self,
                                 component_name,
                                 component_ldj,

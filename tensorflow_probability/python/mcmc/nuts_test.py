@@ -574,6 +574,14 @@ class NutsTest(test_util.TestCase):
     self.assertAllClose(
         average_rhat, np.ones_like(average_rhat), atol=0.05, rtol=0.05)
 
+  def test_step_size_trace(self):
+    dist = tfd.Normal(0., 1.)
+    kernel = tfp.mcmc.NoUTurnSampler(dist.log_prob, step_size=1.)
+    _, _, fkr = tfp.mcmc.sample_chain(10, 0., kernel=kernel,
+                                      return_final_kernel_results=True,
+                                      seed=test_util.test_seed())
+    self.assertAlmostEqual(1., self.evaluate(fkr.step_size))
+
 
 @test_util.test_all_tf_execution_regimes
 class DistributedNutsTest(distribute_test_lib.DistributedTest):

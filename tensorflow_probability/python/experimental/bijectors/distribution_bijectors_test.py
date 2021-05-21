@@ -144,13 +144,12 @@ class DistributionBijectorsTest(test_util.TestCase):
       'build_asvi_surrogate_posterior')
   def test_mcmc_funnel_docstring_example_runs(self):
 
-    # TODO(b/170865194): Use JDC here once sample_chain can take non-list state.
-    model_with_funnel = tfd.JointDistributionSequentialAutoBatched([
-        tfd.Normal(loc=-1., scale=2., name='z'),
-        lambda z: tfd.Normal(loc=[0.], scale=tf.exp(z), name='x'),
-        lambda x: tfd.Poisson(log_rate=x, name='y')])
-    pinned_model = tfp.experimental.distributions.JointDistributionPinned(
-        model_with_funnel, y=[1])
+    @tfd.JointDistributionCoroutineAutoBatched
+    def model_with_funnel():
+      z = yield tfd.Normal(loc=-1., scale=2., name='z')
+      x = yield tfd.Normal(loc=[0.], scale=tf.exp(z), name='x')
+      yield tfd.Poisson(log_rate=x, name='y')
+    pinned_model = model_with_funnel.experimental_pin(y=[1])
     surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
         pinned_model)
 

@@ -17,6 +17,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import abc
 import functools
 import numpy as np
 import six
@@ -81,10 +82,10 @@ def _tensorize(d, dtype=None, name=None, as_ref=False):
   return d._value(dtype, name, as_ref)  # pylint: disable=protected-access
 
 
-class TensorMetaClass(type):
+class TensorMetaClass(abc.ABCMeta):
   """A type of class which will make objects which act like Tensors."""
 
-  def __new__(mcs, name, bases, attrs):
+  def __new__(mcs, name, bases, attrs):  # pylint: disable=bad-mcs-classmethod-argument
     operators = set(tf.Tensor.OVERLOADABLE_OPERATORS)
     operators.difference_update({'__eq__', '__ne__'})
     operators.update({'__iter__'})
@@ -109,7 +110,7 @@ class TensorMetaClass(type):
       attrs.update(
           (attr, getattr(tf.Tensor, attr))
           for attr in {'__bool__', '__array_priority__', '__nonzero__'})
-    cls = super(TensorMetaClass, mcs).__new__(mcs, name, bases, attrs)
+    cls = super(TensorMetaClass, mcs).__new__(mcs, name, bases, attrs)  # pylint: disable=too-many-function-args
     tf.register_tensor_conversion_function(cls, conversion_func=_tensorize)
     return cls
 
@@ -117,7 +118,8 @@ class TensorMetaClass(type):
 NONE_SPECIFIED = 'None'
 
 
-class DeferredTensor(six.with_metaclass(TensorMetaClass, tf.Module)):
+class DeferredTensor(six.with_metaclass(
+    TensorMetaClass, tf.Module, tf.__internal__.CompositeTensor)):
   """Variable tracking object which applies function upon `convert_to_tensor`.
 
   #### Example
@@ -379,6 +381,39 @@ class DeferredTensor(six.with_metaclass(TensorMetaClass, tf.Module)):
           'numpy array.')
     return np.array(self._value(dtype=dtype))
 
+  def _get_input_spec(self):
+    if isinstance(self.pretransformed_input, tf.__internal__.CompositeTensor):
+      return self.pretransformed_input._type_spec  # pylint: disable=protected-access
+    if isinstance(self.pretransformed_input, tf.Variable):
+      return resource_variable_ops.VariableSpec(
+          self.pretransformed_input.shape,
+          dtype=self.pretransformed_input.dtype,
+          trainable=self.pretransformed_input.trainable)
+    return tf.TensorSpec.from_tensor(self.pretransformed_input)
+
+  @property
+  def _type_spec(self):
+    input_spec = self._get_input_spec()
+    transform_or_spec = getattr(self._transform_fn, '_type_spec',
+                                self._transform_fn)
+
+    # Extract Variables from also_track.
+    if self.also_track is None:
+      also_track_spec = None
+    else:
+      also_track_vars = tf.nest.flatten(
+          tf.nest.map_structure(
+              lambda x: x.variables if isinstance(x, tf.Module) else x,
+              self.also_track))
+      also_track_spec = tf.nest.map_structure(
+          lambda x: resource_variable_ops.VariableSpec(  # pylint: disable=g-long-lambda
+              x.shape, x.dtype, trainable=x.trainable),
+          also_track_vars)
+
+    return _DeferredTensorSpec(
+        input_spec, transform_or_spec, dtype=self.dtype, shape=self.shape,
+        name=self.name, also_track_spec=also_track_spec)
+
 
 class TransformedVariable(DeferredTensor):
   """Variable tracking object which applies a bijector upon `convert_to_tensor`.
@@ -455,11 +490,7 @@ class TransformedVariable(DeferredTensor):
         which is the initial value for the `TransformedVariable`. The underlying
         untransformed `tf.Variable` will be initialized with
         `bijector.inverse(initial_value)`. Can also be a callable with no
-        argument that returns the initial value when called. Note: if
-        `initial_value` is a `TransformedVariable` then the instantiated object
-        does not create a new `tf.Variable`, but rather points to the underlying
-        `Variable` and chains the `bijector` arg with the underlying bijector as
-        `tfb.Chain([bijector, initial_value.bijector])`.
+        argument that returns the initial value when called.
       bijector: A `Bijector`-like instance which defines the transformations
         applied to the underlying `tf.Variable`.
       dtype: `tf.dtype.DType` instance or otherwise valid `dtype` value to
@@ -479,16 +510,25 @@ class TransformedVariable(DeferredTensor):
 
     if callable(initial_value):
       initial_value = initial_value()
-    initial_value = tf.convert_to_tensor(
-        initial_value, dtype_hint=bijector.dtype, dtype=dtype)
+
+    # Extra kwarg that TypeSpec._from_components uses to re-build the object
+    # without re-initializing the variable.
+    pretransformed_input = kwargs.pop('pretransformed_input', None)
+    if pretransformed_input is None:
+      initial_value = tf.convert_to_tensor(
+          initial_value, dtype_hint=bijector.dtype, dtype=dtype)
+      pretransformed_input = tf.Variable(
+          initial_value=bijector.inverse(initial_value),
+          name=name,
+          dtype=dtype,
+          **kwargs)
+      shape = initial_value.shape
+    else:
+      shape = bijector.forward_event_shape(pretransformed_input.shape)
     super(TransformedVariable, self).__init__(
-        pretransformed_input=tf.Variable(
-            initial_value=bijector.inverse(initial_value),
-            name=name,
-            dtype=dtype,
-            **kwargs),
+        pretransformed_input=pretransformed_input,
         transform_fn=bijector,
-        shape=initial_value.shape,
+        shape=shape,
         name=bijector.name)
     self._bijector = bijector
 
@@ -529,41 +569,16 @@ class TransformedVariable(DeferredTensor):
         name=name,
         read_value=read_value)
 
-
-@type_spec.register('tfp.util.TransformedVariableSpec')
-class _TransformedVariableSpec(type_spec.BatchableTypeSpec):
-  """`tf.TypeSpec` for `tfp.util.TransformedVariable`."""
-
-  __slots__ = ('_input_spec', '_transform_or_spec', '_dtype', '_name', '_specs',
-               '_unique_id_params', '_transform_is_composite')
-
-  def __init__(self, input_spec, transform_or_spec, dtype, name):
-    """Initializes a new `_TransformedVariableSpec`.
-
-    Args:
-      input_spec: `tf.TypeSpec` instance describing the `TransformedVariable`s
-        `pretransformed_input` attribute.
-      transform_or_spec: The `bijector` passed to the `TransformedVariable`'s
-        constructor, or `bijector._type_spec` if `bijector` is a
-        `CompositeTensor`.
-      dtype: `tf.DType`, `dtype` property of the `TransformedVariable`.
-      name: `str`, name of the `TransformedVariable`.
-    """
-    self._input_spec = input_spec
-    self._transform_or_spec = transform_or_spec
-    self._dtype = dtype
-    self._name = name
-
-    self._unique_id_params = {'dtype': dtype}
-    self._transform_is_composite = isinstance(transform_or_spec, tf.TypeSpec)
-
-    self._specs = {'input_spec': input_spec}
-    if self._transform_is_composite:
-      self._specs['transform_or_spec'] = transform_or_spec
-
   @property
-  def value_type(self):
-    return TransformedVariable
+  def _type_spec(self):
+    input_spec = self._get_input_spec()
+    transform_or_spec = getattr(self.bijector, '_type_spec', self.bijector)
+    return _TransformedVariableSpec(
+        input_spec, transform_or_spec, self.dtype, self.name)
+
+
+class _DeferredTensorSpecBase(object):
+  """Common methods for '_DeferredTensorSpec' and '_TransformedVariableSpec."""
 
   @property
   def name(self):
@@ -637,57 +652,16 @@ class _TransformedVariableSpec(type_spec.BatchableTypeSpec):
       else:
         return value
 
-    transform_or_spec = self._specs.pop(
+    specs = self._specs.copy()
+    transform_or_spec = specs.pop(
         'transform_or_spec', self.transform_or_spec)
     return type(self)(
         **tf.nest.map_structure(
             relax,
-            dict(self._specs,
+            dict(specs,
                  transform_or_spec=transform_or_spec,
                  **self._unique_id_params,
                  name=self.name)))
-
-  def _to_components(self, value):
-    """Encodes `value` as a nested structure of Tensor/CompositeTensor."""
-    components = dict(pretransformed_input=value.pretransformed_input)
-    if isinstance(value.bijector, tf.__internal__.CompositeTensor):
-      components['bijector'] = value.bijector
-    return components
-
-  def _from_components(self, components):
-    """Reconstructs a value from a structure of Tensor/CompositeTensor."""
-    bijector = components.pop('bijector', self.transform_or_spec)
-    return TransformedVariable(
-        **components, initial_value=None, bijector=bijector,
-        dtype=self.dtype, name=self.name)
-
-  @property
-  def _component_specs(self):
-    """A nested structure of TypeSpecs for the DeferredTensor's components."""
-    specs = dict(pretransformed_input=self._input_spec)
-    if self._transform_is_composite:
-      specs['bijector'] = self.transform_or_spec
-    return specs
-
-  def _batch(self, batch_size):
-    """Returns a TypeSpec representing a batch of DeferredTensors."""
-    transform_or_spec = self._specs.pop(
-        'transform_or_spec', self.transform_or_spec)
-    return type(self)(
-        self._get_batched_input_spec(batch_size),
-        transform_or_spec=transform_or_spec,
-        dtype=self.dtype,
-        name=self.name)
-
-  def _unbatch(self):
-    """Returns a TypeSpec representing a single DeferredTensor."""
-    transform_or_spec = self._specs.pop(
-        'transform_or_spec', self.transform_or_spec)
-    return type(self)(
-        self._get_unbatched_input_spec(),
-        transform_or_spec=transform_or_spec,
-        dtype=self.dtype,
-        name=self.name)
 
   def _get_batched_input_spec(self, batch_size):
     """Returns the batched `input_spec` for the given `batch_size`."""
@@ -759,3 +733,184 @@ class _TransformedVariableSpec(type_spec.BatchableTypeSpec):
   def __hash__(self):
     return hash(self.__get_cmp_key())
 
+
+@type_spec.register('tfp.util.DeferredTensorSpec')
+class _DeferredTensorSpec(_DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
+  """`tf.TypeSpec` for `tfp.util.DeferredTensor`."""
+
+  __slots__ = ('_input_spec', '_transform_or_spec', '_also_track_spec',
+               '_dtype', '_shape', '_name', '_specs', '_unique_id_params',
+               '_transform_is_composite')
+
+  def __init__(self, input_spec, transform_or_spec, dtype, shape, name,
+               also_track_spec=None):
+    """Initializes a new `_DeferredTensorSpec`.
+
+    Args:
+      input_spec: `tf.TypeSpec` instance describing the `DeferredTensor`s
+        `pretransformed_input` attribute.
+      transform_or_spec: The `transform_fn` passed to the `DeferredTensor`'s
+        constructor, or `transform_fn._type_spec` if `transform_fn` is a
+        `CompositeTensor`.
+      dtype: `tf.DType`, `dtype` property of the `DeferredTensor`.
+      shape: `tf.TensorShape`, `shape` property of the `DeferredTensor`.
+      name: `str`, name of the `DeferredTensor`.
+      also_track_spec: Python `list` of `VariableSpec` instances describing the
+        additional variables tracked by the `DeferredTensor`.
+    """
+    self._input_spec = input_spec
+    self._transform_or_spec = transform_or_spec
+    self._also_track_spec = also_track_spec
+    self._dtype = dtype
+    self._shape = shape
+    self._name = name
+
+    self._transform_is_composite = isinstance(transform_or_spec, tf.TypeSpec)
+    self._unique_id_params = {'dtype': dtype, 'shape': shape}
+
+    self._specs = {'input_spec': input_spec}
+    if self._transform_is_composite:
+      self._specs['transform_or_spec'] = transform_or_spec
+    if also_track_spec is not None:
+      self._specs['also_track_spec'] = also_track_spec
+
+  @property
+  def value_type(self):
+    return DeferredTensor
+
+  @property
+  def shape(self):
+    return self._shape
+
+  def _to_components(self, value):
+    """Encodes `value` as a nested structure of Tensor/CompositeTensor."""
+    components = dict(pretransformed_input=value.pretransformed_input)
+    # pylint: disable=protected-access
+    if isinstance(value._transform_fn, tf.__internal__.CompositeTensor):
+      components['transform_fn'] = value._transform_fn
+    if value.also_track is not None:
+      components['also_track'] = tf.nest.flatten(
+          tf.nest.map_structure(
+              lambda x: x.variables if isinstance(x, tf.Module) else x,
+              value.also_track))
+    return components
+
+  def _from_components(self, components):
+    """Reconstructs a value from a structure of Tensor/CompositeTensor."""
+    transform_fn = components.pop('transform_fn', self.transform_or_spec)
+    return DeferredTensor(**components, transform_fn=transform_fn,
+                          dtype=self.dtype, shape=self.shape, name=self.name)
+
+  @property
+  def _component_specs(self):
+    """A nested structure of TypeSpecs for the DeferredTensor's components."""
+    specs = dict(pretransformed_input=self._input_spec)
+    if self._transform_is_composite:
+      specs['transform_fn'] = self.transform_or_spec
+    if self._also_track_spec is not None:
+      specs['also_track'] = self._also_track_spec
+    return specs
+
+  def _batch(self, batch_size):
+    """Returns a TypeSpec representing a batch of DeferredTensors."""
+    transform_or_spec = self._specs.get(
+        'transform_or_spec', self.transform_or_spec)
+    return _DeferredTensorSpec(
+        self._get_batched_input_spec(batch_size),
+        transform_or_spec=transform_or_spec,
+        dtype=self.dtype,
+        shape=(None if self.shape is None
+               else tf.TensorShape([batch_size]).concatenate(self.shape)),
+        name=self.name,
+        also_track_spec=self._also_track_spec)
+
+  def _unbatch(self):
+    """Returns a TypeSpec representing a single DeferredTensor."""
+    transform_or_spec = self._specs.get(
+        'transform_or_spec', self.transform_or_spec)
+    return _DeferredTensorSpec(
+        self._get_unbatched_input_spec(),
+        transform_or_spec=transform_or_spec,
+        dtype=self.dtype,
+        shape=(None if self.shape is None else self.shape[1:]),
+        name=self.name,
+        also_track_spec=self._also_track_spec)
+
+
+@type_spec.register('tfp.util.TransformedVariableSpec')
+class _TransformedVariableSpec(
+    _DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
+  """`tf.TypeSpec` for `tfp.util.TransformedVariable`."""
+
+  __slots__ = ('_input_spec', '_transform_or_spec', '_dtype', '_name', '_specs',
+               '_unique_id_params', '_transform_is_composite')
+
+  def __init__(self, input_spec, transform_or_spec, dtype, name):
+    """Initializes a new `_TransformedVariableSpec`.
+
+    Args:
+      input_spec: `tf.TypeSpec` instance describing the `TransformedVariable`s
+        `pretransformed_input` attribute.
+      transform_or_spec: The `bijector` passed to the `TransformedVariable`'s
+        constructor, or `bijector._type_spec` if `bijector` is a
+        `CompositeTensor`.
+      dtype: `tf.DType`, `dtype` property of the `TransformedVariable`.
+      name: `str`, name of the `TransformedVariable`.
+    """
+    self._input_spec = input_spec
+    self._transform_or_spec = transform_or_spec
+    self._dtype = dtype
+    self._name = name
+
+    self._unique_id_params = {'dtype': dtype}
+    self._transform_is_composite = isinstance(transform_or_spec, tf.TypeSpec)
+
+    self._specs = {'input_spec': input_spec}
+    if self._transform_is_composite:
+      self._specs['transform_or_spec'] = transform_or_spec
+
+  @property
+  def value_type(self):
+    return TransformedVariable
+
+  def _to_components(self, value):
+    """Encodes `value` as a nested structure of Tensor/CompositeTensor."""
+    components = dict(pretransformed_input=value.pretransformed_input)
+    if isinstance(value.bijector, tf.__internal__.CompositeTensor):
+      components['bijector'] = value.bijector
+    return components
+
+  def _from_components(self, components):
+    """Reconstructs a value from a structure of Tensor/CompositeTensor."""
+    bijector = components.pop('bijector', self.transform_or_spec)
+    return TransformedVariable(
+        **components, initial_value=None, bijector=bijector,
+        dtype=self.dtype, name=self.name)
+
+  @property
+  def _component_specs(self):
+    """A structure of TypeSpecs for the TransformedVariable's components."""
+    specs = dict(pretransformed_input=self._input_spec)
+    if self._transform_is_composite:
+      specs['bijector'] = self.transform_or_spec
+    return specs
+
+  def _batch(self, batch_size):
+    """Returns a TypeSpec representing a batch of TransformedVariable."""
+    transform_or_spec = self._specs.get(
+        'transform_or_spec', self.transform_or_spec)
+    return _TransformedVariableSpec(
+        self._get_batched_input_spec(batch_size),
+        transform_or_spec=transform_or_spec,
+        dtype=self.dtype,
+        name=self.name)
+
+  def _unbatch(self):
+    """Returns a TypeSpec representing a single TransformedVariable."""
+    transform_or_spec = self._specs.get(
+        'transform_or_spec', self.transform_or_spec)
+    return _TransformedVariableSpec(
+        self._get_unbatched_input_spec(),
+        transform_or_spec=transform_or_spec,
+        dtype=self.dtype,
+        name=self.name)

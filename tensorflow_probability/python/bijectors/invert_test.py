@@ -28,6 +28,22 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 
+class NonCompositeScale(tfb.Bijector):
+  """Bijector that is not a `CompositeTensor`."""
+
+  def __init__(self, scale):
+    parameters = dict(locals())
+    self.scale = scale
+    super(NonCompositeScale, self).__init__(
+        validate_args=True,
+        forward_min_event_ndims=0.,
+        parameters=parameters,
+        name='non_composite_scale')
+
+  def _inverse(self, y):
+    return y / self.scale
+
+
 @test_util.test_all_tf_execution_regimes
 class InvertBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = Invert(bij) transformation."""
@@ -41,7 +57,7 @@ class InvertBijectorTest(test_util.TestCase):
         tfb.SoftmaxCentered(),
     ]:
       rev = tfb.Invert(fwd)
-      self.assertStartsWith(rev.name, "_".join(["invert", fwd.name]))
+      self.assertStartsWith(rev.name, '_'.join(['invert', fwd.name]))
       x = [[[1., 2.],
             [2., 3.]]]
       self.assertAllClose(
@@ -114,6 +130,40 @@ class InvertBijectorTest(test_util.TestCase):
         x,
         self.evaluate(bij.inverse_log_det_jacobian(x)))
 
+  def testNonCompositeTensorBijectorTfFunction(self):
+    scale = tf.Variable(5.)
+    b = NonCompositeScale(scale)
+    inv_b = tfb.Invert(b)
+    x = tf.constant([3.])
 
-if __name__ == "__main__":
+    @tf.function
+    def f(bij, x):
+      return bij.forward(x)
+
+    self.evaluate(scale.initializer)
+    self.assertAllClose(self.evaluate(f(inv_b, x)), [0.6])
+
+  @test_util.numpy_disable_variable_test
+  @test_util.jax_disable_variable_test
+  def testNonCompositeTensorBijectorRetainsVariable(self):
+
+    class BijectorContainer(tf.Module):
+
+      def __init__(self, bijector):
+        self.bijector = bijector
+
+    b = NonCompositeScale(tf.Variable(3.))
+    inv_b = tfb.Invert(b)
+    bc = BijectorContainer(inv_b)
+
+    # If `Invert` subclasses `CompositeTensor` but its inner bijector does not,
+    # this test fails because `tf.Module.trainable_variables` calls
+    # `nest.flatten(..., expand_composites=True` on the `tf.Module`s attributes.
+    # `Invert._type_spec` will treat the inner bijector as a callable (see
+    # `AutoCompositeTensor` docs) and not decompose the inner bijector correctly
+    # into its `Tensor` components.
+    self.assertLen(bc.trainable_variables, 1)
+
+
+if __name__ == '__main__':
   tf.test.main()
