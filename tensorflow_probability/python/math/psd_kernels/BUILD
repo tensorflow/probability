@@ -55,6 +55,7 @@ multi_substrate_py_library(
     deps = [
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
@@ -66,9 +67,11 @@ multi_substrate_py_test(
     srcs = ["positive_semidefinite_kernel_test.py"],
     numpy_tags = ["notap"],
     deps = [
+        ":positive_semidefinite_kernel",
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],

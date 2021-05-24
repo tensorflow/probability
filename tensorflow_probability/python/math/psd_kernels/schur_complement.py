@@ -46,7 +46,8 @@ def _add_diagonal_shift(matrix, shift):
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
-class SchurComplement(psd_kernel.PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   """The SchurComplement kernel.
 
   Given a block matrix `M = [[A, B], [C, D]]`, the Schur complement of D in M is

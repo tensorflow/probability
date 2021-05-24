@@ -25,6 +25,7 @@ import operator
 import six
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels.internal import util
@@ -925,6 +926,18 @@ class PositiveSemidefiniteKernel(tf.Module):
     return ()
 
 
+class AutoCompositeTensorPsdKernel(PositiveSemidefiniteKernel,
+                                   auto_composite_tensor.AutoCompositeTensor):
+  pass
+
+
+auto_composite_tensor_psd_kernel = functools.partial(
+    auto_composite_tensor.auto_composite_tensor,
+    omit_kwargs=('parameters',),
+    non_identifying_kwargs=('name',),
+    module_name='tfp.math._psdkernels')
+
+
 def _flatten_summand_list(kernels):
   """Flatten a list of kernels which may contain _SumKernel instances.
 
@@ -937,7 +950,7 @@ def _flatten_summand_list(kernels):
   """
   flattened = []
   for k in kernels:
-    if isinstance(k, _SumKernel):
+    if isinstance(k, _NonCompositeTensorSumKernel):
       flattened += k.kernels
     else:
       flattened.append(k)
@@ -956,14 +969,14 @@ def _flatten_multiplicand_list(kernels):
   """
   flattened = []
   for k in kernels:
-    if isinstance(k, _ProductKernel):
+    if isinstance(k, _NonCompositeTensorProductKernel):
       flattened += k.kernels
     else:
       flattened.append(k)
   return flattened
 
 
-class _SumKernel(PositiveSemidefiniteKernel):
+class _NonCompositeTensorSumKernel(PositiveSemidefiniteKernel):
   """Kernel class representing summation over a list of kernels.
 
   Mathematically this class represents the pointwise sum of several kernels.
@@ -1019,7 +1032,7 @@ class _SumKernel(PositiveSemidefiniteKernel):
     if name is None:
       name = 'SumKernel'
     # We have ensured the list is non-empty and all feature_ndims are the same.
-    super(_SumKernel, self).__init__(
+    super(_NonCompositeTensorSumKernel, self).__init__(
         feature_ndims=kernels[0].feature_ndims,
         dtype=util.maybe_get_common_dtype(
             [None if k.dtype is None else k for k in kernels]),
@@ -1052,7 +1065,25 @@ class _SumKernel(PositiveSemidefiniteKernel):
                             [k.batch_shape_tensor() for k in self.kernels])
 
 
-class _ProductKernel(PositiveSemidefiniteKernel):
+@auto_composite_tensor_psd_kernel
+class _SumKernel(_NonCompositeTensorSumKernel,
+                 auto_composite_tensor.AutoCompositeTensor):
+
+  def __new__(cls, kernels, name=None):
+    if cls is _SumKernel:
+      if not all(isinstance(k, tf.__internal__.CompositeTensor)
+                 for k in kernels):
+        return _NonCompositeTensorSumKernel(kernels, name=name)
+    return super(_SumKernel, cls).__new__(cls)
+
+
+_SumKernel.__doc__ = _NonCompositeTensorSumKernel.__doc__ + '\n' + (
+    'When an `_SumKernel` is constructed, if any element of its `kernels`'
+    'list is not a `CompositeTensor` instance, a `_NonCompositeTensorSumKernel`'
+    ' instance is returned instead.')
+
+
+class _NonCompositeTensorProductKernel(PositiveSemidefiniteKernel):
   """Kernel class representing the product over a list of kernels.
 
   Mathematically this class represents the pointwise product of several kernels.
@@ -1098,7 +1129,7 @@ class _ProductKernel(PositiveSemidefiniteKernel):
     if name is None:
       name = 'ProductKernel'
     # We have ensured the list is non-empty and all feature_ndims are the same.
-    super(_ProductKernel, self).__init__(
+    super(_NonCompositeTensorProductKernel, self).__init__(
         feature_ndims=kernels[0].feature_ndims,
         dtype=util.maybe_get_common_dtype(
             [None if k.dtype is None else k for k in kernels]),
@@ -1133,3 +1164,21 @@ class _ProductKernel(PositiveSemidefiniteKernel):
   def _batch_shape_tensor(self):
     return functools.reduce(tf.broadcast_dynamic_shape,
                             [k.batch_shape_tensor() for k in self.kernels])
+
+
+@auto_composite_tensor_psd_kernel
+class _ProductKernel(_NonCompositeTensorProductKernel,
+                     auto_composite_tensor.AutoCompositeTensor):
+
+  def __new__(cls, kernels, name=None):
+    if cls is _ProductKernel:
+      if not all(isinstance(k, tf.__internal__.CompositeTensor)
+                 for k in kernels):
+        return _NonCompositeTensorProductKernel(kernels, name=name)
+    return super(_ProductKernel, cls).__new__(cls)
+
+
+_ProductKernel.__doc__ = _NonCompositeTensorProductKernel.__doc__ + '\n' + (
+    'When an `_ProductKernel` is constructed, if any element of its `kernels`'
+    'list is not a `CompositeTensor` instance, a '
+    '`_NonCompositeTensorProductKernel` instance is returned instead.')
