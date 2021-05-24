@@ -196,11 +196,9 @@ COMPOSITE_TENSOR_RTOL.update({
 })
 COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
 
-# TODO(b/182603117): Enable AutoCT for meta-bijectors and LinearOperator.
+# TODO(b/182603117): Enable AutoCT for meta-bijectors.
 AUTO_COMPOSITE_TENSOR_IS_BROKEN = [
     'FillScaleTriL',
-    'ScaleMatvecDiag',
-    'ScaleMatvecTriL',
 ]
 
 

@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import fill_triangular as fill_triangular_bijector
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.internal import dtype_util
@@ -31,6 +32,7 @@ __all__ = [
 ]
 
 
+@bijector.auto_composite_tensor_bijector
 class ScaleMatvecTriL(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
   """Compute `Y = g(X; scale) = scale @ X`.
 
