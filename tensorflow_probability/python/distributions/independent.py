@@ -280,6 +280,11 @@ class Independent(distribution_lib.Distribution):
       return lambda x, axis: tfp_math.reduce_kahan_sum(x, axis).total
     return tf.math.reduce_sum
 
+  def _sample_and_log_prob(self, sample_shape, seed, **kwargs):
+    x, lp = self.distribution.experimental_sample_and_log_prob(
+        sample_shape, seed=seed, **kwargs)
+    return x, self._reduce(self._sum_fn(), lp)
+
   def _log_prob(self, x, **kwargs):
     return self._reduce(
         self._sum_fn(), self.distribution.log_prob(x, **kwargs))

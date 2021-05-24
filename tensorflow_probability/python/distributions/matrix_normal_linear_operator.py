@@ -213,6 +213,13 @@ class MatrixNormalLinearOperator(distribution.Distribution):
     samples = self._as_multivariate_normal(loc=loc).sample(n, seed=seed)
     return _unvec(samples, self._event_shape_tensor(loc=loc))
 
+  def _sample_and_log_prob(self, sample_shape, seed):
+    loc = tf.convert_to_tensor(self.loc)
+    x, lp = self._as_multivariate_normal(
+        loc=loc).experimental_sample_and_log_prob(
+            sample_shape, seed=seed)
+    return _unvec(x, self._event_shape_tensor(loc=loc)), lp
+
   def _entropy(self):
     return self._as_multivariate_normal().entropy()
 
