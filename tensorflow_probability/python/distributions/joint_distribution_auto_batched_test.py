@@ -334,6 +334,66 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
 
+  @parameterized.named_parameters(
+      {'testcase_name': 'coroutine',
+       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
+      {'testcase_name': 'sequential',
+       'jd_class': tfd.JointDistributionSequentialAutoBatched},
+      {'testcase_name': 'named',
+       'jd_class': tfd.JointDistributionNamedAutoBatched})
+  def test_sample_and_log_prob(self, jd_class):
+
+    # Define a bijector to detect if/when `inverse` is called.
+    inverted_values = []
+
+    class InverseTracingExp(tfb.Exp):
+
+      def _inverse(self, y):
+        inverted_values.append(y)
+        return tf.math.log(y)
+
+    models = {}
+
+    def coroutine_model():
+      g = yield InverseTracingExp()(tfd.Normal(0., 1.), name='g')
+      df = yield tfd.Exponential(1., name='df')
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20, name='loc')
+      yield tfd.StudentT(df, loc, 1, name='x')
+    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[tfd.JointDistributionSequentialAutoBatched] = [
+        InverseTracingExp()(tfd.Normal(0., 1.), name='g'),
+        tfd.Exponential(1., name='df'),
+        lambda _, g: tfd.Sample(tfd.Normal(0, g), 20, name='loc'),
+        lambda loc, df: tfd.StudentT(df, loc, 1, name='x')
+    ]
+
+    models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
+        ('g', InverseTracingExp()(tfd.Normal(0., 1.))),
+        ('df', tfd.Exponential(1.)),
+        ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
+        ('x', lambda loc, df: tfd.StudentT(df, loc, 1))))
+
+    joint = jd_class(models[jd_class], validate_args=True)
+
+    for sample_shape in ([], [5]):
+      inverted_values.clear()
+      x1, lp1 = self.evaluate(
+          joint.experimental_sample_and_log_prob(
+              sample_shape,
+              seed=test_util.test_seed(sampler_type='seedless'),
+              df=2.7))  # Check that kwargs are supported.
+      x2 = self.evaluate(
+          joint.sample(sample_shape,
+                       seed=test_util.test_seed(sampler_type='seedless'),
+                       df=2.7))
+      self.assertAllCloseNested(x1, x2)
+
+      self.assertLen(inverted_values, 0)
+      lp2 = joint.log_prob(x1)
+      self.assertLen(inverted_values, 1)
+      self.assertAllClose(lp1, lp2)
+
   def test_sample_with_batch_value(self):
     @tfd.JointDistributionCoroutineAutoBatched
     def dist():
