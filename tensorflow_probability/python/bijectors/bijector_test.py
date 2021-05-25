@@ -29,6 +29,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import cache_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
@@ -84,12 +85,12 @@ class BaseBijectorTest(test_util.TestCase):
 
     with self.assertRaisesRegexp(
         NotImplementedError,
-        'inverse not implemented'):
+        'Cannot derive `inverse_log_det_jacobian`'):
       bij.inverse_log_det_jacobian(0, event_ndims=0)
 
     with self.assertRaisesRegexp(
         NotImplementedError,
-        'forward not implemented'):
+        'Cannot derive `forward_log_det_jacobian`'):
       bij.forward_log_det_jacobian(0, event_ndims=0)
 
   @test_util.disable_test_for_backend(
@@ -128,8 +129,11 @@ class BaseBijectorTest(test_util.TestCase):
         error_clazz, 'Tensor conversion requested dtype'):
       b64.forward(x32)
 
+  @parameterized.named_parameters(
+      ('no_batch_shape', 1.4),
+      ('with_batch_shape', [[[2., 3.], [5., 7.]]]))
   @test_util.numpy_disable_gradient_test
-  def testAutodiffLogDetJacobian(self):
+  def testAutodiffLogDetJacobian(self, bijector_scale):
 
     class NoJacobianBijector(tfb.Bijector):
       """Bijector with no log det jacobian methods."""
@@ -148,7 +152,12 @@ class BaseBijectorTest(test_util.TestCase):
       def _inverse(self, y):
         return tf.math.log(y) / self._scale
 
-    b = NoJacobianBijector(scale=1.4)
+      @classmethod
+      def _parameter_properties(cls, dtype, num_classes=None):
+        return dict(
+            scale=parameter_properties.ParameterProperties(event_ndims=0))
+
+    b = NoJacobianBijector(scale=bijector_scale)
     x = tf.convert_to_tensor([2., -3.])
     [
         fldj,

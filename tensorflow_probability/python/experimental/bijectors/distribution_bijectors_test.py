@@ -97,8 +97,6 @@ class DistributionBijectorsTest(test_util.TestCase):
 
     dist = data.draw(dhps.base_distributions(
         dist_name=dist_name,
-        # TODO(b/175354524) fix autodiff for batch LDJs and enable batch tests.
-        batch_shape=[],
         enable_vars=False,
         param_strategy_fn=_constrained_zeros_fn))
     try:
