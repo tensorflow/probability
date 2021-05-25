@@ -155,6 +155,7 @@ class JointDistributionTest(test_lib.DistributedTest):
 
     keys = tfp.random.split_seed(self.key, 2)
     samples = []
+    unmapped_samples = []
     log_probs = []
     true_log_probs = []
 
@@ -172,24 +173,51 @@ class JointDistributionTest(test_lib.DistributedTest):
       true_log_prob = true_log_prob_fn(w, x, data)
 
       samples.append(sample)
+      unmapped_samples.append((w, x, data))
       log_probs.append(log_prob[0])
       true_log_probs.append(true_log_prob)
 
-    def run_diff(x, y):
-      return tfp.experimental.distributions.log_prob_ratio(dist, x, dist, y)
+    def true_diff(x, y):
+      return true_log_prob_fn(*x) - true_log_prob_fn(*y)
 
-    dist_lp_diff = self.per_replica_to_tensor(
+    def run_diff(x, y):
+      def _lpr(x, y):
+        return tfp.experimental.distributions.log_prob_ratio(dist, x, dist, y)
+      return tfp.math.value_and_gradient(_lpr, [x, y])
+
+    dist_lp_diff, dist_lp_diff_grad = self.per_replica_to_tensor(
         self.strategy_run(
             run_diff, tuple(tf.nest.map_structure(self.shard_values, samples))))
 
-    true_lp_diff = true_log_probs[0] - true_log_probs[1]
+    true_lp_diff, true_lp_diff_grad = tfp.math.value_and_gradient(
+        true_diff, unmapped_samples)
+
+    if isinstance(dist, jd.JointDistributionNamed):
+      dist_lp_diff_grad[0] = (
+          dist_lp_diff_grad[0]['w'][0],
+          dist_lp_diff_grad[0]['x'],
+          dist_lp_diff_grad[0]['data'])
+      dist_lp_diff_grad[1] = (
+          dist_lp_diff_grad[1]['w'][0],
+          dist_lp_diff_grad[1]['x'],
+          dist_lp_diff_grad[1]['data'])
+    else:
+      true_lp_diff_grad[0] = list(true_lp_diff_grad[0])
+      true_lp_diff_grad[1] = list(true_lp_diff_grad[1])
+      dist_lp_diff_grad[0] = list(dist_lp_diff_grad[0])
+      dist_lp_diff_grad[0][0] = dist_lp_diff_grad[0][0][0]
+      dist_lp_diff_grad[1] = list(dist_lp_diff_grad[1])
+      dist_lp_diff_grad[1][0] = dist_lp_diff_grad[1][0][0]
+
     lp_diff = log_probs[0] - log_probs[1]
 
     self.assertAllClose(
-        self.evaluate(true_lp_diff), self.evaluate(lp_diff),
+        true_lp_diff, lp_diff,
         rtol=7e-6)  # relaxed tol for fp32 in JAX
     self.assertAllClose(
-        self.evaluate(true_lp_diff), self.evaluate(dist_lp_diff[0]))
+        true_lp_diff, dist_lp_diff[0])
+    self.assertAllClose(
+        true_lp_diff_grad, dist_lp_diff_grad)
 
   def test_default_event_space_bijector_non_interacting(self):
 
