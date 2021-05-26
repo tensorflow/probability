@@ -40,6 +40,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import unnest
+from tensorflow_probability.python.math import generic as generic_math
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
 from tensorflow_probability.python.mcmc import sample
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
@@ -538,8 +539,9 @@ def windowed_adaptive_nuts(n_draws,
       work. Defaults to the dimension of the log density to the 0.25 power.
     dual_averaging_kwargs: Optional dict
       Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
-      By default, a `target_accept_prob` of 0.85 is set, and the class defaults
-      are used otherwise.
+      By default, a `target_accept_prob` of 0.85 is set, acceptance
+      probabilities across chains are reduced using a harmonic mean, and the
+      class defaults are used otherwise.
     max_tree_depth: Maximum depth of the tree implicitly built by NUTS. The
       maximum number of leapfrog steps is bounded by `2**max_tree_depth` i.e.
       the number of nodes in a binary tree `max_tree_depth` nodes deep. The
@@ -654,8 +656,9 @@ def windowed_adaptive_hmc(n_draws,
       work. Defaults to the dimension of the log density to the 0.25 power.
     dual_averaging_kwargs: Optional dict
       Keyword arguments to pass to `tfp.mcmc.DualAveragingStepSizeAdaptation`.
-      By default, a `target_accept_prob` of 0.75 is set, and the class defaults
-      are used otherwise.
+      By default, a `target_accept_prob` of 0.75 is set, acceptance
+      probabilities across chains are reduced using a harmonic mean, and the
+      class defaults are used otherwise.
     trace_fn: Optional callable
       The trace function should accept the arguments
       `(state, bijector, is_adapting, phmc_kernel_results)`,  where the `state`
@@ -736,6 +739,8 @@ def _windowed_adaptive_impl(n_draws,
     # trace_fn result allocation sizes.
     num_adaptation_steps = tf.convert_to_tensor(num_adaptation_steps)
 
+  dual_averaging_kwargs.setdefault('reduce_fn',
+                                   generic_math.reduce_log_harmonic_mean_exp)
   setup_seed, init_seed, seed = samplers.split_seed(
       samplers.sanitize_seed(seed), n=3)
   (target_log_prob_fn, initial_transformed_position, bijector,
