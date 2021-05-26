@@ -21,11 +21,14 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import joint_map
 from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -42,8 +45,7 @@ def _get_static_splits(splits):
   return splits if static_splits is None else static_splits
 
 
-# TODO(b/182603117): Enable AutoCompositeTensor once Chain subclasses it.
-class Blockwise(chain.Chain):
+class _Blockwise(composition.Composition):
   """Bijector which applies a list of bijectors to blocks of a `Tensor`.
 
   More specifically, given [F_0, F_1, ... F_n] which are scalar or vector
@@ -151,9 +153,12 @@ class Blockwise(chain.Chain):
           name='concat')
 
       self._maybe_changes_size = maybe_changes_size
-      super(Blockwise, self).__init__(
-          bijectors=[b_concat, b_joint, b_split],
+      self._chain = chain.Chain(
+          [b_concat, b_joint, b_split], validate_args=validate_args)
+      super(_Blockwise, self).__init__(
+          bijectors=self._chain.bijectors,
           validate_args=validate_args,
+          validate_event_size=True,
           parameters=parameters,
           name=name)
 
@@ -186,13 +191,13 @@ class Blockwise(chain.Chain):
     return self._b_concat.split_sizes
 
   def _forward(self, x, **kwargs):
-    y = super(Blockwise, self)._forward(x, **kwargs)
+    y = super(_Blockwise, self)._forward(x, **kwargs)
     if not self._maybe_changes_size:
       tensorshape_util.set_shape(y, x.shape)
     return y
 
   def _inverse(self, y, **kwargs):
-    x = super(Blockwise, self)._inverse(y, **kwargs)
+    x = super(_Blockwise, self)._inverse(y, **kwargs)
     if not self._maybe_changes_size:
       tensorshape_util.set_shape(x, y.shape)
     return x
@@ -220,19 +225,19 @@ class Blockwise(chain.Chain):
   def _forward_event_shape_tensor(self, x, **kwargs):
     if not self._maybe_changes_size:
       return x
-    return super(Blockwise, self)._forward_event_shape_tensor(x, **kwargs)
+    return super(_Blockwise, self)._forward_event_shape_tensor(x, **kwargs)
 
   def _inverse_event_shape_tensor(self, y, **kwargs):
     if not self._maybe_changes_size:
       return y
-    return super(Blockwise, self)._inverse_event_shape_tensor(y, **kwargs)
+    return super(_Blockwise, self)._inverse_event_shape_tensor(y, **kwargs)
 
   def _walk_forward(self, step_fn, x, **kwargs):
-    return super(Blockwise, self)._walk_forward(
+    return self._chain._walk_forward(  # pylint: disable=protected-access
         step_fn, x, **{self._b_joint.name: kwargs})
 
   def _walk_inverse(self, step_fn, x, **kwargs):
-    return super(Blockwise, self)._walk_inverse(
+    return self._chain._walk_inverse(  # pylint: disable=protected-access
         step_fn, x, **{self._b_joint.name: kwargs})
 
 
@@ -263,3 +268,32 @@ def _validate_block_sizes(block_sizes, bijectors, validate_args):
   # Set the shape if missing to pass statically known structure to split.
   tensorshape_util.set_shape(block_sizes, [len(bijectors)])
   return block_sizes
+
+
+@bijector_lib.auto_composite_tensor_bijector
+class Blockwise(_Blockwise, auto_composite_tensor.AutoCompositeTensor):
+
+  def __new__(cls, *args, **kwargs):
+    """Returns a `_Blockwise` if any of `bijectors` is not `CompositeTensor."""
+    if cls is Blockwise:
+      if args:
+        bijectors = args[0]
+      elif 'bijectors' in kwargs:
+        bijectors = kwargs['bijectors']
+      else:
+        raise TypeError(
+            '`Blockwise.__new__()` is missing argument `bijectors`.')
+
+      if not all(isinstance(b, tf.__internal__.CompositeTensor)
+                 for b in bijectors):
+        return _Blockwise(*args, **kwargs)
+    return super(Blockwise, cls).__new__(cls)
+
+
+Blockwise.__doc__ = _Blockwise.__doc__ + '\n' + (
+    'If every element of the `bijectors` list is a `CompositeTensor`, the '
+    'resulting `Blockwise` bijector is a `CompositeTensor` as well. If any '
+    'element of `bijectors` is not a `CompositeTensor`, then a '
+    'non-`CompositeTensor` `_Blockwise` instance is created instead. Bijector '
+    'subclasses that inherit from `Blockwise` will also inherit from '
+    '`CompositeTensor`.')

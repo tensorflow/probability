@@ -294,6 +294,60 @@ class BlockwiseBijectorTest(test_util.TestCase):
     bijectors[0]._inverse_log_det_jacobian.assert_called_with(mock.ANY, arg=7)
     bijectors[1]._inverse_log_det_jacobian.assert_called_with(mock.ANY, arg=8)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX have no notion of CompositeTensor.')
+  def testCompositeTensor(self):
+    exp = tfb.Exp()
+    sp = tfb.Softplus()
+    aff = tfb.Scale(scale=2.)
+    blockwise = tfb.Blockwise(bijectors=[exp, sp, aff])
+    self.assertIsInstance(blockwise, tf.__internal__.CompositeTensor)
+
+    # Bijector may be flattened into `Tensor` components and rebuilt.
+    flat = tf.nest.flatten(blockwise, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(blockwise, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfb.Blockwise)
+
+    # Bijector may be input to a `tf.function`-decorated callable.
+    @tf.function
+    def call_forward(bij, x):
+      return bij.forward(x)
+
+    x = tf.ones([2, 3], dtype=tf.float32)
+    self.assertAllClose(call_forward(unflat, x), blockwise.forward(x))
+
+    # Type spec can be encoded/decoded.
+    struct_coder = tf.__internal__.saved_model.StructureCoder()
+    enc = struct_coder.encode_structure(blockwise._type_spec)
+    dec = struct_coder.decode_proto(enc)
+    self.assertEqual(blockwise._type_spec, dec)
+
+  def testNonCompositeTensor(self):
+
+    class NonCompositeScale(tfb.Bijector):
+      """Bijector that is not a `CompositeTensor`."""
+
+      def __init__(self, scale):
+        parameters = dict(locals())
+        self.scale = scale
+        super(NonCompositeScale, self).__init__(
+            validate_args=True,
+            forward_min_event_ndims=0.,
+            parameters=parameters,
+            name='non_composite_scale')
+
+      def _forward(self, x):
+        return x * self.scale
+
+    exp = tfb.Exp()
+    scale = NonCompositeScale(scale=tf.constant(3.))
+    blockwise = tfb.Blockwise(bijectors=[exp, scale])
+    self.assertNotIsInstance(blockwise, tf.__internal__.CompositeTensor)
+    self.assertAllClose(
+        blockwise.forward([1., 1.]),
+        tf.convert_to_tensor([exp.forward(1.), scale.forward(1.)]))
+
 
 if __name__ == '__main__':
   tf.test.main()
