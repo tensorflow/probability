@@ -28,7 +28,6 @@ package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
 #         "//tensorflow_probability/google:friends",  # DisableOnExport
-        "//discussion/fun_mcmc:__subpackages__",
     ],
 )
 
