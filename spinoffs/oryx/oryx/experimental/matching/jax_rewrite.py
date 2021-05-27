@@ -192,7 +192,7 @@ f(1.) # ==> 1. (i.e. log(1.) + 1.)
 """
 import functools
 
-from typing import Any, Callable, Dict, Iterator, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Tuple, Union
 
 import dataclasses
 import jax
@@ -380,7 +380,7 @@ class JaxVar(JaxExpression):
 class Params(matcher.Pattern):
   """An immutable dictionary used to represent parameters of JAX primitives."""
 
-  def __init__(self, params: Dict[str, Any] = None, **kwargs: Any):
+  def __init__(self, params: Optional[Dict[str, Any]] = None, **kwargs: Any):
     """The constructor for a `Params` object.
 
     A `Params` object is an immutable dictionary, meant to encapsulate the
