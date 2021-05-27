@@ -94,6 +94,7 @@ py_library(
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/distributions:truncated_normal",
         "//tensorflow_probability/python/distributions:uniform",
+        "//tensorflow_probability/python/experimental/bijectors:build_trainable_highway_flow",
         "//tensorflow_probability/python/internal:samplers",
     ],
 )
