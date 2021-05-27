@@ -59,6 +59,7 @@ def _decompose_from_posterior_marginals(
       param.prior.event_shape]) for param in model.parameters]`. This may
       optionally also be a map (Python `dict`) of parameter names to
       `Tensor` values.
+    initial_step: optional `int` specifying the initial timestep of the decomposition.
 
   Returns:
     component_dists: A `collections.OrderedDict` instance mapping
@@ -221,7 +222,7 @@ def decompose_by_component(model, observed_time_series, parameter_samples):
         model, posterior_means, posterior_covs, parameter_samples)
 
 
-def decompose_forecast_by_component(model, forecast_dist, parameter_samples, observed_time_series):
+def decompose_forecast_by_component(model, forecast_dist, parameter_samples):
   """Decompose a forecast distribution into contributions from each component.
 
   Args:
@@ -323,4 +324,4 @@ def decompose_forecast_by_component(model, forecast_dist, parameter_samples, obs
     forecast_latent_covs = dist_util.move_dimension(
         forecast_latent_covs, source_idx=-4, dest_idx=0)
     return _decompose_from_posterior_marginals(
-        model, forecast_latent_mean, forecast_latent_covs, parameter_samples, initial_step=len(observed_time_series))
+        model, forecast_latent_mean, forecast_latent_covs, parameter_samples, initial_step=forecast_lgssm.initial_step)
