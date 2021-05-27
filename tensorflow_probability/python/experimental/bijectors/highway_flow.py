@@ -155,7 +155,7 @@ class HighwayFlow(tfb.Bijector):
 
   dim = 4 # last input dimension
 
-  bijector = build_trainable_highway_flow(dim, activation_fn=True)
+  bijector = build_trainable_highway_flow(dim, activation_fn=tf.nn.softplus)
   y = bijector.forward(x)  # forward mapping
   x = bijector.inverse(y)  # inverse mapping
   base = tfd.MultivariateNormalDiag(loc=tf.zeros(dim)) # Base distribution
