@@ -21,7 +21,8 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.math.psd_kernels.feature_transformed import FeatureTransformed
+from tensorflow_probability.python.math.psd_kernels import feature_transformed
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
 __all__ = ['FeatureScaled']
@@ -29,7 +30,8 @@ __all__ = ['FeatureScaled']
 
 # TODO(b/132103412): Support more general scaling via LinearOperator, along with
 # scaling all feature dimensions.
-class FeatureScaled(FeatureTransformed):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class FeatureScaled(feature_transformed.FeatureTransformed):
   """Kernel that first rescales all feature dimensions.
 
   Given a kernel `k` and `scale_diag` and inputs `x` and `y`, this kernel

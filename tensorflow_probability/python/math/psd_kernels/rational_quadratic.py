@@ -24,13 +24,14 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
-from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = ['RationalQuadratic']
 
 
-class RationalQuadratic(PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class RationalQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
   """RationalQuadratic Kernel.
 
   This kernel function has the form:

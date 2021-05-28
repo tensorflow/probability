@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import blockwise
 from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import exp
 from tensorflow_probability.python.bijectors import identity
 from tensorflow_probability.python.bijectors import invert
@@ -50,7 +51,7 @@ __all__ = [
 ]
 
 
-class Glow(chain.Chain):
+class Glow(composition.Composition):
   r"""Implements the Glow Bijector from Kingma & Dhariwal (2018)[1].
 
   Overview: `Glow` is a chain of bijectors which transforms a rank-1 tensor
@@ -319,6 +320,7 @@ class Glow(chain.Chain):
       name: Python `str`, name given to ops managed by this object.
         Default value: `'glow'`.
     """
+    parameters = dict(locals())
     # Make sure that the input shape is fully defined.
     if not tensorshape_util.is_fully_defined(output_shape):
       raise ValueError('Shape must be fully defined.')
@@ -441,10 +443,13 @@ class Glow(chain.Chain):
           ]))
 
     glow_chain = glow_chain[::-1]
-    # To finish off, we initialize the bijector with the chain we've built
-    # This way, the rest of the model attributes are taken care of for us.
+    # To finish off, we build a bijector that chains the components together
+    # sequentially.
     super(Glow, self).__init__(
-        bijectors=glow_chain, validate_args=validate_args, name=name)
+        bijectors=chain.Chain(glow_chain, validate_args=validate_args),
+        validate_args=validate_args,
+        parameters=parameters,
+        name=name)
 
   @classmethod
   def _parameter_properties(cls, dtype):
@@ -491,7 +496,7 @@ class Glow(chain.Chain):
     return self._blockwise_splits
 
 
-class ExitBijector(blockwise.Blockwise):
+class ExitBijector(composition.Composition):
   """The spatial coupling bijector used in Glow.
 
   This bijector consists of a blockwise bijector of a realNVP bijector. It is
@@ -524,7 +529,7 @@ class ExitBijector(blockwise.Blockwise):
         tensor with event shape `input_shape`, and returns a tensor with shape
         `input_shape`.
     """
-
+    parameters = dict(locals())
     nleave, ngrab, npass = blockwise_splits
 
     new_input_shape = input_shape[:-1]+(nleave,)
@@ -551,7 +556,10 @@ class ExitBijector(blockwise.Blockwise):
           bijector_fn=exit_bijector_fn)
 
     super(ExitBijector, self).__init__(
-        [shift_distribution, identity.Identity()], [nleave + ngrab, npass])
+        blockwise.Blockwise(
+            [shift_distribution, identity.Identity()], [nleave + ngrab, npass]),
+        parameters=parameters,
+        name='exit_bijector')
 
   @staticmethod
   def make_bijector_fn(layer, target_shape, scale_fn=tf.nn.sigmoid):
@@ -601,7 +609,7 @@ class ExitBijector(blockwise.Blockwise):
     return bijector_fn
 
 
-class GlowBlock(chain.Chain):
+class GlowBlock(composition.Composition):
   """Single block for a glow model.
 
   This bijector contains `num_steps` steps of the flow, each consisting of an
@@ -613,7 +621,7 @@ class GlowBlock(chain.Chain):
 
   def __init__(self, input_shape, num_steps, coupling_bijector_fn,
                use_actnorm, seedstream):
-
+    parameters = dict(locals())
     rnvp_block = [identity.Identity()]
     this_nchan = input_shape[-1]
 
@@ -646,7 +654,8 @@ class GlowBlock(chain.Chain):
 
     # Note that we reverse the list since Chain applies bijectors in reverse
     # order.
-    super(GlowBlock, self).__init__(rnvp_block[::-1])
+    super(GlowBlock, self).__init__(
+        chain.Chain(rnvp_block[::-1]), parameters=parameters, name='glow_block')
 
   @staticmethod
   def make_bijector_fn(layer, scale_fn=tf.nn.sigmoid):
@@ -809,7 +818,7 @@ class ActivationNormalization(bijector.Bijector):
     return tf.cond(self._initialized, tf.no_op, _init)
 
 
-class Expand(chain.Chain):
+class Expand(composition.Composition):
   """A bijector to transform channels into spatial pixels."""
 
   def __init__(self, input_shape, block_size=2, validate_args=False, name=None):
@@ -827,8 +836,10 @@ class Expand(chain.Chain):
             event_shape_in=[h, w, c],
             event_shape_out=[h, w, c // n**2, n, n]),
     ]
-    super(Expand, self).__init__(b, name=name or 'Expand',
-                                 parameters=parameters)
+    super(Expand, self).__init__(
+        bijectors=chain.Chain(b, validate_args=validate_args),
+        name=name or 'Expand',
+        parameters=parameters)
 
 
 class GlowDefaultNetwork(tfk.Sequential):

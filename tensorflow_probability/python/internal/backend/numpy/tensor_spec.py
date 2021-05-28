@@ -1,5 +1,4 @@
-# Lint as: python3
-# Copyright 2020 The TensorFlow Probability Authors.
+# Copyright 2021 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,3 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""Numpy stub for `tensor_spec`."""
+
+__all__ = [
+    'TensorSpec',
+]
+
+
+class TensorSpec(object):
+
+  def __init__(self, *args, **kwargs):
+    del args, kwargs
+    self.dtype = None

@@ -55,6 +55,9 @@ TF_REPLACEMENTS = {
     'from tensorflow.python.framework import tensor_util':
         ('from tensorflow_probability.python.internal.backend.numpy '
          'import ops'),
+    'from tensorflow.python.framework import tensor_spec':
+        ('from tensorflow_probability.python.internal.backend.numpy '
+         'import tensor_spec'),
     'from tensorflow.python.framework import type_spec':
         ('from tensorflow_probability.python.internal.backend.numpy '
          'import type_spec'),

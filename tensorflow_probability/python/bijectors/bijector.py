@@ -1415,7 +1415,23 @@ class Bijector(tf.Module):
           x = self.inverse(y, **kwargs)  # Fall back to computing `-fldj(x)`
           ildj = attrs['ildj'] = -self._forward_log_det_jacobian(x, **kwargs)
         elif self._is_scalar:
-          ildj = _autodiff_log_det_jacobian(self._inverse, y)
+          try:
+            scalar_batch_shape = self.experimental_batch_shape_tensor(
+                y_event_ndims=0)
+          except NotImplementedError:
+            raise NotImplementedError(
+                'Cannot derive `inverse_log_det_jacobian` using automatic '
+                'differentiation because its shape could not be determined. '
+                'Please implement at least one of:\n'
+                '`{bijector_type}._parameter_properties`\n'
+                '`{bijector_type}._batch_shape_tensor`\n'
+                '`{bijector_type}._forward_log_det_jacobian`\n '
+                '`{bijector_type}._inverse_log_det_jacobian`.'.format(
+                    bijector_type=type(self).__name__))
+          ildj = _autodiff_log_det_jacobian(
+              self.inverse,
+              tf.broadcast_to(y, ps.broadcast_shape(ps.shape(y),
+                                                    scalar_batch_shape)))
         else:
           raise NotImplementedError(
               'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
@@ -1524,7 +1540,23 @@ class Bijector(tf.Module):
           y = self.forward(x, **kwargs)  # Fall back to computing `ildj(y)`
           ildj = attrs['ildj'] = self._inverse_log_det_jacobian(y, **kwargs)
         elif self._is_scalar:
-          ildj = -_autodiff_log_det_jacobian(self._forward, x)
+          try:
+            scalar_batch_shape = self.experimental_batch_shape_tensor(
+                x_event_ndims=0)
+          except NotImplementedError:
+            raise NotImplementedError(
+                'Cannot derive `forward_log_det_jacobian` using automatic '
+                'differentiation because its shape could not be determined. '
+                'Please implement at least one of:\n'
+                '`{bijector_type}._parameter_properties`\n'
+                '`{bijector_type}._batch_shape_tensor`\n'
+                '`{bijector_type}._forward_log_det_jacobian`\n '
+                '`{bijector_type}._inverse_log_det_jacobian`.'.format(
+                    bijector_type=type(self).__name__))
+          ildj = -_autodiff_log_det_jacobian(
+              self.forward,
+              tf.broadcast_to(x, ps.broadcast_shape(ps.shape(x),
+                                                    scalar_batch_shape)))
         else:
           raise NotImplementedError(
               'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
@@ -2111,6 +2143,8 @@ def ldj_reduction_shape(shape_structure,
 
 def _autodiff_log_det_jacobian(fn, x):
   """Automatically compute the log det jacobian of a scalar function."""
+  # Note: x must be fully broadcast (`shape(x) == shape(fn(x))`); otherwise
+  # the gradients will be (incorrectly) summed.
   _, grads = gradient.value_and_gradient(fn, x)
   if grads is None:
     raise ValueError('Cannot compute log det jacobian; function {} has `None` '

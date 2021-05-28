@@ -116,9 +116,11 @@ class JointDistributionVmapMixin(object):
                                           self._model_flatten(value),
                                           check_types=False),
             flat_core_ndims=tf.nest.flatten(self._single_sample_ndims)))
+    sample_shape_may_be_nontrivial = (
+        distribution_util.shape_may_be_nontrivial(sample_shape))
 
     if not self.use_vectorized_map or not (
-        distribution_util.shape_may_be_nontrivial(sample_shape) or  # pylint: disable=protected-access
+        sample_shape_may_be_nontrivial or  # pylint: disable=protected-access
         value_might_have_sample_dims):
       # No need to auto-vectorize.
       return joint_distribution_lib.JointDistribution._call_execute_model(  # pylint: disable=protected-access
@@ -134,7 +136,8 @@ class JointDistributionVmapMixin(object):
           lambda v, nd: None if v is None else nd,
           value, self._model_unflatten(self._single_sample_ndims),
           check_types=False)
-    batch_execute_model = vectorization_util.make_rank_polymorphic(
+
+    vectorized_execute_model_helper = vectorization_util.make_rank_polymorphic(
         lambda v, seed: (  # pylint: disable=g-long-lambda
             joint_distribution_lib.JointDistribution._call_execute_model(  # pylint: disable=protected-access
                 self,
@@ -144,12 +147,16 @@ class JointDistributionVmapMixin(object):
                 sample_and_trace_fn=sample_and_trace_fn)),
         core_ndims=[value_core_ndims, None],
         validate_args=self.validate_args)
+    # Redefine the polymorphic fn to hack around `make_rank_polymorphic`
+    # not currently supporting keyword args. This is needed because the
+    # `iid_sample` wrapper below expects to pass through a `seed` kwarg.
+    vectorized_execute_model = (
+        lambda v, seed: vectorized_execute_model_helper(v, seed))  # pylint: disable=unnecessary-lambda
 
-    # Draw samples.
-    vectorized_execute_model = vectorization_util.iid_sample(
-        # Redefine the polymorphic fn to hack around `make_rank_polymorphic`
-        # not currently supporting keyword args.
-        lambda v, seed: batch_execute_model(v, seed), sample_shape)  # pylint: disable=unnecessary-lambda
+    if sample_shape_may_be_nontrivial:
+      vectorized_execute_model = vectorization_util.iid_sample(
+          vectorized_execute_model, sample_shape)
+
     return vectorized_execute_model(value, seed=seed)
 
   def _default_event_space_bijector(self, *args, **kwargs):

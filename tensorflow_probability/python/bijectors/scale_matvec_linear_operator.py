@@ -33,9 +33,7 @@ __all__ = [
 ]
 
 
-# TODO(b/182603117): Enable AutoCompositeTensor once LinearOperators are
-# converted to CompositeTensor.
-class _ScaleMatvecLinearOperatorBase(bijector.Bijector):
+class _ScaleMatvecLinearOperatorBase(bijector.AutoCompositeTensorBijector):
   """Common base class for `ScaleMatvecLinearOperator{Block}`."""
 
   @property
@@ -68,6 +66,7 @@ class _ScaleMatvecLinearOperatorBase(bijector.Bijector):
     return []
 
 
+@bijector.auto_composite_tensor_bijector
 class ScaleMatvecLinearOperator(_ScaleMatvecLinearOperatorBase):
   """Compute `Y = g(X; scale) = scale @ X`.
 
@@ -144,6 +143,7 @@ class ScaleMatvecLinearOperator(_ScaleMatvecLinearOperatorBase):
           name=name)
 
 
+@bijector.auto_composite_tensor_bijector
 class ScaleMatvecLinearOperatorBlock(_ScaleMatvecLinearOperatorBase):
   """Compute `Y = g(X; scale) = scale @ X` for blockwise `X` and `scale`.
 

@@ -257,9 +257,9 @@ def register_elementwise(prim):
       incell, = incells
       if not incell.top() and outcell.top():
         val = outcell.val
-        f_sum = lambda x: f(x).sum()
-        ildj_ = outcell.ildj + np.log(jax.grad(f_sum)(val))
-        ndslice = NDSlice.new(f(val), ildj_)
+        f_sum = lambda x: f(x, **params).sum()
+        ildj_ = outcell.ildj + np.log(np.abs(jax.grad(f_sum)(val)))
+        ndslice = NDSlice.new(f(val, **params), ildj_)
         incells = [InverseAndILDJ(outcell.aval, [ndslice])]
       elif not outcell.top() and incell.top():
         outcells = [InverseAndILDJ.new(prim.bind(incell.val, **params))]

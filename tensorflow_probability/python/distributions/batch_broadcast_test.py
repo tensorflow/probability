@@ -76,7 +76,8 @@ class _BatchBroadcastTest(object):
                                     batch_shape,
                                     dist.event_shape_tensor()],
                                    axis=0)
-    sample = dist.sample(sample_shape, seed=test_util.test_seed())
+    sample = dist.sample(sample_shape,
+                         seed=test_util.test_seed(sampler_type='stateless'))
     if self.is_static_shape:
       self.assertEqual(tf.TensorShape(self.evaluate(sample_batch_event)),
                        sample.shape)
@@ -88,6 +89,16 @@ class _BatchBroadcastTest(object):
                                         sample_batch_event),
                         sample,
                         atol=.1)
+
+    # Check that `sample_and_log_prob` also gives a correctly-shaped sample
+    # with correct log-prob.
+    sample2, lp = dist.experimental_sample_and_log_prob(
+        sample_shape, seed=test_util.test_seed(sampler_type='stateless'))
+    if self.is_static_shape:
+      self.assertEqual(tf.TensorShape(self.evaluate(sample_batch_event)),
+                       sample2.shape)
+    self.assertAllEqual(sample_batch_event, tf.shape(sample2))
+    self.assertAllClose(lp, dist.log_prob(sample2))
 
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(default_max_examples=5)

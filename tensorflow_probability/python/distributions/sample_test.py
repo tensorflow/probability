@@ -66,6 +66,14 @@ class SampleDistributionTest(test_util.TestCase):
     self.assertEqual((6, 1, 3), actual_lp_.shape)
     self.assertAllClose(expected_lp_, actual_lp_, atol=0, rtol=1e-3)
 
+  def test_sample_and_log_prob(self):
+    s = tfd.Sample(
+        tfd.Independent(tfd.Normal(loc=tf.zeros([3, 2]), scale=1), 1), [5, 4],
+        validate_args=True)
+    x, lp = s.experimental_sample_and_log_prob([6, 1],
+                                               seed=test_util.test_seed())
+    self.assertAllClose(lp, s.log_prob(x))
+
   def test_mixed_scalar(self):
     s = tfd.Sample(tfd.Independent(tfd.Normal(loc=[0., 0], scale=1), 1),
                    3, validate_args=False)

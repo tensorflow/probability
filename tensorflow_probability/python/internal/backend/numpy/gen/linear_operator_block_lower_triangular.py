@@ -55,6 +55,7 @@ __all__ = ["LinearOperatorBlockLowerTriangular"]
 
 
 # @tf_export("linalg.LinearOperatorBlockLowerTriangular")
+# @linear_operator.make_composite_tensor
 class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
   """Combines `LinearOperators` into a blockwise lower-triangular matrix.
 
@@ -892,6 +893,10 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
     eig_list = linear_operator_util.broadcast_matrix_batch_dims(eig_list)
     eigs = array_ops.concat(eig_list, axis=-2)
     return array_ops.squeeze(eigs, axis=-1)
+
+  @property
+  def _composite_tensor_fields(self):
+    return ("operators",)
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg

@@ -20,6 +20,8 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import blockwise
+from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import batch_jacobian
 
@@ -115,7 +117,7 @@ class GlowTest(test_util.TestCase):
 
     x = bijection.bijectors[0].inverse(x)
     for b in bijection.bijectors[1].bijectors:
-      if isinstance(b, tfb.blockwise.Blockwise):
+      if isinstance(b, blockwise._Blockwise):
         x1, x2 = tf.split(x, splits[-2-nblocks], axis=-1)
 
         for bb in b.bijectors[0].bijectors:
@@ -131,7 +133,7 @@ class GlowTest(test_util.TestCase):
         x = tf.concat([x1, x2], axis=-1)
         nblocks += 1
 
-      elif isinstance(b, tfb.chain.Chain):
+      elif isinstance(b, composition.Composition):
         for bb in b.bijectors:
           x = self.evaluate(bb.inverse(x))
           if isinstance(bb, tfb.glow.ActivationNormalization):
@@ -156,7 +158,7 @@ class GlowTest(test_util.TestCase):
     splits = [[bs[0]+bs[1], bs[2]] for bs in splits]
 
     for b in reversed(bijection.bijectors[1].bijectors):
-      if isinstance(b, tfb.blockwise.Blockwise):
+      if isinstance(b, blockwise._Blockwise):
         y1, y2 = tf.split(y, splits[nblocks], axis=-1)
 
         for bb in reversed(b.bijectors[0].bijectors):
@@ -172,7 +174,7 @@ class GlowTest(test_util.TestCase):
         y = tf.concat([y1, y2], axis=-1)
         nblocks += 1
 
-      elif isinstance(b, tfb.chain.Chain):
+      elif isinstance(b, composition.Composition):
         for bb in reversed(b.bijectors):
           y = self.evaluate(bb.forward(y))
           if isinstance(bb, tfb.glow.ActivationNormalization):
