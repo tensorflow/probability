@@ -379,10 +379,12 @@ def _build_highway_flow_block(num_layers, width,
     for _ in range(0, num_layers - 1):
         bijectors.append(
             build_trainable_highway_flow(width,
+                                         residual_fraction_initial_value=residual_fraction_initial_value,
                                          activation_fn=tf.nn.softplus,
                                          gate_first_n=gate_first_n, seed=seed))
     bijectors.append(
         build_trainable_highway_flow(width,
+                                     residual_fraction_initial_value=residual_fraction_initial_value,
                                      activation_fn=None,
                                      gate_first_n=gate_first_n, seed=seed))
 
@@ -415,7 +417,7 @@ def _cf_surrogate_for_joint_distribution(
                 bijectors = _build_highway_flow_block(
                     num_layers,
                     width=num_auxiliary_variables,
-                    residual_fraction_initial_value=None,
+                    residual_fraction_initial_value=0,  # not used
                     gate_first_n=0, seed=seed)
                 variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
