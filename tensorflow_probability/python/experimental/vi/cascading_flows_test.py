@@ -31,8 +31,6 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-# test_util.test_seed(sampler_type='stateless'))
-
 @test_util.test_all_tf_execution_regimes
 class _TrainableCFSurrogate(object):
 
@@ -62,9 +60,9 @@ class _TrainableCFSurrogate(object):
 
     # Test that the sample shape is correct
     three_posterior_samples = surrogate_posterior.sample(
-      3, seed=(0, 0))
+      3, seed=test_util.test_seed(sampler_type='stateless'))
     three_prior_samples = prior_dist.sample(
-      3, seed=(0, 0))
+      3, seed=test_util.test_seed(sampler_type='stateless'))
     self.assertAllEqualNested(
       [s.shape for s in tf.nest.flatten(three_prior_samples)],
       [s.shape for s in tf.nest.flatten(three_posterior_samples)])
@@ -72,7 +70,7 @@ class _TrainableCFSurrogate(object):
     # Test that gradients are available wrt the variational parameters.
     with tf.GradientTape() as tape:
       posterior_sample = surrogate_posterior.sample(
-        seed=(0, 0))
+        seed=test_util.test_seed(sampler_type='stateless'))
       posterior_logprob = surrogate_posterior.log_prob(posterior_sample)
     grad = tape.gradient(posterior_logprob,
                          surrogate_posterior.trainable_variables)
@@ -83,19 +81,19 @@ class _TrainableCFSurrogate(object):
 
     surrogate_posterior = tfp.experimental.vi.build_cf_surrogate_posterior(
       prior=prior_dist,
-      seed=(0, 0))
+      seed=test_util.test_seed(sampler_type='stateless'))
     self.evaluate(
       [v.initializer for v in surrogate_posterior.trainable_variables])
     posterior_sample = surrogate_posterior.sample(
-      seed=(0, 0))
+      seed=test_util.test_seed(sampler_type='stateless'))
 
     surrogate_posterior2 = tfp.experimental.vi.build_cf_surrogate_posterior(
       prior=prior_dist,
-      seed=(0, 0))
+      seed=test_util.test_seed(sampler_type='stateless'))
     self.evaluate(
       [v.initializer for v in surrogate_posterior2.trainable_variables])
     posterior_sample2 = surrogate_posterior2.sample(
-      seed=(0, 0))
+      seed=test_util.test_seed(sampler_type='stateless'))
 
     self.assertAllEqualNested(posterior_sample, posterior_sample2)
 
@@ -103,7 +101,6 @@ class _TrainableCFSurrogate(object):
 @test_util.test_all_tf_execution_regimes
 class CFSurrogatePosteriorTestBrownianMotion(test_util.TestCase,
                                              _TrainableCFSurrogate):
-
 
   def make_prior_dist(self):
 
@@ -338,6 +335,7 @@ class TestCFDistributionSubstitution(test_util.TestCase):
     self.assertIsInstance(surrogate_dists.local_scale.distribution,
                           tfd.Normal)
     self.assertIsInstance(surrogate_dists.weights, tfd.Normal)
+
 
 if __name__ == '__main__':
   tf.test.main()
