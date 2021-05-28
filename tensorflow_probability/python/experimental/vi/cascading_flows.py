@@ -48,13 +48,12 @@ from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import truncated_normal
 from tensorflow_probability.python.distributions import uniform
-from tensorflow_probability.python.experimental.bijectors import \
-  build_trainable_highway_flow
+from tensorflow_probability.python.experimental.bijectors import build_trainable_highway_flow
 from tensorflow_probability.python.internal import samplers
 
 __all__ = [
-    'register_cf_substitution_rule',
-    'build_cf_surrogate_posterior'
+  'register_cf_substitution_rule',
+  'build_cf_surrogate_posterior'
 ]
 
 Root = joint_distribution_coroutine.JointDistributionCoroutine.Root
@@ -129,7 +128,6 @@ def register_cf_substitution_rule(condition, substitution_fn):
             # pylint: disable=g-long-lambda
             distribution, cls)
     ASVI_SURROGATE_SUBSTITUTIONS[condition] = substitution_fn
-
 
 # Default substitutions attempt to express distributions using the most
 # flexible available parameterization.

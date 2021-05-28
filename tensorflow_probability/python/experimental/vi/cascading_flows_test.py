@@ -104,6 +104,7 @@ class _TrainableCFSurrogate(object):
 class CFSurrogatePosteriorTestBrownianMotion(test_util.TestCase,
                                              _TrainableCFSurrogate):
 
+
   def make_prior_dist(self):
 
     def _prior_model_fn():
@@ -128,6 +129,7 @@ class CFSurrogatePosteriorTestBrownianMotion(test_util.TestCase,
     ground_truth = prior_dist.sample()
     likelihood = self.make_likelihood_model(
       x=ground_truth, observation_noise=observation_noise)
+
     return likelihood.sample(1)
 
   def get_target_log_prob(self, observations, prior_dist):
@@ -174,7 +176,6 @@ class CFSurrogatePosteriorTestBrownianMotion(test_util.TestCase,
 @test_util.test_all_tf_execution_regimes
 class CFSurrogatePosteriorTestEightSchools(test_util.TestCase,
                                            _TrainableCFSurrogate):
-
   def make_prior_dist(self):
     treatment_effects = tf.constant([28, 8, -3, 7, -1, 1, 18, 12],
                                     dtype=tf.float32)
@@ -337,7 +338,6 @@ class TestCFDistributionSubstitution(test_util.TestCase):
     self.assertIsInstance(surrogate_dists.local_scale.distribution,
                           tfd.Normal)
     self.assertIsInstance(surrogate_dists.weights, tfd.Normal)
-
 
 if __name__ == '__main__':
   tf.test.main()
