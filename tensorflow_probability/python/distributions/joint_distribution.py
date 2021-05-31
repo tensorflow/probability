@@ -98,6 +98,15 @@ def trace_values_only(dist, sample_shape, seed, value=None):
   return ValueWithTrace(value=value, traced=value)
 
 
+def trace_values_and_log_probs(dist, sample_shape, seed, value=None):
+  """Draws a sample, and traces both the sampled value and its log density."""
+  if value is None:
+    value, lp = dist.experimental_sample_and_log_prob(sample_shape, seed=seed)
+  else:
+    lp = dist.log_prob(value)
+  return ValueWithTrace(value=value, traced=(value, lp))
+
+
 CALLING_CONVENTION_DESCRIPTION = """
 The measure methods of `JointDistribution` (`log_prob`, `prob`, etc.)
 can be called either by passing a single structure of tensors or by using
@@ -570,6 +579,19 @@ class JointDistribution(distribution_lib.Distribution):
 
     return self._model_unflatten(xs)
 
+  # TODO(b/189122177): Implement _sample_and_log_prob for distributed JDs.
+  def _sample_and_log_prob(self, sample_shape, seed, value=None, **kwargs):
+    xs, lps = zip(
+        *self._call_execute_model(
+            sample_shape,
+            seed=seed,
+            value=self._resolve_value(value=value,
+                                      allow_partially_specified=True,
+                                      **kwargs),
+            sample_and_trace_fn=trace_values_and_log_probs))
+    return (self._model_unflatten(xs),
+            sum(maybe_check_wont_broadcast(lps, self.validate_args)))
+
   def _map_measure_over_dists(self, attr, value):
     if any(x is None for x in tf.nest.flatten(value)):
       raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
@@ -727,14 +749,13 @@ class JointDistribution(distribution_lib.Distribution):
   # tactically implement the `_call_sample_n` redirector.  We don't want to
   # override the public level because then tfp.layers can't take generic
   # `Distribution.sample` as argument for the `convert_to_tensor_fn` parameter.
-  def _call_sample_n(self, sample_shape, seed, name, value=None, **kwargs):
-    with self._name_and_control_scope(name):
-      return self._sample_n(
-          sample_shape,
-          seed=seed() if callable(seed) else seed,
-          value=self._resolve_value(value=value,
-                                    allow_partially_specified=True,
-                                    **kwargs))
+  def _call_sample_n(self, sample_shape, seed, value=None, **kwargs):
+    return self._sample_n(
+        sample_shape,
+        seed=seed() if callable(seed) else seed,
+        value=self._resolve_value(value=value,
+                                  allow_partially_specified=True,
+                                  **kwargs))
 
   def _execute_model(self,
                      sample_shape=(),

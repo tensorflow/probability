@@ -55,6 +55,7 @@ __all__ = [
 
 
 # @tf_export("linalg.LinearOperatorLowRankUpdate")
+# @linear_operator.make_composite_tensor
 class LinearOperatorLowRankUpdate(linear_operator.LinearOperator):
   """Perturb a `LinearOperator` with a rank `K` update.
 
@@ -522,6 +523,10 @@ class LinearOperatorLowRankUpdate(linear_operator.LinearOperator):
     # D^{-1} + V^H L^{-1} V
     capacitance = self._diag_operator.inverse().add_to_tensor(vh_linv_u)
     return capacitance
+
+  @property
+  def _composite_tensor_fields(self):
+    return ("base_operator", "u", "diag_update", "v", "is_diag_update_positive")
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg

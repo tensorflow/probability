@@ -1,4 +1,4 @@
-# Copyright 2020 The TensorFlow Probability Authors.
+# Copyright 2021 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""FunMCMC API using the TensorFlow backend."""
+"""Numpy stub for `tensor_spec`."""
 
-# Need to register the rewrite hooks.
-from discussion.fun_mcmc import rewrite
-from discussion.fun_mcmc.dynamic.backend_tf import api  # pytype: disable=import-error
-# pylint: disable=wildcard-import
-from discussion.fun_mcmc.dynamic.backend_tf.api import *  # pytype: disable=import-error
-del rewrite
+__all__ = [
+    'TensorSpec',
+]
 
-__all__ = api.__all__
+
+class TensorSpec(object):
+
+  def __init__(self, *args, **kwargs):
+    del args, kwargs
+    self.dtype = None

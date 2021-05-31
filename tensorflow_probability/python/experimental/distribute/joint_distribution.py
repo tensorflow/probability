@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as distribution_lib
 from tensorflow_probability.python.distributions import log_prob_ratio as lp_ratio
@@ -39,30 +37,23 @@ class JointDistributionDistributedMixin(object):
     if (attr in ('log_prob', 'unnormalized_log_prob')) and any(
         self.experimental_shard_axis_names):
 
-      def inner_log_prob_parts(flat_value):
-        unflat_value = self._model_unflatten(flat_value)
+      def inner_log_prob_parts(value):
         ds, xs = self._call_flat_sample_distributions(
-            value=unflat_value, seed=samplers.zeros_seed())
-        # For sharded distributions, we need to make sure not to do an
-        # all-reduce.
-        axis_names = self._model_flatten(self.experimental_shard_axis_names)
-        log_prob_fns = [
-            functools.partial(getattr(d, attr), reduce_over_shards=False)
-            if axis_name else getattr(d, attr)
-            for d, axis_name in zip(ds, axis_names)
-        ]
+            value=value, seed=samplers.zeros_seed())
         # We need to flatten and unflatten here to ensure the output structure
         # matches `flat_sharded_distributions`.
-        vals = self._model_unflatten(
-            [log_prob_fn(x) for log_prob_fn, x in zip(log_prob_fns, xs)])
-        return self._model_flatten(vals)
+        return self._model_unflatten(
+            [getattr(d, attr)(x) for d, x in zip(ds, xs)])
 
-      flat_value = self._model_flatten(value)
-      flat_axis_names = self._model_flatten(self.experimental_shard_axis_names)
-      flat_xs = distribute_lib.make_sharded_log_prob_parts(
-          inner_log_prob_parts, flat_axis_names)(
-              flat_value)
-      return iter(flat_xs)
+      axis_names = self.experimental_shard_axis_names
+      # Individual distributions will apply psum in their `log_prob` methods
+      # so we need to pbroadcast `value` according to `axis_names` to provide
+      # correct gradients. We are safe to add pbroadcasts to functions with
+      # psums already in them.
+      log_prob_parts = distribute_lib.make_pbroadcast_function(
+          inner_log_prob_parts, (axis_names,), axis_names,
+          out_dtype=value)(value)
+      return iter(tf.nest.flatten(log_prob_parts))
     ds, xs = self._call_flat_sample_distributions(
         value=value, seed=samplers.zeros_seed())
     return (getattr(d, attr)(x) for d, x in zip(ds, xs))
@@ -104,16 +95,14 @@ def _dist_jd_log_prob_ratio(p, x, q, y, name=None):
     def log_prob_ratio_parts_fn(x, y):
       p_dists = p.sample_distributions(value=x, seed=samplers.zeros_seed())[0]
       q_dists = q.sample_distributions(value=y, seed=samplers.zeros_seed())[0]
-      # Ensure sharded distributions defer reductions.
-      kwds = lambda a: {'reduce_over_shards': False} if a else {}
       return nest.map_structure_up_to(
           p_dists,
-          lambda p, x, q, y, s: lp_ratio.log_prob_ratio(p, x, q, y, **kwds(s)),
-          p_dists, x, q_dists, y, p_axis_names)
+          lp_ratio.log_prob_ratio,
+          p_dists, x, q_dists, y)
 
     return tf.add_n(
         tf.nest.flatten(
-            distribute_lib.make_psum_function(
+            distribute_lib.make_pbroadcast_function(
                 log_prob_ratio_parts_fn,
                 in_axes=(p_axis_names, p_axis_names),
                 out_axes=p_axis_names,

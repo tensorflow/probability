@@ -334,6 +334,45 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
 
+  def test_sample_and_log_prob(self):
+
+    # Define a bijector to detect if/when `inverse` is called.
+    inverted_values = []
+
+    class InverseTracingExp(tfb.Exp):
+
+      def _inverse(self, y):
+        inverted_values.append(y)
+        return tf.math.log(y)
+
+    def coroutine_model():
+      g = yield Root(InverseTracingExp()(tfd.Normal(0., 1.), name='g'))
+      df = yield Root(tfd.Exponential(1., name='df'))
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20, name='loc')
+      yield tfd.Independent(tfd.StudentT(df[..., tf.newaxis], loc, 1, name='x'),
+                            reinterpreted_batch_ndims=1)
+
+    joint = tfd.JointDistributionCoroutine(coroutine_model, validate_args=True)
+
+    for sample_shape in ([], [5]):
+      inverted_values.clear()
+      x1, lp1 = self.evaluate(
+          joint.experimental_sample_and_log_prob(
+              sample_shape,
+              seed=test_util.test_seed(sampler_type='seedless'),
+              df=2.7 * tf.ones(sample_shape)  # Check that kwargs are supported.
+              ))
+      x2 = self.evaluate(
+          joint.sample(sample_shape,
+                       seed=test_util.test_seed(sampler_type='seedless'),
+                       df=2.7 * tf.ones(sample_shape)))
+      self.assertAllCloseNested(x1, x2)
+
+      self.assertLen(inverted_values, 0)
+      lp2 = joint.log_prob(x1)
+      self.assertLen(inverted_values, 1)
+      self.assertAllClose(lp1, lp2)
+
   def test_detect_missing_root(self):
     if not tf.executing_eagerly(): return
     # The joint distribution specified below is intended to

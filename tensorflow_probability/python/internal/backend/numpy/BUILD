@@ -33,6 +33,7 @@ py_library(
         ":composite_tensor",
         ":config",
         ":control_flow",
+        ":data_structures",
         ":debugging",
         ":deprecation",
         ":dtype",
@@ -57,9 +58,11 @@ py_library(
         ":sparse_lib",
         ":static_rewrites",
         ":tensor_array_ops",
+        ":tensor_spec",
         ":test_lib",
         ":tf_inspect",
         ":type_spec",
+        ":variables",
     ],
 )
 
@@ -108,6 +111,12 @@ py_library(
         ":ops",
         # numpy dep,
     ],
+)
+
+py_library(
+    name = "data_structures",
+    srcs = ["data_structures.py"],
+    deps = [],
 )
 
 py_library(
@@ -390,8 +399,21 @@ py_library(
 )
 
 py_library(
+    name = "tensor_spec",
+    srcs = ["tensor_spec.py"],
+)
+
+py_library(
     name = "type_spec",
     srcs = ["type_spec.py"],
+)
+
+py_library(
+    name = "variables",
+    srcs = ["variables.py"],
+    deps = [
+        ":ops",
+    ],
 )
 
 py_library(

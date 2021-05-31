@@ -211,6 +211,16 @@ class BatchReshape(distribution_lib.Distribution):
         axis=0)
     return tf.reshape(x, new_shape)
 
+  def _sample_and_log_prob(self, sample_shape, seed=None, **kwargs):
+    x, lp = self.distribution.experimental_sample_and_log_prob(
+        sample_shape=sample_shape, seed=seed, **kwargs)
+    return (tf.reshape(x, tf.concat([sample_shape,
+                                     self._batch_shape_unexpanded,
+                                     self.event_shape_tensor()], axis=0)),
+            tf.reshape(lp, tf.concat([sample_shape,
+                                      self._batch_shape_unexpanded],
+                                     axis=0)))
+
   def _log_prob(self, x, **kwargs):
     return self._call_reshape_input_output(
         self.distribution.log_prob, x, extra_kwargs=kwargs)

@@ -23,6 +23,7 @@ from inference_gym.internal.datasets import convection_lorenz_bridge as convecti
 from inference_gym.internal.datasets import sp500_closing_prices as sp500_closing_prices_lib
 from inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib
 from inference_gym.internal.datasets import synthetic_log_gaussian_cox_process as synthetic_log_gaussian_cox_process_lib
+from inference_gym.internal.datasets import synthetic_plasma_spectroscopy as synthetic_plasma_spectroscopy_lib
 
 __all__ = [
     'brownian_motion_missing_middle_observations',
@@ -32,6 +33,7 @@ __all__ = [
     'sp500_closing_prices',
     'synthetic_item_response_theory',
     'synthetic_log_gaussian_cox_process',
+    'synthetic_plasma_spectroscopy',
 ]
 
 
@@ -555,4 +557,23 @@ def synthetic_log_gaussian_cox_process(
       train_locations=locations,
       train_extents=extents,
       train_counts=counts,
+  )
+
+
+def synthetic_plasma_spectroscopy():
+  """Synthetic dataset sampled from the PlasmaSpectroscopy model.
+
+  Returns:
+    dataset: A Dict with the following keys:
+      measurements: Float `Tensor` with shape [num_wavelengths, num_sensors].
+        The spectrometer measurements.
+      wavelengths: Float `Tensor` with shape [num_wavelengths]. Wavelengths
+        measured by the spectrometers.
+      center_wavelength: Float `Tensor` scalar. The center wavelength of the
+        target emission line.
+  """
+  return dict(
+      measurements=synthetic_plasma_spectroscopy_lib.MEASUREMENTS,
+      wavelengths=synthetic_plasma_spectroscopy_lib.WAVELENGTHS,
+      center_wavelength=synthetic_plasma_spectroscopy_lib.CENTER_WAVELENGTH,
   )

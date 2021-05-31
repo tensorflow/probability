@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
+
 # Dependency imports
 import numpy as np
 
@@ -929,17 +931,6 @@ def monte_carlo_variational_loss(target_log_prob_fn,
 
   """
   with tf.name_scope(name or 'monte_carlo_variational_loss'):
-
-    def divergence_fn(q_samples):
-      target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
-      return discrepancy_fn(
-          target_log_prob - surrogate_posterior.log_prob(
-              q_samples))
-
-    # If Q is joint, drawing samples forces it to build its components. It's
-    # important to do this *before* checking its reparameterization type.
-    q_samples = surrogate_posterior.sample(sample_size, seed=seed)
-
     reparameterization_types = tf.nest.flatten(
         surrogate_posterior.reparameterization_type)
     if use_reparameterization is None:
@@ -958,6 +949,22 @@ def monte_carlo_variational_loss(target_log_prob_fn,
     if not callable(target_log_prob_fn):
       raise TypeError('`target_log_prob_fn` must be a Python `callable`'
                       'function.')
+
+    def divergence_fn(q_samples, q_lp=None):
+      target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
+      if q_lp is None:
+        q_lp = surrogate_posterior.log_prob(q_samples)
+      return discrepancy_fn(target_log_prob - q_lp)
+
+    if use_reparameterization:
+      # Attempt to avoid bijector inverses by computing the surrogate log prob
+      # during the forward sampling pass.
+      q_samples, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
+          sample_size, seed=seed)
+      divergence_fn = functools.partial(divergence_fn, q_lp=q_lp)
+    else:
+      # Score fn objective requires explicit gradients of `log_prob`.
+      q_samples = surrogate_posterior.sample(sample_size, seed=seed)
 
     return monte_carlo.expectation(
         f=divergence_fn,

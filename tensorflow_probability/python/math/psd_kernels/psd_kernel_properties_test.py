@@ -115,6 +115,44 @@ class KernelPropertiesTest(test_util.TestCase):
           xs, xs, example_ndims=example_ndims))
     self.assertAllClose(diag, diag2)
 
+  @parameterized.named_parameters(dict(testcase_name=kname, kernel_name=kname)
+                                  for kname in TF2_FRIENDLY_KERNELS)
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings(
+      default_max_examples=10,
+      suppress_health_check=[
+          hp.HealthCheck.too_slow,
+          hp.HealthCheck.data_too_large])
+  def testCompositeTensor(self, kernel_name, data):
+    kernel, _ = data.draw(
+        kernel_hps.kernels(
+            kernel_name=kernel_name,
+            event_dim=2,
+            feature_dim=2,
+            feature_ndims=1,
+            enable_vars=True))
+    self.assertIsInstance(kernel, tf.__internal__.CompositeTensor)
+
+    xs = tf.identity(data.draw(kernel_hps.kernel_input(
+        batch_shape=[],
+        example_ndims=1,
+        feature_dim=2,
+        feature_ndims=1)))
+    diag = kernel.apply(xs, xs, example_ndims=1)
+
+    # Test flatten/unflatten.
+    flat = tf.nest.flatten(kernel, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(kernel, flat, expand_composites=True)
+
+    # Test tf.function.
+    @tf.function
+    def diag_fn(k):
+      return k.apply(xs, xs, example_ndims=1)
+
+    self.evaluate([v.initializer for v in kernel.variables])
+    self.assertAllClose(diag, diag_fn(kernel))
+    self.assertAllClose(diag, diag_fn(unflat))
+
 
 CONSTRAINTS = {
     # Keep amplitudes large enough so that the matrices are well conditioned.

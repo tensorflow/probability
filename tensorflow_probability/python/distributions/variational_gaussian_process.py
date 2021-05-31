@@ -35,7 +35,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.math import psd_kernels as tfpk
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util as kernel_util
 
 __all__ = [
@@ -43,7 +43,8 @@ __all__ = [
 ]
 
 
-class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
   """A PSDKernel which computes the variational kernel from [Titsias, 2009].
 
   The VariationalGaussianProcess can be cast as a special case of
@@ -129,12 +130,12 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
           inducing_index_points, dtype=dtype, name='inducing_index_points')
       self._variational_scale = tensor_util.convert_nonref_to_tensor(
           variational_scale, dtype=dtype, name='variational_scale')
-      jitter = tensor_util.convert_nonref_to_tensor(
+      self._jitter = tensor_util.convert_nonref_to_tensor(
           jitter, dtype=dtype, name='jitter')
 
       def _compute_chol_kzz(z):
         kzz = base_kernel.matrix(z, z)
-        result = tf.linalg.cholesky(_add_diagonal_shift(kzz, jitter))
+        result = tf.linalg.cholesky(_add_diagonal_shift(kzz, self._jitter))
         return result
 
       # Somewhat confusingly, but for the sake of brevity, we use `var` to refer

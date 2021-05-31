@@ -289,6 +289,32 @@ class ReproducibilityTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
+class SampleAndLogProbTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                          list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
+                                        validate_args=False))
+    seed = test_util.test_seed(sampler_type='stateless')
+    sample_shape = [2, 1]
+    with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
+      s1, lp1 = dist.experimental_sample_and_log_prob(sample_shape, seed=seed)
+      s2 = dist.sample(sample_shape, seed=seed)
+      self.assertAllClose(s1, s2, atol=1e-4)
+
+      # Sanity-check the log prob. The actual values may differ arbitrarily (if
+      # the `sample_and_log_prob` implementation is more stable) or be NaN, but
+      # they should at least have the same shape.
+      lp2 = dist.log_prob(s1)
+      self.assertAllEqual(lp1.shape, lp2.shape)
+
+
+@test_util.test_all_tf_execution_regimes
 class NoNansTest(test_util.TestCase, dhps.TestCase):
 
   @parameterized.named_parameters(
@@ -403,17 +429,28 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
     if event_space_bijector is None:
       return
 
+    # Draw a sample shape
+    sample_shape = data.draw(tfp_hps.shapes())
+    inv_event_shape = event_space_bijector.inverse_event_shape(
+        tensorshape_util.concatenate(dist.batch_shape, dist.event_shape))
+
+    # Draw a shape that broadcasts with `[batch_shape, inverse_event_shape]`
+    # where `inverse_event_shape` is the event shape in the bijector's
+    # domain. This is the shape of `y` in R**n, such that
+    # x = event_space_bijector(y) has the event shape of the distribution.
+
+    # TODO(b/174778703): Actually draw broadcast compatible shapes.
+    batch_inv_event_compat_shape = inv_event_shape
+    # batch_inv_event_compat_shape = data.draw(
+    #     tfp_hps.broadcast_compatible_shape(inv_event_shape))
+    # batch_inv_event_compat_shape = tensorshape_util.concatenate(
+    #     (1,) * (len(inv_event_shape) - len(batch_inv_event_compat_shape)),
+    #     batch_inv_event_compat_shape)
+
     total_sample_shape = tensorshape_util.concatenate(
-        # Draw a sample shape
-        data.draw(tfp_hps.shapes()),
-        # Draw a shape that broadcasts with `[batch_shape, inverse_event_shape]`
-        # where `inverse_event_shape` is the event shape in the bijector's
-        # domain. This is the shape of `y` in R**n, such that
-        # x = event_space_bijector(y) has the event shape of the distribution.
-        data.draw(tfp_hps.broadcasting_shapes(
-            event_space_bijector.inverse_event_shape(
-                tensorshape_util.concatenate(
-                    dist.batch_shape, dist.event_shape)), n=1))[0])
+        sample_shape, batch_inv_event_compat_shape)
+    # full_sample_batch_event_shape = tensorshape_util.concatenate(
+    #     sample_shape, inv_event_shape)
 
     y = data.draw(
         tfp_hps.constrained_tensors(
@@ -424,6 +461,14 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
       hp.note('Got constrained samples {}'.format(x))
       with tf.control_dependencies(dist._sample_control_dependencies(x)):
         self.evaluate(tf.identity(x))
+
+      # TODO(b/158874412): Verify DoF changing default bijectors.
+      # y_bc = tf.broadcast_to(y, full_sample_batch_event_shape)
+      # x_bc = event_space_bijector(y_bc)
+      # self.assertAllClose(x, x_bc)
+      # fldj = event_space_bijector.forward_log_det_jacobian(y)
+      # fldj_bc = event_space_bijector.forward_log_det_jacobian(y_bc)
+      # self.assertAllClose(fldj, fldj_bc)
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}

@@ -1010,6 +1010,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
         "//tensorflow_probability/python/mcmc:sample",
     ],

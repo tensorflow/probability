@@ -35,16 +35,9 @@ JAX_MODE = False
 
 def _implement_sharded_lp_fn(fn_name):
   """Implements log_prob or unnormalized_log_prob."""
-  def lp_fn(self, x, reduce_over_shards=True, **kwargs):
-
-    new_kwargs = dict(kwargs)
-    if self.distribution.experimental_shard_axis_names:
-      new_kwargs['reduce_over_shards'] = reduce_over_shards
-    lp = getattr(self.distribution, fn_name)(x, **new_kwargs)
-    if reduce_over_shards:
-      lp = distribute_lib.psum(lp, self.experimental_shard_axis_names)
-
-    return lp
+  def lp_fn(self, x):
+    lp = getattr(self.distribution, fn_name)(x)
+    return distribute_lib.psum(lp, self.experimental_shard_axis_names)
 
   lp_fn.__name__ = f'_{fn_name}'
   return lp_fn
@@ -181,7 +174,7 @@ class Sharded(distribution_lib.Distribution):
 
 
 @log_prob_ratio.RegisterLogProbRatio(Sharded)
-def _sharded_log_prob_ratio(p, x, q, y, name=None, reduce_over_shards=True):
+def _sharded_log_prob_ratio(p, x, q, y, name=None):
   """Distributed log-prob ratio for Sharded."""
   with tf.name_scope(name or 'sharded_log_prob_ratio'):
     if p.experimental_shard_axis_names != q.experimental_shard_axis_names:
@@ -194,10 +187,7 @@ def _sharded_log_prob_ratio(p, x, q, y, name=None, reduce_over_shards=True):
       return log_prob_ratio.log_prob_ratio(p.distribution, x,
                                            q.distribution, y)
 
-    if reduce_over_shards:
-      axes = p.experimental_shard_axis_names
-
-      return distribute_lib.make_psum_function(
-          log_prob_ratio_fn, in_axes=(axes, axes), out_axes=axes,
-          out_dtype=x)(x, y)
-    return log_prob_ratio_fn(x, y)
+    axes = p.experimental_shard_axis_names
+    return distribute_lib.make_psum_function(
+        log_prob_ratio_fn, in_axes=(axes, axes), out_axes=axes,
+        out_dtype=x)(x, y)

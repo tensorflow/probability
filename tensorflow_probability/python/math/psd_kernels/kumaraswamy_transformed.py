@@ -25,12 +25,14 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import feature_transformed
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
 
 __all__ = ['KumaraswamyTransformed']
 
 
+@psd_kernel.auto_composite_tensor_psd_kernel
 class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
   """Transform inputs by Kumaraswamy bijector.
 

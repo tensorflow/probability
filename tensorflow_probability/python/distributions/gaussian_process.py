@@ -532,6 +532,15 @@ class GaussianProcess(distribution.Distribution):
   def _sample_n(self, n, seed=None, index_points=None):
     return self.get_marginal_distribution(index_points).sample(n, seed=seed)
 
+  def _sample_and_log_prob(self,
+                           sample_shape,
+                           seed,
+                           index_points=None,
+                           **kwargs):
+    return self.get_marginal_distribution(
+        index_points).experimental_sample_and_log_prob(
+            sample_shape, seed=seed, **kwargs)
+
   def _log_survival_function(self, value, index_points=None):
     return self.get_marginal_distribution(
         index_points).log_survival_function(value)

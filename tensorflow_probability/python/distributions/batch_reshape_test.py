@@ -200,7 +200,7 @@ class _BatchReshapeTest(object):
       # document that the test is not intended to run in eager mode.
       return
 
-    seed = test_util.test_seed()
+    seed = test_util.test_seed(sampler_type='stateless')
 
     new_batch_shape = [2, 2]
     old_batch_shape = [4]
@@ -220,27 +220,15 @@ class _BatchReshapeTest(object):
     expected_log_prob = tf.reshape(normal.log_prob(x), expected_log_prob_shape)
     actual_log_prob = reshape_normal.log_prob(expected_sample)
 
-    [
-        batch_shape_,
-        event_shape_,
-        expected_sample_,
-        actual_sample_,
-        expected_log_prob_,
-        actual_log_prob_,
-    ] = self.evaluate([
-        batch_shape,
-        event_shape,
-        expected_sample,
-        actual_sample,
-        expected_log_prob,
-        actual_log_prob,
-    ])
-    self.assertAllEqual(new_batch_shape, batch_shape_)
-    self.assertAllEqual([], event_shape_)
-    self.assertAllClose(expected_sample_, actual_sample_,
-                        atol=0., rtol=1e-6)
-    self.assertAllClose(expected_log_prob_, actual_log_prob_,
-                        atol=0., rtol=1e-6)
+    self.assertAllEqual(new_batch_shape, batch_shape)
+    self.assertAllEqual([], event_shape)
+    self.assertAllClose(expected_sample, actual_sample, atol=0., rtol=1e-6)
+    self.assertAllClose(expected_log_prob, actual_log_prob, atol=0., rtol=1e-6)
+
+    slp_sample, slp_lp = reshape_normal.experimental_sample_and_log_prob(
+        seed=seed)
+    self.assertAllClose(expected_sample, slp_sample, atol=0., rtol=1e-6)
+    self.assertAllClose(expected_log_prob, slp_lp, atol=0., rtol=1e-6)
     if not self.is_static_shape:
       return
     self.assertAllEqual(new_batch_shape, reshape_normal.batch_shape)

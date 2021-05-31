@@ -19,8 +19,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.internal import callable_util
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = ['ScalarFunctionWithInferredInverse']
 
@@ -35,6 +37,7 @@ class ScalarFunctionWithInferredInverse(bijector.Bijector):
                max_iterations=50,
                require_convergence=True,
                additional_scalar_parameters_requiring_gradients=(),
+               dtype=None,
                validate_args=False,
                name='scalar_function_with_inferred_inverse'):
     """Initialize the ScalarFunctionWithInferredInverse bijector.
@@ -72,6 +75,9 @@ class ScalarFunctionWithInferredInverse(bijector.Bijector):
         anything in the closure of `fn`) will not, in general, receive
         gradients.
         Default value: `()`.
+      dtype: `tf.dtype` supported by this `Bijector`. `None` means dtype is not
+        enforced.
+        Default value: `None`.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
@@ -91,7 +97,6 @@ class ScalarFunctionWithInferredInverse(bijector.Bijector):
       # VJPs and JVPs can be computed efficiently using actual matrix ops.
       self._additional_scalar_parameters_requiring_gradients = (
           additional_scalar_parameters_requiring_gradients)
-      self._cached_fn_batch_shape = None
 
       self._bound_fn = (
           lambda x: fn(x, *additional_scalar_parameters_requiring_gradients))
@@ -99,6 +104,7 @@ class ScalarFunctionWithInferredInverse(bijector.Bijector):
 
       super(ScalarFunctionWithInferredInverse, self).__init__(
           parameters=parameters,
+          dtype=dtype,
           forward_min_event_ndims=0,
           inverse_min_event_ndims=0,
           validate_args=validate_args,
@@ -129,15 +135,25 @@ class ScalarFunctionWithInferredInverse(bijector.Bijector):
     """Forward `fn` with any extra args bound, so that `y = bound_fn(x)`."""
     return self._bound_fn
 
-  def _fn_batch_shape(self):
-    if self._cached_fn_batch_shape is None:
-      # Evaluating at a scalar value (0.) exposes the function's batch shape.
-      # For example, evaluating
-      # `fn = lambda x: x * constant([1., 2., 3.])`
-      # returns a result of shape `[3]`.
-      self._cached_fn_batch_shape = ps.shape(
-          self.bound_fn(self.domain_constraint_fn(0.)))  # pylint: disable=not-callable
-    return self._cached_fn_batch_shape
+  def _batch_shape(self, x_event_ndims):
+    try:
+      # Trace the function to extract its batch shape without executing it.
+      fn_shape = callable_util.get_output_spec(
+          lambda x: self.bound_fn(self.domain_constraint_fn(x)),  # pylint: disable=not-callable
+          tf.TensorSpec([], dtype=self.dtype if self.dtype else tf.float32)
+          ).shape
+    except TypeError:  # `dtype` wasn't specified.
+      return tf.TensorShape(None)
+
+    fn_rank = tensorshape_util.rank(fn_shape)
+    if fn_rank is not None:
+      return fn_shape[:fn_rank - x_event_ndims]
+    return fn_shape
+
+  def _batch_shape_tensor(self, x_event_ndims):
+    fn_shape = ps.shape(
+        self.bound_fn(self.domain_constraint_fn(0.)))  # pylint: disable=not-callable
+    return fn_shape[:ps.rank_from_shape(fn_shape) - x_event_ndims]
 
   def _forward(self, x):
     return self.bound_fn(x)
@@ -220,8 +236,8 @@ class ScalarFunctionWithInferredInverse(bijector.Bijector):
         # TODO(davmre): Do gradient reductions directly in the VJP using
         # `tf.raw_ops.BroadcastGradientArgs` so we can remove this wrapper
         # and avoid spurious broadcasting.
-        full_batch_shape = ps.broadcast_shape(self._fn_batch_shape(),
-                                              ps.shape(y))
+        full_batch_shape = ps.broadcast_shape(
+            self.experimental_batch_shape_tensor(), ps.shape(y))
         args = [tf.broadcast_to(arg, full_batch_shape) for arg in args]
       return _inverse_with_gradient(y, *args)
 

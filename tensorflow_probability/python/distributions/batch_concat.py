@@ -423,6 +423,20 @@ class BatchConcat(distribution_lib.Distribution):
 
     return tf.concat(samples, axis=self._axis+1)
 
+  def _sample_and_log_prob(self, sample_shape, seed, **kwargs):
+    all_seeds = samplers.split_seed(
+        seed, len(self._distributions), salt='BatchConcat')
+    samples = []
+    log_probs = []
+    for d, s in zip(self._distributions, all_seeds):
+      x, lp = d.experimental_sample_and_log_prob(sample_shape, s)
+      samples.append(self._broadcast(x, sample_shape))
+      log_probs.append(self._broadcast(lp, sample_shape))
+
+    sample_shape_size = ps.rank_from_shape(sample_shape)
+    return (tf.concat(samples, axis=self._axis + sample_shape_size),
+            tf.concat(log_probs, axis=self._axis + sample_shape_size))
+
   def _call_split_concat(self, fn, x, **kwargs):
     sample_shape_size, split_x = self._split_sample(x)
     result = [

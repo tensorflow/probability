@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import abc
 import collections
 import functools
 import sys
@@ -115,7 +114,11 @@ class Composition(bijector.Bijector):
     """Instantiates a Composition of bijectors.
 
     Args:
-      bijectors: A nest-compatible structure of bijector instances.
+      bijectors: A nest-compatible structure of bijector instances or a
+        `Composition` bijector. If `bijectors` is a nested structure, then
+        `_walk_forward` and `_walk_inverse` must be implemented. If `bijectors`
+        is a `Composition` bijector, `_walk_forward` and `_walk_inverse` call
+        its corresponding methods.
       name: Name of this bijector.
       parameters: Dictionary of parameters used to initialize this bijector.
         These must be the exact values passed to `__init__`.
@@ -195,6 +198,8 @@ class Composition(bijector.Bijector):
 
   @property
   def bijectors(self):
+    if isinstance(self._bijectors, Composition):
+      return self._bijectors.bijectors  # pylint: disable=protected-access
     return self._bijectors
 
   @property
@@ -346,9 +351,6 @@ class Composition(bijector.Bijector):
         transform_wrapper, packed_args, **kwargs)
     return unpack_structs_like(self.forward_min_event_ndims, packed_result)
 
-  ### Abstract Methods
-
-  @abc.abstractmethod
   def _walk_forward(self, step_fn, argument, **kwargs):
     """Subclass stub for forward-mode traversals.
 
@@ -363,11 +365,17 @@ class Composition(bijector.Bijector):
         `_call_walk_forward` instead.
       argument: A (structure of) Tensor matching `self.forward_min_event_ndims`.
       **kwargs: Keyword arguments to be forwarded to nested bijectors.
+    Returns:
+      bijectors_forward: The value returned by `self._bijectors._walk_forward`
+        if `self._bijectors` is a `Composition` bijector.
+    Raises:
+      NotImplementedError, if `self._bijectors` is a nested structure.
     """
+    if isinstance(self._bijectors, Composition):
+      return self._bijectors._walk_forward(step_fn, argument, **kwargs)  # pylint: disable=protected-access
     raise NotImplementedError('{}._walk_forward is not implemented'.format(
         type(self).__name__))
 
-  @abc.abstractmethod
   def _walk_inverse(self, step_fn, argument, **kwargs):
     """Subclass stub for inverse-mode traversals.
 
@@ -382,7 +390,14 @@ class Composition(bijector.Bijector):
         `_call_walk_inverse` instead.
       argument: A (structure of) Tensor matching `self.inverse_min_event_ndims`.
       **kwargs: Keyword arguments to be forwarded to nested bijectors.
+    Returns:
+      bijectors_inverse: The value returned by `self._bijectors._walk_inverse`
+        if `self._bijectors` is a `Composition` bijector.
+    Raises:
+      NotImplementedError, if `self._bijectors` is a nested structure.
     """
+    if isinstance(self._bijectors, Composition):
+      return self._bijectors._walk_inverse(step_fn, argument, **kwargs)  # pylint: disable=protected-access
     raise NotImplementedError('{}._walk_inverse is not implemented'.format(
         type(self).__name__))
 
@@ -509,6 +524,36 @@ class Composition(bijector.Bijector):
     self._call_walk_inverse(step, y, event_ndims, increased_dof, **kwargs)
     with tf.control_dependencies([x for x in assertions if x is not None]):
       return tf.identity(ldj_sum, name='ildj')
+
+  def _batch_shape(self, x_event_ndims):
+    """Broadcasts the batch shapes of component bijectors."""
+    batch_shapes_at_components = []
+
+    def _accumulate_batch_shapes_forward(bij, event_ndims):
+      batch_shapes_at_components.append(
+          bij.experimental_batch_shape(x_event_ndims=event_ndims))
+      return bij.forward_event_ndims(event_ndims)
+
+    # Populate 'batch_shapes_at_components' by walking forwards.
+    self._walk_forward(_accumulate_batch_shapes_forward, x_event_ndims)
+    return functools.reduce(tf.broadcast_static_shape,
+                            batch_shapes_at_components,
+                            tf.TensorShape([]))
+
+  def _batch_shape_tensor(self, x_event_ndims):
+    """Broadcasts the batch shapes of component bijectors."""
+    batch_shapes_at_components = []
+
+    def _accumulate_batch_shapes_forward(bij, event_ndims):
+      batch_shapes_at_components.append(
+          bij.experimental_batch_shape_tensor(x_event_ndims=event_ndims))
+      return bij.forward_event_ndims(event_ndims)
+
+    # Populate 'batch_shapes_at_components' by walking forwards.
+    self._walk_forward(_accumulate_batch_shapes_forward, x_event_ndims)
+    return functools.reduce(ps.broadcast_shape,
+                            batch_shapes_at_components,
+                            [])
 
   def _maybe_warn_increased_dof(self,
                                 component_name,

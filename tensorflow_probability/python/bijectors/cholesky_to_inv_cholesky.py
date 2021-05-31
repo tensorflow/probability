@@ -23,7 +23,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors.cholesky_outer_product import CholeskyOuterProduct
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
@@ -33,8 +32,7 @@ __all__ = [
 ]
 
 
-@auto_composite_tensor.auto_composite_tensor(
-    omit_kwargs=('name',), module_name='tfp.bijectors')
+@bijector.auto_composite_tensor_bijector
 class CholeskyToInvCholesky(bijector.AutoCompositeTensorBijector):
   """Maps the Cholesky factor of `M` to the Cholesky factor of `M^{-1}`.
 

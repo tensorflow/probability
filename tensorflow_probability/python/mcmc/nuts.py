@@ -262,8 +262,6 @@ class NoUTurnSampler(TransitionKernel):
 
       # Process all other arguments.
       self._target_log_prob_fn = target_log_prob_fn
-      if not tf.nest.is_nested(step_size):
-        step_size = [step_size]
       self._step_size = step_size
 
       self._parameters = dict(
@@ -400,12 +398,16 @@ class NoUTurnSampler(TransitionKernel):
           read_instruction=read_instruction
           )
 
+      step_size = _prepare_step_size(
+          previous_kernel_results.step_size,
+          current_target_log_prob.dtype,
+          len(current_state))
       _, _, _, new_step_metastate = tf.while_loop(
           cond=lambda iter_, seed, state, metastate: (  # pylint: disable=g-long-lambda
               (iter_ < self.max_tree_depth) &
               tf.reduce_any(metastate.continue_tree)),
           body=lambda iter_, seed, state, metastate: self._loop_tree_doubling(  # pylint: disable=g-long-lambda
-              previous_kernel_results.step_size,
+              step_size,
               previous_kernel_results.momentum_state_memory,
               current_step_meta_info,
               iter_,
@@ -472,26 +474,20 @@ class NoUTurnSampler(TransitionKernel):
       ] = leapfrog_impl.process_args(self.target_log_prob_fn, dummy_momentum,
                                      init_state)
 
-      # Padding the step_size so it is compatable with the states
-      step_size = self.step_size
-      if len(step_size) == 1:
-        step_size = step_size * len(init_state)
-      if len(step_size) != len(init_state):
-        raise ValueError('Expected either one step size or {} (size of '
-                         '`init_state`), but found {}'.format(
-                             len(init_state), len(step_size)))
-      step_size = tf.nest.map_structure(
-          lambda x: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
-              x,
-              dtype=current_target_log_prob.dtype,
-              name='step_size'),
-          step_size)
+      # Confirm that the step size is compatible with the state parts.
+      _ = _prepare_step_size(
+          self.step_size, current_target_log_prob.dtype, len(init_state))
 
       return NUTSKernelResults(
           target_log_prob=current_target_log_prob,
           grads_target_log_prob=current_grads_log_prob,
           momentum_state_memory=momentum_state_memory,
-          step_size=step_size,
+          step_size=tf.nest.map_structure(
+              lambda x: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
+                  x,
+                  dtype=current_target_log_prob.dtype,
+                  name='step_size'),
+              self.step_size),
           log_accept_ratio=tf.zeros_like(current_target_log_prob,
                                          name='log_accept_ratio'),
           leapfrogs_taken=tf.zeros_like(current_target_log_prob,
@@ -1078,6 +1074,17 @@ def generate_efficient_write_read_instruction(instruction_array):
       # existing code while no computation happens.
       read_instruction.append([0, 0])
   return write_instruction, np.asarray(read_instruction)
+
+
+def _prepare_step_size(step_size, dtype, n_state_parts):
+  step_sizes, _ = mcmc_util.prepare_state_parts(
+      step_size, dtype=dtype, name='step_size')
+  if len(step_sizes) == 1:
+    step_sizes *= n_state_parts
+  if n_state_parts != len(step_sizes):
+    raise ValueError('There should be exactly one `step_size` or it should '
+                     'have same length as `current_state`.')
+  return step_sizes
 
 
 def compute_hamiltonian(target_log_prob, momentum_parts,

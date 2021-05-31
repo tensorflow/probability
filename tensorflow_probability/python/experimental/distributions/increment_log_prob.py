@@ -21,6 +21,7 @@ from __future__ import print_function
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -49,7 +50,7 @@ class IncrementLogProb(object):
   def __init__(
       self,
       log_prob_increment,
-      validate_args=False,  # pylint: disable=unused-argument
+      validate_args=False,
       allow_nan_stats=False,  # pylint: disable=unused-argument
       reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,  # pylint: disable=unused-argument
       name='IncrementLogProb'):
@@ -71,6 +72,11 @@ class IncrementLogProb(object):
           log_prob_increment)
       self._dtype = self._log_prob_increment.dtype
       self._name = name
+      self._validate_args = validate_args
+
+  @property
+  def validate_args(self):
+    return self._validate_args
 
   @property
   def log_prob_increment(self):
@@ -172,3 +178,6 @@ class IncrementLogProb(object):
                 self.event_shape_tensor()
             ],
             axis=0))
+
+  def experimental_default_event_space_bijector(self):
+    return identity_bijector.Identity(validate_args=self.validate_args)
