@@ -980,6 +980,49 @@ class JointDistributionCoroutineTest(test_util.TestCase):
           self.evaluate(bijectors[i].inverse_event_shape_tensor(
               event_shapes[i])))
 
+  @parameterized.named_parameters(
+      ('_sample', lambda d, **kwargs: d.sample(**kwargs)),
+      ('_sample_and_log_prob',
+       lambda d, **kwargs: d.experimental_sample_and_log_prob(**kwargs)[0]),
+  )
+  def test_nested_partial_value(self, sample_fn):
+    @tfd.JointDistributionCoroutine
+    def innermost():
+      a = yield Root(tfd.Exponential(1., name='a'))
+      yield tfd.Sample(tfd.LogNormal(a, a), [5], name='b')
+
+    @tfd.JointDistributionCoroutine
+    def inner():
+      yield Root(tfd.Exponential(1., name='c'))
+      yield Root(innermost.copy(name='d'))
+
+    @tfd.JointDistributionCoroutine
+    def outer():
+      yield Root(tfd.Exponential(1., name='e'))
+      yield Root(inner.copy(name='f'))
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    true_xs = outer.sample(seed=seed)
+
+    # These asserts work because we advance the stateless seed inside the model
+    # whether or not a sample is actually generated.
+    partial_xs = true_xs._replace(f=None)
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = true_xs._replace(e=None)
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = true_xs._replace(f=true_xs.f._replace(d=None))
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = true_xs._replace(
+        f=true_xs.f._replace(d=true_xs.f.d._replace(a=None)))
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
   def test_default_event_space_bijector_nested(self):
     @tfd.JointDistributionCoroutine
     def inner():
