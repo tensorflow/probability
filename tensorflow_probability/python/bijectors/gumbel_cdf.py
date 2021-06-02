@@ -33,7 +33,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class GumbelCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = exp(-exp(-(X - loc) / scale))`, the Gumbel CDF.
 

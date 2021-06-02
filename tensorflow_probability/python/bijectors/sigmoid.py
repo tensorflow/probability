@@ -64,7 +64,6 @@ else:
     return y, grad_fn
 
 
-@bijector.auto_composite_tensor_bijector
 class Sigmoid(bijector.AutoCompositeTensorBijector):
   """Bijector that computes the logistic sigmoid function.
 

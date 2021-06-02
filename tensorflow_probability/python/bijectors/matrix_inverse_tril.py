@@ -30,7 +30,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class MatrixInverseTriL(bijector.AutoCompositeTensorBijector):
   """Computes `g(L) = inv(L)`, where `L` is a lower-triangular matrix.
 

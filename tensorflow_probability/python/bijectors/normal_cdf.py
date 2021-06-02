@@ -33,7 +33,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class NormalCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = NormalCDF(x)`.
 

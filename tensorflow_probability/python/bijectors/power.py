@@ -37,7 +37,6 @@ def _is_odd_integer(x):
   return ps.equal(x, ps.round(x)) & ps.not_equal(2. * ps.floor(x / 2.), x)
 
 
-@bijector.auto_composite_tensor_bijector
 class Power(bijector.AutoCompositeTensorBijector):
   """Compute `g(X) = X ** power`; where X is a non-negative real number.
 

@@ -36,7 +36,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Softfloor(bijector.AutoCompositeTensorBijector):
   """Compute a differentiable approximation to `tf.math.floor`.
 

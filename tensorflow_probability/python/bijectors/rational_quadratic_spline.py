@@ -58,7 +58,6 @@ _SplineShared = collections.namedtuple(
     'SplineShared', 'out_of_bounds,x_k,y_k,d_k,d_kp1,h_k,w_k,s_k')
 
 
-@bijector.auto_composite_tensor_bijector
 class RationalQuadraticSpline(bijector.AutoCompositeTensorBijector):
   """A piecewise rational quadratic spline, as developed in [1].
 

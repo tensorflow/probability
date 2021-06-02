@@ -35,7 +35,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class CholeskyOuterProduct(bijector.AutoCompositeTensorBijector):
   """Compute `g(X) = X @ X.T`; X is lower-triangular, positive-diagonal matrix.
 

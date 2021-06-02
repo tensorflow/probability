@@ -32,7 +32,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class GeneralizedExtremeValueCDF(bijector.AutoCompositeTensorBijector):
   """Compute the GeneralizedExtremeValue CDF.
 

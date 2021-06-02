@@ -35,7 +35,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Split(bijector.AutoCompositeTensorBijector):
   """Split a `Tensor` event along an axis into a list of `Tensor`s.
 

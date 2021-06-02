@@ -37,7 +37,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class ScaleMatvecLU(bijector.AutoCompositeTensorBijector):
   """Matrix-vector multiply using LU decomposition.
 

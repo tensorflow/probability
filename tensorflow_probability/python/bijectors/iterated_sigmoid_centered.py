@@ -31,7 +31,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class IteratedSigmoidCentered(bijector.AutoCompositeTensorBijector):
   """Bijector which applies a Stick Breaking procedure.
 

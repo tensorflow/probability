@@ -26,7 +26,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class TransformDiagonal(bijector.AutoCompositeTensorBijector):
   """Applies a Bijector to the diagonal of a matrix.
 

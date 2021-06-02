@@ -66,7 +66,6 @@ class _ScaleMatvecLinearOperatorBase(bijector.AutoCompositeTensorBijector):
     return []
 
 
-@bijector.auto_composite_tensor_bijector
 class ScaleMatvecLinearOperator(_ScaleMatvecLinearOperatorBase):
   """Compute `Y = g(X; scale) = scale @ X`.
 
@@ -143,7 +142,6 @@ class ScaleMatvecLinearOperator(_ScaleMatvecLinearOperatorBase):
           name=name)
 
 
-@bijector.auto_composite_tensor_bijector
 class ScaleMatvecLinearOperatorBlock(_ScaleMatvecLinearOperatorBase):
   """Compute `Y = g(X; scale) = scale @ X` for blockwise `X` and `scale`.
 

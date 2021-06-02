@@ -28,7 +28,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Inline(bijector.AutoCompositeTensorBijector):
   """Bijector constructed from custom callables.
 

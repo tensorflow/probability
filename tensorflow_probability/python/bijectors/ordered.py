@@ -30,7 +30,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Ordered(bijector.AutoCompositeTensorBijector):
   """Maps a vector of increasing elements to an unconstrained vector.
 

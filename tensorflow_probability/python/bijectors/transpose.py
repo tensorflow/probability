@@ -37,7 +37,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Transpose(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = transpose_rightmost_dims(X, rightmost_perm)`.
 

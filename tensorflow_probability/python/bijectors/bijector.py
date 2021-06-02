@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import abc
 import contextlib
-import functools
 
 # Dependency imports
 import numpy as np
@@ -1778,13 +1777,6 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
       return ()
 
 
-auto_composite_tensor_bijector = functools.partial(
-    auto_composite_tensor.auto_composite_tensor,
-    omit_kwargs=('parameters',),
-    non_identifying_kwargs=('name',),
-    module_name='tfp.bijectors')
-
-
 class _AutoCompositeTensorBijectorMeta(_BijectorMeta):
   """Metaclass for `AutoCompositeTensorBijector`."""
 
@@ -1793,7 +1785,11 @@ class _AutoCompositeTensorBijectorMeta(_BijectorMeta):
 
     cls = super(_AutoCompositeTensorBijectorMeta, mcs).__new__(  # pylint: disable=too-many-function-args
         mcs, classname, baseclasses, attrs)
-    return auto_composite_tensor_bijector(cls)
+    return auto_composite_tensor.auto_composite_tensor(
+        cls,
+        omit_kwargs=('parameters',),
+        non_identifying_kwargs=('name',),
+        module_name='tfp.bijectors')
 
 
 class AutoCompositeTensorBijector(

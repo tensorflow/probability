@@ -33,7 +33,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class FrechetCDF(bijector.AutoCompositeTensorBijector):
   """The Frechet cumulative density function.
 

@@ -36,7 +36,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Permute(bijector.AutoCompositeTensorBijector):
   """Permutes the rightmost dimension of a `Tensor`.
 
