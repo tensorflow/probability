@@ -124,7 +124,6 @@ multi_substrate_py_library(
     ],
     deps = [
         # numpy dep,
-        # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
