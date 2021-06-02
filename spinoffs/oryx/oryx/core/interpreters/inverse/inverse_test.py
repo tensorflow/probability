@@ -353,6 +353,18 @@ class InverseTest(test_util.TestCase):
     onp.testing.assert_allclose(
         f_y_ildj(3.), np.log(np.abs(jax.grad(f_y_inv)(3.))))
 
+  def test_sqrt_inverse(self):
+    def f(x):
+      return np.sqrt(x)
+    f_inv = core.inverse(f)
+    onp.testing.assert_allclose(f_inv(2.), 4.)
+
+  def test_sqrt_ildj(self):
+    def f(x):
+      return np.sqrt(x)
+    f_ildj = core.ildj(f)
+    onp.testing.assert_allclose(f_ildj(3.), np.log(2.) + np.log(3.))
+
 
 if __name__ == '__main__':
   os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=2'
