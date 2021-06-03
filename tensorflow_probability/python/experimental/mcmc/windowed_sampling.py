@@ -255,9 +255,13 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     return lp + ldj
 
   def step_broadcast(step_size):
-    return step_bijector(
-        nest_util.broadcast_structure(pinned_model.event_shape_tensor(),
-                                      step_size))
+    # Only apply the bijector to nested step sizes or non-scalar batches.
+    if tf.nest.is_nested(step_size):
+      return step_bijector(
+          nest_util.broadcast_structure(pinned_model.event_shape_tensor(),
+                                        step_size))
+    else:
+      return step_size
 
   return (target_log_prob_fn,
           initial_transformed_position,

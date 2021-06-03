@@ -428,8 +428,7 @@ class WindowedSamplingTest(test_util.TestCase):
         num_adaptation_steps=100, init_step_size=tf.ones([10, 1]),
         seed=test_util.test_seed()))
     self.assertEqual((2, 64, 10, 3), states.x.shape)
-    self.assertLen(trace['step_size'], 1)
-    self.assertEqual((2, 10, 1), trace['step_size'][0].shape)
+    self.assertEqual((2, 10, 1), trace['step_size'].shape)
 
   def test_batch_of_problems_named(self):
     use_multinomial = tf.executing_eagerly()
@@ -457,8 +456,7 @@ class WindowedSamplingTest(test_util.TestCase):
             init_step_size=tf.ones([10, 1]),
             seed=test_util.test_seed()))
     self.assertEqual((2, 64, 10, 3), states['x'].shape)
-    self.assertLen(trace['step_size'], 1)
-    self.assertEqual((2, 10, 1), trace['step_size'][0].shape)
+    self.assertEqual((2, 10, 1), trace['step_size'].shape)
 
 
 @test_util.test_graph_and_eager_modes
@@ -529,21 +527,20 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
     })
 
     init_step_size = 1.
-    _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_hmc(
-        1,
-        jd_model,
-        num_adaptation_steps=100,
-        n_chains=20,
-        init_step_size=init_step_size,
-        num_leapfrog_steps=5,
-        discard_tuning=False,
-        trace_fn=lambda *args: unnest.get_innermost(args[-1], 'step_size'),
-        seed=stream(),
-    )
+    _, traced_step_size = self.evaluate(
+        tfp.experimental.mcmc.windowed_adaptive_hmc(
+            1,
+            jd_model,
+            num_adaptation_steps=100,
+            n_chains=20,
+            init_step_size=init_step_size,
+            num_leapfrog_steps=5,
+            discard_tuning=False,
+            trace_fn=lambda *args: unnest.get_innermost(args[-1], 'step_size'),
+            seed=stream()))
 
-    actual_step = [j[0] for j in actual_step_size]
-    expected_step = [1., 1.]
-    self.assertAllCloseNested(expected_step, actual_step)
+    self.assertEqual((100 + 1,), traced_step_size.shape)
+    self.assertAllClose(1., traced_step_size[0])
 
   def test_sequential_step_size(self):
     stream = test_util.test_seed_stream()
