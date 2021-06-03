@@ -136,6 +136,7 @@ BooleanNest = Union[BooleanTensor, Sequence[BooleanTensor],
                     Mapping[Any, BooleanTensor]]
 FloatNest = Union[FloatTensor, Sequence[FloatTensor], Mapping[Any, FloatTensor]]
 IntNest = Union[IntTensor, Sequence[IntTensor], Mapping[Any, IntTensor]]
+StringNest = Union[Text, Sequence[Text], Mapping[Any, Text]]
 DTypeNest = Union['tf.DType', Sequence['tf.DType'], Mapping[Any, 'tf.DType']]
 State = TensorNest  # pylint: disable=invalid-name
 TransitionOperator = Callable[..., Tuple[State, TensorNest]]
@@ -1381,6 +1382,7 @@ class IntegratorExtras(NamedTuple):
   final_kinetic_energy: 'FloatTensor'
   final_kinetic_energy_extra: Any
   integrator_trace: Any
+  momentum_grads: 'State'
 
 
 @util.named_call
@@ -1496,7 +1498,8 @@ def hamiltonian_integrator(
       final_energy=final_energy,
       final_kinetic_energy=integrator_step_extra.kinetic_energy,
       final_kinetic_energy_extra=integrator_step_extra.kinetic_energy_extra,
-      integrator_trace=integrator_trace)
+      integrator_trace=integrator_trace,
+      momentum_grads=integrator_step_extra.momentum_grads)
 
   return state, extra
 
