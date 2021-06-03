@@ -205,7 +205,6 @@ def _cf_surrogate_for_distribution(dist,
                                    num_auxiliary_variables,
                                    num_layers,
                                    global_auxiliary_variables=None,
-                                   sample_shape=None,
                                    variables=None,
                                    seed=None):
   """Recursively creates CF surrogates, and creates new variables if needed.
@@ -215,17 +214,12 @@ def _cf_surrogate_for_distribution(dist,
     base_distribution_surrogate_fn: Callable to build a surrogate posterior
       for a 'base' (non-meta and non-joint) distribution, with signature
       `surrogate_posterior, variables = base_distribution_fn(
-      dist, sample_shape=None, variables=None, seed=None)`.
+      dist, variables=None, seed=None)`.
     num_auxiliary_variables: The number of auxiliary variables to use for each
       variable in the input program.
     num_layers: Number of layers to use in each Highway Flow architecture.
     global_auxiliary_variables: The sampled global auxiliary variables
       (available only if using auxiliary variables). Default value: None.
-    sample_shape: Optional `Tensor` shape of samples drawn from `dist` by
-      `tfd.Sample` wrappers. If not `None`, the surrogate's event will include
-      independent sample dimensions, i.e., it will have event shape
-      `concat([sample_shape, dist.event_shape], axis=0)`.
-      Default value: `None`.
     variables: Optional nested structure of `tf.Variable`s returned from a
       previous call to `_cf_surrogate_for_distribution`. If `None`,
       new variables will be created; otherwise, constructs a surrogate posterior
@@ -244,9 +238,6 @@ def _cf_surrogate_for_distribution(dist,
       structure of such `tfb.Chain`s.
   """
 
-  # Apply any substitutions, while attempting to preserve the original name.
-  dist = _set_name(_as_substituted_distribution(dist), name=_get_name(dist))
-
   if hasattr(dist, '_model_coroutine'):
     surrogate_posterior, variables = _cf_surrogate_for_joint_distribution(
       dist,
@@ -258,7 +249,7 @@ def _cf_surrogate_for_distribution(dist,
       seed=seed)
   else:
     surrogate_posterior, variables = base_distribution_surrogate_fn(
-      dist=dist, sample_shape=sample_shape, variables=variables,
+      dist=dist, variables=variables,
       global_auxiliary_variables=global_auxiliary_variables,
       num_layers=num_layers,
       seed=seed)
@@ -386,7 +377,6 @@ def _cf_surrogate_for_joint_distribution(
         _extract_variables_from_coroutine_model(
           posterior_generator, seed=seed)))
 
-  # Temporary workaround for bijector caching issues with autobatched JDs.
   surrogate_posterior = joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched(
     posterior_generator,
     use_vectorized_map=dist.use_vectorized_map,
@@ -411,14 +401,12 @@ def _cf_surrogate_for_joint_distribution(
   return surrogate_posterior, variables
 
 
-# todo: sample_shape is not used.. can remove?
 def _cf_convex_update_for_base_distribution(dist,
                                             initial_prior_weight,
                                             num_auxiliary_variables,
                                             num_layers,
                                             global_auxiliary_variables,
                                             variables,
-                                            sample_shape=None,
                                             seed=None):
   """Creates a trainable surrogate for a (non-meta, non-joint) distribution."""
 
