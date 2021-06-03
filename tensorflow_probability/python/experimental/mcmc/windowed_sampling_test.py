@@ -471,14 +471,14 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
             loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
     })
 
-    init_step_size = {'a': tf.reshape(tf.linspace(1., 2., 20), (20, 1)),
-                      'b': tf.reshape(tf.linspace(1., 2., 60), (20, 3))}
+    init_step_size = {'a': tf.reshape(tf.linspace(1., 2., 3), (3, 1)),
+                      'b': tf.reshape(tf.linspace(1., 2., 9), (3, 3))}
 
     _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_hmc(
         1,
         jd_model,
-        num_adaptation_steps=100,
-        n_chains=20,
+        num_adaptation_steps=25,
+        n_chains=3,
         init_step_size=init_step_size,
         num_leapfrog_steps=5,
         discard_tuning=False,
@@ -504,8 +504,8 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
     _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_hmc(
         1,
         jd_model,
-        num_adaptation_steps=100,
-        n_chains=20,
+        num_adaptation_steps=25,
+        n_chains=3,
         init_step_size=init_step_size,
         num_leapfrog_steps=5,
         discard_tuning=False,
@@ -531,7 +531,7 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
         tfp.experimental.mcmc.windowed_adaptive_hmc(
             1,
             jd_model,
-            num_adaptation_steps=100,
+            num_adaptation_steps=25,
             n_chains=20,
             init_step_size=init_step_size,
             num_leapfrog_steps=5,
@@ -539,7 +539,7 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
             trace_fn=lambda *args: unnest.get_innermost(args[-1], 'step_size'),
             seed=stream()))
 
-    self.assertEqual((100 + 1,), traced_step_size.shape)
+    self.assertEqual((25 + 1,), traced_step_size.shape)
     self.assertAllClose(1., traced_step_size[0])
 
   def test_sequential_step_size(self):
@@ -551,8 +551,8 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
     _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_nuts(
         1,
         jd_model,
-        num_adaptation_steps=100,
-        n_chains=20,
+        num_adaptation_steps=25,
+        n_chains=3,
         init_step_size=init_step_size,
         discard_tuning=False,
         trace_fn=lambda *args: unnest.get_innermost(args[-1], 'step_size'),
