@@ -662,6 +662,7 @@ class HamiltonianMonteCarloWithStateGradsExtra(NamedTuple):
   proposed_state: 'fun_mc.State'
 
 
+@util.named_call
 def hamiltonian_monte_carlo_with_state_grads_step(
     hmc_state: 'fun_mc.HamiltonianMonteCarloState',
     trajectory_length: 'fun_mc.FloatTensor',
