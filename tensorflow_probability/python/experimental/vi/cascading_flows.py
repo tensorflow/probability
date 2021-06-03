@@ -347,9 +347,12 @@ def _cf_surrogate_for_joint_distribution(
         # save the variables.
         value_out = yield (surrogate_posterior if flat_variables
                            else (surrogate_posterior, variables))
-        if type(value_out) == list:
+
+        # When using auxiliary variables, value out is a list containing
+        # [latent_variables, auxiliary_variables].
+        if num_auxiliary_variables>0:
           if len(dist.event_shape) == 0:
-            dist = prior_gen.send(tf.squeeze(value_out[0], -1))
+            dist = prior_gen.send(value_out[0][...,0])
           else:
             dist = prior_gen.send(value_out[0])
 
