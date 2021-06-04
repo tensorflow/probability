@@ -30,6 +30,8 @@ from tensorflow_probability.python.internal import test_util
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
+Root = tfd.JointDistributionCoroutine.Root
+
 
 def true_log_prob_fn(w, x, data):
   return (tfd.Normal(0., 1.).log_prob(w) +
@@ -65,7 +67,7 @@ def make_jd_named(axis_name):
 def make_jd_coroutine(axis_name):
 
   def model_coroutine():
-    w = yield tfd.JointDistributionCoroutine.Root(tfd.Normal(0., 1.))
+    w = yield Root(tfd.Normal(0., 1.))
     x = yield sharded.Sharded(
         tfd.Sample(tfd.Normal(w, 1.), 1), shard_axis_name=axis_name)
     yield sharded.Sharded(
@@ -218,6 +220,86 @@ class JointDistributionTest(test_lib.DistributedTest):
         true_lp_diff, dist_lp_diff[0])
     self.assertAllClose(
         true_lp_diff_grad, dist_lp_diff_grad)
+
+  def test_jd_has_correct_sample_path_gradients(self):
+
+    def log_prob_fn(x_loc):
+      @tfd.JointDistributionCoroutine
+      def surrogate():
+        x = yield Root(tfd.Normal(x_loc, 1.))
+        y = yield tfd.Normal(x, 1.)
+        yield tfd.Sample(tfd.Normal(x + y, 1.), test_lib.NUM_DEVICES)
+
+      @tfd.JointDistributionCoroutine
+      def model():
+        yield Root(tfd.Normal(1., 1.))
+        yield Root(tfd.Normal(1., 1.))
+        yield tfd.Sample(tfd.Normal(1., 1.), test_lib.NUM_DEVICES)
+      return tf.reduce_mean(
+          model.log_prob(surrogate.sample(sample_shape=1e6, seed=self.key)))
+
+    true_log_prob, true_log_prob_grad = tfp.math.value_and_gradient(
+        log_prob_fn, 0.)
+
+    def run(seed):
+      def sharded_log_prob_fn(x_loc):
+        @jd.JointDistributionCoroutine
+        def surrogate():
+          x = yield Root(tfd.Normal(x_loc, 1.))
+          y = yield tfd.Normal(x, 1.)
+          yield sharded.Sharded(tfd.Normal(x + y, 1.), self.axis_name)
+
+        @jd.JointDistributionCoroutine
+        def model():
+          yield Root(tfd.Normal(1., 1.))
+          yield Root(tfd.Normal(1., 1.))
+          yield sharded.Sharded(tfd.Normal(1., 1.), self.axis_name)
+        return tf.reduce_mean(
+            model.log_prob(surrogate.sample(sample_shape=1e6, seed=seed)))
+      sharded_log_prob, sharded_log_prob_grad = tfp.math.value_and_gradient(
+          sharded_log_prob_fn, 0.)
+      return sharded_log_prob, sharded_log_prob_grad
+
+    sharded_log_prob, sharded_log_prob_grad = self.per_replica_to_tensor(
+        self.strategy_run(
+            run, (self.key,), in_axes=None))
+    for i in range(test_lib.NUM_DEVICES):
+      self.assertAllClose(sharded_log_prob[i], true_log_prob, atol=1e-2)
+      self.assertAllClose(sharded_log_prob_grad[i], true_log_prob_grad,
+                          atol=1e-2)
+
+  def test_jd_has_correct_sample_path_gradients_with_partial_values(self):
+
+    def run(seed):
+      @jd.JointDistributionCoroutine
+      def model():
+        yield Root(tfd.Normal(0., 1., name='x'))
+        yield tfd.Normal(0., 1., name='y')
+        yield sharded.Sharded(tfd.Normal(1., 1.), self.axis_name, name='z')
+
+      sample = model.sample(seed=seed)
+
+      def lp_fn1(x, y, z):
+        return model.log_prob((x, y, z))
+
+      def lp_fn2(x, z):
+        return model.log_prob(model.sample(value=(x, None, z), seed=seed))
+
+      lp_and_grad1 = tfp.math.value_and_gradient(
+          lp_fn1, [*sample])
+      (lp2, grad2) = tfp.math.value_and_gradient(
+          lp_fn2, [sample.x, sample.z])
+      return lp_and_grad1, (lp2, grad2)
+
+    (lp1, grad1), (lp2, grad2) = self.per_replica_to_tensor(
+        self.strategy_run(
+            run, (self.key,), in_axes=None))
+    grad2 = [grad2[0], None, grad2[1]]
+    for i in range(test_lib.NUM_DEVICES):
+      for j in range(3):
+        self.assertAllClose(lp1[i], lp2[i])
+        if grad2[j] is not None:
+          self.assertAllClose(grad1[j][i], grad2[j][i])
 
   def test_default_event_space_bijector_non_interacting(self):
 

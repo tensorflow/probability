@@ -753,6 +753,7 @@ class JointDistribution(distribution_lib.Distribution):
                      sample_shape=(),
                      seed=None,
                      value=None,
+                     stop_index=None,
                      sample_and_trace_fn=trace_distributions_and_values):
     """Executes `model`, creating both samples and distributions."""
     values_out = []
@@ -833,6 +834,8 @@ class JointDistribution(distribution_lib.Distribution):
           values_out.append(traced_values)
 
         index += 1
+        if stop_index is not None and index == stop_index:
+          break
         d = gen.send(next_value)
     except StopIteration:
       pass
@@ -1205,7 +1208,6 @@ def _jd_log_prob_ratio(p, x, q, y, name=None):
     ps, _ = p.sample_distributions(value=x, seed=samplers.zeros_seed())
     qs, _ = q.sample_distributions(value=y, seed=samplers.zeros_seed())
     tf.nest.assert_same_structure(ps, qs)
-    parts = []
-    for p_, x_, q_, y_ in zip(ps, x, qs, y):
-      parts.append(log_prob_ratio.log_prob_ratio(p_, x_, q_, y_))
-    return tf.add_n(parts)
+    log_prob_ratio_parts = nest.map_structure_up_to(
+        ps, log_prob_ratio.log_prob_ratio, ps, x, qs, y)
+    return tf.add_n(tf.nest.flatten(log_prob_ratio_parts))
