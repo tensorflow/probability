@@ -37,7 +37,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class MoyalCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = erfc(exp(- 1/2 * (X - loc) / scale) / sqrt(2))`.
 

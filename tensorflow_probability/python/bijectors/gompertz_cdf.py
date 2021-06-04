@@ -33,7 +33,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class GompertzCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = 1 - exp(-c * (exp(rate * X) - 1)`, the Gompertz CDF.
 

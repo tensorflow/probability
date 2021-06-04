@@ -33,7 +33,6 @@ class _NoOpCache(dict):
     return {}
 
 
-@bijector.auto_composite_tensor_bijector
 class Identity(bijector.AutoCompositeTensorBijector):
   """Compute Y = g(X) = X.
 

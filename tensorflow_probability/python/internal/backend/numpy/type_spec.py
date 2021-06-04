@@ -14,12 +14,18 @@
 # ============================================================================
 """Numpy stub for `type_spec`."""
 
+import re
+
 __all__ = [
     'lookup',
     'register',
     'BatchableTypeSpec',
     'TypeSpec',
 ]
+
+_TYPE_SPEC_TO_NAME = {}
+_NAME_TO_TYPE_SPEC = {}
+_REGISTERED_NAME_RE = re.compile(r'^(\w+\.)+\w+$')
 
 
 def register(_):

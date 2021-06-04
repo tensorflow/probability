@@ -27,7 +27,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Cumsum(bijector.AutoCompositeTensorBijector):
   """Computes the cumulative sum of a tensor along a specified axis.
 

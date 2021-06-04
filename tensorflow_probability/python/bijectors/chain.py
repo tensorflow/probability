@@ -81,7 +81,7 @@ class Chain(composition.Composition):
   def __init__(self,
                bijectors=None,
                validate_args=False,
-               validate_event_size=True,
+               validate_event_size=False,
                parameters=None,
                name=None):
     """Instantiates `Chain` bijector.

@@ -34,7 +34,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Pad(bijector.AutoCompositeTensorBijector):
   """Pads a value to the `event_shape` of a `Tensor`.
 

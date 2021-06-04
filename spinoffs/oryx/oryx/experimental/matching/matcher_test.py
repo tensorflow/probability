@@ -52,6 +52,10 @@ class MatcherTest(test_util.TestCase):
     with self.assertRaises(ValueError):
       list(matcher.match_all(matcher.Star(1), 1.))
 
+  def test_list_patterns_match_equal_lists(self):
+    self.assertDictEqual(matcher.match([1, 2, 3], [1, 2, 3]), {})
+    self.assertDictEqual(matcher.match([(1, 2), 2, 3], [(1, 2), 2, 3]), {})
+
   def test_tuple_patterns_match_equal_tuples(self):
     self.assertDictEqual(matcher.match((1, 2, 3), (1, 2, 3)), {})
     self.assertDictEqual(matcher.match(((1, 2), 2, 3), ((1, 2), 2, 3)), {})
@@ -224,6 +228,30 @@ class MatcherTest(test_util.TestCase):
     self.assertLen(matches, 6)
     for i in range(len(matches)):
       self.assertDictEqual(matches[i], dict(x=(1,) * i, y=(1,) * (10 - 2 * i)))
+
+  def test_can_match_string_literals(self):
+    pattern = 'abcd'
+    self.assertDictEqual(matcher.match(pattern, 'abcd'), {})
+    with self.assertRaises(matcher.MatchError):
+      matcher.match(pattern, 'dcba')
+
+  def test_can_match_var_with_length_one_string(self):
+    pattern = matcher.Var('x')
+    self.assertDictEqual(matcher.match(pattern, 'a'), {'x': 'a'})
+
+  def test_can_use_star_patterns_in_string_patterns(self):
+    pattern = ['a', 'b', matcher.Segment('rest')]
+    self.assertDictEqual(matcher.match(pattern, 'abcd'), {'rest': 'cd'})
+
+    with self.assertRaises(matcher.MatchError):
+      matcher.match(pattern, 'acd')
+
+    pattern = ['a', 'b', matcher.Star('c'), 'd']
+    self.assertDictEqual(matcher.match(pattern, 'abccccd'), {})
+    self.assertDictEqual(matcher.match(pattern, 'abd'), {})
+
+    with self.assertRaises(matcher.MatchError):
+      matcher.match(pattern, 'abccc')
 
 
 if __name__ == '__main__':

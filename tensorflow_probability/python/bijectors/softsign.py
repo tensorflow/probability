@@ -30,7 +30,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Softsign(bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = X / (1 + |X|)`.
 

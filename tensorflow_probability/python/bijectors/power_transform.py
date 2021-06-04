@@ -30,7 +30,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class PowerTransform(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 + X * c)**(1 / c), X >= -1 / c`.
 

@@ -327,6 +327,54 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertAllEqual(lp.shape, [5])
 
   @parameterized.named_parameters(
+      ('_sample', lambda d, **kwargs: d.sample(**kwargs)),
+      ('_sample_and_log_prob',
+       lambda d, **kwargs: d.experimental_sample_and_log_prob(**kwargs)[0]),
+  )
+  def test_nested_partial_value(self, sample_fn):
+    innermost = tfd.JointDistributionSequential((
+        tfd.Exponential(1.),
+        lambda a: tfd.Sample(tfd.LogNormal(a, a), [5]),
+    ))
+
+    inner = tfd.JointDistributionSequential((
+        tfd.Exponential(1.),
+        innermost,
+    ))
+
+    outer = tfd.JointDistributionSequential((
+        tfd.Exponential(1.),
+        inner,
+    ))
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    true_xs = outer.sample(seed=seed)
+
+    def _update(tuple_, index, value):
+      res = list(tuple_)
+      res[index] = value
+      return tuple(res)
+
+    # These asserts work because we advance the stateless seed inside the model
+    # whether or not a sample is actually generated.
+    partial_xs = _update(true_xs, 1, None)
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = _update(true_xs, 0, None)
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = _update(true_xs, 1, _update(true_xs[1], 1, None))
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = _update(
+        true_xs, 1, _update(true_xs[1], 1, _update(true_xs[1][1], 0, None)))
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+  @parameterized.named_parameters(
       ('basic', basic_model_fn),
       ('nested_lists', nested_lists_model_fn))
   def test_can_call_log_prob_with_args_and_kwargs(self, model_fn):

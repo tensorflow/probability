@@ -33,7 +33,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class SinhArcsinh(bijector.AutoCompositeTensorBijector):
   """`Y = g(X) = Sinh( (Arcsinh(X) + skewness) * tailweight ) * multiplier`.
 

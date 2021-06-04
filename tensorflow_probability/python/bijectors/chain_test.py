@@ -378,17 +378,23 @@ class ChainBijectorTest(test_util.TestCase):
     smc = tfb.SoftmaxCentered()
 
     # Increase in event-size is the last step. No problems here.
-    safe_bij = tfb.Chain([smc, exp], validate_args=True)
+    safe_bij = tfb.Chain([smc, exp],
+                         validate_args=True,
+                         validate_event_size=True)
     self.evaluate(safe_bij.forward_log_det_jacobian([1., 2., 3.], 1))
 
     # Increase in event-size before Exp.
-    raise_bij = tfb.Chain([exp, smc], validate_args=True)
+    raise_bij = tfb.Chain([exp, smc],
+                          validate_args=True,
+                          validate_event_size=True)
     with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
                                 r".+degrees of freedom.+"):
       self.evaluate(raise_bij.forward_log_det_jacobian([1., 2., 3.], 1))
 
     # When validate_args is False, warns instead of raising.
-    warn_bij = tfb.Chain([exp, smc], validate_args=False)
+    warn_bij = tfb.Chain([exp, smc],
+                         validate_args=False,
+                         validate_event_size=True)
     with mock.patch.object(tf, "print", return_value=tf.no_op()) as mock_print:
       self.evaluate(warn_bij.forward_log_det_jacobian([1., 2., 3.], 1))
       print_args, _ = mock_print.call_args

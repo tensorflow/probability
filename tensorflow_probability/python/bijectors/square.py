@@ -32,7 +32,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Square(bijector.AutoCompositeTensorBijector):
   """Compute `g(X) = X^2`; X is a positive real number.
 

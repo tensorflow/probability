@@ -41,7 +41,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class SoftClip(bijector.AutoCompositeTensorBijector):
   """Bijector that approximates clipping as a continuous, differentiable map.
 

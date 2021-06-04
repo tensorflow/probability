@@ -21,7 +21,6 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
-from tensorflow_probability.python.internal import auto_composite_tensor
 
 __all__ = [
     'Invert',
@@ -148,8 +147,7 @@ class _Invert(bijector_lib.Bijector):
     return self.bijector.inverse_event_ndims(event_ndims, **kwargs)
 
 
-@bijector_lib.auto_composite_tensor_bijector
-class Invert(_Invert, auto_composite_tensor.AutoCompositeTensor):
+class Invert(_Invert, bijector_lib.AutoCompositeTensorBijector):
 
   def __new__(cls, *args, **kwargs):
     """Returns an `_Invert` instance if `bijector` is not a `CompositeTensor."""

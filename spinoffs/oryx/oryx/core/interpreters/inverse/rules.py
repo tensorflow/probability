@@ -48,6 +48,7 @@ register_elementwise(lax.cos_p)(np.arccos)
 register_elementwise(lax.expm1_p)(np.log1p)
 register_elementwise(lax.log1p_p)(np.expm1)
 register_elementwise(lax.neg_p)(lambda x: -x)
+register_elementwise(lax.sqrt_p)(np.square)
 
 
 @register_elementwise(lax.integer_pow_p)

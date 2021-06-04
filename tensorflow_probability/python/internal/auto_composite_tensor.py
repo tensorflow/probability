@@ -395,6 +395,32 @@ class AutoCompositeTensor(composite_tensor.CompositeTensor):
     pass
 
 
+def type_spec_register(name, allow_overwrite=True):
+  """Decorator used to register a unique name for a TypeSpec subclass.
+
+  Unlike TensorFlow's `type_spec.register`, this function allows a new
+  `TypeSpec` to be registered with a `name` that already appears in the
+  registry (overwriting the `TypeSpec` already registered with that name). This
+  allows for re-definition of `AutoCompositeTensor` subclasses in test
+  environments and iPython.
+
+  Args:
+    name: The name of the type spec. Must have the form
+    `"{project_name}.{type_name}"`.  E.g. `"my_project.MyTypeSpec"`.
+    allow_overwrite: `bool`, if `True` then the entry in the `TypeSpec` registry
+      keyed by `name` will be overwritten if it exists. If `False`, then
+      behavior is the same as `type_spec.register`.
+
+  Returns:
+    A class decorator that registers the decorated class with the given name.
+  """
+  # pylint: disable=protected-access
+  if allow_overwrite and name in type_spec._NAME_TO_TYPE_SPEC:
+    type_spec._TYPE_SPEC_TO_NAME.pop(
+        type_spec._NAME_TO_TYPE_SPEC.pop(name))
+  return type_spec.register(name)
+
+
 def auto_composite_tensor(
     cls=None, omit_kwargs=(), non_identifying_kwargs=(), module_name=None):
   """Automagically generate `CompositeTensor` behavior for `cls`.
@@ -540,19 +566,13 @@ def auto_composite_tensor(
   type_spec_class_name = f'{cls.__name__}_ACTTypeSpec'
   type_spec_name = f'{module_name}.{type_spec_class_name}'
 
-  try:
-    ts = type_spec.lookup(type_spec_name)
-    return ts.value_type.fget(None)
-  except ValueError:
-    pass
-
   # If the declared class is already a CompositeTensor subclass, we can avoid
   # affecting the actual type of the returned class. Otherwise, we need to
   # explicitly mix in the CT type, and hence create and return a newly
   # synthesized type.
   if issubclass(cls, composite_tensor.CompositeTensor):
 
-    @type_spec.register(type_spec_name)
+    @type_spec_register(type_spec_name)
     class _AlreadyCTTypeSpec(_AutoCompositeTensorTypeSpec):
 
       @property
@@ -576,7 +596,6 @@ def auto_composite_tensor(
   if clsid in _registry and issubclass(_registry[clsid], cls):
     return _registry[clsid]
 
-  @type_spec.register(type_spec_name)
   class _GeneratedCTTypeSpec(_AutoCompositeTensorTypeSpec):
 
     @property
@@ -595,4 +614,5 @@ def auto_composite_tensor(
 
   _AutoCompositeTensor.__name__ = cls.__name__
   _registry[clsid] = _AutoCompositeTensor
+  type_spec_register(type_spec_name)(_GeneratedCTTypeSpec)
   return _AutoCompositeTensor

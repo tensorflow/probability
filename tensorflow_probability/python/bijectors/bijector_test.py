@@ -27,7 +27,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -875,11 +874,10 @@ class ConditionalBijectorTest(test_util.TestCase):
       mock_method.assert_called_once_with(mock.ANY, arg1=arg1, arg2=arg2)
 
 
-@bijector_lib.auto_composite_tensor_bijector
 class CompositeForwardBijector(tfb.AutoCompositeTensorBijector):
 
-  def __init__(self, scale=2., validate_args=False, name=None):
-    parameters = dict(locals())
+  def __init__(self, scale=2., validate_args=False, parameters=None, name=None):
+    parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name or 'forward_only') as name:
       self._scale = tensor_util.convert_nonref_to_tensor(
           scale,
@@ -895,6 +893,14 @@ class CompositeForwardBijector(tfb.AutoCompositeTensorBijector):
 
   def _forward_log_det_jacobian(self, _):
     return tf.math.log(self._scale)
+
+
+class CompositeForwardScaleThree(CompositeForwardBijector):
+
+  def __init__(self, name='scale_three'):
+    parameters = dict(locals())
+    super(CompositeForwardScaleThree, self).__init__(
+        scale=3., parameters=parameters, name=name)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -916,6 +922,15 @@ class AutoCompositeTensorBijectorTest(test_util.TestCase):
     self.assertAllClose(
         non_ct_bijector.forward(x),
         tf.function(lambda b: b.forward(x))(unflat))
+
+  def test_composite_tensor_subclass(self):
+
+    bij = CompositeForwardScaleThree()
+    self.assertIs(bij._type_spec.value_type, type(bij))
+
+    flat = tf.nest.flatten(bij, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(bij, flat, expand_composites=True)
+    self.assertIsInstance(unflat, CompositeForwardScaleThree)
 
 
 if __name__ == '__main__':

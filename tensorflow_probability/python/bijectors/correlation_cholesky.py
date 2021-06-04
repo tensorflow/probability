@@ -32,7 +32,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class CorrelationCholesky(bijector.AutoCompositeTensorBijector):
   """Maps unconstrained reals to Cholesky-space correlation matrices.
 
