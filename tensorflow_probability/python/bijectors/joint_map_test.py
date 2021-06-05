@@ -129,6 +129,61 @@ class JointMapBijectorTest(test_util.TestCase):
     bij_reshape.inverse_event_ndims([10])  # expect [9]
     self.assertEqual(bij_reshape.inverse_event_ndims([10]), [9])
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX have no notion of CompositeTensor/saved_model.')
+  def testCompositeTensor(self):
+    exp = tfb.Exp()
+    sp = tfb.Softplus()
+    aff = tfb.Scale(scale=2.)
+    bij = tfb.JointMap(bijectors=[exp, sp, aff])
+    self.assertIsInstance(bij, tf.__internal__.CompositeTensor)
+
+    # Bijector may be flattened into `Tensor` components and rebuilt.
+    flat = tf.nest.flatten(bij, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(bij, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfb.JointMap)
+
+    # Bijector may be input to a `tf.function`-decorated callable.
+    @tf.function
+    def call_forward(bij, x):
+      return bij.forward(x)
+
+    x = [1., 2., 3.]
+    self.assertAllClose(call_forward(unflat, x), bij.forward(x))
+
+    # Type spec can be encoded/decoded.
+    struct_coder = tf.__internal__.saved_model.StructureCoder()
+    enc = struct_coder.encode_structure(bij._type_spec)
+    dec = struct_coder.decode_proto(enc)
+    self.assertEqual(bij._type_spec, dec)
+
+  def testNonCompositeTensor(self):
+
+    # TODO(b/182603117): Move NonComposite* into test_util.
+    class NonCompositeScale(tfb.Bijector):
+      """Bijector that is not a `CompositeTensor`."""
+
+      def __init__(self, scale):
+        parameters = dict(locals())
+        self.scale = scale
+        super(NonCompositeScale, self).__init__(
+            validate_args=True,
+            forward_min_event_ndims=0.,
+            parameters=parameters,
+            name='non_composite_scale')
+
+      def _forward(self, x):
+        return x * self.scale
+
+    exp = tfb.Exp()
+    scale = NonCompositeScale(scale=tf.constant(3.))
+    bij = tfb.JointMap(bijectors=[exp, scale])
+    self.assertNotIsInstance(bij, tf.__internal__.CompositeTensor)
+    self.assertAllClose(
+        bij.forward([1., 1.]),
+        [exp.forward(1.), scale.forward(1.)])
+
 
 if __name__ == '__main__':
   tf.test.main()
