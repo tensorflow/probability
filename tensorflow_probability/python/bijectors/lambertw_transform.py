@@ -106,7 +106,7 @@ def _w_delta_squared(z, delta):
 
 
 # Private class that implements the heavy tail transformation.
-class _HeavyTailOnly(bijector.Bijector):
+class _HeavyTailOnly(bijector.AutoCompositeTensorBijector):
   """Heavy tail transformation for Lambert W x F distributions.
 
   This bijector defines the transformation z = u * exp(0.5 * delta * u**2)
@@ -178,7 +178,6 @@ class _HeavyTailOnly(bijector.Bijector):
 # fix batch_shape inconsistencies when running distribution_properties_test.
 
 
-#  TODO(b/182603117): Enable AutoCompositeTensor when Chain is enabled.
 class LambertWTail(chain.Chain):
   """LambertWTail transformation for heavy-tail Lambert W x F random variables.
 

@@ -20,6 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.internal import parameter_properties
@@ -31,7 +32,7 @@ __all__ = [
 ]
 
 
-class Chain(composition.Composition):
+class _Chain(composition.Composition):
   """Bijector which applies a sequence of bijectors.
 
   Example Use:
@@ -124,7 +125,7 @@ class Chain(composition.Composition):
       inverse_min_event_ndims = None  # Inferred by base class.
 
     with tf.name_scope(name) as name:
-      super(Chain, self).__init__(
+      super(_Chain, self).__init__(
           bijectors=bijectors or (),
           validate_args=validate_args,
           validate_event_size=validate_event_size,
@@ -160,7 +161,32 @@ class Chain(composition.Composition):
     return y  # Now `x`
 
 
-@ldj_ratio.RegisterFLDJRatio(Chain)
+class Chain(_Chain, bijector_lib.AutoCompositeTensorBijector):
+
+  def __new__(cls, *args, **kwargs):
+    """Returns a `_Chain` if any of `bijectors` is not a `CompositeTensor."""
+    if cls is Chain:
+      if args:
+        bijectors = args[0]
+      else:
+        bijectors = kwargs.get('bijectors')
+
+      if bijectors is not None:
+        if not all(isinstance(b, tf.__internal__.CompositeTensor)
+                   for b in bijectors):
+          return _Chain(*args, **kwargs)
+    return super(Chain, cls).__new__(cls)
+
+
+Chain.__doc__ = _Chain.__doc__ + '\n' + (
+    'If every element of the `bijectors` list is a `CompositeTensor`, the '
+    'resulting `Chain` bijector is a `CompositeTensor` as well. If any element '
+    'of `bijectors` is not a `CompositeTensor`, then a non-`CompositeTensor` '
+    '`_Chain` instance is created instead. Bijector subclasses that inherit '
+    'from `Chain` will also inherit from `CompositeTensor`.')
+
+
+@ldj_ratio.RegisterFLDJRatio(_Chain)
 def _fldj_ratio_chain(p, x, q, y):
   """Sum-of-diffs FLDJRatio for Chains."""
   if len(p.bijectors) != len(q.bijectors):
@@ -177,7 +203,7 @@ def _fldj_ratio_chain(p, x, q, y):
   return tf.add_n(ratios)
 
 
-@ldj_ratio.RegisterILDJRatio(Chain)
+@ldj_ratio.RegisterILDJRatio(_Chain)
 def _ildj_ratio_chain(p, x, q, y):
   """Sum-of-diffs ILDJRatio for Chains."""
   if len(p.bijectors) != len(q.bijectors):

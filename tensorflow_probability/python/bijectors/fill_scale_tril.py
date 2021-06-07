@@ -33,7 +33,6 @@ __all__ = [
 ]
 
 
-# TODO(b/182603117): Enable AutoCompositeTensor once Chain subclasses it.
 class FillScaleTriL(chain.Chain):
   """Transforms unconstrained vectors to TriL matrices with positive diagonal.
 
@@ -91,7 +90,8 @@ class FillScaleTriL(chain.Chain):
 
     Args:
       diag_bijector: `Bijector` instance, used to transform the output diagonal
-        to be positive.
+        to be positive. Must be an instance of `tf.__internal__.CompositeTensor`
+        (including `tfb.AutoCompositeTensorBijector`).
         Default value: `None` (i.e., `tfb.Softplus()`).
       diag_shift: Float value broadcastable and added to all diagonal entries
         after applying the `diag_bijector`. Setting a positive
@@ -104,11 +104,18 @@ class FillScaleTriL(chain.Chain):
         Default value: `False` (i.e., arguments are not validated).
       name: Python `str` name given to ops managed by this object.
         Default value: `fill_scale_tril`.
+
+    Raises:
+      TypeError, if `diag_bijector` is not an instance of
+        `tf.__internal__.CompositeTensor`.
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       if diag_bijector is None:
         diag_bijector = softplus.Softplus(validate_args=validate_args)
+      if not isinstance(diag_bijector, tf.__internal__.CompositeTensor):
+        raise TypeError('`diag_bijector` must be an instance of '
+                        '`tf.__internal__.CompositeTensor`.')
 
       if diag_shift is not None:
         dtype = dtype_util.common_dtype([diag_bijector, diag_shift], tf.float32)

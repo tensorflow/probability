@@ -196,11 +196,6 @@ COMPOSITE_TENSOR_RTOL.update({
 })
 COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
 
-# TODO(b/182603117): Enable AutoCT for meta-bijectors.
-AUTO_COMPOSITE_TENSOR_IS_BROKEN = [
-    'FillScaleTriL',
-]
-
 
 def is_invert(bijector):
   return isinstance(bijector, (tfb.Invert, invert_lib._Invert))
@@ -915,24 +910,16 @@ class BijectorPropertiesTest(test_util.TestCase):
                         'bijectors.')
       self.skipTest('`_Invert` bijectors are not `CompositeTensor`s.')
 
-    # TODO(b/182603117): Remove "if" condition and s/composite_bij/bijector
-    # when AutoCT is enabled for meta-bijectors and LinearOperator.
-    if type(bijector).__name__ in AUTO_COMPOSITE_TENSOR_IS_BROKEN:
-      composite_bij = experimental.as_composite(bijector)
-    else:
-      composite_bij = bijector
-
     if not tf.executing_eagerly():
-      composite_bij = tf.nest.map_structure(
+      bijector = tf.nest.map_structure(
           lambda x: (tf.convert_to_tensor(x)  # pylint: disable=g-long-lambda
                      if isinstance(x, DeferredTensor) else x),
-          composite_bij,
+          bijector,
           expand_composites=True)
 
-    self.assertIsInstance(composite_bij, tf.__internal__.CompositeTensor)
-    flat = tf.nest.flatten(composite_bij, expand_composites=True)
-    unflat = tf.nest.pack_sequence_as(
-        composite_bij, flat, expand_composites=True)
+    self.assertIsInstance(bijector, tf.__internal__.CompositeTensor)
+    flat = tf.nest.flatten(bijector, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(bijector, flat, expand_composites=True)
 
     # Compare forward maps before and after compositing.
     n = 3
@@ -950,7 +937,7 @@ class BijectorPropertiesTest(test_util.TestCase):
     # Input to tf.function
     self.assertAllClose(
         before_ys,
-        tf.function(lambda b: b.forward(xs))(composite_bij),
+        tf.function(lambda b: b.forward(xs))(bijector),
         rtol=COMPOSITE_TENSOR_RTOL[bijector_name],
         atol=COMPOSITE_TENSOR_ATOL[bijector_name])
 
@@ -958,7 +945,7 @@ class BijectorPropertiesTest(test_util.TestCase):
     # respect to the input and parameter variables.  Also check that any
     # variables are not referenced overmuch.
     xs = self._draw_domain_tensor(bijector, data, event_dim)
-    wrt_vars = [xs] + [v for v in composite_bij.trainable_variables
+    wrt_vars = [xs] + [v for v in bijector.trainable_variables
                        if v.dtype.is_floating]
     with tf.GradientTape() as tape:
       tape.watch(wrt_vars)
