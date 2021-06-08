@@ -210,6 +210,24 @@ class _UtilityTests(test_util.TestCase):
     self.assertAllClose(stddev, unmasked_stddev)
     self.assertAllClose(initial, unmasked_initial)
 
+  def test_empirical_statistics_accepts_vector(self):
+
+    mu = [0., 0.]
+    covariance_matrix = [
+                          [1., 0.5],
+                          [0.5, 1.],
+                        ]
+    time_series = tfd.MultivariateNormalFullCovariance(
+        loc=mu,
+        covariance_matrix=covariance_matrix
+    ).sample(1000)
+
+    mean, stddev, initial = self.evaluate(
+        sts_util.empirical_statistics(time_series, event_axis=-2))
+    cov = stddev ** 2
+    self.assertAllClose(cov, covariance_matrix, atol=0.1)
+    self.assertAllClose(mean, mu, atol=0.1)
+
   def test_mix_over_posterior_draws(self):
     num_posterior_draws = 3
     batch_shape = [2, 1]

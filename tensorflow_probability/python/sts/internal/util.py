@@ -26,6 +26,7 @@ from tensorflow_probability.python.distributions.mvn_linear_operator import Mult
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.sts.internal import missing_values_util
+from tensorflow_probability.python import stats
 
 tfl = tf.linalg
 
@@ -195,13 +196,16 @@ def sum_mvns(distributions):
           'currently implemented. (given: {})'.format(distributions))
 
 
-def empirical_statistics(observed_time_series):
+def empirical_statistics(observed_time_series, event_axis=-1):
   """Compute statistics of a provided time series, as heuristic initialization.
 
   Args:
     observed_time_series: `Tensor` representing a time series, or batch of time
        series, of shape either `batch_shape + [num_timesteps, 1]` or
        `batch_shape + [num_timesteps]` (allowed if `num_timesteps > 1`).
+    event_axis: Scalar.
+       Axis indexing random events, whose covariance we are interested in.
+       Default value: `-1` (rightmost axis holds events).
 
   Returns:
     observed_mean: `Tensor` of shape `batch_shape`, giving the empirical
@@ -222,15 +226,24 @@ def empirical_statistics(observed_time_series):
 
     squeezed_series = observed_time_series[..., 0]
     if mask is None:
-      observed_mean, observed_variance = tf.nn.moments(
-          x=squeezed_series, axes=-1)
-      observed_initial = squeezed_series[..., 0]
+      if event_axis == -1:
+        observed_mean, observed_variance = tf.nn.moments(
+            x=squeezed_series, axes=-1)
+        observed_initial = squeezed_series[..., 0]
+      else:
+        observed_mean = tf.reduce_mean(squeezed_series, 0)
+        observed_variance = stats.covariance(squeezed_series)
+        observed_initial = squeezed_series[0]
     else:
-      broadcast_mask = tf.broadcast_to(tf.cast(mask, tf.bool),
-                                       tf.shape(squeezed_series))
-      observed_mean, observed_variance = (
-          missing_values_util.moments_of_masked_time_series(
-              squeezed_series, broadcast_mask=broadcast_mask))
+      if event_axis == -1:
+        broadcast_mask = tf.broadcast_to(tf.cast(mask, tf.bool),
+                                         tf.shape(squeezed_series))
+        observed_mean, observed_variance = (
+            missing_values_util.moments_of_masked_time_series(
+                squeezed_series, broadcast_mask=broadcast_mask))
+      else:
+        raise NotImplementedError('Computing multivariate vector with mask is'
+                                  'currently not implemented.')
       try:
         observed_initial = (
             missing_values_util.initial_value_of_masked_time_series(
