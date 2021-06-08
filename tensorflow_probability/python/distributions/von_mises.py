@@ -42,7 +42,7 @@ from tensorflow_probability.python.math.gradient import value_and_gradient
 __all__ = ['VonMises']
 
 
-class VonMises(distribution.Distribution):
+class VonMises(distribution.AutoCompositeTensorDistribution):
   """The von Mises distribution over angles.
 
   The von Mises distribution is a univariate directional distribution.

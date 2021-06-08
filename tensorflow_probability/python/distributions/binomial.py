@@ -266,7 +266,7 @@ def _random_binomial(
     return sampler_impl(**params)
 
 
-class Binomial(distribution.Distribution):
+class Binomial(distribution.AutoCompositeTensorDistribution):
   """Binomial distribution.
 
   This distribution is parameterized by `probs`, a (batch of) probabilities for

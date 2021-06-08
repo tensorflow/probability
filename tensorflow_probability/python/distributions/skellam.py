@@ -39,7 +39,7 @@ __all__ = [
 ]
 
 
-class Skellam(distribution.Distribution):
+class Skellam(distribution.AutoCompositeTensorDistribution):
   """Skellam distribution.
 
   The Skellam distribution is parameterized by two rate parameters,

@@ -45,7 +45,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 __all__ = ['VonMisesFisher']
 
 
-class VonMisesFisher(distribution.Distribution):
+class VonMisesFisher(distribution.AutoCompositeTensorDistribution):
   r"""The von Mises-Fisher distribution over unit vectors on `S^{n-1}`.
 
   The von Mises-Fisher distribution is a directional distribution over vectors

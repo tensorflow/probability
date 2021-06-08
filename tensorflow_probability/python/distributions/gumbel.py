@@ -26,6 +26,7 @@ from tensorflow_probability.python.bijectors import gumbel_cdf as gumbel_cdf_bij
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
@@ -35,7 +36,10 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
-class Gumbel(transformed_distribution.TransformedDistribution):
+# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
+# `TransformedDistribution` is converted to `CompositeTensor`.
+class Gumbel(transformed_distribution.TransformedDistribution,
+             distribution.AutoCompositeTensorDistribution):
   """The scalar Gumbel distribution with location `loc` and `scale` parameters.
 
   #### Mathematical details

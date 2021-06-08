@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class HalfStudentT(distribution.Distribution):
+class HalfStudentT(distribution.AutoCompositeTensorDistribution):
   """Half-Student's t distribution.
 
   The half-Student's t distribution has three parameters: degree of freedom

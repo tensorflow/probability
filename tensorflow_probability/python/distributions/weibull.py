@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.bijectors import weibull_cdf as weibull_cdf_bijector
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
@@ -35,7 +36,8 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
-class Weibull(transformed_distribution.TransformedDistribution):
+class Weibull(transformed_distribution.TransformedDistribution,
+              distribution.AutoCompositeTensorDistribution):
   """The Weibull distribution with 'concentration' and `scale` parameters.
 
   #### Mathematical details

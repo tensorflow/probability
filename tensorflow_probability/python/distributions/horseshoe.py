@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-class Horseshoe(distribution.Distribution):
+class Horseshoe(distribution.AutoCompositeTensorDistribution):
   r"""Horseshoe distribution.
 
   The so-called 'horseshoe' distribution is a Cauchy-Normal scale mixture,

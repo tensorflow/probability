@@ -51,7 +51,7 @@ def _unvec(x, matrix_shape):
       [prefer_static.shape(x)[:-1], matrix_shape], axis=0))
 
 
-class MatrixNormalLinearOperator(distribution.Distribution):
+class MatrixNormalLinearOperator(distribution.AutoCompositeTensorDistribution):
   """The Matrix Normal distribution on `n x p` matrices.
 
   The Matrix Normal distribution is defined over `n x p` matrices and

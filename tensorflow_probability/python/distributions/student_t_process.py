@@ -87,7 +87,7 @@ def make_cholesky_factored_marginal_fn(jitter):
   return marginal_fn
 
 
-class StudentTProcess(distribution.Distribution):
+class StudentTProcess(distribution.AutoCompositeTensorDistribution):
   """Marginal distribution of a Student's T process at finitely many points.
 
   A Student's T process (TP) is an indexed collection of random variables, any

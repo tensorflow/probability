@@ -58,7 +58,7 @@ BATES_TOTAL_COUNT_STABILITY_LIMITS = {
 }
 
 
-class Bates(distribution.Distribution):
+class Bates(distribution.AutoCompositeTensorDistribution):
   """Bates distribution.
 
   The Bates distribution is the distribution of the average of `total_count`

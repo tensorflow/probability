@@ -50,7 +50,7 @@ can be broadcast with `self.total_count`, `self.concentration1` and
 """
 
 
-class BetaBinomial(distribution.Distribution):
+class BetaBinomial(distribution.AutoCompositeTensorDistribution):
   """Beta-Binomial compound distribution.
 
   The Beta-Binomial distribution is parameterized by (a batch of) `total_count`

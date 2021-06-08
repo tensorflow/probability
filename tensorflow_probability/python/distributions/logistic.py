@@ -34,7 +34,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
-class Logistic(distribution.Distribution):
+class Logistic(distribution.AutoCompositeTensorDistribution):
   """The Logistic distribution with location `loc` and `scale` parameters.
 
   #### Mathematical details

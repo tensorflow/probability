@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.bijectors import shift as shift_bijector
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import sample
@@ -58,7 +59,8 @@ or
 
 
 class MultivariateNormalLinearOperator(
-    transformed_distribution.TransformedDistribution):
+    transformed_distribution.TransformedDistribution,
+    distribution.AutoCompositeTensorDistribution):
   """The multivariate normal distribution on `R^k`.
 
   The Multivariate Normal distribution is defined over `R^k` and parameterized

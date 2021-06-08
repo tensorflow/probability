@@ -53,7 +53,7 @@ or
 
 
 class MultivariateNormalLowRankUpdateLinearOperatorCovariance(
-    distribution.Distribution):
+    distribution.AutoCompositeTensorDistribution):
   """The multivariate normal distribution on `R^k`.
 
   This Multivariate Normal distribution is defined over `R^k` and parameterized

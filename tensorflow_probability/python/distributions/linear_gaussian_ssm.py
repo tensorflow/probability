@@ -172,7 +172,8 @@ def _augment_sample_shape(partial_batch_dist,
     return full_sample_and_batch_shape[:num_broadcast_dims]
 
 
-class LinearGaussianStateSpaceModel(distribution.Distribution):
+class LinearGaussianStateSpaceModel(
+    distribution.AutoCompositeTensorDistribution):
   """Observation distribution from a linear Gaussian state space model.
 
   A linear Gaussian state space model, sometimes called a Kalman filter, posits

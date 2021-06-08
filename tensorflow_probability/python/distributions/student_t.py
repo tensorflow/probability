@@ -146,7 +146,7 @@ def entropy(df, scale, batch_shape, dtype):
           (tf.math.digamma(0.5 * (df + 1.)) - tf.math.digamma(0.5 * df)))
 
 
-class StudentT(distribution.Distribution):
+class StudentT(distribution.AutoCompositeTensorDistribution):
   """Student's t-distribution.
 
   This distribution has parameters: degree of freedom `df`, location `loc`,

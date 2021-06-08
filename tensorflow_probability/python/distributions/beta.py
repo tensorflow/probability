@@ -48,7 +48,7 @@ _beta_sample_note = """Note: `x` must have dtype `self.dtype` and be in
 `[0, 1].` It must have a shape compatible with `self.batch_shape()`."""
 
 
-class Beta(distribution.Distribution):
+class Beta(distribution.AutoCompositeTensorDistribution):
   """Beta distribution.
 
   The Beta distribution is defined over the `(0, 1)` interval using parameters

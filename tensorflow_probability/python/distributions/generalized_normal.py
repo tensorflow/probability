@@ -42,7 +42,7 @@ __all__ = [
 ]
 
 
-class GeneralizedNormal(distribution.Distribution):
+class GeneralizedNormal(distribution.AutoCompositeTensorDistribution):
   """The Generalized Normal distribution.
 
   The Generalized Normal (or Generalized Gaussian) generalizes the Normal

@@ -32,7 +32,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
 
-class RelaxedBernoulli(distribution.Distribution):
+class RelaxedBernoulli(distribution.AutoCompositeTensorDistribution):
   """RelaxedBernoulli distribution with temperature and logits parameters.
 
   The RelaxedBernoulli is a distribution over the unit interval (0,1), which

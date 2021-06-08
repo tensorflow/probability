@@ -392,21 +392,38 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
   def test_subclass_with_inherited_type_spec_raises(self):
 
-    class StandardNormal(AutoNormal):
+    @tfp.experimental.auto_composite_tensor(
+        omit_kwargs=('parameters',), non_identifying_kwargs=('name',))
+    class ParentBijector(
+        tfb.Bijector, tfp.experimental.AutoCompositeTensor):
+      """Minimal specification of a `Bijector`.
 
-      def __init__(self):
-        super(StandardNormal, self).__init__(
-            loc=0., scale=1., validate_args=True)
+      We do not subclass `AutoCompositeTensorBijector` since its metaclass
+      would make subclasses automatically re-generate their `TypeSpec`.
+      """
 
-    d = StandardNormal()
+      def __init__(self, a):
+        parameters = dict(locals())
+        self.a = a
+        super(ParentBijector, self).__init__(
+            forward_min_event_ndims=0,
+            parameters=parameters)
+
+    class ChildBijector(ParentBijector):
+
+      def __init__(self, b):
+        self.b = b
+        super(ChildBijector, self).__init__(a=b+1)
+
+    b = ChildBijector(b=4)
     with self.assertRaisesRegex(
         ValueError,
-        '`StandardNormal` has inherited the `_type_spec` of `Normal`'):
-      tf.nest.flatten(d, expand_composites=True)
+        '`ChildBijector` has inherited the `_type_spec` of `ParentBijector`'):
+      tf.nest.flatten(b, expand_composites=True)
 
-    AutoStandardNormal = tfp.experimental.auto_composite_tensor(StandardNormal)  # pylint: disable=invalid-name
-    d_ct = AutoStandardNormal()
-    self.assertLen(tf.nest.flatten(d_ct, expand_composites=True), 0)
+    AutoChildBijector = tfp.experimental.auto_composite_tensor(ChildBijector)  # pylint: disable=invalid-name
+    b_ct = AutoChildBijector(b=2)
+    self.assertLen(tf.nest.flatten(b_ct, expand_composites=True), 0)
 
   def test_names_preserved_through_flatten(self):
 

@@ -42,7 +42,7 @@ __all__ = [
 ]
 
 
-class Normal(distribution.Distribution):
+class Normal(distribution.AutoCompositeTensorDistribution):
   """The Normal distribution with location `loc` and `scale` parameters.
 
   #### Mathematical details

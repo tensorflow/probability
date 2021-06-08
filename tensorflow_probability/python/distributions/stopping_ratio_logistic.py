@@ -36,7 +36,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
-class StoppingRatioLogistic(distribution.Distribution):
+class StoppingRatioLogistic(distribution.AutoCompositeTensorDistribution):
   """Stopping ratio logistic distribution.
 
   The StoppingRatioLogistic distribution is parameterized by a location and a

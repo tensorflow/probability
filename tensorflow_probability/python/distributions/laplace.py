@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class Laplace(distribution.Distribution):
+class Laplace(distribution.AutoCompositeTensorDistribution):
   """The Laplace distribution with location `loc` and `scale` parameters.
 
   #### Mathematical details

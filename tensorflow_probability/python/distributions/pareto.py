@@ -39,7 +39,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
-class Pareto(distribution.Distribution):
+class Pareto(distribution.AutoCompositeTensorDistribution):
   """Pareto distribution.
 
   The Pareto distribution is parameterized by a `scale` and a

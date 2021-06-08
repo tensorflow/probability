@@ -43,6 +43,7 @@ from tensorflow_probability.python.distributions import hypothesis_testlib as dh
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import numerics_testing as nt
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
@@ -460,7 +461,7 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
       x = event_space_bijector(y)
       hp.note('Got constrained samples {}'.format(x))
       with tf.control_dependencies(dist._sample_control_dependencies(x)):
-        self.evaluate(tf.identity(x))
+        self.evaluate(tensor_util.identity_as_tensor(x))
 
       # TODO(b/158874412): Verify DoF changing default bijectors.
       # y_bc = tf.broadcast_to(y, full_sample_batch_event_shape)
@@ -495,9 +496,8 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
     def ok(name):
       return name not in EVENT_SPACE_BIJECTOR_IS_BROKEN
     dist = data.draw(dhps.distributions(
-        dist_name=dist_name, enable_vars=True,
+        dist_name=dist_name, enable_vars=False,
         eligibility_filter=ok))
-    self.evaluate([var.initializer for var in dist.variables])
     self.assume_loc_scale_ok(dist)
     self.check_event_space_bijector_constrains(dist, data)
 

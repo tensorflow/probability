@@ -40,7 +40,8 @@ __all__ = [
 ]
 
 
-class ExponentiallyModifiedGaussian(distribution.Distribution):
+class ExponentiallyModifiedGaussian(
+    distribution.AutoCompositeTensorDistribution):
   """Exponentially modified Gaussian distribution.
 
   #### Mathematical details

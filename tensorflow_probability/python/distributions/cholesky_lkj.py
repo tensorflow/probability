@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-class CholeskyLKJ(distribution.Distribution):
+class CholeskyLKJ(distribution.AutoCompositeTensorDistribution):
   """The CholeskyLKJ distribution on cholesky factors of correlation matrices.
 
   This is a one-parameter family of distributions on cholesky factors of

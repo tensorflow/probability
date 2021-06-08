@@ -33,7 +33,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
-class GeneralizedPareto(distribution.Distribution):
+class GeneralizedPareto(distribution.AutoCompositeTensorDistribution):
   """The Generalized Pareto distribution.
 
   The Generalized Pareto distributions are a family of continuous distributions

@@ -47,7 +47,7 @@ from tensorflow_probability.python.random import random_ops
 __all__ = ['PowerSpherical']
 
 
-class PowerSpherical(distribution.Distribution):
+class PowerSpherical(distribution.AutoCompositeTensorDistribution):
   r"""The Power Spherical distribution over unit vectors on `S^{n-1}`.
 
   The Power Spherical distribution [1] is a distribution over vectors

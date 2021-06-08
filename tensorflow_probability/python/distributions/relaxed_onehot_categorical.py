@@ -38,7 +38,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
-class ExpRelaxedOneHotCategorical(distribution.Distribution):
+class ExpRelaxedOneHotCategorical(distribution.AutoCompositeTensorDistribution):
   """ExpRelaxedOneHotCategorical distribution with temperature and logits.
 
   An ExpRelaxedOneHotCategorical distribution is a log-transformed
@@ -397,7 +397,8 @@ class ExpRelaxedOneHotCategorical(distribution.Distribution):
 
 
 class RelaxedOneHotCategorical(
-    transformed_distribution.TransformedDistribution):
+    transformed_distribution.TransformedDistribution,
+    distribution.AutoCompositeTensorDistribution):
   """RelaxedOneHotCategorical distribution with temperature and logits.
 
   The RelaxedOneHotCategorical is a distribution over random probability

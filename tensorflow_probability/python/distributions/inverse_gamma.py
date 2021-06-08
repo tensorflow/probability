@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class InverseGamma(distribution.Distribution):
+class InverseGamma(distribution.AutoCompositeTensorDistribution):
   """InverseGamma distribution.
 
   The `InverseGamma` distribution is defined over positive real numbers using

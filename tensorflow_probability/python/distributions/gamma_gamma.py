@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class GammaGamma(distribution.Distribution):
+class GammaGamma(distribution.AutoCompositeTensorDistribution):
   """Gamma-Gamma distribution.
 
   Gamma-Gamma is a [compound

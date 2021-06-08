@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class PERT(distribution.Distribution):
+class PERT(distribution.AutoCompositeTensorDistribution):
   """Modified PERT distribution for modeling expert predictions.
 
   The PERT distribution is a loc-scale family of Beta distributions

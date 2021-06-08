@@ -45,7 +45,7 @@ def _cauchy_cdf_diff(x, y):
   return tfp_math.atan_difference(x, y) / np.pi
 
 
-class TruncatedCauchy(distribution.Distribution):
+class TruncatedCauchy(distribution.AutoCompositeTensorDistribution):
   """The Truncated Cauchy distribution.
 
   The truncated Cauchy is a Cauchy distribution bounded between `low`

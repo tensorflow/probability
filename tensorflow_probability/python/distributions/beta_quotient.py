@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class BetaQuotient(distribution.Distribution):
+class BetaQuotient(distribution.AutoCompositeTensorDistribution):
   """BetaQuotient distribution.
 
   The Beta Quotient distribution is defined over the positive reals, as

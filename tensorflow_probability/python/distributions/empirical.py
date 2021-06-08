@@ -55,7 +55,7 @@ def _broadcast_event_and_samples(event, samples, event_ndims):
   return event, samples
 
 
-class Empirical(distribution.Distribution):
+class Empirical(distribution.AutoCompositeTensorDistribution):
   """Empirical distribution.
 
   The Empirical distribution is parameterized by a [batch] multiset of samples.

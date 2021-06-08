@@ -82,7 +82,7 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
     self.evaluate(unflat.sample())
 
-    d2 = onehot_cat_composite(logits=[.5, .5], validate_args=True)
+    d2 = onehot_cat_composite(logits=tf.Variable([.5, .5]), validate_args=True)
     tf.nest.assert_same_structure(dist, d2, expand_composites=True)
 
     d3 = onehot_cat_composite(probs=var, validate_args=True)
@@ -189,8 +189,16 @@ class CompositeTensorTest(tfp_test_util.TestCase):
   def test_import_unrecognized_class(self):
     path = self.create_tempdir().full_path
 
-    class Normal(tfd.Normal):  # Note, same name as tfd.Normal, but diff type.
-      pass
+    class Normal(tfd.Distribution):  # Same name as tfd.Normal, but diff type.
+
+      def __init__(self, loc, scale):
+        self.dist = tfd.Normal(loc, scale)
+        super(Normal, self).__init__(
+            dtype=None, reparameterization_type=None,
+            validate_args=False, allow_nan_stats=False)
+
+      def _sample_n(self, n, seed=None, **kwargs):
+        return self.dist._sample_n(n, seed=seed, **kwargs)  # pylint: disable=protected-access
 
     class Model(tf.Module):
 
@@ -435,7 +443,17 @@ class CompositeTensorTest(tfp_test_util.TestCase):
     self.assertEqual(log_prob_before, log_prob_after)
 
   def test_multi_calls(self):
-    d = tfd.Normal(0, 1)
+
+    class TrivialMetaDist(tfd.Distribution):
+
+      def __init__(self, dist):
+        self.dist = dist
+        super(TrivialMetaDist, self).__init__(
+            dtype=None, reparameterization_type=None,
+            validate_args=False, allow_nan_stats=False)
+
+    n = tfd.Normal(0, 1)
+    d = TrivialMetaDist(n)
     d1 = tfp.experimental.as_composite(d)
     d2 = tfp.experimental.as_composite(d1)
     self.assertIsNot(d, d1)

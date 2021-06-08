@@ -80,7 +80,7 @@ def _log_xexp_ratio(x):
     return result
 
 
-class ContinuousBernoulli(distribution.Distribution):
+class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
   """Continuous Bernoulli distribution.
 
   This distribution is parameterized by `probs`, a (batch of) parameters

@@ -55,7 +55,7 @@ def _normal_log_pdf(x):
   return -0.5 * (tf.math.log(two_pi) + tf.square(x))
 
 
-class TruncatedNormal(distribution.Distribution):
+class TruncatedNormal(distribution.AutoCompositeTensorDistribution):
   """The Truncated Normal distribution.
 
   The truncated normal is a normal distribution bounded between `low`

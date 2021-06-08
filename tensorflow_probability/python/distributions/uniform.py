@@ -33,7 +33,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
-class Uniform(distribution.Distribution):
+class Uniform(distribution.AutoCompositeTensorDistribution):
   """Uniform distribution with `low` and `high` parameters.
 
   #### Mathematical Details

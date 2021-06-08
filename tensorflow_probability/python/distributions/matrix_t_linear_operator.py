@@ -52,7 +52,7 @@ def _unvec(x, matrix_shape):
       [prefer_static.shape(x)[:-1], matrix_shape], axis=0))
 
 
-class MatrixTLinearOperator(distribution.Distribution):
+class MatrixTLinearOperator(distribution.AutoCompositeTensorDistribution):
   """The Matrix T distribution on `n x p` matrices.
 
   The Matrix T distribution is defined over `n x p` matrices and

@@ -384,6 +384,7 @@ multi_substrate_py_library(
     srcs = ["chi.py"],
     deps = [
         ":chi2",
+        ":distribution",
         ":kullback_leibler",
         ":transformed_distribution",
         # numpy dep,
@@ -610,8 +611,11 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
@@ -806,6 +810,7 @@ multi_substrate_py_library(
     name = "gumbel",
     srcs = ["gumbel.py"],
     deps = [
+        ":distribution",
         ":kullback_leibler",
         ":transformed_distribution",
         ":uniform",
@@ -826,6 +831,7 @@ multi_substrate_py_library(
     name = "gev",
     srcs = ["gev.py"],
     deps = [
+        ":distribution",
         ":kullback_leibler",
         ":transformed_distribution",
         ":uniform",
@@ -995,6 +1001,7 @@ multi_substrate_py_library(
     name = "johnson_su",
     srcs = ["johnson_su.py"],
     deps = [
+        ":distribution",
         ":normal",
         ":transformed_distribution",
         # tensorflow dep,
@@ -1132,6 +1139,7 @@ multi_substrate_py_library(
     name = "kumaraswamy",
     srcs = ["kumaraswamy.py"],
     deps = [
+        ":distribution",
         ":transformed_distribution",
         ":uniform",
         # numpy dep,
@@ -1278,6 +1286,7 @@ multi_substrate_py_library(
     name = "lognormal",
     srcs = ["lognormal.py"],
     deps = [
+        ":distribution",
         ":normal",
         ":transformed_distribution",
         # numpy dep,
@@ -1294,6 +1303,7 @@ multi_substrate_py_library(
     name = "logitnormal",
     srcs = ["logitnormal.py"],
     deps = [
+        ":distribution",
         ":normal",
         ":transformed_distribution",
         # numpy dep,
@@ -1426,6 +1436,7 @@ multi_substrate_py_library(
     name = "moyal",
     srcs = ["moyal.py"],
     deps = [
+        ":distribution",
         ":kullback_leibler",
         ":transformed_distribution",
         ":uniform",
@@ -1500,6 +1511,7 @@ multi_substrate_py_library(
     name = "mvn_linear_operator",
     srcs = ["mvn_linear_operator.py"],
     deps = [
+        ":distribution",
         ":kullback_leibler",
         ":normal",
         ":sample",
@@ -2219,6 +2231,7 @@ multi_substrate_py_library(
     name = "vector_exponential_linear_operator",
     srcs = ["vector_exponential_linear_operator.py"],
     deps = [
+        ":distribution",
         ":exponential",
         ":sample",
         ":transformed_distribution",
@@ -2227,6 +2240,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:scale_matvec_linear_operator",
         "//tensorflow_probability/python/bijectors:shift",
         "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -2287,6 +2301,7 @@ multi_substrate_py_library(
     srcs = ["weibull.py"],
     deps = [
         ":distribution",
+        ":transformed_distribution",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:chain",
@@ -3382,6 +3397,7 @@ multi_substrate_py_test(
     name = "mvn_diag_plus_low_rank_covariance_test",
     srcs = ["mvn_diag_plus_low_rank_covariance_test.py"],
     deps = [
+        ":distribution",
         ":mvn_diag_plus_low_rank_covariance",
         # numpy dep,
         # tensorflow dep,

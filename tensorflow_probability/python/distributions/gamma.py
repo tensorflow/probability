@@ -46,7 +46,7 @@ __all__ = [
 ]
 
 
-class Gamma(distribution.Distribution):
+class Gamma(distribution.AutoCompositeTensorDistribution):
   """Gamma distribution.
 
   The Gamma distribution is defined over positive real numbers using

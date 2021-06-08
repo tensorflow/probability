@@ -24,9 +24,10 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import invert
-from tensorflow_probability.python.bijectors import kumaraswamy_cdf as kumaraswamy_cdf
+from tensorflow_probability.python.bijectors import kumaraswamy_cdf
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import assert_util
@@ -61,7 +62,10 @@ def _harmonic_number(x):
   return tf.math.digamma(x + one) - tf.math.digamma(one)
 
 
-class Kumaraswamy(transformed_distribution.TransformedDistribution):
+# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
+# `TransformedDistribution` is converted to `CompositeTensor`.
+class Kumaraswamy(transformed_distribution.TransformedDistribution,
+                  distribution.AutoCompositeTensorDistribution):
   """Kumaraswamy distribution.
 
   The Kumaraswamy distribution is defined over the `(0, 1)` interval using

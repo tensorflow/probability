@@ -48,7 +48,7 @@ def _log1px2(x):
       2 * tf.math.log(tf.math.abs(x)))
 
 
-class NormalInverseGaussian(distribution.Distribution):
+class NormalInverseGaussian(distribution.AutoCompositeTensorDistribution):
   """Normal Inverse Gaussian distribution.
 
   The [Normal-inverse Gaussian distribution]

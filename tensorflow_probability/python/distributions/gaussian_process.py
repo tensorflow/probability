@@ -85,7 +85,7 @@ def make_cholesky_factored_marginal_fn(jitter):
   return marginal_fn
 
 
-class GaussianProcess(distribution.Distribution):
+class GaussianProcess(distribution.AutoCompositeTensorDistribution):
   """Marginal distribution of a Gaussian process at finitely many points.
 
   A Gaussian process (GP) is an indexed collection of random variables, any

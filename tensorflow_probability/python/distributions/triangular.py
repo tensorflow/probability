@@ -34,7 +34,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
-class Triangular(distribution.Distribution):
+class Triangular(distribution.AutoCompositeTensorDistribution):
   r"""Triangular distribution with `low`, `high` and `peak` parameters.
 
   #### Mathematical Details

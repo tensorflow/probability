@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class DoublesidedMaxwell(distribution.Distribution):
+class DoublesidedMaxwell(distribution.AutoCompositeTensorDistribution):
   r"""Double-sided Maxwell distribution.
 
   This distribution is useful to compute measure valued derivatives for Gaussian

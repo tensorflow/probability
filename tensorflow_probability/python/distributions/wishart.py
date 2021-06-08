@@ -46,7 +46,7 @@ __all__ = [
 ]
 
 
-class WishartLinearOperator(distribution.Distribution):
+class WishartLinearOperator(distribution.AutoCompositeTensorDistribution):
   """The matrix Wishart distribution on positive definite matrices.
 
   This distribution is defined by a scalar number of degrees of freedom `df` and

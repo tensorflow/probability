@@ -1932,6 +1932,48 @@ class Distribution(_BaseDistribution):
     return ()
 
 
+class _AutoCompositeTensorDistributionMeta(_DistributionMeta):
+  """Metaclass for `AutoCompositeTensorBijector`."""
+
+  def __new__(mcs, classname, baseclasses, attrs):  # pylint: disable=bad-mcs-classmethod-argument
+    """Give subclasses their own type_spec, not an inherited one."""
+
+    cls = super(_AutoCompositeTensorDistributionMeta, mcs).__new__(  # pylint: disable=too-many-function-args
+        mcs, classname, baseclasses, attrs)
+    if 'tensorflow_probability.python.distributions' in cls.__module__:
+      module_name = 'tfp.distributions'
+    elif ('tensorflow_probability.python.experimental.distributions'
+          in cls.__module__):
+      module_name = 'tfp.experimental.distributions'
+    else:
+      module_name = cls.__module__
+    return auto_composite_tensor.auto_composite_tensor(
+        cls,
+        omit_kwargs=('parameters',),
+        non_identifying_kwargs=('name',),
+        module_name=module_name)
+
+
+class AutoCompositeTensorDistribution(
+    Distribution, auto_composite_tensor.AutoCompositeTensor,
+    metaclass=_AutoCompositeTensorDistributionMeta):
+  r"""Base for `CompositeTensor` bijectors with auto-generated `TypeSpec`s.
+
+  `CompositeTensor` objects are able to pass in and out of `tf.function` and
+  `tf.while_loop`, or serve as part of the signature of a TF saved model.
+  `Distribution` subclasses that follow the contract of
+  `tfp.experimental.auto_composite_tensor` may be defined as `CompositeTensor`s
+  by inheriting from `AutoCompositeTensorDistribution`:
+
+  ```python
+  class MyDistribution(tfb.AutoCompositeTensorDistribution):
+
+    # The remainder of the subclass implementation is unchanged.
+  ```
+  """
+  pass
+
+
 class _PrettyDict(dict):
   """`dict` with stable `repr`, `str`."""
 

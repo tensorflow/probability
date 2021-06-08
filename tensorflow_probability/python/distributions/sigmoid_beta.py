@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-class SigmoidBeta(distribution.Distribution):
+class SigmoidBeta(distribution.AutoCompositeTensorDistribution):
   """SigmoidBeta Distribution.
 
   The SigmoidBeta distribution is defined over the real line using parameters

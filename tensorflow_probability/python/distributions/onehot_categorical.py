@@ -33,7 +33,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
-class OneHotCategorical(distribution.Distribution):
+class OneHotCategorical(distribution.AutoCompositeTensorDistribution):
   """OneHotCategorical distribution.
 
   The categorical distribution is parameterized by the log-probabilities

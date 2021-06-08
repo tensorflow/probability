@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-class HalfCauchy(distribution.Distribution):
+class HalfCauchy(distribution.AutoCompositeTensorDistribution):
   """Half-Cauchy distribution.
 
   The half-Cauchy distribution is parameterized by a `loc` and a

@@ -42,7 +42,7 @@ __all__ = [
 
 
 @six.add_metaclass(abc.ABCMeta)
-class _BaseDeterministic(distribution.Distribution):
+class _BaseDeterministic(distribution.AutoCompositeTensorDistribution):
   """Base class for Deterministic distributions."""
 
   def __init__(self,

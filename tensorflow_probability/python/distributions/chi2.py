@@ -39,7 +39,7 @@ __all__ = [
 ]
 
 
-class Chi2(distribution.Distribution):
+class Chi2(distribution.AutoCompositeTensorDistribution):
   """Chi2 distribution.
 
   The Chi2 distribution is defined over positive real numbers using a degrees of

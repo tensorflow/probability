@@ -40,7 +40,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 # QuantizedDistribution.
 
 
-class OrderedLogistic(distribution.Distribution):
+class OrderedLogistic(distribution.AutoCompositeTensorDistribution):
   """Ordered logistic distribution.
 
   The OrderedLogistic distribution is parameterized by a location and a set of

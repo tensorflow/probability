@@ -39,7 +39,7 @@ __all__ = [
 ]
 
 
-class Zipf(distribution.Distribution):
+class Zipf(distribution.AutoCompositeTensorDistribution):
   """Zipf distribution.
 
   The Zipf distribution is parameterized by a `power` parameter.

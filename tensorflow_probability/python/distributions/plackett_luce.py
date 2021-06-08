@@ -31,7 +31,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
-class PlackettLuce(distribution.Distribution):
+class PlackettLuce(distribution.AutoCompositeTensorDistribution):
   """Plackett-Luce distribution over permutations.
 
   The Plackett-Luce distribution is defined over permutations of

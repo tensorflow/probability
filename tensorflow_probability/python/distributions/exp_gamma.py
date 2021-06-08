@@ -44,7 +44,7 @@ __all__ = [
 ]
 
 
-class ExpGamma(distribution.Distribution):
+class ExpGamma(distribution.AutoCompositeTensorDistribution):
   """ExpGamma distribution.
 
   The ExpGamma distribution is defined over the real line using
@@ -285,7 +285,10 @@ class ExpGamma(distribution.Distribution):
 kullback_leibler.RegisterKL(ExpGamma, ExpGamma)(gamma_lib.kl_gamma_gamma)
 
 
-class ExpInverseGamma(transformed_distribution.TransformedDistribution):
+# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
+# `TransformedDistribution` is converted to `CompositeTensor`.
+class ExpInverseGamma(transformed_distribution.TransformedDistribution,
+                      distribution.AutoCompositeTensorDistribution):
   """ExpInverseGamma distribution.
 
   The `ExpInverseGamma` distribution is defined over the real numbers such that

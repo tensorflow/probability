@@ -46,7 +46,7 @@ __all__ = [
 ]
 
 
-class InverseGaussian(distribution.Distribution):
+class InverseGaussian(distribution.AutoCompositeTensorDistribution):
   """Inverse Gaussian distribution.
 
   The [inverse Gaussian distribution]

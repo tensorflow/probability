@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-class Cauchy(distribution.Distribution):
+class Cauchy(distribution.AutoCompositeTensorDistribution):
   """The Cauchy distribution with location `loc` and scale `scale`.
 
   #### Mathematical details

@@ -39,7 +39,8 @@ __all__ = [
 ]
 
 
-class MultivariateStudentTLinearOperator(distribution.Distribution):
+class MultivariateStudentTLinearOperator(
+    distribution.AutoCompositeTensorDistribution):
   """The [Multivariate Student's t-distribution](
 
   https://en.wikipedia.org/wiki/Multivariate_t-distribution) on `R^k`.

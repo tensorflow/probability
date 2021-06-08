@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class HalfNormal(distribution.Distribution):
+class HalfNormal(distribution.AutoCompositeTensorDistribution):
   """The Half Normal distribution with scale `scale`.
 
   #### Mathematical details

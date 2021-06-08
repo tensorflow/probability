@@ -39,7 +39,7 @@ from tensorflow_probability.python.random import random_ops
 __all__ = ['SphericalUniform']
 
 
-class SphericalUniform(distribution.Distribution):
+class SphericalUniform(distribution.AutoCompositeTensorDistribution):
   r"""The uniform distribution over unit vectors on `S^{n-1}`.
 
   The uniform distribution on the unit hypersphere `S^{n-1}` embedded in

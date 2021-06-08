@@ -48,7 +48,7 @@ dtype `self.dtype` and be in the `(self.event_shape() - 1)`-simplex, i.e.,
 `self.batch_shape() + self.event_shape()`."""
 
 
-class Dirichlet(distribution.Distribution):
+class Dirichlet(distribution.AutoCompositeTensorDistribution):
   """Dirichlet distribution.
 
   The Dirichlet distribution is defined over the
