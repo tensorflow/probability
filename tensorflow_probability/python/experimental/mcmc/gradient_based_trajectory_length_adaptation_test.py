@@ -396,6 +396,45 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
       self.assertAllClose(avg_sq_grad[0], avg_sq_grad[i])
       self.assertAllClose(avg_max_tl[0], avg_max_tl[i])
 
+  def test_gbtla_kernel_can_shard_chains_across_devices(self):
+
+    def target_log_prob(a, b):
+      return (
+          tfd.Normal(0., 1.).log_prob(a)
+          + tfd.Sample(tfd.Normal(a, 1.), 4).log_prob(b))
+
+    kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
+                                            step_size=1e-2,
+                                            num_leapfrog_steps=2)
+    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+        kernel, 10)
+    sharded_kernel = kernel.experimental_with_chain_axes(self.axis_name)
+
+    def run(seed):
+      init_seed, sample_seed = samplers.split_seed(seed)
+      state_seeds = samplers.split_seed(init_seed)
+      state = [
+          samplers.normal(seed=state_seeds[0], shape=[]),
+          samplers.normal(seed=state_seeds[1], shape=[4])
+      ]
+      kr = sharded_kernel.bootstrap_results(state)
+      _, kr = sharded_kernel.one_step(state, kr, seed=sample_seed)
+      return (
+          kr.averaged_sq_grad,
+          kr.averaged_max_trajectory_length
+      )
+
+    seeds = self.shard_values(tf.stack(tfp.random.split_seed(
+        samplers.zeros_seed(), distribute_test_lib.NUM_DEVICES)), 0)
+
+    avg_sq_grad, avg_max_tl = self.evaluate(
+        self.per_replica_to_tensor(self.strategy_run(
+            run, args=(seeds,), axis_name=self.axis_name), 0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(avg_sq_grad[0], avg_sq_grad[i])
+      self.assertAllClose(avg_max_tl[0], avg_max_tl[i])
+
 
 del _GradientBasedTrajectoryLengthAdaptationTest
 
