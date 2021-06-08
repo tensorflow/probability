@@ -193,10 +193,10 @@ class DistributionLambda(tf.keras.layers.Lambda):
         value.shape = value[-1].shape
         value.get_shape = value[-1].get_shape
         value.dtype = value[-1].dtype
-        distribution.shape = value[-1].shape
+        distribution._shape = value[-1].shape  # pylint: disable=protected-access
         distribution.get_shape = value[-1].get_shape
       else:
-        distribution.shape = value.shape
+        distribution._shape = value.shape  # pylint: disable=protected-access
         distribution.get_shape = value.get_shape
       return distribution, value
 

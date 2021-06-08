@@ -62,7 +62,7 @@ class VariableInputLayerTest(test_util.TestCase):
     self.assertTrue(model.layers[1].weights[0].trainable)
 
     # Check the distribution.
-    self.assertIsInstance(dist, tfd.Independent)
+    self.assertIsInstance(dist.tensor_distribution, tfd.Independent)
     self.assertIs(tf.float64, dist.dtype)
     self.assertEqual((3,), dist.batch_shape)
     self.assertEqual((5,), dist.event_shape)
@@ -102,7 +102,7 @@ class VariableInputLayerTest(test_util.TestCase):
     self.assertTrue(model.layers[2].weights[0].trainable)
 
     # Check the distribution.
-    self.assertIsInstance(dist, tfd.Independent)
+    self.assertIsInstance(dist.tensor_distribution, tfd.Independent)
     self.assertIs(tf.float64, dist.dtype)
     self.assertEqual((3,), dist.batch_shape)
     self.assertEqual((5,), dist.event_shape)

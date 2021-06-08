@@ -200,7 +200,7 @@ class DistributionTensorConversionTest(test_util.TestCase):
 
     # Now we show that adding two distributions has random variable semantics.
     y_coerce = dtc._TensorCoercible(y, tfd.Distribution.variance)
-    self.assertIsInstance(y_coerce, Normal)
+    self.assertIsInstance(y_coerce.tensor_distribution, Normal)
     var = tf.convert_to_tensor(y_coerce)
 
     # Note: it is not possible to have user-defined operators and also use the
@@ -269,6 +269,21 @@ class DistributionTensorConversionTest(test_util.TestCase):
 
   def testWhileLoopWithControlFlowV2(self):
     tf_test_util.enable_control_flow_v2(self._testWhileLoop)()
+
+  def testPropagatedAttributes(self):
+    d = tfd.Normal([0., -1.], 1.)
+    tc = dtc._TensorCoercible(d)
+
+    # Assert `sample` and `log_prob` work correctly.
+    s = self.evaluate(tc.sample())
+    self.assertAllEqual(d.log_prob(s), tc.log_prob(s))
+
+    # Assert that other properties/methods of the underlying `Normal` are passed
+    # through correctly.
+    self.assertAllEqual(d.loc, tc.loc)
+    self.assertAllEqual(d.batch_shape_tensor(),
+                        tc.batch_shape_tensor())
+    self.assertAllEqual(d.batch_shape, tc.batch_shape)
 
 
 @test_util.test_all_tf_execution_regimes

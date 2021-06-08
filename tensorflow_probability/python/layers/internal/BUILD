@@ -40,6 +40,7 @@ py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:kullback_leibler",
         "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/util",
