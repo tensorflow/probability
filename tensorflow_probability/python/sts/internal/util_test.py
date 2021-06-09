@@ -227,7 +227,8 @@ class _UtilityTests(test_util.TestCase):
     cov = stddev ** 2
     self.assertAllClose(cov, covariance_matrix, atol=0.1)
     self.assertAllClose(mean, mu, atol=0.1)
-    self.assertAllEqual(initial, time_series[0] - tf.reduce_mean(time_series, 0))
+    self.assertAllEqual(initial, time_series[0] -
+                        tf.reduce_mean(time_series, 0))
 
   def test_mix_over_posterior_draws(self):
     num_posterior_draws = 3
