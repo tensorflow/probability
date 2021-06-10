@@ -341,13 +341,15 @@ class TruncatedNormal(distribution.AutoCompositeTensorDistribution):
     return std_samples * scale[tf.newaxis] + loc[tf.newaxis]
 
   def _log_prob(self, x):
+    np_dtype = dtype_util.as_numpy_dtype(x.dtype)
     loc, scale, low, high = self._loc_scale_low_high()
-    log_prob = -(0.5 * tf.square(
-        (x - loc) / scale) + 0.5 * np.log(2. * np.pi) + tf.math.log(scale) +
+    log_prob = -(np_dtype(0.5) * tf.square(
+        (x - loc) / scale) + (0.5 * np.log(2. * np.pi)).astype(np_dtype) +
+                 tf.math.log(scale) +
                  self._log_normalizer(loc=loc, scale=scale, low=low, high=high))
     # p(x) is 0 outside the bounds.
     bounded_log_prob = tf.where((x > high) | (x < low),
-                                dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+                                np_dtype(-np.inf),
                                 log_prob)
     return bounded_log_prob
 

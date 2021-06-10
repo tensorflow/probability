@@ -246,9 +246,10 @@ def _truncated_normal_jax(
   import jax.random as jaxrand  # pylint: disable=g-import-not-at-top
   if seed is None:
     raise ValueError('Must provide PRNGKey to sample in JAX.')
+  dtype = utils.common_dtype([means, stddevs, minvals, maxvals])
   std_low = (minvals - means) / stddevs
   std_high = (maxvals - means) / stddevs
-  std_samps = jaxrand.truncated_normal(seed, std_low, std_high, shape)
+  std_samps = jaxrand.truncated_normal(seed, std_low, std_high, shape, dtype)
   return std_samps * stddevs + means
 
 
