@@ -557,7 +557,7 @@ class JointDistributionPinned(object):
       log_weights: log-weight of the given point, i.e. the log pinned evidence.
     """
     pin_probs = self.unnormalized_log_prob_parts(*args, **kwargs).pinned
-    return tf.add_n(
+    return sum(  # Sum uses +, which broadcasts
         pin_probs.values() if isinstance(pin_probs, dict) else pin_probs)
 
   @docstring_util.expand_docstring(
