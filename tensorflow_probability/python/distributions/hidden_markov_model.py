@@ -1189,7 +1189,7 @@ class HiddenMarkovModel(distribution.Distribution):
   # pylint: disable=protected-access
   def _default_event_space_bijector(self):
     return (self._observation_distribution.
-            _experimental_default_event_space_bijector())
+            experimental_default_event_space_bijector())
   # pylint: enable=protected-access
 
   def _parameter_control_dependencies(self, is_init):

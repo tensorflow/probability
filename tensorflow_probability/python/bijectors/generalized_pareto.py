@@ -47,7 +47,7 @@ class GeneralizedPareto(bijector_lib.AutoCompositeTensorBijector):
   `x >= loc`                                             if `concentration >= 0`
   `x >= loc` and `x <= loc + scale / abs(concentration)` if `concentration < 0`
 
-  This bijector is used as the `_experimental_default_event_space_bijector` of
+  This bijector is used as the `experimental_default_event_space_bijector` of
   the `GeneralizedPareto` distribution.
 
   """

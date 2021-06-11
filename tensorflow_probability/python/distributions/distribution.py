@@ -1762,12 +1762,6 @@ class Distribution(_BaseDistribution):
         '_default_event_space_bijector` is not implemented: {}'.format(
             type(self).__name__))
 
-  @deprecation.deprecated(
-      '2020-10-20',
-      'Use `experimental_default_event_space_bijector` instead.')
-  def _experimental_default_event_space_bijector(self, *args, **kwargs):
-    return self.experimental_default_event_space_bijector(*args, **kwargs)
-
   def experimental_default_event_space_bijector(self, *args, **kwargs):
     """Bijector mapping the reals (R**n) to the event space of the distribution.
 
