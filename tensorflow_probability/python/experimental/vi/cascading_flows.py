@@ -142,11 +142,12 @@ def build_cf_surrogate_posterior(
 
   ```python
   num_aux_vars=10
-  target_dist = tfd.Independent(tfd.Normal(loc=tf.reshape(
-    tf.Variable([tf.random.normal((1,)) for _ in range(num_aux_vars)]), -1),
-      scale=tf.reshape(tfp.util.TransformedVariable(
-        [tf.random.uniform((1,), minval=0.01, maxval=1.)
-      for _ in range(num_aux_vars)], bijector=tfb.Softplus()), -1)), 1)
+  event_len = len(prior.event_shape_tensor())
+  target_dist = tfd.Independent(
+  tfd.Normal(loc=tf.Variable(tf.random.normal((event_len,num_aux_vars))),
+             scale=tfp.util.TransformedVariable(
+             tf.random.uniform((event_len,num_aux_vars), minval=0.01, maxval=1.)
+             , bijector=tfb.Softplus())), 2)
 
   def target_log_prob_aux_vars(z_and_eps):
     z = [x[0] for x in z_and_eps[1:]]
