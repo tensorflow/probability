@@ -62,7 +62,7 @@ class CascadingFlowTests(test_util.TestCase):
     self.assertAllEqualNested(get_shapes(x1), get_shapes(x2))
 
 
-'''@test_util.test_all_tf_execution_regimes
+@test_util.test_all_tf_execution_regimes
 class _TrainableCFSurrogate(object):
 
   def _expected_num_trainable_variables(self, prior_dist, num_layers):
@@ -305,67 +305,6 @@ class CFSurrogatePosteriorTestNesting(test_util.TestCase,
       # pylint: enable=g-long-lambda
 
     return tfd.JointDistributionCoroutineAutoBatched(nested_model)
-
-
-@test_util.test_all_tf_execution_regimes
-class TestCFDistributionSubstitution(test_util.TestCase):
-
-  def test_default_substitutes_trainable_families(self):
-    @tfd.JointDistributionCoroutineAutoBatched
-    def model():
-      yield tfd.Sample(
-        tfd.Uniform(low=-2., high=7.),
-        sample_shape=[2],
-        name='a')
-      yield tfd.HalfNormal(1., name='b')
-      yield tfd.Exponential(rate=[1., 2.], name='c')
-      yield tfd.Chi2(df=3., name='d')
-
-    surrogate = tfp.experimental.vi.build_cf_surrogate_posterior(
-      model)
-    self.assertAllEqualNested(model.event_shape, surrogate.event_shape)
-
-    surrogate_dists, _ = surrogate.sample_distributions()
-    self.assertIsInstance(surrogate_dists.a, tfd.Independent)
-    self.assertIsInstance(surrogate_dists.a.distribution,
-                          tfd.TransformedDistribution)
-    self.assertIsInstance(surrogate_dists.a.distribution.distribution,
-                          tfd.Beta)
-    self.assertIsInstance(surrogate_dists.b, tfd.TruncatedNormal)
-    self.assertIsInstance(surrogate_dists.c, tfd.Gamma)
-    self.assertIsInstance(surrogate_dists.d, tfd.Gamma)
-
-  def test_can_specify_custom_substitution(self):
-    @tfd.JointDistributionCoroutineAutoBatched
-    def centered_horseshoe(ndims=100):
-      global_scale = yield tfd.HalfCauchy(
-        loc=0., scale=1., name='global_scale')
-      local_scale = yield tfd.HalfCauchy(
-        loc=0., scale=tf.ones([ndims]), name='local_scale')
-      yield tfd.Normal(
-        loc=0., scale=tf.sqrt(global_scale * local_scale),
-        name='weights')
-
-    tfp.experimental.vi.register_asvi_substitution_rule(
-      condition=tfd.HalfCauchy,
-      substitution_fn=(
-        lambda d: tfb.Softplus(1e-6)(
-          tfd.Normal(loc=d.loc, scale=d.scale))))
-    surrogate = tfp.experimental.vi.build_cf_surrogate_posterior(
-      centered_horseshoe)
-    self.assertAllEqualNested(centered_horseshoe.event_shape,
-                              surrogate.event_shape)
-
-    # If the surrogate was built with names or structure differing from the
-    # model, so that it had to be `tfb.Restructure`'d, then this
-    # sample_distributions call will fail because the surrogate isn't an
-    # instance of tfd.JointDistribution.
-    surrogate_dists, _ = surrogate.sample_distributions()
-    self.assertIsInstance(surrogate_dists.global_scale.distribution,
-                          tfd.Normal)
-    self.assertIsInstance(surrogate_dists.local_scale.distribution,
-                          tfd.Normal)
-    self.assertIsInstance(surrogate_dists.weights, tfd.Normal)'''
 
 
 if __name__ == '__main__':
