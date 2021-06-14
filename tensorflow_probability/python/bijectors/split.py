@@ -26,7 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -102,7 +102,7 @@ class Split(bijector.AutoCompositeTensorBijector):
       if static_axis >= 0:
         raise ValueError('`axis` must be negative. Got {}'.format(axis))
 
-      self._axis = tf.convert_to_tensor(axis, tf.int32)
+      self._axis = ps.convert_to_shape_tensor(axis, tf.int32)
 
       super(Split, self).__init__(
           forward_min_event_ndims=-axis,
@@ -154,7 +154,7 @@ class Split(bijector.AutoCompositeTensorBijector):
       assertions = []
     else:
       assertions = self._validate_output_shape_tensors(
-          [prefer_static.shape(y_) for y_ in y])
+          [ps.shape(y_) for y_ in y])
 
     with tf.control_dependencies(assertions):
       return tf.concat(y, axis=self.axis)
@@ -179,7 +179,7 @@ class Split(bijector.AutoCompositeTensorBijector):
     if is_validated or not self.validate_args:
       assertions = []
     else:
-      assertions = self._validate_input_shape_tensor(prefer_static.shape(x))
+      assertions = self._validate_input_shape_tensor(ps.shape(x))
 
     with tf.control_dependencies(assertions):
       if self.split_sizes is None:
@@ -277,7 +277,7 @@ class Split(bijector.AutoCompositeTensorBijector):
       # Each element of the `output_shape_tensor` list is equal to the
       # `input_shape`, with the corresponding element of `split_sizes`
       # substituted in the `axis` position.
-      positive_axis = prefer_static.rank_from_shape(input_shape) + self.axis
+      positive_axis = ps.rank_from_shape(input_shape) + self.axis
       tiled_input_shape = tf.tile(
           input_shape[tf.newaxis, :], [self.num_splits, 1])
       fused_output_shapes = tf.concat([
@@ -314,7 +314,7 @@ class Split(bijector.AutoCompositeTensorBijector):
       total_size = tf.reduce_sum([t[self.axis] for t in output_shapes])
       inverse_event_shape = tf.tensor_scatter_nd_update(
           output_shapes[0],
-          [[prefer_static.rank_from_shape(output_shapes[0]) + self.axis]],
+          [[ps.rank_from_shape(output_shapes[0]) + self.axis]],
           [total_size])
       return tf.identity(tf.convert_to_tensor(
           inverse_event_shape, dtype_hint=tf.int32,
@@ -458,7 +458,7 @@ class Split(bijector.AutoCompositeTensorBijector):
 
   def _validate_input_shape_tensor(self, input_shape):
     input_dim = tf.gather(
-        input_shape, [prefer_static.rank_from_shape(input_shape) + self.axis])
+        input_shape, [ps.rank_from_shape(input_shape) + self.axis])
     if self.split_sizes is None:
       return [assert_util.assert_equal(
           0,
@@ -505,7 +505,7 @@ class Split(bijector.AutoCompositeTensorBijector):
       for i, shape in enumerate(output_shapes):
         output_size = tf.gather(
             shape,
-            [prefer_static.rank_from_shape(output_shapes[0]) + self.axis])
+            [ps.rank_from_shape(output_shapes[0]) + self.axis])
         split_size = split_sizes[i]
         assertions.append(
             assert_util.assert_equal(
