@@ -194,7 +194,7 @@ def build_cascading_flow_surrogate_posterior(
     surrogate_posterior, variables = _cascading_flow_surrogate_for_distribution(
       dist=prior,
       base_distribution_surrogate_fn=functools.partial(
-        _cascading_flow_convex_update_for_base_distribution,
+        _cascading_flow_update_for_base_distribution,
         initial_prior_weight=initial_prior_weight,
         num_auxiliary_variables=num_auxiliary_variables,
         num_layers=num_layers),
@@ -415,7 +415,7 @@ def _cascading_flow_surrogate_for_joint_distribution(
   return surrogate_posterior, variables
 
 
-def _cascading_flow_convex_update_for_base_distribution(dist,
+def _cascading_flow_update_for_base_distribution(dist,
                                             initial_prior_weight,
                                             num_auxiliary_variables,
                                             num_layers,
