@@ -225,7 +225,7 @@ def _cascading_flow_surrogate_for_distribution(dist,
     num_layers: Number of layers to use in each Highway Flow architecture.
     global_auxiliary_variables: The sampled global auxiliary variables
       (available only if using auxiliary variables). Default value: None.
-    variables: Optional nested structure of `tf.Variable`s returned from a
+    variables: Optional nested structure containing `tf.Variable`s returned from a
       previous call to `_cascading_flow_surrogate_for_distribution`. If `None`,
       new variables will be created; otherwise, constructs a surrogate posterior
       backed by the passed-in variables.
@@ -236,7 +236,7 @@ def _cascading_flow_surrogate_for_distribution(dist,
       surrogate posterior distribution, with the same structure and `name` as
       `dist`, and with addition of global and local auxiliary variables if
       `num_auxiliary_variables > 0`.
-    variables: Nested structure of `tf.Variable` trainable parameters for the
+    variables: Nested structure containing `tf.Variable` trainable parameters for the
       surrogate posterior. If `dist` is a base distribution, this is
       a `tfb.Chain` of bijectors containing HighwayFlow blocks and `Reshape`
       bijectors. If `dist` is a joint distribution, this is a `dist.dtype`
