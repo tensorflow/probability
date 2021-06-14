@@ -25,7 +25,11 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import joint_map
 from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.bijectors import restructure
 from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import blockwise
@@ -43,13 +47,13 @@ from tensorflow_probability.python.experimental.bijectors import \
 from tensorflow_probability.python.internal import samplers
 
 __all__ = [
-  'build_cf_surrogate_posterior'
+  'build_cascading_flow_surrogate_posterior'
 ]
 
 Root = joint_distribution_coroutine.JointDistributionCoroutine.Root
 
 
-def build_cf_surrogate_posterior(
+def build_cascading_flow_surrogate_posterior(
     prior,
     num_auxiliary_variables=0,
     initial_prior_weight=0.98,
@@ -84,7 +88,7 @@ def build_cf_surrogate_posterior(
     the layers will have `softplus` activation function, apart from the last one
     which will have linear activation. Default value: `3`.
     seed: Python `int` seed for random initialization.
-    name: Optional string. Default value: `build_cf_surrogate_posterior`.
+    name: Optional string. Default value: `build_cascading_flow_surrogate_posterior`.
 
   Returns:
     surrogate_posterior: A `tfd.JointDistributionCoroutineAutoBatched` instance
@@ -114,7 +118,7 @@ def build_cf_surrogate_posterior(
 
   ```python
   surrogate_posterior =
-    tfp.experimental.vi.build_cf_surrogate_posterior(prior)
+    tfp.experimental.vi.build_cascading_flow_surrogate_posterior(prior)
   ```
 
   This creates a trainable joint distribution, defined by variables in
@@ -157,20 +161,20 @@ def build_cf_surrogate_posterior(
     return lp_z + lp_eps
 
   target_log_prob = lambda *values: target_log_prob_aux_vars(values)
-  cf_surrogate_posterior = build_cf_surrogate_posterior(prior,
+  cascading_flow_surrogate_posterior = build_cascading_flow_surrogate_posterior(prior,
                                           num_auxiliary_variables=num_aux_vars)
-  trainable_variables = list(cf_surrogate_posterior.trainable_variables)
+  trainable_variables = list(cascading_flow_surrogate_posterior.trainable_variables)
   trainable_variables.extend(list(target_dist.trainable_variables))
-  cf_losses = tfp.vi.fit_surrogate_posterior(target_log_prob,
-                                        cf_surrogate_posterior,
+  cascading_flow_losses = tfp.vi.fit_surrogate_posterior(target_log_prob,
+                                        cascading_flow_surrogate_posterior,
                                         optimizer=tf.optimizers.Adam(0.01),
                                         num_steps=8000,
                                         sample_size=50,
                                         trainable_variables=trainable_variables)
 
-  cf_posterior_samples = cf_surrogate_posterior.sample(num_samples)
-  cf_posterior_samples = tf.convert_to_tensor(
-                                       [s[0] for s in cf_posterior_samples[1:]])
+  cascading_flow_posterior_samples = cascading_flow_surrogate_posterior.sample(num_samples)
+  cascading_flow_posterior_samples = tf.convert_to_tensor(
+                                       [s[0] for s in cascading_flow_posterior_samples[1:]])
   ```
 
   #### References
@@ -186,11 +190,11 @@ def build_cf_surrogate_posterior(
   models." International Conference on Machine Learning. PMLR, 2016.
 
   """
-  with tf.name_scope(name or 'build_cf_surrogate_posterior'):
-    surrogate_posterior, variables = _cf_surrogate_for_distribution(
+  with tf.name_scope(name or 'build_cascading_flow_surrogate_posterior'):
+    surrogate_posterior, variables = _cascading_flow_surrogate_for_distribution(
       dist=prior,
       base_distribution_surrogate_fn=functools.partial(
-        _cf_convex_update_for_base_distribution,
+        _cascading_flow_convex_update_for_base_distribution,
         initial_prior_weight=initial_prior_weight,
         num_auxiliary_variables=num_auxiliary_variables,
         num_layers=num_layers),
@@ -201,7 +205,7 @@ def build_cf_surrogate_posterior(
     return surrogate_posterior
 
 
-def _cf_surrogate_for_distribution(dist,
+def _cascading_flow_surrogate_for_distribution(dist,
                                    base_distribution_surrogate_fn,
                                    num_auxiliary_variables,
                                    num_layers,
@@ -222,7 +226,7 @@ def _cf_surrogate_for_distribution(dist,
     global_auxiliary_variables: The sampled global auxiliary variables
       (available only if using auxiliary variables). Default value: None.
     variables: Optional nested structure of `tf.Variable`s returned from a
-      previous call to `_cf_surrogate_for_distribution`. If `None`,
+      previous call to `_cascading_flow_surrogate_for_distribution`. If `None`,
       new variables will be created; otherwise, constructs a surrogate posterior
       backed by the passed-in variables.
       Default value: `None`.
@@ -240,7 +244,7 @@ def _cf_surrogate_for_distribution(dist,
   """
 
   if hasattr(dist, '_model_coroutine'):
-    surrogate_posterior, variables = _cf_surrogate_for_joint_distribution(
+    surrogate_posterior, variables = _cascading_flow_surrogate_for_joint_distribution(
       dist,
       base_distribution_surrogate_fn=base_distribution_surrogate_fn,
       variables=variables,
@@ -277,7 +281,7 @@ def _build_highway_flow_block(num_layers, width,
   return bijectors
 
 
-def _cf_surrogate_for_joint_distribution(
+def _cascading_flow_surrogate_for_joint_distribution(
     dist, base_distribution_surrogate_fn, variables,
     num_auxiliary_variables, num_layers, global_auxiliary_variables,
     seed=None):
@@ -330,7 +334,7 @@ def _cf_surrogate_for_joint_distribution(
           dist = dist.distribution
 
         seed, init_seed = samplers.split_seed(seed)
-        surrogate_posterior, variables = _cf_surrogate_for_distribution(
+        surrogate_posterior, variables = _cascading_flow_surrogate_for_distribution(
           dist,
           base_distribution_surrogate_fn=base_distribution_surrogate_fn,
           num_auxiliary_variables=num_auxiliary_variables,
@@ -370,7 +374,7 @@ def _cf_surrogate_for_joint_distribution(
     # try to build new variables on every invocation; the recursive call will
     # define a new `posterior_generator` that knows about the variables we're
     # about to create.
-    return _cf_surrogate_for_joint_distribution(
+    return _cascading_flow_surrogate_for_joint_distribution(
       dist=dist,
       base_distribution_surrogate_fn=base_distribution_surrogate_fn,
       num_auxiliary_variables=num_auxiliary_variables,
@@ -385,6 +389,12 @@ def _cf_surrogate_for_joint_distribution(
     posterior_generator,
     use_vectorized_map=dist.use_vectorized_map,
     name=_get_name(dist))
+
+  '''tokenize = lambda jd: jd._model_unflatten(
+    # pylint: disable=protected-access, g-long-lambda
+    range(len(jd._model_flatten(jd.dtype)))
+    # pylint: disable=protected-access
+  )'''
 
   # Ensure that the surrogate posterior structure matches that of the prior.
   # todo: check me, do we need this? in case needs to be modified
@@ -405,7 +415,7 @@ def _cf_surrogate_for_joint_distribution(
   return surrogate_posterior, variables
 
 
-def _cf_convex_update_for_base_distribution(dist,
+def _cascading_flow_convex_update_for_base_distribution(dist,
                                             initial_prior_weight,
                                             num_auxiliary_variables,
                                             num_layers,
@@ -436,20 +446,23 @@ def _cf_convex_update_for_base_distribution(dist,
     variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
   if num_auxiliary_variables > 0:
-    batch_shape = global_auxiliary_variables.shape[0] if len(
-      global_auxiliary_variables.shape) > 1 else []
+    flatten_event = reshape.Reshape(
+      event_shape_out=[-1],
+      event_shape_in=dist.event_shape_tensor())
 
     cascading_flows = split.Split(
       [-1, num_auxiliary_variables])(
       transformed_distribution.TransformedDistribution(
         distribution=blockwise.Blockwise([
-          batch_broadcast.BatchBroadcast(dist,
-                                         to_shape=batch_shape),
+          transformed_distribution.TransformedDistribution(
+            distribution=dist, bijector=flatten_event),
           independent.Independent(
-            deterministic.Deterministic(
-              global_auxiliary_variables),
+            deterministic.Deterministic(global_auxiliary_variables),
             reinterpreted_batch_ndims=1)]),
         bijector=variables))
+
+    cascading_flows = joint_map.JointMap(
+      [invert.Invert(flatten_event), identity.Identity()])(cascading_flows)
 
   else:
     cascading_flows = transformed_distribution.TransformedDistribution(
