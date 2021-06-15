@@ -50,9 +50,7 @@ from tree import flatten_with_path
 from tree import flatten_with_path_up_to
 from tree import is_nested
 from tree import map_structure as dm_tree_map_structure
-from tree import map_structure_up_to
-from tree import map_structure_with_path
-from tree import map_structure_with_path_up_to
+from tree import map_structure_with_path_up_to as dm_tree_map_structure_with_path_up_to
 from tree import unflatten_as
 # pylint: enable=unused-import
 
@@ -211,6 +209,35 @@ def flatten_with_tuple_paths_up_to(shallow_structure,
                                    check_types=True):
   return flatten_with_path_up_to(shallow_structure, input_structure,
                                  check_types)
+
+
+def map_structure_up_to(shallow_structure, func, *structures, **kwargs):
+  return map_structure_with_path_up_to(
+      shallow_structure,
+      lambda _, *args: func(*args),  # Discards path.
+      *structures,
+      **kwargs)
+
+
+def map_structure_with_path(func, *structures, **kwargs):
+  return map_structure_with_path_up_to(structures[0], func, *structures,
+                                       **kwargs)
+
+
+def map_structure_with_path_up_to(shallow_structure, func, *structures,
+                                  **kwargs):
+  """Wraps nest.map_structure_with_path_up_to, with structure/type checking."""
+  if not structures:
+    raise ValueError('Cannot map over no sequences')
+
+  check_types = kwargs.get('check_types', True)
+
+  for input_tree in structures:
+    _assert_shallow_structure(
+        shallow_structure, input_tree, check_types=check_types)
+
+  return dm_tree_map_structure_with_path_up_to(
+      shallow_structure, func, *structures, **kwargs)
 
 
 def map_structure_with_tuple_paths(func, *structures, **kwargs):
