@@ -356,11 +356,7 @@ def _cascading_flow_surrogate_for_joint_distribution(
         # When using auxiliary variables, value out is a list containing
         # [latent_variables, auxiliary_variables].
         if num_auxiliary_variables>0:
-          if len(dist.event_shape) == 0:
-            dist = prior_gen.send(value_out[0][...,0])
-          else:
-            dist = prior_gen.send(value_out[0])
-
+          dist = prior_gen.send(value_out[0])
         else:
           dist = prior_gen.send(value_out)
         i += 1
@@ -423,32 +419,35 @@ def _cascading_flow_update_for_base_distribution(dist,
                                             variables,
                                             seed=None):
   """Creates a trainable surrogate for a (non-meta, non-joint) distribution."""
+  event_shape = dist.event_shape_tensor()
+  flat_event_shape = tf.nest.flatten(event_shape)
+  flat_event_size = tf.nest.map_structure(tf.reduce_prod, flat_event_shape)
+  ndims = int(tf.reduce_sum(flat_event_size))
+  flatten_event = reshape.Reshape(
+    event_shape_out=[-1],
+    event_shape_in=dist.event_shape_tensor())
 
   if variables is None:
-    actual_event_shape = dist.event_shape_tensor()
-    int_event_shape = int(actual_event_shape) if \
-      actual_event_shape.shape.as_list()[0] > 0 else 1
-    bijectors = [reshape.Reshape([-1],
-                                 event_shape_in=actual_event_shape +
-                                                num_auxiliary_variables)]
+
+    '''bijectors = [reshape.Reshape([-1],
+                                 event_shape_in=ndims +
+                                                num_auxiliary_variables)]'''
+    bijectors = []
 
     bijectors.extend(
       _build_highway_flow_block(
         num_layers,
         width=tf.reduce_prod(
-          actual_event_shape + num_auxiliary_variables),
+          ndims + num_auxiliary_variables),
         residual_fraction_initial_value=initial_prior_weight,
-        gate_first_n=int_event_shape, seed=seed))
+        gate_first_n=ndims, seed=seed))
 
-    bijectors.append(
-      reshape.Reshape(actual_event_shape + num_auxiliary_variables))
+    '''bijectors.append(
+      reshape.Reshape(ndims + num_auxiliary_variables))'''
 
     variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
   if num_auxiliary_variables > 0:
-    flatten_event = reshape.Reshape(
-      event_shape_out=[-1],
-      event_shape_in=dist.event_shape_tensor())
 
     cascading_flows = split.Split(
       [-1, num_auxiliary_variables])(
@@ -457,7 +456,7 @@ def _cascading_flow_update_for_base_distribution(dist,
           transformed_distribution.TransformedDistribution(
             distribution=dist, bijector=flatten_event),
           independent.Independent(
-            deterministic.Deterministic(global_auxiliary_variables),
+            deterministic.Deterministic(global_auxiliary_variables, ),
             reinterpreted_batch_ndims=1)]),
         bijector=variables))
 
@@ -468,6 +467,8 @@ def _cascading_flow_update_for_base_distribution(dist,
     cascading_flows = transformed_distribution.TransformedDistribution(
       distribution=dist,
       bijector=variables)
+
+    cascading_flows = invert.Invert(flatten_event)(cascading_flows)
 
   return cascading_flows, variables
 
