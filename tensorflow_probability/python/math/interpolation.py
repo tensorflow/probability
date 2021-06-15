@@ -26,7 +26,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
@@ -97,7 +97,7 @@ def _interp_regular_1d_grid_impl(x,
       x_ref_max = x_ref_max[..., tf.newaxis]
 
     axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
-    axis = prefer_static.non_negative_axis(axis, tf.rank(y_ref))
+    axis = ps.non_negative_axis(axis, tf.rank(y_ref))
     _assert_ndims_statically(axis, expect_ndims=0)
 
     ny = tf.cast(tf.shape(y_ref)[axis], dtype)
@@ -626,7 +626,7 @@ def batch_interp_regular_nd_grid(x,
 
     # Convert axis and check it statically.
     axis = tf.convert_to_tensor(axis, dtype=tf.int32, name='axis')
-    axis = prefer_static.non_negative_axis(axis, tf.rank(y_ref))
+    axis = ps.non_negative_axis(axis, tf.rank(y_ref))
     tensorshape_util.assert_has_rank(axis.shape, 0)
     axis_ = tf.get_static_value(axis)
     y_ref_rank_ = tf.get_static_value(tf.rank(y_ref))
@@ -639,26 +639,33 @@ def batch_interp_regular_nd_grid(x,
             'dimensions of `x_ref_min` to be {}.'.format(
                 axis_, y_ref_rank_, nd))
 
-    x_batch_shape = tf.shape(x)[:-2]
-    x_ref_min_batch_shape = tf.shape(x_ref_min)[:-1]
-    x_ref_max_batch_shape = tf.shape(x_ref_max)[:-1]
-    y_ref_batch_shape = tf.shape(y_ref)[:axis]
+    x_batch_shape = ps.shape(x)[:-2]
+    x_ref_min_batch_shape = ps.shape(x_ref_min)[:-1]
+    x_ref_max_batch_shape = ps.shape(x_ref_max)[:-1]
+    y_ref_batch_shape = ps.shape(y_ref)[:axis]
 
     # Do a brute-force broadcast of batch dims (add zeros).
     batch_shape = y_ref_batch_shape
     for tensor in [x_batch_shape, x_ref_min_batch_shape, x_ref_max_batch_shape]:
-      batch_shape = tf.broadcast_dynamic_shape(batch_shape, tensor)
+      batch_shape = ps.broadcast_shape(batch_shape, tensor)
 
-    def _batch_of_zeros_with_rightmost_singletons(n_singletons):
+    def _batch_shape_of_zeros_with_rightmost_singletons(n_singletons):
       """Return Tensor of zeros with some singletons on the rightmost dims."""
-      ones = tf.ones(shape=[n_singletons], dtype=tf.int32)
-      return tf.zeros(shape=tf.concat([batch_shape, ones], axis=0), dtype=dtype)
+      ones = ps.ones(shape=[n_singletons], dtype=tf.int32)
+      return ps.concat([batch_shape, ones], axis=0)
 
-    x += _batch_of_zeros_with_rightmost_singletons(n_singletons=2)
-    x_ref_min += _batch_of_zeros_with_rightmost_singletons(n_singletons=1)
-    x_ref_max += _batch_of_zeros_with_rightmost_singletons(n_singletons=1)
-    y_ref += _batch_of_zeros_with_rightmost_singletons(
-        n_singletons=tf.rank(y_ref) - axis)
+    x = _broadcast_with(
+        x, _batch_shape_of_zeros_with_rightmost_singletons(n_singletons=2))
+    x_ref_min = _broadcast_with(
+        x_ref_min,
+        _batch_shape_of_zeros_with_rightmost_singletons(n_singletons=1))
+    x_ref_max = _broadcast_with(
+        x_ref_max,
+        _batch_shape_of_zeros_with_rightmost_singletons(n_singletons=1))
+    y_ref = _broadcast_with(
+        y_ref,
+        _batch_shape_of_zeros_with_rightmost_singletons(
+            n_singletons=tf.rank(y_ref) - axis))
 
     return _batch_interp_with_gather_nd(
         x=x,
@@ -667,7 +674,7 @@ def batch_interp_regular_nd_grid(x,
         y_ref=y_ref,
         nd=nd,
         fill_value=fill_value,
-        batch_dims=tf.get_static_value(tf.rank(x)) - 2)
+        batch_dims=ps.rank(x) - 2)
 
 
 def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
@@ -735,9 +742,9 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
   # (using tf.where) the output y.  This requires appending singletons.
   def _expand_x_fn(tensor):
     # Reshape tensor to tensor.shape + [1] * M.
-    extended_shape = tf.concat([
-        tf.shape(tensor),
-        tf.ones_like(tf.shape(y_ref)[batch_dims + nd:])
+    extended_shape = ps.concat([
+        ps.shape(tensor),
+        ps.ones_like(ps.shape(y_ref)[batch_dims + nd:])
     ],
                                axis=0)
     return tf.reshape(tensor, extended_shape)
@@ -819,7 +826,7 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
     # Now, y.shape = [D, B1,...,BM], so we'll have to broadcast oob_idx.
 
     oob_idx = _expand_x_fn(oob_idx)  # Shape [D, 1,...,1]
-    oob_idx |= tf.fill(tf.shape(y), False)
+    oob_idx = _broadcast_with(oob_idx, ps.shape(y))
     y = tf.where(oob_idx, fill_value, y)
   return y
 
@@ -848,7 +855,7 @@ def _make_expand_x_fn_for_non_batch_interpolation(y_ref, axis):
   #   y_ref.shape[:axis] + x.shape + y_ref.shape[axis+1:]
 
   # Recall we made axis non-negative
-  y_ref_shape = tf.shape(y_ref)
+  y_ref_shape = ps.shape(y_ref)
   y_ref_shape_left = y_ref_shape[:axis]
   y_ref_shape_right = y_ref_shape[axis + 1:]
 
@@ -856,23 +863,20 @@ def _make_expand_x_fn_for_non_batch_interpolation(y_ref, axis):
     """Expand x so it can bcast w/ tensors of output shape."""
     # Assume out_shape = A + x.shape + B, and rank(A) = axis.
     # Expand with singletons with same rank as A, B.
-    expanded_shape = tf.pad(
-        tensor=tf.shape(x),
-        paddings=[[axis, tf.size(y_ref_shape_right)]],
+    expanded_shape = ps.pad(
+        tensor=ps.shape(x),
+        paddings=[[axis, ps.size(y_ref_shape_right)]],
         constant_values=1)
     x_expanded = tf.reshape(x, expanded_shape)
 
     if broadcast:
-      out_shape = tf.concat((
+      out_shape = ps.concat((
           y_ref_shape_left,
-          tf.shape(x),
+          ps.shape(x),
           y_ref_shape_right,
       ),
                             axis=0)
-      if dtype_util.is_bool(x.dtype):
-        x_expanded = x_expanded | tf.cast(tf.zeros(out_shape), tf.bool)
-      else:
-        x_expanded += tf.zeros(out_shape, dtype=x.dtype)
+      x_expanded = _broadcast_with(x_expanded, out_shape)
     return x_expanded
 
   return expand_ends
@@ -886,30 +890,27 @@ def _make_expand_x_fn_for_batch_interpolation(y_ref, axis):
   #   x.shape[-1:] +  y_ref.shape[axis+1:]
 
   # Recall we made axis non-negative
-  y_ref_shape = tf.shape(y_ref)
+  y_ref_shape = ps.shape(y_ref)
   y_ref_shape_left = y_ref_shape[:axis]
   y_ref_shape_right = y_ref_shape[axis + 1:]
 
   def expand_right_dims(x, broadcast=False):
     """Expand x so it can bcast w/ tensors of output shape."""
-    expanded_shape_left = tf.broadcast_dynamic_shape(
-        tf.shape(x)[:-1],
-        tf.ones([tf.size(y_ref_shape_left)], dtype=tf.int32))
-    expanded_shape = tf.concat(
-        (expanded_shape_left, tf.shape(x)[-1:],
-         tf.ones([tf.size(y_ref_shape_right)], dtype=tf.int32)),
+    expanded_shape_left = ps.broadcast_shape(
+        ps.shape(x)[:-1],
+        ps.ones([ps.size(y_ref_shape_left)], dtype=tf.int32))
+    expanded_shape = ps.concat(
+        (expanded_shape_left, ps.shape(x)[-1:],
+         ps.ones([ps.size(y_ref_shape_right)], dtype=tf.int32)),
         axis=0)
     x_expanded = tf.reshape(x, expanded_shape)
     if broadcast:
-      broadcast_shape_left = tf.broadcast_dynamic_shape(
-          tf.shape(x)[:-1], y_ref_shape_left)
-      broadcast_shape = tf.concat(
-          (broadcast_shape_left, tf.shape(x)[-1:], y_ref_shape_right),
+      broadcast_shape_left = ps.broadcast_shape(
+          ps.shape(x)[:-1], y_ref_shape_left)
+      broadcast_shape = ps.concat(
+          (broadcast_shape_left, ps.shape(x)[-1:], y_ref_shape_right),
           axis=0)
-      if dtype_util.is_bool(x.dtype):
-        x_expanded = x_expanded | tf.cast(tf.zeros(broadcast_shape), tf.bool)
-      else:
-        x_expanded += tf.zeros(broadcast_shape, dtype=x.dtype)
+      x_expanded = _broadcast_with(x_expanded, broadcast_shape)
     return x_expanded
 
   return expand_right_dims
@@ -930,15 +931,13 @@ def _batch_gather_with_broadcast(params, indices, axis):
   # where ai broadcasts with Ai.
 
   # leading_bcast_shape is the broadcast of [A1,...,AN] and [a1,...,aN].
-  leading_bcast_shape = tf.broadcast_dynamic_shape(
-      tf.shape(params)[:axis],
-      tf.shape(indices)[:-1])
-  params += tf.zeros(
-      tf.concat((leading_bcast_shape, tf.shape(params)[axis:]), axis=0),
-      dtype=params.dtype)
-  indices += tf.zeros(
-      tf.concat((leading_bcast_shape, tf.shape(indices)[-1:]), axis=0),
-      dtype=indices.dtype)
+  leading_bcast_shape = ps.broadcast_shape(
+      ps.shape(params)[:axis],
+      ps.shape(indices)[:-1])
+  params = _broadcast_with(
+      params, ps.concat((leading_bcast_shape, ps.shape(params)[axis:]), axis=0))
+  indices = _broadcast_with(
+      indices, ps.concat((leading_bcast_shape, ps.shape(indices)[-1:]), axis=0))
   return tf.gather(
       params, indices, batch_dims=tensorshape_util.rank(indices.shape) - 1)
 
@@ -946,3 +945,8 @@ def _batch_gather_with_broadcast(params, indices, axis):
 def _binary_count(n):
   """Count `n` binary digits from [0...0] to [1...1]."""
   return list(itertools.product([0, 1], repeat=n))
+
+
+def _broadcast_with(tensor, shape):
+  """Like broadcast_to, but allows singletons in the destination shape."""
+  return tf.broadcast_to(tensor, ps.broadcast_shape(ps.shape(tensor), shape))

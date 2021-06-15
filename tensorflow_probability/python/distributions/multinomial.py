@@ -55,7 +55,7 @@ fractional components, and such that
 with `self.probs` and `self.total_count`."""
 
 
-class Multinomial(distribution.Distribution):
+class Multinomial(distribution.AutoCompositeTensorDistribution):
   """Multinomial distribution.
 
   This Multinomial distribution is parameterized by `probs`, a (batch of)
@@ -235,16 +235,6 @@ class Multinomial(distribution.Distribution):
     """Input argument `probs`."""
     return self._probs
 
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        tf.shape(self._probs if self._logits is None else self._logits)[:-1],
-        tf.shape(self.total_count))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        (self._probs if self._logits is None else self._logits).shape[:-1],
-        self.total_count.shape)
-
   def _event_shape_tensor(self):
     # We will never broadcast the num_categories with total_count.
     return tf.shape(self._probs if self._logits is None else self._logits)[-1:]
@@ -300,7 +290,7 @@ class Multinomial(distribution.Distribution):
   def _logits_parameter_no_checks(self):
     if self._logits is None:
       return tf.math.log(self._probs)
-    return tf.identity(self._logits)
+    return tensor_util.identity_as_tensor(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
@@ -309,7 +299,7 @@ class Multinomial(distribution.Distribution):
 
   def _probs_parameter_no_checks(self):
     if self._logits is None:
-      return tf.identity(self._probs)
+      return tensor_util.identity_as_tensor(self._probs)
     return tf.math.softmax(self._logits)
 
   def _default_event_space_bijector(self):

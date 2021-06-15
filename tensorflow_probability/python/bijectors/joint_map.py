@@ -19,8 +19,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
-from tensorflow_probability.python.internal import nest_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -29,7 +29,7 @@ __all__ = [
 ]
 
 
-class JointMap(composition.Composition):
+class _JointMap(composition.Composition):
   """Bijector which applies a structure of bijectors in parallel.
 
   This is the "structured" counterpart to `Chain`. Whereas `Chain` applies an
@@ -93,22 +93,13 @@ class JointMap(composition.Composition):
       self._nested_structure = self._no_dependency(
           nest.map_structure(lambda b: None, bijectors))
 
-      super(JointMap, self).__init__(
+      super(_JointMap, self).__init__(
           bijectors=bijectors,
           validate_args=validate_args,
+          forward_min_event_ndims=self._nested_structure,
+          inverse_min_event_ndims=self._nested_structure,
           parameters=parameters,
-          name=name,
-          # JointMap and other bijectors that operate independently on
-          # parts of structured inputs do not have statically-known
-          # `min_event_ndims`. Infer the input/output structures, and fill them
-          # with `None`.
-          forward_min_event_ndims=nest.map_structure(
-              lambda b: nest_util.broadcast_structure(  # pylint: disable=g-long-lambda
-                  b.forward_min_event_ndims, None), bijectors),
-          inverse_min_event_ndims=nest.map_structure(
-              lambda b: nest_util.broadcast_structure(  # pylint: disable=g-long-lambda
-                  b.forward_min_event_ndims, None), bijectors),
-          )
+          name=name)
 
   def _walk_forward(self, step_fn, xs, **kwargs):
     """Applies `transform_fn` to `x` in parallel over nested bijectors."""
@@ -125,3 +116,27 @@ class JointMap(composition.Composition):
         self._nested_structure,
         lambda bij, y: step_fn(bij, y, **kwargs.get(bij.name, {})),  # pylint: disable=unnecessary-lambda
         self._bijectors, ys, check_types=False)
+
+
+class JointMap(_JointMap, bijector_lib.AutoCompositeTensorBijector):
+
+  def __new__(cls, *args, **kwargs):
+    """Returns a `_JointMap` any of `bijectors` is not a `CompositeTensor."""
+    if cls is JointMap:
+      if args:
+        bijectors = args[0]
+      else:
+        bijectors = kwargs.get('bijectors')
+      if bijectors is not None:
+        if not all(isinstance(b, tf.__internal__.CompositeTensor)
+                   for b in tf.nest.flatten(bijectors)):
+          return _JointMap(*args, **kwargs)
+    return super(JointMap, cls).__new__(cls)
+
+
+JointMap.__doc__ = _JointMap.__doc__ + '\n' + (
+    'If every element of `bijectors` is a `CompositeTensor`, the resulting '
+    '`JointMap` bijector is a `CompositeTensor` as well. If any element of '
+    '`bijectors` is not a `CompositeTensor`, then a non-`CompositeTensor` '
+    '`_JointMap` instance is created instead. Bijector subclasses that inherit '
+    'from `JointMap` will also inherit from `CompositeTensor`.')

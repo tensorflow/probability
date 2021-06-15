@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 import numpy as np
 
@@ -35,6 +33,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import numeric
 from tensorflow_probability.python.math import special as tfp_math
 
 __all__ = [
@@ -46,7 +45,7 @@ def _cauchy_cdf_diff(x, y):
   return tfp_math.atan_difference(x, y) / np.pi
 
 
-class TruncatedCauchy(distribution.Distribution):
+class TruncatedCauchy(distribution.AutoCompositeTensorDistribution):
   """The Truncated Cauchy distribution.
 
   The truncated Cauchy is a Cauchy distribution bounded between `low`
@@ -222,19 +221,6 @@ class TruncatedCauchy(distribution.Distribution):
   def high(self):
     return self._high
 
-  def _batch_shape(self):
-    return functools.reduce(
-        tf.broadcast_static_shape,
-        (self.loc.shape, self.scale.shape, self.low.shape, self.high.shape))
-
-  def _batch_shape_tensor(self, loc=None, scale=None, low=None, high=None):
-    return functools.reduce(
-        ps.broadcast_shape,
-        (ps.shape(self.loc if loc is None else loc),
-         ps.shape(self.scale if scale is None else scale),
-         ps.shape(self.low if low is None else low),
-         ps.shape(self.high if high is None else high)))
-
   def _event_shape(self):
     return tf.TensorShape([])
 
@@ -339,7 +325,10 @@ class TruncatedCauchy(distribution.Distribution):
 
     tanb = tf.math.tan(tfp_math.atan_difference(std_high, std_low) * p)
     x = (std_low + tanb) / (1 - std_low * tanb)
-    return x * scale + loc
+    # Clip the answer to prevent it from falling numerically outside
+    # the support.
+    return numeric.clip_by_value_preserve_gradient(
+        x * scale + loc, clip_value_min=low, clip_value_max=high)
 
   def _default_event_space_bijector(self):
     return sigmoid_bijector.Sigmoid(

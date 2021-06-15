@@ -330,7 +330,7 @@ def _rank(input, name=None):  # pylint: disable=redefined-builtin,unused-argumen
     input = (tf.convert_to_tensor(input) if tf.get_static_value(input) is None
              else np.array(input))
   ndims_ = tensorshape_util.rank(getattr(input, 'shape', None))
-  return tf.rank(input) if ndims_ is None else np.int32(ndims_)
+  return tf.rank(input) if ndims_ is None else np.array(ndims_, np.int32)
 rank = _copy_docstring(
     tf.rank,
     _rank)
@@ -436,6 +436,7 @@ concat = _prefer_static(tf.concat, nptf.concat)
 convert_to_shape_tensor = (
     _prefer_static(tf.convert_to_tensor, _convert_to_shape_tensor_jax)
     if JAX_MODE else tf.convert_to_tensor)
+constant = _prefer_static(tf.constant, nptf.constant)
 cumprod = _prefer_static(tf.math.cumprod, nptf.math.cumprod)
 cumsum = _prefer_static(tf.math.cumsum, nptf.math.cumsum)
 equal = _prefer_static(tf.equal, nptf.equal)

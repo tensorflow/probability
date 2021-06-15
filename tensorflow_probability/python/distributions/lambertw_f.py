@@ -21,6 +21,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
@@ -120,7 +121,14 @@ class LambertWDistribution(transformed_distribution.TransformedDistribution):
                                           self.scale))
       self._allow_nan_stats = allow_nan_stats
       super(LambertWDistribution, self).__init__(
-          distribution=distribution,
+          # TODO(b/160730249): Remove broadcasting when
+          # TransformedDistribution's bijector can modify its `batch_shape`.
+          distribution=batch_broadcast.BatchBroadcast(
+              distribution,
+              with_shape=ps.broadcast_shape(
+                  ps.shape(tailweight),
+                  ps.broadcast_shape(ps.shape(shift),
+                                     ps.shape(scale)))),
           bijector=tfb.LambertWTail(shift=shift, scale=scale,
                                     tailweight=tailweight,
                                     validate_args=validate_args),
@@ -132,6 +140,7 @@ class LambertWDistribution(transformed_distribution.TransformedDistribution):
   def _parameter_properties(cls, dtype, num_classes=None):
     # pylint: disable=g-long-lambda
     return dict(
+        distribution=parameter_properties.BatchedComponentProperties(),
         shift=parameter_properties.ParameterProperties(),
         scale=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
@@ -161,20 +170,6 @@ class LambertWDistribution(transformed_distribution.TransformedDistribution):
     return self._tailweight
 
   experimental_is_sharded = False
-
-  def _batch_shape_tensor(self, shift=None, scale=None, tailweight=None):
-    """Returns the batch shape of tensor parameter broadcasting."""
-    return ps.shape(
-        ps.shape(self.tailweight if tailweight is None
-                 else tailweight,
-                 ps.shape(self.shift if shift is None else shift)),
-        ps.shape(self.scale if scale is None else scale))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        tf.broadcast_static_shape(self.tailweight.shape,
-                                  self.shift.shape),
-        self.scale.shape)
 
 
 class LambertWNormal(LambertWDistribution):
@@ -300,20 +295,6 @@ class LambertWNormal(LambertWDistribution):
     # independent of the tail parameter.
     loc = tf.convert_to_tensor(self.loc)
     return tf.broadcast_to(loc, self.batch_shape)
-
-  def _batch_shape_tensor(self, loc=None, scale=None, tailweight=None):
-    """Returns the batch shape of tensor parameter broadcasting."""
-    return ps.shape(
-        ps.shape(self.tailweight if tailweight is None
-                 else tailweight,
-                 ps.shape(self.loc if loc is None else loc)),
-        ps.shape(self.scale if scale is None else scale))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        tf.broadcast_static_shape(self.tailweight.shape,
-                                  self.loc.shape),
-        self.scale.shape)
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 
-class Permute(bijector.Bijector):
+class Permute(bijector.AutoCompositeTensorBijector):
   """Permutes the rightmost dimension of a `Tensor`.
 
   ```python
@@ -131,7 +131,8 @@ class Permute(bijector.Bijector):
         permutation=parameter_properties.ParameterProperties(
             event_ndims=1,
             default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED))
+            .BIJECTOR_NOT_IMPLEMENTED),
+        axis=parameter_properties.ShapeParameterProperties())
 
   @property
   def permutation(self):

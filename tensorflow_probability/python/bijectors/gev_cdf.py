@@ -32,7 +32,7 @@ __all__ = [
 ]
 
 
-class GeneralizedExtremeValueCDF(bijector.Bijector):
+class GeneralizedExtremeValueCDF(bijector.AutoCompositeTensorBijector):
   """Compute the GeneralizedExtremeValue CDF.
 
   Compute `Y = g(X) = exp(-t(X))`,

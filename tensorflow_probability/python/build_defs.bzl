@@ -274,6 +274,7 @@ def multi_substrate_py_test(
         tags = [],
         numpy_tags = [],
         jax_tags = [],
+        tf_tags = [],
         disabled_substrates = [],
         srcs_version = "PY3",
         python_version = "PY3",
@@ -300,6 +301,7 @@ def multi_substrate_py_test(
             to produce the `test_suite`.
         numpy_tags: Tags specific to the NumPy test. (e.g. `"notap"`).
         jax_tags: Tags specific to the JAX test. (e.g. `"notap"`).
+        tf_tags: Tags specific to the TF test. (e.g. `"notap"`).
         disabled_substrates: Iterable of substrates to disable, items from
             ["numpy", "jax"].
         srcs_version: As with `py_test`.
@@ -318,7 +320,7 @@ def multi_substrate_py_test(
         srcs = srcs,
         main = main or "{}.py".format(name),
         deps = deps,
-        tags = tags,
+        tags = tags + tf_tags,
         srcs_version = srcs_version,
         python_version = python_version,
         timeout = timeout,

@@ -23,11 +23,11 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 
 __all__ = [
-    "Invert",
+    'Invert',
 ]
 
 
-class Invert(bijector_lib.Bijector):
+class _Invert(bijector_lib.Bijector):
   """Bijector which inverts another Bijector.
 
   Example Use: [ExpGammaDistribution (see Background & Context)](
@@ -67,12 +67,12 @@ class Invert(bijector_lib.Bijector):
     parameters = dict(locals()) if parameters is None else parameters
     if not bijector._is_injective:  # pylint: disable=protected-access
       raise NotImplementedError(
-          "Invert is not implemented for non-injective bijectors.")
+          'Invert is not implemented for non-injective bijectors.')
 
-    name = name or "_".join(["invert", bijector.name])
+    name = name or '_'.join(['invert', bijector.name])
     with tf.name_scope(name) as name:
       self._bijector = bijector
-      super(Invert, self).__init__(
+      super(_Invert, self).__init__(
           forward_min_event_ndims=bijector.inverse_min_event_ndims,
           inverse_min_event_ndims=bijector.forward_min_event_ndims,
           dtype=bijector.dtype,
@@ -97,6 +97,16 @@ class Invert(bijector_lib.Bijector):
   def inverse_event_shape_tensor(self, output_shape):
     return self.bijector.forward_event_shape_tensor(output_shape)
 
+  def experimental_batch_shape(self, x_event_ndims=None, y_event_ndims=None):
+    return self.bijector.experimental_batch_shape(
+        x_event_ndims=y_event_ndims, y_event_ndims=x_event_ndims)
+
+  def experimental_batch_shape_tensor(self,
+                                      x_event_ndims=None,
+                                      y_event_ndims=None):
+    return self.bijector.experimental_batch_shape_tensor(
+        x_event_ndims=y_event_ndims, y_event_ndims=x_event_ndims)
+
   @property
   def bijector(self):
     return self._bijector
@@ -104,6 +114,10 @@ class Invert(bijector_lib.Bijector):
   @property
   def _is_permutation(self):
     return self.bijector._is_permutation  # pylint: disable=protected-access
+
+  @property
+  def _parts_interact(self):
+    return self.bijector._parts_interact  # pylint: disable=protected-access
 
   def _internal_is_increasing(self, **kwargs):
     return self.bijector._internal_is_increasing(**kwargs)  # pylint: disable=protected-access
@@ -131,3 +145,27 @@ class Invert(bijector_lib.Bijector):
 
   def forward_event_ndims(self, event_ndims, **kwargs):
     return self.bijector.inverse_event_ndims(event_ndims, **kwargs)
+
+
+class Invert(_Invert, bijector_lib.AutoCompositeTensorBijector):
+
+  def __new__(cls, *args, **kwargs):
+    """Returns an `_Invert` instance if `bijector` is not a `CompositeTensor."""
+    if cls is Invert:
+      if args:
+        bijector = args[0]
+      elif 'bijector' in kwargs:
+        bijector = kwargs['bijector']
+      else:
+        raise TypeError('`Invert.__new__()` is missing argument `bijector`.')
+
+      if not isinstance(bijector, tf.__internal__.CompositeTensor):
+        return _Invert(*args, **kwargs)
+    return super(Invert, cls).__new__(cls)
+
+
+Invert.__doc__ = _Invert.__doc__ + '/n' + (
+    'When an `Invert` bijector is constructed, if its `bijector` arg is not a '
+    '`CompositeTensor` instance, an `_Invert` instance is returned instead. '
+    'Bijectors subclasses that inherit from `Invert` will also inherit from '
+    ' `CompositeTensor`.')

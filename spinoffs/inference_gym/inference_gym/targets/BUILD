@@ -45,6 +45,7 @@ py_library(
         ":model",
         ":neals_funnel",
         ":non_identifiable_quartic",
+        ":plasma_spectroscopy",
         ":probit_regression",
         ":radon_contextual_effects",
         ":sparse_logistic_regression",
@@ -368,6 +369,33 @@ py_test(
     deps = [
         ":non_identifiable_quartic",
         # tensorflow dep,
+        "//inference_gym/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "plasma_spectroscopy",
+    srcs = ["plasma_spectroscopy.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":bayesian_model",
+        ":model",
+        # numpy dep,
+        "//inference_gym/internal:data",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "plasma_spectroscopy_test",
+    srcs = ["plasma_spectroscopy_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":plasma_spectroscopy",
+        # numpy dep,
+        # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )

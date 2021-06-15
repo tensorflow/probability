@@ -36,7 +36,7 @@ __all__ = [
 ]
 
 
-class CategoricalToDiscrete(bijector.Bijector):
+class CategoricalToDiscrete(bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = values[X]`.
 
   Example Usage:

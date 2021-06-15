@@ -146,7 +146,7 @@ def entropy(df, scale, batch_shape, dtype):
           (tf.math.digamma(0.5 * (df + 1.)) - tf.math.digamma(0.5 * df)))
 
 
-class StudentT(distribution.Distribution):
+class StudentT(distribution.AutoCompositeTensorDistribution):
   """Student's t-distribution.
 
   This distribution has parameters: degree of freedom `df`, location `loc`,
@@ -324,19 +324,6 @@ class StudentT(distribution.Distribution):
   def scale(self):
     """Scaling factors of these Student's t distribution(s)."""
     return self._scale
-
-  def _batch_shape_tensor(self, df=None, loc=None, scale=None):
-    return ps.broadcast_shape(
-        ps.shape(self.df if df is None else df),
-        ps.broadcast_shape(
-            ps.shape(self.loc if loc is None else loc),
-            ps.shape(self.scale if scale is None else scale)))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        tf.broadcast_static_shape(self.df.shape,
-                                  self.loc.shape),
-        self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

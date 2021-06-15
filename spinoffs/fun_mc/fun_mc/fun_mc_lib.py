@@ -43,6 +43,7 @@ from fun_mc import backend
 tf = backend.tf
 tfp = backend.tfp
 util = backend.util
+ps = backend.prefer_static
 tfb = tfp.bijectors
 
 __all__ = [
@@ -135,6 +136,7 @@ BooleanNest = Union[BooleanTensor, Sequence[BooleanTensor],
                     Mapping[Any, BooleanTensor]]
 FloatNest = Union[FloatTensor, Sequence[FloatTensor], Mapping[Any, FloatTensor]]
 IntNest = Union[IntTensor, Sequence[IntTensor], Mapping[Any, IntTensor]]
+StringNest = Union[Text, Sequence[Text], Mapping[Any, Text]]
 DTypeNest = Union['tf.DType', Sequence['tf.DType'], Mapping[Any, 'tf.DType']]
 State = TensorNest  # pylint: disable=invalid-name
 TransitionOperator = Callable[..., Tuple[State, TensorNest]]
@@ -566,8 +568,8 @@ def maybe_broadcast_structure(from_structure: 'Any',
 def reparameterize_potential_fn(
     potential_fn: 'PotentialFn',
     transport_map_fn: 'TransportMap',
-    init_state: 'State' = None,
-    state_structure: 'Any' = None,
+    init_state: 'Optional[State]' = None,
+    state_structure: 'Optional[Any]' = None,
     track_volume: 'bool' = True,
 ) -> 'Tuple[PotentialFn, Optional[State]]':
   """Performs a change of variables of a potential function.
@@ -650,7 +652,7 @@ def reparameterize_potential_fn(
 
 def transform_log_prob_fn(log_prob_fn: 'PotentialFn',
                           bijector: 'BijectorNest',
-                          init_state: 'State' = None) -> 'Any':
+                          init_state: 'Optional[State]' = None) -> 'Any':
   """Transforms a log-prob function using a bijector.
 
   This takes a log-prob function and creates a new log-prob function that now
@@ -1040,7 +1042,7 @@ def metropolis_hastings_step(
     current_state: 'State',
     proposed_state: 'State',
     energy_change: 'FloatTensor',
-    log_uniform: 'FloatTensor' = None,
+    log_uniform: 'Optional[FloatTensor]' = None,
     seed=None) -> 'Tuple[State, MetropolisHastingsExtra]':
   """Metropolis-Hastings step.
 
@@ -1085,9 +1087,9 @@ MomentumSampleFn = Callable[[Any], State]
 
 
 @util.named_call
-def gaussian_momentum_sample(state: 'State' = None,
-                             shape: 'IntTensor' = None,
-                             dtype: 'DTypeNest' = None,
+def gaussian_momentum_sample(state: 'Optional[State]' = None,
+                             shape: 'Optional[IntTensor]' = None,
+                             dtype: 'Optional[DTypeNest]' = None,
                              seed=None) -> 'State':
   """Generates a sample from a Gaussian (Normal) momentum distribution.
 
@@ -1204,17 +1206,17 @@ def _default_hamiltonian_monte_carlo_energy_change_fn(
 def hamiltonian_monte_carlo_step(
     hmc_state: 'HamiltonianMonteCarloState',
     target_log_prob_fn: 'PotentialFn',
-    step_size: 'Any' = None,
-    num_integrator_steps: 'IntTensor' = None,
-    momentum: 'State' = None,
-    kinetic_energy_fn: 'PotentialFn' = None,
-    momentum_sample_fn: 'MomentumSampleFn' = None,
+    step_size: 'Optional[Any]' = None,
+    num_integrator_steps: 'Optional[IntTensor]' = None,
+    momentum: 'Optional[State]' = None,
+    kinetic_energy_fn: 'Optional[PotentialFn]' = None,
+    momentum_sample_fn: 'Optional[MomentumSampleFn]' = None,
     integrator_trace_fn: 'Callable[[IntegratorStepState, IntegratorStepExtras],'
     'TensorNest]' = lambda *args: (),
-    log_uniform: 'FloatTensor' = None,
+    log_uniform: 'Optional[FloatTensor]' = None,
     integrator_fn=None,
     unroll_integrator: 'bool' = False,
-    max_num_integrator_steps: 'IntTensor' = None,
+    max_num_integrator_steps: 'Optional[IntTensor]' = None,
     energy_change_fn:
     'Callable[[IntegratorState, IntegratorState, IntegratorExtras], '
     'Tuple[FloatTensor, Any]]' = _default_hamiltonian_monte_carlo_energy_change_fn,
@@ -1297,7 +1299,7 @@ def hamiltonian_monte_carlo_step(
 
   if kinetic_energy_fn is None:
     kinetic_energy_fn = make_gaussian_kinetic_energy_fn(
-        len(target_log_prob.shape) if target_log_prob.shape is not None else tf
+        len(target_log_prob.shape) if target_log_prob.shape is not None else tf  # pytype: disable=attribute-error
         .rank(target_log_prob))
 
   if momentum_sample_fn is None:
@@ -1380,6 +1382,7 @@ class IntegratorExtras(NamedTuple):
   final_kinetic_energy: 'FloatTensor'
   final_kinetic_energy_extra: Any
   integrator_trace: Any
+  momentum_grads: 'State'
 
 
 @util.named_call
@@ -1391,7 +1394,7 @@ def hamiltonian_integrator(
     integrator_trace_fn: 'Callable[[IntegratorStepState, IntegratorStepExtras],'
     'TensorNest]' = lambda *args: (),
     unroll: 'bool' = False,
-    max_num_steps: 'IntTensor' = None,
+    max_num_steps: 'Optional[IntTensor]' = None,
 ) -> 'Tuple[IntegratorState, IntegratorExtras]':
   """Intergrates a discretized set of Hamiltonian equations.
 
@@ -1423,7 +1426,7 @@ def hamiltonian_integrator(
   state_grads = int_state.state_grads
   state_extra = int_state.state_extra
 
-  num_steps = tf.convert_to_tensor(num_steps)
+  num_steps = ps.convert_to_shape_tensor(num_steps)
   is_ragged = len(num_steps.shape) > 0 or max_num_steps is not None  # pylint: disable=g-explicit-length-test
 
   initial_kinetic_energy, initial_kinetic_energy_extra = call_potential_fn(
@@ -1434,7 +1437,7 @@ def hamiltonian_integrator(
     step = 0
     # TODO(siege): Use cond for the common padding, ala the old RNN code.
     if max_num_steps is None:
-      max_num_steps = tf.reduce_max(num_steps)
+      max_num_steps = ps.reduce_max(num_steps)
   else:
     step = []
     max_num_steps = num_steps
@@ -1495,7 +1498,8 @@ def hamiltonian_integrator(
       final_energy=final_energy,
       final_kinetic_energy=integrator_step_extra.kinetic_energy,
       final_kinetic_energy_extra=integrator_step_extra.kinetic_energy_extra,
-      integrator_trace=integrator_trace)
+      integrator_trace=integrator_trace,
+      momentum_grads=integrator_step_extra.momentum_grads)
 
   return state, extra
 
@@ -1718,7 +1722,7 @@ def gradient_descent_step(
 def gaussian_proposal(
     state: 'State',
     scale: 'FloatNest' = 1.,
-    seed: 'Any' = None) -> 'Tuple[State, Tuple[Tuple[()], float]]':
+    seed: 'Optional[Any]' = None) -> 'Tuple[State, Tuple[Tuple[()], float]]':
   """Axis-aligned gaussian random-walk proposal.
 
   Args:
@@ -1756,7 +1760,7 @@ def maximal_reflection_coupling_proposal(
     chain_ndims: 'int' = 0,
     scale: 'FloatNest' = 1,
     epsilon: 'FloatTensor' = 1e-20,
-    seed: 'Any' = None
+    seed: 'Optional[Any]' = None
 ) -> 'Tuple[State, Tuple[MaximalReflectiveCouplingProposalExtra, float]]':
   """Maximal reflection coupling proposal.
 
@@ -1899,7 +1903,7 @@ def random_walk_metropolis_step(
     rwm_state: 'RandomWalkMetropolisState',
     target_log_prob_fn: 'PotentialFn',
     proposal_fn: 'TransitionOperator',
-    log_uniform: 'FloatTensor' = None,
+    log_uniform: 'Optional[FloatTensor]' = None,
     seed=None) -> 'Tuple[RandomWalkMetropolisState, RandomWalkMetropolisExtra]':
   """Random Walk Metropolis Hastings `TransitionOperator`.
 
@@ -1991,8 +1995,8 @@ def running_variance_init(shape: 'IntTensor',
 def running_variance_step(
     state: 'RunningVarianceState',
     vec: 'FloatNest',
-    axis: 'Union[int, List[int], Tuple[int]]' = None,
-    window_size: 'IntNest' = None,
+    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
+    window_size: 'Optional[IntNest]' = None,
 ) -> 'Tuple[RunningVarianceState, Tuple[()]]':
   """Updates the `RunningVarianceState`.
 
@@ -2116,8 +2120,8 @@ def running_covariance_init(shape: 'IntTensor',
 def running_covariance_step(
     state: 'RunningCovarianceState',
     vec: 'FloatNest',
-    axis: 'Union[int, List[int], Tuple[int]]' = None,
-    window_size: 'IntNest' = None,
+    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
+    window_size: 'Optional[IntNest]' = None,
 ) -> 'Tuple[RunningCovarianceState, Tuple[()]]':
   """Updates the `RunningCovarianceState`.
 
@@ -2233,8 +2237,8 @@ def running_mean_init(shape: 'IntTensor',
 def running_mean_step(
     state: 'RunningMeanState',
     vec: 'FloatNest',
-    axis: 'Union[int, List[int], Tuple[int]]' = None,
-    window_size: 'IntNest' = None,
+    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
+    window_size: 'Optional[IntNest]' = None,
 ) -> 'Tuple[RunningMeanState, Tuple[()]]':
   """Updates the `RunningMeanState`.
 
@@ -2414,7 +2418,7 @@ def running_approximate_auto_covariance_init(
     max_lags: 'int',
     state_shape: 'IntTensor',
     dtype: 'DTypeNest',
-    axis: 'Union[int, List[int], Tuple[int]]' = None,
+    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
 ) -> 'RunningApproximateAutoCovarianceState':
   """Initializes `RunningApproximateAutoCovarianceState`.
 
@@ -2462,7 +2466,7 @@ def running_approximate_auto_covariance_init(
 def running_approximate_auto_covariance_step(
     state: 'RunningApproximateAutoCovarianceState',
     vec: 'TensorNest',
-    axis: 'Union[int, List[int], Tuple[int]]' = None,
+    axis: 'Optional[Union[int, List[int], Tuple[int]]]' = None,
 ) -> 'Tuple[RunningApproximateAutoCovarianceState, Tuple[()]]':
   """Updates `RunningApproximateAutoCovarianceState`.
 
@@ -2567,7 +2571,7 @@ def running_approximate_auto_covariance_step(
 
 
 def make_surrogate_loss_fn(
-    grad_fn: 'GradFn' = None,
+    grad_fn: 'Optional[GradFn]' = None,
     loss_value: 'tf.Tensor' = 0.,
 ) -> 'Any':
   """Creates a surrogate loss function with specified gradients.

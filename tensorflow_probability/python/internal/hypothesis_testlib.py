@@ -593,7 +593,7 @@ def broadcasting_named_shapes(draw, batch_shape, param_names):
   n = len(param_names)
   return dict(
       zip(draw(hps.permutations(param_names)),
-          draw(broadcasting_shapes(batch_shape, n))))
+          draw(broadcasting_shapes(batch_shape, n, no_error_n_eq_1=True))))
 
 
 def _compute_rank_and_fullsize_reqd(draw, target_shape, current_shape, is_last):
@@ -651,7 +651,7 @@ def broadcast_compatible_shape(shape):
 
 
 @hps.composite
-def broadcasting_shapes(draw, target_shape, n):
+def broadcasting_shapes(draw, target_shape, n, no_error_n_eq_1=False):
   """Strategy for drawing a set of `n` shapes that broadcast to `target_shape`.
 
   For each shape we need to choose its rank, and whether or not each axis i is 1
@@ -663,12 +663,17 @@ def broadcasting_shapes(draw, target_shape, n):
     draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     target_shape: The target (fully-defined) batch shape.
     n: Python `int`, the number of shapes to draw.
+    no_error_n_eq_1: If True, don't raise ValueError when n==1.
 
   Returns:
     shapes: A strategy for drawing sequences of `tf.TensorShape` such that the
       set of shapes in each sequence broadcast to `target_shape`. The shapes are
       fully defined.
   """
+  if n == 1 and not no_error_n_eq_1:
+    raise ValueError('`broadcasting_shapes(shp, n=1) is just `shp`. '
+                     'Did you want `broadcast_compatible_shape`? If `n` '
+                     'is stochastic, add arg `no_error_n_eq_1=True`.')
   target_shape = tf.TensorShape(target_shape)
   target_rank = tensorshape_util.rank(target_shape)
   result = []
@@ -799,7 +804,7 @@ def orthonormal(x):
 
 def lower_tril_positive_definite(x):
   return tf.linalg.band_part(
-      tf.linalg.set_diag(x, softplus_plus_eps()(tf.linalg.diag_part(x))),
+      tf.linalg.set_diag(x, softplus_plus_eps(1e-4)(tf.linalg.diag_part(x))),
       num_lower=-1,
       num_upper=0)
 

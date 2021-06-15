@@ -60,7 +60,7 @@ from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import scale as tfb_scale
 from tensorflow_probability.python.bijectors import shift as tfb_shift
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -81,9 +81,7 @@ def _xexp_delta_squared(u, delta):
     The transformed tensor with same shape and same dtype as `u`.
   """
   delta = tf.convert_to_tensor(delta, dtype=u.dtype)
-  u = tf.broadcast_to(u,
-                      prefer_static.broadcast_shape(tf.shape(u),
-                                                    tf.shape(delta)))
+  u = tf.broadcast_to(u, ps.broadcast_shape(ps.shape(u), ps.shape(delta)))
   return u * tf.math.exp(0.5 * delta * u**2)
 
 
@@ -102,14 +100,13 @@ def _w_delta_squared(z, delta):
   """
   delta = tf.convert_to_tensor(delta, dtype=z.dtype)
   z = tf.broadcast_to(z,
-                      prefer_static.broadcast_shape(tf.shape(z),
-                                                    tf.shape(delta)))
+                      ps.broadcast_shape(ps.shape(z), ps.shape(delta)))
   wd = tf.sign(z) * tf.sqrt(tfp_math.lambertw(delta * z**2) / delta)
   return tf.where(tf.equal(delta, 0.0), z, wd)
 
 
 # Private class that implements the heavy tail transformation.
-class _HeavyTailOnly(bijector.Bijector):
+class _HeavyTailOnly(bijector.AutoCompositeTensorBijector):
   """Heavy tail transformation for Lambert W x F distributions.
 
   This bijector defines the transformation z = u * exp(0.5 * delta * u**2)

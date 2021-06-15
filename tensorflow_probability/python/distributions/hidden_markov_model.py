@@ -230,22 +230,6 @@ class HiddenMarkovModel(distribution.Distribution):
 
       self._parameters = parameters
 
-  def _batch_shape_tensor(self):
-    observation_batch_shape = (
-        self._observation_distribution.batch_shape_tensor()[:-2]
-        if self._time_varying_observation_distribution
-        else self._observation_distribution.batch_shape_tensor()[:-1])
-    return ps.broadcast_shape(
-        self._initial_distribution.batch_shape_tensor(),
-        ps.broadcast_shape(
-            self._transition_distribution.batch_shape_tensor()[:-2]
-            if self._time_varying_transition_distribution else
-            self._transition_distribution.batch_shape_tensor()[:-1],
-            observation_batch_shape))
-
-  def _batch_shape(self):
-    return self._static_batch_shape
-
   def _event_shape_tensor(self):
     return ps.concat([[self._num_steps],
                       self.observation_distribution.event_shape_tensor()],
@@ -1205,7 +1189,7 @@ class HiddenMarkovModel(distribution.Distribution):
   # pylint: disable=protected-access
   def _default_event_space_bijector(self):
     return (self._observation_distribution.
-            _experimental_default_event_space_bijector())
+            experimental_default_event_space_bijector())
   # pylint: enable=protected-access
 
   def _parameter_control_dependencies(self, is_init):

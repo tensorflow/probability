@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -173,6 +174,13 @@ class BatchBroadcast(distribution_lib.Distribution):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties(),
+        to_shape=parameter_properties.ShapeParameterProperties(),
+        with_shape=parameter_properties.ShapeParameterProperties())
+
   @property
   def distribution(self):
     return self._distribution
@@ -186,8 +194,8 @@ class BatchBroadcast(distribution_lib.Distribution):
     return self._to_shape
 
   @property
-  def experimental_is_sharded(self):
-    return self.distribution.experimental_is_sharded
+  def experimental_shard_axis_names(self):
+    return self.distribution.experimental_shard_axis_names
 
   def __getitem__(self, slices):
     # Implementing this method would require logic similar to
@@ -216,47 +224,90 @@ class BatchBroadcast(distribution_lib.Distribution):
   def _event_shape_tensor(self):
     return self.distribution.event_shape_tensor()
 
-  def _sample_n(self, n, seed=None):
+  def _augment_sample_shape(self, sample_shape):
+    # Suppose we have:
+    #   - sample shape of `[n]`,
+    #   - underlying distribution batch shape of `[2, 1]`,
+    #   - final broadcast batch shape of `[4, 2, 3]`.
+    # Then we must draw `sample_shape + [12]` samples, where
+    # `12 == n_batch // underlying_n_batch`.
+    batch_shape = self.batch_shape_tensor()
+    n_batch = ps.reduce_prod(batch_shape)
+    underlying_batch_shape = self.distribution.batch_shape_tensor()
+    underlying_n_batch = ps.reduce_prod(underlying_batch_shape)
+    return ps.concat(
+        [sample_shape,
+         [ps.maximum(0, n_batch // underlying_n_batch)]],
+        axis=0)
+
+  def _transpose_and_reshape_result(self, x, sample_shape, event_shape=None):
+    if event_shape is None:
+      event_shape = self.event_shape_tensor()
+
     batch_shape = self.batch_shape_tensor()
     batch_rank = ps.rank_from_shape(batch_shape)
-    n_batch = ps.reduce_prod(batch_shape)
 
     underlying_batch_shape = self.distribution.batch_shape_tensor()
     underlying_batch_rank = ps.rank_from_shape(underlying_batch_shape)
-    underlying_n_batch = ps.reduce_prod(underlying_batch_shape)
 
-    # Left pad underlying shape with any necessary ones.
+    # Continuing the example from `_augment_sample_shape`, suppose we have:
+    #   - sample shape of `[n]`,
+    #   - underlying distribution batch shape of `[2, 1]`,
+    #   - final broadcast batch shape of `[4, 2, 3]`.
+    # and have drawn an `x` of shape `[n, 12, 2, 1] + event_shape`, which we
+    # ultimately want to have shape `[n, 4, 2, 3] + event_shape`.
+
+    # First, we reshape to expand out the batch elements:
+    # `shape_with_doubled_batch == [n] + [4, 1, 3] + [1, 2, 1] + event_shape`,
+    # where `[1, 2, 1]` is the fully-expanded underlying batch shape, and
+    # `[4, 1, 3]` is the shape of the elements being added by broadcasting.
     underlying_bcast_shp = ps.concat(
         [ps.ones([ps.maximum(batch_rank - underlying_batch_rank, 0)],
                  dtype=underlying_batch_shape.dtype),
          underlying_batch_shape],
         axis=0)
-
-    # Determine how many underlying samples to produce.
-    n_bcast_samples = ps.maximum(0, n_batch // underlying_n_batch)
-    samps = self.distribution.sample([n, n_bcast_samples], seed=seed)
-
     is_dim_bcast = ps.not_equal(batch_shape, underlying_bcast_shp)
+    x_with_doubled_batch = tf.reshape(
+        x,
+        ps.concat([sample_shape,
+                   ps.where(is_dim_bcast, batch_shape, 1),
+                   underlying_bcast_shp,
+                   event_shape], axis=0))
 
-    event_shape = self.event_shape_tensor()
-    event_rank = ps.rank_from_shape(event_shape)
-    shp = ps.concat([[n], ps.where(is_dim_bcast, batch_shape, 1),
-                     underlying_bcast_shp,
-                     event_shape], axis=0)
-    # Reshape to expand n_bcast_samples and ones-padded underlying_bcast_shp.
-    samps = tf.reshape(samps, shp)
-    # Interleave broadcast and underlying axis indices for transpose.
-    interleaved_batch_axes = ps.reshape(
-        ps.stack([ps.range(batch_rank),
-                  ps.range(batch_rank) + batch_rank],
-                 axis=-1),
-        [-1]) + 1
+    # Next, construct the permutation that interleaves the batch dimensions,
+    # resulting in samples with shape
+    # `[n] + [4, 1] + [1, 2] + [3, 1] + event_shape`.
+    # Note that each interleaved pair of batch dimensions contains exactly one
+    # dim of size `1` and one of size `>= 1`.
+    sample_ndims = ps.rank_from_shape(sample_shape)
+    x_with_interleaved_batch = tf.transpose(
+        x_with_doubled_batch,
+        perm=ps.concat([
+            ps.range(sample_ndims),
+            sample_ndims + ps.reshape(
+                ps.stack([ps.range(batch_rank),
+                          ps.range(batch_rank) + batch_rank], axis=-1),
+                [-1]),
+            sample_ndims + 2 * batch_rank + ps.range(
+                ps.rank_from_shape(event_shape))], axis=0))
 
-    event_axes = ps.range(event_rank) + (1 + 2 * batch_rank)
-    perm = ps.concat([[0], interleaved_batch_axes, event_axes], axis=0)
-    samps = tf.transpose(samps, perm=perm)
-    # Finally, reshape to the fully-broadcast batch shape.
-    return tf.reshape(samps, ps.concat([[n], batch_shape, event_shape], axis=0))
+    # Final reshape to remove the spurious `1` dimensions.
+    return tf.reshape(
+        x_with_interleaved_batch,
+        ps.concat([sample_shape, batch_shape, event_shape], axis=0))
+
+  def _sample_n(self, n, seed=None):
+    sample_shape = ps.reshape(n, [1])
+    x = self.distribution.sample(
+        self._augment_sample_shape(sample_shape), seed=seed)
+    return self._transpose_and_reshape_result(x, sample_shape=sample_shape)
+
+  def _sample_and_log_prob(self, sample_shape, seed):
+    x, lp = self.distribution.experimental_sample_and_log_prob(
+        self._augment_sample_shape(sample_shape), seed=seed)
+    return (self._transpose_and_reshape_result(x, sample_shape),
+            self._transpose_and_reshape_result(lp, sample_shape,
+                                               event_shape=()))
 
   _log_prob = _make_bcast_fn('log_prob', n_event_shapes=0)
   _prob = _make_bcast_fn('prob', n_event_shapes=0)
@@ -324,9 +375,6 @@ class BatchBroadcast(distribution_lib.Distribution):
 
   def _sample_control_dependencies(self, value, **kwargs):
     return self.distribution._sample_control_dependencies(value, **kwargs)  # pylint: disable=protected-access
-
-  _composite_tensor_nonshape_params = ('distribution',)
-  _composite_tensor_shape_params = ('with_shape', 'to_shape')
 
 
 class _BroadcastingBijector(bijector_lib.Bijector):

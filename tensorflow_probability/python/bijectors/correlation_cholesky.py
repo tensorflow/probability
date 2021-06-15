@@ -32,7 +32,7 @@ __all__ = [
 ]
 
 
-class CorrelationCholesky(bijector.Bijector):
+class CorrelationCholesky(bijector.AutoCompositeTensorBijector):
   """Maps unconstrained reals to Cholesky-space correlation matrices.
 
   #### Mathematical Details

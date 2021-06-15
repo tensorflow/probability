@@ -38,7 +38,6 @@ from tensorflow_probability.python.experimental import distributions
 from tensorflow_probability.python.experimental import lazybones
 from tensorflow_probability.python.experimental import linalg
 from tensorflow_probability.python.experimental import marginalize
-from tensorflow_probability.python.experimental import math
 from tensorflow_probability.python.experimental import mcmc
 from tensorflow_probability.python.experimental import nn
 from tensorflow_probability.python.experimental import parallel_filter
@@ -65,7 +64,6 @@ _allowed_symbols = [
     'lazybones',
     'linalg',
     'marginalize',
-    'math',
     'mcmc',
     'nn',
     'parallel_filter',

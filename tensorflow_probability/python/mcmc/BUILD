@@ -66,6 +66,8 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/stats",
@@ -123,6 +125,7 @@ multi_substrate_py_library(
         ":metropolis_hastings",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/mcmc/internal:leapfrog_integrator",
@@ -143,6 +146,10 @@ multi_substrate_py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -157,6 +164,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:broadcast_util",
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:generic",
@@ -192,6 +200,9 @@ multi_substrate_py_test(
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_testlib",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -223,6 +234,7 @@ multi_substrate_py_library(
         ":kernel",
         ":metropolis_hastings",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:diag_jacobian",
@@ -241,6 +253,9 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -287,6 +302,7 @@ multi_substrate_py_library(
         ":kernel",
         ":metropolis_hastings",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/mcmc/internal:util",
         "//tensorflow_probability/python/util:seed_stream",
@@ -301,6 +317,9 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -327,7 +346,6 @@ multi_substrate_py_test(
     size = "medium",
     timeout = "long",
     srcs = ["replica_exchange_mc_test.py"],
-    numpy_tags = ["notap"],
     shard_count = 11,
     deps = [
         # absl/logging dep,
@@ -348,6 +366,7 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/mcmc/internal",
     ],
 )
@@ -428,6 +447,7 @@ multi_substrate_py_library(
     deps = [
         ":kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -448,6 +468,9 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/mcmc/internal",
     ],
@@ -545,43 +568,5 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
-    name = "text_messages_hmc",
-    srcs = ["text_messages_hmc.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-# bazel run -c opt :text_messages_hmc_eager_test -- --benchmarks=.
-py_test(
-    name = "text_messages_hmc_eager_test",
-    size = "medium",  # Might run > 1 minute.
-    srcs = ["text_messages_hmc_eager_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        ":text_messages_hmc",
-        # tensorflow dep,
-        "//tensorflow_probability",
-    ],
-)
-
-# bazel run -c opt :text_messages_hmc_graph_test -- --benchmarks=.
-py_test(
-    name = "text_messages_hmc_graph_test",
-    size = "medium",  # Might run > 1 minute.
-    srcs = ["text_messages_hmc_graph_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        ":text_messages_hmc",
-        # tensorflow dep,
-        "//tensorflow_probability",
     ],
 )

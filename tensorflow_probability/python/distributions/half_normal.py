@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class HalfNormal(distribution.Distribution):
+class HalfNormal(distribution.AutoCompositeTensorDistribution):
   """The Half Normal distribution with scale `scale`.
 
   #### Mathematical details
@@ -134,12 +134,6 @@ class HalfNormal(distribution.Distribution):
   def scale(self):
     """Distribution parameter for the scale."""
     return self._scale
-
-  def _batch_shape_tensor(self):
-    return ps.shape(self.scale)
-
-  def _batch_shape(self):
-    return self.scale.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

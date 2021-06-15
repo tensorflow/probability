@@ -29,7 +29,7 @@ __all__ = [
 ]
 
 
-class Expm1(bijector.Bijector):
+class Expm1(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = exp(X) - 1`.
 
     This `Bijector` is no different from Chain([Shift(-1), Exp()]).

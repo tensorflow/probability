@@ -27,7 +27,7 @@ __all__ = [
 ]
 
 
-class Cumsum(bijector.Bijector):
+class Cumsum(bijector.AutoCompositeTensorBijector):
   """Computes the cumulative sum of a tensor along a specified axis.
 
   If `axis` is not provided, the default uses the rightmost dimension, i.e.,
@@ -119,3 +119,7 @@ class Cumsum(bijector.Bijector):
 
   def _forward_log_det_jacobian(self, x):
     return tf.constant(0., x.dtype)
+
+  @property
+  def _compposite_tensor_shape_params(self):
+    return ('axis',)

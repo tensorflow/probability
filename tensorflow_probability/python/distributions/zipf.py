@@ -39,7 +39,7 @@ __all__ = [
 ]
 
 
-class Zipf(distribution.Distribution):
+class Zipf(distribution.AutoCompositeTensorDistribution):
   """Zipf distribution.
 
   The Zipf distribution is parameterized by a `power` parameter.
@@ -191,12 +191,6 @@ class Zipf(distribution.Distribution):
   def sample_maximum_iterations(self):
     """Maximum number of allowable iterations in `sample`."""
     return self._sample_maximum_iterations
-
-  def _batch_shape_tensor(self):
-    return tf.shape(self.power)
-
-  def _batch_shape(self):
-    return self.power.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

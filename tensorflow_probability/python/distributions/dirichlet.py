@@ -48,7 +48,7 @@ dtype `self.dtype` and be in the `(self.event_shape() - 1)`-simplex, i.e.,
 `self.batch_shape() + self.event_shape()`."""
 
 
-class Dirichlet(distribution.Distribution):
+class Dirichlet(distribution.AutoCompositeTensorDistribution):
   """Dirichlet distribution.
 
   The Dirichlet distribution is defined over the
@@ -163,6 +163,7 @@ class Dirichlet(distribution.Distribution):
                concentration,
                validate_args=False,
                allow_nan_stats=True,
+               force_probs_to_zero_outside_support=False,
                name='Dirichlet'):
     """Initialize a batch of Dirichlet distributions.
 
@@ -181,9 +182,13 @@ class Dirichlet(distribution.Distribution):
         (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
+      force_probs_to_zero_outside_support: If `True`, force `prob(x) == 0` and
+        `log_prob(x) == -inf` for values of x outside the distribution support.
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
+    self._force_probs_to_zero_outside_support = (
+        force_probs_to_zero_outside_support)
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([concentration], dtype_hint=tf.float32)
       self._concentration = tensor_util.convert_nonref_to_tensor(
@@ -211,14 +216,9 @@ class Dirichlet(distribution.Distribution):
     """Concentration parameter; expected counts for that coordinate."""
     return self._concentration
 
-  def _batch_shape_tensor(self):
-    # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
-    # so we pre-emptively convert-to-tensor.
-    concentration = tf.convert_to_tensor(self.concentration)
-    return ps.shape(concentration)[:-1]
-
-  def _batch_shape(self):
-    return self.concentration.shape[:-1]
+  @property
+  def force_probs_to_zero_outside_support(self):
+    return self._force_probs_to_zero_outside_support
 
   def _event_shape_tensor(self):
     # NOTE: In TF1, tf.shape(x) can call `tf.convert_to_tensor(x)` **twice**,
@@ -242,8 +242,16 @@ class Dirichlet(distribution.Distribution):
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _log_prob(self, x):
     concentration = tf.convert_to_tensor(self.concentration)
-    return (tf.reduce_sum(tf.math.xlogy(concentration - 1., x), axis=-1) -
-            tf.math.lbeta(concentration))
+    lp = (tf.reduce_sum(tf.math.xlogy(concentration - 1., x), axis=-1) -
+          tf.math.lbeta(concentration))
+    if self._force_probs_to_zero_outside_support:
+      eps = np.finfo(dtype_util.as_numpy_dtype(x.dtype)).eps
+      in_support = (
+          tf.reduce_all(x >= 0, axis=-1) &
+          # Reusing the logic of tf.debugging.assert_near, 10 * np.finfo.eps
+          (tf.math.abs(tf.reduce_sum(x, axis=-1) - 1.) < 10 * eps))
+      return tf.where(in_support, lp, -float('inf'))
+    return lp
 
   @distribution_util.AppendDocstring(_dirichlet_sample_note)
   def _prob(self, x):

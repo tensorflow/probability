@@ -505,23 +505,19 @@ class JohnsonSUTest(test_util.TestCase):
       with tf.control_dependencies([x.assign(-1.)]):
         self.evaluate(d.mean())
 
-  def testIncompatibleArgShapesGraph(self):
-    if tf.executing_eagerly(): return
+  def testIncompatibleArgShapes(self):
     scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
-    with self.assertRaisesRegexp(tf.errors.OpError, r'Incompatible shapes'):
+    with self.assertRaisesRegexp(Exception, r'Incompatible shapes'):
       d = tfd.JohnsonSU(skewness=1., tailweight=2., loc=tf.zeros([2, 3]),
                         scale=scale, validate_args=True)
       self.evaluate(d.batch_shape_tensor())
 
-  def testIncompatibleArgShapesEager(self):
-    if not tf.executing_eagerly(): return
-    scale = tf1.placeholder_with_default(tf.ones([4, 1]), shape=None)
-    d = tfd.JohnsonSU(skewness=1., tailweight=2., loc=tf.zeros([2, 3]),
-                      scale=scale, validate_args=True)
-    with self.assertRaisesWithLiteralMatch(
-        ValueError,
-        'Incompatible shapes for broadcasting: (2, 3) and (4, 1)'):
-      d.batch_shape_tensor()
+  def testBatchSamplesAreIndependent(self):
+    num_samples = 1000
+    d = tfd.JohnsonSU(loc=[0., 0.], scale=1., skewness=0., tailweight=1.)
+    xs = d.sample(num_samples, seed=test_util.test_seed())
+    cov = 1. / num_samples * tf.matmul(xs, xs, transpose_a=True)
+    self.assertAllClose(cov / d.variance(), tf.eye(2), atol=0.4)
 
 
 if __name__ == '__main__':

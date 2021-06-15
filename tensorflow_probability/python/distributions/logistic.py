@@ -34,7 +34,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
-class Logistic(distribution.Distribution):
+class Logistic(distribution.AutoCompositeTensorDistribution):
   """The Logistic distribution with location `loc` and `scale` parameters.
 
   #### Mathematical details
@@ -154,14 +154,6 @@ class Logistic(distribution.Distribution):
   def scale(self):
     """Distribution parameter for scale."""
     return self._scale
-
-  def _batch_shape_tensor(self, loc=None, scale=None):
-    return ps.broadcast_shape(
-        ps.shape(self.loc if loc is None else loc),
-        ps.shape(self.scale if scale is None else scale))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

@@ -31,7 +31,7 @@ __all__ = [
 ]
 
 
-class Shift(bijector.Bijector):
+class Shift(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X; shift) = X + shift`.
 
   where `shift` is a numeric `Tensor`.

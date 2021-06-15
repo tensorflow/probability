@@ -34,7 +34,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
-class Triangular(distribution.Distribution):
+class Triangular(distribution.AutoCompositeTensorDistribution):
   r"""Triangular distribution with `low`, `high` and `peak` parameters.
 
   #### Mathematical Details
@@ -179,19 +179,6 @@ class Triangular(distribution.Distribution):
   def _pdf_at_peak(self):
     """Pdf evaluated at the peak."""
     return (self.peak - self.low) / (self.high - self.low)
-
-  def _batch_shape_tensor(self, low=None, peak=None, high=None):
-    return ps.broadcast_shape(
-        ps.shape(self.peak if peak is None else peak),
-        ps.broadcast_shape(
-            ps.shape(self.low if low is None else low),
-            ps.shape(self.high if high is None else high)))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.peak.shape,
-        tf.broadcast_static_shape(
-            self.low.shape, self.high.shape))
 
   def _event_shape(self):
     return tf.TensorShape([])

@@ -83,6 +83,16 @@ class _SplitBijectorTest(object):
         self.evaluate(bijector.forward_log_det_jacobian(
             x, event_ndims=event_ndims)))
 
+  def testCompositeTensor(self):
+    split_sizes = self.build_input([1, 2, 2])
+    bijector = tfb.Split(split_sizes, validate_args=True)
+    x = tf.ones([3, 2, 5])
+    flat = tf.nest.flatten(bijector, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(bijector, flat, expand_composites=True)
+    self.assertAllClose(
+        bijector.forward(x),
+        tf.function(lambda b_: b_.forward(x))(unflat))
+
   def testAssertRaisesNonVectorSplitSizes(self):
     split_sizes = self.build_input([[1, 2, 2]])
     with self.assertRaisesRegexp(ValueError, 'must be an integer or 1-D'):

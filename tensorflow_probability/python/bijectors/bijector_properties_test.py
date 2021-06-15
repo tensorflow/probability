@@ -28,13 +28,16 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import experimental
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.bijectors import invert as invert_lib
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 TF2_FRIENDLY_BIJECTORS = (
     'Ascending',
@@ -49,10 +52,10 @@ TF2_FRIENDLY_BIJECTORS = (
     'FillScaleTriL',
     'FillTriangular',
     'FrechetCDF',
+    'GeneralizedExtremeValueCDF',
     'GeneralizedPareto',
     'GompertzCDF',
     'GumbelCDF',
-    'GeneralizedExtremeValueCDF',
     'Identity',
     'Inline',
     'Invert',
@@ -181,15 +184,21 @@ AUTOVECTORIZATION_ATOL.update({
     'ScaleMatvecLU': 1e-2,  # TODO(b/151041130) tighten this.
     'ScaleMatvecTriL': 1e-1})  # TODO(b/150250388) tighten this.
 
+
 COMPOSITE_TENSOR_IS_BROKEN = [
-    'BatchNormalization',
-    'Inline',  # callable
-    'TransformDiagonal',  # callable
+    'BatchNormalization',  # tf.layers arg
+    'RationalQuadraticSpline',  # TODO(b/185628453): Debug loss of static info.
 ]
+
+COMPOSITE_TENSOR_RTOL = collections.defaultdict(lambda: 2e-6)
+COMPOSITE_TENSOR_RTOL.update({
+    'PowerTransform': 1e-5,
+})
+COMPOSITE_TENSOR_ATOL = collections.defaultdict(lambda: 1e-6)
 
 
 def is_invert(bijector):
-  return isinstance(bijector, tfb.Invert)
+  return isinstance(bijector, (tfb.Invert, invert_lib._Invert))
 
 
 def is_transform_diagonal(bijector):
@@ -228,12 +237,14 @@ def broadcasting_params(draw,
           mutex_params=MUTEX_PARAMS))
 
 
-class CallableModule(tf.Module):  # TODO(b/141098791): Eliminate this.
+# TODO(b/141098791): Eliminate this.
+@experimental.auto_composite_tensor
+class CallableModule(tf.Module, experimental.AutoCompositeTensor):
   """Convenience object for capturing variables closed over by Inline."""
 
   def __init__(self, fn, varobj):
     self._fn = fn
-    self._vars = varobj
+    self._varobj = varobj
 
   def __call__(self, *args, **kwargs):
     return self._fn(*args, **kwargs)
@@ -613,7 +624,7 @@ class BijectorPropertiesTest(test_util.TestCase):
         return False
       if isinstance(bijector, tfb.Softfloor):
         return True
-      if isinstance(bijector, tfb.Invert):
+      if is_invert(bijector):
         return exception(bijector.bijector)
       return False
     if (bijector.forward_min_event_ndims == 0 and
@@ -684,6 +695,21 @@ class BijectorPropertiesTest(test_util.TestCase):
       self.assertTrue(bijector._is_constant_jacobian)
       self.assertAllEqual(ldj, 0.)
 
+    # Verify correctness of batch shape.
+    xs_batch_shapes = tf.nest.map_structure(
+        lambda x, nd: ps.shape(x)[:ps.rank(x) - nd],
+        xs,
+        bijector.inverse_event_ndims(event_ndims))
+    empirical_batch_shape = functools.reduce(
+        ps.broadcast_shape,
+        nest.flatten_up_to(bijector.forward_min_event_ndims, xs_batch_shapes))
+    batch_shape = bijector.experimental_batch_shape(y_event_ndims=event_ndims)
+    if tensorshape_util.is_fully_defined(batch_shape):
+      self.assertAllEqual(empirical_batch_shape, batch_shape)
+    self.assertAllEqual(empirical_batch_shape,
+                        bijector.experimental_batch_shape_tensor(
+                            y_event_ndims=event_ndims))
+
     # Check that the outputs of forward_dtype and inverse_dtype match the dtypes
     # of the outputs of forward and inverse.
     self.assertAllEqualNested(ys.dtype, bijector.forward_dtype(xs.dtype))
@@ -710,6 +736,7 @@ class BijectorPropertiesTest(test_util.TestCase):
         'perm',  # Transpose.
         'rightmost_transposed_ndims',  # Transpose.
         'diag_bijector',  # TransformDiagonal.
+        'diag_shift'  # FillScaleTriL (doesn't support batch shape).
     )
     bijector, event_dim = self._draw_bijector(
         bijector_name, data,
@@ -719,8 +746,8 @@ class BijectorPropertiesTest(test_util.TestCase):
     # Extract the full shape of an output from this bijector.
     xs = self._draw_domain_tensor(bijector, data, event_dim)
     ys = bijector.forward(xs)
-    output_shape = prefer_static.shape(ys)
-    sample_and_batch_ndims = (prefer_static.rank_from_shape(output_shape) -
+    output_shape = ps.shape(ys)
+    sample_and_batch_ndims = (ps.rank_from_shape(output_shape) -
                               bijector.inverse_min_event_ndims)
 
     try:
@@ -732,6 +759,9 @@ class BijectorPropertiesTest(test_util.TestCase):
     seeds = samplers.split_seed(test_util.test_seed(), n=len(params))
     new_parameters = {}
     for i, (param_name, param) in enumerate(params.items()):
+      if param_name in non_trainable_params:
+        continue
+
       # Check that the shape_fn is consistent with event_ndims.
       try:
         param_shape = param.shape_fn(sample_shape=output_shape)
@@ -740,7 +770,7 @@ class BijectorPropertiesTest(test_util.TestCase):
                       'parameter {}.'.format(bijector_name, param_name))
       self.assertGreaterEqual(
           param.event_ndims,
-          prefer_static.rank_from_shape(param_shape) - sample_and_batch_ndims)
+          ps.rank_from_shape(param_shape) - sample_and_batch_ndims)
 
       if param.is_preferred:
         try:
@@ -806,7 +836,7 @@ class BijectorPropertiesTest(test_util.TestCase):
     event_ndims = data.draw(
         hps.integers(
             min_value=bijector.forward_min_event_ndims,
-            max_value=prefer_static.rank_from_shape(xs.shape) - 1))
+            max_value=ps.rank_from_shape(xs.shape) - 1))
     fldj_fn = functools.partial(bijector.forward_log_det_jacobian,
                                 event_ndims=event_ndims)
     vectorized_fldj = tf.vectorized_map(fldj_fn, xs,
@@ -827,7 +857,7 @@ class BijectorPropertiesTest(test_util.TestCase):
     event_ndims = data.draw(
         hps.integers(
             min_value=bijector.inverse_min_event_ndims,
-            max_value=prefer_static.rank_from_shape(ys.shape) - 1))
+            max_value=ps.rank_from_shape(ys.shape) - 1))
     ildj_fn = functools.partial(bijector.inverse_log_det_jacobian,
                                 event_ndims=event_ndims)
     vectorized_ildj = tf.vectorized_map(ildj_fn, ys,
@@ -866,16 +896,30 @@ class BijectorPropertiesTest(test_util.TestCase):
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testCompositeTensor(self, bijector_name, data):
-    # Test that making a composite tensor of this bijector doesn't throw any
-    # errors.
+
     bijector, event_dim = self._draw_bijector(
-        bijector_name, data, batch_shape=[],
+        bijector_name, data,
+        batch_shape=[],
+        validate_args=True,
         allowed_bijectors=(set(TF2_FRIENDLY_BIJECTORS) -
                            set(COMPOSITE_TENSOR_IS_BROKEN)))
-    composite_bij = experimental.as_composite(bijector)
-    flat = tf.nest.flatten(composite_bij, expand_composites=True)
-    unflat = tf.nest.pack_sequence_as(composite_bij, flat,
-                                      expand_composites=True)
+
+    if type(bijector) is invert_lib._Invert:  # pylint: disable=unidiomatic-typecheck
+      if isinstance(bijector.bijector, tf.__internal__.CompositeTensor):
+        raise TypeError('`_Invert` should wrap only non-`CompositeTensor` '
+                        'bijectors.')
+      self.skipTest('`_Invert` bijectors are not `CompositeTensor`s.')
+
+    if not tf.executing_eagerly():
+      bijector = tf.nest.map_structure(
+          lambda x: (tf.convert_to_tensor(x)  # pylint: disable=g-long-lambda
+                     if isinstance(x, DeferredTensor) else x),
+          bijector,
+          expand_composites=True)
+
+    self.assertIsInstance(bijector, tf.__internal__.CompositeTensor)
+    flat = tf.nest.flatten(bijector, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(bijector, flat, expand_composites=True)
 
     # Compare forward maps before and after compositing.
     n = 3
@@ -889,6 +933,26 @@ class BijectorPropertiesTest(test_util.TestCase):
     before_xs = bijector.inverse(ys)
     after_xs = unflat.inverse(ys)
     self.assertAllClose(*self.evaluate((before_xs, after_xs)))
+
+    # Input to tf.function
+    self.assertAllClose(
+        before_ys,
+        tf.function(lambda b: b.forward(xs))(bijector),
+        rtol=COMPOSITE_TENSOR_RTOL[bijector_name],
+        atol=COMPOSITE_TENSOR_ATOL[bijector_name])
+
+    # Forward mapping: Check differentiation through forward mapping with
+    # respect to the input and parameter variables.  Also check that any
+    # variables are not referenced overmuch.
+    xs = self._draw_domain_tensor(bijector, data, event_dim)
+    wrt_vars = [xs] + [v for v in bijector.trainable_variables
+                       if v.dtype.is_floating]
+    with tf.GradientTape() as tape:
+      tape.watch(wrt_vars)
+      # TODO(b/73073515): Fix graph mode gradients with bijector caching.
+      ys = bijector.forward(xs + 0)
+    grads = tape.gradient(ys, wrt_vars)
+    assert_no_none_grad(bijector, 'forward', wrt_vars, grads)
 
 
 def ensure_nonzero(x):

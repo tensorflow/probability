@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-class KumaraswamyCDF(bijector.Bijector):
+class KumaraswamyCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 - X**a)**b, X in [0, 1]`.
 
   This bijector maps inputs from `[0, 1]` to `[0, 1]`. The inverse of the

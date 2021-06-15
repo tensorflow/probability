@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-class Pad(bijector.Bijector):
+class Pad(bijector.AutoCompositeTensorBijector):
   """Pads a value to the `event_shape` of a `Tensor`.
 
   The semantics of `tfp.bijectors.Pad` generally follow that of `tf.pad()`
@@ -157,11 +157,9 @@ class Pad(bijector.Bijector):
   @classmethod
   def _parameter_properties(cls, dtype):
     return dict(
-        paddings=parameter_properties.ParameterProperties(
-            event_ndims=1,
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED),
-        constant_values=parameter_properties.ParameterProperties())
+        paddings=parameter_properties.ShapeParameterProperties(),
+        constant_values=parameter_properties.ParameterProperties(),
+        axis=parameter_properties.ShapeParameterProperties())
 
   @property
   def paddings(self):

@@ -134,7 +134,7 @@ class _NormalInverseGaussianTest(object):
     scale_v = self.dtype(np.pi)
     tailweight_v = self.dtype(1.87)
     skewness_v = self.dtype(-1.)
-    n = int(3e6)
+    n = int(3e5)
     normal_inverse_gaussian = tfd.NormalInverseGaussian(
         loc_v, scale_v, tailweight_v, skewness_v, validate_args=True)
     samples = normal_inverse_gaussian.sample(n, seed=test_util.test_seed())
@@ -152,7 +152,7 @@ class _NormalInverseGaussianTest(object):
     scale_v = self.dtype(np.pi)
     tailweight_v = self.dtype(1.87)
     skewness_v = self.dtype(-1.)
-    n = int(3e6)
+    n = int(3e5)
     normal_inverse_gaussian = tfd.NormalInverseGaussian(
         loc_v, scale_v, tailweight_v, skewness_v, validate_args=True)
     samples = normal_inverse_gaussian.sample(n, seed=test_util.test_seed())
@@ -170,7 +170,7 @@ class _NormalInverseGaussianTest(object):
     scale_v = np.linspace(1., 3., 3).astype(self.dtype).reshape((3, 1))
     tailweight_v = np.array([2., 0.5], dtype=self.dtype)
     skewness_v = 0.5 * tailweight_v
-    n = int(3e6)
+    n = int(3e5)
     normal_inverse_gaussian = tfd.NormalInverseGaussian(
         loc_v, scale_v, tailweight_v, skewness_v, validate_args=True)
     samples = normal_inverse_gaussian.sample(n, seed=test_util.test_seed())
@@ -188,7 +188,7 @@ class _NormalInverseGaussianTest(object):
     scale_v = np.linspace(1., 3., 3).astype(self.dtype).reshape((3, 1))
     tailweight_v = np.array([2., 0.5], dtype=self.dtype)
     skewness_v = 0.5 * tailweight_v
-    n = int(3e6)
+    n = int(3e5)
     normal_inverse_gaussian = tfd.NormalInverseGaussian(
         loc_v, scale_v, tailweight_v, skewness_v, validate_args=True)
     samples = normal_inverse_gaussian.sample(n, seed=test_util.test_seed())

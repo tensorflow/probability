@@ -37,7 +37,7 @@ def _is_odd_integer(x):
   return ps.equal(x, ps.round(x)) & ps.not_equal(2. * ps.floor(x / 2.), x)
 
 
-class Power(bijector.Bijector):
+class Power(bijector.AutoCompositeTensorBijector):
   """Compute `g(X) = X ** power`; where X is a non-negative real number.
 
   When `power` is an odd integer, this bijector has domain the whole real line,

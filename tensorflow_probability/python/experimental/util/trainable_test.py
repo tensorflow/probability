@@ -78,7 +78,7 @@ class TestTrainableDistributionsAndBijectors(test_util.TestCase):
     # Verify expected number of trainable variables.
     self.assertLen(bijector.trainable_variables,
                    len([k for k, p in cls.parameter_properties().items()
-                        if p.is_preferred]))
+                        if p.is_tensor and p.is_preferred]))
 
     # Verify gradients to all parameters.
     x = self.evaluate(samplers.normal(batch_and_event_shape,

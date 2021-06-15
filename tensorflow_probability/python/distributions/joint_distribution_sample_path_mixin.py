@@ -23,6 +23,7 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.distributions import joint_distribution as jd_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static
 
@@ -123,9 +124,7 @@ class JointDistributionSamplePathMixin(object):
             d.event_shape_tensor()))
       return self._model_unflatten(component_shapes)
 
-  def _map_and_reduce_measure_over_dists(self, attr, reduce_fn, value):
-    """Reduces all non-batch dimensions of the provided measure."""
-    xs = list(self._map_measure_over_dists(attr, value))
+  def _reduce_measure_over_dists(self, xs, reduce_fn):
     num_trailing_batch_dims_treated_as_event = [
         prefer_static.rank_from_shape(
             d.batch_shape_tensor()) - self._batch_ndims
@@ -145,14 +144,31 @@ class JointDistributionSamplePathMixin(object):
             parts[0], s, message='Component batch shapes are inconsistent.'))
     return assertions
 
-  def _log_prob(self, value):
+  def _reduce_log_probs_over_dists(self, lps):
     if self._experimental_use_kahan_sum:
-      xs = self._map_and_reduce_measure_over_dists(
-          'log_prob', tfp_math.reduce_kahan_sum, value)
-      return sum(xs).total
-    xs = self._map_and_reduce_measure_over_dists(
-        'log_prob', tf.reduce_sum, value)
-    return sum(xs)
+      return sum(jd_lib.maybe_check_wont_broadcast(
+          self._reduce_measure_over_dists(
+              lps, reduce_fn=tfp_math.reduce_kahan_sum),
+          self.validate_args)).total
+    else:
+      return sum(jd_lib.maybe_check_wont_broadcast(
+          self._reduce_measure_over_dists(lps, reduce_fn=tf.reduce_sum),
+          self.validate_args))
+
+  def _sample_and_log_prob(self, sample_shape, seed, value=None, **kwargs):
+    xs, lps = zip(
+        *self._call_execute_model(
+            sample_shape,
+            seed=seed,
+            value=self._resolve_value(value=value,
+                                      allow_partially_specified=True,
+                                      **kwargs),
+            sample_and_trace_fn=jd_lib.trace_values_and_log_probs))
+    return self._model_unflatten(xs), self._reduce_log_probs_over_dists(lps)
+
+  def _log_prob(self, value):
+    return self._reduce_log_probs_over_dists(
+        self._map_measure_over_dists('log_prob', value))
 
   def log_prob_parts(self, value, name='log_prob_parts'):
     """Log probability density/mass function, part-wise.
@@ -172,18 +188,14 @@ class JointDistributionSamplePathMixin(object):
       sum_fn = tf.reduce_sum
       if self._experimental_use_kahan_sum:
         sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
-      xs = self._map_and_reduce_measure_over_dists(
-          'log_prob', sum_fn, value)
-      return self._model_unflatten(xs)
+      return self._model_unflatten(
+          self._reduce_measure_over_dists(
+              self._map_measure_over_dists('log_prob', value),
+              sum_fn))
 
   def _unnormalized_log_prob(self, value):
-    if self._experimental_use_kahan_sum:
-      xs = self._map_and_reduce_measure_over_dists(
-          'unnormalized_log_prob', tfp_math.reduce_kahan_sum, value)
-      return sum(xs).total
-    xs = self._map_and_reduce_measure_over_dists(
-        'unnormalized_log_prob', tf.reduce_sum, value)
-    return sum(xs)
+    return self._reduce_log_probs_over_dists(
+        self._map_measure_over_dists('unnormalized_log_prob', value))
 
   def unnormalized_log_prob_parts(self, value, name=None):
     """Unnormalized log probability density/mass function, part-wise.
@@ -203,9 +215,10 @@ class JointDistributionSamplePathMixin(object):
       sum_fn = tf.reduce_sum
       if self._experimental_use_kahan_sum:
         sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
-      xs = self._map_and_reduce_measure_over_dists(
-          'unnormalized_log_prob', sum_fn, value)
-      return self._model_unflatten(xs)
+      return self._model_unflatten(
+          self._reduce_measure_over_dists(
+              self._map_measure_over_dists('unnormalized_log_prob', value),
+              sum_fn))
 
   def prob_parts(self, value, name='prob_parts'):
     """Log probability density/mass function.
@@ -221,9 +234,10 @@ class JointDistributionSamplePathMixin(object):
         each `distribution_fn` evaluated at each corresponding `value`.
     """
     with self._name_and_control_scope(name):
-      xs = self._map_and_reduce_measure_over_dists(
-          'prob', tf.reduce_prod, value)
-      return self._model_unflatten(xs)
+      return self._model_unflatten(
+          self._reduce_measure_over_dists(
+              self._map_measure_over_dists('prob', value),
+              tf.reduce_prod))
 
   def is_scalar_batch(self, name='is_scalar_batch'):
     """Indicates that `batch_shape == []`.

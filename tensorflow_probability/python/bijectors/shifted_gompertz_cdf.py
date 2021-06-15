@@ -35,7 +35,7 @@ __all__ = [
 ]
 
 
-class ShiftedGompertzCDF(bijector.Bijector):
+class ShiftedGompertzCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 - exp(-rate * X)) * exp(-c * exp(-rate * X))`.
 
   This bijector maps inputs from `[-inf, inf]` to `[0, inf]`. The inverse of the

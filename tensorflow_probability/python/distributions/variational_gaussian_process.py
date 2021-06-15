@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -34,7 +35,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.math import psd_kernels as tfpk
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util as kernel_util
 
 __all__ = [
@@ -42,7 +43,8 @@ __all__ = [
 ]
 
 
-class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
   """A PSDKernel which computes the variational kernel from [Titsias, 2009].
 
   The VariationalGaussianProcess can be cast as a special case of
@@ -128,12 +130,12 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
           inducing_index_points, dtype=dtype, name='inducing_index_points')
       self._variational_scale = tensor_util.convert_nonref_to_tensor(
           variational_scale, dtype=dtype, name='variational_scale')
-      jitter = tensor_util.convert_nonref_to_tensor(
+      self._jitter = tensor_util.convert_nonref_to_tensor(
           jitter, dtype=dtype, name='jitter')
 
       def _compute_chol_kzz(z):
         kzz = base_kernel.matrix(z, z)
-        result = tf.linalg.cholesky(_add_diagonal_shift(kzz, jitter))
+        result = tf.linalg.cholesky(_add_diagonal_shift(kzz, self._jitter))
         return result
 
       # Somewhat confusingly, but for the sake of brevity, we use `var` to refer
@@ -173,19 +175,6 @@ class _VariationalKernel(tfpk.PositiveSemidefiniteKernel):
   @property
   def variational_scale(self):
     return self._variational_scale
-
-  @classmethod
-  def _parameter_properties(cls, dtype, num_classes=None):
-    return dict(
-        base_kernel=parameter_properties.BatchedComponentProperties(),
-        inducing_index_points=parameter_properties.ParameterProperties(
-            event_ndims=lambda self: self.kernel.feature_ndims + 1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
-        variational_scale=parameter_properties.ParameterProperties(
-            event_ndims=2,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
-            default_constraining_bijector_fn=(
-                fill_scale_tril_bijector.FillScaleTriL)))
 
   def chol_kzz(self):
     return tf.convert_to_tensor(self._chol_kzz)
@@ -929,6 +918,35 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
           name=name)
       self._parameters = parameters
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        kernel=parameter_properties.BatchedComponentProperties(),
+        index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        inducing_index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        variational_inducing_observations_loc=(
+            parameter_properties.ParameterProperties(
+                event_ndims=1,
+                shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED)),
+        variational_inducing_observations_scale=(
+            parameter_properties.ParameterProperties(
+                event_ndims=2,
+                shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+                default_constraining_bijector_fn=(
+                    fill_scale_tril_bijector.FillScaleTriL))),
+        observation_noise_variance=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        predictive_noise_variance=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED))
+
   @property
   def inducing_index_points(self):
     return self._inducing_index_points
@@ -944,22 +962,6 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess):
   @property
   def predictive_noise_variance(self):
     return self._predictive_noise_variance
-
-  def _batch_shape(self, index_points=None):
-    index_points = self._get_index_points(index_points)
-    batch_shapes = [
-        self.kernel.batch_shape,
-        self.variational_inducing_observations_loc.shape[:-1],
-        index_points.shape[:-(self.kernel.feature_ndims + 1)]]
-    return functools.reduce(tf.broadcast_static_shape, batch_shapes)
-
-  def _batch_shape_tensor(self, index_points=None):
-    index_points = self._get_index_points(index_points)
-    batch_shape_tensors = [
-        self.kernel.batch_shape_tensor(),
-        tf.shape(self.variational_inducing_observations_loc)[:-1],
-        tf.shape(index_points)[:-(self.kernel.feature_ndims + 1)]]
-    return functools.reduce(tf.broadcast_dynamic_shape, batch_shape_tensors)
 
   def surrogate_posterior_expected_log_likelihood(
       self,

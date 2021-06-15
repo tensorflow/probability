@@ -47,7 +47,7 @@ from tensorflow_probability.python.random import random_ops
 __all__ = ['PowerSpherical']
 
 
-class PowerSpherical(distribution.Distribution):
+class PowerSpherical(distribution.AutoCompositeTensorDistribution):
   r"""The Power Spherical distribution over unit vectors on `S^{n-1}`.
 
   The Power Spherical distribution [1] is a distribution over vectors
@@ -190,18 +190,6 @@ class PowerSpherical(distribution.Distribution):
   def concentration(self):
     """Concentration parameter."""
     return self._concentration
-
-  def _batch_shape_tensor(self, mean_direction=None, concentration=None):
-    return ps.broadcast_shape(
-        ps.shape(self.mean_direction if mean_direction is None
-                 else mean_direction)[:-1],
-        ps.shape(self.concentration if concentration is None
-                 else concentration))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        tensorshape_util.with_rank_at_least(self.mean_direction.shape, 1)[:-1],
-        self.concentration.shape)
 
   def _event_shape_tensor(self, mean_direction=None):
     return ps.shape(self.mean_direction if mean_direction is None

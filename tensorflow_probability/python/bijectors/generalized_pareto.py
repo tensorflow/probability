@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-class GeneralizedPareto(bijector_lib.Bijector):
+class GeneralizedPareto(bijector_lib.AutoCompositeTensorBijector):
   """Bijector mapping R**n to non-negative reals.
 
   Forward computation maps R**n to the support of the `GeneralizedPareto`
@@ -47,7 +47,7 @@ class GeneralizedPareto(bijector_lib.Bijector):
   `x >= loc`                                             if `concentration >= 0`
   `x >= loc` and `x <= loc + scale / abs(concentration)` if `concentration < 0`
 
-  This bijector is used as the `_experimental_default_event_space_bijector` of
+  This bijector is used as the `experimental_default_event_space_bijector` of
   the `GeneralizedPareto` distribution.
 
   """

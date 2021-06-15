@@ -33,6 +33,7 @@ py_library(
         ":composite_tensor",
         ":config",
         ":control_flow",
+        ":data_structures",
         ":debugging",
         ":deprecation",
         ":dtype",
@@ -52,12 +53,16 @@ py_library(
         ":private",
         ":random_generators",
         ":raw_ops",
+        ":resource_variable_ops",
         ":sets_lib",
         ":sparse_lib",
         ":static_rewrites",
         ":tensor_array_ops",
+        ":tensor_spec",
         ":test_lib",
         ":tf_inspect",
+        ":type_spec",
+        ":variables",
     ],
 )
 
@@ -106,6 +111,12 @@ py_library(
         ":ops",
         # numpy dep,
     ],
+)
+
+py_library(
+    name = "data_structures",
+    srcs = ["data_structures.py"],
+    deps = [],
 )
 
 py_library(
@@ -332,6 +343,11 @@ py_library(
 )
 
 py_library(
+    name = "resource_variable_ops",
+    srcs = ["resource_variable_ops.py"],
+)
+
+py_library(
     name = "sets_lib",
     srcs = ["sets_lib.py"],
     deps = [
@@ -361,6 +377,7 @@ py_library(
     testonly = 1,
     srcs = ["tensor_shape_gen.py"],
     deps = [
+        # absl/logging dep,
         # six dep,
     ],
 )
@@ -379,6 +396,24 @@ py_library(
     name = "tf_inspect",
     srcs = ["tf_inspect.py"],
     deps = [],
+)
+
+py_library(
+    name = "tensor_spec",
+    srcs = ["tensor_spec.py"],
+)
+
+py_library(
+    name = "type_spec",
+    srcs = ["type_spec.py"],
+)
+
+py_library(
+    name = "variables",
+    srcs = ["variables.py"],
+    deps = [
+        ":ops",
+    ],
 )
 
 py_library(

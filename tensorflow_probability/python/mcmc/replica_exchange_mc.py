@@ -308,7 +308,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
   `untempered_log_prob_fn`. In this case, the `kth` replica samples from
   density `p_k(x)` with
   `log(p_k(x)) = beta_k * tempered_log_prob_fn(x) + untempered_log_prob_fn(x)`.
-  The this case, `beta` may be zero, and one often sets `beta[-1]` to zero.
+  In this case, `beta` may be zero, and one often sets `beta[-1]` to zero.
   This means the last replica samples using `untempered_log_prob_fn`.
   In the Bayesian setup, `untempered_log_prob_fn` will often be the log prior,
   and `tempered_log_prob_fn` the likelihood.
@@ -830,7 +830,7 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           raise ValueError(
               'Number of replicas implied by initial state ({}) must equal '
               'number of replicas implied by inverse_temperatures ({}), but '
-              'did not'.format(it_n_replica, state_n_replica))
+              'did not'.format(state_n_replica, it_n_replica))
 
       # We will now replicate each of a possible batch of initial stats, one for
       # each inverse_temperature. So if init_state=[x, y] of shapes [Sx, Sy]
@@ -902,6 +902,11 @@ class ReplicaExchangeMC(kernel_base.TransitionKernel):
           seed=samplers.zeros_seed(),
           potential_energy=tf.zeros_like(pre_swap_replica_target_log_prob),
       )
+
+  def experimental_with_shard_axes(self, shard_axes):
+    def new_make_kernel_fn(tlp):
+      return self.make_kernel_fn(tlp).experimental_with_shard_axes(shard_axes)
+    return self.copy(make_kernel_fn=new_make_kernel_fn)
 
 
 def _make_replica_target_log_prob_fn(

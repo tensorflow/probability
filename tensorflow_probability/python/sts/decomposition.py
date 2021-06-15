@@ -39,7 +39,7 @@ def _split_covariance_into_marginals(covariance, block_sizes):
 
 
 def _decompose_from_posterior_marginals(
-    model, posterior_means, posterior_covs, parameter_samples):
+    model, posterior_means, posterior_covs, parameter_samples, initial_step=0):
   """Utility method to decompose a joint posterior into components.
 
   Args:
@@ -59,6 +59,8 @@ def _decompose_from_posterior_marginals(
       param.prior.event_shape]) for param in model.parameters]`. This may
       optionally also be a map (Python `dict`) of parameter names to
       `Tensor` values.
+    initial_step: optional `int` specifying the initial timestep of the
+      decomposition.
 
   Returns:
     component_dists: A `collections.OrderedDict` instance mapping
@@ -89,7 +91,7 @@ def _decompose_from_posterior_marginals(
         tf.shape(posterior_means))[-2]
     component_ssms = model.make_component_state_space_models(
         num_timesteps=num_timesteps,
-        param_vals=parameter_samples)
+        param_vals=parameter_samples, initial_step=initial_step)
     component_predictive_dists = collections.OrderedDict()
     for (component, component_ssm,
          component_mean, component_cov) in zip(model.components, component_ssms,
@@ -322,6 +324,6 @@ def decompose_forecast_by_component(model, forecast_dist, parameter_samples):
         forecast_latent_mean, source_idx=-3, dest_idx=0)
     forecast_latent_covs = dist_util.move_dimension(
         forecast_latent_covs, source_idx=-4, dest_idx=0)
-
     return _decompose_from_posterior_marginals(
-        model, forecast_latent_mean, forecast_latent_covs, parameter_samples)
+        model, forecast_latent_mean, forecast_latent_covs, parameter_samples,
+        initial_step=forecast_lgssm.initial_step)

@@ -98,16 +98,17 @@ class Masked(distribution_lib.Distribution):
 
   Sometimes we may want a way of masking out a subset of distributions. Perhaps
   we have labels for only a subset of batch members and want to evaluate a
-  log_prob. Or we may want to encode a sparse random variables as a dense
+  log_prob. Or we may want to encode a sparse random variable as a dense
   random variable with a mask applied. In single-program/multiple-data regimes,
   it can be necessary to pad Distributions and the samples thereof to a given
   size in order to achieve the "single-program" desideratum.
 
   When computing a probability density in this regime, we would like to mask out
-  the contributions of invalid batch members. We may want to ensure that the
-  values being sampled are valid parameters for descendant distributions in a
-  hierarchical model, even if they are ultimately masked out. This distribution
-  answers those requirements. Specifically, for invalid batch elements:
+  the contributions of invalid batch members. We may also want to ensure that
+  the values being sampled are valid parameters for descendant distributions in
+  a hierarchical model, even if they are ultimately masked out. This
+  distribution answers those requirements. Specifically, for invalid batch
+  elements:
   - `log_prob(x) == 0.` for all `x`, with no gradients back to `x`, nor any
     gradients to the parameters of `distribution`.
   - `sample() == tf.stop_gradient(safe_value_fn(distribution))`, with no
@@ -129,6 +130,17 @@ class Masked(distribution_lib.Distribution):
     because it uses too large an `N`.
   - Not OK: `tf.linalg.cholesky(masked_dist.covariance())` will fail for invalid
     batch elements.
+
+  The default `safe_value_fn` is to draw a fixed-seeded sample from the
+  underlying `distribution`.  Since this may be expensive, it is suggested to
+  specify a computationally cheaper method. Some options might include:
+  - `tfd.Distribution.mode`
+  - `tfd.Distribution.mean`
+  - `lambda d: d.quantile(.5)` (median)
+  - `lambda _: 0.` (if zero is always in the support of d)
+  - `lambda d: d.experimental_default_event_space_bijector()(0.)`
+  Besides the output of `sample`, results from `safe_value_fn` may also appear
+  in (invalid batch members of) `masked.default_event_space_bijector().forward`.
 
   #### Examples
 
@@ -191,15 +203,7 @@ class Masked(distribution_lib.Distribution):
         of samples from a `Masked` distribution to assume a "safe" even if
         invalid value. (Be careful to ensure that such downstream usages are
         themselves masked!) Note that the result of this function will be
-        wrapped in a `tf.stop_gradient` call. Defaults to a function which draws
-        a deterministic zero-seeded sample from the underlying `distribution`.
-        Since this may be expensive, it is suggested to specify a
-        computationally cheaper method. Some options might include:
-        - `tfd.Distribution.mode`
-        - `tfd.Distribution.mean`
-        - `lambda d: d.quantile(.5)` (median)
-        - `lambda _: 0.`
-        - `lambda d: d.experimental_default_event_space_bijector()(0.)`
+        wrapped in a `tf.stop_gradient` call.
       validate_args: Boolean indicating whether argument assertions should be
         run. May impose performance penalties.
       allow_nan_stats: Boolean indicating whether statistical functions may
@@ -247,14 +251,6 @@ class Masked(distribution_lib.Distribution):
   @property
   def experimental_is_sharded(self):
     return self.distribution.experimental_is_sharded
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.distribution.batch_shape, self.validity_mask.shape)
-
-  def _batch_shape_tensor(self):
-    return ps.broadcast_shape(
-        self.distribution.batch_shape_tensor(), ps.shape(self.validity_mask))
 
   def _event_shape(self):
     return self.distribution.event_shape
@@ -309,8 +305,6 @@ class Masked(distribution_lib.Distribution):
     if underlying_bijector is None:
       return None
     return _MaskedBijector(self, underlying_bijector)
-
-  _composite_tensor_nonshape_params = ('validity_mask', 'distribution')
 
 
 @kullback_leibler.RegisterKL(Masked, Masked)
@@ -404,13 +398,13 @@ class _MaskedBijector(bijector_lib.Bijector):
         self._bijector.inverse_event_shape(masked.event_shape))
     pullback_event_mask = _add_event_dims_to_mask(
         validity_mask, event_ndims=pullback_event_ndims)
-    safe_val = masked.safe_sample_fn(masked.distribution)
-    safe_val_pullback = tf.stop_gradient(bij.inverse(safe_val))
-    return tf.where(pullback_event_mask, x, safe_val_pullback)
+    # We presume that 0 in unconstrained space is safe.
+    return tf.where(pullback_event_mask, x, 0.)
 
   def _forward(self, x):
-    safe_x = self._make_safe_x(x, self._masked.validity_mask)
-    return self._bijector.forward(safe_x)
+    mask = self._masked.validity_mask
+    safe_x = self._make_safe_x(x, mask)
+    return self._make_safe_y(self._bijector.forward(safe_x), mask)
 
   def _forward_log_det_jacobian(self, x):
     validity_mask = tf.convert_to_tensor(self._masked.validity_mask)

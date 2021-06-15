@@ -296,6 +296,22 @@ class TraceScanTest(test_util.TestCase):
     self.assertAllClose(7 + 6 + 5 + 4 + 3 + 2 + 1, final_state)
     self.assertAllClose([3, 5, 14], trace)
 
+  @test_util.jax_disable_test_missing_functionality('b/157611426')
+  @parameterized.named_parameters(
+      ('static_length', True),
+      ('dynamic_length', False))
+  def testConditionFn(self, static_length):
+    final_state, trace = self.evaluate(
+        util.trace_scan(
+            loop_fn=lambda state, element: state + element,
+            initial_state=0,
+            elems=[1, 2, 3, 4, 5, 6, 7],
+            trace_fn=lambda state: state / 2,
+            condition_fn=lambda step, state, num_traced, trace: state < 9,
+            static_trace_allocation_size=4 if static_length else None))
+    self.assertAllClose(10, final_state)
+    self.assertAllClose([.5, 1.5, 3, 5], trace)
+
   @test_util.jax_disable_test_missing_functionality('b/171298381')
   @test_util.numpy_disable_test_missing_functionality('No expanding composites')
   def testComposite(self):

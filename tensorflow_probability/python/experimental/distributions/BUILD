@@ -55,6 +55,7 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
     ],
 )
 
@@ -177,6 +178,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",

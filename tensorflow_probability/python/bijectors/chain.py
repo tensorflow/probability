@@ -23,17 +23,16 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import ldj_ratio
-from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Chain',
 ]
 
 
-class Chain(composition.Composition):
+class _Chain(composition.Composition):
   """Bijector which applies a sequence of bijectors.
 
   Example Use:
@@ -83,7 +82,7 @@ class Chain(composition.Composition):
   def __init__(self,
                bijectors=None,
                validate_args=False,
-               validate_event_size=True,
+               validate_event_size=False,
                parameters=None,
                name=None):
     """Instantiates `Chain` bijector.
@@ -118,25 +117,28 @@ class Chain(composition.Composition):
               '_of_'.join(['chain'] + [b.name for b in bijectors]))
       name = name.replace('/', '')
 
+    # If there are no bijectors, treat this like a single-part Identity.
+    forward_min_event_ndims = 0
+    inverse_min_event_ndims = 0
     if bijectors:
-      f_min_event_ndims, i_min_event_ndims = _infer_min_event_ndims(bijectors)
-    else:
-      # If there are no bijectors, treat this like a single-part Identity.
-      f_min_event_ndims = i_min_event_ndims = None
+      forward_min_event_ndims = None  # Inferred by base class.
+      inverse_min_event_ndims = None  # Inferred by base class.
 
     with tf.name_scope(name) as name:
-      super(Chain, self).__init__(
+      super(_Chain, self).__init__(
           bijectors=bijectors or (),
-          forward_min_event_ndims=f_min_event_ndims,
-          inverse_min_event_ndims=i_min_event_ndims,
           validate_args=validate_args,
           validate_event_size=validate_event_size,
+          forward_min_event_ndims=forward_min_event_ndims,
+          inverse_min_event_ndims=inverse_min_event_ndims,
           parameters=parameters,
           name=name)
 
   @classmethod
   def _parameter_properties(cls, dtype):
-    return dict()
+    return dict(
+        bijectors=parameter_properties.BatchedComponentProperties(
+            event_ndims=lambda self: [None for _ in self.bijectors]))
 
   def _is_increasing(self, **kwargs):
     # desc(desc)=>asc, asc(asc)=>asc, other cases=>desc.
@@ -158,108 +160,61 @@ class Chain(composition.Composition):
       y = step_fn(bij, y, **kwargs.get(bij.name, {}))
     return y  # Now `x`
 
-  @property
-  def _composite_tensor_nonshape_params(self):
-    """A tuple describing which parameters are non-shape-related tensors.
 
-    Flattening in JAX involves many of the same considerations with regards to
-    identifying tensor arguments for the purposes of CompositeTensor, except
-    that shape-related items will be considered metadata.  This property
-    identifies the keys of parameters that are expected to be tensors, except
-    those that are shape-related.
-    """
-    return ('bijectors',)
+class Chain(_Chain, bijector_lib.AutoCompositeTensorBijector):
 
+  def __new__(cls, *args, **kwargs):
+    """Returns a `_Chain` if any of `bijectors` is not a `CompositeTensor."""
+    if cls is Chain:
+      if args:
+        bijectors = args[0]
+      else:
+        bijectors = kwargs.get('bijectors')
 
-def _infer_min_event_ndims(bijectors):
-  """Computes `min_event_ndims` for a sequence of bijectors."""
-  # Find the index of the first bijector with statically-known min_event_ndims.
-  try:
-    idx = next(i for i, b in enumerate(bijectors)
-               if b.has_static_min_event_ndims)
-  except StopIteration:
-    # If none of the nested bijectors have static min_event_ndims, give up
-    # and return tail-structures filled with `None`.
-    return (
-        nest_util.broadcast_structure(
-            bijectors[-1].forward_min_event_ndims, None),
-        nest_util.broadcast_structure(
-            bijectors[0].inverse_min_event_ndims, None))
-
-  # Accumulator tracking the maximum value of "min_event_ndims - ndims".
-  rolling_offset = 0
-
-  def update_event_ndims(input_event_ndims,
-                         input_min_event_ndims,
-                         output_min_event_ndims):
-    """Returns output_event_ndims and updates rolling_offset as needed."""
-    nonlocal rolling_offset
-    ldj_reduce_ndims = bijector_lib.ldj_reduction_ndims(
-        input_event_ndims, input_min_event_ndims)
-    # Update rolling_offset when batch_ndims are negative.
-    rolling_offset = ps.maximum(rolling_offset, -ldj_reduce_ndims)
-    return nest.map_structure(lambda nd: ldj_reduce_ndims + nd,
-                              output_min_event_ndims)
-
-  def sanitize_event_ndims(event_ndims):
-    """Updates `rolling_offset` when event_ndims are negative."""
-    nonlocal rolling_offset
-    max_missing_ndims = -ps.reduce_min(nest.flatten(event_ndims))
-    rolling_offset = ps.maximum(rolling_offset, max_missing_ndims)
-    return event_ndims
-
-  # Wrappers for Bijector.forward_event_ndims and Bijector.inverse_event_ndims
-  # that recursively walk into Composition bijectors when static min_event_ndims
-  # is not available.
-
-  def update_f_event_ndims(bij, event_ndims):
-    event_ndims = nest_util.coerce_structure(
-        bij.inverse_min_event_ndims, event_ndims)
-    if bij.has_static_min_event_ndims:
-      return update_event_ndims(
-          input_event_ndims=event_ndims,
-          input_min_event_ndims=bij.inverse_min_event_ndims,
-          output_min_event_ndims=bij.forward_min_event_ndims)
-    elif isinstance(bij, composition.Composition):
-      return bij._call_walk_inverse(update_f_event_ndims, event_ndims)  # pylint: disable=protected-access
-    else:
-      return sanitize_event_ndims(bij.inverse_event_ndims(event_ndims))
-
-  def update_i_event_ndims(bij, event_ndims):
-    event_ndims = nest_util.coerce_structure(
-        bij.forward_min_event_ndims, event_ndims)
-    if bij.has_static_min_event_ndims:
-      return update_event_ndims(
-          input_event_ndims=event_ndims,
-          input_min_event_ndims=bij.forward_min_event_ndims,
-          output_min_event_ndims=bij.inverse_min_event_ndims)
-    elif isinstance(bij, composition.Composition):
-      return bij._call_walk_forward(update_i_event_ndims, event_ndims)  # pylint: disable=protected-access
-    else:
-      return sanitize_event_ndims(bij.forward_event_ndims(event_ndims))
-
-  # Initialize event_ndims to the first statically-known min_event_ndims in
-  # the Chain of bijectors.
-  f_event_ndims = i_event_ndims = bijectors[idx].inverse_min_event_ndims
-  for b in bijectors[idx:]:
-    f_event_ndims = update_f_event_ndims(b, f_event_ndims)
-  for b in reversed(bijectors[:idx]):
-    i_event_ndims = update_i_event_ndims(b, i_event_ndims)
-
-  # Shift both event_ndims to satisfy min_event_ndims for nested components.
-  return (nest.map_structure(lambda nd: rolling_offset + nd, f_event_ndims),
-          nest.map_structure(lambda nd: rolling_offset + nd, i_event_ndims))
+      if bijectors is not None:
+        if not all(isinstance(b, tf.__internal__.CompositeTensor)
+                   for b in bijectors):
+          return _Chain(*args, **kwargs)
+    return super(Chain, cls).__new__(cls)
 
 
-@ldj_ratio.RegisterILDJRatio(Chain)
+Chain.__doc__ = _Chain.__doc__ + '\n' + (
+    'If every element of the `bijectors` list is a `CompositeTensor`, the '
+    'resulting `Chain` bijector is a `CompositeTensor` as well. If any element '
+    'of `bijectors` is not a `CompositeTensor`, then a non-`CompositeTensor` '
+    '`_Chain` instance is created instead. Bijector subclasses that inherit '
+    'from `Chain` will also inherit from `CompositeTensor`.')
+
+
+@ldj_ratio.RegisterFLDJRatio(_Chain)
+def _fldj_ratio_chain(p, x, q, y):
+  """Sum-of-diffs FLDJRatio for Chains."""
+  if len(p.bijectors) != len(q.bijectors):
+    raise ValueError('Mismatched lengths of bijectors: `p` has '
+                     f'{len(p.bijectors)} but `q` has {len(q.bijectors)}.')
+  ratios = []
+  max_shp = []
+  for p, q in zip(reversed(p.bijectors), reversed(q.bijectors)):
+    ratios.append(ldj_ratio.forward_log_det_jacobian_ratio(
+        p, x, q, y, p.forward_min_event_ndims))
+    max_shp = ps.broadcast_shape(max_shp, ps.shape(ratios[-1]))
+    x, y = p.forward(x), q.forward(y)
+  ratios = [tf.broadcast_to(r, max_shp) for r in ratios]
+  return tf.add_n(ratios)
+
+
+@ldj_ratio.RegisterILDJRatio(_Chain)
 def _ildj_ratio_chain(p, x, q, y):
   """Sum-of-diffs ILDJRatio for Chains."""
   if len(p.bijectors) != len(q.bijectors):
     raise ValueError('Mismatched lengths of bijectors: `p` has '
                      f'{len(p.bijectors)} but `q` has {len(q.bijectors)}.')
   ratios = []
+  max_shp = []
   for p, q in zip(p.bijectors, q.bijectors):
     ratios.append(ldj_ratio.inverse_log_det_jacobian_ratio(
         p, x, q, y, p.inverse_min_event_ndims))
+    max_shp = ps.broadcast_shape(max_shp, ps.shape(ratios[-1]))
     x, y = p.inverse(x), q.inverse(y)
+  ratios = [tf.broadcast_to(r, max_shp) for r in ratios]
   return tf.add_n(ratios)

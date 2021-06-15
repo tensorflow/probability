@@ -58,7 +58,8 @@ match({'a': 1, 'b': 2}, {'a': 1, 'b': 2})  # ==> {}
 match(1, 2) # ==> MatchError!
 ```
 
-A `tuple` pattern matches a `tuple` expression if each of its elements matches.
+A `Sequence` pattern matches a `Sequence` expression if each of its elements
+matches.
 Similarly, a `dict` pattern matches a `dict` expression if their keys are
 the same and the corresponding values match.
 
@@ -127,10 +128,11 @@ match(Choice((1, 2), (2, 1), name='x'), (2, 1)) # ==> {'x': (2, 1)}
 
 ## `Star`, `Plus`, and `Segment`
 
-The `Star`, `Plus` and `Segment` patterns are used when matching tuples.
-Specifically, they can match variable-length slices of a tuple. `Star` takes
-in a pattern and matches a tuple slice if all of its elements match the pattern.
-`Star` must be used inside of a tuple.
+The `Star`, `Plus` and `Segment` patterns are used when matching sequences.
+Specifically, they can match variable-length slices of a sequence. `Star` takes
+in a pattern and matches a sequence slice if all of its elements match the
+pattern.
+`Star` must be used inside of a sequence.
 
 ```python
 match((Star(1),), ()) # ==> {}
@@ -161,7 +163,8 @@ match((Star(Dot, name='x'), 4), (1, 2, 3, 4))  # ==> {'x': (1, 2, 3)}
 If the pattern inside of a `Star` has any names in it (from `Var`s or
 nested `Star`s), the same value needs to match for the entire slice. If name
 `'x'` needs to be bound to `1` to make an element of a slice match, it needs to
-be `1` for every subsequent element of the tuple. For example, in the following
+be `1` for every subsequent element of the sequence. For example, in the
+following
 snippets, `x` cannot be bound to multiple values to make the match succeed.
 
 ```python
@@ -176,7 +179,7 @@ match each element of a slice to its pattern. For `Var`s inside of a `Star`,
 this means that the value bound to its name must match across the slice.
 When we accumulate for a name inside of a `Star`, rather than enforcing that the
 match is the same across the slice, we collect the individual matches into a
-tuple and bind the name to the tuple.
+sequence and bind the name to the sequence.
 ```python
 match((Star(Var('x'), accumulate=['x']),), (1, 2, 3)) # ==> {'x': (1, 2, 3)}
 match((Star((Var('x'), Var('y')), accumulate=['y']),), ((1, 2), (1, 3)))
@@ -196,7 +199,7 @@ match(distributive, Add(Mul('a', 'b'), Mul('c', 'd'))) # MatchError!
 ```
 
 A `Segment` is shorthand for a named `Star` that has the `Dot` pattern,
-meaning it matches slices of a tuple regardless of the individual values.
+meaning it matches slices of a sequence regardless of the individual values.
 Specifically, `Segment(name)` matches the same expressions as
 `Star(Dot, name=name)`.
 ```python
@@ -220,7 +223,7 @@ By default, `matcher` returns a `match` that only succeeds if the pattern and
 expression are equal according to Python equality. To extend it for a custom
 type `Foo` that we'd like to match against, we can call
 `matcher.register(Foo)(custom_matcher)` to define a custom matcher for `Foo`
-objects. This is how we define matchers for tuples and dictionaries.
+objects. This is how we define matchers for sequences and dictionaries.
 
 2. Alternatively, we provide the `Pattern` class which is the parent class
 of the various combinators (`Choice`, `Not`, `Star`, etc.). By subclassing
@@ -229,7 +232,7 @@ the class is automatically registered with `matcher`.
 """
 import functools
 
-from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Tuple, TypeVar
+from typing import Any, Callable, Dict, Iterator, Optional, Sequence, TypeVar
 
 import dataclasses
 
@@ -254,8 +257,8 @@ Expr = Any
 Bindings = Dict[str, Expr]
 Success = Iterator[T]
 Continuation = Callable[[Bindings], Success]
-TupleSegment = Tuple[Any]
-StarContinuation = Callable[[Bindings, TupleSegment], Success]
+SequenceSegment = Sequence[Any]
+StarContinuation = Callable[[Bindings, SequenceSegment], Success]
 Matcher = Callable[[Expr, Bindings, Continuation], Success]
 
 id_success = lambda x: (yield x)
@@ -297,7 +300,7 @@ class MatchError(Exception):
 def is_match(pattern: Any, expr: Expr) -> bool:
   """Returns whether or not an expression matches a pattern."""
   if isinstance(pattern, Star):
-    raise ValueError('`Star` pattern must be inside of a tuple.')
+    raise ValueError('`Star` pattern must be inside of a sequence.')
   for _ in matcher(pattern)(expr, {}, id_success):
     return True
   return False
@@ -306,7 +309,7 @@ def is_match(pattern: Any, expr: Expr) -> bool:
 def match(pattern: Any, expr: Expr) -> Bindings:
   """Returns a single match for pattern and expression or errors otherwise."""
   if isinstance(pattern, Star):
-    raise ValueError('`Star` pattern must be inside of a tuple.')
+    raise ValueError('`Star` pattern must be inside of a sequence.')
   for bindings in matcher(pattern)(expr, {}, id_success):
     return bindings
   raise MatchError(f'No match found. Pattern: {pattern}, Expression: {expr}')
@@ -315,7 +318,7 @@ def match(pattern: Any, expr: Expr) -> Bindings:
 def match_all(pattern: Any, expr: Expr) -> Iterator[Bindings]:
   """Returns an iterator over all bindings matching a pattern to an expression."""
   if isinstance(pattern, Star):
-    raise ValueError('`Star` pattern must be inside of a tuple.')
+    raise ValueError('`Star` pattern must be inside of a sequence.')
   yield from matcher(pattern)(expr, {}, id_success)
 
 
@@ -422,14 +425,14 @@ class Choice(Pattern):
 
 @dataclasses.dataclass(frozen=True)
 class Star(Pattern):
-  """A pattern for repeated sub-patterns inside of a tuple.
+  """A pattern for repeated sub-patterns inside of a sequence.
 
   Attributes:
-    pattern: an object that will be matched against elements of a tuple.
+    pattern: an object that will be matched against elements of a sequence.
     name: an optional `str` name to bind the result of the star match.
     accumulate: a sequence of `str` names corresponding to `Var`s in `pattern`
-      that will be accumulated into a tuple instead of having to match across
-      the elements of the tuple.
+      that will be accumulated into a sequence instead of having to match across
+      the elements of the sequence.
     greedy: a `bool` that sets whether or not the `Star` greedily matches a
       sequence. A greedy `Star` will try to match slices starting from the
       largest possible and then trying smaller ones. A non-greedy `Star` will
@@ -458,7 +461,7 @@ class Star(Pattern):
 
   def accumulate_match(self, expr: Expr, bindings: Bindings,
                        succeed: Continuation) -> Success:
-    """Matches each element of a tuple to this `Star`'s pattern.
+    """Matches each element of a sequence to this `Star`'s pattern.
 
     Iteratively matches each element of `expr` with `self.pattern`. For any
     created as the result of each match, they are accumulated if the names
@@ -498,7 +501,8 @@ class Star(Pattern):
     """Matches the `Star` pattern against an expression.
 
     Constructs all splits of the expression and performs an `accumulate_match`
-    on each of the left halves. The right half is matched using tuple matching.
+    on each of the left halves. The right half is matched using sequence
+    matching.
 
     Args:
       expr: An expression to match.
@@ -511,7 +515,7 @@ class Star(Pattern):
       The results of the `succeed` continuation function, augmented with
       bindings corresponding to matches made over the course of the Star match.
     """
-    if not isinstance(expr, tuple):
+    if not isinstance(expr, Sequence):
       return
     # If name appears in bindings, we have already matched and need to verify
     # that bound value matches the current expression
@@ -545,14 +549,14 @@ class Star(Pattern):
 
 
 class Plus(Star):
-  """A pattern for repeated sub-patterns inside of a tuple.
+  """A pattern for repeated sub-patterns inside of a sequence.
 
   Attributes:
-    pattern: an object that will be matched against elements of a tuple.
+    pattern: an object that will be matched against elements of a sequence.
     name: an optional `str` name to bind the result of the star match.
     accumulate: a sequence of `str` names corresponding to `Var`s in `pattern`
-      that will be accumulated into a tuple instead of having to match across
-      the elements of the tuple.
+      that will be accumulated into a sequence instead of having to match across
+      the elements of the sequence.
     greedy: a `bool` that sets whether or not the `Plus` greedily matches a
       sequence. A greedy `Plus` will try to match slices starting from the
       largest possible and then trying smaller ones. A non-greedy `Plus` will
@@ -570,14 +574,14 @@ class Plus(Star):
 
 
 class Segment(Star):
-  """Matches any slice of a tuple.
+  """Matches any slice of a sequence.
 
   Attributes:
     name: a `str` name to bind the result of the segment match. If `name` is
       `None`, a match produces no binding.
     accumulate: a sequence of `str` names corresponding to `Var`s in `pattern`
-      that will be accumulated into a tuple instead of having to match across
-      the elements of the tuple.
+      that will be accumulated into a sequence instead of having to match across
+      the elements of the sequence.
     greedy: a `bool` that sets whether or not the `Segment` greedily matches a
       sequence. A greedy `Segment` will try to match slices starting from the
       largest possible and then trying smaller ones. A non-greedy `Segment` will
@@ -597,21 +601,21 @@ class Segment(Star):
         Dot, name=name, accumulate=accumulate, plus=plus, greedy=greedy)
 
 
-@matcher.register(tuple)
-def tuple_matcher(pattern: Tuple[Any]):
-  """Returns a matcher for a given tuple pattern."""
+@matcher.register(Sequence)
+def sequence_matcher(pattern: Sequence[Any]):
+  """Returns a matcher for a given sequence pattern."""
 
-  def tuple_match(expr: Expr, bindings: Bindings,
-                  succeed: Continuation) -> Success:
-    """Matches a tuple expression against a tuple pattern.
+  def sequence_match(expr: Expr, bindings: Bindings,
+                     succeed: Continuation) -> Success:
+    """Matches a sequence expression against a sequence pattern.
 
-    Matches each element of the tuple pattern against each element of the
-    tuple expression. When there is a `Star` in the tuple pattern, the tuple
-    matcher calls the `Star` pattern's matcher, which calls a special success
-    function that takes in the remaining part of the tuple to match.
+    Matches each element of the sequence pattern against each element of the
+    sequence expression. When there is a `Star` in the sequence pattern, the
+    sequence  matcher calls the `Star` pattern's matcher, which calls a special
+    success function that takes in the remaining part of the sequence to match.
 
     Args:
-      expr: An expression to match.
+      expr: A sequence to match.
       bindings: A dictionary mapping string names to values representing the
         results of previous matches.
       succeed: A function that when passed in `bindings` returns a generator
@@ -619,17 +623,18 @@ def tuple_matcher(pattern: Tuple[Any]):
 
     Yields:
       The results of the `succeed` continuation function, augmented with
-      bindings corresponding to matches made over the course of the tuple match.
+      bindings corresponding to matches made over the course of the sequence
+      match.
     """
-    if not isinstance(expr, tuple):
+    if not isinstance(expr, Sequence):
       return
     # Special case Star here
     if pattern and isinstance(pattern[0], Star):
       star_pattern, rest_pattern = pattern[0], pattern[1:]
 
       # A star continuation takes in an additional `remaining` argument that
-      # contains the remaining slice of the tuple to be matched.
-      def star_succeed(bindings: Bindings, remaining: Tuple[Any]) -> Success:
+      # contains the remaining slice of the sequence to be matched.
+      def star_succeed(bindings: Bindings, remaining: Sequence[Any]) -> Success:
         post_star_match = matcher(rest_pattern)
         yield from post_star_match(remaining, bindings, succeed)
 
@@ -654,7 +659,34 @@ def tuple_matcher(pattern: Tuple[Any]):
     first_match = matcher(pattern[0])
     yield from first_match(expr[0], bindings, rest_succeed)
 
-  return tuple_match
+  return sequence_match
+
+
+@matcher.register(str)
+def str_matcher(pattern: Any):
+  """Overrides default sequence matcher for strings to avoid infinite recursion.
+
+  Strings are a tricky case of sequence because indexing into a string returns
+  a length-1 string. This, by default, triggers an infinite recursion in the
+  sequence matcher. To avoid this, we special-case 1-length strings to do a
+  manual match and use the sequence matcher for other strings.
+
+  Args:
+    pattern: A pattern used to match a string.
+  Returns:
+    A pattern matcher for string expressions.
+  """
+  def str_match(expr: Expr,
+                bindings: Bindings,
+                succeed: Continuation) -> Success:
+    if not isinstance(expr, str):
+      return
+    if len(expr) == 1 and isinstance(pattern, str):
+      if pattern == expr:
+        yield from succeed(bindings)
+      return
+    yield from sequence_matcher(pattern)(expr, bindings, succeed)
+  return str_match
 
 
 @matcher.register(dict)

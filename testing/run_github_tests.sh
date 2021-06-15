@@ -51,7 +51,7 @@ install_bazel() {
 }
 
 install_python_packages() {
-  ${DIR}/install_test_dependencies.sh
+  ${DIR}/install_test_dependencies.sh --user
 }
 
 # Only install bazel if not already present (useful for locally testing this
@@ -59,13 +59,16 @@ install_python_packages() {
 which bazel || install_bazel
 install_python_packages
 
+# You can alter this test_target to some smaller subset of TFP tests in case
+# you need to reproduce something on the CI workers.
+test_target="//tensorflow_probability/..."
 test_tags_to_skip="(gpu|requires-gpu-nvidia|notap|no-oss-ci|tfp_jax|tf2-broken|tf2-kokoro-broken)"
 
 # Given a test size (small, medium, large), a number of shards and a shard ID,
 # query and print a list of tests of the given size to run in the given shard.
 query_and_shard_tests_by_size() {
   size=$1
-  bazel_query="attr(size, ${size}, tests(//tensorflow_probability/...)) \
+  bazel_query="attr(size, ${size}, tests(${test_target})) \
                except \
                attr(tags, \"${test_tags_to_skip}\", \
                     tests(//tensorflow_probability/...))"
@@ -80,6 +83,9 @@ sharded_tests="$(query_and_shard_tests_by_size small)"
 sharded_tests="${sharded_tests} $(query_and_shard_tests_by_size medium)"
 sharded_tests="${sharded_tests} $(query_and_shard_tests_by_size large)"
 
-# Run tests using run_tfp_test.sh script.
-echo "${sharded_tests}" \
-  | xargs $DIR/run_tfp_test.sh
+# Run tests using run_tfp_test.sh script. Don't bother if there are no tests
+# (bazel will error otherwise).
+if echo "${sharded_tests}" | grep ".*\w.*"; then
+  echo "${sharded_tests}" \
+    | xargs $DIR/run_tfp_test.sh
+fi

@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-class Horseshoe(distribution.Distribution):
+class Horseshoe(distribution.AutoCompositeTensorDistribution):
   r"""Horseshoe distribution.
 
   The so-called 'horseshoe' distribution is a Cauchy-Normal scale mixture,
@@ -172,12 +172,6 @@ class Horseshoe(distribution.Distribution):
   def scale(self):
     """Distribution parameter for scale."""
     return self._scale
-
-  def _batch_shape_tensor(self):
-    return ps.shape(self.scale)
-
-  def _batch_shape(self):
-    return self.scale.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

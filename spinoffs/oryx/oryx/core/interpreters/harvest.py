@@ -487,7 +487,8 @@ nest_p = jax_core.CallPrimitive('nest')
 
 
 def _nest_impl(f, *args, **_):
-  return f.call_wrapped(*args)
+  with jax_core.new_sublevel():
+    return f.call_wrapped(*args)
 
 
 nest_p.def_impl(_nest_impl)

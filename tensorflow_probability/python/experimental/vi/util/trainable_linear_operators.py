@@ -305,7 +305,7 @@ def build_linear_operator_zeros(
         is_self_adjoint=is_square, dtype=dtype)
 
 
-class _DefaultScaleDiagonal(bijector_lib.Bijector):
+class _DefaultScaleDiagonal(bijector_lib.AutoCompositeTensorBijector):
   """Default bijector for constraining the diagonal of scale matrices."""
 
   def __init__(self):

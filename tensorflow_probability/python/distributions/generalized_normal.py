@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 import numpy as np
 
@@ -44,7 +42,7 @@ __all__ = [
 ]
 
 
-class GeneralizedNormal(distribution.Distribution):
+class GeneralizedNormal(distribution.AutoCompositeTensorDistribution):
   """The Generalized Normal distribution.
 
   The Generalized Normal (or Generalized Gaussian) generalizes the Normal
@@ -161,16 +159,6 @@ class GeneralizedNormal(distribution.Distribution):
   def power(self):
     """Distribution parameter for shape."""
     return self._power
-
-  def _batch_shape_tensor(self, loc=None, scale=None, power=None):
-    return functools.reduce(ps.broadcast_shape, (
-        ps.shape(self.loc if loc is None else loc),
-        ps.shape(self.scale if scale is None else scale),
-        ps.shape(self.power if power is None else power)))
-
-  def _batch_shape(self):
-    return functools.reduce(tf.broadcast_static_shape, (
-        self.loc.shape, self.scale.shape, self.power.shape))
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

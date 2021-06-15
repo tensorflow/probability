@@ -44,7 +44,7 @@ __all__ = [
 ]
 
 
-class ExpGamma(distribution.Distribution):
+class ExpGamma(distribution.AutoCompositeTensorDistribution):
   """ExpGamma distribution.
 
   The ExpGamma distribution is defined over the real line using
@@ -203,16 +203,6 @@ class ExpGamma(distribution.Distribution):
     """Log-rate parameter."""
     return self._log_rate
 
-  def _batch_shape_tensor(self):
-    rate_or_log_rate = self.log_rate if self.rate is None else self.rate
-    return ps.broadcast_shape(ps.shape(self.concentration),
-                              ps.shape(rate_or_log_rate))
-
-  def _batch_shape(self):
-    rate_or_log_rate = self.log_rate if self.rate is None else self.rate
-    return tf.broadcast_static_shape(self.concentration.shape,
-                                     rate_or_log_rate.shape)
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -295,7 +285,10 @@ class ExpGamma(distribution.Distribution):
 kullback_leibler.RegisterKL(ExpGamma, ExpGamma)(gamma_lib.kl_gamma_gamma)
 
 
-class ExpInverseGamma(transformed_distribution.TransformedDistribution):
+# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
+# `TransformedDistribution` is converted to `CompositeTensor`.
+class ExpInverseGamma(transformed_distribution.TransformedDistribution,
+                      distribution.AutoCompositeTensorDistribution):
   """ExpInverseGamma distribution.
 
   The `ExpInverseGamma` distribution is defined over the real numbers such that

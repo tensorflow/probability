@@ -17,6 +17,7 @@ import os
 
 from absl.testing import absltest
 import jax
+from jax import lax
 import jax.numpy as np
 import numpy as onp
 
@@ -295,6 +296,74 @@ class InverseTest(test_util.TestCase):
     onp.testing.assert_allclose(f_ildj(-100.),
                                 tfb.Sigmoid().forward_log_det_jacobian(
                                     -100., 0))
+
+  def test_integer_pow_inverse(self):
+    def f(x):
+      return lax.integer_pow(x, 2)
+    f_inv = core.inverse(f)
+    onp.testing.assert_allclose(f_inv(2.), np.sqrt(2.))
+    def f2(x):
+      return lax.integer_pow(x, 3)
+    f2_inv = core.inverse(f2)
+    onp.testing.assert_allclose(f2_inv(2.), onp.cbrt(2.))
+
+  def test_integer_pow_ildj(self):
+    def f(x):
+      return lax.integer_pow(x, 2)
+    f_ildj = core.ildj(f)
+    onp.testing.assert_allclose(
+        f_ildj(2.), tfb.Power(2.).inverse_log_det_jacobian(2.))
+    def f2(x):
+      return lax.integer_pow(x, 3)
+    f2_ildj = core.ildj(f2)
+    onp.testing.assert_allclose(
+        f2_ildj(2.), tfb.Power(3.).inverse_log_det_jacobian(2.))
+
+  def test_reciprocal_inverse(self):
+    def f(x):
+      return np.reciprocal(x)
+    f_inv = core.inverse(f)
+    onp.testing.assert_allclose(f_inv(2.), 0.5)
+
+  def test_reciprocal_ildj(self):
+    def f(x):
+      return np.reciprocal(x)
+    f_ildj = core.ildj(f)
+    onp.testing.assert_allclose(f_ildj(2.), onp.log(1 / 4.))
+
+  def test_pow_inverse(self):
+    def f(x, y):
+      return lax.pow(x, y)
+    f_x_inv = core.inverse(lambda x: f(x, 2.))
+    onp.testing.assert_allclose(f_x_inv(2.), np.sqrt(2.))
+    f_y_inv = core.inverse(lambda y: f(2., y))
+    onp.testing.assert_allclose(f_y_inv(3.), np.log(3.) / np.log(2.))
+
+  def test_pow_ildj(self):
+    def f(x, y):
+      return lax.pow(x, y)
+    f_x_ildj = core.ildj(lambda x: f(x, 2.))
+    onp.testing.assert_allclose(
+        f_x_ildj(3.), tfb.Power(2.).inverse_log_det_jacobian(3.))
+    f_y_ildj = core.ildj(lambda y: f(2., y))
+    f_y_inv = core.inverse(lambda y: f(2., y))
+    y = f_y_inv(3.)
+    onp.testing.assert_allclose(
+        f_y_ildj(3.), -np.log(np.abs(jax.grad(lambda y: f(2., y))(y))))
+    onp.testing.assert_allclose(
+        f_y_ildj(3.), np.log(np.abs(jax.grad(f_y_inv)(3.))))
+
+  def test_sqrt_inverse(self):
+    def f(x):
+      return np.sqrt(x)
+    f_inv = core.inverse(f)
+    onp.testing.assert_allclose(f_inv(2.), 4.)
+
+  def test_sqrt_ildj(self):
+    def f(x):
+      return np.sqrt(x)
+    f_ildj = core.ildj(f)
+    onp.testing.assert_allclose(f_ildj(3.), np.log(2.) + np.log(3.))
 
 
 if __name__ == '__main__':

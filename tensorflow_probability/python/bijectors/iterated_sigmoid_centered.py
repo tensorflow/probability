@@ -27,11 +27,11 @@ from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
-    "IteratedSigmoidCentered",
+    'IteratedSigmoidCentered',
 ]
 
 
-class IteratedSigmoidCentered(bijector.Bijector):
+class IteratedSigmoidCentered(bijector.AutoCompositeTensorBijector):
   """Bijector which applies a Stick Breaking procedure.
 
   Given a vector `x`, transform it in to a vector `y` such that
@@ -73,7 +73,7 @@ class IteratedSigmoidCentered(bijector.Bijector):
 
   def __init__(self,
                validate_args=False,
-               name="iterated_sigmoid"):
+               name='iterated_sigmoid'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       super(IteratedSigmoidCentered, self).__init__(
@@ -98,14 +98,14 @@ class IteratedSigmoidCentered(bijector.Bijector):
     if not output_shape[-1:].is_fully_defined():
       return output_shape
     if output_shape[-1] <= 1:
-      raise ValueError("output_shape[-1] = %d <= 1" % output_shape[-1])
+      raise ValueError('output_shape[-1] = %d <= 1' % output_shape[-1])
     return output_shape[:-1].concatenate(output_shape[-1] - 1)
 
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
       # It is not possible for a negative shape so we need only check <= 1.
       dependencies = [assert_util.assert_greater(
-          output_shape[-1], 1, message="Need last dimension greater than 1.")]
+          output_shape[-1], 1, message='Need last dimension greater than 1.')]
     else:
       dependencies = []
     with tf.control_dependencies(dependencies):

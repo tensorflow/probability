@@ -31,7 +31,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
-class PlackettLuce(distribution.Distribution):
+class PlackettLuce(distribution.AutoCompositeTensorDistribution):
   """Plackett-Luce distribution over permutations.
 
   The Plackett-Luce distribution is defined over permutations of
@@ -194,14 +194,6 @@ class PlackettLuce(distribution.Distribution):
       scores: A batch of scores used for initializing the distribution.
     """
     return self._scores
-
-  def _batch_shape_tensor(self, scores=None):
-    scores = self._scores if scores is None else scores
-    return ps.shape(scores)[:-1]
-
-  def _batch_shape(self, scores=None):
-    scores = self._scores if scores is None else scores
-    return scores.shape[:-1]
 
   def _event_shape_tensor(self, scores=None):
     scores = self._scores if scores is None else scores

@@ -27,6 +27,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 __all__ = [
     'broadcast_structure',
+    'cast_structure',
     'expand_as_args',
     'call_fn',
 ]
@@ -66,6 +67,16 @@ def broadcast_structure(to_structure, from_structure):
     from_structure = tf.nest.map_structure(lambda _: from_parts[0],
                                            to_structure)
   return from_structure
+
+
+def cast_structure(value, structure):
+  """Cast a structure."""
+  if tf.nest.is_nested(structure):
+    if _is_namedtuple(structure):  # pylint: disable=protected-access
+      return type(structure)(*value)
+    else:
+      return type(structure)(value)
+  return value
 
 
 def _force_leaf(struct):

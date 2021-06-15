@@ -107,9 +107,51 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
     self.assertAllEqual(self.evaluate(mvn.mean()), loc)
     self.assertAllClose(
         self.evaluate(mvn.covariance()),
-        np.matmul(
-            self.evaluate(scale.to_dense()),
-            np.transpose(self.evaluate(scale.to_dense()), [0, 1, 3, 2])))
+        self.evaluate(scale.matmul(scale, adjoint_arg=True).to_dense()))
+
+  def testStatsBroadcastWhenLocIsBiggerThanScale(self):
+    batch_shape = (3,)
+    event_shape = (4,)
+    loc_shape = batch_shape + event_shape
+    loc = self.rng.randn(*loc_shape)
+
+    scale_shape = event_shape * 2
+    scale = tf.linalg.LinearOperatorLowerTriangular(
+        self._random_tril_matrix(scale_shape),
+        is_non_singular=True)
+
+    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+
+    self.assertAllEqual(self.evaluate(mvn.mean()), loc)
+    cov = mvn.covariance()
+    self.assertAllEqual(batch_shape + event_shape * 2, cov.shape)
+    self.assertAllClose(
+        self.evaluate(cov),
+        self.evaluate(scale.matmul(scale, adjoint_arg=True).to_dense()) +
+        np.zeros(loc_shape + (1,), dtype=np.float32))
+
+    entropy = mvn.entropy()
+    self.assertAllEqual(batch_shape, entropy.shape)
+
+  def testMeanAndCovarianceAndVarAndStddevLocIsNone(self):
+    loc = None
+
+    scale_shape = (2, 4, 4)
+    scale = tf.linalg.LinearOperatorLowerTriangular(
+        self._random_tril_matrix(scale_shape), is_non_singular=True)
+
+    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+
+    self.assertAllEqual(
+        self.evaluate(mvn.mean()), np.zeros((2, 4), dtype=np.float32))
+
+    expected_cov = self.evaluate(
+        scale.matmul(scale, adjoint_arg=True).to_dense())
+    self.assertAllClose(self.evaluate(mvn.covariance()), expected_cov)
+
+    expected_var = self.evaluate(tf.linalg.diag_part(expected_cov))
+    self.assertAllClose(self.evaluate(mvn.variance()), expected_var)
+    self.assertAllClose(self.evaluate(mvn.stddev()), expected_var**0.5)
 
   @test_util.tf_tape_safety_test
   def testVariableLocation(self):

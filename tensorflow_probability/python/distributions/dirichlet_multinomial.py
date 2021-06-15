@@ -55,7 +55,7 @@ fractional components, and such that
 with `self.concentration` and `self.total_count`."""
 
 
-class DirichletMultinomial(distribution.Distribution):
+class DirichletMultinomial(distribution.AutoCompositeTensorDistribution):
   """Dirichlet-Multinomial compound distribution.
 
   The Dirichlet-Multinomial distribution is parameterized by a (batch of)
@@ -252,22 +252,6 @@ class DirichletMultinomial(distribution.Distribution):
       concentration = tf.convert_to_tensor(self._concentration)
     return tf.reduce_sum(concentration, axis=-1)
 
-  def _batch_shape_tensor(self, concentration=None, total_count=None):
-    if concentration is None:
-      concentration = tf.convert_to_tensor(self._concentration)
-    if total_count is None:
-      total_count = tf.convert_to_tensor(self._total_count)
-    return ps.broadcast_shape(
-        ps.shape(total_count[..., tf.newaxis]),
-        ps.shape(concentration))[:-1]
-
-  def _batch_shape(self):
-    return tensorshape_util.with_rank_at_least(
-        tf.broadcast_static_shape(
-            tf.TensorShape(self._total_count.shape).concatenate([1]),
-            tf.TensorShape(self._concentration.shape)),
-        1)[:-1]
-
   def _event_shape_tensor(self, concentration=None):
     if concentration is None:
       concentration = tf.convert_to_tensor(self.concentration)
@@ -297,7 +281,8 @@ class DirichletMultinomial(distribution.Distribution):
     x = multinomial.draw_sample(
         1, k, unnormalized_logits, n_draws, self.dtype, multinomial_seed)
     final_shape = ps.concat(
-        [[n], self._batch_shape_tensor(concentration, total_count), [k]], 0)
+        [[n], self._batch_shape_tensor(concentration=concentration,
+                                       total_count=total_count), [k]], 0)
     return tf.reshape(x, final_shape)
 
   @distribution_util.AppendDocstring(_dirichlet_multinomial_sample_note)

@@ -50,7 +50,6 @@ multi_substrate_py_library(
         ":nuts_autobatching",
         ":particle_filter_augmentation",
         ":potential_scale_reduction_reducer",
-        ":preconditioned_nuts",
         ":progress_bar_reducer",
         ":reducer",
         ":sample",
@@ -59,7 +58,6 @@ multi_substrate_py_library(
         ":sample_fold",
         ":thinning_kernel",
         ":tracing_reducer",
-        ":windowed_sampling",
         ":with_reductions",
     ],
     deps = [
@@ -217,6 +215,9 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -233,16 +234,19 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:joint_distribution_named",
         "//tensorflow_probability/python/distributions:joint_distribution_sequential",
         "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/experimental/distribute:joint_distribution",
+        "//tensorflow_probability/python/experimental/distribute:sharded",
         "//tensorflow_probability/python/experimental/distributions:mvn_precision_factor_linop",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:broadcast_util",
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/mcmc/internal:util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "preconditioned_nuts",
     srcs = ["preconditioned_nuts.py"],
     srcs_version = "PY3",
@@ -251,6 +255,7 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:broadcast_util",
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -261,10 +266,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "pnuts_test",
     size = "medium",
     srcs = ["pnuts_test.py"],
+    disabled_substrates = ["numpy"],
     python_version = "PY3",
     shard_count = 10,
     srcs_version = "PY3",
@@ -275,6 +281,9 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -307,7 +316,10 @@ multi_substrate_py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -818,7 +830,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "thermodynamic_integrals_test",
-    size = "small",
+    size = "medium",
     srcs = ["thermodynamic_integrals_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
@@ -945,6 +957,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:broadcast_util",
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:unnest",
@@ -969,11 +982,14 @@ multi_substrate_py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "windowed_sampling",
     srcs = ["windowed_sampling.py"],
     srcs_version = "PY3",
@@ -994,19 +1010,24 @@ py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
         "//tensorflow_probability/python/mcmc:sample",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "windowed_sampling_test",
     size = "large",
     srcs = ["windowed_sampling_test.py"],
+    disabled_substrates = ["numpy"],
     python_version = "PY3",
     shard_count = 12,
     srcs_version = "PY3",
-    tags = ["requires-mem:16g"],
+    tags = [
+        "no-oss-ci",  # Prohibitively slow.
+        "requires-mem:16g",
+    ],
     deps = [
         ":windowed_sampling",
         # absl/testing:parameterized dep,

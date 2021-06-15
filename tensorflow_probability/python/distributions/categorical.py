@@ -62,7 +62,7 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
   return event, params
 
 
-class Categorical(distribution.Distribution):
+class Categorical(distribution.AutoCompositeTensorDistribution):
   """Categorical distribution over integers.
 
   The Categorical distribution is parameterized by either probabilities or
@@ -229,16 +229,6 @@ class Categorical(distribution.Distribution):
     """Input argument `probs`."""
     return self._probs
 
-  def _batch_shape_tensor(self, x=None):
-    if x is None:
-      x = tf.convert_to_tensor(
-          self._probs if self._logits is None else self._logits)
-    return ps.shape(x)[:-1]
-
-  def _batch_shape(self):
-    x = self._probs if self._logits is None else self._logits
-    return x.shape[:-1]
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -259,7 +249,7 @@ class Categorical(distribution.Distribution):
     draws = tf.cast(draws, self.dtype)
     return tf.reshape(
         tf.transpose(draws),
-        shape=ps.concat([[n], self._batch_shape_tensor(logits)], axis=0))
+        shape=ps.concat([[n], self._batch_shape_tensor(logits=logits)], axis=0))
 
   def _cdf(self, k):
     # TODO(b/135263541): Improve numerical precision of categorical.cdf.
@@ -353,7 +343,7 @@ class Categorical(distribution.Distribution):
   def _logits_parameter_no_checks(self):
     if self._logits is None:
       return tf.math.log(self._probs)
-    return tf.identity(self._logits)
+    return tensor_util.identity_as_tensor(self._logits)
 
   def probs_parameter(self, name=None):
     """Probs vec computed from non-`None` input arg (`probs` or `logits`)."""
@@ -362,7 +352,7 @@ class Categorical(distribution.Distribution):
 
   def _probs_parameter_no_checks(self):
     if self._logits is None:
-      return tf.identity(self._probs)
+      return tensor_util.identity_as_tensor(self._probs)
     return tf.math.softmax(self._logits)
 
   def _num_categories(self, x=None):

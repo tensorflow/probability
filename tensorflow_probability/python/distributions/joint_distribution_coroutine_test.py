@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import functools
 import warnings
 
 # Dependency imports
@@ -333,6 +334,45 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
 
+  def test_sample_and_log_prob(self):
+
+    # Define a bijector to detect if/when `inverse` is called.
+    inverted_values = []
+
+    class InverseTracingExp(tfb.Exp):
+
+      def _inverse(self, y):
+        inverted_values.append(y)
+        return tf.math.log(y)
+
+    def coroutine_model():
+      g = yield Root(InverseTracingExp()(tfd.Normal(0., 1.), name='g'))
+      df = yield Root(tfd.Exponential(1., name='df'))
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20, name='loc')
+      yield tfd.Independent(tfd.StudentT(df[..., tf.newaxis], loc, 1, name='x'),
+                            reinterpreted_batch_ndims=1)
+
+    joint = tfd.JointDistributionCoroutine(coroutine_model, validate_args=True)
+
+    for sample_shape in ([], [5]):
+      inverted_values.clear()
+      x1, lp1 = self.evaluate(
+          joint.experimental_sample_and_log_prob(
+              sample_shape,
+              seed=test_util.test_seed(sampler_type='seedless'),
+              df=2.7 * tf.ones(sample_shape)  # Check that kwargs are supported.
+              ))
+      x2 = self.evaluate(
+          joint.sample(sample_shape,
+                       seed=test_util.test_seed(sampler_type='seedless'),
+                       df=2.7 * tf.ones(sample_shape)))
+      self.assertAllCloseNested(x1, x2)
+
+      self.assertLen(inverted_values, 0)
+      lp2 = joint.log_prob(x1)
+      self.assertLen(inverted_values, 1)
+      self.assertAllClose(lp1, lp2)
+
   def test_detect_missing_root(self):
     if not tf.executing_eagerly(): return
     # The joint distribution specified below is intended to
@@ -393,7 +433,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
         ValueError, r'Joint distribution expected values for [0-9] components'):
       d.log_prob(badvar=27.)
 
-    with self.assertRaisesRegexp(TypeError, 'unexpected keyword argument'):
+    with self.assertRaisesRegexp(ValueError, 'unexpected keyword argument'):
       d.log_prob(*value, extra_arg=27.)
 
   def test_log_prob_with_manual_kwargs(self):
@@ -759,6 +799,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertEqual(lp.shape, [7, 9])
 
   @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 
@@ -822,8 +863,8 @@ class JointDistributionCoroutineTest(test_util.TestCase):
                         (grads[0].shape, grads[1].shape))
     self.assertAllNotNone(grads)
 
-  @test_util.jax_disable_test_missing_functionality(
-      'Graph tensors are unsupported in JAX backend.')
+  @test_util.jax_disable_test_missing_functionality('Graph tensors')
+  @test_util.numpy_disable_test_missing_functionality('Graph tensors')
   def test_cache_doesnt_leak_graph_tensors(self):
     if not tf.executing_eagerly():
       return
@@ -938,6 +979,49 @@ class JointDistributionCoroutineTest(test_util.TestCase):
           self.evaluate(inverse_joint_event_shape[i]),
           self.evaluate(bijectors[i].inverse_event_shape_tensor(
               event_shapes[i])))
+
+  @parameterized.named_parameters(
+      ('_sample', lambda d, **kwargs: d.sample(**kwargs)),
+      ('_sample_and_log_prob',
+       lambda d, **kwargs: d.experimental_sample_and_log_prob(**kwargs)[0]),
+  )
+  def test_nested_partial_value(self, sample_fn):
+    @tfd.JointDistributionCoroutine
+    def innermost():
+      a = yield Root(tfd.Exponential(1., name='a'))
+      yield tfd.Sample(tfd.LogNormal(a, a), [5], name='b')
+
+    @tfd.JointDistributionCoroutine
+    def inner():
+      yield Root(tfd.Exponential(1., name='c'))
+      yield Root(innermost.copy(name='d'))
+
+    @tfd.JointDistributionCoroutine
+    def outer():
+      yield Root(tfd.Exponential(1., name='e'))
+      yield Root(inner.copy(name='f'))
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    true_xs = outer.sample(seed=seed)
+
+    # These asserts work because we advance the stateless seed inside the model
+    # whether or not a sample is actually generated.
+    partial_xs = true_xs._replace(f=None)
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = true_xs._replace(e=None)
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = true_xs._replace(f=true_xs.f._replace(d=None))
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = true_xs._replace(
+        f=true_xs.f._replace(d=true_xs.f.d._replace(a=None)))
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
 
   def test_default_event_space_bijector_nested(self):
     @tfd.JointDistributionCoroutine
@@ -1187,6 +1271,89 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     samp = self.evaluate(d.experimental_pin([None, 7.5]).sample_unpinned(
         seed=test_util.test_seed()))
     self.assertAllClose(samp.c + 7.5, samp.a, atol=3e-3)
+
+  @test_util.numpy_disable_gradient_test
+  def test_unnormalized_log_prob(self):
+    def model_fn():
+      c1 = yield Root(tfd.Gamma(1.2, 1.3, name='c1'))
+      c0 = yield Root(tfd.Gamma(1.4, 1.5, name='c0'))
+      yield tfd.BetaBinomial(concentration1=c1, concentration0=c0,
+                             total_count=100, name='successes')
+
+    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+
+    c1 = tf.constant(2.1)
+    c0 = tf.constant(3.1)
+    successes = tf.constant(30.)  # Treated as conditioning.
+
+    def desired_unnorm_lp(c1, c0):
+      c1_unnorm = tf.math.xlogy(1.2 - 1., c1) - 1.3 * c1
+      c0_unnorm = tf.math.xlogy(1.4 - 1., c0) - 1.5 * c0
+      bb_unnorm = (tfp.math.lbeta(c1 + successes, 100 + c0 - successes)
+                   - tfp.math.lbeta(c1, c0))
+      return c1_unnorm + c0_unnorm + bb_unnorm
+
+    self.assertAllCloseNested(
+        tfp.math.value_and_gradient(
+            lambda c1, c0: d.log_prob(c1, c0, successes), (c1, c0))[1],
+        tfp.math.value_and_gradient(
+            desired_unnorm_lp, (c1, c0))[1])
+
+    # TODO(b/187925322): This portion is aspirational.
+    # actual = d.unnormalized_log_prob(c1=c1, c0=c0, successes=successes)
+    # self.assertAllClose(desired_unnorm_lp(c1, c0), actual)
+
+    self.assertAllCloseNested(
+        tfp.math.value_and_gradient(
+            lambda c1, c0: d.log_prob(c1, c0, successes),
+            (c1, c0))[1],
+        tfp.math.value_and_gradient(
+            lambda c1, c0: d.unnormalized_log_prob(c1, c0, successes),
+            (c1, c0))[1])
+
+  @test_util.numpy_disable_gradient_test
+  def test_unnormalized_log_prob_trainable_prior(self):
+
+    def model_fn(cprior):
+      c1 = yield Root(tfd.Gamma(cprior, 1.3, name='c1'))
+      c0 = yield Root(tfd.Gamma(cprior, 1.5, name='c0'))
+      yield tfd.BetaBinomial(concentration1=c1, concentration0=c0,
+                             total_count=100, name='successes')
+
+    successes = tf.constant(30.)  # Treated as conditioning.
+
+    def lp_fn(cprior, c1, c0):
+      d = tfd.JointDistributionCoroutine(functools.partial(model_fn, cprior),
+                                         validate_args=True)
+      return d.log_prob(c1, c0, successes)
+
+    def ulp_fn(cprior, c1, c0):
+      d = tfd.JointDistributionCoroutine(functools.partial(model_fn, cprior),
+                                         validate_args=True)
+      return d.unnormalized_log_prob(c1, c0, successes)
+
+    cprior = tf.constant(1.2)
+    c1 = tf.constant(2.1)
+    c0 = tf.constant(3.1)
+
+    def desired_unnorm_lp(cprior, c1, c0):
+      c1_unnorm = tfd.Gamma(cprior, 1.3).log_prob(c1)
+      c0_unnorm = tfd.Gamma(cprior, 1.5).log_prob(c0)
+      bb_unnorm = (tfp.math.lbeta(c1 + successes, 100 + c0 - successes)
+                   - tfp.math.lbeta(c1, c0))
+      return c1_unnorm + c0_unnorm + bb_unnorm
+
+    self.assertAllCloseNested(
+        tfp.math.value_and_gradient(lp_fn, (cprior, c1, c0))[1],
+        tfp.math.value_and_gradient(desired_unnorm_lp, (cprior, c1, c0))[1])
+
+    # TODO(b/187925322): This portion is aspirational.
+    # actual = d.unnormalized_log_prob(c1=c1, c0=c0, successes=successes)
+    # self.assertAllClose(desired_unnorm_lp(cprior, c1, c0), actual)
+
+    self.assertAllCloseNested(
+        tfp.math.value_and_gradient(lp_fn, (cprior, c1, c0))[1],
+        tfp.math.value_and_gradient(ulp_fn, (cprior, c1, c0))[1])
 
 
 if __name__ == '__main__':

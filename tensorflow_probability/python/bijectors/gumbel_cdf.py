@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 
-class GumbelCDF(bijector.Bijector):
+class GumbelCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = exp(-exp(-(X - loc) / scale))`, the Gumbel CDF.
 
   This bijector maps inputs from `[-inf, inf]` to `[0, 1]`. The inverse of the

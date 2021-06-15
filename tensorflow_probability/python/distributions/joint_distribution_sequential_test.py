@@ -291,32 +291,6 @@ class JointDistributionSequentialTest(test_util.TestCase):
     lp = d.log_prob(x)
     self.assertEqual((2, 3), lp.shape)
 
-  def test_sample_shape_propagation_nondefault_behavior(self):
-    d = tfd.JointDistributionSequential(
-        [
-            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),          # 0
-            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),  # 1
-            tfd.HalfNormal(2.5),                                           # 2
-            lambda s: tfd.Normal(loc=0, scale=s),                          # 3
-            tfd.Exponential(2),                                            # 4
-            lambda df, loc, _, scale: tfd.StudentT(df, loc, scale),        # 5
-        ],
-        validate_args=False)  # So log_prob doesn't complain.
-    # The following enables the nondefault sample shape behavior.
-    d._always_use_specified_sample_shape = True
-    sample_shape = (2, 3)
-    x = d.sample(sample_shape, seed=test_util.test_seed())
-    self.assertLen(x, 6)
-    self.assertEqual(sample_shape + (2,), x[0].shape)
-    self.assertEqual(sample_shape * 2, x[1].shape)  # Has 1 arg.
-    self.assertEqual(sample_shape * 1, x[2].shape)  # Has 0 args.
-    self.assertEqual(sample_shape * 2, x[3].shape)  # Has 1 arg.
-    self.assertEqual(sample_shape * 1, x[4].shape)  # Has 0 args.
-    # Has 3 args, one being scalar.
-    self.assertEqual(sample_shape * 3, x[5].shape)
-    lp = d.log_prob(x)
-    self.assertEqual(sample_shape * 3, lp.shape)
-
   def test_argspec(self):
     argspec = tf_inspect.getfullargspec(Dummy)
     self.assertAllEqual(['me', 'arg1', 'arg2', 'arg3'], argspec.args)
@@ -351,6 +325,54 @@ class JointDistributionSequentialTest(test_util.TestCase):
         ], validate_args=True)
     lp = dist.log_prob(dist.sample(5, seed=test_util.test_seed()))
     self.assertAllEqual(lp.shape, [5])
+
+  @parameterized.named_parameters(
+      ('_sample', lambda d, **kwargs: d.sample(**kwargs)),
+      ('_sample_and_log_prob',
+       lambda d, **kwargs: d.experimental_sample_and_log_prob(**kwargs)[0]),
+  )
+  def test_nested_partial_value(self, sample_fn):
+    innermost = tfd.JointDistributionSequential((
+        tfd.Exponential(1.),
+        lambda a: tfd.Sample(tfd.LogNormal(a, a), [5]),
+    ))
+
+    inner = tfd.JointDistributionSequential((
+        tfd.Exponential(1.),
+        innermost,
+    ))
+
+    outer = tfd.JointDistributionSequential((
+        tfd.Exponential(1.),
+        inner,
+    ))
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    true_xs = outer.sample(seed=seed)
+
+    def _update(tuple_, index, value):
+      res = list(tuple_)
+      res[index] = value
+      return tuple(res)
+
+    # These asserts work because we advance the stateless seed inside the model
+    # whether or not a sample is actually generated.
+    partial_xs = _update(true_xs, 1, None)
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = _update(true_xs, 0, None)
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = _update(true_xs, 1, _update(true_xs[1], 1, None))
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
+
+    partial_xs = _update(
+        true_xs, 1, _update(true_xs[1], 1, _update(true_xs[1][1], 0, None)))
+    xs = sample_fn(outer, value=partial_xs, seed=seed)
+    self.assertAllCloseNested(true_xs, xs)
 
   @parameterized.named_parameters(
       ('basic', basic_model_fn),
@@ -388,7 +410,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
         ValueError, r'Joint distribution expected values for [0-9] components'):
       d.log_prob(badvar=27.)
 
-    with self.assertRaisesRegexp(TypeError, 'unexpected keyword argument'):
+    with self.assertRaisesRegexp(ValueError, 'unexpected keyword argument'):
       d.log_prob(*value, extra_arg=27.)
 
   def test_can_call_prob_with_args_and_kwargs(self):

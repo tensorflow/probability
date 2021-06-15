@@ -29,7 +29,6 @@ from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
@@ -41,7 +40,8 @@ __all__ = [
 ]
 
 
-class ExponentiallyModifiedGaussian(distribution.Distribution):
+class ExponentiallyModifiedGaussian(
+    distribution.AutoCompositeTensorDistribution):
   """Exponentially modified Gaussian distribution.
 
   #### Mathematical details
@@ -154,18 +154,6 @@ class ExponentiallyModifiedGaussian(distribution.Distribution):
     """Distribution parameter for rate parameter of exponential distribution."""
     return self._rate
 
-  def _batch_shape_tensor(self, loc=None, scale=None, rate=None):
-    return prefer_static.broadcast_shape(
-        prefer_static.shape(self.loc if loc is None else loc),
-        prefer_static.broadcast_shape(
-            prefer_static.shape(self.scale if scale is None else scale),
-            prefer_static.shape(self.rate if rate is None else rate)))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.loc.shape,
-        tf.broadcast_static_shape(self.scale.shape, self.rate.shape))
-
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
 
@@ -179,7 +167,7 @@ class ExponentiallyModifiedGaussian(distribution.Distribution):
     loc = tf.convert_to_tensor(self.loc)
     rate = tf.convert_to_tensor(self.rate)
     scale = tf.convert_to_tensor(self.scale)
-    batch_shape = self._batch_shape_tensor(loc, scale, rate)
+    batch_shape = self._batch_shape_tensor(loc=loc, scale=scale, rate=rate)
     loc_broadcast = tf.broadcast_to(loc, batch_shape)
     rate_broadcast = tf.broadcast_to(rate, batch_shape)
     normal_dist = normal_lib.Normal(loc=loc_broadcast, scale=scale)

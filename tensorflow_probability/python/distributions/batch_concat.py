@@ -26,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
@@ -172,6 +173,13 @@ class BatchConcat(distribution_lib.Distribution):
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distributions=parameter_properties.BatchedComponentProperties(
+            event_ndims=lambda self: [0 for _ in self.distributions]),
+        axis=parameter_properties.ShapeParameterProperties())
 
   def _broadcast(self, x, sample_shape):
     """Broadcasts x to target batch_shape.
@@ -414,6 +422,20 @@ class BatchConcat(distribution_lib.Distribution):
       samples.append(self._broadcast(d.sample([n], s), [n]))
 
     return tf.concat(samples, axis=self._axis+1)
+
+  def _sample_and_log_prob(self, sample_shape, seed, **kwargs):
+    all_seeds = samplers.split_seed(
+        seed, len(self._distributions), salt='BatchConcat')
+    samples = []
+    log_probs = []
+    for d, s in zip(self._distributions, all_seeds):
+      x, lp = d.experimental_sample_and_log_prob(sample_shape, s)
+      samples.append(self._broadcast(x, sample_shape))
+      log_probs.append(self._broadcast(lp, sample_shape))
+
+    sample_shape_size = ps.rank_from_shape(sample_shape)
+    return (tf.concat(samples, axis=self._axis + sample_shape_size),
+            tf.concat(log_probs, axis=self._axis + sample_shape_size))
 
   def _call_split_concat(self, fn, x, **kwargs):
     sample_shape_size, split_x = self._split_sample(x)

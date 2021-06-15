@@ -243,17 +243,6 @@ class TransformedDistribution(distribution_lib.Distribution):
   def experimental_is_sharded(self):
     raise NotImplementedError  # TODO(b/175084455): Handle bijector sharding.
 
-  @property
-  def _composite_tensor_nonshape_params(self):
-    if type(self).__init__ is not TransformedDistribution.__init__:
-      # Handles subclasses of TransformedDistribution
-      return super(
-          TransformedDistribution, self)._composite_tensor_nonshape_params
-    # TODO(b/167634378): Enable flattening for bijectors. Right now bijectors
-    # are not registered as pytrees. After they are registered, we can add
-    # the bijector for the TransformedDistribution into the flattened pytree.
-    return ('distribution', 'bijector')
-
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing
     # for instances of TD, not subclasses thereof.
@@ -329,37 +318,41 @@ class TransformedDistribution(distribution_lib.Distribution):
           tf.broadcast_static_shape, tf.nest.flatten(batch_shape))
     return batch_shape
 
-  def _call_sample_n(self, sample_shape, seed, name, **kwargs):
+  def _call_sample_n(self, sample_shape, seed, **kwargs):
     # We override `_call_sample_n` rather than `_sample_n` so we can ensure that
     # the result of `self.bijector.forward` is not modified (and thus caching
     # works).
-    with self._name_and_control_scope(name):
-      sample_shape = ps.convert_to_shape_tensor(
-          sample_shape, dtype=tf.int32, name='sample_shape')
-      sample_shape, n = self._expand_sample_shape_to_vector(
-          sample_shape, 'sample_shape')
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
-      distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    # First, generate samples from the base distribution.
+    x = self.distribution.sample(sample_shape=sample_shape,
+                                 seed=seed,
+                                 **distribution_kwargs)
+    # Apply the bijector's forward transformation. For caching to
+    # work, it is imperative that this is the last modification to the
+    # returned result.
+    return self.bijector.forward(x, **bijector_kwargs)
 
-      # First, generate samples from the base distribution.
-      x = self.distribution.sample(sample_shape=[n], seed=seed,
-                                   **distribution_kwargs)
+  def _sample_and_log_prob(self, sample_shape, seed, **kwargs):
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      # Computing log_prob with a non-injective bijector requires an explicit
+      # inverse to get all points in the inverse image, so we can't get by
+      # with just doing the forward pass.
+      return super()._sample_and_log_prob(sample_shape, seed=seed, **kwargs)
 
-      # Next, we reshape `x` into its final form. We do this prior to the call
-      # to the bijector to ensure that the bijector caching works.
-      def reshape_sample_shape(t):
-        batch_event_shape = ps.shape(t)[1:]
-        final_shape = ps.concat([sample_shape, batch_event_shape], 0)
-        return tf.reshape(t, final_shape)
-      x = tf.nest.map_structure(reshape_sample_shape, x)
-
-      # Finally, we apply the bijector's forward transformation. For caching to
-      # work, it is imperative that this is the last modification to the
-      # returned result.
-      y = self.bijector.forward(x, **bijector_kwargs)
-      y = self._set_sample_static_shape(y, sample_shape)
-
-      return y
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    x, base_distribution_log_prob = (
+        self.distribution.experimental_sample_and_log_prob(
+            sample_shape, seed, **distribution_kwargs))
+    y = self.bijector.forward(x, **bijector_kwargs)
+    fldj = self.bijector.forward_log_det_jacobian(
+        x,
+        event_ndims=tf.nest.map_structure(
+            ps.rank_from_shape,
+            self.distribution.event_shape_tensor()),
+        **bijector_kwargs)
+    return y, (base_distribution_log_prob -
+               tf.cast(fldj, base_distribution_log_prob.dtype))
 
   def _log_prob(self, y, **kwargs):
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
@@ -558,8 +551,6 @@ class TransformedDistribution(distribution_lib.Distribution):
     return self.bijector(
         self.distribution.experimental_default_event_space_bijector())
   # pylint: enable=not-callable
-
-  _composite_tensor_shape_params = ()
 
 
 @kullback_leibler.RegisterKL(TransformedDistribution, TransformedDistribution)

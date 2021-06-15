@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow.python.ops.linalg import linear_operator  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
 ]
 
 
+@linear_operator.make_composite_tensor
 class KahanLogDetLinOpDiag(tf.linalg.LinearOperatorDiag):
   """Override `LinearOperatorDiag` logdet to use Kahan summation."""
 
@@ -288,6 +290,3 @@ class MultivariateNormalDiag(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
             is_preferred=False))
     # pylint: enable=g-long-lambda
-
-  _composite_tensor_nonshape_params = (
-      'loc', 'scale_diag', 'scale_identity_multiplier')

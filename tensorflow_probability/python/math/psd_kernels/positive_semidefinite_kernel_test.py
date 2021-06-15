@@ -28,7 +28,9 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util as kernels_util
 
 
@@ -88,6 +90,12 @@ class TestKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
       value = value * multiplier
 
     return value
+
+
+@psd_kernel.auto_composite_tensor_psd_kernel
+class CompositeTensorTestKernel(
+    TestKernel, auto_composite_tensor.AutoCompositeTensor):
+  pass
 
 
 @test_util.test_all_tf_execution_regimes
@@ -300,15 +308,32 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
 
   def testOperatorOverloads(self):
     k0 = TestKernel(PARAMS_0)
+    k0_ct = CompositeTensorTestKernel(PARAMS_0)
+    sum_kernel = k0 + k0 + k0_ct
+    self.assertLen(sum_kernel.kernels, 3)
+    sum_kernel += k0 + k0
+    self.assertLen(sum_kernel.kernels, 5)
+    self.assertNotIsInstance(sum_kernel, tf.__internal__.CompositeTensor)
+
+    product_kernel = k0 * k0 * k0_ct
+    self.assertLen(product_kernel.kernels, 3)
+    product_kernel *= k0 * k0
+    self.assertLen(product_kernel.kernels, 5)
+    self.assertNotIsInstance(product_kernel, tf.__internal__.CompositeTensor)
+
+  def testOperatorOverloadsCompositeTensor(self):
+    k0 = CompositeTensorTestKernel(PARAMS_0)
     sum_kernel = k0 + k0 + k0
     self.assertLen(sum_kernel.kernels, 3)
     sum_kernel += k0 + k0
     self.assertLen(sum_kernel.kernels, 5)
+    self.assertIsInstance(sum_kernel, tf.__internal__.CompositeTensor)
 
     product_kernel = k0 * k0 * k0
     self.assertLen(product_kernel.kernels, 3)
     product_kernel *= k0 * k0
     self.assertLen(product_kernel.kernels, 5)
+    self.assertIsInstance(product_kernel, tf.__internal__.CompositeTensor)
 
   def testStaticShapesAndValuesOfSum(self):
     k0 = TestKernel(PARAMS_0)

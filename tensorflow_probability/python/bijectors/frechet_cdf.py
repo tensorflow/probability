@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 
-class FrechetCDF(bijector.Bijector):
+class FrechetCDF(bijector.AutoCompositeTensorBijector):
   """The Frechet cumulative density function.
 
   Computes `Y = g(X) = exp(-((X - loc) / scale)**(-concentration))`, the Frechet

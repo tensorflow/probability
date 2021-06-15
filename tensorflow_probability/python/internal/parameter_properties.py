@@ -39,7 +39,7 @@ def SHAPE_FN_NOT_IMPLEMENTED(sample_shape):  # pylint: disable=invalid-name
 class ParameterProperties(
     collections.namedtuple('ParameterProperties', [
         'event_ndims', 'shape_fn', 'default_constraining_bijector_fn',
-        'is_preferred', 'is_tensor'
+        'is_preferred', 'is_tensor', 'specifies_shape'
     ])):
   """Annotates expected properties of a `Tensor`-valued distribution parameter.
 
@@ -50,7 +50,9 @@ class ParameterProperties(
   Elements:
     event_ndims: Python `int`, structure of `int`s, or `callable`, specifying
       the minimum effective Tensor rank of this parameter. See description
-      below.
+      below. May also be `None`, indicating that this parameter does not follow
+      a batch-shape-vs-event-shape distinction (for example, if the parameter
+      cannot have batch dimensions, or if its value itself specifies a shape).
       Default value: `0`.
     shape_fn: Python `callable` with signature
       `parameter_shape = shape_fn(shape)`. Given the desired shape of
@@ -80,6 +82,10 @@ class ParameterProperties(
       Tensor. This should be `False` for non-numeric parameters such as
       other distributions or bijectors.
       Default value: `True`.
+    specifies_shape: Python `bool` indicating whether this parameter is a shape,
+      index, axis, or other quantity such that Tensor shapes
+      may depend on the *value* (rather than just the shape) of this parameter.
+      Default value: `False`.
 
   #### Definition of `event_ndims`
 
@@ -158,7 +164,7 @@ class ParameterProperties(
   the `event_ndims` of the `bijectors` parameter would be `[0, 0]`, matching
   the structure of the `bijectors` value (note that since this structure is
   instance-dependent, the `event_ndims` would need to be specified using a
-  calalble, as detailed above).
+  callable, as detailed above).
 
   #### Choice of constraining bijectors
 
@@ -192,14 +198,17 @@ class ParameterProperties(
               shape_fn=lambda sample_shape: sample_shape,
               default_constraining_bijector_fn=identity_bijector.Identity,
               is_preferred=True,
-              is_tensor=True):
+              is_tensor=True,
+              specifies_shape=False):
+
     return super(ParameterProperties, cls).__new__(
         cls,
         event_ndims=event_ndims,
         shape_fn=shape_fn,
         default_constraining_bijector_fn=default_constraining_bijector_fn,
         is_preferred=is_preferred,
-        is_tensor=is_tensor)
+        is_tensor=is_tensor,
+        specifies_shape=specifies_shape)
 
   def instance_event_ndims(self, instance):
     if callable(self.event_ndims):
@@ -216,14 +225,28 @@ class BatchedComponentProperties(ParameterProperties):
 
   def __new__(cls,
               event_ndims=0,
-              shape_fn=None,
               default_constraining_bijector_fn=None,
               is_preferred=True):
     return super(BatchedComponentProperties, cls).__new__(  # pylint: disable=redundant-keyword-arg
         cls=cls,
         event_ndims=event_ndims,
-        shape_fn=shape_fn,
+        # TODO(davmre): do we need/want shape annotations for non-Tensor params?
+        shape_fn=SHAPE_FN_NOT_IMPLEMENTED,
         default_constraining_bijector_fn=default_constraining_bijector_fn,
         is_preferred=is_preferred,
-        is_tensor=False)
+        is_tensor=False,
+        specifies_shape=False)
 
+
+class ShapeParameterProperties(ParameterProperties):
+  """Convenience alias for annotating shape parameters."""
+
+  def __new__(cls, is_preferred=True):
+    return super(ShapeParameterProperties, cls).__new__(  # pylint: disable=redundant-keyword-arg
+        cls=cls,
+        event_ndims=None,
+        shape_fn=SHAPE_FN_NOT_IMPLEMENTED,
+        default_constraining_bijector_fn=BIJECTOR_NOT_IMPLEMENTED,
+        is_preferred=is_preferred,
+        is_tensor=True,
+        specifies_shape=True)

@@ -29,7 +29,7 @@ __all__ = [
 ]
 
 
-class DiscreteCosineTransform(bijector.Bijector):
+class DiscreteCosineTransform(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = DCT(X)`, where DCT type is indicated by the `type` arg.
 
   The [discrete cosine transform](

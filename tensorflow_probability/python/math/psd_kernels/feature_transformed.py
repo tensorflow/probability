@@ -20,12 +20,13 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 
 __all__ = ['FeatureTransformed']
 
 
-class FeatureTransformed(PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class FeatureTransformed(psd_kernel.AutoCompositeTensorPsdKernel):
   """Input transformed kernel.
 
   Given a kernel `k` and function `f`, compute `k_{new}(x, y) = k(f(x), f(y))`.

@@ -56,7 +56,7 @@ __all__ = [
 ]
 
 
-class _ClipByValue(bijector_lib.Bijector):
+class _ClipByValue(bijector_lib.AutoCompositeTensorBijector):
   """A bijector that clips by value.
 
   This class is intended for minute numerical issues where `|clip(x) - x| <=
@@ -262,7 +262,7 @@ def sample_lkj(
     return result
 
 
-class LKJ(distribution.Distribution):
+class LKJ(distribution.AutoCompositeTensorDistribution):
   """The LKJ distribution on correlation matrices.
 
   This is a one-parameter family of distributions on correlation matrices.  The
@@ -377,12 +377,6 @@ class LKJ(distribution.Distribution):
   def input_output_cholesky(self):
     """Boolean indicating if `Tensor` input/outputs are Cholesky factorized."""
     return self._input_output_cholesky
-
-  def _batch_shape_tensor(self):
-    return ps.shape(self.concentration)
-
-  def _batch_shape(self):
-    return self.concentration.shape
 
   def _event_shape_tensor(self):
     return tf.constant([self.dimension, self.dimension], dtype=tf.int32)

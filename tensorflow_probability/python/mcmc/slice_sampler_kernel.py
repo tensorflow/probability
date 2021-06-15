@@ -23,6 +23,7 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -191,6 +192,7 @@ class SliceSampler(kernel_base.TransitionKernel):
                target_log_prob_fn,
                step_size,
                max_doublings,
+               experimental_shard_axis_names=None,
                name=None):
     """Initializes this transition kernel.
 
@@ -201,7 +203,9 @@ class SliceSampler(kernel_base.TransitionKernel):
       step_size: Scalar or `tf.Tensor` with same dtype as and shape compatible
         with `x_initial`. The size of the initial interval.
       max_doublings: Scalar positive int32 `tf.Tensor`. The maximum number of
-      doublings to consider.
+        doublings to consider.
+      experimental_shard_axis_names: A structure of string names indicating how
+        members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'slice_sampler_kernel').
 
@@ -216,6 +220,7 @@ class SliceSampler(kernel_base.TransitionKernel):
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
         max_doublings=max_doublings,
+        experimental_shard_axis_names=experimental_shard_axis_names,
         name=name)
 
   @property
@@ -303,6 +308,7 @@ class SliceSampler(kernel_base.TransitionKernel):
           current_target_log_prob,
           independent_chain_ndims,
           seed=seed,
+          experimental_shard_axis_names=self.experimental_shard_axis_names
       )
 
       def maybe_flatten(x):
@@ -338,10 +344,20 @@ class SliceSampler(kernel_base.TransitionKernel):
           # Allow room for one_step's seed.
           seed=samplers.zeros_seed())
 
+  @property
+  def experimental_shard_axis_names(self):
+    return self._parameters['experimental_shard_axis_names']
 
-def _choose_random_direction(current_state_parts, batch_rank, seed=None):
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(experimental_shard_axis_names=shard_axis_names)
+
+
+def _choose_random_direction(current_state_parts, batch_rank, seed=None,
+                             experimental_shard_axis_names=None):
   """Chooses a random direction in the event space."""
   seeds = samplers.split_seed(seed, n=len(current_state_parts))
+  seeds = distribute_lib.fold_in_axis_index(
+      seeds, experimental_shard_axis_names)
   # Sample random directions across each of the input components.
   def _sample_direction_part(state_part, part_seed):
     state_part_shape = ps.shape(state_part)
@@ -365,6 +381,7 @@ def _sample_next(target_log_prob_fn,
                  current_target_log_prob,
                  batch_rank,
                  seed=None,
+                 experimental_shard_axis_names=None,
                  name=None):
   """Applies a single iteration of slice sampling update.
 
@@ -390,6 +407,8 @@ def _sample_next(target_log_prob_fn,
     batch_rank: Integer. The number of axes in the state that correspond to
       independent batches.
     seed: Tensor seed pair.
+    experimental_shard_axis_names: A structure of string names indicating how
+      members of the state are sharded.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'find_slice_bounds').
 
@@ -415,9 +434,11 @@ def _sample_next(target_log_prob_fn,
     # First step: Choose a random direction.
     # Direction is a list of tensors. The i'th tensor should have the same shape
     # as the i'th state part.
-    direction = _choose_random_direction(current_state_parts,
-                                         batch_rank=batch_rank,
-                                         seed=direction_seed)
+    direction = _choose_random_direction(
+        current_state_parts,
+        batch_rank=batch_rank,
+        seed=direction_seed,
+        experimental_shard_axis_names=experimental_shard_axis_names)
 
     # Interpolates the step sizes for the chosen direction.
     # Applies an ellipsoidal interpolation to compute the step direction for
@@ -442,10 +463,19 @@ def _sample_next(target_log_prob_fn,
     # so alpha = \sqrt { \frac{1} { ( n_1^2 / s_1^2 + n_2^2 / s_2^2 + ...) } }
     reduce_axes = [ps.range(batch_rank, ps.rank(dirn_part))
                    for dirn_part in direction]
+    experimental_shard_axis_names = (experimental_shard_axis_names
+                                     or ([None] * len(direction)))
+
+    def reduce_sum(v, axis, shard_axes):
+      out = tf.reduce_sum(v, axis=axis)
+      if shard_axes is not None:
+        out = distribute_lib.psum(out, shard_axes)
+      return out
 
     components = [
-        tf.reduce_sum((dirn_part / step_size)**2, axis=reduce_axes[i])
-        for i, (step_size, dirn_part) in enumerate(zip(step_sizes, direction))
+        reduce_sum((dirn_part / step_size)**2, reduce_axes[i], shard_axes)
+        for i, (step_size, dirn_part, shard_axes) in enumerate(zip(
+            step_sizes, direction, experimental_shard_axis_names))
     ]
     step_size = tf.math.rsqrt(tf.add_n(components))
     # Computes the rank of a tensor. Uses the static rank if possible.

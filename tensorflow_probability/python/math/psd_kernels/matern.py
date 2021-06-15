@@ -25,8 +25,8 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math import bessel as tfp_math
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
-from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = [
     'GeneralizedMatern',
@@ -111,7 +111,9 @@ class _AmplitudeLengthScaleMixin(object):
         example_ndims=(x1_example_ndims + x2_example_ndims))
 
 
-class GeneralizedMatern(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class GeneralizedMatern(_AmplitudeLengthScaleMixin,
+                        psd_kernel.AutoCompositeTensorPsdKernel):
   """Generalized Matern Kernel.
 
   This kernel parameterizes the Matern family of kernels.
@@ -224,7 +226,9 @@ class GeneralizedMatern(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
     return assertions
 
 
-class MaternOneHalf(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class MaternOneHalf(_AmplitudeLengthScaleMixin,
+                    psd_kernel.AutoCompositeTensorPsdKernel):
   """Matern Kernel with parameter 1/2.
 
   This kernel is part of the Matern family of kernels, with parameter 1/2.
@@ -295,7 +299,9 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
     return tf.exp(log_result)
 
 
-class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class MaternThreeHalves(_AmplitudeLengthScaleMixin,
+                        psd_kernel.AutoCompositeTensorPsdKernel):
   """Matern Kernel with parameter 3/2.
 
   This kernel is part of the Matern family of kernels, with parameter 3/2.
@@ -363,7 +369,9 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
     return tf.exp(log_result)
 
 
-class MaternFiveHalves(_AmplitudeLengthScaleMixin, PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class MaternFiveHalves(_AmplitudeLengthScaleMixin,
+                       psd_kernel.AutoCompositeTensorPsdKernel):
   """Matern 5/2 Kernel.
 
   This kernel is part of the Matern family of kernels, with parameter 5/2.

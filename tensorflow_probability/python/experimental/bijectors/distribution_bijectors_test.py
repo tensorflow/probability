@@ -40,6 +40,7 @@ PRECONDITIONING_FAILS_DISTS = (
     'GeneralizedNormal',  # CDF gradient incorrect at 0.
     'HalfStudentT',  # Uses StudentT CDF.
     'Laplace',  # CDF gradient incorrect at 0.
+    'LambertWNormal',  # CDF gradient incorrect at 0.
     'SigmoidBeta',  # inverse CDF numerical precision issues for large x
     'StudentT',  # CDF gradient incorrect at 0 (and unstable near zero).
     )
@@ -96,8 +97,6 @@ class DistributionBijectorsTest(test_util.TestCase):
 
     dist = data.draw(dhps.base_distributions(
         dist_name=dist_name,
-        # TODO(b/175354524) fix autodiff for batch LDJs and enable batch tests.
-        batch_shape=[],
         enable_vars=False,
         param_strategy_fn=_constrained_zeros_fn))
     try:
@@ -143,13 +142,12 @@ class DistributionBijectorsTest(test_util.TestCase):
       'build_asvi_surrogate_posterior')
   def test_mcmc_funnel_docstring_example_runs(self):
 
-    # TODO(b/170865194): Use JDC here once sample_chain can take non-list state.
-    model_with_funnel = tfd.JointDistributionSequentialAutoBatched([
-        tfd.Normal(loc=-1., scale=2., name='z'),
-        lambda z: tfd.Normal(loc=[0.], scale=tf.exp(z), name='x'),
-        lambda x: tfd.Poisson(log_rate=x, name='y')])
-    pinned_model = tfp.experimental.distributions.JointDistributionPinned(
-        model_with_funnel, y=[1])
+    @tfd.JointDistributionCoroutineAutoBatched
+    def model_with_funnel():
+      z = yield tfd.Normal(loc=-1., scale=2., name='z')
+      x = yield tfd.Normal(loc=[0.], scale=tf.exp(z), name='x')
+      yield tfd.Poisson(log_rate=x, name='y')
+    pinned_model = model_with_funnel.experimental_pin(y=[1])
     surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
         pinned_model)
 

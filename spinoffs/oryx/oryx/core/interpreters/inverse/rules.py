@@ -48,6 +48,39 @@ register_elementwise(lax.cos_p)(np.arccos)
 register_elementwise(lax.expm1_p)(np.log1p)
 register_elementwise(lax.log1p_p)(np.expm1)
 register_elementwise(lax.neg_p)(lambda x: -x)
+register_elementwise(lax.sqrt_p)(np.square)
+
+
+@register_elementwise(lax.integer_pow_p)
+def integer_pow_inverse(z, *, y):
+  """Inverse for `integer_pow_p` primitive."""
+  if y == 0:
+    raise ValueError('Cannot invert raising to a value to the 0-th power.')
+  elif y == 1:
+    return z
+  elif y == -1:
+    return np.reciprocal(z)
+  elif y == 2:
+    return np.sqrt(z)
+  return lax.pow(z, 1. / y)
+
+
+def pow_left(x, z, ildj_):
+  # x ** y = z
+  # y = f^-1(z) = log(z) / log(x)
+  # grad(f^-1)(z) = 1 / (z log(x))
+  # log(grad(f^-1)(z)) = log(1 / (z log(x))) = -log(z) - log(log(x))
+  return np.log(z) / np.log(x), ildj_ - np.log(z) - np.log(np.log(x))
+
+
+def pow_right(y, z, ildj_):
+  # x ** y = z
+  # x = f^-1(z) = z ** (1 / y)
+  # grad(f^-1)(z) = 1 / y * z ** (1 / y - 1)
+  # log(grad(f^-1)(z)) = (1 / y - 1)log(z) - log(y)
+  y_inv = np.reciprocal(y)
+  return lax.pow(z, y_inv), ildj_ + (y_inv - 1.) * np.log(z) - np.log(y)
+register_binary(lax.pow_p)(pow_left, pow_right)
 
 
 def add_left(left_val, out_val, ildj_):
@@ -182,15 +215,6 @@ def expit_ildj(y):
 def logit_ildj(y):
   return -jax.nn.softplus(-y) - jax.nn.softplus(y)
 
-# Monkey patching JAX so we can define custom, more numerically stable inverses.
-jax.scipy.special.expit = custom_inverse(jax.scipy.special.expit)
-jax.scipy.special.logit = custom_inverse(jax.scipy.special.logit)
-jax.nn.sigmoid = jax.scipy.special.expit
-jax.scipy.special.expit.def_inverse_unary(f_inv=jax.scipy.special.logit,
-                                          f_ildj=expit_ildj)
-jax.scipy.special.logit.def_inverse_unary(f_inv=jax.scipy.special.expit,
-                                          f_ildj=logit_ildj)
-
 
 def convert_element_type_ildj(incells, outcells, *, new_dtype, **params):
   """InverseAndILDJ rule for convert_element_type primitive."""
@@ -206,3 +230,14 @@ def convert_element_type_ildj(incells, outcells, *, new_dtype, **params):
             val, new_dtype=incell.aval.dtype, **params))]
   return incells, outcells, None
 ildj_registry[lax.convert_element_type_p] = convert_element_type_ildj
+
+
+# Monkey patching JAX so we can define custom, more numerically stable inverses.
+jax.scipy.special.expit = custom_inverse(jax.scipy.special.expit)
+jax.scipy.special.logit = custom_inverse(jax.scipy.special.logit)
+jax.nn.sigmoid = jax.scipy.special.expit
+jax.scipy.special.expit.def_inverse_unary(f_inv=jax.scipy.special.logit,
+                                          f_ildj=expit_ildj)
+jax.scipy.special.logit.def_inverse_unary(f_inv=jax.scipy.special.expit,
+                                          f_ildj=logit_ildj)
+

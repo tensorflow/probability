@@ -17,8 +17,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 import numpy as np
 import tensorflow.compat.v2 as tf
 
@@ -41,7 +39,8 @@ __all__ = [
 ]
 
 
-class MultivariateStudentTLinearOperator(distribution.Distribution):
+class MultivariateStudentTLinearOperator(
+    distribution.AutoCompositeTensorDistribution):
   """The [Multivariate Student's t-distribution](
 
   https://en.wikipedia.org/wiki/Multivariate_t-distribution) on `R^k`.
@@ -218,29 +217,13 @@ class MultivariateStudentTLinearOperator(distribution.Distribution):
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
-    # Subclasses must implement their own `_parameter_properties`. If they
-    # don't, call the base Distribution version to raise a NotImplementedError.
-    if cls is MultivariateStudentTLinearOperator:
-      return dict(
-          df=parameter_properties.ParameterProperties(
-              default_constraining_bijector_fn=(
-                  lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))
-              ),
-          loc=parameter_properties.ParameterProperties(event_ndims=1),
-          scale=parameter_properties.BatchedComponentProperties())
-    return distribution.Distribution._parameter_properties(dtype=dtype)  # pylint: disable=protected-access
-
-  def _batch_shape_tensor(self):
-    shape_list = [
-        self.scale.batch_shape_tensor(),
-        tf.shape(self.df),
-        tf.shape(self.loc)[:-1]
-    ]
-    return functools.reduce(tf.broadcast_dynamic_shape, shape_list)
-
-  def _batch_shape(self):
-    shape_list = [self.scale.batch_shape, self.df.shape, self.loc.shape[:-1]]
-    return functools.reduce(tf.broadcast_static_shape, shape_list)
+    return dict(
+        df=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))
+            ),
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        scale=parameter_properties.BatchedComponentProperties())
 
   def _event_shape_tensor(self):
     return self.scale.range_dimension_tensor()[tf.newaxis]

@@ -86,10 +86,17 @@ NO_LOG_PROB_PARAM_GRADS = (
 
 NO_KL_PARAM_GRADS = ('Deterministic', 'VectorDeterministic')
 
+# Number of tensor conversions, *in addition to* the default conversions, is
+# allowed for these distributions.
 EXTRA_TENSOR_CONVERSION_DISTS = {
+    'LambertWNormal': 2,
     'RelaxedBernoulli': 1,
     'WishartTriL': 3,  # not concretizing linear operator scale
     'Chi': 2,  # subclasses `Chi2`, runs redundant checks on `df` parameter
+    # Validating args 2 conversions, in addition to 1-3 extra for the method.
+    # E.g. entropy requires 2 extra, since it requires the base operator does a
+    # determinant + solve inside log_abs_determinant.
+    'MultivariateNormalDiagPlusLowRankCovariance': 3,
 }
 
 # TODO(b/130815467) All distributions should be auto-vectorizeable.
@@ -146,11 +153,11 @@ XLA_LOGPROB_ATOL.update({
     'Binomial': 5e-6,
     'Categorical': 7e-6,  # sparse_softmax_cross_entropy_with_logits
     'DeterminantalPointProcess': 2e-5,
-    'DirichletMultinomial': 1e-4,
+    'DirichletMultinomial': 5e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
     'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
-    'FiniteDiscrete': 6e-6,  # sparse_softmax_cross_entropy_with_logits
+    'FiniteDiscrete': 1e-5,  # sparse_softmax_cross_entropy_with_logits
     'HalfCauchy': 2e-6,
     'InverseGamma': 1e-4,
     'Kumaraswamy': 4e-5,
@@ -159,7 +166,8 @@ XLA_LOGPROB_ATOL.update({
     'OneHotCategorical': 6e-6,
     'PowerSpherical': 2e-5,
     'SigmoidBeta': 5e-4,
-    'Skellam': 1e-4
+    'Skellam': 1e-4,
+    'TruncatedCauchy': 1e-5,
 })
 
 XLA_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
@@ -174,7 +182,7 @@ XLA_LOGPROB_RTOL.update({
     'CholeskyLKJ': 1e-4,
     'ContinuousBernoulli': 2e-6,
     'Dirichlet': 1e-3,
-    'DirichletMultinomial': 2e-4,
+    'DirichletMultinomial': 5e-4,
     'ExpRelaxedOneHotCategorical': 1e-3,  # TODO(b/163118820)
     'ExpGamma': 5e-2,  # TODO(b/166257329)
     'ExpInverseGamma': 5e-2,  # TODO(b/166257329)
@@ -188,6 +196,7 @@ XLA_LOGPROB_RTOL.update({
     'MultivariateNormalDiag': 5e-6,
     'MultivariateNormalFullCovariance': 1e-5,
     'MultivariateNormalTriL': 1e-5,
+    'MultivariateNormalDiagPlusLowRankCovariance': 1e-4,
     'OneHotCategorical': 1e-3,  # TODO(b/163118820)
     'PERT': 5e-4,
     'Poisson': 3e-2,  # TODO(b/159999573)
@@ -195,7 +204,7 @@ XLA_LOGPROB_RTOL.update({
     'RelaxedBernoulli': 3e-3,
     'RelaxedOneHotCategorical': 2e-3,  # TODO(b/163118820)
     'SigmoidBeta': 5e-4,
-    'TruncatedCauchy': 2e-5,
+    'TruncatedCauchy': 5e-5,
     'VectorExponentialDiag': 7e-5,
     'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
@@ -204,10 +213,11 @@ XLA_LOGPROB_RTOL.update({
 
 
 SKIP_KL_CHECK_DIST_VAR_GRADS = [
-    'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
-    'JohnsonSU',  # TD's KL gradients do not rely on bijector variables.
     'GeneralizedExtremeValue',  # TD's KL gradients do not rely on bijector
                                 # variables.
+    'JohnsonSU',  # TD's KL gradients do not rely on bijector variables.
+    'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
+    'SinhArcsinh',  # TD's KL gradients do not rely on bijector variables.
 ]
 
 
@@ -312,7 +322,7 @@ class DistributionGradientTapeAndConcretizationTest(test_util.TestCase):
     dist2 = dist2.copy(validate_args=False)
 
     # Test that KL divergence reads distribution parameters at most once, and
-    # that is produces non-None gradients.
+    # that it produces non-None gradients.
     try:
       for d1, d2 in (dist, dist2), (dist2, dist):
         if dist_name in SKIP_KL_CHECK_DIST_VAR_GRADS:

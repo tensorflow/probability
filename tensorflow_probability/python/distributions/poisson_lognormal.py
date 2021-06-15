@@ -156,7 +156,8 @@ def quadrature_scheme_lognormal_quantiles(
     return grid, probs
 
 
-class PoissonLogNormalQuadratureCompound(distribution.Distribution):
+class PoissonLogNormalQuadratureCompound(
+    distribution.AutoCompositeTensorDistribution):
   """`PoissonLogNormalQuadratureCompound` distribution.
 
   The `PoissonLogNormalQuadratureCompound` is an approximation to a

@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
@@ -27,6 +25,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -52,7 +51,7 @@ def _unvec(x, matrix_shape):
       [prefer_static.shape(x)[:-1], matrix_shape], axis=0))
 
 
-class MatrixNormalLinearOperator(distribution.Distribution):
+class MatrixNormalLinearOperator(distribution.AutoCompositeTensorDistribution):
   """The Matrix Normal distribution on `n x p` matrices.
 
   The Matrix Normal distribution is defined over `n x p` matrices and
@@ -91,12 +90,11 @@ class MatrixNormalLinearOperator(distribution.Distribution):
   col_cov = [[ 0.36,  0.12,  0.06],
              [ 0.12,  0.29, -0.13],
              [ 0.06, -0.13,  0.26]]
-  scale_column = tf.cholesky(col_cov)
+  scale_column = tf.linalg.LinearOperatorTriL(tf.cholesky(col_cov))
   # ==> [[ 0.6,  0. ,  0. ],
   #      [ 0.2,  0.5,  0. ],
   #      [ 0.1, -0.3,  0.4]])
-  scale_row = [[0.9, 0.],
-               [0. , 0.8]]
+  scale_row = tf.linalg.LinearOperatorDiag([0.9, 0.8])
 
   mvn = tfd.MatrixNormalLinearOperator(
       loc=mu,
@@ -154,9 +152,12 @@ class MatrixNormalLinearOperator(distribution.Distribution):
           loc, dtype=dtype, name='loc')
     self._loc = loc
 
+    if not hasattr(scale_row, 'matmul'):
+      raise ValueError('`scale_row` must be a `tf.linalg.LinearOperator`.')
+    if not hasattr(scale_column, 'matmul'):
+      raise ValueError('`scale_column` must be a `tf.linalg.LinearOperator`.')
     if validate_args and not scale_row.is_non_singular:
       raise ValueError('`scale_row` must be non-singular.')
-
     if validate_args and not scale_column.is_non_singular:
       raise ValueError('`scale_column` must be non-singular.')
 
@@ -171,6 +172,13 @@ class MatrixNormalLinearOperator(distribution.Distribution):
         parameters=parameters,
         name=name)
     self._parameters = parameters
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=2),
+        scale_row=parameter_properties.BatchedComponentProperties(),
+        scale_column=parameter_properties.BatchedComponentProperties())
 
   def _as_multivariate_normal(self, loc=None):
     # Rebuild the Multivariate Normal Distribution on every call because the
@@ -205,6 +213,13 @@ class MatrixNormalLinearOperator(distribution.Distribution):
     samples = self._as_multivariate_normal(loc=loc).sample(n, seed=seed)
     return _unvec(samples, self._event_shape_tensor(loc=loc))
 
+  def _sample_and_log_prob(self, sample_shape, seed):
+    loc = tf.convert_to_tensor(self.loc)
+    x, lp = self._as_multivariate_normal(
+        loc=loc).experimental_sample_and_log_prob(
+            sample_shape, seed=seed)
+    return _unvec(x, self._event_shape_tensor(loc=loc)), lp
+
   def _entropy(self):
     return self._as_multivariate_normal().entropy()
 
@@ -222,20 +237,6 @@ class MatrixNormalLinearOperator(distribution.Distribution):
   def scale_column(self):
     """Distribution parameter for column scale."""
     return self._scale_column
-
-  def _batch_shape(self):
-    return functools.reduce(tf.broadcast_static_shape, (
-        self.loc.shape[:-2],
-        self.scale_row.shape[:-2],
-        self.scale_column.shape[:-2]))
-
-  def _batch_shape_tensor(self, loc=None, scale_row=None, scale_column=None):
-    return functools.reduce(prefer_static.broadcast_shape, (
-        prefer_static.shape(self.loc if loc is None else loc)[:-2],
-        prefer_static.shape(
-            self.scale_row if scale_row is None else scale_row)[:-2],
-        prefer_static.shape(
-            self.scale_column if scale_column is None else scale_column)[:-2]))
 
   def _event_shape_tensor(self, loc=None):
     return tf.shape(self.loc if loc is None else loc)[-2:]

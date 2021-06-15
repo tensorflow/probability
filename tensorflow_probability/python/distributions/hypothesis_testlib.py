@@ -61,6 +61,7 @@ TF2_UNFRIENDLY_DISTS = (
 SPECIAL_DISTS = (
     'Autoregressive',
     'BatchBroadcast',  # (has strategy)
+    'BatchConcat',
     'BatchReshape',  # (has strategy)
     'Blockwise',
     'Distribution',  # Base class; not a distribution at all
@@ -76,15 +77,23 @@ SPECIAL_DISTS = (
     'GaussianProcess',  # PSDKernel strategy not implemented.
     'GaussianProcessRegressionModel',  # PSDKernel strategy not implemented.
     'Independent',  # (has strategy)
+    'LambertWDistribution',
+    'MatrixNormalLinearOperator',
+    'MatrixTLinearOperator',
+    'MarkovChain',
     'Masked',  # (has strategy)
     'Mixture',  # (has strategy)
     'MixtureSameFamily',  # (has strategy)
     'MultivariateNormalLinearOperator',
+    'MultivariateNormalLowRankUpdateLinearOperatorCovariance',
     'MultivariateNormalDiagPlusLowRank',  # Some batch shapes fail (b/177958275)
     'MultivariateStudentTLinearOperator',
     'Sample',  # (has strategy)
+    'StudentTProcess',
     'TransformedDistribution',  # (has strategy)
     'QuantizedDistribution',  # (has strategy)
+    'VariationalGaussianProcess',  # PSDKernel strategy not implemented.
+    'WishartLinearOperator'
 )
 
 
@@ -339,6 +348,14 @@ CONSTRAINTS = {
         # Prevent large low-rank perturbations from creating numerically
         # singular matrices.
         tf.math.tanh,
+    'MultivariateNormalDiagPlusLowRankCovariance.cov_diag_factor':
+        # Ensure that the diagonal component is large enough to avoid being
+        # overwhelmed  by the (singular) low-rank perturbation.
+        tfp_hps.softplus_plus_eps(1. + 1e-6),
+    'MultivariateNormalDiagPlusLowRankCovariance.cov_perturb_factor':
+        # Prevent large low-rank perturbations from creating numerically
+        # singular matrices.
+        tf.math.tanh,
     'NormalInverseGaussian':
         fix_normal_inverse_gaussian,
     'PERT':
@@ -422,7 +439,7 @@ def _instantiable_base_dists():
       params_event_ndims = {
           k: p.event_ndims
           for (k, p) in dist_class.parameter_properties().items()
-          if p.is_tensor
+          if p.is_tensor and p.event_ndims is not None
       }
       has_concrete_event_ndims = all(
           isinstance(nd, int) for nd in params_event_ndims.values())
@@ -808,8 +825,6 @@ def params_used(dist):
 def spherical_uniforms(
     draw, batch_shape=None, event_dim=None, validate_args=True):
   """Strategy for drawing `SphericalUniform` distributions.
-
-  The underlying distribution is drawn from the `distributions` strategy.
 
   Args:
     draw: Hypothesis strategy sampler supplied by `@hps.composite`.

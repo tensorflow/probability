@@ -53,7 +53,7 @@ def log_prob_ratio(p, x, q, y, name=None, **kwargs):
     if cls in _log_prob_ratio_registry:
       return _log_prob_ratio_registry[cls](p, x, q, y, name=name, **kwargs)
   with tf.name_scope(name or 'log_prob_ratio'):
-    return p.log_prob(x) - q.log_prob(y)
+    return p.unnormalized_log_prob(x) - q.unnormalized_log_prob(y)
 
 
 class RegisterLogProbRatio(object):

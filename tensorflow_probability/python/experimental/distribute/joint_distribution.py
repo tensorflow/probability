@@ -18,54 +18,88 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as distribution_lib
+from tensorflow_probability.python.distributions import joint_distribution as jd_lib
 from tensorflow_probability.python.distributions import log_prob_ratio as lp_ratio
-from tensorflow_probability.python.experimental.distribute import distribute_lib
-from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import distribute_lib
 
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+
+def pbroadcast_value(value, value_axis_names, output_axis_names):
+  value_axis_names = distribute_lib.canonicalize_axis_name(value_axis_names)
+  pbroadcast_axes = [
+      axis_name for axis_name in output_axis_names
+      if axis_name not in value_axis_names
+  ]
+  return distribute_lib.pbroadcast(value, pbroadcast_axes)
+
+
+def _maybe_substitute_or_add_value_in_tuple(value_tuple, index, value):
+  if index > len(value_tuple):
+    raise ValueError('Cannot add value to tuple without available slot.')
+  if index == len(value_tuple):
+    return value_tuple + (value,)
+  curr_value = value_tuple[index]
+  if curr_value is not None:
+    return value_tuple
+  return value_tuple[:index] + (value,) + value_tuple[index + 1:]
 
 
 class JointDistributionDistributedMixin(object):
   """A JDMixin that shards the log_prob calculation."""
 
-  def _map_measure_over_dists(self, attr, value):
-    """Override the default implementation to shard its log_prob calculation."""
-    if any(x is None for x in tf.nest.flatten(value)):
-      raise ValueError('No `value` part can be `None`; saw: {}.'.format(value))
-    if (attr in ('log_prob', 'unnormalized_log_prob')) and any(
-        self.experimental_shard_axis_names):
+  def _call_execute_model(
+      self,
+      sample_shape=(),
+      seed=None,
+      value=None,
+      sample_and_trace_fn=jd_lib.trace_distributions_and_values):
+    return self._distribute_execute_model(
+        sample_shape=sample_shape,
+        seed=seed,
+        value=value if value is None else self._model_flatten(value),
+        sample_and_trace_fn=sample_and_trace_fn)
 
-      def inner_log_prob_parts(flat_value):
-        unflat_value = self._model_unflatten(flat_value)
-        ds, xs = self._call_flat_sample_distributions(
-            value=unflat_value, seed=samplers.zeros_seed())
-        # For sharded distributions, we need to make sure not to do an
-        # all-reduce.
-        axis_names = self._model_flatten(self.experimental_shard_axis_names)
-        log_prob_fns = [
-            functools.partial(getattr(d, attr), reduce_over_shards=False)
-            if axis_name else getattr(d, attr)
-            for d, axis_name in zip(ds, axis_names)
-        ]
-        # We need to flatten and unflatten here to ensure the output structure
-        # matches `flat_sharded_distributions`.
-        vals = self._model_unflatten(
-            [log_prob_fn(x) for log_prob_fn, x in zip(log_prob_fns, xs)])
-        return self._model_flatten(vals)
+  def _distribute_execute_model(
+      self,
+      sample_shape=(),
+      seed=None,
+      value=None,
+      sample_and_trace_fn=jd_lib.trace_distributions_and_values):
+    """Executes a model, adding `pbroadcasts` to ensure correct gradients."""
+    shard_axis_names = self._model_flatten(self.experimental_shard_axis_names)
+    final_values_out = []
+    if value is None:
+      value = ()
 
-      flat_value = self._model_flatten(value)
-      flat_axis_names = self._model_flatten(self.experimental_shard_axis_names)
-      flat_xs = distribute_lib.make_sharded_log_prob_parts(
-          inner_log_prob_parts, flat_axis_names)(
-              flat_value)
-      return iter(flat_xs)
-    ds, xs = self._call_flat_sample_distributions(
-        value=value, seed=samplers.zeros_seed())
-    return (getattr(d, attr)(x) for d, x in zip(ds, xs))
+    def sample_and_trace_value_fn(dist,
+                                  sample_shape,
+                                  seed,
+                                  value=None):
+      value, traced = sample_and_trace_fn(
+          dist=dist, sample_shape=sample_shape, seed=seed, value=value)
+      # We trace `next_value` here so we can pass it back in as part of `value`
+      # in the next iteration of the coroutine.
+      return value, (value, traced)
+
+    for output_index, output_axes in enumerate(shard_axis_names):
+      # We pbroadcast all values according to the difference between the current
+      # `output_axes` and their own active axes.
+      previous_shard_axes = shard_axis_names[:len(value)]
+      pbroadcasted_value = tuple(
+          pbroadcast_value(v, v_axis_names, output_axes)
+          for v, v_axis_names in zip(value, previous_shard_axes)
+      )
+      pbroadcasted_values, traced_values = zip(*super()._execute_model(
+          sample_shape=sample_shape,
+          seed=seed,
+          value=pbroadcasted_value + (None,),
+          stop_index=output_index + 1,
+          sample_and_trace_fn=sample_and_trace_value_fn))
+      value = _maybe_substitute_or_add_value_in_tuple(
+          value, output_index, pbroadcasted_values[output_index])
+      final_values_out.append(traced_values[output_index])
+    return final_values_out
 
 
 class JointDistributionSequential(JointDistributionDistributedMixin,
@@ -100,27 +134,4 @@ def _dist_jd_log_prob_ratio(p, x, q, y, name=None):
     if p_axis_names != q_axis_names:
       raise ValueError('p and q must use the same sharding. '
                        f'Saw: p: {p}, {p_axis_names}, q: {q}, {q_axis_names}')
-
-    def log_prob_ratio_parts_fn(x_y):
-      x = tf.nest.map_structure(lambda part: part[0], x_y)
-      y = tf.nest.map_structure(lambda part: part[1], x_y)
-      p_dists = p.sample_distributions(value=x, seed=samplers.zeros_seed())[0]
-      q_dists = q.sample_distributions(value=y, seed=samplers.zeros_seed())[0]
-      # Ensure sharded distributions defer reductions.
-      kwds = lambda a: {'reduce_over_shards': False} if a else {}
-      return nest.map_structure_up_to(
-          p_dists,
-          lambda p, x, q, y, s: lp_ratio.log_prob_ratio(p, x, q, y, **kwds(s)),
-          p_dists, x, q_dists, y, p_axis_names)
-
-    return tf.add_n(
-        tf.nest.flatten(
-            distribute_lib.make_sharded_log_prob_parts(
-                log_prob_ratio_parts_fn,
-                # Stack, because make_sharded_log_prob_parts expects
-                # inputs/outputs to be 1 to 1. TODO(b/175084455): revisit this
-                # after the distributed bijectors are done, as it is likely that
-                # make_sharded_log_prob_parts will be adjusted then to not have
-                # this limitation.
-                p_axis_names)(tf.nest.map_structure(
-                    lambda x, y: tf.stack([x, y], axis=0), x, y))))
+    return jd_lib._jd_log_prob_ratio(p, x, q, y, name=name)  # pylint: disable=protected-access

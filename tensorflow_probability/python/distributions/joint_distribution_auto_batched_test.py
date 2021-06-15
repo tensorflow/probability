@@ -203,8 +203,10 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # This model's broadcasting behavior is a footgun (it can break inference
     # routines and cause silently incorrect optimization); it should be
     # disallowed by `validate_args`.
-    with self.assertRaisesRegexp(Exception,
-                                 'Component batch shapes are inconsistent'):
+    with self.assertRaisesRegexp(
+        Exception,
+        ('Component batch shapes are inconsistent|'
+         'Broadcasting probably indicates an error in model specification')):
       jda_invalid = jda_class(jd_auto_models[jda_class],
                               batch_ndims=1, validate_args=True)
       _ = self.evaluate(jda_invalid.log_prob(
@@ -331,6 +333,66 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         tf.math.log((1. + b)))
 
     self.assertAllClose(*self.evaluate([log_prob, expected_log_prob]))
+
+  @parameterized.named_parameters(
+      {'testcase_name': 'coroutine',
+       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
+      {'testcase_name': 'sequential',
+       'jd_class': tfd.JointDistributionSequentialAutoBatched},
+      {'testcase_name': 'named',
+       'jd_class': tfd.JointDistributionNamedAutoBatched})
+  def test_sample_and_log_prob(self, jd_class):
+
+    # Define a bijector to detect if/when `inverse` is called.
+    inverted_values = []
+
+    class InverseTracingExp(tfb.Exp):
+
+      def _inverse(self, y):
+        inverted_values.append(y)
+        return tf.math.log(y)
+
+    models = {}
+
+    def coroutine_model():
+      g = yield InverseTracingExp()(tfd.Normal(0., 1.), name='g')
+      df = yield tfd.Exponential(1., name='df')
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20, name='loc')
+      yield tfd.StudentT(df, loc, 1, name='x')
+    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[tfd.JointDistributionSequentialAutoBatched] = [
+        InverseTracingExp()(tfd.Normal(0., 1.), name='g'),
+        tfd.Exponential(1., name='df'),
+        lambda _, g: tfd.Sample(tfd.Normal(0, g), 20, name='loc'),
+        lambda loc, df: tfd.StudentT(df, loc, 1, name='x')
+    ]
+
+    models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
+        ('g', InverseTracingExp()(tfd.Normal(0., 1.))),
+        ('df', tfd.Exponential(1.)),
+        ('loc', lambda g: tfd.Sample(tfd.Normal(0, g), 20)),
+        ('x', lambda loc, df: tfd.StudentT(df, loc, 1))))
+
+    joint = jd_class(models[jd_class], validate_args=True)
+
+    for sample_shape in ([], [5]):
+      inverted_values.clear()
+      x1, lp1 = self.evaluate(
+          joint.experimental_sample_and_log_prob(
+              sample_shape,
+              seed=test_util.test_seed(sampler_type='seedless'),
+              df=2.7))  # Check that kwargs are supported.
+      x2 = self.evaluate(
+          joint.sample(sample_shape,
+                       seed=test_util.test_seed(sampler_type='seedless'),
+                       df=2.7))
+      self.assertAllCloseNested(x1, x2)
+
+      self.assertLen(inverted_values, 0)
+      lp2 = joint.log_prob(x1)
+      self.assertLen(inverted_values, 1)
+      self.assertAllClose(lp1, lp2)
 
   def test_sample_with_batch_value(self):
     @tfd.JointDistributionCoroutineAutoBatched
@@ -486,6 +548,19 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         [1, 1],
         dist.sample([1, 1],
                     seed=test_util.test_seed(sampler_type='seedless')).x.shape)
+
+  def test_unit_sample_shape(self):
+    @tfd.JointDistributionCoroutineAutoBatched
+    def dist():
+      x = yield tfd.Normal(loc=tf.zeros([3]), scale=1., name='x')
+      yield tfd.Bernoulli(logits=tf.einsum('n->', x), name='y')
+
+    for sample_shape in [(), 1, [1], [1, 1], [2]]:
+      self.assertAllEqual(
+          dist.log_prob(
+              dist.sample(sample_shape,
+                          seed=test_util.test_seed())).shape,
+          np.reshape(sample_shape, [-1]))
 
   def test_sample_dtype_structures_output(self):
 
@@ -688,9 +763,13 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         joint.event_shape)
 
     # Sample shape.
-    z2 = joint.sample(5, seed=test_util.test_seed())
+    z2 = self.evaluate(
+        joint.sample(5, seed=test_util.test_seed()))
     lp2 = joint.log_prob(z2)
     self.assertAllEqual(lp2.shape, [5])
+
+    z3 = joint.sample(value=z2, seed=test_util.test_seed())
+    self.assertAllCloseNested(z2, z3)
 
   @parameterized.named_parameters(*[
       dict(testcase_name='_{}{}'.format(jd_class.__name__,  # pylint: disable=g-complex-comprehension

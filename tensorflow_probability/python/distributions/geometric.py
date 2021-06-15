@@ -34,7 +34,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
-class Geometric(distribution.Distribution):
+class Geometric(distribution.AutoCompositeTensorDistribution):
   """Geometric distribution.
 
   The Geometric distribution is parameterized by p, the probability of a
@@ -139,14 +139,6 @@ class Geometric(distribution.Distribution):
   def force_probs_to_zero_outside_support(self):
     """Return 0 probabilities on non-integer inputs."""
     return self._force_probs_to_zero_outside_support
-
-  def _batch_shape_tensor(self):
-    x = self._probs if self._logits is None else self._logits
-    return ps.shape(x)
-
-  def _batch_shape(self):
-    x = self._probs if self._logits is None else self._logits
-    return x.shape
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -269,11 +261,11 @@ class Geometric(distribution.Distribution):
     if self._logits is None:
       probs = tf.convert_to_tensor(self._probs)
       return tf.math.log(probs) - tf.math.log1p(-probs)
-    return tf.identity(self._logits)
+    return tensor_util.identity_as_tensor(self._logits)
 
   def _probs_parameter_no_checks(self):
     if self._logits is None:
-      return tf.identity(self._probs)
+      return tensor_util.identity_as_tensor(self._probs)
     return tf.math.sigmoid(self._logits)
 
   def _logits_and_probs_no_checks(self):

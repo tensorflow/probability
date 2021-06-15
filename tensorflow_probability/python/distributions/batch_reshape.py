@@ -26,6 +26,7 @@ from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -123,6 +124,12 @@ class BatchReshape(distribution_lib.Distribution):
           parameters=parameters,
           name=name)
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        distribution=parameter_properties.BatchedComponentProperties(),
+        batch_shape=parameter_properties.ShapeParameterProperties())
+
   def _calculate_new_shape(self):
     # Try to get the old shape statically if available.
     original_shape = self._distribution.batch_shape
@@ -203,6 +210,16 @@ class BatchReshape(distribution_lib.Distribution):
         ],
         axis=0)
     return tf.reshape(x, new_shape)
+
+  def _sample_and_log_prob(self, sample_shape, seed=None, **kwargs):
+    x, lp = self.distribution.experimental_sample_and_log_prob(
+        sample_shape=sample_shape, seed=seed, **kwargs)
+    return (tf.reshape(x, tf.concat([sample_shape,
+                                     self._batch_shape_unexpanded,
+                                     self.event_shape_tensor()], axis=0)),
+            tf.reshape(lp, tf.concat([sample_shape,
+                                      self._batch_shape_unexpanded],
+                                     axis=0)))
 
   def _log_prob(self, x, **kwargs):
     return self._call_reshape_input_output(
@@ -459,10 +476,6 @@ class BatchReshape(distribution_lib.Distribution):
       assertions.append(shape_assertion)
 
     return assertions
-
-  _composite_tensor_nonshape_params = ('distribution',)
-
-  _composite_tensor_shape_params = ('batch_shape',)
 
 
 def validate_init_args_statically(distribution, batch_shape):

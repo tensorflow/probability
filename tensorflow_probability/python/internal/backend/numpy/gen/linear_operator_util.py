@@ -230,7 +230,7 @@ def assert_zero_imag_part(x, message=None, name="assert_zero_imag_part"):
     x = ops.convert_to_tensor(x, name="x")
     dtype = x.dtype
 
-    if dtype.is_floating:
+    if np.issubdtype(dtype, np.floating):
       return control_flow_ops.no_op()
 
     zero = ops.convert_to_tensor(0, dtype=dtypes.real_dtype(dtype))

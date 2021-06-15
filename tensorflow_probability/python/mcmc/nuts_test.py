@@ -29,7 +29,12 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import distribute_test_lib
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+
+JAX_MODE = False
 
 
 @tf.function(autograph=False)
@@ -568,6 +573,88 @@ class NutsTest(test_util.TestCase):
     # Check that mcmc sample quality is acceptable with tuning
     self.assertAllClose(
         average_rhat, np.ones_like(average_rhat), atol=0.05, rtol=0.05)
+
+  def test_step_size_trace(self):
+    dist = tfd.Normal(0., 1.)
+    kernel = tfp.mcmc.NoUTurnSampler(dist.log_prob, step_size=1.)
+    _, _, fkr = tfp.mcmc.sample_chain(10, 0., kernel=kernel,
+                                      return_final_kernel_results=True,
+                                      seed=test_util.test_seed())
+    self.assertAlmostEqual(1., self.evaluate(fkr.step_size))
+
+
+@test_util.test_all_tf_execution_regimes
+class DistributedNutsTest(distribute_test_lib.DistributedTest):
+
+  def test_nuts_kernel_tracks_axis_names(self):
+    kernel = tfp.mcmc.NoUTurnSampler(
+        tfd.Normal(0, 1).log_prob, step_size=1.9)
+    self.assertIsNone(kernel.experimental_shard_axis_names)
+    kernel = tfp.mcmc.NoUTurnSampler(
+        tfd.Normal(0, 1).log_prob, step_size=1.9,
+        experimental_shard_axis_names=['a'])
+    self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
+    kernel = tfp.mcmc.NoUTurnSampler(
+        tfd.Normal(0, 1).log_prob, step_size=1.9
+    ).experimental_with_shard_axes(['a'])
+    self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
+
+  def test_takes_same_number_leapfrog_steps_with_sharded_state(self):
+
+    if not JAX_MODE:
+      self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
+
+    def target_log_prob(a, b):
+      return (
+          tfd.Normal(0., 1.).log_prob(a)
+          + distribute_lib.psum(tfd.Normal(
+              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+
+    kernel = tfp.mcmc.NoUTurnSampler(target_log_prob, step_size=1.9)
+    sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
+
+    def run(seed):
+      state = [tf.convert_to_tensor(0.), tf.convert_to_tensor(0.)]
+      kr = sharded_kernel.bootstrap_results(state)
+      _, kr = sharded_kernel.one_step(state, kr, seed=seed)
+      return kr.leapfrogs_taken
+
+    leapfrogs_taken = self.evaluate(self.per_replica_to_tensor(
+        self.strategy_run(run, args=(samplers.zeros_seed(),),
+                          in_axes=None, axis_name='foo'), 0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(leapfrogs_taken[i],
+                          leapfrogs_taken[0])
+
+  def test_unsharded_state_remains_synchronized_across_devices(self):
+
+    if not JAX_MODE:
+      self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
+
+    def target_log_prob(a, b):
+      return (
+          tfd.Normal(0., 1.).log_prob(a)
+          + distribute_lib.psum(tfd.Normal(
+              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+
+    kernel = tfp.mcmc.NoUTurnSampler(target_log_prob, step_size=1e-1)
+    sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
+
+    def run(seed):
+      state = [tf.convert_to_tensor(-10.),
+               tf.convert_to_tensor(-10.)]
+      kr = sharded_kernel.bootstrap_results(state)
+      state, _ = sharded_kernel.one_step(state, kr, seed=seed)
+      return state
+
+    state = self.evaluate(self.per_replica_to_tensor(
+        self.strategy_run(run, args=(samplers.zeros_seed(),),
+                          in_axes=None, axis_name='foo'), 0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(state[0][i],
+                          state[0][0])
 
 
 if __name__ == '__main__':

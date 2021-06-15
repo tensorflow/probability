@@ -16,11 +16,11 @@
 
 from __future__ import print_function
 
-import functools
-
+import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import sequential_monte_carlo_kernel as smc_kernel
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
+from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -395,27 +395,18 @@ def _particle_filter_initial_weighted_particles(observations,
                                                 num_particles,
                                                 seed=None):
   """Initialize a set of weighted particles including the first observation."""
-  # Initial particles all have the same weight, `1. / num_particles`.
-  broadcast_batch_shape = tf.convert_to_tensor(
-      functools.reduce(
-          ps.broadcast_shape,
-          tf.nest.flatten(initial_state_prior.batch_shape_tensor()),
-          []), dtype=tf.int32)
-  initial_log_weights = ps.zeros(
-      ps.concat([[num_particles], broadcast_batch_shape], axis=0),
-      dtype=tf.float32) - ps.log(num_particles)
-
   # Propose an initial state.
   if initial_state_proposal is None:
     initial_state = initial_state_prior.sample(num_particles, seed=seed)
+    initial_log_weights = ps.zeros_like(
+        initial_state_prior.log_prob(initial_state))
   else:
     initial_state = initial_state_proposal.sample(num_particles, seed=seed)
-    initial_log_weights += (initial_state_prior.log_prob(initial_state) -
-                            initial_state_proposal.log_prob(initial_state))
-    # The initial proposal weights are normalized in expectation, but actually
-    # normalizing them reduces variance in the initial marginal
-    # likelihood.
-    initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=0)
+    initial_log_weights = (initial_state_prior.log_prob(initial_state) -
+                           initial_state_proposal.log_prob(initial_state))
+  # Normalize the initial weights. If we used a proposal, the weights are
+  # normalized in expectation, but actually normalizing them reduces variance.
+  initial_log_weights = tf.nn.log_softmax(initial_log_weights, axis=0)
 
   # Return particles weighted by the initial observation.
   return smc_kernel.WeightedParticles(
@@ -437,8 +428,17 @@ def _particle_filter_propose_and_update_log_weights_fn(
   def propose_and_update_log_weights_fn(step, state, seed=None):
     particles, log_weights = state.particles, state.log_weights
     transition_dist = transition_fn(step, particles)
+    assertions = _assert_batch_shape_matches_weights(
+        distribution=transition_dist,
+        weights_shape=ps.shape(log_weights),
+        diststr='transition')
+
     if proposal_fn:
       proposal_dist = proposal_fn(step, particles)
+      assertions += _assert_batch_shape_matches_weights(
+          distribution=proposal_dist,
+          weights_shape=ps.shape(log_weights),
+          diststr='proposal')
       proposed_particles = proposal_dist.sample(seed=seed)
 
       log_weights += (transition_dist.log_prob(proposed_particles) -
@@ -452,11 +452,12 @@ def _particle_filter_propose_and_update_log_weights_fn(
     else:
       proposed_particles = transition_dist.sample(seed=seed)
 
-    return smc_kernel.WeightedParticles(
-        particles=proposed_particles,
-        log_weights=log_weights + _compute_observation_log_weights(
-            step + 1, proposed_particles, observations, observation_fn,
-            num_transitions_per_observation=num_transitions_per_observation))
+    with tf.control_dependencies(assertions):
+      return smc_kernel.WeightedParticles(
+          particles=proposed_particles,
+          log_weights=log_weights + _compute_observation_log_weights(
+              step + 1, proposed_particles, observations, observation_fn,
+              num_transitions_per_observation=num_transitions_per_observation))
   return propose_and_update_log_weights_fn
 
 
@@ -522,3 +523,41 @@ def reconstruct_trajectories(particles, parent_indices, name=None):
           part, ancestor_indices, axis=1, indices_axis=1),
       particles)
 
+
+def _assert_batch_shape_matches_weights(distribution, weights_shape, diststr):
+  """Checks that all parts of a distribution have the expected batch shape."""
+  shapes = [weights_shape] + tf.nest.flatten(distribution.batch_shape_tensor())
+  static_shapes = [tf.get_static_value(ps.convert_to_shape_tensor(s))
+                   for s in shapes]
+  static_shapes_not_none = [s for s in static_shapes if s is not None]
+  static_shapes_match = all([
+      np.all(a == b)  # Also need to check for rank mismatch (below).
+      for (a, b) in zip(static_shapes_not_none[1:],
+                        static_shapes_not_none[:-1])])
+
+  # Build a separate list of static ranks, since rank is often static even when
+  # shape is not.
+  ranks = [ps.rank_from_shape(s) for s in shapes]
+  static_ranks = [int(r) for r in ranks if not tf.is_tensor(r)]
+  static_ranks_match = all([a == b for (a, b) in zip(static_ranks[1:],
+                                                     static_ranks[:-1])])
+
+  msg = (
+      "The {diststr} distribution's batch shape does not match the particle "
+      "weights; a correct {diststr} distribution must return an independent "
+      "log-density for each particle. You may be "
+      "creating a joint distribution in which some parts do not depend on the "
+      "previous particles, and/or you are creating an autobatched joint "
+      "distribution without setting `batch_ndims`.".format(
+          diststr=diststr))
+  if not (static_ranks_match and static_shapes_match):
+    raise ValueError(msg + ' ' +
+                     'Weights have shape {}, but the distribution has batch '
+                     'shape {}.'.format(
+                         weights_shape, distribution.batch_shape))
+
+  assertions = []
+  if distribution.validate_args and any([s is None for s in static_shapes]):
+    assertions = [assert_util.assert_equal(a, b, message=msg)
+                  for a, b in zip(shapes[1:], shapes[:-1])]
+  return assertions

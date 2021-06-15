@@ -35,7 +35,7 @@ __all__ = [
 ]
 
 
-class FillTriangular(bijector.Bijector):
+class FillTriangular(bijector.AutoCompositeTensorBijector):
   """Transforms vectors to triangular.
 
   Triangular matrix elements are filled in a clockwise spiral.

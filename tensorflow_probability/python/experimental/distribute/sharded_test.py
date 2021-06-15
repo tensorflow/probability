@@ -19,12 +19,13 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.distribute import distribute_test_lib as test_lib
 from tensorflow_probability.python.experimental.distribute import sharded
 from tensorflow_probability.python.experimental.distributions import increment_log_prob
 from tensorflow_probability.python.experimental.distributions import joint_density_coroutine
+from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 tfde = tfp.experimental.distributions
 tfp_dist = tfp.experimental.distribute
@@ -206,6 +207,67 @@ class ShardTest(test_lib.DistributedTest):
     self.assertAllClose(tf.ones([2, 2]) * true_lp2, lp2)
     self.assertAllClose(true_g2[0], g2[0])
 
+  def test_log_prob_with_no_axes(self):
+    # The motivation here is to enable writing generic code that works inside
+    # and outside a pmap.
+    def lp_grad(x, axis_name):
+      return tfp.math.value_and_gradient(
+          tfp_dist.Sharded(
+              tfd.Sample(tfd.Normal(0., 1.), x.shape),
+              shard_axis_name=axis_name).log_prob, (x,))
+
+    def true_lp_grad(x):
+      return tfp.math.value_and_gradient(
+          tfd.Sample(tfd.Normal(0., 1.), x.shape).log_prob, (x,))
+
+    x = tf.range(1, 1 + test_lib.NUM_DEVICES, dtype=tf.float32)
+    lp, g = lp_grad(x, axis_name=[])
+    sharded_x = self.shard_values(x)
+    sharded_lp, sharded_g = self.per_replica_to_tensor(
+        self.strategy_run(lambda x: lp_grad(x, self.axis_name), (sharded_x,)))
+    true_lp, true_g = true_lp_grad(x)
+
+    self.assertAllClose(true_lp, lp)
+    self.assertAllClose(true_g, g)
+    self.assertAllClose(true_lp, sharded_lp[0])
+    self.assertAllClose(true_g, sharded_g)
+
+  def test_log_prob_ratio_with_no_axes(self):
+    # The motivation here is to enable writing generic code that works inside
+    # and outside a pmap.
+    def lp_ratio_grad(x0, x1, axis_name):
+      dist0 = tfp_dist.Sharded(
+          tfd.Sample(tfd.Normal(0., 1.), x0.shape), shard_axis_name=axis_name)
+      dist1 = tfp_dist.Sharded(
+          tfd.Sample(tfd.Normal(0., 2.), x0.shape), shard_axis_name=axis_name)
+
+      return tfp.math.value_and_gradient(
+          lambda x0, x1: tfde.log_prob_ratio(dist0, x0, dist1, x1), (x0, x1))
+
+    def true_lp_ratio_grad(x0, x1):
+      dist0 = tfd.Sample(tfd.Normal(0., 1.), x0.shape)
+      dist1 = tfd.Sample(tfd.Normal(0., 2.), x0.shape)
+
+      return tfp.math.value_and_gradient(
+          lambda x0, x1: tfde.log_prob_ratio(dist0, x0, dist1, x1), (x0, x1))
+
+    x0 = tf.range(1, 1 + test_lib.NUM_DEVICES, dtype=tf.float32)
+    x1 = tf.range(5, 5 + test_lib.NUM_DEVICES, dtype=tf.float32)
+    lp_ratio, (g0, g1) = lp_ratio_grad(x0, x1, axis_name=[])
+    sharded_x0 = self.shard_values(x0)
+    sharded_x1 = self.shard_values(x1)
+    sharded_lp_ratio, (sharded_g0, sharded_g1) = self.per_replica_to_tensor(
+        self.strategy_run(lambda x0, x1: lp_ratio_grad(x0, x1, self.axis_name),
+                          (sharded_x0, sharded_x1)))
+    true_lp_ratio, (true_g0, true_g1) = true_lp_ratio_grad(x0, x1)
+
+    self.assertAllClose(true_lp_ratio, lp_ratio)
+    self.assertAllClose(true_g0, g0)
+    self.assertAllClose(true_g1, g1)
+    self.assertAllClose(true_lp_ratio, sharded_lp_ratio[0])
+    self.assertAllClose(true_g0, sharded_g0)
+    self.assertAllClose(true_g1, sharded_g1)
+
   def test_log_prob_ratio_sample(self):
     dist1 = tfd.Sample(tfd.Normal(0., 4.), test_lib.NUM_DEVICES)
     dist2 = tfd.Sample(tfd.Normal(0., 2.), test_lib.NUM_DEVICES)
@@ -318,21 +380,86 @@ class ShardTest(test_lib.DistributedTest):
       ulp, g = tfp.math.value_and_gradient(ulp_fn, (w,))
       return ulp, g
 
+    def test_w_x(w, x):
+      sharded_x = self.shard_values(tf.reshape(x, [test_lib.NUM_DEVICES, -1]))
+
+      lp, g = self.evaluate(
+          self.per_replica_to_tensor(
+              self.strategy_run(ulp_grad, (
+                  w,
+                  sharded_x,
+              ), in_axes=(None, 0))))
+      true_lp, true_g = self.evaluate(true_ulp_grad(w, x))
+
+      self.assertAllClose(true_lp, lp[0])
+      self.assertAllClose(true_g[0], g[0][0])
+
     w = tf.constant(4.)
-    x = tf.zeros([x_size])
-    sharded_x = self.shard_values(tf.reshape(x, [test_lib.NUM_DEVICES, -1]))
+    zeros = tf.zeros([x_size])
+    test_w_x(w, zeros)
+    random_x = self.evaluate(
+        tfd.Normal(loc=tf.zeros([x_size]),
+                   scale=tf.ones([x_size])).sample(seed=self.key))
+    test_w_x(w, random_x)
 
-    lp, g = self.evaluate(
-        self.per_replica_to_tensor(
-            self.strategy_run(ulp_grad, (
-                w,
-                sharded_x,
-            ), in_axes=(None, 0))))
-    true_lp, true_g = self.evaluate(true_ulp_grad(w, x))
+  def test_default_event_space_bijector(self):
+    def sharded_lp_grad(x):
+      dist = tfp_dist.Sharded(
+          tfd.Sample(tfd.Exponential(1.), x.shape),
+          shard_axis_name=self.axis_name)
+      bij = dist.experimental_default_event_space_bijector()
+      dist2 = tfd.TransformedDistribution(dist, tfb.Invert(bij))
+      return tfp.math.value_and_gradient(dist2.log_prob, (x,))
 
-    self.assertAllClose(true_lp, lp[0])
-    self.assertAllClose(true_g[0], g[0][0])
+    def lp_grad(x):
+      dist = tfd.Sample(tfd.Exponential(1.), x.shape)
+      bij = dist.experimental_default_event_space_bijector()
+      dist2 = tfd.TransformedDistribution(dist, tfb.Invert(bij))
+      return tfp.math.value_and_gradient(dist2.log_prob, (x,))
 
+    x = tf.range(1, 1 + test_lib.NUM_DEVICES, dtype=tf.float32)
+    sharded_x = self.shard_values(x)
+    sharded_lp, sharded_g = self.per_replica_to_tensor(
+        self.strategy_run(sharded_lp_grad, (sharded_x,)))
+    true_lp, true_g = lp_grad(x)
+
+    self.assertAllClose(true_lp, sharded_lp[0])
+    self.assertAllClose(true_g, sharded_g)
+
+  def test_none_axis_in_jax_error(self):
+    if not JAX_MODE:
+      self.skipTest('This error is JAX-only.')
+    with self.assertRaisesRegex(
+        ValueError, 'Cannot provide a `None` axis name in JAX backend.'):
+      sharded.Sharded(tfd.Normal(0., 1.))
+
+  def test_none_axis_in_tensorflow(self):
+    if JAX_MODE:
+      self.skipTest('This feature is TensorFlow-only.')
+    dist = sharded.Sharded(tfd.Normal(0., 1.))
+    self.assertEqual([True], dist.experimental_shard_axis_names)
+
+  def test_multiple_axes_in_tensorflow_error(self):
+    if JAX_MODE:
+      self.skipTest('This error is TensorFlow-only.')
+    dist = sharded.Sharded(tfd.Normal(0., 1.), shard_axis_name='i')
+    with self.assertRaisesRegex(
+        ValueError, 'TensorFlow backend does not support multiple shard axes'):
+      sharded.Sharded(dist, shard_axis_name='j')
+    with self.assertRaisesRegex(
+        ValueError, 'TensorFlow backend does not support multiple shard axes'):
+      sharded.Sharded(tfd.Normal(0., 1.), shard_axis_name=['i', 'j'])
+
+  def test_duplicate_axes_in_jax(self):
+    if not JAX_MODE:
+      self.skipTest('This error is JAX-only.')
+    dist = sharded.Sharded(tfd.Normal(0., 1.), shard_axis_name='i')
+    with self.assertRaisesRegex(
+        ValueError, 'Found duplicate axis name'):
+      sharded.Sharded(dist, shard_axis_name='i')
+    with self.assertRaisesRegex(
+        ValueError, 'Found duplicate axis name'):
+      sharded.Sharded(tfd.Normal(0., 1.), shard_axis_name=['i', 'i'])
 
 if __name__ == '__main__':
   tf.test.main()

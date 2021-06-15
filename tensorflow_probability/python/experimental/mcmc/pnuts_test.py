@@ -29,16 +29,26 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import distribute_test_lib
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 tfb = tfp.bijectors
 tfde = tfp.experimental.distributions
 
-_CompositeMultivariateNormalPrecisionFactorLinearOperator = tfp.experimental.auto_composite_tensor(
-    tfde.MultivariateNormalPrecisionFactorLinearOperator, omit_kwargs=('name',))
-_CompositeJointDistributionSequential = tfp.experimental.auto_composite_tensor(
-    tfd.JointDistributionSequential, omit_kwargs=('name',))
+JAX_MODE = False
+
+if JAX_MODE:
+  _CompositeMultivariateNormalPrecisionFactorLinearOperator = tfde.MultivariateNormalPrecisionFactorLinearOperator
+  _CompositeJointDistributionSequential = tfd.JointDistributionSequential
+else:
+  _CompositeMultivariateNormalPrecisionFactorLinearOperator = tfp.experimental.auto_composite_tensor(
+      tfde.MultivariateNormalPrecisionFactorLinearOperator,
+      omit_kwargs=('name',))
+  _CompositeJointDistributionSequential = tfp.experimental.auto_composite_tensor(
+      tfd.JointDistributionSequential, omit_kwargs=('name',))
 
 
 @tf.function(autograph=False)
@@ -579,6 +589,15 @@ class NutsTest(test_util.TestCase):
     self.assertAllClose(
         average_rhat, np.ones_like(average_rhat), atol=0.05, rtol=0.05)
 
+  def test_step_size_trace(self):
+    dist = tfd.Normal(0., 1.)
+    kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
+        dist.log_prob, step_size=1.)
+    _, _, fkr = tfp.mcmc.sample_chain(10, 0., kernel=kernel,
+                                      return_final_kernel_results=True,
+                                      seed=test_util.test_seed())
+    self.assertAlmostEqual(1., self.evaluate(fkr.step_size))
+
 # Allowed type of preconditioning schemes to use.
 # See code for details.
 PRECONDITION_SCHEMES = frozenset([
@@ -602,24 +621,6 @@ RunNUTSResults = collections.namedtuple('RunNUTSResults', [
     'cov_atol',
     'var_rtol',
 ])
-
-
-def _make_composite_tensor(dist):
-  """Wrapper to make distributions of linear operators composite."""
-  if dist is None:
-    return dist
-  composite_dist = tfp.experimental.auto_composite_tensor(dist.__class__,
-                                                          omit_kwargs='name')
-  p = dist.parameters
-
-  for k in p:
-    if isinstance(p[k], tfp.distributions.Distribution):
-      p[k] = _make_composite_tensor(p[k])
-    elif isinstance(p[k], tf.linalg.LinearOperator):
-      composite_linop = tfp.experimental.auto_composite_tensor(p[k].__class__)
-      p[k] = composite_linop(**p[k].parameters)
-  ac_dist = composite_dist(**p)
-  return ac_dist
 
 
 @test_util.test_graph_mode_only
@@ -659,6 +660,8 @@ class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
           precision_factor=cov_linop.cholesky(),
       )
     elif precondition_scheme == 'sqrtm':
+      if JAX_MODE:
+        self.skipTest('`sqrtm` is not yet implemented in JAX.')
       momentum_distribution = _CompositeMultivariateNormalPrecisionFactorLinearOperator(
           # The symmetric square root is a perfectly valid "factor".
           precision_factor=tf.linalg.LinearOperatorFullMatrix(
@@ -673,7 +676,6 @@ class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
     else:
       raise RuntimeError(
           'Unhandled precondition_scheme: {}'.format(precondition_scheme))
-    momentum_distribution = _make_composite_tensor(momentum_distribution)
 
     nuts_kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
@@ -693,15 +695,16 @@ class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
               results.step_size,
       }
 
+    strm = test_util.test_seed_stream()
     @tf.function
     def do_run_run_run():
       """Do a run, return RunNUTSResults."""
       states, trace = tfp.mcmc.sample_chain(
           num_results,
-          current_state=tf.identity(target_mvn.sample(seed=0)),
+          current_state=tf.identity(target_mvn.sample(seed=strm())),
           kernel=nuts_kernel,
           num_burnin_steps=num_adaptation_steps,
-          seed=test_util.test_seed(),
+          seed=strm(),
           trace_fn=trace_fn)
 
       # If we had some number of chain dimensions, we would change sample_axis.
@@ -846,15 +849,17 @@ class PreconditionedNUTSTest(test_util.TestCase):
     if use_default:
       momentum_distribution = None
     else:
-      momentum_distribution = tfp.experimental.as_composite(
-          tfd.Normal(0., tf.constant(.5, dtype=tf.float64)))
+      momentum_distribution = tfd.Normal(0., tf.constant(.5, dtype=tf.float64))
+      if not JAX_MODE:
+        momentum_distribution = tfp.experimental.as_composite(
+            momentum_distribution)
     kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
         lambda x: -x**2, step_size=.5, max_tree_depth=4,
         momentum_distribution=momentum_distribution)
     kernel = tfp.mcmc.SimpleStepSizeAdaptation(kernel, num_adaptation_steps=3)
     self.evaluate(tfp.mcmc.sample_chain(
         1, kernel=kernel, current_state=tf.ones([], tf.float64),
-        num_burnin_steps=5, trace_fn=None))
+        num_burnin_steps=5, seed=test_util.test_seed(), trace_fn=None))
 
   # TODO(b/175787154): Enable this test
   def DISABLED_test_f64_multichain(self, use_default):
@@ -870,7 +875,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
     nchains = 7
     self.evaluate(tfp.mcmc.sample_chain(
         1, kernel=kernel, current_state=tf.ones([nchains], tf.float64),
-        num_burnin_steps=5, trace_fn=None))
+        num_burnin_steps=5, seed=test_util.test_seed(), trace_fn=None))
 
   def test_diag(self, use_default):
     """Test that a diagonal multivariate normal can be effectively sampled from.
@@ -905,7 +910,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
                                          filter_beyond_positive_pairs=False)
 
     if not use_default:
-      self.assertAllClose(ess, tf.fill([3], 100.))
+      self.assertGreaterEqual(self.evaluate(tf.reduce_min(ess)), 40.)
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
@@ -947,7 +952,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
     # ways to have larger ess, these tests don't really test correctness.
     # Perhaps remove all tests like these.
     if not use_default:
-      self.assertAllClose(ess, tf.fill([3], 100.))
+      self.assertGreaterEqual(self.evaluate(tf.reduce_min(ess)), 40.)
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
@@ -991,10 +996,10 @@ class PreconditionedNUTSTest(test_util.TestCase):
                                          filter_threshold=0,
                                          filter_beyond_positive_pairs=False)
     if not use_default:
-      self.assertAllClose(
-          self.evaluate(ess),
-          [tf.constant(100.),
-           tf.constant(100.), 100. * tf.ones((2, 3, 4))])
+      self.assertGreaterEqual(
+          self.evaluate(
+              tf.reduce_min(tf.nest.map_structure(tf.reduce_min, ess))),
+          40.)
     else:
       self.assertLess(
           self.evaluate(
@@ -1029,7 +1034,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
                                          filter_threshold=0,
                                          filter_beyond_positive_pairs=False)
     if not use_default:
-      self.assertAllClose(self.evaluate(ess), 100 * 2. * 4. * tf.ones(3))
+      self.assertGreaterEqual(self.evaluate(tf.reduce_min(ess)), 40.)
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
@@ -1074,9 +1079,89 @@ class PreconditionedNUTSTest(test_util.TestCase):
         draws, cross_chain_dims=[1 for _ in draws],
         filter_threshold=0, filter_beyond_positive_pairs=False)
     if not use_default:
-      self.assertAllClose(self.evaluate(ess), 100 * n_chains * tf.ones(3))
+      self.assertGreaterEqual(self.evaluate(tf.reduce_min(ess)), 40.)
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
+
+
+@test_util.test_all_tf_execution_regimes
+class DistributedNutsTest(distribute_test_lib.DistributedTest):
+
+  def test_pnuts_kernel_tracks_axis_names(self):
+    kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
+        tfd.Normal(0, 1).log_prob, step_size=1.9)
+    self.assertIsNone(kernel.experimental_shard_axis_names)
+    kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
+        tfd.Normal(0, 1).log_prob,
+        step_size=1.9,
+        experimental_shard_axis_names=['a'])
+    self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
+    kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
+        tfd.Normal(0, 1).log_prob,
+        step_size=1.9).experimental_with_shard_axes(['a'])
+    self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
+
+  def test_takes_same_number_leapfrog_steps_with_sharded_state(self):
+
+    if not JAX_MODE:
+      self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
+
+    def target_log_prob(a, b):
+      return (tfd.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          tfd.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
+
+    kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
+        target_log_prob, step_size=1.9)
+    sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
+
+    def run(seed):
+      state = [tf.convert_to_tensor(0.), tf.convert_to_tensor(0.)]
+      kr = sharded_kernel.bootstrap_results(state)
+      _, kr = sharded_kernel.one_step(state, kr, seed=seed)
+      return kr.leapfrogs_taken
+
+    leapfrogs_taken = self.evaluate(
+        self.per_replica_to_tensor(
+            self.strategy_run(
+                run,
+                args=(samplers.zeros_seed(),),
+                in_axes=None,
+                axis_name='foo'), 0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(leapfrogs_taken[i], leapfrogs_taken[0])
+
+  def test_unsharded_state_remains_synchronized_across_devices(self):
+
+    if not JAX_MODE:
+      self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
+
+    def target_log_prob(a, b):
+      return (tfd.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          tfd.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
+
+    kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
+        target_log_prob, step_size=1e-1)
+    sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
+
+    def run(seed):
+      state = [tf.convert_to_tensor(-10.), tf.convert_to_tensor(-10.)]
+      kr = sharded_kernel.bootstrap_results(state)
+      state, _ = sharded_kernel.one_step(state, kr, seed=seed)
+      return state
+
+    state = self.evaluate(
+        self.per_replica_to_tensor(
+            self.strategy_run(
+                run,
+                args=(samplers.zeros_seed(),),
+                in_axes=None,
+                axis_name='foo'), 0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(state[0][i], state[0][0])
 
 
 if __name__ == '__main__':

@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import prefer_static as ps
 
 
 __all__ = [
@@ -29,7 +30,7 @@ __all__ = [
 ]
 
 
-class PowerTransform(bijector.Bijector):
+class PowerTransform(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 + X * c)**(1 / c), X >= -1 / c`.
 
   The [power transform](https://en.wikipedia.org/wiki/Power_transform) maps
@@ -60,7 +61,7 @@ class PowerTransform(bijector.Bijector):
     """
     parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
-      power = tf.get_static_value(tf.convert_to_tensor(power, name='power'))
+      power = tf.get_static_value(ps.constant(power, name='power'))
       if power is None or power < 0:
         raise ValueError('`power` must be a non-negative TF constant.')
       self._power = power

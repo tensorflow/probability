@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 
-class RayleighCDF(bijector.Bijector):
+class RayleighCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = 1 - exp( -(X/scale)**2 / 2 ), X >= 0`.
 
   This bijector maps inputs from `[0, inf]` to `[0, 1]`. The inverse of the

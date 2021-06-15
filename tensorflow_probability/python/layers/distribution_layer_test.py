@@ -50,6 +50,13 @@ def _vec_pad(x, value=0):
   return tf.pad(x, paddings=paddings, constant_values=value)
 
 
+def _unwrap_tensor_coercible(dist):
+  inner_dist = getattr(dist, 'tensor_distribution', dist)
+  if inner_dist is dist:
+    return inner_dist
+  return _unwrap_tensor_coercible(inner_dist)
+
+
 # TODO(b/143642032): Figure out how to solve issues with save/load, so that we
 # can decorate all of these tests with @test_util.test_all_tf_execution_regimes
 @test_util.test_graph_and_eager_modes
@@ -142,8 +149,8 @@ class EndToEndTest(test_util.TestCase):
                   validation_data=(self.x_test, self.x_test),
                   shuffle=True)
     yhat = vae_model(tf.convert_to_tensor(self.x_test))
-    self.assertIsInstance(yhat, tfd.Independent)
-    self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
+    self.assertIsInstance(yhat.tensor_distribution, tfd.Independent)
+    self.assertIsInstance(yhat.tensor_distribution.distribution, tfd.Bernoulli)
 
   def test_keras_functional_api(self):
     """Test `DistributionLambda`s are composable via Keras functional API."""
@@ -193,8 +200,8 @@ class EndToEndTest(test_util.TestCase):
                   validation_data=(self.x_test, self.x_test),
                   shuffle=True)
     yhat = vae_model(tf.convert_to_tensor(self.x_test))
-    self.assertIsInstance(yhat, tfd.Independent)
-    self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
+    self.assertIsInstance(yhat.tensor_distribution, tfd.Independent)
+    self.assertIsInstance(yhat.tensor_distribution.distribution, tfd.Bernoulli)
 
   def test_keras_model_api(self):
     """Test `DistributionLambda`s are composable via Keras `Model` API."""
@@ -249,8 +256,8 @@ class EndToEndTest(test_util.TestCase):
                   epochs=1,
                   validation_data=(self.x_test, self.x_test))
     yhat = vae_model(tf.convert_to_tensor(self.x_test))
-    self.assertIsInstance(yhat, tfd.Independent)
-    self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
+    self.assertIsInstance(yhat.tensor_distribution, tfd.Independent)
+    self.assertIsInstance(yhat.tensor_distribution.distribution, tfd.Bernoulli)
 
   def test_keras_sequential_api_multiple_draws(self):
     num_draws = 2
@@ -293,8 +300,8 @@ class EndToEndTest(test_util.TestCase):
                   steps_per_epoch=1,  # Usually `n // batch_size`.
                   validation_data=(self.x_test, self.x_test))
     yhat = vae_model(tf.convert_to_tensor(self.x_test))
-    self.assertIsInstance(yhat, tfd.Independent)
-    self.assertIsInstance(yhat.distribution, tfd.Bernoulli)
+    self.assertIsInstance(yhat.tensor_distribution, tfd.Independent)
+    self.assertIsInstance(yhat.tensor_distribution.distribution, tfd.Bernoulli)
 
   def test_side_variable_is_auto_tracked(self):
     # `s` is the "side variable".
@@ -587,7 +594,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     layer = tfpl.MultivariateNormalTriL(d, tfd.Distribution.mean)
     t = tfd.Normal(0, 1).sample([2, 3, p], seed=42)
     x = layer(t)
-    self._check_distribution(t, x)
+    self._check_distribution(t, x.tensor_distribution)
 
   def test_doc_string(self):
     # Load data.
@@ -654,7 +661,7 @@ class OneHotCategoricalTest(test_util.TestCase):
     layer = tfpl.OneHotCategorical(d, validate_args=True)
     t = tfd.Normal(0, 1).sample([2, 3, p], seed=42)
     x = layer(t)
-    self._check_distribution(t, x)
+    self._check_distribution(t, x.tensor_distribution)
 
   def test_doc_string(self):
     # Load data.
@@ -692,9 +699,11 @@ class OneHotCategoricalTest(test_util.TestCase):
 class CategoricalMixtureOfOneHotCategoricalTest(test_util.TestCase):
 
   def _check_distribution(self, t, x):
-    self.assertIsInstance(x, tfd.MixtureSameFamily)
-    self.assertIsInstance(x.mixture_distribution, tfd.Categorical)
-    self.assertIsInstance(x.components_distribution, tfd.OneHotCategorical)
+    self.assertIsInstance(_unwrap_tensor_coercible(x), tfd.MixtureSameFamily)
+    self.assertIsInstance(_unwrap_tensor_coercible(x.mixture_distribution),
+                          tfd.Categorical)
+    self.assertIsInstance(_unwrap_tensor_coercible(x.components_distribution),
+                          tfd.OneHotCategorical)
     t_back = tf.concat([
         x.mixture_distribution.logits,
         tf.reshape(x.components_distribution.logits, shape=[2, 3, -1]),
@@ -768,9 +777,12 @@ class CategoricalMixtureOfOneHotCategoricalTest(test_util.TestCase):
               shuffle=True)
 
     yhat = model(x)
-    self.assertIsInstance(yhat, tfd.MixtureSameFamily)
-    self.assertIsInstance(yhat.mixture_distribution, tfd.Categorical)
-    self.assertIsInstance(yhat.components_distribution, tfd.OneHotCategorical)
+    self.assertIsInstance(_unwrap_tensor_coercible(yhat), tfd.MixtureSameFamily)
+    self.assertIsInstance(
+        _unwrap_tensor_coercible(yhat.mixture_distribution), tfd.Categorical)
+    self.assertIsInstance(
+        _unwrap_tensor_coercible(yhat.components_distribution),
+        tfd.OneHotCategorical)
     # TODO(b/120221303): For now we just check that the code executes and we get
     # back a distribution instance. Better would be to change the data
     # generation so the model becomes well-specified (and we can check correctly
@@ -834,7 +846,7 @@ class _IndependentLayerTest(object):
 
     layer = self.layer_class(validate_args=True, dtype=self.dtype)
     x = layer(t)
-    self._check_distribution(t, x, batch_shape)
+    self._check_distribution(t, x.tensor_distribution, batch_shape)
 
   def test_serialization(self):
     event_shape = []
@@ -1163,11 +1175,14 @@ class _MixtureLayerTest(object):
         ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
-    self.assertIsInstance(x, tfd.MixtureSameFamily)
-    self.assertIsInstance(x.mixture_distribution, tfd.Categorical)
-    self.assertIsInstance(x.components_distribution, tfd.Independent)
-    self.assertIsInstance(x.components_distribution.distribution,
-                          self.dist_class)
+    self.assertIsInstance(_unwrap_tensor_coercible(x), tfd.MixtureSameFamily)
+    self.assertIsInstance(
+        _unwrap_tensor_coercible(x.mixture_distribution), tfd.Categorical)
+    self.assertIsInstance(
+        _unwrap_tensor_coercible(x.components_distribution), tfd.Independent)
+    self.assertIsInstance(
+        _unwrap_tensor_coercible(x.components_distribution.distribution),
+        self.dist_class)
     self.assertEqual(self.dtype, x.dtype)
 
     t_back = self._distribution_to_params(x, batch_shape)
@@ -1413,9 +1428,12 @@ class _MixtureSameFamilyTest(object):
         ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
-    self.assertIsInstance(x, tfd.MixtureSameFamily)
-    self.assertIsInstance(x.mixture_distribution, tfd.Categorical)
-    self.assertIsInstance(x.components_distribution, tfd.MultivariateNormalTriL)
+    self.assertIsInstance(_unwrap_tensor_coercible(x), tfd.MixtureSameFamily)
+    self.assertIsInstance(
+        _unwrap_tensor_coercible(x.mixture_distribution), tfd.Categorical)
+    self.assertIsInstance(
+        _unwrap_tensor_coercible(x.components_distribution),
+        tfd.MultivariateNormalTriL)
 
     shape = tf.concat([batch_shape, [-1]], axis=0)
     batch_and_n_shape = tf.concat(

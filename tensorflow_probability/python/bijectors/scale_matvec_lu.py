@@ -37,7 +37,7 @@ __all__ = [
 ]
 
 
-class ScaleMatvecLU(bijector.Bijector):
+class ScaleMatvecLU(bijector.AutoCompositeTensorBijector):
   """Matrix-vector multiply using LU decomposition.
 
   This bijector is identical to the 'Convolution1x1' used in Glow

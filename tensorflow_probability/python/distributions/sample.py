@@ -175,7 +175,8 @@ class Sample(distribution_lib.Distribution):
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
-        distribution=parameter_properties.BatchedComponentProperties())
+        distribution=parameter_properties.BatchedComponentProperties(),
+        sample_shape=parameter_properties.ShapeParameterProperties())
 
   @property
   def sample_shape(self):
@@ -195,12 +196,6 @@ class Sample(distribution_lib.Distribution):
     # through slicing to the underlying.
     return self.copy(distribution=self.distribution.__getitem__(slices))
 
-  def _batch_shape_tensor(self):
-    return self.distribution.batch_shape_tensor()
-
-  def _batch_shape(self):
-    return self.distribution.batch_shape
-
   def _event_shape_tensor(self):
     return ps.concat([
         ps.reshape(self.sample_shape, shape=[-1]),
@@ -219,28 +214,31 @@ class Sample(distribution_lib.Distribution):
     return tensorshape_util.concatenate(sample_shape,
                                         self.distribution.event_shape)
 
-  def _sample_n(self, n, seed, **kwargs):
-    sample_shape = ps.reshape(self.sample_shape, shape=[-1])
-    fake_sample_ndims = ps.rank_from_shape(sample_shape)
+  def _sampling_permutation(self, sample_ndims):
+    fake_sample_ndims = ps.rank_from_shape(
+        ps.reshape(self.sample_shape, shape=[-1]))
     event_ndims = ps.rank_from_shape(
         self.distribution.event_shape_tensor, self.distribution.event_shape)
     batch_ndims = ps.rank_from_shape(
         self.distribution.batch_shape_tensor, self.distribution.batch_shape)
-    perm = ps.concat([
-        [0],
-        ps.range(1 + fake_sample_ndims,
-                 1 + fake_sample_ndims + batch_ndims,
+    return ps.concat([
+        ps.range(sample_ndims),
+        ps.range(sample_ndims + fake_sample_ndims,
+                 sample_ndims + fake_sample_ndims + batch_ndims,
                  dtype=tf.int32),
-        ps.range(1, 1 + fake_sample_ndims, dtype=tf.int32),
-        ps.range(1 + fake_sample_ndims + batch_ndims,
-                 1 + fake_sample_ndims + batch_ndims + event_ndims,
+        ps.range(sample_ndims, sample_ndims + fake_sample_ndims,
+                 dtype=tf.int32),
+        ps.range(sample_ndims + fake_sample_ndims + batch_ndims,
+                 sample_ndims + fake_sample_ndims + batch_ndims + event_ndims,
                  dtype=tf.int32),
     ], axis=0)
-    x = self.distribution.sample(
-        ps.concat([[n], sample_shape], axis=0),
-        seed=seed,
-        **kwargs)
-    return tf.transpose(a=x, perm=perm)
+
+  def _sample_n(self, n, seed, **kwargs):
+    sample_shape = ps.reshape(self.sample_shape, shape=[-1])
+    x = self.distribution.sample(ps.concat([[n], sample_shape], axis=0),
+                                 seed=seed,
+                                 **kwargs)
+    return tf.transpose(a=x, perm=self._sampling_permutation(sample_ndims=1))
 
   def _sum_fn(self):
     if self._experimental_use_kahan_sum:
@@ -264,20 +262,9 @@ class Sample(distribution_lib.Distribution):
             ps.shape(x),
             paddings=[[ps.maximum(0, -d), 0]],
             constant_values=1))
-    ndims = ps.rank(x)
     sample_ndims = ps.maximum(0, d)
-    # (2) Transpose x's dims.
-    sample_dims = ps.range(0, sample_ndims)
-    batch_dims = ps.range(sample_ndims, sample_ndims + batch_ndims)
-    extra_sample_dims = ps.range(
-        sample_ndims + batch_ndims,
-        sample_ndims + batch_ndims + extra_sample_ndims)
-    event_dims = ps.range(
-        sample_ndims + batch_ndims + extra_sample_ndims,
-        ndims)
-    perm = ps.concat(
-        [sample_dims, extra_sample_dims, batch_dims, event_dims], axis=0)
-    x = tf.transpose(x, perm=perm)
+    x = tf.transpose(
+        x, perm=ps.invert_permutation(self._sampling_permutation(sample_ndims)))
     return x, (sample_ndims, extra_sample_ndims, batch_ndims)
 
   def _finish_log_prob(self, lp, aux):
@@ -293,6 +280,21 @@ class Sample(distribution_lib.Distribution):
     # (2) Make the final reduction.
     axis = ps.range(sample_ndims, sample_ndims + extra_sample_ndims)
     return self._sum_fn()(lp, axis=axis)
+
+  def _sample_and_log_prob(self, sample_shape, seed, **kwargs):
+    sample_ndims = ps.rank_from_shape(sample_shape)
+    batch_ndims = ps.rank_from_shape(
+        self.distribution.batch_shape_tensor,
+        self.distribution.batch_shape)
+    extra_sample_shape = ps.reshape(self.sample_shape, shape=[-1])
+    extra_sample_ndims = ps.rank_from_shape(extra_sample_shape)
+    x, lp = self.distribution.experimental_sample_and_log_prob(
+        ps.concat([sample_shape, extra_sample_shape], axis=0), seed=seed,
+        **kwargs)
+    return (
+        tf.transpose(x, perm=self._sampling_permutation(sample_ndims)),
+        self._finish_log_prob(
+            lp, aux=(sample_ndims, extra_sample_ndims, batch_ndims)))
 
   def _log_prob(self, x, **kwargs):
     x, aux = self._prepare_for_underlying(x)
@@ -362,10 +364,6 @@ class Sample(distribution_lib.Distribution):
             sample_shape, -1, message=msg))
 
     return assertions
-
-  _composite_tensor_nonshape_params = ('distribution',)
-
-  _composite_tensor_shape_params = ('sample_shape',)
 
 
 class _DefaultSampleBijector(bijector_lib.Bijector):

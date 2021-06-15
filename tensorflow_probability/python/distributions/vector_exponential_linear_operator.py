@@ -23,6 +23,7 @@ from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -51,6 +52,7 @@ or
 
 
 class VectorExponentialLinearOperator(
+    distribution.AutoCompositeTensorDistribution,
     transformed_distribution.TransformedDistribution):
   """The vectorization of the Exponential distribution on `R^k`.
 
@@ -190,6 +192,8 @@ class VectorExponentialLinearOperator(
     with tf.name_scope(name) as name:
       # Since expand_dims doesn't preserve constant-ness, we obtain the
       # non-dynamic value if possible.
+      # TODO(b/190433277): Verify GradientTape safety and use
+      # `convert_nonref_to_tensor` on `loc`.
       loc = loc if loc is None else tf.convert_to_tensor(
           loc, name='loc', dtype=scale.dtype)
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(

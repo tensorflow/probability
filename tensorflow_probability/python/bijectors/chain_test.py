@@ -33,11 +33,33 @@ from tensorflow_probability.python.internal import test_util
 class ShapeChanging(tfb.Bijector):
   """Only used for op_ndims manipulation."""
 
-  def __init__(self, forward_min_event_ndims=0, inverse_min_event_ndims=3):
+  def __init__(self,
+               forward_min_event_ndims=0,
+               inverse_min_event_ndims=3):
     super(ShapeChanging, self).__init__(
         forward_min_event_ndims=forward_min_event_ndims,
         inverse_min_event_ndims=inverse_min_event_ndims,
         validate_args=False, name="shape_changer")
+
+
+class PermuteParts(tfb.Bijector):
+  """Only used for op_ndims manipulation."""
+
+  def __init__(self):
+    super(PermuteParts, self).__init__(
+        forward_min_event_ndims=[0, 0],
+        inverse_min_event_ndims=[0, 0],
+        validate_args=False, name="permute_parts")
+
+  def forward_event_ndims(self, event_ndims):
+    return [event_ndims[1], event_ndims[0]]
+
+  def inverse_event_ndims(self, event_ndims):
+    return [event_ndims[1], event_ndims[0]]
+
+  @property
+  def _parts_interact(self):
+    return False
 
 
 @test_util.test_all_tf_execution_regimes
@@ -103,100 +125,152 @@ class ChainBijectorTest(test_util.TestCase):
         self.evaluate(
             chain.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
+  def _validateChainMinEventNdims(self,
+                                  bijectors,
+                                  forward_min_event_ndims,
+                                  inverse_min_event_ndims):
+    chain = tfb.Chain(bijectors)
+    self.assertAllEqual(forward_min_event_ndims,
+                        chain.forward_min_event_ndims)
+    self.assertAllEqual(inverse_min_event_ndims,
+                        chain.inverse_min_event_ndims)
+
+    chain_inverse = tfb.Chain([tfb.Invert(b) for b in reversed(bijectors)])
+    self.assertAllEqual(forward_min_event_ndims,
+                        chain_inverse.inverse_min_event_ndims)
+    self.assertAllEqual(inverse_min_event_ndims,
+                        chain_inverse.forward_min_event_ndims)
+
   def testMinEventNdimsChain(self):
-    chain = tfb.Chain([tfb.Exp(), tfb.Exp(), tfb.Exp()])
-    self.assertEqual(0, chain.forward_min_event_ndims)
-    self.assertEqual(0, chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[
+            tfb.Exp(),
+            tfb.Exp(),
+            tfb.Exp()
+        ],
+        forward_min_event_ndims=0,
+        inverse_min_event_ndims=0)
 
-    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
-                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
-                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
-    self.assertEqual(1, chain.forward_min_event_ndims)
-    self.assertEqual(1, chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[
+            tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
+            tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
+            tfb.ScaleMatvecDiag(scale_diag=[1., 1.])
+        ],
+        forward_min_event_ndims=1,
+        inverse_min_event_ndims=1)
 
-    chain = tfb.Chain([tfb.Exp(), tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
-    self.assertEqual(1, chain.forward_min_event_ndims)
-    self.assertEqual(1, chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[
+            tfb.Exp(),
+            tfb.ScaleMatvecDiag(scale_diag=[1., 1.])
+        ],
+        forward_min_event_ndims=1,
+        inverse_min_event_ndims=1)
 
-    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]), tfb.Exp()])
-    self.assertEqual(1, chain.forward_min_event_ndims)
-    self.assertEqual(1, chain.inverse_min_event_ndims)
-
-    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
-                       tfb.Exp(),
-                       tfb.Softplus(),
-                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
-    self.assertEqual(1, chain.forward_min_event_ndims)
-    self.assertEqual(1, chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[
+            tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
+            tfb.Exp(),
+            tfb.Softplus(),
+            tfb.ScaleMatvecDiag(scale_diag=[1., 1.])
+        ],
+        forward_min_event_ndims=1,
+        inverse_min_event_ndims=1)
 
   def testMinEventNdimsShapeChangingAddDims(self):
-    chain = tfb.Chain([ShapeChanging()])
-    self.assertEqual(0, chain.forward_min_event_ndims)
-    self.assertEqual(3, chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[
+            ShapeChanging()
+        ],
+        forward_min_event_ndims=0,
+        inverse_min_event_ndims=3)
 
-    chain = tfb.Chain([ShapeChanging(),
-                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
-    self.assertEqual(1, chain.forward_min_event_ndims)
-    self.assertEqual(4, chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[
+            ShapeChanging(),
+            tfb.ScaleMatvecDiag(scale_diag=[1., 1.])
+        ],
+        forward_min_event_ndims=1,
+        inverse_min_event_ndims=4)
 
-    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
-                       ShapeChanging()])
-    self.assertEqual(0, chain.forward_min_event_ndims)
-    self.assertEqual(3, chain.inverse_min_event_ndims)
-
-    chain = tfb.Chain([ShapeChanging(), ShapeChanging()])
-    self.assertEqual(0, chain.forward_min_event_ndims)
-    self.assertEqual(6, chain.inverse_min_event_ndims)
-
-  def testMinEventNdimsShapeChangingRemoveDims(self):
-    chain = tfb.Chain([ShapeChanging(3, 0)])
-    self.assertEqual(3, chain.forward_min_event_ndims)
-    self.assertEqual(0, chain.inverse_min_event_ndims)
-
-    chain = tfb.Chain([ShapeChanging(3, 0),
-                       tfb.ScaleMatvecDiag(scale_diag=[1., 1.])])
-    self.assertEqual(3, chain.forward_min_event_ndims)
-    self.assertEqual(0, chain.inverse_min_event_ndims)
-
-    chain = tfb.Chain([tfb.ScaleMatvecDiag(scale_diag=[1., 1.]),
-                       ShapeChanging(3, 0)])
-    self.assertEqual(4, chain.forward_min_event_ndims)
-    self.assertEqual(1, chain.inverse_min_event_ndims)
-
-    chain = tfb.Chain([ShapeChanging(3, 0), ShapeChanging(3, 0)])
-    self.assertEqual(6, chain.forward_min_event_ndims)
-    self.assertEqual(0, chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[
+            ShapeChanging(),
+            ShapeChanging()
+        ],
+        forward_min_event_ndims=0,
+        inverse_min_event_ndims=6)
 
   def testMinEventNdimsShapeChangingAddRemoveDims(self):
-    chain = tfb.Chain(
-        [ShapeChanging(2, 1),
-         ShapeChanging(3, 0),
-         ShapeChanging(1, 2)])
-    self.assertEqual(4, chain.forward_min_event_ndims)
-    self.assertEqual(1, chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[
+            ShapeChanging(2, 1),
+            ShapeChanging(3, 0),
+            ShapeChanging(1, 2)
+        ],
+        forward_min_event_ndims=4,
+        inverse_min_event_ndims=1)
 
   def testMinEventNdimsWithJointMap(self):
     jm_0 = tfb.JointMap([ShapeChanging(1, 1), ShapeChanging(3, 1)])
     split = ShapeChanging(1, [1, 1])
     concat = ShapeChanging([1, 1], 1)
     jm_1 = tfb.JointMap([ShapeChanging(1, 0), ShapeChanging(1, 1)])
+    permute = PermuteParts()
 
-    self.assertFalse(jm_0.has_static_min_event_ndims)
-    self.assertFalse(jm_1.has_static_min_event_ndims)
-    self.assertTrue(split.has_static_min_event_ndims)
-    self.assertTrue(concat.has_static_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[jm_0, split, concat, jm_1],
+        forward_min_event_ndims=[4, 3],
+        inverse_min_event_ndims=[3, 1])
 
-    # Decidable. Inner bijectors have static min_event_ndims.
-    chain = tfb.Chain([jm_0, split, concat, jm_1])
-    self.assertTrue(chain.has_static_min_event_ndims)
-    self.assertAllEqualNested([4, 3], chain.forward_min_event_ndims)
-    self.assertAllEqualNested([3, 1], chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[jm_0, jm_1],
+        forward_min_event_ndims=[2, 3],
+        inverse_min_event_ndims=[1, 1])
 
-    # Undecidable. None of the nested bijectors have known event_ndims.
-    chain = tfb.Chain([jm_0, jm_1])
-    self.assertFalse(chain.has_static_min_event_ndims)
-    self.assertAllEqualNested([None, None], chain.forward_min_event_ndims)
-    self.assertAllEqualNested([None, None], chain.inverse_min_event_ndims)
+    self._validateChainMinEventNdims(
+        bijectors=[jm_1, jm_0],
+        forward_min_event_ndims=[1, 3],
+        inverse_min_event_ndims=[0, 1])
+
+    self._validateChainMinEventNdims(
+        bijectors=[jm_1, permute, jm_0],
+        forward_min_event_ndims=[1, 3],
+        inverse_min_event_ndims=[0, 1])
+
+    self._validateChainMinEventNdims(
+        bijectors=[jm_0, split],
+        forward_min_event_ndims=3,
+        inverse_min_event_ndims=[3, 1])
+
+    self._validateChainMinEventNdims(
+        bijectors=[permute, jm_1, split],
+        forward_min_event_ndims=1,
+        inverse_min_event_ndims=[1, 0])
+
+  def testMinEventNdimsWithPartiallyDependentJointMap(self):
+
+    dependent = tfb.Chain([tfb.Split(2), tfb.Invert(tfb.Split(2))])
+    wrap_in_list = tfb.Restructure(input_structure=[0, 1],
+                                   output_structure=[[0, 1]])
+    dependent_as_chain = tfb.Chain([
+        tfb.Invert(wrap_in_list),
+        tfb.JointMap([dependent]),
+        wrap_in_list])
+    self.assertAllEqualNested(dependent.forward_min_event_ndims,
+                              dependent_as_chain.forward_min_event_ndims)
+    self.assertAllEqualNested(dependent.inverse_min_event_ndims,
+                              dependent_as_chain.inverse_min_event_ndims)
+    self.assertAllEqualNested(dependent._parts_interact,
+                              dependent_as_chain._parts_interact)
+
+  def testInvalidChainNdimsRaisesError(self):
+    with self.assertRaisesRegexp(
+        ValueError,
+        "Differences between `event_ndims` and `min_event_ndims must be equal"):
+      tfb.Chain([ShapeChanging([1, 1], [1, 1]),
+                 ShapeChanging([1, 1], [2, 1])])
 
   def testChainExpAffine(self):
     scale_diag = np.array([1., 2., 3.], dtype=np.float32)
@@ -304,17 +378,23 @@ class ChainBijectorTest(test_util.TestCase):
     smc = tfb.SoftmaxCentered()
 
     # Increase in event-size is the last step. No problems here.
-    safe_bij = tfb.Chain([smc, exp], validate_args=True)
+    safe_bij = tfb.Chain([smc, exp],
+                         validate_args=True,
+                         validate_event_size=True)
     self.evaluate(safe_bij.forward_log_det_jacobian([1., 2., 3.], 1))
 
     # Increase in event-size before Exp.
-    raise_bij = tfb.Chain([exp, smc], validate_args=True)
+    raise_bij = tfb.Chain([exp, smc],
+                          validate_args=True,
+                          validate_event_size=True)
     with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
                                 r".+degrees of freedom.+"):
       self.evaluate(raise_bij.forward_log_det_jacobian([1., 2., 3.], 1))
 
     # When validate_args is False, warns instead of raising.
-    warn_bij = tfb.Chain([exp, smc], validate_args=False)
+    warn_bij = tfb.Chain([exp, smc],
+                         validate_args=False,
+                         validate_event_size=True)
     with mock.patch.object(tf, "print", return_value=tf.no_op()) as mock_print:
       self.evaluate(warn_bij.forward_log_det_jacobian([1., 2., 3.], 1))
       print_args, _ = mock_print.call_args
@@ -324,6 +404,60 @@ class ChainBijectorTest(test_util.TestCase):
     ignore_bij = tfb.Chain([exp, smc], validate_event_size=False)
     self.evaluate(ignore_bij.forward_log_det_jacobian([1., 2., 3.], 1))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason="Numpy and JAX have no notion of CompositeTensor/saved_model.")
+  def testCompositeTensor(self):
+    exp = tfb.Exp()
+    sp = tfb.Softplus()
+    aff = tfb.Scale(scale=2.)
+    chain = tfb.Chain(bijectors=[exp, sp, aff])
+    self.assertIsInstance(chain, tf.__internal__.CompositeTensor)
+
+    # Bijector may be flattened into `Tensor` components and rebuilt.
+    flat = tf.nest.flatten(chain, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(chain, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfb.Chain)
+
+    # Bijector may be input to a `tf.function`-decorated callable.
+    @tf.function
+    def call_forward(bij, x):
+      return bij.forward(x)
+
+    x = tf.ones([2, 3], dtype=tf.float32)
+    self.assertAllClose(call_forward(unflat, x), chain.forward(x))
+
+    # TypeSpec can be encoded/decoded.
+    struct_coder = tf.__internal__.saved_model.StructureCoder()
+    enc = struct_coder.encode_structure(chain._type_spec)
+    dec = struct_coder.decode_proto(enc)
+    self.assertEqual(chain._type_spec, dec)
+
+  def testNonCompositeTensor(self):
+
+    class NonCompositeScale(tfb.Bijector):
+      """Bijector that is not a `CompositeTensor`."""
+
+      def __init__(self, scale):
+        parameters = dict(locals())
+        self.scale = scale
+        super(NonCompositeScale, self).__init__(
+            validate_args=True,
+            forward_min_event_ndims=0.,
+            parameters=parameters,
+            name="non_composite_scale")
+
+      def _forward(self, x):
+        return x * self.scale
+
+      def _inverse(self, y):
+        return y / self.scale
+
+    exp = tfb.Exp()
+    scale = NonCompositeScale(scale=tf.constant(3.))
+    chain = tfb.Chain(bijectors=[exp, scale])
+    self.assertNotIsInstance(chain, tf.__internal__.CompositeTensor)
+    self.assertAllClose(chain.forward([1.]), exp.forward(scale.forward([1.])))
 
 if __name__ == "__main__":
   tf.test.main()

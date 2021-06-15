@@ -128,6 +128,13 @@ class _BatchConcatTest(object):
     samples = concat_dist.sample([12, 20], seed=seed)
     self.assertAllEqual(self.evaluate(tf.shape(samples)), [12, 20, 2, 6, 4, 2])
 
+  def test_sample_and_log_prob(self):
+    concat_dist = self.get_distributions()
+    seed = test_util.test_seed()
+    samples, lp = concat_dist.experimental_sample_and_log_prob(seed=seed)
+    self.assertAllEqual(self.evaluate(tf.shape(samples)), [2, 6, 4, 2])
+    self.assertAllClose(lp, concat_dist.log_prob(samples))
+
   def test_split_sample(self):
     concat_dist = self.get_distributions()
     x_sample = tf.ones([2, 6, 4, 2])

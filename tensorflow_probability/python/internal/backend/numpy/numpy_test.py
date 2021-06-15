@@ -562,9 +562,12 @@ def top_k_params(draw):
 
 @hps.composite
 def histogram_fixed_width_bins_params(draw):
+  # TODO(b/187125431): the `min_side=2` and `unique` check can be removed if
+  # https://github.com/tensorflow/tensorflow/pull/38899 is re-implemented.
   values = draw(single_arrays(
       dtype=np.float32,
-      shape=shapes(min_dims=1),
+      shape=shapes(min_dims=1, min_side=2),
+      unique=True,
       elements=hps.floats(min_value=-1e5, max_value=1e5)
   ))
   vmin, vmax = np.min(values), np.max(values)
@@ -812,8 +815,11 @@ NUMPY_TEST_CASES = [
              post_processor=_eig_post_process, xla_disabled=True),
     TestCase('linalg.eigvalsh', [pd_matrices()],
              post_processor=_eig_post_process),
-    TestCase('linalg.det', [nonsingular_matrices()],
-             xla_disabled=True),  # TODO(b/162937268): missing kernel.
+    TestCase(
+        'linalg.det',
+        [nonsingular_matrices()],
+        rtol=1e-3,
+        xla_disabled=True),  # TODO(b/162937268): missing kernel.
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
     TestCase('linalg.matrix_transpose',

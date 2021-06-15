@@ -26,11 +26,11 @@ from tensorflow_probability.python.internal import dtype_util
 
 
 __all__ = [
-    "MatrixInverseTriL",
+    'MatrixInverseTriL',
 ]
 
 
-class MatrixInverseTriL(bijector.Bijector):
+class MatrixInverseTriL(bijector.AutoCompositeTensorBijector):
   """Computes `g(L) = inv(L)`, where `L` is a lower-triangular matrix.
 
   `L` must be nonsingular; equivalently, all diagonal entries of `L` must be
@@ -53,7 +53,7 @@ class MatrixInverseTriL(bijector.Bijector):
 
   """
 
-  def __init__(self, validate_args=False, name="matrix_inverse_tril"):
+  def __init__(self, validate_args=False, name='matrix_inverse_tril'):
     """Instantiates the `MatrixInverseTriL` bijector.
 
     Args:
@@ -99,20 +99,20 @@ class MatrixInverseTriL(bijector.Bijector):
       return []
     shape = tf.shape(x)
     is_matrix = assert_util.assert_rank_at_least(
-        x, 2, message="Input must have rank at least 2.")
+        x, 2, message='Input must have rank at least 2.')
     is_square = assert_util.assert_equal(
-        shape[-2], shape[-1], message="Input must be a square matrix.")
+        shape[-2], shape[-1], message='Input must be a square matrix.')
     above_diagonal = tf.linalg.band_part(
         tf.linalg.set_diag(x, tf.zeros(shape[:-1], dtype=tf.float32)), 0, -1)
     is_lower_triangular = assert_util.assert_equal(
         above_diagonal,
         tf.zeros_like(above_diagonal),
-        message="Input must be lower triangular.")
+        message='Input must be lower triangular.')
     # A lower triangular matrix is nonsingular iff all its diagonal entries are
     # nonzero.
     diag_part = tf.linalg.diag_part(x)
     is_nonsingular = assert_util.assert_none_equal(
         diag_part,
         tf.zeros_like(diag_part),
-        message="Input must have all diagonal entries nonzero.")
+        message='Input must have all diagonal entries nonzero.')
     return [is_matrix, is_square, is_lower_triangular, is_nonsingular]

@@ -669,7 +669,7 @@ def _tracers_to_jaxpr(in_tracers, out_tracers):
         processed_eqn_ids.add(recipe.eqn_id)
     elif isinstance(recipe, pe.LambdaBinding):
       if not any(t is in_tracer for in_tracer in in_tracers):
-        raise VariableError('Found unknown input tracer.')
+        raise VariableError(f'Found unknown input tracer: {t}')
       assert in_tracers, 'Lambda binding with no args'
     elif isinstance(recipe, pe.FreeVar):
       env[getvar(t)] = recipe.val

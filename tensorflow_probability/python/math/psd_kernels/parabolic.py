@@ -23,13 +23,14 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
-from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 
 __all__ = ['Parabolic']
 
 
-class Parabolic(PositiveSemidefiniteKernel):
+@psd_kernel.auto_composite_tensor_psd_kernel
+class Parabolic(psd_kernel.AutoCompositeTensorPsdKernel):
   """The Parabolic kernel.
 
   ```none

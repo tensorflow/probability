@@ -33,7 +33,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
-class Uniform(distribution.Distribution):
+class Uniform(distribution.AutoCompositeTensorDistribution):
   """Uniform distribution with `low` and `high` parameters.
 
   #### Mathematical Details
@@ -145,16 +145,6 @@ class Uniform(distribution.Distribution):
     low = self.low if low is None else low
     high = self.high if high is None else high
     return high - low
-
-  def _batch_shape_tensor(self, low=None, high=None):
-    return ps.broadcast_shape(
-        ps.shape(self.low if low is None else low),
-        ps.shape(self.high if high is None else high))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.low.shape,
-        self.high.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

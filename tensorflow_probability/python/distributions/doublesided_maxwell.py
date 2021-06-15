@@ -41,7 +41,7 @@ __all__ = [
 ]
 
 
-class DoublesidedMaxwell(distribution.Distribution):
+class DoublesidedMaxwell(distribution.AutoCompositeTensorDistribution):
   r"""Double-sided Maxwell distribution.
 
   This distribution is useful to compute measure valued derivatives for Gaussian
@@ -175,14 +175,6 @@ class DoublesidedMaxwell(distribution.Distribution):
   def scale(self):
     """Distribution parameter for the scale."""
     return self._scale
-
-  def _batch_shape_tensor(self, loc=None, scale=None):
-    return ps.broadcast_shape(
-        ps.shape(self.loc if loc is None else loc),
-        ps.shape(self.scale if scale is None else scale))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(self.loc.shape, self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

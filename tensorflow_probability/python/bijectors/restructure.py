@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -43,7 +44,7 @@ def unique_token_set(source_structure):
   return flat_token_set
 
 
-class Restructure(bijector.Bijector):
+class Restructure(bijector.AutoCompositeTensorBijector):
   """Converts between nested structures of Tensors.
 
     This is useful when constructing non-trivial chains of multipart bijectors.
@@ -177,9 +178,9 @@ class Restructure(bijector.Bijector):
     self._output_structure = self._no_dependency(output_structure)
     super(Restructure, self).__init__(
         forward_min_event_ndims=nest_util.broadcast_structure(
-            self._input_structure, None),
+            self._input_structure, 0),
         inverse_min_event_ndims=nest_util.broadcast_structure(
-            self._output_structure, None),
+            self._output_structure, 0),
         is_constant_jacobian=True,
         validate_args=False,
         parameters=parameters,
@@ -187,11 +188,17 @@ class Restructure(bijector.Bijector):
 
   @classmethod
   def _parameter_properties(cls, dtype):
-    return dict()
+    return dict(
+        input_structure=parameter_properties.ShapeParameterProperties(),
+        output_structure=parameter_properties.ShapeParameterProperties())
 
   @property
   def _is_permutation(self):
     return True
+
+  @property
+  def _parts_interact(self):
+    return False
 
   def _forward(self, x):
     flat_dict = {}

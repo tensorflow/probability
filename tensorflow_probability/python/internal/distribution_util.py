@@ -189,6 +189,12 @@ def get_broadcast_shape(*tensors):
   return d_shape
 
 
+def shape_may_be_nontrivial(shape):
+  """Returns `True` if it's possible that `shape` describes a non-scalar."""
+  static_size = tf.get_static_value(tf.size(shape))
+  return (static_size is None) or static_size >= 1
+
+
 def is_diagonal_scale(scale):
   """Returns `True` if `scale` is a `LinearOperator` that is known to be diag.
 
@@ -383,7 +389,7 @@ def move_dimension(x, source_idx, dest_idx):
   """
   dtype = dtype_util.common_dtype([source_idx, dest_idx],
                                   dtype_hint=tf.int32)
-  ndims = ps.cast(prefer_static_rank(x), dtype)
+  ndims = ps.cast(ps.rank(x), dtype)
   source_idx = ps.convert_to_shape_tensor(source_idx, dtype=dtype)
   dest_idx = ps.convert_to_shape_tensor(dest_idx, dtype=dtype)
 
@@ -394,24 +400,20 @@ def move_dimension(x, source_idx, dest_idx):
   # Construct the appropriate permutation of dimensions, depending
   # whether the source is before or after the destination.
   def move_left_permutation():
-    return prefer_static_value(
-        ps.concat([
-            ps.range(0, dest_idx, dtype=dtype),
-            [source_idx],
-            ps.range(dest_idx, source_idx, dtype=dtype),
-            ps.range(source_idx + 1, ndims, dtype=dtype)
-        ],
-                  axis=0))
+    return ps.concat([
+        ps.range(0, dest_idx, dtype=dtype),
+        [source_idx],
+        ps.range(dest_idx, source_idx, dtype=dtype),
+        ps.range(source_idx + 1, ndims, dtype=dtype)
+    ], axis=0)
 
   def move_right_permutation():
-    return prefer_static_value(
-        ps.concat([
-            ps.range(0, source_idx, dtype=dtype),
-            ps.range(source_idx + 1, dest_idx + 1, dtype=dtype),
-            [source_idx],
-            ps.range(dest_idx + 1, ndims, dtype=dtype)
-        ],
-                  axis=0))
+    return ps.concat([
+        ps.range(0, source_idx, dtype=dtype),
+        ps.range(source_idx + 1, dest_idx + 1, dtype=dtype),
+        [source_idx],
+        ps.range(dest_idx + 1, ndims, dtype=dtype)
+    ], axis=0)
 
   def x_permuted():
     return tf.transpose(
@@ -938,7 +940,7 @@ def rotate_transpose(x, shift, name='rotate_transpose'):
   """
   with tf.name_scope(name):
     x = tf.convert_to_tensor(x, name='x')
-    shift = tf.convert_to_tensor(shift, name='shift')
+    shift = ps.convert_to_shape_tensor(shift, name='shift')
     # We do not assign back to preserve constant-ness.
     assert_util.assert_integer(shift)
     shift_value_static = tf.get_static_value(shift)
@@ -1081,7 +1083,7 @@ def prefer_static_rank(x):
   Returns:
     Numpy array (if static rank is obtainable), else `Tensor`.
   """
-  return prefer_static_value(tf.rank(x))
+  return ps.rank(x)
 
 
 def prefer_static_shape(x):
@@ -1093,7 +1095,7 @@ def prefer_static_shape(x):
   Returns:
     Numpy array (if static shape is obtainable), else `Tensor`.
   """
-  return prefer_static_value(tf.shape(x))
+  return ps.shape(x)
 
 
 def prefer_static_value(x):
@@ -1397,7 +1399,7 @@ def expand_to_vector(x, tensor_name=None, op_name=None, validate_args=False):
   """
   with tf.name_scope(op_name or 'expand_to_vector'):
     x_orig = x
-    x = tf.convert_to_tensor(x, name='x')
+    x = ps.convert_to_shape_tensor(x, name='x')
     ndims = tensorshape_util.rank(x.shape)
 
     if ndims is None:
@@ -1407,10 +1409,10 @@ def expand_to_vector(x, tensor_name=None, op_name=None, validate_args=False):
             assert_util.assert_rank_at_most(
                 x, 1, message='Input is neither scalar nor vector.')
         ], x)
-      ndims = tf.rank(x)
+      ndims = ps.rank(x)
       expanded_shape = pick_vector(
-          tf.equal(ndims, 0), np.array([1], dtype=np.int32), tf.shape(x))
-      return tf.reshape(x, expanded_shape)
+          ps.equal(ndims, 0), np.array([1], dtype=np.int32), ps.shape(x))
+      return ps.reshape(x, expanded_shape)
 
     elif ndims == 0:
       # Definitely expand ndims from 0 to 1.

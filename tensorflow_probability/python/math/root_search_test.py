@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import scipy.optimize as optimize
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -172,6 +173,17 @@ class SecantRootSearchTest(test_util.TestCase):
           tfp.math.find_root_secant(
               f, guess, max_iterations=-1, validate_args=True))
 
+  def test_secant_non_static_shape(self):
+    if tf.executing_eagerly():
+      self.skipTest('Test uses dynamic shapes.')
+
+    f = lambda x: (x - 1.) * (x + 1)
+    initial_position = tf1.placeholder_with_default([1., 1., 1.], shape=None)
+    self.assertAllClose(
+        tfp.math.find_root_secant(
+            f, initial_position).objective_at_estimated_root,
+        [0., 0., 0.])
+
 
 @test_util.test_all_tf_execution_regimes
 class ChandrupatlaRootSearchTest(test_util.TestCase):
@@ -265,6 +277,18 @@ class ChandrupatlaRootSearchTest(test_util.TestCase):
         objective_fn=lambda x: (x - expected_roots)**5,
         position_tolerance=1e-8)
     self.assertAllClose(value_at_roots, tf.zeros_like(value_at_roots))
+
+  def test_chandrupatla_non_static_shape(self):
+    if tf.executing_eagerly():
+      self.skipTest('Test uses dynamic shapes.')
+
+    f = lambda x: (x - 1.) * (x + 1)
+    low = tf1.placeholder_with_default([-100., -100., -100.], shape=None)
+    high = tf1.placeholder_with_default([100., 100., 100.], shape=None)
+    self.assertAllClose(
+        tfp.math.find_root_chandrupatla(
+            f, low=low, high=high).objective_at_estimated_root,
+        [0., 0., 0.])
 
 
 @test_util.test_all_tf_execution_regimes

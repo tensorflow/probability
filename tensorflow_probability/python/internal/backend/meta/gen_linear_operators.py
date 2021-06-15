@@ -47,6 +47,7 @@ MODULE_MAPPINGS = {
     'ops import control_flow_ops': 'control_flow as control_flow_ops',
     'ops import linalg_ops': 'linalg_impl as linalg_ops',
     'ops import math_ops': 'numpy_math as math_ops',
+    'ops import nn': 'nn',
     'ops import variables as variables_module': 'ops as variables_module',
     'ops.linalg import linalg_impl as linalg': 'linalg_impl as linalg'
 }
@@ -57,6 +58,7 @@ COMMENT_OUT = [
     'from tensorflow.python.framework import tensor_util',
     '@tf_export',
     '@dispatch',
+    '@linear_operator.make_composite_tensor',
     'self._check_input_dtype',
 ]
 
@@ -110,6 +112,33 @@ def gen_module(module_name):
   code = code.replace(
       'from tensorflow.python.platform import tf_logging',
       'from absl import logging')
+  code = code.replace(
+      'from tensorflow.python.framework import '
+      'composite_tensor',
+      'from tensorflow_probability.python.internal.backend.numpy '
+      'import composite_tensor')
+  code = code.replace(
+      'from tensorflow.python.ops import '
+      'resource_variable_ops',
+      'from tensorflow_probability.python.internal.backend.numpy '
+      'import resource_variable_ops')
+  code = code.replace(
+      'from tensorflow.python.framework import tensor_spec',
+      'from tensorflow_probability.python.internal.backend.numpy import '
+      'tensor_spec')
+  code = code.replace(
+      'from tensorflow.python.framework import type_spec',
+      'from tensorflow_probability.python.internal.backend.numpy '
+      'import type_spec')
+  code = code.replace(
+      'from tensorflow.python.ops import variables',
+      'from tensorflow_probability.python.internal.backend.numpy '
+      'import variables')
+  code = code.replace(
+      'from tensorflow.python.training.tracking '
+      'import data_structures',
+      'from tensorflow_probability.python.internal.backend.numpy '
+      'import data_structures')
   code = re.sub(
       r'from tensorflow\.python\.linalg import (\w+)',
       'from tensorflow_probability.python.internal.backend.numpy.gen import \\1 '
@@ -142,6 +171,8 @@ def gen_module(module_name):
   code = code.replace('.get_shape()', '.shape')
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+\.shape)([^(_])',
                 'tensor_shape.TensorShape(\\1)\\2', code)
+  code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_floating',
+                'np.issubdtype(\\1, np.floating)', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_complex',
                 'np.issubdtype(\\1, np.complexfloating)', code)
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_integer',

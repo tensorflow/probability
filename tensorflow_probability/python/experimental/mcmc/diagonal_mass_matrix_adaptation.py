@@ -93,6 +93,7 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
       momentum_distribution_setter_fn=hmc_like_momentum_distribution_setter_fn,
       momentum_distribution_getter_fn=hmc_like_momentum_distribution_getter_fn,
       validate_args=False,
+      experimental_shard_axis_names=None,
       name=None):
     """Creates the diagonal mass matrix adaptation kernel.
 
@@ -128,15 +129,20 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
       validate_args: Python `bool`. When `True` kernel parameters are checked
         for validity. When `False` invalid inputs may silently render incorrect
         outputs.
+      experimental_shard_axis_names: An optional structure of string names
+        indicating how members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this class. Default:
         'diagonal_mass_matrix_adaptation'.
     """
-    inner_kernel = mcmc_util.enable_store_parameters_in_results(inner_kernel)
+    inner_kernel = mcmc_util.enable_store_parameters_in_results(
+        inner_kernel).experimental_with_shard_axes(
+            experimental_shard_axis_names)
     self._parameters = dict(
         inner_kernel=inner_kernel,
         initial_running_variance=initial_running_variance,
         momentum_distribution_setter_fn=momentum_distribution_setter_fn,
         momentum_distribution_getter_fn=momentum_distribution_getter_fn,
+        experimental_shard_axis_names=experimental_shard_axis_names,
         name=name,
     )
 
@@ -254,7 +260,8 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
                                                   'target_log_prob'))
       init_state_parts = tf.nest.flatten(init_state)
       momentum_distribution = preconditioning_utils.make_momentum_distribution(
-          init_state_parts, batch_shape, diags)
+          init_state_parts, batch_shape, diags,
+          shard_axis_names=self.experimental_shard_axis_names)
       inner_results = self.momentum_distribution_setter_fn(
           inner_results, momentum_distribution)
       proposed = unnest.get_innermost(inner_results, 'proposed_results',
@@ -271,3 +278,11 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
   @property
   def is_calibrated(self):
     return False
+
+  @property
+  def experimental_shard_axis_names(self):
+    return self._parameters['experimental_shard_axis_names']
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(experimental_shard_axis_names=shard_axis_names)
+

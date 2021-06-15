@@ -37,7 +37,7 @@ __all__ = [
 ]
 
 
-class Reshape(bijector.Bijector):
+class Reshape(bijector.AutoCompositeTensorBijector):
   """Reshapes the `event_shape` of a `Tensor`.
 
   The semantics generally follow that of `tf.reshape()`, with
@@ -194,16 +194,8 @@ class Reshape(bijector.Bijector):
   @classmethod
   def _parameter_properties(cls, dtype):
     return dict(
-        event_shape_out=parameter_properties.ParameterProperties(
-            event_ndims=1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED),
-        event_shape_in=parameter_properties.ParameterProperties(
-            event_ndims=1,
-            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED))
+        event_shape_out=parameter_properties.ShapeParameterProperties(),
+        event_shape_in=parameter_properties.ShapeParameterProperties())
 
   @property
   def _is_permutation(self):
@@ -257,8 +249,6 @@ class Reshape(bijector.Bijector):
         self._event_shape_out,
         self._event_shape_in,
         self.validate_args)[0]
-
-  _composite_tensor_shape_params = ('event_shape_in', 'event_shape_out')
 
 
 def _replace_event_shape_in_shape_tensor(

@@ -23,6 +23,7 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -199,6 +200,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
                step_size,
                volatility_fn=None,
                parallel_iterations=10,
+               experimental_shard_axis_names=None,
                name=None):
     """Initializes MALA transition kernel.
 
@@ -220,6 +222,8 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
       parallel_iterations: the number of coordinates for which the gradients of
         the volatility matrix `volatility_fn` can be computed in parallel.
         Default value: `None` (i.e., use system default).
+      experimental_shard_axis_names: A structure of string names indicating how
+        members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'mala_kernel').
 
@@ -241,7 +245,8 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
             step_size=step_size,
             volatility_fn=volatility_fn,
             parallel_iterations=parallel_iterations,
-            name=name))
+            name=name)).experimental_with_shard_axes(
+                experimental_shard_axis_names)
 
     self._impl = impl
     parameters = impl.inner_kernel.parameters.copy()
@@ -309,6 +314,13 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
     """Creates initial `previous_kernel_results` using a supplied `state`."""
     return self._impl.bootstrap_results(init_state)
 
+  @property
+  def experimental_shard_axis_names(self):
+    return self._parameters['experimental_shard_axis_names']
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(experimental_shard_axis_names=shard_axis_names)
+
 
 class UncalibratedLangevin(kernel_base.TransitionKernel):
   """Runs one step of Uncalibrated Langevin discretized diffusion.
@@ -332,6 +344,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
                volatility_fn=None,
                parallel_iterations=10,
                compute_acceptance=True,
+               experimental_shard_axis_names=None,
                name=None):
     """Initializes Langevin diffusion transition kernel.
 
@@ -355,6 +368,8 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
       compute_acceptance: Python 'bool' indicating whether to compute the
         Metropolis log-acceptance ratio used to construct
         `MetropolisAdjustedLangevinAlgorithm` kernel.
+      experimental_shard_axis_names: A structure of string names indicating how
+        members of the state are sharded.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'mala_kernel').
 
@@ -382,6 +397,7 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         volatility_fn=volatility_fn,
         compute_acceptance=tf.convert_to_tensor(compute_acceptance),
         parallel_iterations=parallel_iterations,
+        experimental_shard_axis_names=experimental_shard_axis_names,
         name=name)
 
   @property
@@ -445,6 +461,8 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
         seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
         seeds = samplers.split_seed(
             seed, n=len(current_state_parts), salt='langevin.one_step')
+        seeds = distribute_lib.fold_in_axis_index(
+            seeds, self.experimental_shard_axis_names)
 
         random_draw_parts = []
         for state_part, part_seed in zip(current_state_parts, seeds):
@@ -494,7 +512,8 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
           current_drift_parts,
           next_drift_parts,
           step_size_parts,
-          independent_chain_ndims)
+          independent_chain_ndims,
+          experimental_shard_axis_names=self.experimental_shard_axis_names)
       log_acceptance_correction_skip = tf.zeros_like(next_target_log_prob)
 
       log_acceptance_correction = tf.cond(
@@ -558,6 +577,13 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
           # Allow room for one_step's seed.
           seed=samplers.zeros_seed(),
       )
+
+  @property
+  def experimental_shard_axis_names(self):
+    return self._parameters['experimental_shard_axis_names']
+
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(experimental_shard_axis_names=shard_axis_names)
 
 
 def _euler_method(random_draw_parts,
@@ -681,6 +707,7 @@ def _compute_log_acceptance_correction(current_state_parts,
                                        proposed_drift_parts,
                                        step_size_parts,
                                        independent_chain_ndims,
+                                       experimental_shard_axis_names=None,
                                        name=None):
   r"""Helper to `kernel` which computes the log acceptance-correction.
 
@@ -725,6 +752,8 @@ def _compute_log_acceptance_correction(current_state_parts,
       `current_state_parts`.
     independent_chain_ndims: Scalar `int` `Tensor` representing the number of
       leftmost `Tensor` dimensions which index independent chains.
+    experimental_shard_axis_names: A structure of string names indicating how
+      members of the state are sharded.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'compute_log_acceptance_correction').
 
@@ -738,6 +767,9 @@ def _compute_log_acceptance_correction(current_state_parts,
     proposed_log_density_parts = []
     dual_log_density_parts = []
 
+    if experimental_shard_axis_names is None:
+      experimental_shard_axis_names = [None] * len(current_state_parts)
+
     for [
         current_state,
         proposed_state,
@@ -746,6 +778,7 @@ def _compute_log_acceptance_correction(current_state_parts,
         current_drift,
         proposed_drift,
         step_size,
+        shard_axes
     ] in zip(
         current_state_parts,
         proposed_state_parts,
@@ -754,8 +787,9 @@ def _compute_log_acceptance_correction(current_state_parts,
         current_drift_parts,
         proposed_drift_parts,
         step_size_parts,
+        experimental_shard_axis_names
     ):
-      axis = tf.range(independent_chain_ndims, tf.rank(current_state))
+      axis = ps.range(independent_chain_ndims, ps.rank(current_state))
 
       state_diff = proposed_state - current_state
 
@@ -765,8 +799,14 @@ def _compute_log_acceptance_correction(current_state_parts,
 
       proposed_volatility *= tf.sqrt(step_size)
       # Compute part of `q(proposed_state | current_state)`
+      def reduce_sum(shard_axes, x, axis=None):
+        x = tf.reduce_sum(x, axis)
+        if shard_axes is not None:
+          x = distribute_lib.psum(x, shard_axes)
+        return x
       proposed_energy = (
-          tf.reduce_sum(
+          reduce_sum(
+              shard_axes,
               mcmc_util.safe_sum(
                   [tf.math.log(current_volatility),
                    0.5 * (proposed_energy**2)]),
@@ -776,7 +816,8 @@ def _compute_log_acceptance_correction(current_state_parts,
       # Compute part of `q(current_state | proposed_state)`
       dual_energy = (state_diff + proposed_drift) / proposed_volatility
       dual_energy = (
-          tf.reduce_sum(
+          reduce_sum(
+              shard_axes,
               mcmc_util.safe_sum(
                   [tf.math.log(proposed_volatility), 0.5 * (dual_energy**2)]),
               axis=axis))

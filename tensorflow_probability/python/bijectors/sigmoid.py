@@ -64,7 +64,7 @@ else:
     return y, grad_fn
 
 
-class Sigmoid(bijector.Bijector):
+class Sigmoid(bijector.AutoCompositeTensorBijector):
   """Bijector that computes the logistic sigmoid function.
 
   If the `low` and `high` parameters are not passed, the transformation is

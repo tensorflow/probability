@@ -32,7 +32,6 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 
@@ -42,7 +41,7 @@ __all__ = [
 ]
 
 
-class InverseGamma(distribution.Distribution):
+class InverseGamma(distribution.AutoCompositeTensorDistribution):
   """InverseGamma distribution.
 
   The `InverseGamma` distribution is defined over positive real numbers using
@@ -188,14 +187,6 @@ class InverseGamma(distribution.Distribution):
   def scale(self):
     """Scale parameter."""
     return self._scale
-
-  def _batch_shape_tensor(self):
-    return ps.broadcast_shape(
-        ps.shape(self.concentration), ps.shape(self.scale))
-
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(self.concentration.shape,
-                                     self.scale.shape)
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)

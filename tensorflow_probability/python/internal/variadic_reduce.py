@@ -151,20 +151,21 @@ def make_variadic_reduce(reducer, vjp_bwd, tangents_fn):
       return _xla_reduce(operands, inits, axis)
 
   def _variadic_reduce_fwd(operands, inits, axis, reducer, unsqueezed_shape):
+    del unsqueezed_shape
     return (_variadic_reduce_no_grad(operands, inits, axis, reducer),
-            (operands, inits, axis, unsqueezed_shape))
+            (operands, inits))
 
-  def _variadic_reduce_jvp(inits, axis, reducer, unsqueezed_shape, primals,
+  def _variadic_reduce_jvp(axis, reducer, unsqueezed_shape, primals,
                            tangents):
     del unsqueezed_shape
-    operands, = primals
+    operands, inits = primals
     return (_variadic_reduce_no_grad(operands, inits, axis, reducer),
-            tangents_fn(inits, axis, primals, tangents))
+            tangents_fn(axis, primals, tangents))
 
   @tfp_custom_gradient.custom_gradient(vjp_fwd=_variadic_reduce_fwd,
                                        vjp_bwd=vjp_bwd,
                                        jvp_fn=_variadic_reduce_jvp,
-                                       nondiff_argnums=(1, 2, 3, 4))
+                                       nondiff_argnums=(2, 3, 4))
   def _variadic_reduce_custom_grad(operands, inits, axis, reducer,
                                    unsqueezed_shape):
     del unsqueezed_shape  # provided for backprop convenience

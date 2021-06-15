@@ -43,6 +43,7 @@ from tensorflow_probability.python.distributions import hypothesis_testlib as dh
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import numerics_testing as nt
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
@@ -73,6 +74,7 @@ NO_NANS_TEST_BLOCK_LIST = (
     # Independent log_prob unavoidably emits `nan` if the underlying
     # distribution yields a +inf on one sample and a -inf on another.
     'Independent',
+    'LambertWNormal',
     'LogitNormal',  # TODO(axch): Maybe nan problem hints at accuracy problem
     # Mixtures of component distributions whose samples have different dtypes
     # cannot pass validate_args.
@@ -116,12 +118,14 @@ LOG_PROB_ACCURACY_BLOCK_LIST = (
     'GeneralizedExtremeValue',
     'JohnsonSU',
     'Kumaraswamy',
+    'LambertWNormal',
     'LogitNormal',  # Filters too much in 6/100 runs (nan samples too easy?)
     'MultivariateNormalDiag',
     'MultivariateNormalTriL',
     'NegativeBinomial',
     'OneHotCategorical',
     'PlackettLuce',
+    'SinhArcsinh',  # b/183670203
     'Skellam',
     'StoppingRatioLogistic',  # Filters too much in 61/100 runs; this is odd.
     # TODO(axch): Fix numerics of _cauchy_cdf(x + delta) - _cauchy_cdf(x)
@@ -286,6 +290,32 @@ class ReproducibilityTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
+class SampleAndLogProbTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                          list(dhps.INSTANTIABLE_META_DISTS)))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    dist = data.draw(dhps.distributions(dist_name=dist_name, enable_vars=False,
+                                        validate_args=False))
+    seed = test_util.test_seed(sampler_type='stateless')
+    sample_shape = [2, 1]
+    with tfp_hps.no_tf_rank_errors(), kernel_hps.no_pd_errors():
+      s1, lp1 = dist.experimental_sample_and_log_prob(sample_shape, seed=seed)
+      s2 = dist.sample(sample_shape, seed=seed)
+      self.assertAllClose(s1, s2, atol=1e-4)
+
+      # Sanity-check the log prob. The actual values may differ arbitrarily (if
+      # the `sample_and_log_prob` implementation is more stable) or be NaN, but
+      # they should at least have the same shape.
+      lp2 = dist.log_prob(s1)
+      self.assertAllEqual(lp1.shape, lp2.shape)
+
+
+@test_util.test_all_tf_execution_regimes
 class NoNansTest(test_util.TestCase, dhps.TestCase):
 
   @parameterized.named_parameters(
@@ -307,6 +337,7 @@ class NoNansTest(test_util.TestCase, dhps.TestCase):
     hp.note('Testing on samples {}'.format(samples))
     with tfp_hps.no_tf_rank_errors():
       lp = self.evaluate(dist.log_prob(samples))
+      hp.note('Got log_probs {}'.format(lp))
     self.assertAllEqual(np.zeros_like(lp), np.isnan(lp))
 
   @parameterized.named_parameters(
@@ -399,25 +430,46 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
     if event_space_bijector is None:
       return
 
+    # Draw a sample shape
+    sample_shape = data.draw(tfp_hps.shapes())
+    inv_event_shape = event_space_bijector.inverse_event_shape(
+        tensorshape_util.concatenate(dist.batch_shape, dist.event_shape))
+
+    # Draw a shape that broadcasts with `[batch_shape, inverse_event_shape]`
+    # where `inverse_event_shape` is the event shape in the bijector's
+    # domain. This is the shape of `y` in R**n, such that
+    # x = event_space_bijector(y) has the event shape of the distribution.
+
+    # TODO(b/174778703): Actually draw broadcast compatible shapes.
+    batch_inv_event_compat_shape = inv_event_shape
+    # batch_inv_event_compat_shape = data.draw(
+    #     tfp_hps.broadcast_compatible_shape(inv_event_shape))
+    # batch_inv_event_compat_shape = tensorshape_util.concatenate(
+    #     (1,) * (len(inv_event_shape) - len(batch_inv_event_compat_shape)),
+    #     batch_inv_event_compat_shape)
+
     total_sample_shape = tensorshape_util.concatenate(
-        # Draw a sample shape
-        data.draw(tfp_hps.shapes()),
-        # Draw a shape that broadcasts with `[batch_shape, inverse_event_shape]`
-        # where `inverse_event_shape` is the event shape in the bijector's
-        # domain. This is the shape of `y` in R**n, such that
-        # x = event_space_bijector(y) has the event shape of the distribution.
-        data.draw(tfp_hps.broadcasting_shapes(
-            event_space_bijector.inverse_event_shape(
-                tensorshape_util.concatenate(
-                    dist.batch_shape, dist.event_shape)), n=1))[0])
+        sample_shape, batch_inv_event_compat_shape)
+    # full_sample_batch_event_shape = tensorshape_util.concatenate(
+    #     sample_shape, inv_event_shape)
 
     y = data.draw(
         tfp_hps.constrained_tensors(
             tfp_hps.identity_fn, total_sample_shape.as_list()))
+    hp.note('Trying to constrain inputs {}'.format(y))
     with tfp_hps.no_tf_rank_errors():
       x = event_space_bijector(y)
+      hp.note('Got constrained samples {}'.format(x))
       with tf.control_dependencies(dist._sample_control_dependencies(x)):
-        self.evaluate(tf.identity(x))
+        self.evaluate(tensor_util.identity_as_tensor(x))
+
+      # TODO(b/158874412): Verify DoF changing default bijectors.
+      # y_bc = tf.broadcast_to(y, full_sample_batch_event_shape)
+      # x_bc = event_space_bijector(y_bc)
+      # self.assertAllClose(x, x_bc)
+      # fldj = event_space_bijector.forward_log_det_jacobian(y)
+      # fldj_bc = event_space_bijector.forward_log_det_jacobian(y_bc)
+      # self.assertAllClose(fldj, fldj_bc)
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -444,9 +496,8 @@ class EventSpaceBijectorsTest(test_util.TestCase, dhps.TestCase):
     def ok(name):
       return name not in EVENT_SPACE_BIJECTOR_IS_BROKEN
     dist = data.draw(dhps.distributions(
-        dist_name=dist_name, enable_vars=True,
+        dist_name=dist_name, enable_vars=False,
         eligibility_filter=ok))
-    self.evaluate([var.initializer for var in dist.variables])
     self.assume_loc_scale_ok(dist)
     self.check_event_space_bijector_constrains(dist, data)
 
@@ -466,6 +517,9 @@ class ParameterPropertiesTest(test_util.TestCase):
                                     'TruncatedNormal', 'Uniform')
     not_annotated_dists = ('Empirical|event_ndims=0', 'Empirical|event_ndims=1',
                            'Empirical|event_ndims=2', 'FiniteDiscrete',
+                           # cov_perturb_factor is not annotated since its shape
+                           # could be a vector or a matrix.
+                           'MultivariateNormalDiagPlusLowRankCovariance',
                            'MultivariateStudentTLinearOperator',
                            'PoissonLogNormalQuadratureCompound',
                            'StoppingRatioLogistic',)
@@ -481,8 +535,10 @@ class ParameterPropertiesTest(test_util.TestCase):
         'num_samples',
         'df',  # Can't represent constraint that Wishart df > dimension.
         'mean_direction')  # TODO(b/118492439): Add `UnitVector` bijector.
-    non_trainable_non_tensor_params = ('dimension', 'dtype'
-                                      )  # Required by Zipf.
+    non_trainable_non_tensor_params = (
+        'batch_shape',  # SphericalUniform, at least, has explicit batch shape
+        'dimension',
+        'dtype')
 
     dist = data.draw(
         dhps.distributions(
@@ -534,18 +590,17 @@ class ParameterPropertiesTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
-      for dname in sorted(list(set(dhps.INSTANTIABLE_META_DISTS))))
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                          list(dhps.INSTANTIABLE_META_DISTS)))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testInferredBatchShapeMatchesTrueBatchShape(self, dist_name, data):
-    dist = data.draw(dhps.distributions(dist_name=dist_name))
-    try:
-      self.assertAllEqual(dist.batch_shape_tensor(),
-                          dist._inferred_batch_shape_tensor())
-      self.assertAllEqual(dist.batch_shape,
-                          dist._inferred_batch_shape())
-    except NotImplementedError as e:
-      self.skipTest(str(e))
+    dist = data.draw(
+        dhps.distributions(dist_name=dist_name, validate_args=False))
+    lp = dist.log_prob(dist.sample(seed=test_util.test_seed()))
+
+    self.assertAllEqual(dist.batch_shape_tensor(), tf.shape(lp))
+    self.assertAllEqual(dist.batch_shape, tf.shape(lp))
 
 
 def _all_shapes(thing):

@@ -48,6 +48,8 @@ from tensorflow_probability.python.stats.sample_stats import cumulative_variance
 from tensorflow_probability.python.stats.sample_stats import log_average_probs
 from tensorflow_probability.python.stats.sample_stats import stddev
 from tensorflow_probability.python.stats.sample_stats import variance
+from tensorflow_probability.python.stats.sample_stats import windowed_mean
+from tensorflow_probability.python.stats.sample_stats import windowed_variance
 
 # pylint: enable=unused-import,wildcard-import,line-too-long,g-importing-member
 
@@ -81,6 +83,8 @@ __all__ = [
     'quantiles',
     'stddev',
     'variance',
+    'windowed_mean',
+    'windowed_variance',
 ]
 
 all_util.remove_undocumented(__name__, __all__)

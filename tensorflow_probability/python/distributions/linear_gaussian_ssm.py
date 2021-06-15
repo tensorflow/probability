@@ -172,7 +172,8 @@ def _augment_sample_shape(partial_batch_dist,
     return full_sample_and_batch_shape[:num_broadcast_dims]
 
 
-class LinearGaussianStateSpaceModel(distribution.Distribution):
+class LinearGaussianStateSpaceModel(
+    distribution.AutoCompositeTensorDistribution):
   """Observation distribution from a linear Gaussian state space model.
 
   A linear Gaussian state space model, sometimes called a Kalman filter, posits
@@ -661,7 +662,7 @@ class LinearGaussianStateSpaceModel(distribution.Distribution):
     transition_noise = self.get_transition_noise_for_timestep(t)
     observation_noise = self.get_observation_noise_for_timestep(t)
     return tf.nest.map_structure(
-        tf.identity,
+        tensor_util.identity_as_tensor,
         {'transition_matrix': (
             self.get_transition_matrix_for_timestep(t).to_dense()),
          'observation_matrix': (
@@ -1695,7 +1696,7 @@ def build_kalman_filter_step(get_transition_matrix_for_timestep,
         filtered_mean, filtered_cov,
         predicted_mean, predicted_cov,
         observation_dist.mean()[..., tf.newaxis],
-        observation_dist.covariance(),
+        _get_covariance_no_broadcast(observation_dist),
         log_marginal_likelihood,
         state.timestep+1)
 
@@ -1831,10 +1832,6 @@ def linear_gaussian_update(
         normal.Normal(loc=x_expected[..., 0],
                       scale=tf.sqrt(predicted_obs_cov[..., 0])),
         reinterpreted_batch_ndims=1)
-
-    # Minor hack to define the covariance, so that `predictive_dist` can pass as
-    # an MVNTriL-like object.
-    predictive_dist.covariance = lambda: predicted_obs_cov
   else:
     predictive_dist = mvn_tril.MultivariateNormalTriL(
         loc=x_expected[..., 0],
@@ -2052,3 +2049,18 @@ def _propagate_cov(cov, linop, dist):
   """Propagate covariance through linear Gaussian transformation."""
   # For linop A and input cov P, returns `A P A' + dist.cov()`
   return linop.matmul(linop.matmul(cov), adjoint_arg=True) + dist.covariance()
+
+
+def _get_covariance_no_broadcast(dist):
+  """Returns `dist.covariance()` ignoring any batch shape from `dist.loc`."""
+  if hasattr(dist, 'reinterpreted_batch_ndims'):
+    # Dist is Independent(Normal).
+    return tf.linalg.diag(dist.distribution.scale ** 2)
+  elif hasattr(dist, 'cov_operator'):
+    return dist.covariance_operator.to_dense()
+  elif hasattr(dist, 'scale') and hasattr(dist.scale, 'matmul'):
+     # Dist is MultivariateNormalLinearOperator.
+    return dist.scale.matmul(dist.scale, adjoint_arg=True).to_dense()
+  raise ValueError(
+      'Could not compute unbroadcast covariance of distribution {}.'.format(
+          dist))

@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 import numpy as np
 
@@ -57,7 +55,7 @@ def _normal_log_pdf(x):
   return -0.5 * (tf.math.log(two_pi) + tf.square(x))
 
 
-class TruncatedNormal(distribution.Distribution):
+class TruncatedNormal(distribution.AutoCompositeTensorDistribution):
   """The Truncated Normal distribution.
 
   The truncated normal is a normal distribution bounded between `low`
@@ -241,19 +239,6 @@ class TruncatedNormal(distribution.Distribution):
   def high(self):
     return self._high
 
-  def _batch_shape(self):
-    return functools.reduce(
-        tf.broadcast_static_shape,
-        (self.loc.shape, self.scale.shape, self.low.shape, self.high.shape))
-
-  def _batch_shape_tensor(self, loc=None, scale=None, low=None, high=None):
-    return functools.reduce(
-        ps.broadcast_shape,
-        (ps.shape(self.loc if loc is None else loc),
-         ps.shape(self.scale if scale is None else scale),
-         ps.shape(self.low if low is None else low),
-         ps.shape(self.high if high is None else high)))
-
   def _event_shape(self):
     return tf.TensorShape([])
 
@@ -356,13 +341,15 @@ class TruncatedNormal(distribution.Distribution):
     return std_samples * scale[tf.newaxis] + loc[tf.newaxis]
 
   def _log_prob(self, x):
+    np_dtype = dtype_util.as_numpy_dtype(x.dtype)
     loc, scale, low, high = self._loc_scale_low_high()
-    log_prob = -(0.5 * tf.square(
-        (x - loc) / scale) + 0.5 * np.log(2. * np.pi) + tf.math.log(scale) +
+    log_prob = -(np_dtype(0.5) * tf.square(
+        (x - loc) / scale) + (0.5 * np.log(2. * np.pi)).astype(np_dtype) +
+                 tf.math.log(scale) +
                  self._log_normalizer(loc=loc, scale=scale, low=low, high=high))
     # p(x) is 0 outside the bounds.
     bounded_log_prob = tf.where((x > high) | (x < low),
-                                dtype_util.as_numpy_dtype(x.dtype)(-np.inf),
+                                np_dtype(-np.inf),
                                 log_prob)
     return bounded_log_prob
 
@@ -419,6 +406,19 @@ class TruncatedNormal(distribution.Distribution):
     # parameter to clip_by_value to align with the second and third parameters.
     bc_loc = tf.broadcast_to(loc, shp)
     return tf.clip_by_value(bc_loc, low, high)
+
+  def _quantile(self, p):
+    # TODO(b/188413116): This implementation is analytically correct, but might
+    # not perform well in all cases. See
+    # https://en.wikipedia.org/wiki/Truncated_normal_distribution#Generating_values_from_the_truncated_normal_distribution)
+    # for a discussion on alternatives.
+    loc, scale, low, high = self._loc_scale_low_high()
+    std_low, std_high = self._standardized_low_and_high(
+        low=low, high=high, loc=loc, scale=scale)
+    quantile = tf.math.ndtri(
+        special_math.ndtr(std_low) + p *
+        (special_math.ndtr(std_high) - special_math.ndtr(std_low))) * scale + loc
+    return quantile
 
   def _variance(self):
     loc, scale, low, high = self._loc_scale_low_high()

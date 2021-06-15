@@ -19,6 +19,9 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import distribute_test_lib
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -331,6 +334,106 @@ class GradientBasedTrajectoryLengthAdaptationTestFloat32(
 class GradientBasedTrajectoryLengthAdaptationTestFloat64(
     _GradientBasedTrajectoryLengthAdaptationTest):
   dtype = np.float64
+
+
+@test_util.test_all_tf_execution_regimes
+class DistributedGBTLATest(distribute_test_lib.DistributedTest):
+
+  def test_gbtla_kernel_tracks_axis_names(self):
+    inner_kernel = tfp.mcmc.HamiltonianMonteCarlo(tfd.Normal(0, 1).log_prob,
+                                                  step_size=1.9,
+                                                  num_leapfrog_steps=2)
+    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+        inner_kernel, 1)
+    self.assertIsNone(kernel.experimental_shard_axis_names)
+    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+        inner_kernel, 1, experimental_shard_axis_names=['a'])
+    self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
+    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+        inner_kernel, 1).experimental_with_shard_axes(['a'])
+    self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
+
+  def test_gbtla_kernel_computes_same_criterion_info_with_sharded_state(self):
+
+    if not JAX_MODE:
+      self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
+
+    def target_log_prob(a, b):
+      return (
+          tfd.Normal(0., 1.).log_prob(a)
+          + distribute_lib.psum(tfd.Normal(
+              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+
+    kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
+                                            step_size=1e-2,
+                                            num_leapfrog_steps=2)
+    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+        kernel, 10)
+    sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
+
+    def run(seed):
+      init_seed, sample_seed = samplers.split_seed(seed)
+      state_seeds = samplers.split_seed(init_seed)
+      state = [
+          samplers.normal(seed=state_seeds[0], shape=[5]),
+          samplers.normal(seed=state_seeds[1], shape=[5])
+      ]
+      kr = sharded_kernel.bootstrap_results(state)
+      _, kr = sharded_kernel.one_step(state, kr, seed=sample_seed)
+      return (
+          kr.criterion,
+          kr.averaged_sq_grad,
+          kr.averaged_max_trajectory_length
+      )
+
+    criterion, avg_sq_grad, avg_max_tl = self.evaluate(
+        self.per_replica_to_tensor(self.strategy_run(
+            run, args=(samplers.zeros_seed(),), in_axes=None, axis_name='foo'),
+                                   0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(criterion[0], criterion[i])
+      self.assertAllClose(avg_sq_grad[0], avg_sq_grad[i])
+      self.assertAllClose(avg_max_tl[0], avg_max_tl[i])
+
+  def test_gbtla_kernel_can_shard_chains_across_devices(self):
+
+    def target_log_prob(a, b):
+      return (
+          tfd.Normal(0., 1.).log_prob(a)
+          + tfd.Sample(tfd.Normal(a, 1.), 4).log_prob(b))
+
+    kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
+                                            step_size=1e-2,
+                                            num_leapfrog_steps=2)
+    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+        kernel, 10)
+    sharded_kernel = kernel.experimental_with_chain_axes(self.axis_name)
+
+    def run(seed):
+      init_seed, sample_seed = samplers.split_seed(seed)
+      state_seeds = samplers.split_seed(init_seed)
+      state = [
+          samplers.normal(seed=state_seeds[0], shape=[]),
+          samplers.normal(seed=state_seeds[1], shape=[4])
+      ]
+      kr = sharded_kernel.bootstrap_results(state)
+      _, kr = sharded_kernel.one_step(state, kr, seed=sample_seed)
+      return (
+          kr.averaged_sq_grad,
+          kr.averaged_max_trajectory_length
+      )
+
+    seeds = self.shard_values(tf.stack(tfp.random.split_seed(
+        samplers.zeros_seed(), distribute_test_lib.NUM_DEVICES)), 0)
+
+    avg_sq_grad, avg_max_tl = self.evaluate(
+        self.per_replica_to_tensor(self.strategy_run(
+            run, args=(seeds,), axis_name=self.axis_name), 0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(avg_sq_grad[0], avg_sq_grad[i])
+      self.assertAllClose(avg_max_tl[0], avg_max_tl[i])
 
 
 del _GradientBasedTrajectoryLengthAdaptationTest

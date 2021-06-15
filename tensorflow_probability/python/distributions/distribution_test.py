@@ -19,6 +19,7 @@ from __future__ import print_function
 import collections
 # Dependency imports
 
+from absl import logging
 from absl.testing import parameterized
 
 import numpy as np
@@ -29,8 +30,6 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-from tensorflow.python.platform import test as tf_test  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-from tensorflow.python.platform import tf_logging  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
 class TupleDistribution(tfd.Distribution):
@@ -617,10 +616,7 @@ class ParametersTest(test_util.TestCase):
                     self.evaluate(normal_differential_entropy(scale)),
                     err=1e-5)
 
-  @test_util.jax_disable_test_missing_functionality('tf_logging')
-  @tf_test.mock.patch.object(tf_logging, 'warning', autospec=True)
-  def testParameterPropertiesNotInherited(self, mock_warning):
-    # TODO(b/183457779) Test for NotImplementedError (rather than just warning).
+  def testParameterPropertiesNotInherited(self):
 
     # Subclasses that don't redefine __init__ can inherit properties.
     class NormalTrivialSubclass(tfd.Normal):
@@ -640,11 +636,17 @@ class ParametersTest(test_util.TestCase):
       def __init__(self, param1, param2):
         pass
 
-    NormalTrivialSubclass.parameter_properties()
-    NormalWithPassThroughInit.parameter_properties()
-    with self.assertRaises(NotImplementedError):
-      MyDistribution.parameter_properties()
-    self.assertEqual(0, mock_warning.call_count)
+    with self.assertLogs(level=logging.WARNING) as log:
+      NormalTrivialSubclass.parameter_properties()
+      NormalWithPassThroughInit.parameter_properties()
+      with self.assertRaises(NotImplementedError):
+        MyDistribution.parameter_properties()
+      with self.assertRaises(NotImplementedError):
+        # Ensure that the unimplemented JD propertoes don't raise a warning.
+        tfd.JointDistributionCoroutine.parameter_properties()
+      logging.warning('assertLogs context requires at least one warning.')
+    # Assert that no warnings occurred other than the dummy warning.
+    self.assertLen(log.records, 1)
 
     class NormalWithExtraParam(tfd.Normal):
 
@@ -652,8 +654,9 @@ class ParametersTest(test_util.TestCase):
         self._extra_param = extra_param
         super(NormalWithExtraParam, self).__init__(*args, **kwargs)
 
-    NormalWithExtraParam.parameter_properties()
-    self.assertEqual(1, mock_warning.call_count)
+    with self.assertLogs(level=logging.WARNING) as log:
+      NormalWithExtraParam.parameter_properties()
+    self.assertLen(log.records, 1)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -851,9 +854,9 @@ class BatchShapeInferenceTests(test_util.TestCase):
     value = value_fn()  # Defer construction until we're in the right graph.
     self.assertAllEqual(
         expected_batch_shape,
-        value._inferred_batch_shape_tensor())
+        value.batch_shape_tensor())
 
-    batch_shape = value._inferred_batch_shape()
+    batch_shape = value.batch_shape
     self.assertIsInstance(batch_shape, tf.TensorShape)
     self.assertTrue(
         batch_shape.is_compatible_with(expected_batch_shape))

@@ -218,18 +218,17 @@ def find_root_secant(objective_fn,
   num_iterations = tf.zeros_like(position, dtype=tf.int32)
   max_iterations = tf.convert_to_tensor(max_iterations, dtype=tf.int32)
   max_iterations = tf.broadcast_to(
-      max_iterations, name='max_iterations', shape=position.shape)
+      max_iterations, name='max_iterations', shape=ps.shape(position))
 
   # Compute the step from `next_position` if present. This covers the case where
   # a user has two starting points, which bound the root or has a specific step
   # size in mind.
   if next_position is None:
-    epsilon = tf.constant(1e-4, dtype=position.dtype, shape=position.shape)
-    step = position * epsilon + tf.sign(position) * epsilon
+    step = (position + tf.sign(position)) * 1e-4
   else:
     step = next_position - initial_position
 
-  finished = tf.constant(False, shape=position.shape)
+  finished = tf.zeros(ps.shape(position), dtype=tf.bool)
 
   # Negate `stopping_condition` to determine if the search should continue.
   # This means, in particular, that tf.reduce_*all* will return only when the

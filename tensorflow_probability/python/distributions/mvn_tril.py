@@ -29,12 +29,14 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
+from tensorflow.python.ops.linalg import linear_operator  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'MultivariateNormalTriL',
 ]
 
 
+@linear_operator.make_composite_tensor
 class KahanLogDetLinOpTriL(tf.linalg.LinearOperatorLowerTriangular):
   """Override `LinearOperatorLowerTriangular` logdet to use Kahan summation."""
 
@@ -252,5 +254,3 @@ class MultivariateNormalTriL(
   @property
   def scale_tril(self):
     return self._scale_tril
-
-  _composite_tensor_nonshape_params = ('loc', 'scale_tril')
