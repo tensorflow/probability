@@ -284,6 +284,86 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
         use_xla=BACKEND == 'backend_jax',  # TF XLA is very slow on this problem
     )
 
+  def testLogSP500Small(self):
+    """Checks that you get finite values given unconstrained samples.
+
+    We check `unnormalized_log_prob` as well as the values of the sample
+    transformations.
+    """
+    if BACKEND == 'backend_jax':
+      self.skipTest('Too slow.')
+    model = (
+        vectorized_stochastic_volatility
+        .VectorizedStochasticVolatilityLogSP500Small())
+    self.validate_log_prob_and_transforms(
+        model,
+        sample_transformation_shapes=dict(
+            identity={
+                'persistence_of_volatility': [],
+                'mean_log_volatility': [],
+                'white_noise_shock_scale': [],
+                'log_volatility': [100]
+            }),
+        check_ground_truth_mean_standard_error=True,
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True)
+
+  @test_util.numpy_disable_gradient_test
+  def testLogSP500SmallHMC(self):
+    """Checks approximate samples from the model against the ground truth."""
+    self.skipTest('Broken by omnistaging b/168705919')
+    model = (
+        vectorized_stochastic_volatility
+        .VectorizedStochasticVolatilityLogSP500Small())
+
+    self.validate_ground_truth_using_hmc(
+        model,
+        num_chains=4,
+        num_steps=500,
+        num_leapfrog_steps=15,
+        step_size=1.,
+        use_xla=BACKEND == 'backend_jax',  # TF XLA is very slow on this problem
+    )
+
+  def testLogSP500(self):
+    """Checks that you get finite values given unconstrained samples.
+
+    We check `unnormalized_log_prob` as well as the values of the sample
+    transformations.
+    """
+    model = (
+        vectorized_stochastic_volatility.VectorizedStochasticVolatilityLogSP500(
+        ))
+    self.validate_log_prob_and_transforms(
+        model,
+        sample_transformation_shapes=dict(
+            identity={
+                'persistence_of_volatility': [],
+                'mean_log_volatility': [],
+                'white_noise_shock_scale': [],
+                'log_volatility': [2516]
+            }),
+        check_ground_truth_mean_standard_error=True,
+        check_ground_truth_mean=True,
+        check_ground_truth_standard_deviation=True)
+
+  @test_util.numpy_disable_gradient_test
+  def testLogSP500HMC(self):
+    """Checks approximate samples from the model against the ground truth."""
+    self.skipTest('b/169073800')
+    model = (
+        vectorized_stochastic_volatility.VectorizedStochasticVolatilityLogSP500(
+        ))
+
+    self.validate_ground_truth_using_hmc(
+        model,
+        num_chains=4,
+        num_steps=2000,
+        num_leapfrog_steps=25,
+        step_size=1.,
+        use_xla=BACKEND == 'backend_jax',  # TF XLA is very slow on this problem
+    )
+
 
 if __name__ == '__main__':
   tf.test.main()

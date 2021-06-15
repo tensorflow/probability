@@ -196,7 +196,7 @@ class StochasticVolatilitySP500(StochasticVolatility):
   GROUND_TRUTH_MODULE = stochastic_volatility_sp500
 
   def __init__(self):
-    dataset = data.sp500_closing_prices()
+    dataset = data.sp500_returns()
     super(StochasticVolatilitySP500, self).__init__(
         name='stochastic_volatility_sp500',
         pretty_name='Stochastic volatility model of S&P500 returns.',
@@ -209,7 +209,7 @@ class StochasticVolatilitySP500Small(StochasticVolatility):
   GROUND_TRUTH_MODULE = stochastic_volatility_sp500_small
 
   def __init__(self):
-    dataset = data.sp500_closing_prices(num_points=100)
+    dataset = data.sp500_returns(num_points=100)
     super(StochasticVolatilitySP500Small, self).__init__(
         name='stochastic_volatility_sp500_small',
         pretty_name='Smaller stochastic volatility model of S&P500 returns.',

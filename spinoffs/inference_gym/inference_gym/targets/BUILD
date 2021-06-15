@@ -551,6 +551,8 @@ py_library(
         ":bayesian_model",
         ":model",
         "//inference_gym/internal:data",
+        "//inference_gym/targets/ground_truth:stochastic_volatility_log_sp500",
+        "//inference_gym/targets/ground_truth:stochastic_volatility_log_sp500_small",
         "//inference_gym/targets/ground_truth:stochastic_volatility_sp500",
         "//inference_gym/targets/ground_truth:stochastic_volatility_sp500_small",
     ],

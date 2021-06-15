@@ -60,7 +60,15 @@ class DataTest(test_util.InferenceGymTestCase):
   def testStochasticVolatilityModelSP500(self):
     num_train_points = 2516
 
-    dataset = data.sp500_closing_prices()
+    dataset = data.sp500_returns()
+
+    self.assertEqual((num_train_points,), dataset['centered_returns'].shape)
+    self.assertAllClose(0.0, np.mean(dataset['centered_returns']), atol=1e-5)
+
+  def testStochasticVolatilityModelLogSP500(self):
+    num_train_points = 2516
+
+    dataset = data.sp500_log_returns()
 
     self.assertEqual((num_train_points,), dataset['centered_returns'].shape)
     self.assertAllClose(0.0, np.mean(dataset['centered_returns']), atol=1e-5)

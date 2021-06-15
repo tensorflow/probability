@@ -51,6 +51,8 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.stochastic_volatility import StochasticVolatilitySP500
   from inference_gym.targets.stochastic_volatility import StochasticVolatilitySP500Small
   from inference_gym.targets.vectorized_stochastic_volatility import VectorizedStochasticVolatility
+  from inference_gym.targets.vectorized_stochastic_volatility import VectorizedStochasticVolatilityLogSP500
+  from inference_gym.targets.vectorized_stochastic_volatility import VectorizedStochasticVolatilityLogSP500Small
   from inference_gym.targets.vectorized_stochastic_volatility import VectorizedStochasticVolatilitySP500
   from inference_gym.targets.vectorized_stochastic_volatility import VectorizedStochasticVolatilitySP500Small
   from inference_gym.targets.vector_model import VectorModel
@@ -90,6 +92,8 @@ __all__ = [
     'SyntheticLogGaussianCoxProcess',
     'SyntheticPlasmaSpectroscopy',
     'VectorizedStochasticVolatility',
+    'VectorizedStochasticVolatilityLogSP500',
+    'VectorizedStochasticVolatilityLogSP500Small',
     'VectorizedStochasticVolatilitySP500',
     'VectorizedStochasticVolatilitySP500Small',
     'VectorModel',

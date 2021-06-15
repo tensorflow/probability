@@ -24,6 +24,8 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from inference_gym.internal import data
 from inference_gym.targets import bayesian_model
 from inference_gym.targets import model
+from inference_gym.targets.ground_truth import stochastic_volatility_log_sp500
+from inference_gym.targets.ground_truth import stochastic_volatility_log_sp500_small
 from inference_gym.targets.ground_truth import stochastic_volatility_sp500
 from inference_gym.targets.ground_truth import stochastic_volatility_sp500_small
 
@@ -32,6 +34,8 @@ tfb = tfp.bijectors
 
 __all__ = [
     'VectorizedStochasticVolatility',
+    'VectorizedStochasticVolatilityLogSP500',
+    'VectorizedStochasticVolatilityLogSP500Small',
     'VectorizedStochasticVolatilitySP500',
     'VectorizedStochasticVolatilitySP500Small',
 ]
@@ -365,7 +369,7 @@ class VectorizedStochasticVolatilitySP500(VectorizedStochasticVolatility):
       centered=False,
       use_fft=True,
   ):
-    dataset = data.sp500_closing_prices()
+    dataset = data.sp500_returns()
     super(VectorizedStochasticVolatilitySP500, self).__init__(
         name='vectorized_stochastic_volatility_sp500',
         pretty_name='Stochastic volatility model of S&P500 returns.',
@@ -382,8 +386,44 @@ class VectorizedStochasticVolatilitySP500Small(VectorizedStochasticVolatility):
       centered=False,
       use_fft=True,
   ):
-    dataset = data.sp500_closing_prices(num_points=100)
+    dataset = data.sp500_returns(num_points=100)
     super(VectorizedStochasticVolatilitySP500Small, self).__init__(
         name='vectorized_stochasticic_volatility_sp500_small',
         pretty_name='Smaller stochastic volatility model of S&P500 returns.',
+        **dataset)
+
+
+class VectorizedStochasticVolatilityLogSP500(VectorizedStochasticVolatility):
+  """Stochastic volatility model of ten years of S&P500 log returns."""
+
+  GROUND_TRUTH_MODULE = stochastic_volatility_log_sp500
+
+  def __init__(
+      self,
+      centered=False,
+      use_fft=True,
+  ):
+    dataset = data.sp500_log_returns()
+    super(VectorizedStochasticVolatilityLogSP500, self).__init__(
+        name='vectorized_stochastic_volatility_log_sp500',
+        pretty_name='Stochastic volatility model of S&P500 log returns.',
+        **dataset)
+
+
+class VectorizedStochasticVolatilityLogSP500Small(VectorizedStochasticVolatility
+                                                 ):
+  """Stochastic volatility model of 100 days of S&P500 log returns."""
+
+  GROUND_TRUTH_MODULE = stochastic_volatility_log_sp500_small
+
+  def __init__(
+      self,
+      centered=False,
+      use_fft=True,
+  ):
+    dataset = data.sp500_log_returns(num_points=100)
+    super(VectorizedStochasticVolatilityLogSP500Small, self).__init__(
+        name='vectorized_stochasticic_volatility_log_sp500_small',
+        pretty_name=(
+            'Smaller stochastic volatility model of S&P500 log returns.'),
         **dataset)

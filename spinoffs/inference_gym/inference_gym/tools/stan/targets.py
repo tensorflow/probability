@@ -39,6 +39,8 @@ __all__ = [
     'german_credit_numeric_sparse_logistic_regression',
     'radon_contextual_effects_minnesota',
     'radon_contextual_effects_minnesota_halfnormal',
+    'stochastic_volatility_log_sp500',
+    'stochastic_volatility_log_sp500_small',
     'stochastic_volatility_sp500',
     'stochastic_volatility_sp500_small',
     'synthetic_item_response_theory',
@@ -160,13 +162,13 @@ def radon_contextual_effects_minnesota_halfnormal():
 def stochastic_volatility_sp500():
   """Stochastic volatility model.
 
-  This uses a dataset of 2517 daily closing prices of the S&P 500 index,
+  This uses a dataset of 2517 daily returns of the S&P 500 index,
   representing the time period 6/25/2010-6/24/2020.
 
   Returns:
     target: StanModel.
   """
-  dataset = data.sp500_closing_prices()
+  dataset = data.sp500_returns()
   return stochastic_volatility.stochastic_volatility(**dataset)
 
 
@@ -179,7 +181,33 @@ def stochastic_volatility_sp500_small():
   Returns:
     target: StanModel.
   """
-  dataset = data.sp500_closing_prices(num_points=100)
+  dataset = data.sp500_returns(num_points=100)
+  return stochastic_volatility.stochastic_volatility(**dataset)
+
+
+def stochastic_volatility_log_sp500():
+  """Stochastic volatility model.
+
+  This uses a dataset of 2517 daily log returns of the S&P 500 index,
+  representing the time period 6/25/2010-6/24/2020.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.sp500_log_returns()
+  return stochastic_volatility.stochastic_volatility(**dataset)
+
+
+def stochastic_volatility_log_sp500_small():
+  """Stochastic volatility model.
+
+  This is a smaller version of `stochastic_volatility_model_log_sp500` using
+  only 100 days of log returns from the S&P 500, ending 6/24/2020.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.sp500_log_returns(num_points=100)
   return stochastic_volatility.stochastic_volatility(**dataset)
 
 

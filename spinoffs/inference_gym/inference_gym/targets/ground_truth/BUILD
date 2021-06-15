@@ -128,6 +128,26 @@ py_library(
 
 # pytype_strict
 py_library(
+    name = "stochastic_volatility_log_sp500",
+    srcs = ["stochastic_volatility_log_sp500.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "stochastic_volatility_log_sp500_small",
+    srcs = ["stochastic_volatility_log_sp500_small.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
     name = "stochastic_volatility_sp500",
     srcs = ["stochastic_volatility_sp500.py"],
     srcs_version = "PY3",

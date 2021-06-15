@@ -30,7 +30,8 @@ __all__ = [
     'convection_lorenz_bridge',
     'german_credit_numeric',
     'radon',
-    'sp500_closing_prices',
+    'sp500_returns',
+    'sp500_log_returns',
     'synthetic_item_response_theory',
     'synthetic_log_gaussian_cox_process',
     'synthetic_plasma_spectroscopy',
@@ -427,8 +428,11 @@ def radon(
   )
 
 
-def sp500_closing_prices(num_points=None):
+def sp500_returns(num_points=None):
   """Dataset of mean-adjusted returns of the S&P 500 index.
+
+  The returns here are the absolute returns (current price minus previous
+  price).
 
   Each of the 2516 entries represents the adjusted return of the daily closing
   price relative to the previous close, for each (non-holiday) weekday,
@@ -443,6 +447,31 @@ def sp500_closing_prices(num_points=None):
       `centered_returns`: float `Tensor` daily returns, minus the mean return.
   """
   returns = np.diff(sp500_closing_prices_lib.CLOSING_PRICES)
+  num_points = num_points or len(returns)
+  return dict(
+      centered_returns=returns[-num_points:] - np.mean(returns[-num_points:]))
+
+
+def sp500_log_returns(num_points=None):
+  """Dataset of mean-adjusted log returns of the S&P 500 index.
+
+  A log return is the change in the log-transformed closing prices, which also
+  corresponds to the log of relative returns (current price divided by previous
+  price).
+
+  Each of the 2516 entries represents the adjusted log return of the daily
+  closing price relative to the previous close, for each (non-holiday) weekday,
+  beginning 6/26/2010 and ending 6/24/2020.
+
+  Args:
+    num_points: Optional `int` length of the series to return. If specified,
+      only the final `num_points` returns are centered and returned.
+      Default value: `None`.
+  Returns:
+    dataset: A Dict with the following keys:
+      `centered_returns`: float `Tensor` daily returns, minus the mean return.
+  """
+  returns = np.diff(np.log(sp500_closing_prices_lib.CLOSING_PRICES))
   num_points = num_points or len(returns)
   return dict(
       centered_returns=returns[-num_points:] - np.mean(returns[-num_points:]))
