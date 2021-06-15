@@ -20,9 +20,11 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as distribution_lib
+from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import joint_distribution as jd_lib
 from tensorflow_probability.python.distributions import log_prob_ratio as lp_ratio
 from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import samplers
 
 
 def pbroadcast_value(value, value_axis_names, output_axis_names):
@@ -101,6 +103,11 @@ class JointDistributionDistributedMixin(object):
       final_values_out.append(traced_values[output_index])
     return final_values_out
 
+  def _default_event_space_bijector(self, *args, **kwargs):
+    if args or kwargs:
+      return _DefaultJointBijector(self.experimental_pin(*args, **kwargs))
+    return _DefaultJointBijector(self)
+
 
 class JointDistributionSequential(JointDistributionDistributedMixin,
                                   distribution_lib.JointDistributionSequential):
@@ -135,3 +142,26 @@ def _dist_jd_log_prob_ratio(p, x, q, y, name=None):
       raise ValueError('p and q must use the same sharding. '
                        f'Saw: p: {p}, {p_axis_names}, q: {q}, {q_axis_names}')
     return jd_lib._jd_log_prob_ratio(p, x, q, y, name=name)  # pylint: disable=protected-access
+
+
+class _DefaultJointBijector(jd_lib._DefaultJointBijector):  # pylint: disable=protected-access
+  """Sharding-compatible event space bijector for JDs."""
+
+  def _conditioned_bijectors(self, samples, constrained=False):
+    if samples is None:
+      return self.bijectors
+
+    def sample_and_trace_fn(dist, value, **_):
+      bij = self._bijector_fn(dist)
+      if bij is None:
+        bij = identity_bijector.Identity()
+
+      # If the RV is not yet constrained, transform it.
+      value = value if constrained else bij.forward(value)
+      return jd_lib.ValueWithTrace(value=value, traced=bij)
+
+    return self._jd._call_execute_model(  # pylint: disable=protected-access
+        sample_shape=(),
+        value=samples,
+        seed=samplers.zeros_seed(),
+        sample_and_trace_fn=sample_and_trace_fn)

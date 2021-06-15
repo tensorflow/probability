@@ -23,7 +23,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.distribute import joint_distribution as jd
 from tensorflow_probability.python.experimental.distribute import sharded
-from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
 
@@ -381,19 +380,6 @@ class JointDistributionTest(test_lib.DistributedTest):
           shard_axis_name=self.axis_name,
           name='z')
 
-    @tfd.JointDistributionCoroutine
-    def manual_sharded_model():
-      # This one has manual pbroadcasts; the goal is to get sharded_model above
-      # to do this automatically.
-      x = yield root(tfd.LogNormal(0., 1., name='x'))
-      x = distribute_lib.pbroadcast(x, axis_name=self.axis_name)
-      yield sharded.Sharded(
-          tfd.Uniform(0., x), shard_axis_name=self.axis_name, name='y')
-      yield sharded.Sharded(
-          tfb.Scale(x)(tfd.Normal(0., 1.)),
-          shard_axis_name=self.axis_name,
-          name='z')
-
     sample = model.sample(seed=self.key)
     unconstrained_sample = (
         model.experimental_default_event_space_bijector().inverse(sample))
@@ -416,12 +402,6 @@ class JointDistributionTest(test_lib.DistributedTest):
           lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
               sharded_model, unconstrained_sample), (unconstrained_sample,))
 
-    def manual_run(unconstrained_sample):
-      return tfp.math.value_and_gradient(
-          lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
-              manual_sharded_model, unconstrained_sample),
-          (unconstrained_sample,))
-
     sharded_unconstrained_sample = unconstrained_sample._replace(
         y=self.shard_values(unconstrained_sample.y),
         z=self.shard_values(unconstrained_sample.z))
@@ -433,23 +413,8 @@ class JointDistributionTest(test_lib.DistributedTest):
     lp = lp[0]
     g = g._replace(x=g.x[0])
 
-    manual_lp, (manual_g,) = self.per_replica_to_tensor(
-        self.strategy_run(
-            manual_run, (sharded_unconstrained_sample,),
-            in_axes=(model.dtype._replace(x=None, y=0, z=0),)))
-    manual_lp = manual_lp[0]
-    manual_g = manual_g._replace(x=manual_g.x[0])
-
     self.assertAllClose(true_lp, lp)
-    # TODO(b/175084455): This will fail because there are sharded <->
-    # non-sharded edges in the gradient graph not accounted for. The edges arise
-    # because the sharded bijectors' parameterizations depend non-sharded
-    # parameters.
-    with self.assertRaises(AssertionError):
-      self.assertAllCloseNested(true_g, g)
-
-    self.assertAllClose(true_lp, manual_lp)
-    self.assertAllCloseNested(true_g, manual_g)
+    self.assertAllCloseNested(true_g, g)
 
 if __name__ == '__main__':
   tf.test.main()

@@ -79,6 +79,7 @@ class ValueWithTrace(collections.namedtuple(
 
 def trace_distributions_and_values(dist, sample_shape, seed, value=None):
   """Draws a sample, and traces both the distribution and sampled value."""
+  value = _sanitize_value(dist, value)
   if value is None:
     value = dist.sample(sample_shape, seed=seed)
   elif tf.nest.is_nested(dist.dtype) and any(
@@ -103,6 +104,7 @@ def trace_values_only(dist, sample_shape, seed, value=None):
 
 def trace_values_and_log_probs(dist, sample_shape, seed, value=None):
   """Draws a sample, and traces both the sampled value and its log density."""
+  value = _sanitize_value(dist, value)
   if value is None:
     value, lp = dist.experimental_sample_and_log_prob(sample_shape, seed=seed)
   elif tf.nest.is_nested(dist.dtype) and any(
@@ -786,7 +788,7 @@ class JointDistribution(distribution_lib.Distribution):
         value_at_index = None
         if (value is not None and len(value) > index and
             value[index] is not None):
-          value_at_index = _sanitize_value(actual_distribution, value[index])
+          value_at_index = value[index]
         try:
           next_value, traced_values = sample_and_trace_fn(
               actual_distribution,
