@@ -127,11 +127,11 @@ def sparse_logistic_regression(
     res = collections.OrderedDict()
     res['unscaled_weights'] = util.get_columns(
         samples,
-        r'^unscaled_weights\.\d+$',
+        r'^unscaled_weights\[\d+\]$',
     )
     res['local_scales'] = util.get_columns(
         samples,
-        r'^local_scales\.\d+$',
+        r'^local_scales\[\d+\]$',
     )
     res['global_scale'] = util.get_columns(
         samples,
@@ -143,7 +143,7 @@ def sparse_logistic_regression(
     return util.get_columns(samples, r'^test_nll$')[:, 0]
 
   def _ext_per_example_test_nll(samples):
-    return util.get_columns(samples, r'^per_example_test_nll\.\d+$')
+    return util.get_columns(samples, r'^per_example_test_nll\[\d+\]$')
 
   extract_fns = {'identity': _ext_identity}
   if have_test:

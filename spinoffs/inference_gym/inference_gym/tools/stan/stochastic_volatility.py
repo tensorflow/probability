@@ -94,7 +94,7 @@ def stochastic_volatility(centered_returns):
     res['persistence_of_volatility'] = util.get_columns(
         samples, r'^persistence$')[:, 0]
     res['log_volatility'] = util.get_columns(
-        samples, r'^log_volatilities\.\d+$',)
+        samples, r'^log_volatilities\[\d+\]$',)
     return res
 
   extract_fns = {'identity': _ext_identity}

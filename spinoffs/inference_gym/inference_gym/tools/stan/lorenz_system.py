@@ -107,7 +107,7 @@ def partially_observed_lorenz_system(observed_values, innovation_scale,
 
   def _ext_identity(samples):
     """Extracts the values of all latent variables."""
-    latents = util.get_columns(samples, r'^latents\.\d+\.\d+$')
+    latents = util.get_columns(samples, r'^latents\[\d+,\d+\]$')
     # Last two dimensions are swapped in Stan output.
     return latents.reshape((-1, 3, 30)).swapaxes(1, 2)
 
@@ -173,7 +173,7 @@ def partially_observed_lorenz_system_unknown_scales(
 
   def _ext_identity(samples):
     """Extracts the values of all latent variables."""
-    latents = util.get_columns(samples, r'^latents\.\d+\.\d+$')
+    latents = util.get_columns(samples, r'^latents\[\d+,\d+\]$')
     return {
         'innovation_scale': util.get_columns(samples,
                                              r'^innovation_scale$')[:, 0],

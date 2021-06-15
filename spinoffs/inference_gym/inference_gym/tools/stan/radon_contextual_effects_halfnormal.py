@@ -113,8 +113,8 @@ def radon_contextual_effects(
         samples, r'^county_effect_mean$')[:, 0]
     res['county_effect_scale'] = util.get_columns(
         samples, r'^county_effect_scale$')[:, 0]
-    res['county_effect'] = util.get_columns(samples, r'^county_effect\.\d+$')
-    res['weight'] = util.get_columns(samples, r'^weight\.\d+$')
+    res['county_effect'] = util.get_columns(samples, r'^county_effect\[\d+\]$')
+    res['weight'] = util.get_columns(samples, r'^weight\[\d+\]$')
     res['log_radon_scale'] = (
         util.get_columns(samples, r'^log_radon_scale$')[:, 0])
     return res

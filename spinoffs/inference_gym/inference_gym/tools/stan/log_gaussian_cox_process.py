@@ -113,7 +113,7 @@ def log_gaussian_cox_process(
     )[:, 0]
     res['log_intensity'] = util.get_columns(
         samples,
-        r'^log_intensity\.\d+$',
+        r'^log_intensity\[\d+\]$',
     )
     return res
 

@@ -23,7 +23,7 @@ Usage (run from Inference Gym source directory):
 venv=$(mktemp -d)
 virtualenv -p python3.6 $venv
 source $venv/bin/activate
-pip install cmdstanpy==0.8 pandas numpy tf-nightly tfp-nightly tfds-nightly
+pip install cmdstanpy==0.9 pandas numpy tf-nightly tfp-nightly tfds-nightly
 install_cmdstan
 
 python -m inference_gym.tools.get_ground_truth \
@@ -91,7 +91,7 @@ def main(argv):
   stan_model = getattr(targets, FLAGS.target)()
 
   with stan_model.sample_fn(
-      sampling_iters=FLAGS.stan_samples,
+      iter_sampling=FLAGS.stan_samples,
       chains=FLAGS.stan_chains,
       show_progress=True) as mcmc_output:
     summary = mcmc_output.summary()
@@ -114,7 +114,7 @@ def main(argv):
         # very slow and wastes memory. Consider reading the CSV files ourselves.
 
         # sample shape is [num_samples, num_chains, num_columns]
-        chain = mcmc_output.sample[:, chain_id, :]
+        chain = mcmc_output.draws()[:, chain_id, :]
         dataframe = pd.DataFrame(chain, columns=mcmc_output.column_names)
 
         transformed_samples = fn(dataframe)

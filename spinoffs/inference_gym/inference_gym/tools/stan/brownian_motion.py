@@ -76,7 +76,7 @@ def brownian_motion(observed_locs, innovation_noise_scale,
 
   def _ext_identity(samples):
     """Extracts the values of all latent variables."""
-    locs = util.get_columns(samples, r'^loc\.\d+$')
+    locs = util.get_columns(samples, r'^loc\[\d+\]$')
     return locs
 
   extract_fns = {'identity': _ext_identity}
@@ -137,7 +137,7 @@ def brownian_motion_unknown_scales(observed_locs):
                 samples, r'^innovation_noise_scale$')[:, 0],
             'observation_noise_scale': util.get_columns(
                 samples, r'^observation_noise_scale$')[:, 0],
-            'locs': util.get_columns(samples, r'^loc\.\d+$')}
+            'locs': util.get_columns(samples, r'^loc\[\d+\]$')}
 
   extract_fns = {'identity': _ext_identity}
 

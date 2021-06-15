@@ -73,7 +73,7 @@ def eight_schools():
     res['log_stddev'] = util.get_columns(
         samples, r'^log_stddev$')[:, 0]
     res['school_effects'] = util.get_columns(
-        samples, r'^school_effects\.\d+$')
+        samples, r'^school_effects\[\d+\]$')
     return res
 
   extract_fns = {'identity': _ext_identity}

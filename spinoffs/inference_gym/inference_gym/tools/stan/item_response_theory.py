@@ -150,11 +150,11 @@ def item_response_theory(
     )[:, 0]
     res['student_ability'] = util.get_columns(
         samples,
-        r'^student_ability\.\d+$',
+        r'^student_ability\[\d+\]$',
     )
     res['question_difficulty'] = util.get_columns(
         samples,
-        r'^question_difficulty\.\d+$',
+        r'^question_difficulty\[\d+\]$',
     )
     return res
 
@@ -162,7 +162,7 @@ def item_response_theory(
     return util.get_columns(samples, r'^test_nll$')[:, 0]
 
   def _ext_per_example_test_nll(samples):
-    return util.get_columns(samples, r'^per_example_test_nll\.\d+$')
+    return util.get_columns(samples, r'^per_example_test_nll\[\d+\]$')
 
   extract_fns = {'identity': _ext_identity}
   if have_test:

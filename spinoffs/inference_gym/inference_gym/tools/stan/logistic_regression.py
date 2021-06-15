@@ -112,13 +112,13 @@ def logistic_regression(
   model = util.cached_stan_model(code)
 
   def _ext_identity(samples):
-    return util.get_columns(samples, r'^weights\.\d+$')
+    return util.get_columns(samples, r'^weights\[\d+\]$')
 
   def _ext_test_nll(samples):
     return util.get_columns(samples, r'^test_nll$')[:, 0]
 
   def _ext_per_example_test_nll(samples):
-    return util.get_columns(samples, r'^per_example_test_nll\.\d+$')
+    return util.get_columns(samples, r'^per_example_test_nll\[\d+\]$')
 
   extract_fns = {'identity': _ext_identity}
   if have_test:
