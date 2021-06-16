@@ -399,7 +399,7 @@ def _cascading_flow_surrogate_for_joint_distribution(
       tf.nest.assert_same_structure(dist.dtype, surrogate_posterior.dtype)
     except TypeError:
       surrogate_posterior = restructure.Restructure(
-        output_structure=tokenize(dist),
+        output_structure=dist_tokens,
         input_structure=tokenize(surrogate_posterior))(
         surrogate_posterior, name=_get_name(dist))
 
@@ -426,10 +426,14 @@ def _cascading_flow_update_for_base_distribution(dist,
   flat_event_shape = tf.nest.flatten(event_shape)
   flat_event_size = tf.nest.map_structure(tf.reduce_prod, flat_event_shape)
   ndims = int(tf.reduce_sum(flat_event_size))
-  flatten_event = reshape.Reshape(
+  constraining_bijector = dist.experimental_default_event_space_bijector()
+  flatten_bijector = reshape.Reshape(
     event_shape_out=[-1],
     event_shape_in=dist.event_shape_tensor())
 
+  constraining_and_flattening_bijector = chain.Chain([flatten_bijector, constraining_bijector])
+  processed_dist = transformed_distribution.TransformedDistribution(distribution=dist,
+                                                                    bijector=constraining_and_flattening_bijector)
   if variables is None:
 
     bijectors = []
@@ -451,23 +455,21 @@ def _cascading_flow_update_for_base_distribution(dist,
       [-1, num_auxiliary_variables])(
       transformed_distribution.TransformedDistribution(
         distribution=blockwise.Blockwise([
-          batch_broadcast.BatchBroadcast(transformed_distribution.TransformedDistribution(
-            distribution=dist, bijector=flatten_event), to_shape=batch_shape),
+          batch_broadcast.BatchBroadcast(processed_dist, to_shape=batch_shape),
           independent.Independent(
             deterministic.Deterministic(global_auxiliary_variables, ),
             reinterpreted_batch_ndims=1)]),
         bijector=variables))
 
     cascading_flows = joint_map.JointMap(
-      [invert.Invert(flatten_event), identity.Identity()])(cascading_flows)
+      [invert.Invert(constraining_and_flattening_bijector), identity.Identity()])(cascading_flows)
 
   else:
     cascading_flows = transformed_distribution.TransformedDistribution(
-      distribution=transformed_distribution.TransformedDistribution(
-            distribution=dist, bijector=flatten_event),
+      distribution=processed_dist,
       bijector=variables)
 
-    cascading_flows = invert.Invert(flatten_event)(cascading_flows)
+    cascading_flows = invert.Invert(constraining_and_flattening_bijector)(cascading_flows)
 
   return cascading_flows, variables
 

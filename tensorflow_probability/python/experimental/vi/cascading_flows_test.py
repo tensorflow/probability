@@ -65,7 +65,7 @@ class CascadingFlowTests(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class _TrainableCFSurrogate(object):
 
-  def _expected_num_trainable_variables(self, prior_dist, num_layers):
+  '''def _expected_num_trainable_variables(self, prior_dist, num_layers):
     """Infers the expected number of trainable variables for a non-nested JD."""
     prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
     expected_num_trainable_variables = 0
@@ -127,7 +127,14 @@ class _TrainableCFSurrogate(object):
       seed=test_util.test_seed(sampler_type='stateless'))
 
     self.assertAllEqualNested(posterior_sample, posterior_sample2)
-
+'''
+  def test_surrogate_and_prior_have_same_domain(self):
+    prior_dist = self.make_prior_dist()
+    surrogate_posterior = tfp.experimental.vi.build_cascading_flow_surrogate_posterior(
+      prior=prior_dist,
+      seed=test_util.test_seed(sampler_type='stateless'))
+    self.assertAllFinite(prior_dist.log_prob(
+      surrogate_posterior.sample(10, seed=test_util.test_seed())))
 
 @test_util.test_all_tf_execution_regimes
 class CFSurrogatePosteriorTestBrownianMotion(test_util.TestCase,
