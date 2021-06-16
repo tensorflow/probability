@@ -425,10 +425,7 @@ def _cascading_flow_update_for_base_distribution(dist,
   event_shape = dist.event_shape_tensor()
   flat_event_shape = tf.nest.flatten(event_shape)
   flat_event_size = tf.nest.map_structure(tf.reduce_prod, flat_event_shape)
-  try:
-    ndims = int(tf.reduce_sum(flat_event_size))
-  except:
-    a=0
+  ndims = int(tf.reduce_sum(flat_event_size))
   flatten_event = reshape.Reshape(
     event_shape_out=[-1],
     event_shape_in=dist.event_shape_tensor())
