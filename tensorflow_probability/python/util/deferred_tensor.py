@@ -23,6 +23,7 @@ import numpy as np
 import six
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensor_util
@@ -734,7 +735,7 @@ class _DeferredTensorSpecBase(object):
     return hash(self.__get_cmp_key())
 
 
-@type_spec.register('tfp.util.DeferredTensorSpec')
+@auto_composite_tensor.type_spec_register('tfp.util.DeferredTensorSpec')
 class _DeferredTensorSpec(_DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
   """`tf.TypeSpec` for `tfp.util.DeferredTensor`."""
 
@@ -837,7 +838,7 @@ class _DeferredTensorSpec(_DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
         also_track_spec=self._also_track_spec)
 
 
-@type_spec.register('tfp.util.TransformedVariableSpec')
+@auto_composite_tensor.type_spec_register('tfp.util.TransformedVariableSpec')
 class _TransformedVariableSpec(
     _DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
   """`tf.TypeSpec` for `tfp.util.TransformedVariable`."""
