@@ -386,28 +386,31 @@ def _cascading_flow_surrogate_for_joint_distribution(
     use_vectorized_map=dist.use_vectorized_map,
     name=_get_name(dist))
 
-  '''tokenize = lambda jd: jd._model_unflatten(
+  tokenize = lambda jd: jd._model_unflatten(
     # pylint: disable=protected-access, g-long-lambda
     range(len(jd._model_flatten(jd.dtype)))
     # pylint: disable=protected-access
-  )'''
+  )
 
-  # Ensure that the surrogate posterior structure matches that of the prior.
-  # todo: check me, do we need this? in case needs to be modified
-  #  if we use auxiliary variables, then the structure won't match the one of the
-  #  prior
-  '''try:
-    tf.nest.assert_same_structure(dist.dtype, surrogate_posterior.dtype)
-  except TypeError:
-    tokenize = lambda jd: jd._model_unflatten(
-      # pylint: disable=protected-access, g-long-lambda
-      range(len(jd._model_flatten(jd.dtype)))
-      # pylint: disable=protected-access
-    )
+  dist_tokens = tokenize(dist)
+
+  if num_auxiliary_variables == 0:
+    try:
+      tf.nest.assert_same_structure(dist.dtype, surrogate_posterior.dtype)
+    except TypeError:
+      surrogate_posterior = restructure.Restructure(
+        output_structure=tokenize(dist),
+        input_structure=tokenize(surrogate_posterior))(
+        surrogate_posterior, name=_get_name(dist))
+
+  '''else:
     surrogate_posterior = restructure.Restructure(
-      output_structure=tokenize(dist),
+      output_structure=(
+        tf.nest.map_structure(lambda k: 2 * k + 1, dist_tokens),
+        [0] + [2 * k + 2 for k in tf.nest.flatten(dist_tokens)]),
       input_structure=tokenize(surrogate_posterior))(
       surrogate_posterior, name=_get_name(dist))'''
+
   return surrogate_posterior, variables
 
 
@@ -422,16 +425,16 @@ def _cascading_flow_update_for_base_distribution(dist,
   event_shape = dist.event_shape_tensor()
   flat_event_shape = tf.nest.flatten(event_shape)
   flat_event_size = tf.nest.map_structure(tf.reduce_prod, flat_event_shape)
-  ndims = int(tf.reduce_sum(flat_event_size))
+  try:
+    ndims = int(tf.reduce_sum(flat_event_size))
+  except:
+    a=0
   flatten_event = reshape.Reshape(
     event_shape_out=[-1],
     event_shape_in=dist.event_shape_tensor())
 
   if variables is None:
 
-    '''bijectors = [reshape.Reshape([-1],
-                                 event_shape_in=ndims +
-                                                num_auxiliary_variables)]'''
     bijectors = []
 
     bijectors.extend(
@@ -442,19 +445,17 @@ def _cascading_flow_update_for_base_distribution(dist,
         residual_fraction_initial_value=initial_prior_weight,
         gate_first_n=ndims, seed=seed))
 
-    '''bijectors.append(
-      reshape.Reshape(ndims + num_auxiliary_variables))'''
-
     variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
   if num_auxiliary_variables > 0:
-
+    batch_shape = global_auxiliary_variables.shape[0] if len(
+      global_auxiliary_variables.shape) > 1 else []
     cascading_flows = split.Split(
       [-1, num_auxiliary_variables])(
       transformed_distribution.TransformedDistribution(
         distribution=blockwise.Blockwise([
-          transformed_distribution.TransformedDistribution(
-            distribution=dist, bijector=flatten_event),
+          batch_broadcast.BatchBroadcast(transformed_distribution.TransformedDistribution(
+            distribution=dist, bijector=flatten_event), to_shape=batch_shape),
           independent.Independent(
             deterministic.Deterministic(global_auxiliary_variables, ),
             reinterpreted_batch_ndims=1)]),
@@ -465,7 +466,8 @@ def _cascading_flow_update_for_base_distribution(dist,
 
   else:
     cascading_flows = transformed_distribution.TransformedDistribution(
-      distribution=dist,
+      distribution=transformed_distribution.TransformedDistribution(
+            distribution=dist, bijector=flatten_event),
       bijector=variables)
 
     cascading_flows = invert.Invert(flatten_event)(cascading_flows)
