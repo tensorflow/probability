@@ -372,8 +372,8 @@ class FunMCTest(real_tf.test.TestCase, parameterized.TestCase):
               tfp.distributions.Normal(self._constant(1.), 1.).log_prob(y)), ()
 
     bijectors = [
-        tfp.bijectors.AffineScalar(scale=self._constant(2.)),
-        tfp.bijectors.AffineScalar(scale=self._constant(3.))
+        tfp.bijectors.Scale(scale=self._constant(2.)),
+        tfp.bijectors.Scale(scale=self._constant(3.))
     ]
 
     (transformed_log_prob_fn,
@@ -399,8 +399,8 @@ class FunMCTest(real_tf.test.TestCase, parameterized.TestCase):
               tfp.distributions.Normal(self._constant(1.), 1.).log_prob(y)), ()
 
     bijectors = {
-        'x': tfp.bijectors.AffineScalar(scale=self._constant(2.)),
-        'y': tfp.bijectors.AffineScalar(scale=self._constant(3.))
+        'x': tfp.bijectors.Scale(scale=self._constant(2.)),
+        'y': tfp.bijectors.Scale(scale=self._constant(3.))
     }
 
     (transformed_log_prob_fn,
