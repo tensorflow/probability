@@ -26,7 +26,8 @@ from oryx.internal import test_util
 
 BIJECTORS = [
     ('exp', lambda: bb.Exp(), 1., []),  # pylint: disable=unnecessary-lambda
-    ('affine_scalar', lambda: bb.AffineScalar(1., 2.), 1., [2., 1.]),
+    ('shift', lambda: bb.Shift(3.), 1., [3.]),
+    ('Scale', lambda: bb.Scale(2.), 1., [2.]),
     ('transform_diagonal', lambda: bb.TransformDiagonal(bb.Exp()),
      onp.eye(2).astype(onp.float32), []),
     ('invert', lambda: bb.Invert(bb.Exp()), 1., []),
