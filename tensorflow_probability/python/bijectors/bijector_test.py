@@ -371,6 +371,8 @@ class BijectorBatchShapesTest(test_util.TestCase):
        lambda: tfb.Scale(tf.ones([4, 2])), None),
       ('sigmoid',
        lambda: tfb.Sigmoid(low=tf.zeros([3]), high=tf.ones([4, 1])), None),
+      ('scale_matvec',
+       lambda: tfb.ScaleMatvecDiag([[0.], [3.]]), None),
       ('invert',
        lambda: tfb.Invert(tfb.ScaleMatvecDiag(tf.ones([2, 1]))), None),
       ('reshape',
@@ -415,6 +417,14 @@ class BijectorBatchShapesTest(test_util.TestCase):
         y_event_ndims=y_event_ndims)
     self.assertAllEqual(batch_shape_tensor_x, batch_shape_tensor_y)
     self.assertAllEqual(batch_shape_tensor_x, batch_shape_x)
+
+    # Check that we're robust to integer type.
+    batch_shape_tensor_x64 = bijector.experimental_batch_shape_tensor(
+        x_event_ndims=tf.nest.map_structure(np.int64, x_event_ndims))
+    batch_shape_tensor_y64 = bijector.experimental_batch_shape_tensor(
+        y_event_ndims=tf.nest.map_structure(np.int64, y_event_ndims))
+    self.assertAllEqual(batch_shape_tensor_x64, batch_shape_tensor_y64)
+    self.assertAllEqual(batch_shape_tensor_x64, batch_shape_x)
 
     # Pushing a value through the bijector should return a Tensor(s) with
     # the expected batch shape...

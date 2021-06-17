@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -45,6 +46,10 @@ class _ScaleMatvecLinearOperatorBase(bijector.AutoCompositeTensorBijector):
   def adjoint(self):
     """`bool` indicating whether this class uses `self.scale` or its adjoint."""
     return self._adjoint
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(scale=parameter_properties.BatchedComponentProperties())
 
   def _forward(self, x):
     return self.scale.matvec(x, adjoint=self.adjoint)
@@ -236,10 +241,6 @@ class ScaleMatvecLinearOperatorBlock(_ScaleMatvecLinearOperatorBase):
     if isinstance(self.scale, tf.linalg.LinearOperatorBlockLowerTriangular):
       return _cumulative_broadcast_dynamic(output_shape)
     return output_shape
-
-  @classmethod
-  def _parameter_properties(cls, dtype):
-    return {}
 
 
 def _cumulative_broadcast_static(event_shape):

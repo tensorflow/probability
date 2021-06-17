@@ -137,6 +137,7 @@ def get_base_shape(x):
 
 def slice_batch_shape_tensor(base_shape, event_ndims):
   base_shape = ps.convert_to_shape_tensor(base_shape, dtype_hint=np.int32)
+  event_ndims = ps.convert_to_shape_tensor(event_ndims, dtype_hint=np.int32)
   base_rank = ps.rank_from_shape(base_shape)
   return base_shape[:(base_rank -
                       # Don't try to slice away more ndims than the parameter
