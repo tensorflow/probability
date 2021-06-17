@@ -84,7 +84,7 @@ class XLABenchmarkTests(tfp_test_util.TestCase):
     samples = tf.function(
         gibbs_sampler.fit_with_gibbs_sampling,
         autograph=False,
-        experimental_compile=True)(
+        jit_compile=True)(
             model,
             tfp.sts.MaskedTimeSeries(observed_time_series[..., tf.newaxis],
                                      is_missing),
