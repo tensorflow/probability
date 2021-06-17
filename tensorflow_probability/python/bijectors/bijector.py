@@ -943,6 +943,28 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
 
     return self.forward(value, name=name or 'forward', **kwargs)
 
+  def copy(self, **override_parameters_kwargs):
+    """Creates a copy of the bijector.
+
+    Note: the copy bijector may continue to depend on the original
+    initialization arguments.
+
+    Args:
+      **override_parameters_kwargs: String/value dictionary of initialization
+        arguments to override with new values.
+
+    Returns:
+      bijector: A new instance of `type(self)` initialized from the union
+        of self.parameters and override_parameters_kwargs, i.e.,
+        `dict(self.parameters, **override_parameters_kwargs)`.
+    """
+    parameters = dict(self.parameters, **override_parameters_kwargs)
+    b = type(self)(**parameters)
+    # pylint: disable=protected-access
+    b._parameters = self._no_dependency(parameters)
+    # pylint: enable=protected-access
+    return b
+
   def _forward_event_shape_tensor(self, input_shape):
     """Subclass implementation for `forward_event_shape_tensor` function."""
     # By default, we assume event_shape is unchanged.

@@ -183,6 +183,28 @@ class BaseBijectorTest(test_util.TestCase):
     self.assertAllClose(ildj, true_ildj)
     self.assertAllClose(ildj, -fldj)
 
+  def testCopyExtraArgs(self):
+    # Note: we cannot easily test all bijectors since each requires
+    # different initialization arguments. We therefore spot test a few.
+    sigmoid = tfb.Sigmoid(low=-1., high=2., validate_args=True)
+    self.assertEqual(sigmoid.parameters, sigmoid.copy().parameters)
+    chain = tfb.Chain(
+        [
+            tfb.Softplus(hinge_softness=[1., 2.], validate_args=True),
+            tfb.MatrixInverseTriL(validate_args=True)
+        ], validate_args=True)
+    self.assertEqual(chain.parameters, chain.copy().parameters)
+
+  def testCopyOverride(self):
+    sigmoid = tfb.Sigmoid(low=-1., high=2., validate_args=True)
+    self.assertEqual(sigmoid.parameters, sigmoid.copy().parameters)
+    unused_sigmoid_copy = sigmoid.copy(validate_args=False)
+    base_params = sigmoid.parameters.copy()
+    copy_params = sigmoid.copy(validate_args=False).parameters.copy()
+    self.assertNotEqual(
+        base_params.pop('validate_args'), copy_params.pop('validate_args'))
+    self.assertEqual(base_params, copy_params)
+
 
 class IntentionallyMissingError(Exception):
   pass
