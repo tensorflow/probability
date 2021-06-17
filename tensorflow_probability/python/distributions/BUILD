@@ -3075,7 +3075,7 @@ multi_substrate_py_test(
     name = "joint_distribution_coroutine_test",
     size = "medium",
     srcs = ["joint_distribution_coroutine_test.py"],
-    shard_count = 2,
+    shard_count = 5,
     deps = [
         # numpy dep,
         # tensorflow dep,

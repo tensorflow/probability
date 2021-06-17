@@ -35,7 +35,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import nest_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
@@ -315,56 +315,15 @@ class JointDistribution(distribution_lib.Distribution):
   def use_vectorized_map(self):
     return False
 
-  @property
-  def batch_shape(self):
-    """Shape of a single sample from a single event index as a `TensorShape`.
-
-    May be partially defined or unknown.
-
-    The batch dimensions are indexes into independent, non-identical
-    parameterizations of this distribution.
-
-    Returns:
-      batch_shape: `tuple` of `TensorShape`s representing the `batch_shape` for
-        each distribution in `model`.
-    """
+  def _batch_shape(self):
     return self._model_unflatten([
         d.batch_shape for d in self._get_single_sample_distributions()])
 
-  def batch_shape_tensor(self, sample_shape=(), name='batch_shape_tensor'):
-    """Shape of a single sample from a single event index as a 1-D `Tensor`.
+  def _batch_shape_tensor(self):
+    return self._model_unflatten(
+        self._map_attr_over_dists('batch_shape_tensor'))
 
-    The batch dimensions are indexes into independent, non-identical
-    parameterizations of this distribution.
-
-    Args:
-      sample_shape: The sample shape under which to evaluate the joint
-        distribution. Sample shape at root (toplevel) nodes may affect the batch
-        or event shapes of child nodes.
-      name: name to give to the op
-
-    Returns:
-      batch_shape: `Tensor` representing batch shape of each distribution in
-        `model`.
-    """
-    with self._name_and_control_scope(name):
-      return self._model_unflatten(
-          self._map_attr_over_dists(
-              'batch_shape_tensor',
-              dists=(self.sample_distributions(sample_shape)
-                     if sample_shape else None)))
-
-  @property
-  def event_shape(self):
-    """Shape of a single sample from a single batch as a `TensorShape`.
-
-    May be partially defined or unknown.
-
-    Returns:
-      event_shape: `tuple` of `TensorShape`s representing the `event_shape` for
-        each distribution in `model`.
-    """
-    # Caching will not leak graph Tensors since this is a static attribute.
+  def _event_shape(self):
     if not hasattr(self, '_cached_event_shape'):
       self._cached_event_shape = [
           d.event_shape
@@ -373,24 +332,9 @@ class JointDistribution(distribution_lib.Distribution):
     # wrapping the returned value.
     return self._model_unflatten(self._cached_event_shape)
 
-  def event_shape_tensor(self, sample_shape=(), name='event_shape_tensor'):
-    """Shape of a single sample from a single batch as a 1-D int32 `Tensor`.
-
-    Args:
-      sample_shape: The sample shape under which to evaluate the joint
-        distribution. Sample shape at root (toplevel) nodes may affect the batch
-        or event shapes of child nodes.
-      name: name to give to the op
-    Returns:
-      event_shape: `tuple` of `Tensor`s representing the `event_shape` for each
-        distribution in `model`.
-    """
-    with self._name_and_control_scope(name):
-      return self._model_unflatten(
-          self._map_attr_over_dists(
-              'event_shape_tensor',
-              dists=(self.sample_distributions(sample_shape)
-                     if sample_shape else None)))
+  def _event_shape_tensor(self):
+    return self._model_unflatten(
+        self._map_attr_over_dists('event_shape_tensor'))
 
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
                            name='sample_distributions', **kwargs):
@@ -847,9 +791,9 @@ class JointDistribution(distribution_lib.Distribution):
     requested_shape, _ = self._expand_sample_shape_to_vector(
         tf.convert_to_tensor(sample_shape, dtype=tf.int32),
         name='requested_shape')
-    actual_shape = prefer_static.shape(samples)
-    actual_rank = prefer_static.rank_from_shape(actual_shape)
-    requested_rank = prefer_static.rank_from_shape(requested_shape)
+    actual_shape = ps.shape(samples)
+    actual_rank = ps.rank_from_shape(actual_shape)
+    requested_rank = ps.rank_from_shape(requested_shape)
 
     # We test for two properties we expect of yielded distributions:
     # (1) The rank of the tensor of generated samples must be at least
@@ -1068,8 +1012,8 @@ def maybe_check_wont_broadcast(flat_xs, validate_args):
     # Only when `validate_args` is `True` do we enforce the validation.
     return flat_xs
   msg = 'Broadcasting probably indicates an error in model specification.'
-  s = tuple(prefer_static.shape(x) for x in flat_xs)
-  if all(prefer_static.is_numpy(s_) for s_ in s):
+  s = tuple(ps.shape(x) for x in flat_xs)
+  if all(ps.is_numpy(s_) for s_ in s):
     if not all(np.all(a == b) for a, b in zip(s[1:], s[:-1])):
       raise ValueError(msg)
     return flat_xs
@@ -1092,7 +1036,7 @@ class _DefaultJointBijector(composition.Composition):
       bijectors = tuple(bijector_fn(d)
                         for d in jd._get_single_sample_distributions())
       i_min_event_ndims = tf.nest.map_structure(
-          prefer_static.size, jd.event_shape)
+          ps.size, jd.event_shape)
       f_min_event_ndims = jd._model_unflatten([
           b.inverse_event_ndims(nd) for b, nd in
           zip(bijectors, jd._model_flatten(i_min_event_ndims))])
@@ -1207,9 +1151,9 @@ def _jd_log_prob_ratio(p, x, q, y, name=None):
   """Implements `log_prob_ratio` for tfd.JointDistribution*."""
   with tf.name_scope(name or 'jd_log_prob_ratio'):
     tf.nest.assert_same_structure(x, y)
-    ps, _ = p.sample_distributions(value=x, seed=samplers.zeros_seed())
-    qs, _ = q.sample_distributions(value=y, seed=samplers.zeros_seed())
-    tf.nest.assert_same_structure(ps, qs)
+    p_dists, _ = p.sample_distributions(value=x, seed=samplers.zeros_seed())
+    q_dists, _ = q.sample_distributions(value=y, seed=samplers.zeros_seed())
+    tf.nest.assert_same_structure(p_dists, q_dists)
     log_prob_ratio_parts = nest.map_structure_up_to(
-        ps, log_prob_ratio.log_prob_ratio, ps, x, qs, y)
+        p_dists, log_prob_ratio.log_prob_ratio, p_dists, x, q_dists, y)
     return tf.add_n(tf.nest.flatten(log_prob_ratio_parts))

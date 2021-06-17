@@ -77,33 +77,25 @@ class JointDistributionSamplePathMixin(object):
   def batch_ndims(self):
     return self._batch_ndims
 
-  @property
   def _batch_shape_parts(self):
     return [d.batch_shape[:self.batch_ndims]
             for d in self._get_single_sample_distributions()]
 
-  @property
-  def batch_shape(self):
+  def _batch_shape(self):
     # Caching will not leak graph Tensors since this is a static attribute.
-    if not hasattr(self, '_cached_batch_shape'):
-      reduce_fn = ((lambda a, b: a.merge_with(b)) if self.validate_args
-                   else tf.broadcast_static_shape)  # Allows broadcasting.
-      self._cached_batch_shape = functools.reduce(
-          reduce_fn, self._batch_shape_parts)
-    return self._cached_batch_shape
+    reduce_fn = ((lambda a, b: a.merge_with(b)) if self.validate_args
+                 else tf.broadcast_static_shape)  # Allows broadcasting.
+    return functools.reduce(reduce_fn, self._batch_shape_parts())
 
   def _batch_shape_tensor_parts(self):
     return [d.batch_shape_tensor()[:self.batch_ndims]
             for d in self._get_single_sample_distributions()]
 
-  def batch_shape_tensor(self, sample_shape=(), name='batch_shape_tensor'):
-    del sample_shape  # Unused.
-    with self._name_and_control_scope(name):
-      return tf.convert_to_tensor(functools.reduce(
-          prefer_static.broadcast_shape, self._batch_shape_tensor_parts()))
+  def _batch_shape_tensor(self):
+    return tf.convert_to_tensor(functools.reduce(
+        prefer_static.broadcast_shape, self._batch_shape_tensor_parts()))
 
-  @property
-  def event_shape(self):
+  def _event_shape(self):
     if not hasattr(self, '_cached_event_shape'):
       self._cached_event_shape = list([
           tf.nest.map_structure(  # Recurse over joint component distributions.
@@ -111,18 +103,16 @@ class JointDistributionSamplePathMixin(object):
               d.event_shape) for d in self._get_single_sample_distributions()])
     return self._model_unflatten(self._cached_event_shape)
 
-  def event_shape_tensor(self, sample_shape=(), name='event_shape_tensor'):
+  def _event_shape_tensor(self):
     """Shape of a single sample from a single batch."""
-    del sample_shape  # Unused.
-    with self._name_and_control_scope(name):
-      component_shapes = []
-      for d in self._get_single_sample_distributions():
-        iid_event_shape = d.batch_shape_tensor()[self.batch_ndims:]
-        # Recurse over the (potentially joint) component distribution's event.
-        component_shapes.append(tf.nest.map_structure(
-            lambda a, b=iid_event_shape: prefer_static.concat([b, a], axis=0),
-            d.event_shape_tensor()))
-      return self._model_unflatten(component_shapes)
+    component_shapes = []
+    for d in self._get_single_sample_distributions():
+      iid_event_shape = d.batch_shape_tensor()[self.batch_ndims:]
+      # Recurse over the (potentially joint) component distribution's event.
+      component_shapes.append(tf.nest.map_structure(
+          lambda a, b=iid_event_shape: prefer_static.concat([b, a], axis=0),
+          d.event_shape_tensor()))
+    return self._model_unflatten(component_shapes)
 
   def _reduce_measure_over_dists(self, xs, reduce_fn):
     num_trailing_batch_dims_treated_as_event = [
