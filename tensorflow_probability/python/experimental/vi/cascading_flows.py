@@ -386,11 +386,9 @@ def _cascading_flow_surrogate_for_joint_distribution(
     use_vectorized_map=dist.use_vectorized_map,
     name=_get_name(dist))
 
-  tokenize = lambda jd: jd._model_unflatten(
-    # pylint: disable=protected-access, g-long-lambda
-    range(len(jd._model_flatten(jd.dtype)))
-    # pylint: disable=protected-access
-  )
+  tokenize = lambda jd: tf.nest.pack_sequence_as(
+    jd.dtype,
+    range(len(tf.nest.flatten(jd.dtype))))
 
   dist_tokens = tokenize(dist)
 
@@ -403,13 +401,13 @@ def _cascading_flow_surrogate_for_joint_distribution(
         input_structure=tokenize(surrogate_posterior))(
         surrogate_posterior, name=_get_name(dist))
 
-  '''else:
+  else:
     surrogate_posterior = restructure.Restructure(
       output_structure=(
         tf.nest.map_structure(lambda k: 2 * k + 1, dist_tokens),
         [0] + [2 * k + 2 for k in tf.nest.flatten(dist_tokens)]),
       input_structure=tokenize(surrogate_posterior))(
-      surrogate_posterior, name=_get_name(dist))'''
+      surrogate_posterior, name=_get_name(dist))
 
   return surrogate_posterior, variables
 
@@ -449,7 +447,7 @@ def _cascading_flow_update_for_base_distribution(dist,
     variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
   if num_auxiliary_variables > 0:
-    batch_shape = global_auxiliary_variables.shape[0] if len(
+    batch_shape = global_auxiliary_variables.shape[:-1] if len(
       global_auxiliary_variables.shape) > 1 else []
     cascading_flows = split.Split(
       [-1, num_auxiliary_variables])(
