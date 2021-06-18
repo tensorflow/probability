@@ -84,6 +84,8 @@ toc:
   path: /probability/examples/TFP_Release_Notebook_0_11_0
 - title: TFP 0.12.1
   path: /probability/examples/TFP_Release_Notebook_0_12_1
+- title: TFP 0.13.0
+  path: /probability/examples/TFP_Release_Notebook_0_13_0
 - title: "Tutorials (TF1)"
   style: accordion
   status: deprecated
