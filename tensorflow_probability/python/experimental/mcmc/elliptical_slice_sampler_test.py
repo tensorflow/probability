@@ -160,9 +160,6 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
         seed=test_util.test_seed(),
         trace_fn=None)
 
-    # TODO(b/159923910): Retval[0] does not have a value.
-    samples = tf.convert_to_tensor(self.evaluate(samples))
-
     mean, variance = self.evaluate(tf.nn.moments(samples, axes=[0]))
     posterior_mean, posterior_variance = normal_normal_posterior(
         prior_mean=0.,
