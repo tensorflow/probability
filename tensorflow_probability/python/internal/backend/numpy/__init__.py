@@ -25,11 +25,11 @@ from tensorflow_probability.python.internal.backend.numpy import config
 from tensorflow_probability.python.internal.backend.numpy import debugging
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import errors
-from tensorflow_probability.python.internal.backend.numpy import keras
 from tensorflow_probability.python.internal.backend.numpy import linalg
 from tensorflow_probability.python.internal.backend.numpy import nest
 from tensorflow_probability.python.internal.backend.numpy import nn
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array
+from tensorflow_probability.python.internal.backend.numpy import numpy_keras as keras
 from tensorflow_probability.python.internal.backend.numpy import numpy_logging as logging
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math
 from tensorflow_probability.python.internal.backend.numpy import numpy_signal as signal

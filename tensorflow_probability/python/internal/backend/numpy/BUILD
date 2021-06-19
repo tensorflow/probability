@@ -39,13 +39,13 @@ py_library(
         ":dtype",
         ":errors",
         ":functional_ops",
-        ":keras",
         ":linalg",
         ":misc",
         ":nest",
         ":nested_structure_coder",
         ":nn",
         ":numpy_array",
+        ":numpy_keras",
         ":numpy_logging",
         ":numpy_math",
         ":numpy_signal",
@@ -171,8 +171,8 @@ py_library(
 )
 
 py_library(
-    name = "keras",
-    srcs = ["keras.py"],
+    name = "numpy_keras",
+    srcs = ["numpy_keras.py"],
     deps = [
         ":_utils",
         ":keras_layers",

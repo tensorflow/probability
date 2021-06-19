@@ -37,7 +37,7 @@ FILENAMES = [
     "errors",
     "functional_ops",
     "initializers",
-    "keras",
+    "numpy_keras",
     "keras_layers",
     "linalg",
     "linalg_impl",
