@@ -92,7 +92,7 @@ class Sharded(distribution_lib.Distribution):
     # Use inner axes before outer axes
     full_shard_axis_name = (
         distribution.experimental_shard_axis_names +
-        distribute_lib.canonicalize_axis_name(shard_axis_name))
+        distribute_lib.canonicalize_named_axis(shard_axis_name))
 
     if not JAX_MODE:
       if len(full_shard_axis_name) > 1:

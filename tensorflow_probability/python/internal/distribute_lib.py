@@ -23,6 +23,7 @@ import functools
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -33,38 +34,104 @@ if JAX_MODE:
   from jax import lax  # pylint: disable=g-import-not-at-top
 
 
-def canonicalize_axis_name(axis_name):
-  """Converts an input into a list of axis strings."""
-  if not axis_name:
+def canonicalize_named_axis(named_axes):
+  """Converts an input into a list of named axis `str`s."""
+  if named_axes is None:
     return []
-  if (isinstance(axis_name, str) or
-      not isinstance(axis_name, collections.Iterable)):
-    return [axis_name]
-  return list(axis_name)
+  if (isinstance(named_axes, str) or
+      not isinstance(named_axes, collections.Iterable)):
+    named_axes = [named_axes]
+  if len(named_axes) > 1 and not JAX_MODE:
+    raise ValueError(
+        f'TensorFlow backend does not support multiple shard axes: {named_axes}'
+    )
+  return list(named_axes)
 
 
-def psum(x, axis_name=None):
-  axis_name = canonicalize_axis_name(axis_name)
-  for name in axis_name:
-    x = rwb_psum(x, name)
+def _make_reduce_op(tensor_reduce_fn, collective_reduce_fn):
+  """Makes an op that both reduces over both positional axes and named axes.
+
+  Assumes that the reducers are associative so we can rearrange the tensor and
+  collective reduce's orders.
+
+  Args:
+    tensor_reduce_fn: A function that reduces over the dimensions of a `Tensor`.
+      `tensor_reduce_fn` should take in an `axis` keyword argument.
+    collective_reduce_fn: A function that reduces over named axes.
+      `collective_reduce_fn` should take in a `named_axis` keyword argument.
+
+  Returns:
+    A reduced `Tensor`.
+  """
+
+  def reduce_fn(x, axis=None, named_axis=None, **kwargs):
+    named_axis = canonicalize_named_axis(named_axis)
+    x = tensor_reduce_fn(x, axis=axis, **kwargs)
+    return collective_reduce_fn(x, named_axis=named_axis)
+
+  return reduce_fn
+
+
+def psum(x, named_axis=None):
+  axes = canonicalize_named_axis(named_axis)
+  for axis in axes:
+    x = rwb_psum(x, axis)
   return x
 
 
-def pbroadcast(x, axis_name=None):
-  axis_name = canonicalize_axis_name(axis_name)
-  for name in axis_name:
-    x = rwb_pbroadcast(x, name)
+reduce_sum = _make_reduce_op(tf.reduce_sum, psum)
+
+
+def pbroadcast(x, named_axis=None):
+  axes = canonicalize_named_axis(named_axis)
+  for axis in axes:
+    x = rwb_pbroadcast(x, axis)
   return x
 
 
-def pmean(x, axis_name=None):
-  if JAX_MODE:
-    axis_name = canonicalize_axis_name(axis_name)
-    for name in axis_name:
-      x = lax.pmean(x, name)
-    return x
-  ctx = tf.distribute.get_replica_context()
-  return ctx.all_reduce('mean', x)
+def pmean(x, named_axis=None):
+  axes = canonicalize_named_axis(named_axis)
+  for axis in axes:
+    x = psum(x, named_axis=axis) / get_axis_size(axis)
+  return x
+
+
+reduce_mean = _make_reduce_op(tf.reduce_mean, pmean)
+
+
+def pmax(x, named_axis=None):
+  # TODO(b/187173243): fix gradients for pmax
+  axes = canonicalize_named_axis(named_axis)
+  for axis in axes:
+    if not JAX_MODE:
+      raise NotImplementedError('`pmax` not supported in TF')
+    x = lax.pmax(x, axis)
+  return x
+
+
+reduce_max = _make_reduce_op(tf.reduce_max, pmax)
+
+
+def pmin(x, named_axis=None):
+  # TODO(b/187173243): fix gradients for pmin
+  axis_name = canonicalize_named_axis(named_axis)
+  for name in axis_name:
+    if not JAX_MODE:
+      raise NotImplementedError('`pmax` not supported in TF')
+    x = lax.pmin(x, name)
+  return x
+
+
+reduce_min = _make_reduce_op(tf.reduce_min, pmin)
+
+
+def reduce_logsumexp(x, axis=None, named_axis=None, **kwargs):
+  xmax = reduce_max(
+      tf.stop_gradient(x), axis=axis, named_axis=named_axis, keepdims=True)
+  xmax = tf.where(tf.is_finite(xmax), xmax, tf.zeros_like(xmax))
+  result = tf.log(
+      reduce_sum(tf.exp(x - xmax), axis=axis, named_axis=named_axis), **kwargs)
+  return tf.reshape(xmax, ps.shape(result)) + result
 
 
 def get_axis_index(axis_name=None):
@@ -83,7 +150,7 @@ def get_axis_size(axis_name=None):
 
 def _rwb_psum_fwd(x, axis_name):
   if JAX_MODE:
-    axis_name = canonicalize_axis_name(axis_name)
+    axis_name = canonicalize_named_axis(axis_name)
     out = lax.psum(x, axis_name)
   else:
     ctx = tf.distribute.get_replica_context()
@@ -100,13 +167,15 @@ def fold_in_axis_index(seed, axis_name=None):
   if axis_name is None:
     return seed
   nest.assert_shallow_structure(seed, axis_name)
-  axis_names = nest.map_structure_up_to(
-      seed, canonicalize_axis_name, axis_name)
+  axis_names = nest.map_structure_up_to(seed, canonicalize_named_axis,
+                                        axis_name)
+
   def fold_in(seed, axes):
     for name in axes:
       axis_index = get_axis_index(name)
       seed = samplers.fold_in(seed, tf.cast(axis_index, tf.int32))
     return seed
+
   return nest.map_structure_up_to(seed, fold_in, seed, axis_names)
 
 
@@ -121,6 +190,7 @@ def rwb_psum(x, axis_name):
   Args:
     x: a `Tensor` target for the psum.
     axis_name: A string axis name for the psum.
+
   Returns:
     A `Tensor` that is the result of applying a psum to an input `Tensor`.
   """
@@ -161,8 +231,8 @@ def make_pbroadcast_function(fn, in_axes, out_axes, out_dtype):
       value w.r.t. the input value will be psum-ed over the axes present in the
       output but not the input.
     out_axes: A structure of axis names that should match the structure of the
-      output of `fn`. The inputs to `fn` will be pbroadcast-ed before
-      computing output terms according to their output axes.
+      output of `fn`. The inputs to `fn` will be pbroadcast-ed before computing
+      output terms according to their output axes.
     out_dtype: A structure of dtypes that matches the output of `fn`.
 
   Returns:
@@ -176,9 +246,9 @@ def make_pbroadcast_function(fn, in_axes, out_axes, out_dtype):
   def pbroadcast_fn(*args):
     nest.assert_shallow_structure(args, in_axes)
     nest.assert_shallow_structure(out_dtype, out_axes)
-    map_in_axes = nest.map_structure_up_to(args, canonicalize_axis_name,
+    map_in_axes = nest.map_structure_up_to(args, canonicalize_named_axis,
                                            in_axes)
-    map_out_axes = nest.map_structure_up_to(out_dtype, canonicalize_axis_name,
+    map_out_axes = nest.map_structure_up_to(out_dtype, canonicalize_named_axis,
                                             out_axes)
 
     def _pbroadcast_input(out_axes, x, in_axes):
@@ -232,14 +302,14 @@ def make_psum_function(fn, in_axes, out_axes, out_dtype):
     function and corrects the gradient with respect to its inputs.
   """
 
-  out_axes = nest.map_structure_up_to(out_dtype, canonicalize_axis_name,
+  out_axes = nest.map_structure_up_to(out_dtype, canonicalize_named_axis,
                                       out_axes)
 
   def psum_fn(*args):
     out = make_pbroadcast_function(fn, in_axes, out_axes, out_dtype)(*args)
 
     def _psum_output(x, out_axis):
-      return psum(x, out_axis)
+      return psum(x, named_axis=out_axis)
 
     return nest.map_structure_up_to(out_dtype, _psum_output, out, out_axes)
 

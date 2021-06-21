@@ -196,7 +196,7 @@ def chees_criterion(previous_state,
   """
   batch_ndims = ps.rank(accept_prob)
   batch_axes = ps.range(batch_ndims, dtype=tf.int32)
-  experimental_chain_axis_names = distribute_lib.canonicalize_axis_name(
+  experimental_chain_axis_names = distribute_lib.canonicalize_named_axis(
       experimental_chain_axis_names)
   # Number of total chains is local batch size * distributed axis size
   local_axis_size = ps.maximum(ps.size(accept_prob), 1)
@@ -733,7 +733,7 @@ def _update_trajectory_grad(previous_kernel_results, previous_state,
   trajectory_grad *= trajectory_jitter
 
   # Weight by acceptance probability.
-  experimental_chain_axis_names = distribute_lib.canonicalize_axis_name(
+  experimental_chain_axis_names = distribute_lib.canonicalize_named_axis(
       experimental_chain_axis_names)
   trajectory_grad = tf.where(accept_prob > 1e-4, trajectory_grad, 0.)
   trajectory_grad = tf.where(

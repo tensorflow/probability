@@ -112,6 +112,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         ":custom_gradient",
+        ":prefer_static",
         ":samplers",
         # tensorflow dep,
         "//tensorflow_probability/python/math:gradient",
@@ -128,6 +129,7 @@ multi_substrate_py_test(
         ":distribute_lib",
         ":distribute_test_lib",
         ":test_util",
+        # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
     ],

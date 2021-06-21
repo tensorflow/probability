@@ -16,6 +16,9 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+import itertools
+
+from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -32,6 +35,109 @@ if JAX_MODE:
 
 
 @test_util.test_all_tf_execution_regimes
+class CollectiveTest(test_lib.DistributedTest):
+
+  def test_tf_should_error_with_more_than_one_named_axis(self):
+    if JAX_MODE:
+      self.skipTest('Test only applies to TF backend.')
+    with self.assertRaisesRegex(
+        ValueError, 'TensorFlow backend does not support multiple shard axes'):
+      distribute_lib.canonicalize_named_axis(['a', 'b'])
+
+  @parameterized.named_parameters(
+      ('sum', tf.reduce_sum, distribute_lib.reduce_sum),
+      ('mean', tf.reduce_mean, distribute_lib.reduce_mean),
+      ('max', tf.reduce_max, distribute_lib.reduce_max, True),
+      ('min', tf.reduce_min, distribute_lib.reduce_min, True),
+      ('logsumexp', tf.reduce_logsumexp, distribute_lib.reduce_logsumexp, True))
+  def test_distributed_reduce_works_as_normal_with_int_axes(
+      self, reduce_op, distributed_op, jax_only=False):
+    if not JAX_MODE and jax_only:
+      self.skipTest('Only supported in JAX.')
+    x = tf.reshape(
+        tf.range(test_lib.NUM_DEVICES * 6.) / 5., [test_lib.NUM_DEVICES, 3, 2])
+
+    def make_run(axis):
+      return lambda x: distributed_op(x, axis=axis)
+
+    for axes in [0, 1, None, [0, 1]]:
+      reduce_out = reduce_op(x, axis=axes)
+      dist_out = make_run(axes)(x)
+      self.assertAllEqual(reduce_out, dist_out)
+
+  @parameterized.named_parameters(*(
+      (f'{name} {ax}', (op, d_op, jo), ax)  # pylint: disable=g-complex-comprehension
+      for (name, op, d_op, jo), ax in itertools.product((
+          ('sum', tf.reduce_sum, distribute_lib.reduce_sum, False),
+          ('mean', tf.reduce_mean, distribute_lib.reduce_mean, False),
+          ('max', tf.reduce_max, distribute_lib.reduce_max, True),
+          ('min', tf.reduce_min, distribute_lib.reduce_min, True),
+          ('logsumexp', tf.reduce_logsumexp, distribute_lib.reduce_logsumexp,
+           True)), (None, 0, 1, 2, [0, 1], [1, 2], [0, 2], [0, 1, 2]))))
+  def test_reduce_with_collectives_matches_reduce_without_collectives(
+      self, ops, axes):
+    reduce_op, distributed_op, jax_only = ops
+    if not JAX_MODE and jax_only:
+      self.skipTest('Only supported in JAX.')
+    x = tf.reshape(
+        tf.range(test_lib.NUM_DEVICES * 6.) / 5., [test_lib.NUM_DEVICES, 3, 2])
+
+    def run(x):
+      return distributed_op(x, axis=pos_axes, named_axis=named_axes)
+
+    def distributed_run(x):
+      return self.per_replica_to_tensor(
+          self.strategy_run(run, (self.shard_values(x),)))
+
+    if axes is None:
+      pos_axes = list(range(2))
+      named_axes = [self.axis_name]
+    else:
+      axes = [axes] if not isinstance(axes, list) else axes
+      pos_axes = [x - 1 for x in axes if x != 0]
+      named_axes = [self.axis_name] if 0 in axes else []
+    reduce_out = reduce_op(x, axis=axes)
+    dist_out = distributed_run(x)
+    # If we reduce over the 0 dimension, it will still be present in the
+    # distributed op
+    if axes is None or 0 in axes:
+      for i in range(test_lib.NUM_DEVICES):
+        self.assertAllClose(reduce_out, dist_out[i])
+    else:
+      self.assertAllClose(reduce_out, dist_out)
+
+  @parameterized.named_parameters(
+      ('sum', tf.reduce_sum, distribute_lib.reduce_sum, False, True),
+      ('mean', tf.reduce_mean, distribute_lib.reduce_mean, False, True),
+      ('max', tf.reduce_max, distribute_lib.reduce_max, True, False),
+      ('min', tf.reduce_min, distribute_lib.reduce_min, True, False),
+      ('logsumexp', tf.reduce_logsumexp, distribute_lib.reduce_logsumexp, True,
+       True))
+  def test_reduce_with_collective_grads_matches_without_collectives(
+      self, reduce_op, distributed_op, jax_only, is_supported):
+    if not JAX_MODE and jax_only:
+      self.skipTest('Only supported in JAX.')
+    if not is_supported:
+      self.skipTest('Gradient of operation not supported.')
+    x = tf.reshape(
+        tf.range(test_lib.NUM_DEVICES * 6.) / 5., [test_lib.NUM_DEVICES, 3, 2])
+
+    def compute_dist_grads(x):
+      return tfp.math.value_and_gradient(
+          lambda x: distributed_op(x, axis=[0, 1], named_axis=self.axis_name),
+          [x])[1][0]
+
+    def distributed_run(x):
+      return self.per_replica_to_tensor(
+          self.strategy_run(compute_dist_grads, (self.shard_values(x),)))
+
+    reduce_grads = tfp.math.value_and_gradient(
+        lambda x: reduce_op(x, axis=None), [x])[1][0]
+    dist_grads = distributed_run(x)
+    self.assertAllClose(reduce_grads, dist_grads)
+
+
+@test_util.test_all_tf_execution_regimes
 class ShardedFunctionTest(test_lib.DistributedTest):
 
   def test_psum_unary_function_applies_psum_to_outputs(self):
@@ -39,8 +145,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     def f(x):
       return x
 
-    f = distribute_lib.make_psum_function(f, self.axis_name, self.axis_name,
-                                          out_dtype=tf.float32)
+    f = distribute_lib.make_psum_function(
+        f, self.axis_name, self.axis_name, out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     out_parts = self.per_replica_to_tensor(self.strategy_run(f, (x,)))
@@ -52,10 +158,10 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     def f(x, y):
       return x + y
 
-    f_psum = distribute_lib.make_psum_function(f,
-                                               (self.axis_name, self.axis_name),
-                                               self.axis_name,
-                                               out_dtype=tf.float32)
+    f_psum = distribute_lib.make_psum_function(
+        f, (self.axis_name, self.axis_name),
+        self.axis_name,
+        out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     y = self.shard_values(2 * tf.ones(4))
@@ -64,10 +170,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     self.assertAllEqual(
         self.evaluate(out_parts), self.evaluate(12 * tf.ones(4)))
 
-    f_psum = distribute_lib.make_psum_function(f,
-                                               (self.axis_name, self.axis_name),
-                                               None,
-                                               out_dtype=tf.float32)
+    f_psum = distribute_lib.make_psum_function(
+        f, (self.axis_name, self.axis_name), None, out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     y = self.shard_values(2 * tf.ones(4))
@@ -75,10 +179,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
 
     self.assertAllEqual(self.evaluate(out_parts), self.evaluate(3 * tf.ones(4)))
 
-    f_psum = distribute_lib.make_psum_function(f,
-                                               (self.axis_name, self.axis_name),
-                                               None,
-                                               out_dtype=tf.float32)
+    f_psum = distribute_lib.make_psum_function(
+        f, (self.axis_name, self.axis_name), None, out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     y = self.shard_values(2 * tf.ones(4))
@@ -87,8 +189,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
 
     self.assertAllEqual(self.evaluate(out_parts), self.evaluate(3 * tf.ones(4)))
 
-    f_psum = distribute_lib.make_psum_function(f, (self.axis_name, None), None,
-                                               out_dtype=tf.float32)
+    f_psum = distribute_lib.make_psum_function(
+        f, (self.axis_name, None), None, out_dtype=tf.float32)
 
     x = self.shard_values(tf.ones(4))
     y = 2.
@@ -102,10 +204,10 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     def f(x, y):
       return x * y
 
-    f_psum = distribute_lib.make_psum_function(f,
-                                               (self.axis_name, self.axis_name),
-                                               self.axis_name,
-                                               out_dtype=tf.float32)
+    f_psum = distribute_lib.make_psum_function(
+        f, (self.axis_name, self.axis_name),
+        self.axis_name,
+        out_dtype=tf.float32)
 
     def f_grad(x, y):
       return tfp.math.value_and_gradient(f_psum, (x, y))[1]
@@ -117,9 +219,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     self.assertAllEqual(self.evaluate(out_grads[0]), 2. * tf.range(4.))
     self.assertAllEqual(self.evaluate(out_grads[1]), tf.ones(4))
 
-    f_psum = distribute_lib.make_psum_function(f, (self.axis_name, None),
-                                               self.axis_name,
-                                               out_dtype=tf.float32)
+    f_psum = distribute_lib.make_psum_function(
+        f, (self.axis_name, None), self.axis_name, out_dtype=tf.float32)
 
     def f_grad2(x, y):
       return tfp.math.value_and_gradient(f_psum, (x, y))[1]
@@ -132,9 +233,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     self.assertAllEqual(self.evaluate(out_grads[0]), 2 * tf.ones(4))
     self.assertAllEqual(self.evaluate(out_grads[1]), 6 * tf.ones(4))
 
-    f_psum = distribute_lib.make_psum_function(f,
-                                               (self.axis_name, self.axis_name),
-                                               None, out_dtype=tf.float32)
+    f_psum = distribute_lib.make_psum_function(
+        f, (self.axis_name, self.axis_name), None, out_dtype=tf.float32)
 
     def f_grad3(x, y):
       return tfp.math.value_and_gradient(f_psum, (x, y))[1]
@@ -146,8 +246,8 @@ class ShardedFunctionTest(test_lib.DistributedTest):
     self.assertAllEqual(self.evaluate(out_grads[0]), tf.ones(4))
     self.assertAllEqual(self.evaluate(out_grads[1]), tf.range(4.))
 
-    f_psum = distribute_lib.make_psum_function(f, (self.axis_name, None), None,
-                                               out_dtype=tf.float32)
+    f_psum = distribute_lib.make_psum_function(
+        f, (self.axis_name, None), None, out_dtype=tf.float32)
 
     def f_grad4(x, y):
       return tfp.math.value_and_gradient(f_psum, (x, y))[1]

@@ -75,10 +75,10 @@ class Sharded(bijector_lib.Bijector):
 
     return distribute_lib.psum(
         self.bijector.forward_log_det_jacobian(x, **kwargs),
-        axis_name=self.shard_axis_name)
+        named_axis=self.shard_axis_name)
 
   def _inverse_log_det_jacobian(self, y, **kwargs):
 
     return distribute_lib.psum(
         self.bijector.inverse_log_det_jacobian(y, **kwargs),
-        axis_name=self.shard_axis_name)
+        named_axis=self.shard_axis_name)

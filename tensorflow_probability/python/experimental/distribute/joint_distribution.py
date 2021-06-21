@@ -28,12 +28,12 @@ from tensorflow_probability.python.internal import samplers
 
 
 def pbroadcast_value(value, value_axis_names, output_axis_names):
-  value_axis_names = distribute_lib.canonicalize_axis_name(value_axis_names)
+  value_axis_names = distribute_lib.canonicalize_named_axis(value_axis_names)
   pbroadcast_axes = [
       axis_name for axis_name in output_axis_names
       if axis_name not in value_axis_names
   ]
-  return distribute_lib.pbroadcast(value, pbroadcast_axes)
+  return distribute_lib.pbroadcast(value, named_axis=pbroadcast_axes)
 
 
 def _maybe_substitute_or_add_value_in_tuple(value_tuple, index, value):
