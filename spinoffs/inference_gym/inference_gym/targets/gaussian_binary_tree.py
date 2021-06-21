@@ -11,32 +11,31 @@ tfd = tfp.distributions
 
 Root = tfd.JointDistributionCoroutine.Root
 
+
 # coupling link could be e.g. tf.nn.tanh
 def gaussian_binary_tree_prior_fn(num_layers, initial_scale, nodes_scale,
                                   coupling_link=None):
   initial_loc = 0.
-  nodes = []
   # in the "root" layer (or inverse root, as it is a reversed tree) we have
-  # 2**num_layers nodes (with depth 2 --> 4 nodes, depth 4 --> 16 nodes)
-  for i in range(2 ** num_layers):
-    node = yield Root(tfd.Normal(initial_loc, initial_scale))
-    nodes.append(node)
+  # 2**(num_layers-1) nodes (with depth 2 --> 2 nodes, depth 4 --> 8 nodes)
+
+  nodes = yield Root(
+    tfd.Sample(tfd.Normal(initial_loc, initial_scale), 2 ** (num_layers - 1),
+               name=f'layer_{num_layers - 1}'))
   # for the remaining layers, we then sample the respective nodes values
   # applying the link function
   # we do not do this for the final node, as it is supposed to be observed
   for l in range(num_layers, 1, -1):
-    next_layer_nodes = []
-    for i in range(0, (2 ** l), 2):
-      if coupling_link:
-        node = yield tfd.Independent(
-          tfd.Normal(coupling_link(nodes[i]) - coupling_link(nodes[i + 1]),
-                     nodes_scale), 0)
-      else:
-        node = yield tfd.Independent(
-          tfd.Normal(nodes[i] - nodes[i + 1],
-                     nodes_scale), 0)
-      next_layer_nodes.append(node)
-    nodes = next_layer_nodes
+    if coupling_link:
+      nodes = yield tfd.Independent(tfd.Normal(tf.stack(
+        [coupling_link(nodes[..., i]) - coupling_link(nodes[..., i + 1]) for i
+         in range(0, 2 ** l, 2)],
+        -1),
+        nodes_scale), 1, name=f'layer_{l - 1}')
+    else:
+      nodes = yield tfd.Independent(tfd.Normal(tf.stack(
+        [nodes[..., i] - nodes[..., i + 1] for i in range(0, 2 ** l, 2)], -1),
+        nodes_scale), 1, name=f'layer_{l - 1}')
 
 
 def gaussian_binary_tree_log_likelihood_fn(values, observed_last_node,
@@ -88,7 +87,8 @@ class GaussianBinaryTree(bayesian_model.BayesianModel):
       }
 
     super(GaussianBinaryTree, self).__init__(
-      default_event_space_bijector=tfb.Identity(), # todo: what should I use here?
+      default_event_space_bijector=tfb.Identity(),
+      # todo: what should I use here?
       event_shape=self._prior_dist.event_shape,
       dtype=self._prior_dist.dtype,
       name=name,
