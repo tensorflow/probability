@@ -291,6 +291,10 @@ def _cascading_flow_surrogate_for_joint_distribution(
   flat_variables = dist._model_flatten(
     variables) if variables else None  # pylint: disable=protected-access
   prior_coroutine = dist._model_coroutine  # pylint: disable=protected-access
+  prior_batch_shape = dist.batch_shape_tensor()
+  if tf.nest.is_nested(prior_batch_shape):
+    prior_batch_shape = functools.reduce(tf.broadcast_static_shape,
+                                         dist._model_flatten(prior_batch_shape))
 
   def posterior_generator(seed=seed):
     prior_gen = prior_coroutine()
@@ -312,8 +316,8 @@ def _cascading_flow_surrogate_for_joint_distribution(
         variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
       eps = transformed_distribution.TransformedDistribution(
-        distribution=sample.Sample(normal.Normal(0., 1.),
-                                   num_auxiliary_variables),
+        distribution=batch_broadcast.BatchBroadcast(sample.Sample(normal.Normal(0., 1.),
+                                   num_auxiliary_variables), prior_batch_shape),
         bijector=variables)
 
       eps = Root(eps)
