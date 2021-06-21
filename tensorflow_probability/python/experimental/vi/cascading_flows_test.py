@@ -51,7 +51,7 @@ class CascadingFlowTests(test_util.TestCase):
     prior = tfd.JointDistributionCoroutineAutoBatched(test_shapes_model, batch_ndims=1)
     surrogate_posterior = tfp.experimental.vi.build_cascading_flow_surrogate_posterior(prior) #num_auxiliary_variables=10)
 
-    x1 = test_shapes_model.sample()
+    x1 = surrogate_posterior.sample()
     x2 = nest.map_structure_up_to(
       x1,
       # Strip auxiliary variables.
