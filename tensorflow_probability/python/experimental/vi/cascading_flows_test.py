@@ -36,7 +36,7 @@ Root = tfd.JointDistributionCoroutine.Root
 class CascadingFlowTests(test_util.TestCase):
 
   def test_shapes(self):
-    @tfd.JointDistributionCoroutine
+
     def test_shapes_model():
       # Matrix-valued random variable with batch shape [3].
       A = yield Root(
@@ -45,10 +45,11 @@ class CascadingFlowTests(test_util.TestCase):
       x = yield tfd.MultivariateNormalTriL(loc=tf.zeros([2]),
                                            scale_tril=tf.linalg.cholesky(A),
                                            name='x')
-      # Scalar-valued random variable, with batch shape `[4, 3]`.
-      y = yield tfd.Normal(loc=tf.reduce_sum(x, axis=-1), scale=tf.ones([4, 3]))
+      # Scalar-valued random variable, with batch shape `[3]`.
+      y = yield tfd.Normal(loc=tf.reduce_sum(x, axis=-1), scale=tf.ones([3]))
 
-    surrogate_posterior = tfp.experimental.vi.build_cascading_flow_surrogate_posterior(test_shapes_model, num_auxiliary_variables=10)
+    prior = tfd.JointDistributionCoroutineAutoBatched(test_shapes_model, batch_ndims=1)
+    surrogate_posterior = tfp.experimental.vi.build_cascading_flow_surrogate_posterior(prior) #num_auxiliary_variables=10)
 
     x1 = test_shapes_model.sample()
     x2 = nest.map_structure_up_to(
@@ -65,7 +66,7 @@ class CascadingFlowTests(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class _TrainableCFSurrogate(object):
 
-  '''def _expected_num_trainable_variables(self, prior_dist, num_layers):
+  def _expected_num_trainable_variables(self, prior_dist, num_layers):
     """Infers the expected number of trainable variables for a non-nested JD."""
     prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
     expected_num_trainable_variables = 0
@@ -127,7 +128,7 @@ class _TrainableCFSurrogate(object):
       seed=test_util.test_seed(sampler_type='stateless'))
 
     self.assertAllEqualNested(posterior_sample, posterior_sample2)
-'''
+
   def test_surrogate_and_prior_have_same_domain(self):
     prior_dist = self.make_prior_dist()
     surrogate_posterior = tfp.experimental.vi.build_cascading_flow_surrogate_posterior(
@@ -268,20 +269,6 @@ class CFSurrogatePosteriorTestHalfNormal(test_util.TestCase,
         allow_nan_stats=False)
 
     return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
-
-
-@test_util.test_all_tf_execution_regimes
-class CFSurrogatePosteriorTestDiscreteLatent(
-  test_util.TestCase, _TrainableCFSurrogate):
-
-  def make_prior_dist(self):
-    def _prior_model_fn():
-      a = yield tfd.Bernoulli(logits=0.5, name='a')
-      yield tfd.Normal(loc=2. * tf.cast(a, tf.float32) - 1.,
-                       scale=1., name='b')
-
-    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
-
 
 @test_util.test_all_tf_execution_regimes
 class CFSurrogatePosteriorTestNesting(test_util.TestCase,
