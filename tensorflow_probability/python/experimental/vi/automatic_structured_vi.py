@@ -39,6 +39,7 @@ from tensorflow_probability.python.distributions import half_normal
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import joint_distribution_coroutine
+from tensorflow_probability.python.distributions import markov_chain
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import truncated_normal
@@ -297,6 +298,13 @@ def _asvi_surrogate_for_distribution(dist,
   dist = _set_name(_as_substituted_distribution(dist), name=_get_name(dist))
 
   # Handle wrapper ("meta") distributions.
+  if isinstance(dist, markov_chain.MarkovChain):
+    return _asvi_surrogate_for_markov_chain(
+        dist=dist,
+        variables=variables,
+        base_distribution_surrogate_fn=base_distribution_surrogate_fn,
+        sample_shape=sample_shape,
+        seed=seed)
   if isinstance(dist, sample.Sample):
     dist_sample_shape = distribution_util.expand_to_vector(dist.sample_shape)
     nested_surrogate, variables = build_nested_surrogate(  # pylint: disable=redundant-keyword-arg
@@ -415,6 +423,58 @@ def _asvi_surrogate_for_joint_distribution(
         input_structure=tokenize(surrogate_posterior))(
             surrogate_posterior, name=_get_name(dist))
   return surrogate_posterior, variables
+
+
+def _asvi_surrogate_for_markov_chain(dist,
+                                     base_distribution_surrogate_fn,
+                                     sample_shape=None,
+                                     variables=None,
+                                     seed=None):
+  """Builds a structured surrogate posterior for a Markov chain."""
+  prior_seed, transition_seed = samplers.split_seed(seed, 2)
+  if variables is None:
+    prior_variables, transition_variables = None, None
+  else:
+    prior_variables, transition_variables = variables
+
+  surrogate_prior, prior_variables = _asvi_surrogate_for_distribution(
+      dist.initial_state_prior,
+      base_distribution_surrogate_fn=base_distribution_surrogate_fn,
+      variables=prior_variables,
+      seed=prior_seed)
+
+  if transition_variables is None:
+    # Construct variables for all chain steps in a single call. These will have
+    # an initial dimension of size `num_steps - 1`, which we can gather from
+    # as the chain runs.
+    all_steps = tf.range(dist.num_steps - 1)
+    batch_state = dist.initial_state_prior.sample(dist.num_steps - 1)
+    _, transition_variables = _asvi_surrogate_for_distribution(
+        dist.transition_fn(all_steps, batch_state),
+        base_distribution_surrogate_fn=base_distribution_surrogate_fn,
+        variables=None,
+        sample_shape=sample_shape,
+        seed=transition_seed)
+
+  def surrogate_transition_fn(step, state):
+    surrogate_new_dist, _ = _asvi_surrogate_for_distribution(
+        dist.transition_fn(step, state),
+        base_distribution_surrogate_fn=base_distribution_surrogate_fn,
+        variables=tf.nest.map_structure(
+            # Gather parameters for this specific step of the chain.
+            lambda v: tf.gather(v, step, axis=0), transition_variables),
+        sample_shape=sample_shape,
+        seed=transition_seed)
+    return surrogate_new_dist
+
+  chain_surrogate = markov_chain.MarkovChain(
+      initial_state_prior=surrogate_prior,
+      transition_fn=surrogate_transition_fn,
+      num_steps=dist.num_steps,
+      validate_args=dist.validate_args,
+      name=_get_name(dist))
+
+  return chain_surrogate, [prior_variables, transition_variables]
 
 
 # TODO(davmre): consider breaking the mean field case into a separate method.

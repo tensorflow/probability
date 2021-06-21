@@ -287,6 +287,38 @@ class ASVISurrogatePosteriorTestNesting(test_util.TestCase,
 
 
 @test_util.test_all_tf_execution_regimes
+class ASVISurrogatePosteriorTestMarkovChain(test_util.TestCase,
+                                            _TrainableASVISurrogate):
+
+  def _expected_num_trainable_variables(self, _):
+    return 16
+
+  def make_prior_dist(self):
+    num_timesteps = 10
+    def stochastic_volatility_prior_fn():
+      """Generative process for a stochastic volatility model."""
+      persistence_of_volatility = 0.9
+      mean_log_volatility = yield tfd.Cauchy(
+          loc=0., scale=5., name='mean_log_volatility')
+      white_noise_shock_scale = yield tfd.HalfCauchy(
+          loc=0., scale=2., name='white_noise_shock_scale')
+      _ = yield tfd.MarkovChain(
+          initial_state_prior=tfd.Normal(
+              loc=mean_log_volatility,
+              scale=white_noise_shock_scale / tf.math.sqrt(
+                  tf.ones([]) - persistence_of_volatility**2)),
+          transition_fn=lambda _, x_t: tfd.Normal(  # pylint: disable=g-long-lambda
+              loc=persistence_of_volatility * (
+                  x_t -  mean_log_volatility) + mean_log_volatility,
+              scale=white_noise_shock_scale),
+          num_steps=num_timesteps,
+          name='log_volatility')
+
+    return tfd.JointDistributionCoroutineAutoBatched(
+        stochastic_volatility_prior_fn)
+
+
+@test_util.test_all_tf_execution_regimes
 class TestASVIDistributionSubstitution(test_util.TestCase):
 
   def test_default_substitutes_trainable_families(self):
