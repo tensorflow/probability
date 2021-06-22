@@ -26,6 +26,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import ldj_ratio as ldj_ratio_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
@@ -76,8 +77,11 @@ def _max_precision_sum(a, b):
 
 MinEventNdimsInferenceDownstreamQuantities = collections.namedtuple(
     'MinEventNdimsInferenceDownstreamQuantities',
-    ['forward_min_event_ndims',
-     'parts_interact'])
+    ['forward_min_event_ndims', 'parts_interact'])
+
+BijectorWithMetadata = collections.namedtuple(
+    'BijectorWithMetadata',
+    ['bijector', 'x', 'x_event_ndims', 'kwargs', 'assertions'])
 
 
 class Composition(bijector.Bijector):
@@ -407,6 +411,60 @@ class Composition(bijector.Bijector):
 
   ## LDJ Methods
 
+  def _get_bijectors_with_metadata(self,
+                                   x,
+                                   event_ndims,
+                                   forward=True,
+                                   **kwargs):
+    """Trace bijectors + metadata forward/backward."""
+    bijectors_with_metadata = []
+
+    if forward:
+      forward_fn = lambda bij, *args, **kwargs: bij.forward(*args, **kwargs)
+      forward_event_ndims_fn = (
+          lambda bij, *args, **kwargs: bij.forward_event_ndims(*args, **kwargs))
+      walk_forward_fn = self._call_walk_forward
+    else:
+      forward_fn = lambda bij, *args, **kwargs: bij.inverse(*args, **kwargs)
+      forward_event_ndims_fn = (
+          lambda bij, *args, **kwargs: bij.inverse_event_ndims(*args, **kwargs))
+      walk_forward_fn = self._call_walk_inverse
+
+    def step(bij, x, x_event_ndims, increased_dof, **kwargs):  # pylint: disable=missing-docstring
+      # Transform inputs for the next bijector.
+      y = forward_fn(bij, x, **kwargs)
+      y_event_ndims = forward_event_ndims_fn(bij, x_event_ndims, **kwargs)
+
+      # Check if the inputs to this bijector have increased degrees of freedom
+      # due to some upstream bijector. We assume that the upstream bijector
+      # produced a valid LDJ, but this one does not (unless LDJ is 0, in which
+      # case it doesn't matter).
+      increased_dof = ps.reduce_any(nest.flatten(increased_dof))
+      if self.validate_event_size:
+        assertions = [
+            self._maybe_warn_increased_dof(
+                component_name=bij.name, increased_dof=increased_dof)
+        ]
+        increased_dof |= (_event_size(y, y_event_ndims)
+                          > _event_size(x, x_event_ndims))
+      else:
+        assertions = []
+
+      increased_dof = nest_util.broadcast_structure(y, increased_dof)
+      bijectors_with_metadata.append(
+          BijectorWithMetadata(
+              bijector=bij,
+              x=x,
+              x_event_ndims=x_event_ndims,
+              kwargs=kwargs,
+              assertions=assertions,
+          ))
+      return y, y_event_ndims, increased_dof
+
+    increased_dof = nest_util.broadcast_structure(event_ndims, False)
+    walk_forward_fn(step, x, event_ndims, increased_dof, **kwargs)
+    return bijectors_with_metadata
+
   def _call_forward_log_det_jacobian(self, x, event_ndims, name, **kwargs):
     """Compute forward_log_det_jacobian over the composition."""
     with self._name_and_control_scope(name):
@@ -422,48 +480,27 @@ class Composition(bijector.Bijector):
       return self._forward_log_det_jacobian(x, event_ndims, **kwargs)
 
   def _forward_log_det_jacobian(self, x, event_ndims, **kwargs):
-    # Container for accumulated LDJ.
+    bijectors_with_metadata = self._get_bijectors_with_metadata(
+        x, event_ndims, forward=True, **kwargs)
+
+    # We do a running sum for the purpose of dtype inference.
     ldj_sum = tf.zeros([], dtype=tf.float32)
-    # Container for accumulated assertions.
     assertions = []
 
-    def step(bij, x, x_event_ndims, increased_dof, **kwargs):  # pylint: disable=missing-docstring
-      nonlocal ldj_sum
-
-      # Compute the LDJ for this step, and add it to the rolling sum.
-      component_ldj = tf.convert_to_tensor(
-          bij.forward_log_det_jacobian(x, x_event_ndims, **kwargs),
+    for bm in bijectors_with_metadata:
+      ldj = tf.convert_to_tensor(
+          bm.bijector.forward_log_det_jacobian(bm.x, bm.x_event_ndims,
+                                               **bm.kwargs),
           dtype_hint=ldj_sum.dtype)
 
-      if not dtype_util.is_floating(component_ldj.dtype):
+      if not dtype_util.is_floating(ldj.dtype):
         raise TypeError(('Nested bijector "{}" of Composition "{}" returned '
-                         'LDJ with a non-floating dtype: {}')
-                        .format(bij.name, self.name, component_ldj.dtype))
-      ldj_sum = _max_precision_sum(ldj_sum, component_ldj)
+                         'FLDJ with a non-floating dtype: {}').format(
+                             bm.bijector.name, self.name, ldj.dtype))
+      ldj_sum = _max_precision_sum(ldj_sum, ldj)
+      assertions.extend(bm.assertions)
 
-      # Transform inputs for the next bijector.
-      y = bij.forward(x, **kwargs)
-      y_event_ndims = bij.forward_event_ndims(x_event_ndims, **kwargs)
-
-      # Check if the inputs to this bijector have increased degrees of freedom
-      # due to some upstream bijector. We assume that the upstream bijector
-      # produced a valid LDJ, but this one does not (unless LDJ is 0, in which
-      # case it doesn't matter).
-      increased_dof = ps.reduce_any(nest.flatten(increased_dof))
-      if self.validate_event_size:
-        assertions.append(self._maybe_warn_increased_dof(
-            component_name=bij.name,
-            component_ldj=component_ldj,
-            increased_dof=increased_dof))
-        increased_dof |= (_event_size(y, y_event_ndims)
-                          > _event_size(x, x_event_ndims))
-
-      increased_dof = nest_util.broadcast_structure(y, increased_dof)
-      return y, y_event_ndims, increased_dof
-
-    increased_dof = nest_util.broadcast_structure(event_ndims, False)
-    self._call_walk_forward(step, x, event_ndims, increased_dof, **kwargs)
-    with tf.control_dependencies([x for x in assertions if x is not None]):
+    with tf.control_dependencies(assertions):
       return tf.identity(ldj_sum, name='fldj')
 
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
@@ -481,48 +518,28 @@ class Composition(bijector.Bijector):
       return self._inverse_log_det_jacobian(y, event_ndims, **kwargs)
 
   def _inverse_log_det_jacobian(self, y, event_ndims, **kwargs):
-    # Container for accumulated LDJ.
-    ldj_sum = tf.convert_to_tensor(0., dtype=tf.float32)
-    # Container for accumulated assertions.
+    bijectors_with_metadata = self._get_bijectors_with_metadata(
+        y, event_ndims, forward=False, **kwargs)
+
+    # We do a running sum for the purpose of dtype inference.
+    ldj_sum = tf.zeros([], dtype=tf.float32)
     assertions = []
 
-    def step(bij, y, y_event_ndims, increased_dof=False, **kwargs):  # pylint: disable=missing-docstring
-      nonlocal ldj_sum
-
-      # Compute the LDJ for this step, and add it to the rolling sum.
-      component_ldj = tf.convert_to_tensor(
-          bij.inverse_log_det_jacobian(y, y_event_ndims, **kwargs),
+    for bm in bijectors_with_metadata:
+      # N.B. x's are y's here.
+      ldj = tf.convert_to_tensor(
+          bm.bijector.inverse_log_det_jacobian(bm.x, bm.x_event_ndims,
+                                               **bm.kwargs),
           dtype_hint=ldj_sum.dtype)
 
-      if not dtype_util.is_floating(component_ldj.dtype):
+      if not dtype_util.is_floating(ldj.dtype):
         raise TypeError(('Nested bijector "{}" of Composition "{}" returned '
-                         'LDJ with a non-floating dtype: {}')
-                        .format(bij.name, self.name, component_ldj.dtype))
-      ldj_sum = _max_precision_sum(ldj_sum, component_ldj)
+                         'ILDJ with a non-floating dtype: {}')
+                        .format(bm.bijector.name, self.name, ldj.dtype))
+      ldj_sum = _max_precision_sum(ldj_sum, ldj)
+      assertions.extend(bm.assertions)
 
-      # Transform inputs for the next bijector.
-      x = bij.inverse(y, **kwargs)
-      x_event_ndims = bij.inverse_event_ndims(y_event_ndims, **kwargs)
-
-      # Check if the inputs to this bijector have increased degrees of freedom
-      # due to some upstream bijector. We assume that the upstream bijector
-      # produced a valid LDJ, but this one does not (unless LDJ is 0, in which
-      # case it doesn't matter).
-      increased_dof = ps.reduce_any(nest.flatten(increased_dof))
-      if self.validate_event_size:
-        assertions.append(self._maybe_warn_increased_dof(
-            component_name=bij.name,
-            component_ldj=component_ldj,
-            increased_dof=increased_dof))
-        increased_dof |= (_event_size(x, x_event_ndims)
-                          > _event_size(y, y_event_ndims))
-
-      increased_dof = nest_util.broadcast_structure(x, increased_dof)
-      return x, x_event_ndims, increased_dof
-
-    increased_dof = nest_util.broadcast_structure(event_ndims, False)
-    self._call_walk_inverse(step, y, event_ndims, increased_dof, **kwargs)
-    with tf.control_dependencies([x for x in assertions if x is not None]):
+    with tf.control_dependencies(assertions):
       return tf.identity(ldj_sum, name='ildj')
 
   def _batch_shape(self, x_event_ndims):
@@ -557,14 +574,8 @@ class Composition(bijector.Bijector):
 
   def _maybe_warn_increased_dof(self,
                                 component_name,
-                                component_ldj,
                                 increased_dof):
     """Warns or raises when `increased_dof` is True."""
-    # Short-circuit when the component LDJ is statically zero.
-    if (tf.get_static_value(tf.rank(component_ldj)) == 0
-        and tf.get_static_value(component_ldj) == 0):
-      return
-
     # Short-circuit when increased_dof is statically False.
     increased_dof_ = tf.get_static_value(increased_dof)
     if increased_dof_ is False:  # pylint: disable=g-bool-id-comparison
@@ -741,3 +752,91 @@ _update_inverse_min_event_ndims = functools.partial(
     get_forward_min_event_ndims=lambda b: b.inverse_min_event_ndims,
     get_inverse_min_event_ndims=lambda b: b.forward_min_event_ndims,
     inverse_event_ndims_fn=lambda b, nd: b.forward_event_ndims(nd))
+
+
+@ldj_ratio_lib.RegisterFLDJRatio(Composition)
+def _fldj_ratio_composition(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
+  """Composition FLDJ ratio."""
+  p_bijectors_with_metadata = p._get_bijectors_with_metadata(  # pylint: disable=protected-access
+      x, event_ndims, forward=True, **p_kwargs)
+  q_bijectors_with_metadata = q._get_bijectors_with_metadata(  # pylint: disable=protected-access
+      y, event_ndims, forward=True, **q_kwargs)
+
+  if len(p_bijectors_with_metadata) != len(q_bijectors_with_metadata):
+    raise ValueError(
+        f'Composition "{p.name}" and "{q.name}" have different numbers of '
+        f'component bijectors: {len(p_bijectors_with_metadata)} != '
+        f'{len(q_bijectors_with_metadata)}.')
+
+  # We do a running sum for the purpose of dtype inference.
+  ldj_ratio_sum = tf.zeros([], dtype=tf.float32)
+  assertions = []
+
+  for p_bm, q_bm in zip(p_bijectors_with_metadata, q_bijectors_with_metadata):
+    ldj_ratio = ldj_ratio_lib.forward_log_det_jacobian_ratio(
+        p=p_bm.bijector,
+        x=p_bm.x,
+        q=q_bm.bijector,
+        y=q_bm.x,
+        event_ndims=p_bm.x_event_ndims,
+        p_kwargs=p_bm.kwargs,
+        q_kwargs=q_bm.kwargs)
+
+    ldj_ratio = tf.convert_to_tensor(ldj_ratio, dtype_hint=ldj_ratio_sum.dtype)
+
+    if not dtype_util.is_floating(ldj_ratio.dtype):
+      raise TypeError(
+          f'Nested bijector "{p_bm.bijector.name}" of Composition "{p.name}" '
+          f'and bijector "{q_bm.bijector.name}" of Composition "{q.name}" '
+          f'returned FLDJ ratio with a non-floating dtype: {ldj_ratio.dtype}')
+    ldj_ratio_sum = _max_precision_sum(ldj_ratio_sum, ldj_ratio)
+    assertions.extend(p_bm.assertions)
+    assertions.extend(q_bm.assertions)
+
+  with tf.control_dependencies(
+      assertions):
+    return tf.identity(ldj_ratio_sum, name='fldj_ratio')
+
+
+@ldj_ratio_lib.RegisterILDJRatio(Composition)
+def _ildj_ratio_composition(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
+  """Composition ILDJ ratio."""
+  p_bijectors_with_metadata = p._get_bijectors_with_metadata(  # pylint: disable=protected-access
+      x, event_ndims, forward=False, **p_kwargs)
+  q_bijectors_with_metadata = q._get_bijectors_with_metadata(  # pylint: disable=protected-access
+      y, event_ndims, forward=False, **q_kwargs)
+
+  if len(p_bijectors_with_metadata) != len(q_bijectors_with_metadata):
+    raise ValueError(
+        f'Composition "{p.name}" and "{q.name}" have different numbers of '
+        f'component bijectors: {len(p_bijectors_with_metadata)} != '
+        f'{len(q_bijectors_with_metadata)}.')
+
+  # We do a running sum for the purpose of dtype inference.
+  ldj_ratio_sum = tf.zeros([], dtype=tf.float32)
+  assertions = []
+
+  for p_bm, q_bm in zip(p_bijectors_with_metadata, q_bijectors_with_metadata):
+    ldj_ratio = ldj_ratio_lib.inverse_log_det_jacobian_ratio(
+        p=p_bm.bijector,
+        x=p_bm.x,
+        q=q_bm.bijector,
+        y=q_bm.x,
+        event_ndims=p_bm.x_event_ndims,
+        p_kwargs=p_bm.kwargs,
+        q_kwargs=q_bm.kwargs)
+
+    ldj_ratio = tf.convert_to_tensor(ldj_ratio, dtype_hint=ldj_ratio_sum.dtype)
+
+    if not dtype_util.is_floating(ldj_ratio.dtype):
+      raise TypeError(
+          f'Nested bijector "{p_bm.bijector.name}" of Composition "{p.name}" '
+          f'and bijector "{q_bm.bijector.name}" of Composition "{q.name}" '
+          f'returned ILDJ ratio with a non-floating dtype: {ldj_ratio.dtype}')
+    ldj_ratio_sum = _max_precision_sum(ldj_ratio_sum, ldj_ratio)
+    assertions.extend(p_bm.assertions)
+    assertions.extend(q_bm.assertions)
+
+  with tf.control_dependencies(
+      assertions):
+    return tf.identity(ldj_ratio_sum, name='ildj_ratio')

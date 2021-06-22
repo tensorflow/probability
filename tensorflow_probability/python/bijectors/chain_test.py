@@ -330,6 +330,9 @@ class ChainBijectorTest(test_util.TestCase):
       return tf1.placeholder_with_default(x, shape=None)
 
     def xform_static(x):
+      # Copy the Tensor, because otherwise the set_shape can pass information
+      # into the past.
+      x = tf.identity(x)
       tensorshape_util.set_shape(x, [1])
       return x
 

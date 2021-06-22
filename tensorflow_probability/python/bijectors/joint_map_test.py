@@ -23,6 +23,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.internal import test_util
 
 
@@ -183,6 +184,52 @@ class JointMapBijectorTest(test_util.TestCase):
     self.assertAllClose(
         bij.forward([1., 1.]),
         [exp.forward(1.), scale.forward(1.)])
+
+  def testLDJRatio(self):
+    q = tfb.JointMap({
+        'a': tfb.Exp(),
+        'b': tfb.Scale(2.),
+        'c': tfb.Shift(3.)
+    })
+    p = tfb.JointMap({
+        'a': tfb.Exp(),
+        'b': tfb.Scale(3.),
+        'c': tfb.Shift(4.)
+    })
+
+    a = np.asarray([[[1, 2], [2, 3]]], dtype=np.float32)   # shape=[1, 2, 2]
+    b = np.asarray([[0, 4]], dtype=np.float32)             # shape=[1, 2]
+    c = np.asarray([[5, 6]], dtype=np.float32)             # shape=[1, 2]
+
+    x = {'a': a, 'b': b, 'c': c}
+    y = {'a': a + 1, 'b': b + 1, 'c': c + 1}
+    event_ndims = {'a': 1, 'b': 0, 'c': 0}
+
+    fldj_ratio_true = p.forward_log_det_jacobian(
+        x, event_ndims) - q.forward_log_det_jacobian(y, event_ndims)
+    fldj_ratio = ldj_ratio.forward_log_det_jacobian_ratio(
+        p, x, q, y, event_ndims)
+    self.assertAllClose(fldj_ratio_true, fldj_ratio)
+
+    ildj_ratio_true = p.inverse_log_det_jacobian(
+        x, event_ndims) - q.inverse_log_det_jacobian(y, event_ndims)
+    ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
+        p, x, q, y, event_ndims)
+    self.assertAllClose(ildj_ratio_true, ildj_ratio)
+
+    event_ndims = {'a': 1, 'b': 2, 'c': 0}
+
+    fldj_ratio_true = p.forward_log_det_jacobian(
+        x, event_ndims) - q.forward_log_det_jacobian(y, event_ndims)
+    fldj_ratio = ldj_ratio.forward_log_det_jacobian_ratio(
+        p, x, q, y, event_ndims)
+    self.assertAllClose(fldj_ratio_true, fldj_ratio)
+
+    ildj_ratio_true = p.inverse_log_det_jacobian(
+        x, event_ndims) - q.inverse_log_det_jacobian(y, event_ndims)
+    ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
+        p, x, q, y, event_ndims)
+    self.assertAllClose(ildj_ratio_true, ildj_ratio)
 
 
 if __name__ == '__main__':

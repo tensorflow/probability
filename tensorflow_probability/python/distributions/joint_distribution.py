@@ -29,6 +29,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.bijectors import ldj_ratio as ldj_ratio_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
@@ -1104,6 +1105,28 @@ class _DefaultJointBijector(composition.Composition):
   def _inverse_log_det_jacobian(self, y, event_ndims, **kwargs):
     return super(_DefaultJointBijector, self)._inverse_log_det_jacobian(
         y, event_ndims, _jd_conditioning=y, **kwargs)
+
+
+@ldj_ratio_lib.RegisterFLDJRatio(_DefaultJointBijector)
+def _fldj_ratio_jd_default(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
+  return composition._fldj_ratio_composition(p, x, q, y, event_ndims, {
+      '_jd_conditioning': x,
+      **p_kwargs
+  }, {
+      '_jd_conditioning': y,
+      **q_kwargs
+  })
+
+
+@ldj_ratio_lib.RegisterILDJRatio(_DefaultJointBijector)
+def _ildj_ratio_jd_default(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
+  return composition._ildj_ratio_composition(p, x, q, y, event_ndims, {
+      '_jd_conditioning': x,
+      **p_kwargs
+  }, {
+      '_jd_conditioning': y,
+      **q_kwargs
+  })
 
 
 def _sanitize_value(distribution, value):

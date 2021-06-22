@@ -2113,7 +2113,6 @@ multi_substrate_py_library(
         ":kullback_leibler",
         ":log_prob_ratio",
         # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:ldj_ratio",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",

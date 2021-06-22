@@ -1422,7 +1422,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
           # Non-injective bijectors don't use caching, and the resulting
           # LDJ is a tuple of LDJ over possible partitions on `x`.
           return tuple(
-              self._reduce_jacobian_det_over_shape(ildj, reduce_shape)
+              reduce_jacobian_det_over_shape(ildj, reduce_shape)
               for ildj in self._inverse_log_det_jacobian(y, **kwargs))
 
         # Make sure the unreduced ILDJ is in the cache.
@@ -1457,7 +1457,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
               'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
               'is implemented. One or the other is required.')
 
-        return self._reduce_jacobian_det_over_shape(ildj, reduce_shape)
+        return reduce_jacobian_det_over_shape(ildj, reduce_shape)
 
   def inverse_log_det_jacobian(self,
                                y,
@@ -1582,7 +1582,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
               'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
               'is implemented. One or the other is required.')
 
-        return self._reduce_jacobian_det_over_shape(-ildj, reduce_shape)
+        return reduce_jacobian_det_over_shape(-ildj, reduce_shape)
 
   def forward_log_det_jacobian(self,
                                x,
@@ -1723,14 +1723,6 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
           return
         with tf.control_dependencies(deps) as deps_scope:
           yield deps_scope
-
-  def _reduce_jacobian_det_over_shape(self, unreduced, reduce_shape):
-    """Reduce LDJ over the rightmost `reduce_shape.ndims` dimensions."""
-    # Broadcast LDJ to the reduce shape (in case of is_constant_jacobian)
-    # and reduce over the trailing dimensions.
-    ones = tf.ones(reduce_shape, unreduced.dtype)
-    reduce_dims = ps.range(-ps.size(reduce_shape), 0)
-    return tf.reduce_sum(ones * unreduced, axis=reduce_dims)
 
   def _parameter_control_dependencies(self, is_init):
     """Returns a list of ops to be executed in members with graph deps.
@@ -2165,6 +2157,17 @@ def ldj_reduction_shape(shape_structure,
                            'LDJ reduction shape.')))
 
     return ldj_reduce_shape, assertions
+
+
+def reduce_jacobian_det_over_shape(unreduced,
+                                   reduce_shape,
+                                   sum_fn=tf.reduce_sum):
+  """Reduce LDJ over the rightmost `reduce_shape.ndims` dimensions."""
+  # Broadcast LDJ to the reduce shape (in case of is_constant_jacobian)
+  # and reduce over the trailing dimensions.
+  ones = tf.ones(reduce_shape, unreduced.dtype)
+  reduce_dims = ps.range(-ps.size(reduce_shape), 0)
+  return sum_fn(ones * unreduced, axis=reduce_dims)
 
 
 def _autodiff_log_det_jacobian(fn, x):
