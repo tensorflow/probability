@@ -24,6 +24,7 @@ from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -114,8 +115,10 @@ class ScaleMatvecDiag(scale_matvec_linear_operator.ScaleMatvecLinearOperator):
 
 
 @ldj_ratio.RegisterILDJRatio(ScaleMatvecDiag)
-def _ildj_ratio_scale_matvec_diag(p, x, q, y):
-  del x, y
-  return tf.math.reduce_sum(tf.math.log(tf.math.abs(q.scale.diag_part())) -
-                            tf.math.log(tf.math.abs(p.scale.diag_part())),
-                            axis=-1)
+def _ildj_ratio_scale_matvec_diag(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
+  del x, y, p_kwargs, q_kwargs
+  return tf.math.reduce_sum(
+      tf.math.log(tf.math.abs(q.scale.diag_part())) -
+      tf.math.log(tf.math.abs(p.scale.diag_part())),
+      axis=-1 - ps.range(event_ndims),
+  )

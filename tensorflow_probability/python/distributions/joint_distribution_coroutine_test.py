@@ -981,6 +981,46 @@ class JointDistributionCoroutineTest(test_util.TestCase):
               event_shapes[i])))
 
   @parameterized.named_parameters(
+      ('_scalar', []),
+      ('_batched', [3]),
+  )
+  def test_default_event_space_bijector_ratio(self, sample_shape):
+
+    def dists():
+      a = yield Root(tfd.Exponential(1., validate_args=True))
+      b = yield tfd.Independent(
+          tfd.Uniform([-1., -2.], a[..., tf.newaxis], validate_args=True), 1)
+      yield tfd.Independent(
+          tfd.Logistic(b, a[..., tf.newaxis], validate_args=True), 1)
+
+    jd = tfd.JointDistributionCoroutine(dists, validate_args=True)
+    joint_bijector = jd.experimental_default_event_space_bijector()
+
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'), 2)
+    x1 = jd.sample(sample_shape, seed=seed1)
+    x2 = jd.sample(sample_shape, seed=seed2)
+    z1 = joint_bijector.inverse(x1)
+    z2 = joint_bijector.inverse(x2)
+    z1, z2 = tf.nest.map_structure(tf.identity, (z1, z2))
+
+    event_ndims = tf.nest.map_structure(len, jd.event_shape)
+    true_fldj_ratio = (
+        joint_bijector.forward_log_det_jacobian(z1, event_ndims) -
+        joint_bijector.forward_log_det_jacobian(z2, event_ndims))
+    self.assertAllClose(
+        true_fldj_ratio,
+        tfp.experimental.bijectors.forward_log_det_jacobian_ratio(
+            joint_bijector, z1, joint_bijector, z2, event_ndims))
+    true_ildj_ratio = (
+        joint_bijector.inverse_log_det_jacobian(x1, event_ndims) -
+        joint_bijector.inverse_log_det_jacobian(x2, event_ndims))
+    self.assertAllClose(
+        true_ildj_ratio,
+        tfp.experimental.bijectors.inverse_log_det_jacobian_ratio(
+            joint_bijector, x1, joint_bijector, x2, event_ndims))
+
+  @parameterized.named_parameters(
       ('_sample', lambda d, **kwargs: d.sample(**kwargs)),
       ('_sample_and_log_prob',
        lambda d, **kwargs: d.experimental_sample_and_log_prob(**kwargs)[0]),

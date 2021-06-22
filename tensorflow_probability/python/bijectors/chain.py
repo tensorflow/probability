@@ -22,7 +22,6 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
-from tensorflow_probability.python.bijectors import ldj_ratio
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 
@@ -184,37 +183,3 @@ Chain.__doc__ = _Chain.__doc__ + '\n' + (
     'of `bijectors` is not a `CompositeTensor`, then a non-`CompositeTensor` '
     '`_Chain` instance is created instead. Bijector subclasses that inherit '
     'from `Chain` will also inherit from `CompositeTensor`.')
-
-
-@ldj_ratio.RegisterFLDJRatio(_Chain)
-def _fldj_ratio_chain(p, x, q, y):
-  """Sum-of-diffs FLDJRatio for Chains."""
-  if len(p.bijectors) != len(q.bijectors):
-    raise ValueError('Mismatched lengths of bijectors: `p` has '
-                     f'{len(p.bijectors)} but `q` has {len(q.bijectors)}.')
-  ratios = []
-  max_shp = []
-  for p, q in zip(reversed(p.bijectors), reversed(q.bijectors)):
-    ratios.append(ldj_ratio.forward_log_det_jacobian_ratio(
-        p, x, q, y, p.forward_min_event_ndims))
-    max_shp = ps.broadcast_shape(max_shp, ps.shape(ratios[-1]))
-    x, y = p.forward(x), q.forward(y)
-  ratios = [tf.broadcast_to(r, max_shp) for r in ratios]
-  return tf.add_n(ratios)
-
-
-@ldj_ratio.RegisterILDJRatio(_Chain)
-def _ildj_ratio_chain(p, x, q, y):
-  """Sum-of-diffs ILDJRatio for Chains."""
-  if len(p.bijectors) != len(q.bijectors):
-    raise ValueError('Mismatched lengths of bijectors: `p` has '
-                     f'{len(p.bijectors)} but `q` has {len(q.bijectors)}.')
-  ratios = []
-  max_shp = []
-  for p, q in zip(p.bijectors, q.bijectors):
-    ratios.append(ldj_ratio.inverse_log_det_jacobian_ratio(
-        p, x, q, y, p.inverse_min_event_ndims))
-    max_shp = ps.broadcast_shape(max_shp, ps.shape(ratios[-1]))
-    x, y = p.inverse(x), q.inverse(y)
-  ratios = [tf.broadcast_to(r, max_shp) for r in ratios]
-  return tf.add_n(ratios)

@@ -36,18 +36,29 @@ class LdjRatioTest(test_util.TestCase):
         tfeb.inverse_log_det_jacobian_ratio(
             tfb.Scale(3.), 0., tfb.Scale(-2.), 0., event_ndims=0))
 
+  def test_scale_2d(self):
+    x = tf.zeros([3, 2])
+    self.assertAllClose(
+        2 * (np.log(3.) - np.log(2.)),
+        tfeb.forward_log_det_jacobian_ratio(
+            tfb.Scale(3.), x, tfb.Scale(-2.), x, event_ndims=1))
+    self.assertAllClose(
+        2 * (np.log(2.) - np.log(3.)),
+        tfeb.inverse_log_det_jacobian_ratio(
+            tfb.Scale(3.), x, tfb.Scale(-2.), x, event_ndims=1))
+
   def test_scale_matvec_diag(self):
     z = tf.zeros([2])
     self.assertAllClose(
         (np.log([3., 2]) - np.log([2., 7])).sum(),
         tfeb.forward_log_det_jacobian_ratio(
             tfb.ScaleMatvecDiag([3., 2]), z, tfb.ScaleMatvecDiag([-2., 7]), z,
-            event_ndims=0))
+            event_ndims=1))
     self.assertAllClose(
         (np.log([2., 7]) - np.log([3., 2])).sum(),
         tfeb.inverse_log_det_jacobian_ratio(
             tfb.ScaleMatvecDiag([3., 2]), z, tfb.ScaleMatvecDiag([-2., 7]), z,
-            event_ndims=0))
+            event_ndims=1))
 
   def test_exp(self):
     b = tfb.Exp()

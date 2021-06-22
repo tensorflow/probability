@@ -75,7 +75,6 @@ multi_substrate_py_library(
         ":joint_map",
         ":kumaraswamy_cdf",
         ":lambertw_transform",
-        ":ldj_ratio",
         ":masked_autoregressive",
         ":matrix_inverse_tril",
         ":moyal_cdf",
@@ -121,6 +120,7 @@ multi_substrate_py_library(
         "bijector.py",
         "chain.py",
         "composition.py",
+        "ldj_ratio.py",
     ],
     deps = [
         # numpy dep,
@@ -265,11 +265,11 @@ multi_substrate_py_library(
     name = "scale_matvec_diag",
     srcs = ["scale_matvec_diag.py"],
     deps = [
-        ":ldj_ratio",
         ":scale_matvec_linear_operator",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
@@ -601,14 +601,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "ldj_ratio",
-    srcs = ["ldj_ratio.py"],
-    deps = [
-        # tensorflow dep,
     ],
 )
 

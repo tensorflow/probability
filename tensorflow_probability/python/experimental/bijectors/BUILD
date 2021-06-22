@@ -39,7 +39,6 @@ multi_substrate_py_library(
         ":highway_flow",
         ":scalar_function_with_inferred_inverse",
         ":sharded",
-        "//tensorflow_probability/python/bijectors:ldj_ratio",
     ],
 )
 
