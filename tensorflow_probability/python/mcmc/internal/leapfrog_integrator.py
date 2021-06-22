@@ -104,8 +104,6 @@ class SimpleLeapfrogIntegrator(LeapfrogIntegrator):
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
   from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
-  tf.enable_v2_behavior()
-
   dims = 10
   dtype = tf.float32
 

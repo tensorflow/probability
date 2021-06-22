@@ -1010,6 +1010,5 @@ def constraint_for(bijector_name=None, param=None):
 
 
 if __name__ == '__main__':
-  tf.enable_v2_behavior()
   np.set_printoptions(floatmode='unique', precision=None)
   tf.test.main()

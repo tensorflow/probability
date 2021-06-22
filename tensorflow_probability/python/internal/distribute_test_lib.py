@@ -19,7 +19,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import test_util
 
-tf.enable_v2_behavior()
 JAX_MODE = False
 NUMPY_MODE = False
 NUM_DEVICES = 4
