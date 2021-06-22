@@ -104,7 +104,7 @@ class AutoGraphFrontendTest(test_util.TestCase):
         return even(n - 1)
 
     inputs = np.array([5, 6, 8, 9], dtype=np.int32)
-    outputs = np.array([False, True, True, False], dtype=np.bool)
+    outputs = np.array([False, True, True, False], dtype=np.bool_)
     # pylint: disable=unexpected-keyword-arg
     # The `max_stack_depth` and `backend` keyword arguments to `even`
     # are introduced by the `@ab.batch` decorator, confusing pylint.

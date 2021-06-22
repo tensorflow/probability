@@ -569,6 +569,6 @@ def minimize(grad_and_hessian_loss_fn,
         body=_loop_body,
         loop_vars=[
             x_start,
-            tf.zeros([], np.bool, name='converged'),
+            tf.zeros([], np.bool_, name='converged'),
             tf.zeros([], np.int32, name='iter'),
         ])

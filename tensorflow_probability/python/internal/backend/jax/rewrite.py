@@ -53,7 +53,7 @@ def main(argv):
   else:
     contents = contents.replace('\nimport numpy as np',
                                 '\nimport numpy as np; onp = np')
-  contents = contents.replace('np.bool', 'onp.bool')
+  contents = contents.replace('np.bool_', 'onp.bool_')
   contents = contents.replace('np.dtype', 'onp.dtype')
   contents = contents.replace('np.generic', 'onp.generic')
 

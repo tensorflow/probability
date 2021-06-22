@@ -176,7 +176,7 @@ def _infer_dtype(value, default_dtype):
     # Duck-typing onp types
     return value.dtype
   elif isinstance(value, bool):
-    return np.bool
+    return np.bool_
   elif isinstance(value, six.integer_types):
     return np.int32
   elif isinstance(value, float):
@@ -285,7 +285,7 @@ def _default_convert_to_tensor_with_dtype(value, dtype,
   elif isinstance(value, bool):
     # Bool check needs to happen before int check because bools are instances of
     # int.
-    dtype_compatible = (dtype == np.bool or np.issubdtype(dtype, np.integer)
+    dtype_compatible = (dtype == np.bool_ or np.issubdtype(dtype, np.integer)
                         or np.issubdtype(dtype, np.floating))
     if not dtype_compatible:
       if error_if_mismatch:
@@ -297,7 +297,7 @@ def _default_convert_to_tensor_with_dtype(value, dtype,
       raise MixedTypesError()
     if dtype == np.int32 and _is_int64(value):
       raise _Int64ToInt32Error(np.array(value, dtype=dtype))
-    if dtype == np.bool:
+    if dtype == np.bool_:
       # Can't downcast an int to a bool
       raise TypeConversionError(value, dtype)
   elif isinstance(value, float):

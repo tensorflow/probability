@@ -76,13 +76,13 @@ class DirichletTest(test_util.TestCase):
     dist = tfd.Dirichlet(concentration, validate_args=True)
     log_prob = self.evaluate(dist.log_prob(x))
     self.assertAllEqual(
-        np.ones_like(log_prob, dtype=np.bool), np.isfinite(log_prob))
+        np.ones_like(log_prob, dtype=np.bool_), np.isfinite(log_prob))
 
     # Test when concentration[k] = 1., and x is zero at various dimensions.
     dist = tfd.Dirichlet(10 * [1.])
     log_prob = self.evaluate(dist.log_prob(x))
     self.assertAllEqual(
-        np.ones_like(log_prob, dtype=np.bool), np.isfinite(log_prob))
+        np.ones_like(log_prob, dtype=np.bool_), np.isfinite(log_prob))
 
   def testPdfOnBoundaryWhenAlphaGreaterThanOne(self):
     dist = tfd.Dirichlet(9 * [2.])

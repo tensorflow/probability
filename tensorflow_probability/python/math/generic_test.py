@@ -249,15 +249,15 @@ class SoftplusInverseTest(test_util.TestCase):
     self.assertAllCloseAccordingToType(
         np_features, tf_softplus_inverse,
         atol=0., rtol=rtol)
-    self.assertAllEqual(np.ones_like(tf_softplus).astype(np.bool),
+    self.assertAllEqual(np.ones_like(tf_softplus).astype(np.bool_),
                         tf_softplus > 0)
 
     self.assertShapeEqual(np_softplus, softplus)
     self.assertShapeEqual(np_softplus, softplus_inverse)
 
-    self.assertAllEqual(np.ones_like(tf_softplus).astype(np.bool),
+    self.assertAllEqual(np.ones_like(tf_softplus).astype(np.bool_),
                         np.isfinite(tf_softplus))
-    self.assertAllEqual(np.ones_like(tf_softplus_inverse).astype(np.bool),
+    self.assertAllEqual(np.ones_like(tf_softplus_inverse).astype(np.bool_),
                         np.isfinite(tf_softplus_inverse))
 
   @test_util.numpy_disable_gradient_test  # TODO(sharadmv): fix Numpy test
@@ -321,7 +321,7 @@ class SoftplusInverseTest(test_util.TestCase):
     _, grads = self.evaluate(tfp.math.value_and_gradient(
         tfp.math.softplus_inverse, x))
     # Equivalent to `assertAllFalse` (if it existed).
-    self.assertAllEqual(np.zeros_like(grads).astype(np.bool), np.isnan(grads))
+    self.assertAllEqual(np.zeros_like(grads).astype(np.bool_), np.isnan(grads))
 
   @test_util.numpy_disable_gradient_test
   def testInverseSoftplusGradientFinite(self):
@@ -332,7 +332,7 @@ class SoftplusInverseTest(test_util.TestCase):
         tfp.math.softplus_inverse, x))
     # Equivalent to `assertAllTrue` (if it existed).
     self.assertAllEqual(
-        np.ones_like(grads).astype(np.bool), np.isfinite(grads))
+        np.ones_like(grads).astype(np.bool_), np.isfinite(grads))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -552,7 +552,7 @@ class LogCoshTest(test_util.TestCase):
     # Check that the computation succeeds over a large range of values.
     x = np.logspace(10., 20., 100)
     self.assertAllEqual(
-        np.zeros(x.shape, dtype=np.bool),
+        np.zeros(x.shape, dtype=np.bool_),
         self.evaluate(tf.math.is_inf(tfp.math.log_cosh(x))))
 
   def testLogCosh(self):

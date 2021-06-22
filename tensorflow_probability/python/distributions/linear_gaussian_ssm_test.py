@@ -744,7 +744,7 @@ class _MissingObservationsTests(test_util.TestCase):
         [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
     observed_time_series_ = observed_time_series_[..., np.newaxis]
     observation_mask_ = np.array(
-        [False, False, True, False, True, True, False, True]).astype(np.bool)
+        [False, False, True, False, True, True, False, True]).astype(np.bool_)
 
     # Pass inputs with dynamic shape. Ideally we would run all tests with
     # both static and dynamic shape, but since LGSSM tests are unusually
@@ -842,7 +842,7 @@ class _MissingObservationsTests(test_util.TestCase):
            np.nan, 1000., 4.2, np.inf]).astype(np.float32)
       observed_time_series = observed_time_series[..., np.newaxis]
       observation_mask = np.array(
-          [False, False, True, False, True, True, False, True]).astype(np.bool)
+          [False, False, True, False, True, True, False, True]).astype(np.bool_)
 
       # Check that we've avoided the NaN-gradient gotcha described in
       # https://stackoverflow.com/questions/33712178/tensorflow-nan-bug/42497444#42497444
@@ -946,7 +946,7 @@ class _MissingObservationsTests(test_util.TestCase):
 
     observed_time_series = np.arange(8, dtype=np.float32)[..., np.newaxis]
     observation_mask = np.array(
-        [False, False, True, False, True, True, False, True]).astype(np.bool)
+        [False, False, True, False, True, True, False, True]).astype(np.bool_)
 
     _, _, _, _, _, _, model = self.make_model()
     _, _, _, _, _, _, model_with_mask = self.make_model(mask=observation_mask)

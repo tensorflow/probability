@@ -41,7 +41,7 @@ class HalfNormalTest(test_util.TestCase):
 
   def assertAllFinite(self, array):
     is_finite = np.isfinite(array)
-    all_true = np.ones_like(is_finite, dtype=np.bool)
+    all_true = np.ones_like(is_finite, dtype=np.bool_)
     self.assertAllEqual(all_true, is_finite)
 
   def assertRaisesError(self, msg):

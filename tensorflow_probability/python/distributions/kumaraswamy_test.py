@@ -322,8 +322,8 @@ class KumaraswamyTest(test_util.TestCase):
       b = 10. * np.random.random(shape).astype(dt)
       x = np.random.random(shape).astype(dt)
       actual = self.evaluate(tfd.Kumaraswamy(a, b, validate_args=True).cdf(x))
-      self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
-      self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
+      self.assertAllEqual(np.ones(shape, dtype=np.bool_), 0. <= x)
+      self.assertAllEqual(np.ones(shape, dtype=np.bool_), 1. >= x)
       self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual)
 
   def testKumaraswamyLogCdf(self):
@@ -334,8 +334,8 @@ class KumaraswamyTest(test_util.TestCase):
       x = np.random.random(shape).astype(dt)
       actual = self.evaluate(
           tf.exp(tfd.Kumaraswamy(a, b, validate_args=True).log_cdf(x)))
-      self.assertAllEqual(np.ones(shape, dtype=np.bool), 0. <= x)
-      self.assertAllEqual(np.ones(shape, dtype=np.bool), 1. >= x)
+      self.assertAllEqual(np.ones(shape, dtype=np.bool_), 0. <= x)
+      self.assertAllEqual(np.ones(shape, dtype=np.bool_), 1. >= x)
       self.assertAllClose(_kumaraswamy_cdf(a, b, x), actual)
 
   def testPdfAtBoundary(self):

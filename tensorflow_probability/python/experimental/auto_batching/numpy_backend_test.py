@@ -71,7 +71,7 @@ class NumpyVariableTest(tfp_test_util.TestCase, backend_test.VariableTestCase):
     value_shape = data.draw(hpnp.array_shapes(min_dims=1))
     batch_size = value_shape[0]
     dtype = data.draw(hpnp.scalar_dtypes())
-    masks = hpnp.arrays(dtype=np.bool, shape=[batch_size])
+    masks = hpnp.arrays(dtype=np.bool_, shape=[batch_size])
     values = hpnp.arrays(dtype, value_shape)
     init_val = data.draw(values)
     ops = data.draw(

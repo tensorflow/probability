@@ -393,7 +393,7 @@ class NumpyBackend(object):
   def full_mask(self, size, name=None):
     """Returns an all-True mask `np.ndarray` with shape `[size]`."""
     del name
-    return np.ones(size, dtype=np.bool)
+    return np.ones(size, dtype=np.bool_)
 
   def broadcast_to_shape_of(self, val, target, name=None):
     """Broadcasts val to the shape of target.
