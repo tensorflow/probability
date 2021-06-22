@@ -104,7 +104,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "joint_distribution_test",
-    size = "medium",
+    size = "large",
     srcs = ["joint_distribution_test.py"],
     disabled_substrates = ["numpy"],
     python_version = "PY3",
