@@ -25,9 +25,8 @@ from tensorflow_probability.python.distributions import mvn_linear_operator
 def make_backoff_choleksy(alternate_cholesky, name='BackoffCholesky'):
   """Make a function that tries Cholesky then the user-specified function.
 
-  Note this will NOT work under a gradient tape until b/177365178 is resolved.
-  Also this uses XLA compilation, which is necessary until b/144845034 is
-  resolved.
+  Warning: This function uses an XLA-compiled `tf.linalg.cholesky` to capture
+  factorization failures.
 
   Args:
     alternate_cholesky: A callable with the same signature as
