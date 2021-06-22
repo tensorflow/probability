@@ -110,8 +110,6 @@ class PixelCNN(distribution.Distribution):
   tfk = tf.keras
   tfkl = tf.keras.layers
 
-  tf.enable_v2_behavior()
-
   # Load MNIST from tensorflow_datasets
   data = tfds.load('mnist')
   train_data, test_data = data['train'], data['test']

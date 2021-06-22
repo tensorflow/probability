@@ -96,8 +96,6 @@ class SliceSampler(kernel_base.TransitionKernel):
   import tensorflow_probability as tfp
   import numpy as np
 
-  tf.enable_v2_behavior()
-
   dtype = np.float32
 
   target = tfd.Normal(loc=dtype(0), scale=dtype(1))
@@ -132,8 +130,6 @@ class SliceSampler(kernel_base.TransitionKernel):
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
   import numpy as np
-
-  tf.enable_v2_behavior()
 
   dtype = np.float32
   true_mean = dtype([0, 0])

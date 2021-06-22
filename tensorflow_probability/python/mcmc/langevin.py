@@ -93,8 +93,6 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   import numpy as np
   import matplotlib.pyplot as plt
 
-  tf.enable_v2_behavior()
-
   tfd = tfp.distributions
   dtype = np.float32
 
@@ -139,8 +137,6 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
   import numpy as np
-
-  tf.enable_v2_behavior()
 
   dtype = np.float32
   true_mean = dtype([0, 0, 0])

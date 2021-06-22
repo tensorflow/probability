@@ -221,8 +221,6 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   import numpy as np
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
-  tf.enable_v2_behavior()
-
   tfd = tfp.distributions
 
   dtype = np.float32
@@ -253,8 +251,6 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   import numpy as np
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
-  tf.enable_v2_behavior()
-
   tfd = tfp.distributions
 
   dtype = np.float32
@@ -304,8 +300,6 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
   import numpy as np
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
-  tf.enable_v2_behavior()
-
   tfd = tfp.distributions
 
   dtype = np.float32

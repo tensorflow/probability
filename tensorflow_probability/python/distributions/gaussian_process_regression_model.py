@@ -194,8 +194,6 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
 
-  tf.enable_v2_behavior()
-
   tfb = tfp.bijectors
   tfd = tfp.distributions
   psd_kernels = tfp.math.psd_kernels

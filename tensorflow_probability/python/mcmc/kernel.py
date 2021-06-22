@@ -44,7 +44,6 @@ class TransitionKernel(object):
   ```python
   from tensorflow_probability.python.mcmc import kernel as kernel_base
   import tensorflow.compat.v2 as tf
-  tf.enable_v2_behavior()
   import tensorflow_probability as tfp
 
   tfd = tfp.distributions

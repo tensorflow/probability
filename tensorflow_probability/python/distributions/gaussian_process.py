@@ -176,8 +176,6 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
   import tensorflow.compat.v2 as tf
   import tensorflow_probability as tfp
 
-  tf.enable_v2_behavior()
-
   tfd = tfp.distributions
   psd_kernels = tfp.math.psd_kernels
 
