@@ -27,6 +27,7 @@ from oryx.core.interpreters import unzip
 from tensorflow_probability.substrates import jax as tfp
 
 tfd = tfp.distributions
+tfed = tfp.experimental.distribute
 
 InverseAndILDJ = inverse.core.InverseAndILDJ
 
@@ -60,8 +61,11 @@ def _sample_distribution(key, dist):
 
 @ppl.random_variable.register(tfd.Distribution)
 def distribution_random_variable(dist: tfd.Distribution, *,
-                                 name: Optional[str] = None):
+                                 name: Optional[str] = None,
+                                 plate: Optional[str] = None):
   """Converts a distribution into a sampling function."""
+  if plate is not None:
+    dist = tfed.Sharded(dist, plate)
   def wrapped(key):
     def sample(key):
       result = primitive.initial_style_bind(
