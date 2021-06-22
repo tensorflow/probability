@@ -19,51 +19,63 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import jax
 from jax import random
-import jax.numpy as np
-import numpy as onp
+import jax.numpy as jnp
+import numpy as np
 
 from oryx import core
-from oryx import distributions as bd
+from oryx import distributions
 from oryx.core import ppl
 from oryx.internal import test_util
 
+from tensorflow_probability.substrates import jax as tfp
+
+del distributions  # only needed registering distributions with transformations
+
+tfd = tfp.distributions
 
 # Use lambdas to defer construction of distributions
 # pylint: disable=g-long-lambda
 DISTRIBUTIONS = [
-    ('normal_scalar_args', bd.Normal, lambda: (0., 1.), lambda: {},
-     0., [0., 1.]),
-    ('normal_scalar_kwargs', bd.Normal, lambda: (),
-     lambda: {'loc': 0., 'scale': 1.}, 0., [0., 1.]),
-    ('mvn_diag_args', bd.MultivariateNormalDiag,
-     lambda: (onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)),
-     lambda: {},
-     onp.zeros(5, dtype=onp.float32),
-     [onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)]),
-    ('mvn_diag_kwargs', bd.MultivariateNormalDiag, lambda: (),
-     lambda: {'loc': onp.zeros(5, dtype=onp.float32),
-              'scale_diag': onp.ones(5, dtype=onp.float32)},
-     onp.zeros(5, dtype=onp.float32),
-     [onp.zeros(5, dtype=onp.float32),
-      onp.ones(5, dtype=onp.float32)]),
-    ('independent_normal_args', bd.Independent, lambda: (bd.Normal(
-        onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)),),
-     lambda: {'reinterpreted_batch_ndims': 1}, onp.zeros(5, dtype=onp.float32),
-     [onp.zeros(5, dtype=onp.float32),
-      onp.ones(5, dtype=onp.float32)]),
-    ('independent_normal_args2', bd.Independent, lambda: (bd.Normal(
-        loc=onp.zeros(5, dtype=onp.float32),
-        scale=onp.ones(5, dtype=onp.float32)),), lambda: {
-            'reinterpreted_batch_ndims': 1
-        }, onp.zeros(5, dtype=onp.float32),
-     [onp.zeros(5, dtype=onp.float32),
-      onp.ones(5, dtype=onp.float32)]),
-    ('independent_normal_kwargs', bd.Independent, lambda: (), lambda: {
-        'reinterpreted_batch_ndims': 1,
-        'distribution': bd.Normal(onp.zeros(5, dtype=onp.float32),
-                                  onp.ones(5, dtype=onp.float32))},
-     onp.zeros(5, dtype=onp.float32),
-     [onp.zeros(5, dtype=onp.float32), onp.ones(5, dtype=onp.float32)]),
+    ('normal_scalar_args', tfd.Normal, lambda:
+     (0., 1.), lambda: {}, 0., [0., 1.]),
+    ('normal_scalar_kwargs', tfd.Normal, lambda: (), lambda: {
+        'loc': 0.,
+        'scale': 1.
+    }, 0., [0., 1.]),
+    ('mvn_diag_args', tfd.MultivariateNormalDiag, lambda:
+     (np.zeros(5, dtype=np.float32), np.ones(5, dtype=np.float32)), lambda: {},
+     np.zeros(5, dtype=np.float32),
+     [np.zeros(5, dtype=np.float32),
+      np.ones(5, dtype=np.float32)]),
+    ('mvn_diag_kwargs', tfd.MultivariateNormalDiag, lambda: (), lambda: {
+        'loc': np.zeros(5, dtype=np.float32),
+        'scale_diag': np.ones(5, dtype=np.float32)
+    }, np.zeros(5, dtype=np.float32),
+     [np.zeros(5, dtype=np.float32),
+      np.ones(5, dtype=np.float32)]),
+    ('independent_normal_args', tfd.Independent, lambda:
+     (tfd.Normal(np.zeros(5, dtype=np.float32), np.ones(5, dtype=np.float32)),),
+     lambda: {
+         'reinterpreted_batch_ndims': 1
+     }, np.zeros(5, dtype=np.float32),
+     [np.zeros(5, dtype=np.float32),
+      np.ones(5, dtype=np.float32)]),
+    ('independent_normal_args2', tfd.Independent, lambda: (tfd.Normal(
+        loc=np.zeros(5, dtype=np.float32), scale=np.ones(5, dtype=np.float32)
+    ),), lambda: {
+        'reinterpreted_batch_ndims': 1
+    }, np.zeros(5, dtype=np.float32),
+     [np.zeros(5, dtype=np.float32),
+      np.ones(5, dtype=np.float32)]),
+    ('independent_normal_kwargs', tfd.Independent, lambda: (), lambda: {
+        'reinterpreted_batch_ndims':
+            1,
+        'distribution':
+            tfd.Normal(
+                np.zeros(5, dtype=np.float32), np.ones(5, dtype=np.float32))
+    }, np.zeros(5, dtype=np.float32),
+     [np.zeros(5, dtype=np.float32),
+      np.ones(5, dtype=np.float32)]),
 ]
 
 
@@ -94,7 +106,7 @@ class DistributionsExtensionsTest(test_util.TestCase):
     flat_p, _ = jax.tree_flatten(p)
     self.assertEqual(len(flat_p), len(flat))
     for e1, e2 in zip(flat_p, flat):
-      onp.testing.assert_allclose(e1, e2)
+      np.testing.assert_allclose(e1, e2)
 
   @parameterized.named_parameters(DISTRIBUTIONS)
   def test_log_prob_transformation(self, dist, args, kwargs, out, flat):
@@ -127,8 +139,8 @@ class DistributionsExtensionsTest(test_util.TestCase):
 
     def model(key):
       k1, k2 = random.split(key)
-      z = ppl.random_variable(bd.Normal(0., 1.), name='z')(k1)
-      x = ppl.random_variable(bd.Normal(z, 1.), name='x')(k2)
+      z = ppl.random_variable(tfd.Normal(0., 1.), name='z')(k1)
+      x = ppl.random_variable(tfd.Normal(z, 1.), name='x')(k2)
       return x
 
     with self.assertRaises(ValueError):
@@ -139,31 +151,31 @@ class DistributionsExtensionsTest(test_util.TestCase):
             'z': 1.,
             'x': 2.
         }),
-        bd.Normal(0., 1.).log_prob(1.) + bd.Normal(1., 1.).log_prob(2.))
+        tfd.Normal(0., 1.).log_prob(1.) + tfd.Normal(1., 1.).log_prob(2.))
 
   def test_eight_schools(self):
-    treatment_stddevs = np.array([15, 10, 16, 11, 9, 11, 10, 18],
-                                 dtype=np.float32)
+    treatment_stddevs = jnp.array([15, 10, 16, 11, 9, 11, 10, 18],
+                                  dtype=jnp.float32)
 
     def eight_schools(key):
       ae_key, as_key, se_key, te_key = random.split(key, 4)
       avg_effect = ppl.random_variable(
-          bd.Normal(loc=0., scale=10.), name='avg_effect')(
+          tfd.Normal(loc=0., scale=10.), name='avg_effect')(
               ae_key)
       avg_stddev = ppl.random_variable(
-          bd.Normal(loc=5., scale=1.), name='avg_stddev')(
+          tfd.Normal(loc=5., scale=1.), name='avg_stddev')(
               as_key)
       school_effects_standard = ppl.random_variable(
-          bd.Independent(
-              bd.Normal(loc=np.zeros(8), scale=np.ones(8)),
+          tfd.Independent(
+              tfd.Normal(loc=jnp.zeros(8), scale=jnp.ones(8)),
               reinterpreted_batch_ndims=1),
           name='se_standard')(
               se_key)
       treatment_effects = ppl.random_variable(
-          bd.Independent(
-              bd.Normal(
-                  loc=(avg_effect[..., np.newaxis] +
-                       np.exp(avg_stddev[..., np.newaxis]) *
+          tfd.Independent(
+              tfd.Normal(
+                  loc=(avg_effect[..., jnp.newaxis] +
+                       jnp.exp(avg_stddev[..., jnp.newaxis]) *
                        school_effects_standard),
                   scale=treatment_stddevs),
               reinterpreted_batch_ndims=1),
@@ -183,14 +195,14 @@ class DistributionsExtensionsTest(test_util.TestCase):
         dim_in = x.shape[-1]
         w_key, b_key = random.split(key)
         w = ppl.random_variable(
-            bd.Sample(bd.Normal(0., 1.), sample_shape=(dim_out, dim_in)),
+            tfd.Sample(tfd.Normal(0., 1.), sample_shape=(dim_out, dim_in)),
             name=f'{name}_w')(
                 w_key)
         b = ppl.random_variable(
-            bd.Sample(bd.Normal(0., 1.), sample_shape=(dim_out,)),
+            tfd.Sample(tfd.Normal(0., 1.), sample_shape=(dim_out,)),
             name=f'{name}_b')(
                 b_key)
-        return np.dot(w, x) + b
+        return jnp.dot(w, x) + b
 
       return forward
 
@@ -211,12 +223,34 @@ class DistributionsExtensionsTest(test_util.TestCase):
       def forward(key, x):
         k1, k2 = random.split(key)
         logits = mlp(k1, x)
-        return bd.Categorical(logits=logits).sample(seed=k2, name='y')
+        return tfd.Categorical(logits=logits).sample(seed=k2, name='y')
 
       return forward
 
     sample = ppl.joint_sample(predict(mlp(200, 2)))
-    core.log_prob(sample)(sample(random.PRNGKey(0), np.ones(784)), np.ones(784))
+    core.log_prob(sample)(sample(random.PRNGKey(0), jnp.ones(784)),
+                          jnp.ones(784))
+
+  def test_plate_produces_independent_samples(self):
+
+    model = ppl.rv(tfd.Normal(0., 1.), plate='foo')
+    out = jax.vmap(
+        lambda _, key: model(key), in_axes=(0, None),
+        axis_name='foo')(jnp.ones(3), random.PRNGKey(0))
+    for i in range(3):
+      for j in range(3):
+        if i == j:
+          continue
+        self.assertNotAlmostEqual(out[i], out[j])
+
+  def test_plate_reduces_over_named_axes(self):
+
+    model = ppl.rv(tfd.Normal(0., 1.), plate='foo')
+    out = jax.vmap(
+        ppl.log_prob(model), axis_name='foo', out_axes=None)(
+            jnp.arange(3.))
+    np.testing.assert_allclose(
+        tfd.Normal(0., 1.).log_prob(jnp.arange(3.)).sum(), out)
 
 
 if __name__ == '__main__':

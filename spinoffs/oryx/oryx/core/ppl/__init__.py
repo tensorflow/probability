@@ -23,6 +23,7 @@ from oryx.core.ppl.transformations import joint_sample
 from oryx.core.ppl.transformations import log_prob
 from oryx.core.ppl.transformations import LogProbFunction
 from oryx.core.ppl.transformations import nest
+from oryx.core.ppl.transformations import plate
 from oryx.core.ppl.transformations import Program
 from oryx.core.ppl.transformations import random_variable
 from oryx.core.ppl.transformations import RANDOM_VARIABLE

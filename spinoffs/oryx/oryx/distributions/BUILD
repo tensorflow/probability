@@ -61,5 +61,6 @@ py_test(
         "//oryx/core",
         "//oryx/core/ppl",
         "//oryx/internal:test_util",
+        # tensorflow_probability/substrates:jax dep,
     ],
 )

@@ -25,6 +25,7 @@ py_library(
     srcs = ["transformations.py"],
     srcs_version = "PY3",
     deps = [
+        ":plate_util",
         # jax dep,
         "//oryx/core:primitive",
         "//oryx/core/interpreters:harvest",
@@ -37,8 +38,19 @@ py_library(
     name = "ppl",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
+    deps = [":transformations"],
+)
+
+# pytype_strict
+py_library(
+    name = "plate_util",
+    srcs = ["plate_util.py"],
+    srcs_version = "PY3",
     deps = [
-        ":transformations",
+        # jax dep,
+        "//oryx/core:primitive",
+        "//oryx/core/interpreters:log_prob",
+        "//oryx/core/interpreters:propagate",
     ],
 )
 
@@ -52,7 +64,9 @@ py_test(
         ":transformations",
         # absl/testing:absltest dep,
         # jax dep,
+        # numpy dep,
         "//oryx/core/interpreters:log_prob",
         "//oryx/internal:test_util",
+        # tensorflow_probability/substrates:jax dep,
     ],
 )

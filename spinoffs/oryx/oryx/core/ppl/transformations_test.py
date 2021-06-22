@@ -15,23 +15,31 @@
 # Lint as: python3
 """Tests for tensorflow_probability.spinoffs.oryx.core.ppl.transformations."""
 from absl.testing import absltest
+
+import jax
 from jax import abstract_arrays
 from jax import core as jax_core
 from jax import random
-import jax.numpy as np
+from jax.interpreters import batching
+import jax.numpy as jnp
+import numpy as np
 
 from oryx.core.interpreters import log_prob as lp
 from oryx.core.ppl import transformations
 from oryx.internal import test_util
+from tensorflow_probability.substrates import jax as tfp
+
+tfd = tfp.distributions
 
 seed = random.PRNGKey
 block = transformations.block
 conditional = transformations.conditional
 graph_replace = transformations.graph_replace
+intervene = transformations.intervene
 joint_log_prob = transformations.joint_log_prob
 joint_sample = transformations.joint_sample
 log_prob = transformations.log_prob
-intervene = transformations.intervene
+plate = transformations.plate
 random_variable = transformations.random_variable
 
 # Define a random normal primitive so we can register it with the `log_prob`
@@ -39,29 +47,38 @@ random_variable = transformations.random_variable
 random_normal_p = jax_core.Primitive('random_normal')
 
 
-def random_normal(key):
-  return random_normal_p.bind(key)
+def random_normal(key, batch_ndims=0):
+  return random_normal_p.bind(key, batch_ndims=batch_ndims)
 
 
-def random_normal_impl(rng):
-  return random.normal(rng)
+def random_normal_impl(rng, *, batch_ndims):
+  sample = random.normal
+  for _ in range(batch_ndims):
+    sample = jax.vmap(sample)
+  return sample(rng)
 
 
-def random_normal_abstract(_):
-  return abstract_arrays.ShapedArray((), np.float32)
+def random_normal_abstract(key, **_):
+  del key
+  return abstract_arrays.ShapedArray((), jnp.float32)
 
 
-def random_normal_log_prob(x):
-  return -0.5 * np.log(2 * np.pi) - 0.5 * x**2
-
-
-def random_normal_log_prob_rule(incells, outcells):
+def random_normal_log_prob_rule(incells, outcells, *, batch_ndims, **_):
   outcell, = outcells
   if not outcell.top():
     return incells, outcells, None
   x = outcell.val
-  return incells, outcells, random_normal_log_prob(x)
+  return incells, outcells, tfd.Independent(tfd.Normal(0., 1.),
+                                            batch_ndims).log_prob(x)
 
+
+def random_normal_batch_rule(args, _, *, batch_ndims):
+  keys, = args
+  out = random_normal_p.bind(keys, batch_ndims=batch_ndims + 1)
+  return out, 0
+
+
+batching.primitive_batchers[random_normal_p] = random_normal_batch_rule
 
 random_normal_p.def_impl(random_normal_impl)
 random_normal_p.def_abstract_eval(random_normal_abstract)
@@ -208,7 +225,7 @@ class LogProbTest(test_util.TestCase):
     def model(key):
       return random_normal(key)
 
-    self.assertEqual(log_prob(model)(0.1), random_normal_log_prob(0.1))
+    self.assertEqual(log_prob(model)(0.1), tfd.Normal(0., 1.).log_prob(0.1))
 
   def test_log_prob_should_fail_on_model_with_latents(self):
 
@@ -233,14 +250,14 @@ class LogProbTest(test_util.TestCase):
             'z': 1.,
             'x': 1.
         }),
-        random_normal_log_prob(1.) + random_normal_log_prob(0.))
+        tfd.Normal(0., 1.).log_prob(1.) + tfd.Normal(0., 1.).log_prob(0.))
 
     self.assertEqual(
         joint_log_prob(model)({
             'z': 1.,
             'x': 1.
         }),
-        random_normal_log_prob(1.) + random_normal_log_prob(0.))
+        tfd.Normal(0., 1.).log_prob(1.) + tfd.Normal(0., 1.).log_prob(0.))
 
   def test_log_prob_should_work_with_nondependent_latents(self):
 
@@ -252,7 +269,9 @@ class LogProbTest(test_util.TestCase):
 
     limited_model = lambda key: model(key)['z']
 
-    self.assertEqual(log_prob(limited_model)(1.), random_normal_log_prob(1.))
+    self.assertEqual(
+        log_prob(limited_model)(1.),
+        tfd.Normal(0., 1.).log_prob(1.))
 
   def test_intervened_log_prob(self):
 
@@ -263,7 +282,9 @@ class LogProbTest(test_util.TestCase):
 
     intervened_model = intervene(model, z=1.)
 
-    self.assertEqual(log_prob(intervened_model)(1.), random_normal_log_prob(0.))
+    self.assertEqual(
+        log_prob(intervened_model)(1.),
+        tfd.Normal(0., 1.).log_prob(0.))
 
   def test_conditional_log_prob(self):
 
@@ -275,7 +296,8 @@ class LogProbTest(test_util.TestCase):
     conditioned_model = conditional(model, 'z')
 
     self.assertEqual(
-        log_prob(conditioned_model)(1., 1.), random_normal_log_prob(0.))
+        log_prob(conditioned_model)(1., 1.),
+        tfd.Normal(0., 1.).log_prob(0.))
 
 
 class GraphReplaceTest(test_util.TestCase):
@@ -347,6 +369,73 @@ class GraphReplaceTest(test_util.TestCase):
             'z': random.normal(k1),
             'x': random.normal(k1) + random.normal(k2)
         })
+
+  def test_plate_should_result_in_different_samples(self):
+
+    @plate(name='foo')
+    def model(key):
+      return random_variable(random_normal)(key)
+
+    out = jax.vmap(
+        lambda _, key: model(key), in_axes=(0, None),
+        axis_name='foo')(jnp.ones(3), random.PRNGKey(0))
+    for i in range(3):
+      for j in range(3):
+        if i == j:
+          continue
+        self.assertNotAlmostEqual(out[i], out[j])
+
+  def test_nested_plates_should_produce_multiple_axes(self):
+
+    @plate(name='foo')
+    @plate(name='bar')
+    def model(key):
+      return random_variable(random_normal)(key)
+
+    out = jax.vmap(
+        lambda _, key: jax.vmap(  # pylint: disable=g-long-lambda,unnecessary-lambda
+            lambda _, key: model(key),  # pylint: disable=unnecessary-lambda
+            in_axes=(0, None),
+            axis_name='bar')(_, key),
+        in_axes=(0, None),
+        axis_name='foo')(jnp.ones((3, 2)), random.PRNGKey(0))
+    for i in range(6):
+      for j in range(6):
+        if i == j:
+          continue
+        i1, i2 = i // 2, i - 2 * (i // 2)
+        j1, j2 = j // 2, j - 2 * (j // 2)
+        self.assertNotAlmostEqual(out[i1, i2], out[j1, j2])
+
+  def test_plate_should_reduce_over_log_prob_named_axis(self):
+
+    @plate(name='foo')
+    def model(key):
+      return random_variable(random_normal)(key)
+
+    out = jax.vmap(
+        log_prob(model), axis_name='foo', out_axes=None)(
+            jnp.arange(3.))
+    np.testing.assert_allclose(
+        tfd.Normal(0., 1.).log_prob(jnp.arange(3.)).sum(), out)
+
+  def test_nested_plates_should_reduce_over_all_axes(self):
+
+    @plate(name='foo')
+    @plate(name='bar')
+    def model(key):
+      return random_variable(random_normal)(key)
+
+    out = jax.vmap(
+        jax.vmap(log_prob(model), axis_name='bar', out_axes=None),
+        axis_name='foo',
+        out_axes=None)(
+            jnp.arange(6.).reshape((3, 2)))
+    np.testing.assert_allclose(
+        tfd.Normal(0., 1.).log_prob(jnp.arange(6.)).sum(),
+        out,
+        rtol=1e-6,
+        atol=1e-5)
 
 
 if __name__ == '__main__':

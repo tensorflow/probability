@@ -219,6 +219,7 @@ from jax import util as jax_util
 from oryx.core import primitive
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters import log_prob as lp
+from oryx.core.ppl import plate_util
 
 __all__ = [
     'block',
@@ -245,7 +246,10 @@ nest = harvest.nest
 
 
 @functools.singledispatch
-def random_variable(obj, *, name: Optional[str] = None) -> Program:
+def random_variable(obj,
+                    *,
+                    name: Optional[str] = None,
+                    plate: Optional[str] = None) -> Program:  # pylint: disable=redefined-outer-name
   """A single-dispatch function used to tag values and the outputs of programs.
 
   `random_variable` is a single-dispatch function that enables registering
@@ -255,6 +259,7 @@ def random_variable(obj, *, name: Optional[str] = None) -> Program:
   Args:
     obj: A JAX type to be tagged.
     name (str): A string name to tag input value, cannot be `None`.
+    plate (str): A string named axis for this random variable's plate.
 
   Returns:
     The input value.
@@ -262,7 +267,57 @@ def random_variable(obj, *, name: Optional[str] = None) -> Program:
   if name is None:
     raise ValueError(f'Cannot call `random_variable` on {type(obj)} '
                      'without passing in a name.')
+  if plate is not None:
+    raise ValueError(f'Cannot call `random_variable` on {type(obj)} '
+                     'with a plate.')
   return harvest.sow(obj, tag=RANDOM_VARIABLE, name=name, mode='strict')
+
+
+def plate(f: Optional[Program] = None, name: Optional[str] = None):
+  """Transforms a program into one that draws samples on a named axis.
+
+  In graphical model parlance, a plate designates independent random variables.
+  The `plate` transformation follows this idea, where a `plate`-ed program
+  draws independent samples. Unlike `jax.vmap`-ing a program, which also
+  produces independent samples with positional batch dimensions, `plate`
+  produces samples with implicit named axes. Named axis support is useful for
+  other JAX transformations like `pmap` and `xmap`.
+
+  Specifically, a `plate`-ed program creates a different key for each axis
+  of the named axis. `log_prob` reduces over the named axis to produce a single
+  value.
+
+  Example usage:
+  ```python
+  @ppl.plate(name='foo')
+  def model(key):
+    return random_variable(random.normal)(key)
+  # We can't call model directly because there are implicit named axes present
+  try:
+    model(random.PRNGKey(0))
+  except NameError:
+    print('No named axis present!')
+  # If we vmap with a named axis, we produce independent samples.
+  vmap(model, axis_name='foo')(random.split(random.PRNGKey(0), 3)) #
+  ```
+
+  Args:
+    f: a `Program` to transform. If `f` is `None`, `plate` returns a decorator.
+    name: a `str` name for the plate which can used as a name axis in JAX
+      functions and transformations.
+
+  Returns:
+    A decorator if `f` is `None` or a transformed program if `f` is provided.
+    The transformed program behaves produces independent across a named
+    axis with name `name`.
+  """
+
+  def transform(f: Program) -> Program:
+    return plate_util.make_plate(f, name=name)
+
+  if f is not None:
+    return transform(f)
+  return transform
 
 
 # Alias for random_variable
@@ -273,21 +328,26 @@ rv = random_variable
 @random_variable.register(functools.partial)
 def function_random_variable(f: Program,
                              *,
-                             name: Optional[str] = None) -> Program:
+                             name: Optional[str] = None,
+                             plate: Optional[str] = None) -> Program:  # pylint: disable=redefined-outer-name
   """Registers functions with the `random_variable` single dispatch function.
 
   Args:
     f: A probabilistic program.
     name (str): A string name that is used to when tagging the output of `f`.
+    plate (str): A string named axis for this random variable's plate.
 
   Returns:
     A probabilistic program whose output is tagged with `name`.
   """
 
   def wrapped(*args, **kwargs):
+    fun = f
+    if plate is not None:
+      fun = plate_util.make_plate(fun, name=plate)
     if name is not None:
-      return random_variable(nest(f, scope=name)(*args, **kwargs), name=name)
-    return f(*args, **kwargs)
+      return random_variable(nest(fun, scope=name)(*args, **kwargs), name=name)
+    return fun(*args, **kwargs)
 
   return wrapped
 
