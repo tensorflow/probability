@@ -17,7 +17,6 @@
 from jax import core as jax_core
 from jax import random
 from jax import tree_util
-import jax.numpy as np
 
 from oryx.core import trace_util
 from oryx.core.interpreters import inverse
@@ -47,16 +46,17 @@ class LogProbRules(dict):
     self[prim] = rule = make_default_rule(prim)
     return rule
 
-log_prob_rules = LogProbRules()
 
+log_prob_rules = LogProbRules()
 
 # The log_prob_registry is used to compute log_prob values from samples after
 # propagation is done.
-log_prob_registry = {}
+log_prob_registry = set()
 
 
 def log_prob(f):
   """LogProb function transformation."""
+
   def wrapped(sample, *args, **kwargs):
     """Function wrapper that takes in log_prob arguments."""
     # Trace the function using a random seed
@@ -69,50 +69,55 @@ def log_prob(f):
         InverseAndILDJ.unknown(trace_util.get_shaped_aval(dummy_seed))
     ] + [InverseAndILDJ.new(val) for val in flat_inargs]
     flat_outcells = [InverseAndILDJ.new(a) for a in flat_outargs]
-    # Re-use the InverseAndILDJ propagation but silently fail instead of
-    # erroring when we hit a primitive we can't invert.
-    env = propagate.propagate(InverseAndILDJ, log_prob_rules, jaxpr.jaxpr,
-                              constcells, flat_incells, flat_outcells)
-    # Traverse the resulting environment, looking for primitives that have
-    # registered log_probs.
-    final_log_prob = _accumulate_log_probs(env)
-    return final_log_prob
+    return log_prob_jaxpr(jaxpr.jaxpr, constcells, flat_incells, flat_outcells)
+
   return wrapped
 
+failed_log_prob = object()  # sentinel for being unable to compute a log_prob
 
-def _accumulate_log_probs(env):
-  """Recursively traverses Jaxprs to accumulate log_prob values."""
-  final_log_prob = 0.0
-  eqns = safe_map(propagate.Equation.from_jaxpr_eqn, env.jaxpr.eqns)
-  for eqn in eqns:
-    if eqn.primitive in log_prob_registry:
-      var, = eqn.outvars
-      if var not in env:
-        raise ValueError('Cannot compute log_prob of function.')
-      incells = [env.read(v) for v in eqn.invars]
-      outcells = [env.read(v) for v in eqn.outvars]
-      outcell, = outcells
-      if not outcell.top():
-        raise ValueError('Cannot compute log_prob of function.')
-      lp = log_prob_registry[eqn.primitive](
-          [cell if not cell.top() else cell.val for cell in incells],
-          outcell.val, **eqn.params
-      )
-      assert np.ndim(lp) == 0, 'log_prob must return a scalar.'
-      # Accumulate ILDJ term
-      final_log_prob += lp + np.sum(outcell.ildj)
-  for subenv in env.subenvs.values():
-    sub_lp = _accumulate_log_probs(subenv)
-    final_log_prob += sub_lp
+
+def log_prob_jaxpr(jaxpr, constcells, flat_incells, flat_outcells):
+  """Runs log_prob propagation on a Jaxpr."""
+
+  def reducer(env, eqn, curr_log_prob, new_log_prob):
+    if curr_log_prob is failed_log_prob or new_log_prob is failed_log_prob:
+      # If `curr_log_prob` is `None` that means we were unable to compute
+      # a log_prob elsewhere, so the propagate failed.
+      return failed_log_prob
+    if eqn.primitive in log_prob_registry and new_log_prob is None:
+      # We are unable to compute a log_prob for this primitive.
+      return failed_log_prob
+    if new_log_prob is not None:
+      cells = [env.read(var) for var in eqn.outvars]
+      ildjs = sum([cell.ildj.sum() for cell in cells if cell.top()])
+      return curr_log_prob + new_log_prob + ildjs
+    return curr_log_prob
+
+  # Re-use the InverseAndILDJ propagation but silently fail instead of
+  # erroring when we hit a primitive we can't invert. We accumulate the log
+  # probability values using the propagater state.
+  _, final_log_prob = propagate.propagate(
+      InverseAndILDJ,
+      log_prob_rules,
+      jaxpr,
+      constcells,
+      flat_incells,
+      flat_outcells,
+      reducer=reducer,
+      initial_state=0.)
+  if final_log_prob is failed_log_prob:
+    raise ValueError('Cannot compute log_prob of function.')
   return final_log_prob
 
 
 def make_default_rule(prim):
   """Creates rule for prim without a registered log_prob."""
+
   def rule(incells, outcells, **params):
     """Executes the inverse rule but fails if the inverse isn't implemented."""
     try:
       return ildj_registry[prim](incells, outcells, **params)
     except NotImplementedError:
       return incells, outcells, None
+
   return rule

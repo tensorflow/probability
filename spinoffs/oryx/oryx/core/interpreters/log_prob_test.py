@@ -28,6 +28,7 @@ from oryx import distributions as bd
 from oryx.core import state
 from oryx.core.interpreters.log_prob import log_prob
 from oryx.core.interpreters.log_prob import log_prob_registry
+from oryx.core.interpreters.log_prob import log_prob_rules
 from oryx.internal import test_util
 
 random_normal_p = jax_core.Primitive('random_normal')
@@ -49,10 +50,14 @@ def random_normal_abstract(_, name=None):
 random_normal_p.def_abstract_eval(random_normal_abstract)
 
 
-def random_normal_log_prob(_, outval, name=None):
-  del name
-  return bd.Normal(0., 1.).log_prob(outval)
-log_prob_registry[random_normal_p] = random_normal_log_prob
+def random_normal_log_prob_rule(incells, outcells, **_):
+  outcell, = outcells
+  if not outcell.top():
+    return incells, outcells, None
+  outval = outcell.val
+  return incells, outcells, bd.Normal(0., 1.).log_prob(outval)
+log_prob_rules[random_normal_p] = random_normal_log_prob_rule
+log_prob_registry.add(random_normal_p)
 
 
 def call(f):

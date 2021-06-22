@@ -51,13 +51,22 @@ def random_normal_abstract(_):
   return abstract_arrays.ShapedArray((), np.float32)
 
 
-def random_normal_log_prob(_, x):
+def random_normal_log_prob(x):
   return -0.5 * np.log(2 * np.pi) - 0.5 * x**2
+
+
+def random_normal_log_prob_rule(incells, outcells):
+  outcell, = outcells
+  if not outcell.top():
+    return incells, outcells, None
+  x = outcell.val
+  return incells, outcells, random_normal_log_prob(x)
 
 
 random_normal_p.def_impl(random_normal_impl)
 random_normal_p.def_abstract_eval(random_normal_abstract)
-lp.log_prob_registry[random_normal_p] = random_normal_log_prob
+lp.log_prob_rules[random_normal_p] = random_normal_log_prob_rule
+lp.log_prob_registry.add(random_normal_p)
 
 
 class SampleTest(test_util.TestCase):
@@ -101,6 +110,7 @@ class SampleTest(test_util.TestCase):
         })
 
   def test_block_composing_with_intervene(self):
+
     def program(key):
       k1, k2, k3 = random.split(key, 3)
       a = random_variable(random_normal, name='a')(k1)
@@ -186,8 +196,9 @@ class SampleTest(test_util.TestCase):
       return random_variable(lambda key: random_normal(key) + z, name='x')(k2)
 
     self.assertSetEqual(
-        set(joint_sample(conditional(model, 'x'))(
-            random.PRNGKey(0), 1.).keys()), {'z'})
+        set(
+            joint_sample(conditional(model, 'x'))(random.PRNGKey(0),
+                                                  1.).keys()), {'z'})
 
 
 class LogProbTest(test_util.TestCase):
@@ -197,7 +208,7 @@ class LogProbTest(test_util.TestCase):
     def model(key):
       return random_normal(key)
 
-    self.assertEqual(log_prob(model)(0.1), random_normal_log_prob(None, 0.1))
+    self.assertEqual(log_prob(model)(0.1), random_normal_log_prob(0.1))
 
   def test_log_prob_should_fail_on_model_with_latents(self):
 
@@ -222,14 +233,14 @@ class LogProbTest(test_util.TestCase):
             'z': 1.,
             'x': 1.
         }),
-        random_normal_log_prob(None, 1.) + random_normal_log_prob(None, 0.))
+        random_normal_log_prob(1.) + random_normal_log_prob(0.))
 
     self.assertEqual(
         joint_log_prob(model)({
             'z': 1.,
             'x': 1.
         }),
-        random_normal_log_prob(None, 1.) + random_normal_log_prob(None, 0.))
+        random_normal_log_prob(1.) + random_normal_log_prob(0.))
 
   def test_log_prob_should_work_with_nondependent_latents(self):
 
@@ -241,8 +252,7 @@ class LogProbTest(test_util.TestCase):
 
     limited_model = lambda key: model(key)['z']
 
-    self.assertEqual(
-        log_prob(limited_model)(1.), random_normal_log_prob(None, 1.))
+    self.assertEqual(log_prob(limited_model)(1.), random_normal_log_prob(1.))
 
   def test_intervened_log_prob(self):
 
@@ -253,8 +263,7 @@ class LogProbTest(test_util.TestCase):
 
     intervened_model = intervene(model, z=1.)
 
-    self.assertEqual(
-        log_prob(intervened_model)(1.), random_normal_log_prob(None, 0.))
+    self.assertEqual(log_prob(intervened_model)(1.), random_normal_log_prob(0.))
 
   def test_conditional_log_prob(self):
 
@@ -266,7 +275,7 @@ class LogProbTest(test_util.TestCase):
     conditioned_model = conditional(model, 'z')
 
     self.assertEqual(
-        log_prob(conditioned_model)(1., 1.), random_normal_log_prob(None, 0.))
+        log_prob(conditioned_model)(1., 1.), random_normal_log_prob(0.))
 
 
 class GraphReplaceTest(test_util.TestCase):

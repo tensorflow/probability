@@ -53,6 +53,7 @@ py_library(
     srcs = ["propagate.py"],
     srcs_version = "PY3",
     deps = [
+        ":harvest",
         # dataclasses dep,
         # jax dep,
         "//oryx/core:pytree",

@@ -16,7 +16,6 @@
 from absl.testing import absltest
 import jax
 from jax import lax
-from jax.interpreters import xla
 import jax.numpy as np
 import numpy as onp
 
@@ -24,7 +23,6 @@ from oryx.core import trace_util
 from oryx.core.interpreters.propagate import Cell
 from oryx.core.interpreters.propagate import propagate
 from oryx.internal import test_util
-
 
 inverse_rules = {}
 
@@ -75,6 +73,8 @@ def exp_rule(invals, outvals):
   elif outval.bottom() and not inval.bottom():
     outvals = [Inverse.new(np.exp(inval.val))]
   return invals, outvals, None
+
+
 inverse_rules[lax.exp_p] = exp_rule
 
 
@@ -89,18 +89,9 @@ def add_rule(invals, outvals):
   elif outval.bottom() and not left.bottom() and not right.bottom():
     outvals = [Inverse.new(left.val + right.val)]
   return invals, outvals, None
+
+
 inverse_rules[lax.add_p] = add_rule
-
-
-def xla_call_rule(invals, outvals, **params):
-  del params
-  f, invals = invals[0], invals[1:]
-  subenv = f.call_wrapped(invals, outvals)
-  new_invals = [subenv.read(invar) for invar in subenv.jaxpr.invars]
-  new_outvals = [subenv.read(outvar) for outvar in subenv.jaxpr.outvars]
-  return new_invals, new_outvals, subenv
-inverse_rules[xla.xla_call_p] = xla_call_rule
-
 
 ildj_rules = {}
 
@@ -153,7 +144,9 @@ def exp_ildj(invals, outvals):
   elif not outval.top() and inval.top():
     val, ildj = inval.val, inval.ildj
     outvals = [ILDJ(outval.aval, np.exp(val), ildj)]
-  return invals, outvals, None
+  return invals, outvals, 1
+
+
 ildj_rules[lax.exp_p] = exp_ildj
 
 
@@ -168,117 +161,141 @@ def add_ildj(invals, outvals):
       invals = [ILDJ(left.aval, val - right.val, ildj), right]
   elif not outval.top() and left.top() and right.top():
     outvals = [ILDJ(outval.aval, left.val + right.val, 0.)]
-  return invals, outvals, None
+  return invals, outvals, 1
+
+
 ildj_rules[lax.add_p] = add_ildj
 
 
 class PropagateTest(test_util.TestCase):
 
   def test_correct_inverse_for_identity_function(self):
+
     def f(x):
       return x
 
     jaxpr, _ = trace_util.stage(f)(1.)
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
-    env = propagate(Inverse, inverse_rules, jaxpr,
-                    list(map(Inverse.new, consts)),
-                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
-                    list(map(Inverse.new, (1.,))))
+    env, _ = propagate(Inverse, inverse_rules, jaxpr,
+                       list(map(Inverse.new, consts)),
+                       [Inverse.unknown(var.aval) for var in jaxpr.invars],
+                       list(map(Inverse.new, (1.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.val, 1.)
 
   def test_should_propagate_to_invars_for_one_op_function(self):
+
     def f(x):
       return np.exp(x)
 
     jaxpr, _ = trace_util.stage(f)(1.)
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
-    env = propagate(Inverse, inverse_rules, jaxpr,
-                    list(map(Inverse.new, consts)),
-                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
-                    list(map(Inverse.new, (1.,))))
+    env, _ = propagate(Inverse, inverse_rules, jaxpr,
+                       list(map(Inverse.new, consts)),
+                       [Inverse.unknown(var.aval) for var in jaxpr.invars],
+                       list(map(Inverse.new, (1.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.val, 0.)
 
   def test_should_propagate_to_invars_for_chain_function(self):
+
     def f(x):
       return 2. + np.exp(x)
 
     jaxpr, _ = trace_util.stage(f)(3.)
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
-    env = propagate(Inverse, inverse_rules, jaxpr,
-                    list(map(Inverse.new, consts)),
-                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
-                    list(map(Inverse.new, (3.,))))
+    env, _ = propagate(Inverse, inverse_rules, jaxpr,
+                       list(map(Inverse.new, consts)),
+                       [Inverse.unknown(var.aval) for var in jaxpr.invars],
+                       list(map(Inverse.new, (3.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.val, 0.)
 
   def test_propagate_through_jit(self):
+
     def f(x):
       return jax.jit(np.exp)(x) + 2.
 
     jaxpr, _ = trace_util.stage(f)(3.)
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
-    env = propagate(Inverse, inverse_rules, jaxpr,
-                    list(map(Inverse.new, consts)),
-                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
-                    list(map(Inverse.new, (3.,))))
+    env, _ = propagate(Inverse, inverse_rules, jaxpr,
+                       list(map(Inverse.new, consts)),
+                       [Inverse.unknown(var.aval) for var in jaxpr.invars],
+                       list(map(Inverse.new, (3.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.val, 0.)
-    self.assertLen(env.subenvs, 1)
 
   def test_propagation_should_not_reach_invars(self):
+
     def f(x):
       del x
       return 2.
 
     jaxpr, _ = trace_util.stage(f)(1.)
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
-    env = propagate(Inverse, inverse_rules, jaxpr,
-                    list(map(Inverse.new, consts)),
-
-                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
-                    list(map(Inverse.new, (1.,))))
+    env, _ = propagate(Inverse, inverse_rules, jaxpr,
+                       list(map(Inverse.new, consts)),
+                       [Inverse.unknown(var.aval) for var in jaxpr.invars],
+                       list(map(Inverse.new, (1.,))))
     self.assertTrue(env.read(jaxpr.invars[0]).bottom())
 
   def test_should_propagate_forward_and_backward(self):
+
     def f(x, y):
       return x + 1., np.exp(x + 1.) + y
 
     jaxpr, _ = trace_util.stage(f)(0., 2.)
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
-    env = propagate(Inverse, inverse_rules, jaxpr,
-                    list(map(Inverse.new, consts)),
-                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
-                    list(map(Inverse.new, (0., 2.))))
+    env, _ = propagate(Inverse, inverse_rules, jaxpr,
+                       list(map(Inverse.new, consts)),
+                       [Inverse.unknown(var.aval) for var in jaxpr.invars],
+                       list(map(Inverse.new, (0., 2.))))
     invals = [env[invar].val for invar in jaxpr.invars]
     onp.testing.assert_allclose(invals, (-1., 1.))
 
   def test_should_propagate_accumulated_values_in_one_op_function(self):
+
     def f(x):
       return np.exp(x)
 
     jaxpr, _ = trace_util.stage(f)(2.)
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
-    env = propagate(ILDJ, ildj_rules, jaxpr,
-                    list(map(ILDJ.new, consts)),
-                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
-                    list(map(ILDJ.new, (2.,))))
+    env, _ = propagate(ILDJ, ildj_rules, jaxpr, list(map(ILDJ.new, consts)),
+                       [Inverse.unknown(var.aval) for var in jaxpr.invars],
+                       list(map(ILDJ.new, (2.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.ildj, -np.log(2.))
 
   def test_should_propagate_accumulated_values_in_chain_function(self):
+
     def f(x):
       return np.exp(x) + 2.
 
     jaxpr, _ = trace_util.stage(f)(4.)
     jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
-    env = propagate(ILDJ, ildj_rules, jaxpr,
-                    list(map(ILDJ.new, consts)),
-                    [Inverse.unknown(var.aval) for var in jaxpr.invars],
-                    list(map(ILDJ.new, (4.,))))
+    env, _ = propagate(ILDJ, ildj_rules, jaxpr, list(map(ILDJ.new, consts)),
+                       [Inverse.unknown(var.aval) for var in jaxpr.invars],
+                       list(map(ILDJ.new, (4.,))))
     inval = env[jaxpr.invars[0]]
     self.assertEqual(inval.ildj, -np.log(2.))
+
+  def test_propagate_should_accumulate_state(self):
+
+    def f(x):
+      return np.exp(x) + 2.
+
+    jaxpr, _ = trace_util.stage(f)(4.)
+    jaxpr, consts = jaxpr.jaxpr, jaxpr.literals
+    _, state = propagate(
+        ILDJ,
+        ildj_rules,
+        jaxpr,
+        list(map(ILDJ.new, consts)),
+        [Inverse.unknown(var.aval) for var in jaxpr.invars],
+        list(map(ILDJ.new, (4.,))),
+        reducer=lambda env, eqn, count, next: count + next,
+        initial_state=0)
+    self.assertEqual(state, 2)
 
 
 if __name__ == '__main__':
