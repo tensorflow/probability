@@ -92,6 +92,7 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
       velocity_scale=0.5,
       absolute_noise_scale=0.5,
       relative_noise_scale=0.05,
+      use_bump_function=False,
       name='plasma_spectroscopy',
       pretty_name='Plasma Spectroscopy',
   ):
@@ -124,6 +125,8 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
         observation noise.
       relative_noise_scale: Float `Tensor` scalar. Absolute noise scale of the
         observation noise.
+      use_bump_function: Python `bool`. If True, use a bump function to smoothly
+        decay the plasma blob to 0 at the edges.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -151,6 +154,7 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
       self._velocity_scale = velocity_scale
       self._absolute_noise_scale = absolute_noise_scale
       self._relative_noise_scale = relative_noise_scale
+      self._use_bump_function = use_bump_function
 
       @tfd.JointDistributionCoroutine
       def prior():
@@ -262,6 +266,10 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
   def relative_noise_scale(self):
     return self._relative_noise_scale
 
+  @property
+  def use_bump_function(self):
+    return self._use_bump_function
+
   def forward_model(self, sample):
     """The forward model.
 
@@ -313,6 +321,10 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
         tf.constant(np.sqrt(2 * np.pi), bandwidth.dtype) * bandwidth) * tf.exp(
             -(wavelengths[:, tf.newaxis] - doppler_shifted_center_wavelength)**2
             / (2 * bandwidth**2))
+
+    if self.use_bump_function:
+      emissivity *= tfp.math.round_exponential_bump_function(
+          tf.linspace(-1., 1., self.num_shells))
 
     x = tf.linspace(-self.outer_shell_radius, self.outer_shell_radius,
                     self.num_integration_points)

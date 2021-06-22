@@ -393,6 +393,7 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":plasma_spectroscopy",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,

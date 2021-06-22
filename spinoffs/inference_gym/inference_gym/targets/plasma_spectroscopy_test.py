@@ -15,6 +15,7 @@
 # ============================================================================
 """Tests for inference_gym.targets.plasma_spectroscopy."""
 
+from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
@@ -36,13 +37,21 @@ def _test_dataset():
 @test_util.multi_backend_test(globals(), 'targets.plasma_spectroscopy_test')
 class PlasmaSpectroscopyTest(test_util.InferenceGymTestCase):
 
-  def testBasic(self):
+  @parameterized.named_parameters(
+      ('Smooth', True),
+      ('NotSmooth', False),
+  )
+  def testBasic(self, use_bump_function):
     """Checks that you get finite values given unconstrained samples.
 
     We check `unnormalized_log_prob` as well as the values of the sample
     transformations.
+
+    Args:
+      use_bump_function: Whether to use the bump function.
     """
-    model = plasma_spectroscopy.PlasmaSpectroscopy(**_test_dataset())
+    model = plasma_spectroscopy.PlasmaSpectroscopy(
+        **_test_dataset(), use_bump_function=use_bump_function)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
