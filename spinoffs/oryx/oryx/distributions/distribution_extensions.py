@@ -28,32 +28,30 @@ from tensorflow_probability.substrates import jax as tfp
 
 tfd = tfp.distributions
 
-
 InverseAndILDJ = inverse.core.InverseAndILDJ
 
 random_variable_p = primitive.InitialStylePrimitive('random_variable')
 unzip.block_registry.add(random_variable_p)
 
 
-def random_variable_log_prob_rule(flat_incells, flat_outcells, **params):
+def random_variable_log_prob_rule(flat_incells, flat_outcells, *, num_consts,
+                                  in_tree, out_tree, **_):
   """Registers Oryx distributions with the log_prob transformation."""
-  del params
-  return flat_incells, flat_outcells, None
+  _, incells = jax_util.split_list(flat_incells, [num_consts])
+  val_incells = incells[1:]
+  if not all(cell.top() for cell in val_incells):
+    return flat_incells, flat_outcells, None
+  if not all(cell.top() for cell in flat_outcells):
+    return flat_incells, flat_outcells, None
+  seed_flat_invals = [object()] + [cell.val for cell in val_incells]
+  flat_outvals = [cell.val for cell in flat_outcells]
+  _, dist = tree_util.tree_unflatten(in_tree, seed_flat_invals)
+  outval = tree_util.tree_unflatten(out_tree, flat_outvals)
+  return flat_incells, flat_outcells, dist.log_prob(outval)
+
 log_prob.log_prob_rules[random_variable_p] = random_variable_log_prob_rule
 
-
-def random_variable_log_prob(flat_incells, val, *, num_consts, in_tree, **_):
-  """Registers Oryx distributions with the log_prob transformation."""
-  _, flat_incells = jax_util.split_list(flat_incells, [num_consts])
-  _, dist = tree_util.tree_unflatten(in_tree, flat_incells)
-  if any(not cell.top() for cell in flat_incells[1:]
-         if isinstance(val, InverseAndILDJ)):
-    return None
-  return dist.log_prob(val)
-
-
-log_prob.log_prob_registry[
-    random_variable_p] = random_variable_log_prob
+log_prob.log_prob_registry.add(random_variable_p)
 
 
 def _sample_distribution(key, dist):

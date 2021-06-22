@@ -29,7 +29,7 @@ graph are returned.
 import collections
 import functools
 import itertools as it
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Tuple, Type, Union
 
 import dataclasses
 from jax import core as jax_core
@@ -37,9 +37,10 @@ from jax import linear_util as lu
 from jax import tree_util
 from jax import util as jax_util
 from jax.interpreters import partial_eval as pe
+from jax.interpreters import xla
 
 from oryx.core import pytree
-
+from oryx.core.interpreters import harvest
 
 __all__ = [
     'Cell',
@@ -48,7 +49,7 @@ __all__ = [
     'propagate'
 ]
 
-
+State = Any
 VarOrLiteral = Union[jax_core.Var, jax_core.Literal]
 safe_map = jax_core.safe_map
 
@@ -120,8 +121,9 @@ class Equation:
   @classmethod
   def from_jaxpr_eqn(cls, eqn):
     params_flat, params_tree = tree_util.tree_flatten(eqn.params)
-    return Equation(tuple(eqn.invars), tuple(eqn.outvars), eqn.primitive,
-                    tuple(params_flat), params_tree)
+    return Equation(
+        tuple(eqn.invars), tuple(eqn.outvars), eqn.primitive,
+        tuple(params_flat), params_tree)
 
   @property
   def params(self):
@@ -130,10 +132,11 @@ class Equation:
   def __hash__(self):
     # Override __hash__ to use Literal object IDs because Literals are not
     # natively hashable
-    hashable_invars = tuple(id(invar) if isinstance(invar, jax_core.Literal)
-                            else invar for invar in self.invars)
-    return hash((hashable_invars, self.outvars, self.primitive,
-                 self.params_tree))
+    hashable_invars = tuple(
+        id(invar) if isinstance(invar, jax_core.Literal) else invar
+        for invar in self.invars)
+    return hash(
+        (hashable_invars, self.outvars, self.primitive, self.params_tree))
 
   def __str__(self):
     return '{outvars} = {primitive} {invars}'.format(
@@ -143,38 +146,14 @@ class Equation:
     )
 
 
-class Environment(pytree.Pytree):
+class Environment:
   """Keeps track of variables and their values during propagation."""
 
   def __init__(self, cell_type, jaxpr):
     self.cell_type = cell_type
     self.env: Dict[jax_core.Var, Cell] = {}
-    self.subenvs: Dict[Equation, 'Environment'] = {}
+    self.states: Dict[Equation, Cell] = {}
     self.jaxpr: jax_core.Jaxpr = jaxpr
-
-  def copy(self) -> 'Environment':
-    env = Environment(self.cell_type, self.jaxpr)
-    env.env = self.env.copy()
-    env.subenv = {k: subenv.copy() for k, subenv in self.subenvs.items()}
-    return env
-
-  def join(self, other: 'Environment') -> 'Environment':
-    env = Environment(self.cell_type, self.jaxpr)
-    for var, val in self.env.items():
-      env.env[var] = val.join(other.env[var])
-    for eqn, subenv in self.subenvs.items():
-      env.subenvs[eqn] = subenv.join(other.subenvs[eqn])
-    return env
-
-  def assert_same_type(self, other_env) -> None:
-    """Raises an error if environments do not have matching Jaxprs."""
-    error = ValueError('Cannot compare environments of different types.')
-    if self.cell_type != other_env.cell_type:
-      raise error
-    elif self.jaxpr != other_env.jaxpr:
-      raise error
-    elif self.env.keys() != other_env.env.keys():
-      raise error
 
   def read(self, var: VarOrLiteral) -> Cell:
     if isinstance(var, jax_core.Literal):
@@ -203,26 +182,11 @@ class Environment(pytree.Pytree):
       return True
     return var in self.env
 
-  def write_subenv(self, eqn: Equation, subenv: 'Environment') -> None:
-    if eqn not in self.subenvs:
-      self.subenvs[eqn] = subenv
-    else:
-      self.subenvs[eqn] = self.subenvs[eqn].join(subenv)
+  def read_state(self, eqn: Equation) -> State:
+    return self.states.get(eqn, None)
 
-  def flatten(self):
-    env_keys, env_values = jax_util.unzip2(self.env.items())
-    subenv_keys, subenv_values = jax_util.unzip2(self.subenvs.items())
-    return (env_values, subenv_values), (env_keys, subenv_keys, self.cell_type,
-                                         self.jaxpr)
-
-  @classmethod
-  def unflatten(cls, data, xs):
-    env_keys, subenv_keys, cell_type, jaxpr = data
-    env_values, subenv_values = xs
-    env = Environment(cell_type, jaxpr)
-    env.env = dict(zip(env_keys, env_values))
-    env.subenvs = dict(zip(subenv_keys, subenv_values))
-    return env
+  def write_state(self, eqn: Equation, state: State) -> None:
+    self.states[eqn] = state
 
 
 def construct_graph_representation(eqns):
@@ -238,11 +202,12 @@ def construct_graph_representation(eqns):
     if isinstance(var, jax_core.Literal):
       return set()
     return neighbors[var]
+
   return get_neighbors
 
 
-def update_queue_state(queue, cur_eqn, get_neighbor_eqns,
-                       incells, outcells, new_incells, new_outcells):
+def update_queue_state(queue, cur_eqn, get_neighbor_eqns, incells, outcells,
+                       new_incells, new_outcells):
   """Updates the queue from the result of a propagation."""
   all_vars = cur_eqn.invars + cur_eqn.outvars
   old_cells = incells + outcells
@@ -259,10 +224,13 @@ def update_queue_state(queue, cur_eqn, get_neighbor_eqns,
       queue.extendleft(neighbors)
 
 
-PropagationRule = Callable[
-    [List[Any], List[Cell]],
-    Tuple[List[Cell], List[Cell], Optional[Environment]],
-]
+PropagationRule = Callable[[List[Any], List[Cell]], Tuple[List[Cell],
+                                                          List[Cell], State]]
+
+
+def identity_reducer(env, eqn, state, new_state):
+  del env, eqn, new_state
+  return state
 
 
 def propagate(cell_type: Type[Cell],
@@ -270,7 +238,10 @@ def propagate(cell_type: Type[Cell],
               jaxpr: pe.Jaxpr,
               constcells: List[Cell],
               incells: List[Cell],
-              outcells: List[Cell]) -> Environment:
+              outcells: List[Cell],
+              reducer: Callable[[Environment, Equation, State, State],
+                                State] = identity_reducer,
+              initial_state: State = None) -> Tuple[Environment, State]:
   """Propagates cells in a Jaxpr using a set of rules.
 
   Args:
@@ -280,6 +251,11 @@ def propagate(cell_type: Type[Cell],
     constcells: used to populate the Jaxpr's constvars
     incells: used to populate the Jaxpr's invars
     outcells: used to populate the Jaxpr's outcells
+    reducer: An optional callable used to reduce over the state at each
+      equation in the Jaxpr. `reducer` takes in `(env, eqn, state, new_state)`
+      as arguments and should return an updated state. The `new_state` value
+      is provided by each equation.
+    initial_state: The initial `state` value used in the reducer
   Returns:
     The Jaxpr environment after propagation has terminated
   """
@@ -307,23 +283,64 @@ def propagate(cell_type: Type[Cell],
     incells = safe_map(env.read, eqn.invars)
     outcells = safe_map(env.read, eqn.outvars)
 
-    rule = rules[eqn.primitive]
     call_jaxpr, params = jax_core.extract_call_jaxpr(eqn.primitive, eqn.params)
     if call_jaxpr:
       subfuns = [
-          lu.wrap_init(functools.partial(propagate, cell_type, rules,
-                                         call_jaxpr, ()))
+          lu.wrap_init(
+              functools.partial(propagate, cell_type, rules, call_jaxpr, (),
+                                initial_state=initial_state,
+                                reducer=reducer))
       ]
+      if eqn.primitive not in rules:
+        rule = default_call_rules.get(eqn.primitive)
+      else:
+        rule = rules[eqn.primitive]
     else:
       subfuns = []
-    new_incells, new_outcells, subenv = rule(
-        subfuns + incells, outcells, **params)
-    if subenv:
-      env.write_subenv(eqn, subenv)
+      rule = rules[eqn.primitive]
+    new_incells, new_outcells, eqn_state = rule(subfuns + incells, outcells,
+                                                **params)
+    env.write_state(eqn, eqn_state)
 
     new_incells = safe_map(env.write, eqn.invars, new_incells)
     new_outcells = safe_map(env.write, eqn.outvars, new_outcells)
 
     update_queue_state(queue, eqn, get_neighbor_eqns, incells, outcells,
                        new_incells, new_outcells)
-  return env
+  state = initial_state
+  for eqn in eqns:
+    state = reducer(env, eqn, state, env.read_state(eqn))
+  return env, state
+
+
+@lu.transformation_with_aux
+def flat_propagate(tree, *flat_invals):
+  invals, outvals = tree_util.tree_unflatten(tree, flat_invals)
+  env, state = yield ((invals, outvals), {})
+  new_incells = [env.read(var) for var in env.jaxpr.invars]
+  new_outcells = [env.read(var) for var in env.jaxpr.outvars]
+  flat_out, out_tree = tree_util.tree_flatten(
+      (new_incells, new_outcells, state))
+  yield flat_out, out_tree
+
+
+def call_rule(prim, incells, outcells, **params):
+  """Propagate rule for call primitives."""
+  f, incells = incells[0], incells[1:]
+  flat_vals, in_tree = tree_util.tree_flatten((incells, outcells))
+  new_params = dict(params)
+  if 'donated_invars' in params:
+    new_params['donated_invars'] = (False,) * len(flat_vals)
+  f, aux = flat_propagate(f, in_tree)
+  flat_out = prim.bind(f, *flat_vals, **new_params)
+  out_tree = aux()
+  return tree_util.tree_unflatten(out_tree, flat_out)
+
+
+default_call_rules = {}
+default_call_rules[xla.xla_call_p] = jax_util.partial(call_rule, xla.xla_call_p)
+default_call_rules[jax_core.call_p] = jax_util.partial(call_rule,
+                                                       jax_core.call_p)
+default_call_rules[pe.remat_call_p] = jax_util.partial(call_rule,
+                                                       pe.remat_call_p)
+default_call_rules[harvest.nest_p] = jax_util.partial(call_rule, harvest.nest_p)

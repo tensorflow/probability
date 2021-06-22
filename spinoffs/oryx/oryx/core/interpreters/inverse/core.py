@@ -18,17 +18,13 @@ from typing import Iterable
 import jax
 from jax import abstract_arrays
 from jax import core as jax_core
-from jax import linear_util as lu
 from jax import tree_util
 from jax import util as jax_util
-from jax.interpreters import partial_eval as pe
 from jax.interpreters import pxla
-from jax.interpreters import xla
 import jax.numpy as np
 
 from oryx.core import primitive
 from oryx.core import trace_util
-from oryx.core.interpreters import harvest
 from oryx.core.interpreters import propagate
 from oryx.core.interpreters.inverse import slice as slc
 
@@ -177,8 +173,8 @@ def inverse_and_ildj(f, *trace_args, reduce_ildj=True):
         for arg in flat_forward_args]
     flat_incells = [InverseAndILDJ.unknown(aval) for aval in flat_forward_avals]
     flat_outcells = safe_map(InverseAndILDJ.new, flat_args)
-    env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr.jaxpr,
-                              flat_constcells, flat_incells, flat_outcells)  # pytype: disable=wrong-arg-types
+    env, _ = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr.jaxpr,
+                                 flat_constcells, flat_incells, flat_outcells)  # pytype: disable=wrong-arg-types
     flat_incells = [env.read(invar) for invar in jaxpr.jaxpr.invars]
     if any(not flat_incell.top() for flat_incell in flat_incells):
       raise ValueError('Cannot invert function.')
@@ -246,6 +242,9 @@ class InverseDict(object):
   def __setitem__(self, prim, val):
     self.rules[prim] = val
 
+  def __contains__(self, prim):
+    return prim in self.rules
+
 
 def register_elementwise(prim):
   """Registers an elementwise primitive with ILDJ."""
@@ -296,46 +295,19 @@ def register_binary(prim):
 ildj_registry = InverseDict()
 
 
-@lu.transformation_with_aux
-def flat_propagate(tree, *flat_invals):
-  invals, outvals = tree_util.tree_unflatten(tree, flat_invals)
-  subenv = yield ((invals, outvals), {})
-  subenv_vals, subenv_tree = tree_util.tree_flatten(subenv)
-  yield subenv_vals, subenv_tree
-
-
-def call_ildj(prim, incells, outcells, **params):
-  """InverseAndILDJ rule for call primitives."""
-  f, incells = incells[0], incells[1:]
-  flat_vals, in_tree = tree_util.tree_flatten((incells, outcells))
-  new_params = dict(params)
-  if 'donated_invars' in params:
-    new_params['donated_invars'] = (False,) * len(flat_vals)
-  f, aux = flat_propagate(f, in_tree)
-  subenv_vals = prim.bind(f, *flat_vals, **new_params)
-  subenv_tree = aux()
-  subenv = tree_util.tree_unflatten(subenv_tree, subenv_vals)
-  new_incells = [subenv.read(var) for var in subenv.jaxpr.invars]
-  new_outcells = [subenv.read(var) for var in subenv.jaxpr.outvars]
-  return new_incells, new_outcells, subenv
-ildj_registry[xla.xla_call_p] = jax_util.partial(call_ildj, xla.xla_call_p)
-ildj_registry[jax_core.call_p] = jax_util.partial(call_ildj, jax_core.call_p)
-ildj_registry[pe.remat_call_p] = jax_util.partial(call_ildj, pe.remat_call_p)
-ildj_registry[harvest.nest_p] = jax_util.partial(call_ildj, harvest.nest_p)
-
-
 def hop_inverse_rule(prim):
-  ildj_registry[prim] = jax_util.partial(call_ildj, prim)
+  ildj_registry[prim] = jax_util.partial(propagate.call_rule, prim)
 primitive.register_hop_transformation_rule('inverse', hop_inverse_rule)
 
 
 def initial_ildj(incells, outcells, *, jaxpr, num_consts, **_):
   const_cells, incells = jax_util.split_list(incells, [num_consts])
-  env = propagate.propagate(InverseAndILDJ, ildj_registry, jaxpr, const_cells,
-                            incells, outcells)  # pytype: disable=wrong-arg-types
+  env, state = propagate.propagate(
+      InverseAndILDJ, ildj_registry, jaxpr, const_cells,
+      incells, outcells)  # pytype: disable=wrong-arg-types
   new_incells = [env.read(invar) for invar in jaxpr.invars]
   new_outcells = [env.read(outvar) for outvar in jaxpr.outvars]
-  return const_cells + new_incells, new_outcells, None
+  return const_cells + new_incells, new_outcells, state
 
 
 def initial_inverse_rule(prim):
@@ -371,7 +343,7 @@ def map_ildj(prim, incells, outcells, **params):
   mapped_incells = safe_map(remove_slice, incells)
   mapped_outcells = safe_map(remove_slice, outcells)
   flat_vals, in_tree = tree_util.tree_flatten((mapped_incells, mapped_outcells))
-  f, aux = flat_propagate(f, in_tree)
+  f, aux = propagate.flat_propagate(f, in_tree)
   # Assume all invars as mapped
   new_in_axes = (0,) * len(flat_vals)
   new_params = dict(params, in_axes=new_in_axes)
@@ -383,14 +355,13 @@ def map_ildj(prim, incells, outcells, **params):
         lambda: (0,) * aux().num_leaves,
         closure=('ildj', params['out_axes']))
     del new_params['out_axes']
-  subenv_vals = prim.bind(f, *flat_vals, **new_params)
-  subenv_tree = aux()
-  subenv = tree_util.tree_unflatten(subenv_tree, subenv_vals)
-  new_incells = [subenv.read(var) for var in subenv.jaxpr.invars]
-  new_outcells = [subenv.read(var) for var in subenv.jaxpr.outvars]
+  flat_out = prim.bind(f, *flat_vals, **new_params)
+  out_tree = aux()
+  new_incells, new_outcells, state = tree_util.tree_unflatten(
+      out_tree, flat_out)
   new_incells = [add_slice(v, old_v)
                  for old_v, v in safe_zip(incells, new_incells)]
   new_outcells = [add_slice(v, old_v)
                   for old_v, v in safe_zip(outcells, new_outcells)]
-  return new_incells, new_outcells, subenv
+  return new_incells, new_outcells, state
 ildj_registry[pxla.xla_pmap_p] = jax_util.partial(map_ildj, pxla.xla_pmap_p)
