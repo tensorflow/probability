@@ -121,6 +121,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "distribute_lib_test",
+    size = "medium",
     srcs = ["distribute_lib_test.py"],
     disabled_substrates = ["numpy"],
     python_version = "PY3",
