@@ -20,7 +20,11 @@ from __future__ import print_function
 import collections
 
 # Dependency imports
+import numpy as np
 import tensorflow.compat.v2 as tf
+
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 
 tfl = tf.linalg
 
@@ -123,8 +127,8 @@ def moments_of_masked_time_series(time_series_tensor, broadcast_mask):
     mean: float `Tensor` of shape `batch_shape`.
     variance: float `Tensor` of shape `batch_shape`.
   """
-  num_unmasked_entries = tf.cast(
-      tf.reduce_sum(tf.cast(~broadcast_mask, tf.int32), axis=-1),
+  num_unmasked_entries = ps.cast(
+      ps.reduce_sum(ps.cast(~broadcast_mask, np.int32), axis=-1),
       time_series_tensor.dtype)
 
   # Manually compute mean and variance, excluding masked entries.
@@ -148,21 +152,29 @@ def moments_of_masked_time_series(time_series_tensor, broadcast_mask):
 def initial_value_of_masked_time_series(time_series_tensor, broadcast_mask):
   """Get the first unmasked entry of each time series in the batch.
 
+  If a batch element has no unmasked entries, the corresponding return value
+  for that element is undefined.
+
   Args:
-    time_series_tensor: float `Tensor` of shape [..., num_timesteps].
+    time_series_tensor: float `Tensor` of shape `batch_shape + [num_timesteps]`.
     broadcast_mask: bool `Tensor` of same shape as `time_series`.
+  Returns:
+    initial_values: float `Tensor` of shape `batch_shape`.
   """
 
-  num_timesteps = tf.shape(time_series_tensor)[-1]
+  num_timesteps = ps.shape(time_series_tensor)[-1]
 
   # Compute the index of the first unmasked entry for each series in the batch.
   unmasked_negindices = (
-      tf.cast(~broadcast_mask, tf.int32) *
-      tf.range(num_timesteps, 0, -1))
-  first_unmasked_indices = num_timesteps - tf.reduce_max(
+      ps.cast(~broadcast_mask, np.int32) *
+      ps.range(num_timesteps, 0, -1))
+  first_unmasked_indices = num_timesteps - ps.reduce_max(
       unmasked_negindices, axis=-1)
+  # Avoid out-of-bounds errors if all indices are masked.
+  safe_unmasked_indices = ps.minimum(first_unmasked_indices, num_timesteps - 1)
 
-  if first_unmasked_indices.shape.ndims is None:
+  batch_dims = tensorshape_util.rank(safe_unmasked_indices.shape)
+  if batch_dims is None:
     raise NotImplementedError(
         'Cannot compute initial values of a masked time series with'
         'dynamic rank.')  # `batch_gather` requires static rank
@@ -170,5 +182,5 @@ def initial_value_of_masked_time_series(time_series_tensor, broadcast_mask):
   # Extract the initial value for each series in the batch.
   return tf.squeeze(tf.gather(
       params=time_series_tensor,
-      indices=first_unmasked_indices[..., tf.newaxis],
-      batch_dims=first_unmasked_indices.shape.ndims), axis=-1)
+      indices=safe_unmasked_indices[..., np.newaxis],
+      batch_dims=batch_dims, axis=-1))

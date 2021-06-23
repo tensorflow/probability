@@ -183,23 +183,32 @@ class _UtilityTests(test_util.TestCase):
     # Ensure that masks broadcast over batch shape by creating a batch of
     # time series.
     time_series = np.random.randn(3, 2, 5)
-    mask = np.array([True, False, False, True, False])
+    mask = np.array([[True, False, False, True, False],
+                     [True, True, True, True, True]])
 
     masked_series = missing_values_util.MaskedTimeSeries(
         time_series=time_series, is_missing=mask)
     mean, stddev, initial = self.evaluate(
         sts_util.empirical_statistics(masked_series))
 
+    # Should return default values when the series is completely masked.
+    self.assertAllClose(mean[:, 1], tf.zeros_like(mean[:, 1]))
+    self.assertAllClose(stddev[:, 1], tf.ones_like(stddev[:, 1]))
+    self.assertAllClose(initial[:, 1], tf.zeros_like(initial[:, 1]))
+
+    # Otherwise, should return the actual mean/stddev/initial values.
+    time_series = time_series[:, 0, :]
+    mask = mask[0, :]
     broadcast_mask = np.broadcast_to(mask, time_series.shape)
-    unmasked_series = time_series[~broadcast_mask].reshape([3, 2, 3])
+    unmasked_series = time_series[~broadcast_mask].reshape([3, 3])
     unmasked_mean, unmasked_stddev, unmasked_initial = self.evaluate(
         sts_util.empirical_statistics(unmasked_series))
-    self.assertAllClose(mean, unmasked_mean)
-    self.assertAllClose(stddev, unmasked_stddev)
-    self.assertAllClose(initial, unmasked_initial)
+    self.assertAllClose(mean[:, 0], unmasked_mean)
+    self.assertAllClose(stddev[:, 0], unmasked_stddev)
+    self.assertAllClose(initial[:, 0], unmasked_initial)
 
     # Run the same tests without batch shape.
-    unbatched_time_series = time_series[0, 0, :]
+    unbatched_time_series = time_series[0, :]
     masked_series = missing_values_util.MaskedTimeSeries(
         time_series=unbatched_time_series, is_missing=mask)
     mean, stddev, initial = self.evaluate(
