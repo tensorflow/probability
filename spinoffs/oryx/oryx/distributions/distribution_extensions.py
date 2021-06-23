@@ -14,12 +14,17 @@
 # ============================================================================
 # Lint as: python3
 """Wraps TFP distributions for use with Jax."""
+import itertools as it
+
 from typing import Optional
 
+import jax
 from jax import tree_util
 from jax import util as jax_util
+from jax.interpreters import batching
 from oryx.core import ppl
 from oryx.core import primitive
+from oryx.core import trace_util
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters import inverse
 from oryx.core.interpreters import log_prob
@@ -36,7 +41,7 @@ unzip.block_registry.add(random_variable_p)
 
 
 def random_variable_log_prob_rule(flat_incells, flat_outcells, *, num_consts,
-                                  in_tree, out_tree, **_):
+                                  in_tree, out_tree, batch_ndims, **_):
   """Registers Oryx distributions with the log_prob transformation."""
   _, incells = jax_util.split_list(flat_incells, [num_consts])
   val_incells = incells[1:]
@@ -48,11 +53,35 @@ def random_variable_log_prob_rule(flat_incells, flat_outcells, *, num_consts,
   flat_outvals = [cell.val for cell in flat_outcells]
   _, dist = tree_util.tree_unflatten(in_tree, seed_flat_invals)
   outval = tree_util.tree_unflatten(out_tree, flat_outvals)
-  return flat_incells, flat_outcells, dist.log_prob(outval)
+  return flat_incells, flat_outcells, dist.log_prob(outval).sum(
+      axis=list(range(batch_ndims)))
 
 log_prob.log_prob_rules[random_variable_p] = random_variable_log_prob_rule
 
 log_prob.log_prob_registry.add(random_variable_p)
+
+
+def random_variable_batching_rule(args, dims, *, num_consts, batch_ndims,
+                                  jaxpr, **params):
+  """Batching (vmap) rule for the `random_variable` primitive."""
+  old_consts = args[:num_consts]
+  args, dims = args[num_consts:], dims[num_consts:]
+  def _run(*args):
+    return random_variable_p.impl(*it.chain(old_consts, args),
+                                  num_consts=len(old_consts),
+                                  jaxpr=jaxpr,
+                                  batch_ndims=batch_ndims,
+                                  **params)
+  run = jax.vmap(_run, in_axes=dims, out_axes=0)
+  closed_jaxpr, _ = trace_util.stage(run, dynamic=True)(*args)
+  new_jaxpr, new_consts = closed_jaxpr.jaxpr, closed_jaxpr.literals
+  result = random_variable_p.bind(*it.chain(new_consts, args),
+                                  num_consts=len(new_consts),
+                                  jaxpr=new_jaxpr,
+                                  batch_ndims=batch_ndims + 1,
+                                  **params)
+  return result, (0,) * len(result)
+batching.primitive_batchers[random_variable_p] = random_variable_batching_rule
 
 
 def _sample_distribution(key, dist):
@@ -66,10 +95,15 @@ def distribution_random_variable(dist: tfd.Distribution, *,
   """Converts a distribution into a sampling function."""
   if plate is not None:
     dist = tfed.Sharded(dist, plate)
+  if dist.batch_shape != []:  # pylint: disable=g-explicit-bool-comparison
+    raise ValueError(
+        f'Cannot use a distribution with `batch_shape`: {dist.batch_shape}. '
+        'Instead, use `jax.vmap` or `ppl.plate` to draw independent samples.')
   def wrapped(key):
     def sample(key):
       result = primitive.initial_style_bind(
           random_variable_p,
+          batch_ndims=0,
           distribution_name=dist.__class__.__name__)(_sample_distribution)(
               key, dist)
       return result
