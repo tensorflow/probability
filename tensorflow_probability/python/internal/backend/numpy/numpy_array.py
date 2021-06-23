@@ -197,11 +197,9 @@ def _linspace(start, stop, num, name=None, axis=0):  # pylint: disable=unused-ar
   if np.issubdtype(start.dtype, np.integer):
     start = start.astype(np.float64)
   stop = ops.convert_to_tensor(stop, dtype=start.dtype)
-  num = ops.convert_to_tensor(num, dtype_hint=np.int32)
-  if not np.issubdtype(num.dtype, np.integer):
+  if not np.issubdtype(np.array(num).dtype, np.integer):
     raise TypeError('`num` must be an integer but got {}'.format(num.dtype))
-  num = num.astype(np.int32)
-  return np.linspace(start, stop, num, axis=axis).astype(start.dtype)
+  return np.linspace(start, stop, int(num), axis=axis).astype(start.dtype)
 
 
 def _one_hot(  # pylint: disable=unused-argument

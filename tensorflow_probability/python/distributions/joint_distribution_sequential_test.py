@@ -29,6 +29,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import joint_distribution_sequential
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
@@ -501,6 +502,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertEqual(lp.shape, [7, 9])
 
   @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_latent_dirichlet_allocation(self):
     """Tests Latent Dirichlet Allocation joint model.
 
@@ -587,8 +589,7 @@ class JointDistributionSequentialTest(test_util.TestCase):
         indices=tf.cast(
             tau[..., tf.newaxis] < tf.linspace(0., 1., n),
             dtype=tf.int32),
-        # TODO(b/139204153): Remove static value hack after bug closed.
-        batch_dims=int(tf.get_static_value(tf.rank(tau))))
+        batch_dims=ps.rank(tau))
 
     alpha = tf.math.reciprocal(tf.reduce_mean(count_data))
 

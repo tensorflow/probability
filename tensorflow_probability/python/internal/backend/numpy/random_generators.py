@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
-import numpy as onp  # Avoids JAX rewrite.  # pylint: disable=reimported
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -64,14 +63,10 @@ def _ensure_shape_tuple(t):
 
 
 def _bcast_shape(base_shape, args):
-  base_shape = _ensure_shape_tuple(base_shape)
-  if not args:
-    return base_shape
-  bc_arr = onp.zeros(base_shape + (0,))
+  bcast_shape = _ensure_shape_tuple(base_shape)
   for arg in args:
-    if arg is not None:
-      bc_arr = bc_arr + onp.zeros(np.asarray(arg).shape + (0,))
-  return bc_arr.shape[:-1]
+    bcast_shape = ops.broadcast_shape(bcast_shape, np.asarray(arg).shape)
+  return bcast_shape
 
 
 def _binomial(shape, seed, counts, probs, output_dtype=np.int32, name=None):  # pylint: disable=unused-argument

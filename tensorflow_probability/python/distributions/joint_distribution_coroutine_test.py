@@ -1395,6 +1395,37 @@ class JointDistributionCoroutineTest(test_util.TestCase):
         tfp.math.value_and_gradient(lp_fn, (cprior, c1, c0))[1],
         tfp.math.value_and_gradient(ulp_fn, (cprior, c1, c0))[1])
 
+  @test_util.numpy_disable_test_missing_functionality('symbolic tracing')
+  @test_util.jax_disable_test_missing_functionality(
+      'https://github.com/google/jax/issues/7011')
+  def test_symbolic_trace_dtype(self):
+    # A model that will definitely OOM. (1 billion squared floats).
+    @tfd.JointDistributionCoroutine
+    def model():
+      x = yield Root(tfd.MultivariateNormalDiag(
+          tf.zeros(int(1e9)), tf.ones(int(1e9)), name='x'))
+      loc = tf.einsum('i,j->ij', x, x)
+      yield tfd.Independent(
+          tfd.MultivariateNormalDiag(loc, tf.ones(int(1e9))),
+          reinterpreted_batch_ndims=1,
+          name='y')
+    self.assertEqual((tf.float32, tf.float32), model.dtype)
+
+  @test_util.numpy_disable_test_missing_functionality('symbolic tracing')
+  def test_symbolic_trace_is_cached(self):
+    model_executions = []
+
+    @tfd.JointDistributionCoroutine
+    def model():
+      x = yield Root(tfd.Normal(0., 1., name='x'))
+      y = yield tfd.Normal(x, 1., name='y')
+      model_executions.append(y)
+
+    self.assertAllEqual(((), ()), model.event_shape)
+    self.assertAllEqual(((), ()), model.batch_shape)
+    self.assertAllEqual((tf.float32, tf.float32), model.dtype)
+    self.assertAllEqual(('x', 'y'), model._flat_resolve_names())
+    self.assertLen(model_executions, 1)
 
 if __name__ == '__main__':
   tf.test.main()
