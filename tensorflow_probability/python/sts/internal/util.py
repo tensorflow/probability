@@ -198,6 +198,9 @@ def sum_mvns(distributions):
 def empirical_statistics(observed_time_series):
   """Compute statistics of a provided time series, as heuristic initialization.
 
+  If a series is entirely unobserved (all values are masked), default statistics
+  `mean == 0.`, `stddev == 1.`, and `initial_centered == 0.` are returned.
+
   Args:
     observed_time_series: `Tensor` representing a time series, or batch of time
        series, of shape either `batch_shape + [num_timesteps, 1]` or
@@ -245,7 +248,14 @@ def empirical_statistics(observed_time_series):
 
     observed_stddev = tf.sqrt(observed_variance)
     observed_initial_centered = observed_initial - observed_mean
-    return observed_mean, observed_stddev, observed_initial_centered
+
+    # Dividing by zero will estimate `inf` or `nan` for the mean and stddev
+    # (and thus initial_centered) if a series is entirely masked. Replace these
+    # with default values.
+    replace_nans = lambda x, v: tf.where(tf.math.is_finite(x), x, v)
+    return (replace_nans(observed_mean, 0.),
+            replace_nans(observed_stddev, 1.),
+            replace_nans(observed_initial_centered, 0.))
 
 
 def _maybe_expand_trailing_dim(observed_time_series_tensor):
