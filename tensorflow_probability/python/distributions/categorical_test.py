@@ -393,6 +393,18 @@ class CategoricalTest(test_util.TestCase):
     ans = [-(0.5*np.log(0.5) + 0.5*np.log(0.5)), -(np.log(1))]
     self.assertAllClose(self.evaluate(dist_entropy), ans)
 
+  def testEntropyWithLargeNegLogits(self):
+    num_categories = 11
+    logits = np.array([
+        [-1e7] * num_categories,
+        [-1e8] * num_categories,
+        [-1e9] * num_categories], dtype=np.float32)
+    dist = tfd.Categorical(logits=logits, validate_args=True)
+    dist_entropy = dist.entropy()
+
+    ans = [np.log(num_categories)] * 3
+    self.assertAllClose(self.evaluate(dist_entropy), ans)
+
   def testSample(self):
     histograms = np.array([[[0.2, 0.8], [0.4, 0.6]]])
     dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
