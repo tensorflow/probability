@@ -38,6 +38,7 @@ py_library(
     deps = [
         # jax dep,
         "//oryx/core:primitive",
+        "//oryx/core:trace_util",
         "//oryx/core/interpreters:harvest",
         "//oryx/core/interpreters:log_prob",
         "//oryx/core/interpreters:unzip",

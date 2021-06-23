@@ -252,6 +252,30 @@ class DistributionsExtensionsTest(test_util.TestCase):
     np.testing.assert_allclose(
         tfd.Normal(0., 1.).log_prob(jnp.arange(3.)).sum(), out)
 
+  def test_vmapping_distribution_reduces_to_scalar_log_prob(self):
+
+    def model(key):
+      return jax.vmap(ppl.rv(tfd.Normal(0., 1.)))(random.split(key))
+
+    out = ppl.log_prob(model)(jnp.arange(2.))
+    np.testing.assert_allclose(
+        tfd.Normal(0., 1.).log_prob(jnp.arange(2.)).sum(), out)
+
+  def test_can_map_over_batches_with_vmap_and_reduce_to_scalar_log_prob(self):
+
+    def f(key, x):
+      return ppl.rv(tfd.Normal(x, 1.))(key)
+
+    def model(key, xs):
+      return jax.vmap(f)(random.split(key), xs)
+
+    out = ppl.log_prob(model)(jnp.arange(2.), 2 * jnp.arange(2.))
+    np.testing.assert_allclose(
+        tfd.Normal(jnp.arange(2.), 1.).log_prob(2 * jnp.arange(2.)).sum(), out)
+
+  def test_cannot_use_distribution_with_nontrivial_batch_shape(self):
+    with self.assertRaises(ValueError):
+      ppl.rv(tfd.Normal(jnp.ones(2), 1.))(random.PRNGKey(0))
 
 if __name__ == '__main__':
   absltest.main()
