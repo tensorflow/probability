@@ -303,31 +303,23 @@ class Categorical(distribution.AutoCompositeTensorDistribution):
       return -tf.reduce_sum(
           tf.math.multiply_no_nan(tf.math.log(probs), probs),
           axis=-1)
-    # The following result can be derived as follows. Write log(p[i]) as:
-    # s[i]-m-lse(s[i]-m) where m=max(s), then you have:
-    #   sum_i exp(s[i]-m-lse(s-m)) (s[i] - m - lse(s-m))
-    #   = -m - lse(s-m) + sum_i s[i] exp(s[i]-m-lse(s-m))
-    #   = -m - lse(s-m) + (1/exp(lse(s-m))) sum_i s[i] exp(s[i]-m)
-    #   = -m - lse(s-m) + (1/sumexp(s-m)) sum_i s[i] exp(s[i]-m)
-    # Write x[i]=s[i]-m then you have:
-    #   = -m - lse(x) + (1/sum_exp(x)) sum_i s[i] exp(x[i])
-    # Negating all of this result is the Shanon (discrete) entropy.
+    # The following result can be derived as follows. Let s[i] be a logit.
+    # The entropy is:
+    #   H = -sum_i(p[i] * log(p[i]))
+    #     = -sum_i(p[i] * (s[i] - logsumexp(s))
+    #     = logsumexp(s) - sum_i(p[i] * s[i])
     logits = tf.convert_to_tensor(self._logits)
-    m = tf.reduce_max(logits, axis=-1, keepdims=True)
-    x = logits - m
-    sum_exp_x = tf.reduce_sum(tf.math.exp(x), axis=-1)
-    lse_logits = m[..., 0] + tf.math.log(sum_exp_x)
+    logits = logits - tf.reduce_max(logits, axis=-1, keepdims=True)
+    lse_logits = tf.reduce_logsumexp(logits, axis=-1)
+
     # TODO(b/161014180): Workaround to support correct gradient calculations
     # with -inf logits.
-    is_inf_logits = tf.cast(tf.math.is_inf(logits), dtype=tf.float32)
-    is_negative_logits = tf.cast(logits < 0, dtype=tf.float32)
     masked_logits = tf.where(
-        tf.cast((is_inf_logits * is_negative_logits), dtype=bool),
+        (tf.math.is_inf(logits) & (logits < 0)),
         tf.cast(1.0, dtype=logits.dtype), logits)
-
     return lse_logits - tf.reduce_sum(
-        tf.math.multiply_no_nan(masked_logits, tf.math.exp(x)),
-        axis=-1) / sum_exp_x
+        tf.math.multiply_no_nan(masked_logits, tf.math.exp(logits)),
+        axis=-1) / tf.math.exp(lse_logits)
 
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
