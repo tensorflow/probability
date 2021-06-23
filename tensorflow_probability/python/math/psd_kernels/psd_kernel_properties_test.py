@@ -68,12 +68,14 @@ class KernelPropertiesTest(test_util.TestCase):
           hp.HealthCheck.too_slow,
           hp.HealthCheck.data_too_large])
   def testKernelGradient(self, kernel_name, data):
-    event_dim = data.draw(hps.integers(min_value=2, max_value=4))
+    event_dim = data.draw(hps.integers(min_value=2, max_value=3))
     feature_ndims = data.draw(hps.integers(min_value=1, max_value=2))
     feature_dim = data.draw(hps.integers(min_value=2, max_value=4))
+    batch_shape = data.draw(tfp_hps.shapes(max_ndims=2))
 
     kernel, kernel_parameter_variable_names = data.draw(
         kernel_hps.kernels(
+            batch_shape=batch_shape,
             kernel_name=kernel_name,
             event_dim=event_dim,
             feature_dim=feature_dim,
