@@ -78,8 +78,9 @@ class JointDistributionSamplePathMixin(object):
     return self._batch_ndims
 
   def _batch_shape_parts(self):
-    return [d.batch_shape[:self.batch_ndims]
-            for d in self._get_single_sample_distributions()]
+    return [batch_shape[:self.batch_ndims]
+            for batch_shape in self._get_static_distribution_attributes().
+            batch_shape]
 
   def _batch_shape(self):
     # Caching will not leak graph Tensors since this is a static attribute.

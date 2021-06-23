@@ -33,6 +33,8 @@ from tensorflow_probability.python.bijectors import ldj_ratio as ldj_ratio_lib
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.internal import callable_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import nest_util
@@ -51,6 +53,38 @@ __all__ = [
 
 
 JAX_MODE = False
+
+
+@auto_composite_tensor.auto_composite_tensor
+class StaticDistributionAttributes(auto_composite_tensor.AutoCompositeTensor):
+  """Container to smuggle static attributes out of a tf.function trace."""
+
+  def __init__(self,
+               batch_shape,
+               dtype,
+               event_shape,
+               experimental_shard_axis_names,
+               name,
+               reparameterization_type):
+    self.batch_shape = batch_shape
+    self.dtype = dtype
+    self.event_shape = event_shape
+    self.experimental_shard_axis_names = experimental_shard_axis_names
+    self.name = name
+    self.reparameterization_type = reparameterization_type
+
+  def __iter__(self):
+    """Yields parameters in order matching __init__ signature."""
+    return iter((self.batch_shape, self.dtype, self.event_shape,
+                 self.experimental_shard_axis_names, self.name,
+                 self.reparameterization_type))
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top
+  tree_util.register_pytree_node(
+      StaticDistributionAttributes,
+      flatten_func=lambda sda: ([], list(sda)),
+      unflatten_func=lambda attrs, _: StaticDistributionAttributes(*attrs))
 
 
 class ValueWithTrace(collections.namedtuple(
@@ -117,6 +151,22 @@ def trace_values_and_log_probs(dist, sample_shape, seed, value=None):
   else:
     lp = dist.log_prob(value)
   return ValueWithTrace(value=value, traced=(value, lp))
+
+
+def trace_static_attributes(dist, sample_shape, seed, value):
+  """Extracts the current distribution's static attributes as Tensor specs."""
+  del sample_shape
+  if value is None:
+    value = dist.sample(seed=seed)
+  return ValueWithTrace(
+      value=value,
+      traced=StaticDistributionAttributes(
+          batch_shape=dist.batch_shape,
+          dtype=dist.dtype,
+          experimental_shard_axis_names=dist.experimental_shard_axis_names,
+          event_shape=dist.event_shape,
+          name=get_explicit_name_for_component(dist),
+          reparameterization_type=dist.reparameterization_type))
 
 
 CALLING_CONVENTION_DESCRIPTION = """
@@ -269,6 +319,17 @@ class JointDistribution(distribution_lib.Distribution):
       self._single_sample_distributions[graph_id] = ds
     return ds
 
+  def _get_static_distribution_attributes(self, seed=None):
+    if not hasattr(self, '_cached_static_attributes'):
+      flat_list_of_static_attributes = callable_util.get_output_spec(
+          lambda: self._execute_model(  # pylint: disable=g-long-lambda
+              sample_and_trace_fn=trace_static_attributes,
+              seed=seed if seed is not None else samplers.zeros_seed()))
+      self._cached_static_attributes = StaticDistributionAttributes(
+          *zip(*flat_list_of_static_attributes))
+
+    return self._cached_static_attributes
+
   # Override `tf.Module`'s `_flatten` method to ensure that distributions are
   # instantiated, so that accessing `.variables` or `.trainable_variables` gives
   # consistent results.
@@ -287,8 +348,8 @@ class JointDistribution(distribution_lib.Distribution):
   @property
   def dtype(self):
     """The `DType` of `Tensor`s handled by this `Distribution`."""
-    return self._model_unflatten([
-        d.dtype for d in self._get_single_sample_distributions()])
+    return self._model_unflatten(
+        self._get_static_distribution_attributes().dtype)
 
   @property
   def reparameterization_type(self):
@@ -301,37 +362,31 @@ class JointDistribution(distribution_lib.Distribution):
       reparameterization_type: `ReparameterizationType` of each distribution in
         `model`.
     """
-    return self._model_unflatten([
-        d.reparameterization_type
-        for d in self._get_single_sample_distributions()])
+    return self._model_unflatten(
+        self._get_static_distribution_attributes().reparameterization_type)
 
   @property
   def experimental_shard_axis_names(self):
     """Indicates whether part distributions have active shard axis names."""
-    return self._model_unflatten([
-        d.experimental_shard_axis_names
-        for d in self._get_single_sample_distributions()])
+    return self._model_unflatten(
+        self._get_static_distribution_attributes().
+        experimental_shard_axis_names)
 
   @property
   def use_vectorized_map(self):
     return False
 
   def _batch_shape(self):
-    return self._model_unflatten([
-        d.batch_shape for d in self._get_single_sample_distributions()])
+    return self._model_unflatten(
+        self._get_static_distribution_attributes().batch_shape)
 
   def _batch_shape_tensor(self):
     return self._model_unflatten(
         self._map_attr_over_dists('batch_shape_tensor'))
 
   def _event_shape(self):
-    if not hasattr(self, '_cached_event_shape'):
-      self._cached_event_shape = [
-          d.event_shape
-          for d in self._get_single_sample_distributions()]
-    # Unflattening *after* retrieving from cache prevents tf.Module from
-    # wrapping the returned value.
-    return self._model_unflatten(self._cached_event_shape)
+    return self._model_unflatten(
+        self._get_static_distribution_attributes().event_shape)
 
   def _event_shape_tensor(self):
     return self._model_unflatten(
@@ -363,6 +418,11 @@ class JointDistribution(distribution_lib.Distribution):
       samples: a `tuple` of `Tensor`s with prepended dimensions `sample_shape`
         for each of `distribution_fn`.
     """
+    # Use the user-provided seed to trace static distribution attributes, if
+    # they're not already cached. This ensures we don't try to pass a stateless
+    # seed to a stateful sampler, or vice versa.
+    self._get_static_distribution_attributes(seed=seed)
+
     with self._name_and_control_scope(name):
       value = self._resolve_value(value=value,
                                   allow_partially_specified=True,
@@ -516,6 +576,11 @@ class JointDistribution(distribution_lib.Distribution):
                 'corresponding distribution. Default value: `None` '
                 '(i.e., draw a sample from each distribution).')})
   def _sample_n(self, sample_shape, seed, value=None):
+    # Use the user-provided seed to trace static distribution attributes, if
+    # they're not already cached. This ensures we don't try to pass a stateless
+    # seed to a stateful sampler, or vice versa.
+    self._get_static_distribution_attributes(seed=seed)
+
     might_have_batch_dims = (
         distribution_util.shape_may_be_nontrivial(sample_shape)
         or value is not None)
@@ -539,6 +604,11 @@ class JointDistribution(distribution_lib.Distribution):
 
   # TODO(b/189122177): Implement _sample_and_log_prob for distributed JDs.
   def _sample_and_log_prob(self, sample_shape, seed, value=None, **kwargs):
+    # Use the user-provided seed to trace static distribution attributes, if
+    # they're not already cached. This ensures we don't try to pass a stateless
+    # seed to a stateful sampler, or vice versa.
+    self._get_static_distribution_attributes(seed=seed)
+
     xs, lps = zip(
         *self._call_execute_model(
             sample_shape,
@@ -673,8 +743,8 @@ class JointDistribution(distribution_lib.Distribution):
     """Resolves a name for each random variable in the model."""
     names = []
     names_used = set()
-    for dummy_idx, d in enumerate(self._get_single_sample_distributions()):
-      name = get_explicit_name_for_component(d)
+    for dummy_idx, name in enumerate(
+        self._get_static_distribution_attributes().name):
       if name is None:
         name = '{}{}'.format(dummy_name, dummy_idx)
       if name in names_used:

@@ -23,6 +23,12 @@ NUMPY_MODE = False
 def get_output_spec(fn, *args, **kwargs):
   """Traces a callable to determine shape and dtype of its return value(s).
 
+  Tracing incurs the Python execution cost of running the callable to build a
+  temporary graph, but does not execute any Tensor operations and has no
+  side effects in the calling graph. It is supported only in TensorFlow and
+  JAX. Calls to this method using the Numpy backend may incur the full execution
+  cost of `fn`.
+
   Args:
     fn: Python `callable` accepting (structures of) `Tensor` arguments and
       returning (structures) of `Tensor`s.
@@ -37,8 +43,12 @@ def get_output_spec(fn, *args, **kwargs):
   """
 
   if NUMPY_MODE:
-    raise NotImplementedError('Either TensorFlow or JAX is required in order '
-                              'to trace a function without executing it.')
+    def _as_tensor(t):
+      if isinstance(t, tf.TensorSpec):
+        return tf.zeros(t.shape, dtype=t.dtype)
+      return t
+    args, kwargs = tf.nest.map_structure(_as_tensor, (args, kwargs))
+    return fn(*args, **kwargs)
 
   if JAX_MODE:
     import jax  # pylint: disable=g-import-not-at-top
@@ -48,7 +58,8 @@ def get_output_spec(fn, *args, **kwargs):
     if isinstance(t, tf.TensorSpec):
       return t
     return tf.TensorSpec.from_tensor(tf.convert_to_tensor(t))
+  arg_specs, kwarg_specs = tf.nest.map_structure(_as_tensor_spec,
+                                                 (args, kwargs))
   return tf.function(fn, autograph=False).get_concrete_function(
-      *tf.nest.map_structure(_as_tensor_spec, args),
-      **tf.nest.map_structure(_as_tensor_spec, kwargs)).structured_outputs
+      *arg_specs, **kwarg_specs).structured_outputs
 

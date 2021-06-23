@@ -3100,7 +3100,6 @@ multi_substrate_py_test(
     name = "joint_distribution_sequential_test",
     size = "medium",
     srcs = ["joint_distribution_sequential_test.py"],
-    numpy_tags = ["notap"],
     shard_count = 2,
     deps = [
         # absl/testing:parameterized dep,

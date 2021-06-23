@@ -21,6 +21,9 @@ __all__ = [
 
 class TensorSpec(object):
 
-  def __init__(self, *args, **kwargs):
-    del args, kwargs
-    self.dtype = None
+  def __init__(self, shape, dtype):
+    self.shape = shape
+    self.dtype = dtype
+
+  def __repr__(self):
+    return f'TensorSpec(shape={self.shape}, dtype={self.dtype})'
