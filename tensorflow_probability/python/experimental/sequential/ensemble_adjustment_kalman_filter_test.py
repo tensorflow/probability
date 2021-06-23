@@ -64,7 +64,10 @@ class EnsembleAdjustmentKalmanFilterTest(test_util.TestCase):
         step=0, particles=particles, extra={'unchanged': 1})
 
     predicted_state = tfs.ensemble_kalman_filter_predict(
-        state, transition_fn=transition_fn, inflate_fn=None)
+        state,
+        transition_fn=transition_fn,
+        inflate_fn=None,
+        seed=test_util.test_seed())
 
     # Check that extra is correctly propagated.
     self.assertIn('unchanged', predicted_state.extra)
@@ -116,13 +119,18 @@ class EnsembleAdjustmentKalmanFilterTest(test_util.TestCase):
 
     for i in range(10):
       state = tfs.ensemble_kalman_filter_predict(
-          state, transition_fn=transition_fn, inflate_fn=None)
+          state,
+          transition_fn=transition_fn,
+          inflate_fn=None,
+          seed=test_util.test_seed())
 
       self.assertIn('transition_count', state.extra)
       self.assertEqual(i + 1, state.extra['transition_count'])
 
       state = tfs.ensemble_adjustment_kalman_filter_update(
-          state, observation=[1. * i], observation_fn=observation_fn)
+          state,
+          observation=[1. * i],
+          observation_fn=observation_fn)
 
       self.assertIn('observation_count', state.extra)
       self.assertEqual(i + 1, state.extra['observation_count'])
