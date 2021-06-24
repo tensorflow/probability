@@ -454,14 +454,11 @@ class PreconditionedHMCCorrectnessTest(test_util.TestCase):
                         grads_next_target_log_prob)
 
 
-@test_util.test_all_tf_execution_regimes
-@parameterized.named_parameters(
-    dict(testcase_name='_default', use_default=True),
-    dict(testcase_name='_explicit', use_default=False))
-class PreconditionedHMCTest(test_util.TestCase):
+class _PreconditionedHMCTest(test_util.TestCase):
 
-  def test_f64(self, use_default):
-    if use_default:
+  @test_util.test_graph_and_eager_modes()
+  def test_f64(self):
+    if self.use_default_momentum_distribution:
       momentum_distribution = None
     else:
       momentum_distribution = as_composite(
@@ -474,8 +471,9 @@ class PreconditionedHMCTest(test_util.TestCase):
         1, kernel=kernel, current_state=tf.ones([], tf.float64),
         num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
 
-  def test_f64_multichain(self, use_default):
-    if use_default:
+  @test_util.test_graph_and_eager_modes()
+  def test_f64_multichain(self):
+    if self.use_default_momentum_distribution:
       momentum_distribution = None
     else:
       momentum_distribution = as_composite(
@@ -489,8 +487,9 @@ class PreconditionedHMCTest(test_util.TestCase):
         1, kernel=kernel, current_state=tf.ones([nchains], tf.float64),
         num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
 
-  def test_f64_multichain_multipart(self, use_default):
-    if use_default:
+  @test_util.test_graph_and_eager_modes()
+  def test_f64_multichain_multipart(self):
+    if self.use_default_momentum_distribution:
       momentum_distribution = None
     else:
       momentum_distribution = _make_composite_tensor(
@@ -508,7 +507,8 @@ class PreconditionedHMCTest(test_util.TestCase):
                        tf.ones([nchains], tf.float64)),
         num_burnin_steps=5, trace_fn=None, seed=test_util.test_seed()))
 
-  def test_diag(self, use_default):
+  @test_util.test_graph_mode_only()  # Long chains are very slow in eager mode.
+  def test_diag(self):
     """Test that a diagonal multivariate normal can be effectively sampled from.
 
     Note that the effective sample size is expected to be exactly 100: this is
@@ -516,15 +516,11 @@ class PreconditionedHMCTest(test_util.TestCase):
     a point to nearly the antipodal point, which causes a negative lag 1
     autocorrelation, and the effective sample size calculation cuts off when
     the autocorrelation drops below zero.
-
-    Args:
-      use_default: bool, whether to use a custom momentum distribution, or
-        the default.
     """
     mvn = tfd.MultivariateNormalDiag(
         loc=[1., 2., 3.], scale_diag=[0.1, 1., 10.])
 
-    if use_default:
+    if self.use_default_momentum_distribution:
       momentum_distribution = None
       step_size = 0.1
     else:
@@ -547,20 +543,20 @@ class PreconditionedHMCTest(test_util.TestCase):
                                          filter_threshold=0,
                                          filter_beyond_positive_pairs=False)
 
-    if not use_default:
+    if not self.use_default_momentum_distribution:
       self.assertAllClose(ess, tf.fill([3], 100.))
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
-  def test_tril(self, use_default):
-    if tf.executing_eagerly():
-      self.skipTest('b/169882656 Too many warnings are issued in eager logs')
+  @test_util.test_graph_mode_only()  # Long chains are very slow in eager mode.
+  @test_util.jax_disable_test_missing_functionality('dynamic shapes')
+  def test_tril(self):
     cov = 0.9 * tf.ones([3, 3]) + 0.1 * tf.eye(3)
     scale = tf.linalg.cholesky(cov)
     mv_tril = tfd.MultivariateNormalTriL(loc=[1., 2., 3.],
                                          scale_tril=scale)
 
-    if use_default:
+    if self.use_default_momentum_distribution:
       momentum_distribution = None
     else:
       momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
@@ -588,16 +584,17 @@ class PreconditionedHMCTest(test_util.TestCase):
     # was the wrong one. Why is that? A guess is that since there are *many*
     # ways to have larger ess, these tests don't really test correctness.
     # Perhaps remove all tests like these.
-    if not use_default:
+    if not self.use_default_momentum_distribution:
       self.assertAllClose(ess, tf.fill([3], 100.))
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
-  def test_transform(self, use_default):
+  @test_util.test_graph_mode_only()  # Long chains are very slow in eager mode.
+  def test_transform(self):
     mvn = tfd.MultivariateNormalDiag(loc=[1., 2., 3.], scale_diag=[1., 1., 1.])
     diag_variance = tf.constant([0.1, 1., 10.])
 
-    if use_default:
+    if self.use_default_momentum_distribution:
       momentum_distribution = None
     else:
       momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
@@ -622,19 +619,20 @@ class PreconditionedHMCTest(test_util.TestCase):
                                          filter_threshold=0,
                                          filter_beyond_positive_pairs=False)
 
-    if not use_default:
+    if not self.use_default_momentum_distribution:
       self.assertAllClose(ess, tf.fill([3], 100.))
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
-  def test_multi_state_part(self, use_default):
+  @test_util.test_graph_mode_only()  # Long chains are very slow in eager mode.
+  def test_multi_state_part(self):
     mvn = tfd.JointDistributionSequential([
         tfd.Normal(1., 0.1),
         tfd.Normal(2., 1.),
         tfd.Independent(tfd.Normal(3 * tf.ones([2, 3, 4]), 10.), 3)
     ])
 
-    if use_default:
+    if self.use_default_momentum_distribution:
       momentum_distribution = None
       step_size = 0.1
     else:
@@ -667,7 +665,7 @@ class PreconditionedHMCTest(test_util.TestCase):
     ess = tfp.mcmc.effective_sample_size(draws,
                                          filter_threshold=0,
                                          filter_beyond_positive_pairs=False)
-    if not use_default:
+    if not self.use_default_momentum_distribution:
       self.assertAllClose(
           self.evaluate(ess),
           [tf.constant(100.),
@@ -678,11 +676,12 @@ class PreconditionedHMCTest(test_util.TestCase):
               tf.reduce_min(tf.nest.map_structure(tf.reduce_min, ess))),
           50.)
 
-  def test_batched_state(self, use_default):
+  @test_util.test_graph_mode_only()  # Long chains are very slow in eager mode.
+  def test_batched_state(self):
     mvn = tfd.MultivariateNormalDiag(
         loc=[1., 2., 3.], scale_diag=[0.1, 1., 10.])
     batch_shape = [2, 4]
-    if use_default:
+    if self.use_default_momentum_distribution:
       momentum_distribution = None
       step_size = 0.1
     else:
@@ -705,18 +704,19 @@ class PreconditionedHMCTest(test_util.TestCase):
     ess = tfp.mcmc.effective_sample_size(draws[10:], cross_chain_dims=[1, 2],
                                          filter_threshold=0,
                                          filter_beyond_positive_pairs=False)
-    if not use_default:
+    if not self.use_default_momentum_distribution:
       self.assertAllClose(self.evaluate(ess), 100 * 2. * 4. * tf.ones(3))
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
 
-  def test_batches(self, use_default):
+  @test_util.test_graph_mode_only()  # Long chains are very slow in eager mode.
+  def test_batches(self):
     mvn = tfd.JointDistributionSequential(
         [tfd.Normal(1., 0.1),
          tfd.Normal(2., 1.),
          tfd.Normal(3., 10.)])
     n_chains = 10
-    if use_default:
+    if self.use_default_momentum_distribution:
       momentum_distribution = None
       step_size = 0.1
     else:
@@ -751,10 +751,21 @@ class PreconditionedHMCTest(test_util.TestCase):
     ess = tfp.mcmc.effective_sample_size(
         draws, cross_chain_dims=[1 for _ in draws],
         filter_threshold=0, filter_beyond_positive_pairs=False)
-    if not use_default:
+    if not self.use_default_momentum_distribution:
       self.assertAllClose(self.evaluate(ess), 100 * n_chains * tf.ones(3))
     else:
       self.assertLess(self.evaluate(tf.reduce_min(ess)), 100.)
+
+
+class PreconditionedHMCTestDefaultMomentum(_PreconditionedHMCTest):
+  use_default_momentum_distribution = True
+
+
+class PreconditionedHMCTestExplicitMomentum(_PreconditionedHMCTest):
+  use_default_momentum_distribution = False
+
+
+del _PreconditionedHMCTest  # Don't try to run base class tests.
 
 
 @test_util.test_all_tf_execution_regimes

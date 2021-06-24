@@ -311,7 +311,6 @@ multi_substrate_py_test(
     srcs = ["preconditioned_hmc_test.py"],
     disabled_substrates = ["numpy"],
     python_version = "PY3",
-    shard_count = 10,
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
