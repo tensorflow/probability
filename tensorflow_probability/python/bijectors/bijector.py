@@ -34,6 +34,7 @@ from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic as math_generic
 from tensorflow_probability.python.math import gradient
 # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation
@@ -531,6 +532,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
                dtype=None,
                forward_min_event_ndims=UNSPECIFIED,
                inverse_min_event_ndims=UNSPECIFIED,
+               experimental_use_kahan_sum=False,
                parameters=None,
                name=None):
     """Constructs Bijector.
@@ -564,6 +566,11 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
       inverse_min_event_ndims: Python `integer` (structure) indicating the
         minimum number of dimensions on which `inverse` operates. Will be set to
         `forward_min_event_ndims` by default, if no value is provided.
+      experimental_use_kahan_sum: Python `bool`. When `True`, use Kahan
+        summation to aggregate log-det jacobians from independent underlying
+        log-det jacobian values, which improves against the precision of a naive
+        float32 sum. This can be noticeable in particular for large dimensions
+        in float32. See CPU caveat on `tfp.math.reduce_kahan_sum`.
       parameters: Python `dict` of parameters used to instantiate this
         `Bijector`. Bijector instances with identical types, names, and
         `parameters` share an input/output cache. `parameters` dicts are
@@ -599,6 +606,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
     self._is_constant_jacobian = is_constant_jacobian
     self._validate_args = validate_args
     self._dtype = dtype
+    self._use_kahan_sum = experimental_use_kahan_sum
 
     self._defer_all_assertions = (
         auto_composite_tensor.is_deferred_assertion_context())
@@ -1422,7 +1430,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
           # Non-injective bijectors don't use caching, and the resulting
           # LDJ is a tuple of LDJ over possible partitions on `x`.
           return tuple(
-              reduce_jacobian_det_over_shape(ildj, reduce_shape)
+              reduce_jacobian_det_over_shape(
+                  ildj, reduce_shape, sum_fn=self._sum_fn)
               for ildj in self._inverse_log_det_jacobian(y, **kwargs))
 
         # Make sure the unreduced ILDJ is in the cache.
@@ -1457,7 +1466,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
               'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
               'is implemented. One or the other is required.')
 
-        return reduce_jacobian_det_over_shape(ildj, reduce_shape)
+        return reduce_jacobian_det_over_shape(
+            ildj, reduce_shape, sum_fn=self._sum_fn)
 
   def inverse_log_det_jacobian(self,
                                y,
@@ -1582,7 +1592,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
               'Neither _forward_log_det_jacobian nor _inverse_log_det_jacobian '
               'is implemented. One or the other is required.')
 
-        return reduce_jacobian_det_over_shape(-ildj, reduce_shape)
+        return reduce_jacobian_det_over_shape(
+            -ildj, reduce_shape, sum_fn=self._sum_fn)
 
   def forward_log_det_jacobian(self,
                                x,
@@ -1789,6 +1800,12 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
                    if v.specifies_shape)
     except NotImplementedError:
       return ()
+
+  def _sum_fn(self, x, axis=None):
+    if self._use_kahan_sum:
+      return math_generic.reduce_kahan_sum(x, axis=axis).total
+    else:
+      return tf.reduce_sum(x, axis=axis)
 
 
 class _AutoCompositeTensorBijectorMeta(_BijectorMeta):
@@ -2161,7 +2178,7 @@ def ldj_reduction_shape(shape_structure,
 
 def reduce_jacobian_det_over_shape(unreduced,
                                    reduce_shape,
-                                   sum_fn=tf.reduce_sum):
+                                   sum_fn):
   """Reduce LDJ over the rightmost `reduce_shape.ndims` dimensions."""
   # Broadcast LDJ to the reduce shape (in case of is_constant_jacobian)
   # and reduce over the trailing dimensions.

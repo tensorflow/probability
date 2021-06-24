@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import functools
 import os
 
 # Dependency imports
@@ -533,6 +534,43 @@ class IndependentDistributionTest(test_util.TestCase):
     lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
     # Fails ~75% CPU, 1-75% GPU --vary_seed runs w/o experimental_use_kahan_sum.
     self.assertAllClose(lp64, lp, rtol=0., atol=.01)
+
+  @parameterized.named_parameters(dict(testcase_name=''),
+                                  dict(testcase_name='_jit', jit=True))
+  def test_kahan_precision_bijector(self, jit=False):
+    maybe_jit = lambda f: f
+    if jit:
+      self.skip_if_no_xla()
+      maybe_jit = tf.function(jit_compile=True)
+
+    def ldj_fn(x, dist):
+      bij = dist.experimental_default_event_space_bijector()
+      y = bij.inverse(x) + 0.
+      return bij.inverse_log_det_jacobian(
+          x, event_ndims=1), bij.forward_log_det_jacobian(
+              y, event_ndims=1)
+
+    stream = test_util.test_seed_stream()
+    n = 20_000
+    samps = tfd.Exponential(rate=1.).sample(n, seed=stream())
+    rate = tf.fill([n], tfd.LogNormal(0, .2).sample(seed=stream()))
+    exp = tfd.Exponential(rate=rate)
+    ldj32_fn = maybe_jit(
+        functools.partial(
+            ldj_fn,
+            dist=tfd.Independent(
+                exp,
+                reinterpreted_batch_ndims=1,
+                experimental_use_kahan_sum=True),
+        ))
+    ldj32 = ldj32_fn(samps)
+    exp64 = tfd.Exponential(rate=tf.cast(rate, tf.float64))
+    ldj64 = ldj_fn(
+        tf.cast(samps, tf.float64),
+        dist=tfd.Independent(exp64, reinterpreted_batch_ndims=1))
+    # Evaluate together to ensure we use the same samples.
+    ldj32, ldj64 = self.evaluate((ldj32, ldj64))
+    self.assertAllCloseNested(ldj64, ldj32, rtol=0., atol=.002)
 
   def testLargeLogProbDiff(self):
     b = 15

@@ -315,7 +315,17 @@ class Independent(distribution_lib.Distribution):
     return self.distribution.mode(**kwargs)
 
   def _default_event_space_bijector(self):
-    return self.distribution.experimental_default_event_space_bijector()
+    bijector = self.distribution.experimental_default_event_space_bijector()
+    if (bijector is not None and
+        getattr(bijector,
+                '_use_kahan_sum',
+                False) != self._experimental_use_kahan_sum):
+      # Copy in case the wrapped distribution doesn't construct a brand-new
+      # bijector each time.
+      bijector = bijector.copy()
+      # TODO(b/191803645): Come up with an API to set this.
+      bijector._use_kahan_sum = self._experimental_use_kahan_sum  # pylint: disable=protected-access
+    return bijector
 
   def _parameter_control_dependencies(self, is_init):
     # self, distribution, reinterpreted_batch_ndims, validate_args):
@@ -430,4 +440,3 @@ def _independent_log_prob_ratio(p, x, q, y, name=None):
       return sum_fn(
           log_prob_ratio.log_prob_ratio(p.distribution, x, q.distribution, y),
           axis=-1 - ps.range(p.reinterpreted_batch_ndims))
-
