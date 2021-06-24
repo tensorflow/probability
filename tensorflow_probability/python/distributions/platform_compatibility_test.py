@@ -217,6 +217,7 @@ SKIP_KL_CHECK_DIST_VAR_GRADS = [
                                 # variables.
     'JohnsonSU',  # TD's KL gradients do not rely on bijector variables.
     'Kumaraswamy',  # TD's KL gradients do not rely on bijector variables.
+    'LambertWNormal',  # TD's KL gradients do not rely on bijector variables.
     'SinhArcsinh',  # TD's KL gradients do not rely on bijector variables.
 ]
 

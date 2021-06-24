@@ -30,7 +30,6 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
-from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -169,13 +168,12 @@ class Moyal(transformed_distribution.TransformedDistribution,
       # cause samples to lie in `(inf, -inf]` instead of `(inf, -inf)`. To fix
       # this, we use `np.finfo(dtype_util.as_numpy_dtype(self.dtype).tiny`
       # because it is the smallest, positive, 'normal' number.
-      batch_shape = distribution_util.get_broadcast_shape(loc, scale)
       super(Moyal, self).__init__(
           # TODO(b/137665504): Use batch-adding meta-distribution to set the
           # batch shape instead of tf.ones.
           distribution=uniform.Uniform(
               low=np.finfo(dtype_util.as_numpy_dtype(dtype)).tiny,
-              high=tf.ones(batch_shape, dtype=dtype),
+              high=tf.ones([], dtype=dtype),
               allow_nan_stats=allow_nan_stats),
           # The Moyal bijector encodes the CDF function as the forward,
           # and hence needs to be inverted.

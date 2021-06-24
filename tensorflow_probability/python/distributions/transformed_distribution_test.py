@@ -25,11 +25,13 @@ from absl.testing import parameterized  # pylint: disable=unused-import
 
 import numpy as np
 from scipy import stats
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -557,175 +559,126 @@ class TransformedDistributionTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class ScalarToMultiTest(test_util.TestCase):
 
-  def setUp(self):
-    self._shift = np.array([-1, 0, 1], dtype=np.float32)
-    self._tril = np.array([[[1., 0, 0],
-                            [2, 1, 0],
-                            [3, 2, 1]],
-                           [[2, 0, 0],
-                            [3, 2, 0],
-                            [4, 3, 2]]],
-                          dtype=np.float32)
-    super(ScalarToMultiTest, self).setUp()
+  def testNormalBatchBroadcasting(self):
+    td = tfd.TransformedDistribution(
+        distribution=tfd.Normal(0., 1.),
+        bijector=tfb.Shift([1., 1., 1.]))
 
-  def _testMVN(self,
-               base_distribution_class,
-               base_distribution_kwargs,
-               event_shape=()):
-    # Base distribution shapes must be compatible w/bijector; most bijectors are
-    # batch_shape agnostic and only care about event_ndims.
-    # In the case of `ScaleMatvecTriL`, if we got it wrong then it would fire an
-    # exception due to incompatible dimensions.
-    event_shape_var = tf.Variable(
-        np.int32(event_shape),
-        shape=tf.TensorShape(None),
-        name='dynamic_event_shape')
+    self.assertAllEqual(td.event_shape, [])
+    self.assertAllEqual(td.event_shape_tensor(), [])
+    self.assertAllEqual(td.batch_shape, [3])
+    self.assertAllEqual(td.batch_shape_tensor(), [3])
 
-    base_distribution_dynamic_kwargs = {
-        k: tf.Variable(
-            v, shape=tf.TensorShape(None), name='dynamic_{}'.format(k))
-        for k, v in base_distribution_kwargs.items()}
-    fake_mvn_dynamic = tfd.TransformedDistribution(
+    x = self.evaluate(td.sample(seed=test_util.test_seed()))
+    self.assertAllEqual(x.shape, [3])
+    self.assertAllEqual(td.log_prob(x).shape, [3])
+    # Check that we got a different sample for each batch element.
+    self.assertLen(np.unique(x), 3)
+
+    x, lp = self.evaluate(
+        td.experimental_sample_and_log_prob(seed=test_util.test_seed()))
+    self.assertAllEqual(x.shape, [3])
+    self.assertAllEqual(lp.shape, [3])
+    # Check that we got a different sample for each batch element.
+    self.assertLen(np.unique(x), 3)
+
+  @parameterized.named_parameters(
+      {'testcase_name': 'static',
+       'event_shape': [3],
+       'shift': np.array([-1, 0, 1], dtype=np.float32),
+       'tril': np.array([[2, 0, 0],  # Shape [3, 3].
+                         [3, 2, 0],
+                         [4, 3, 2]], dtype=np.float32),
+       'dynamic_shape': False},
+      {'testcase_name': 'batch_static',
+       'event_shape': [3],
+       'shift': np.ones([4, 1, 3], dtype=np.float32),
+       'tril': np.array([[[1., 0, 0],  # Shape [2, 3, 3].
+                          [2, 1, 0],
+                          [3, 2, 1]],
+                         [[2, 0, 0],
+                          [3, 2, 0],
+                          [4, 3, 2]]], dtype=np.float32),
+       'dynamic_shape': False},
+      {'testcase_name': 'batch_dynamic',
+       'event_shape': [3],
+       'shift': np.ones([4, 1, 3], dtype=np.float32),
+       'tril': np.array([[[1., 0, 0],  # Shape [2, 3, 3].
+                          [2, 1, 0],
+                          [3, 2, 1]],
+                         [[2, 0, 0],
+                          [3, 2, 0],
+                          [4, 3, 2]]], dtype=np.float32),
+       'dynamic_shape': True})
+  def testMVN(self, event_shape, shift, tril, dynamic_shape):
+    if dynamic_shape and tf.executing_eagerly():
+      self.skipTest('Eager execution does not support dynamic shape.')
+    as_tensor = tf.convert_to_tensor
+    if dynamic_shape:
+      as_tensor = lambda v, name: tf1.placeholder_with_default(  # pylint: disable=g-long-lambda
+          v, shape=None, name='dynamic_' + name)
+
+    fake_mvn = tfd.TransformedDistribution(
         distribution=tfd.Sample(
-            base_distribution_class(
-                validate_args=True, **base_distribution_dynamic_kwargs),
-            sample_shape=event_shape_var),
+            tfd.Normal(loc=as_tensor(0., name='loc'),
+                       scale=as_tensor(1., name='scale'),
+                       validate_args=True),
+            sample_shape=as_tensor(np.int32(event_shape), name='event_shape')),
         bijector=tfb.Chain(
-            [tfb.Shift(shift=self._shift),
-             tfb.ScaleMatvecTriL(scale_tril=self._tril)]),
-        validate_args=True)
+            [tfb.Shift(shift=as_tensor(shift, name='shift')),
+             tfb.ScaleMatvecTriL(scale_tril=as_tensor(tril, name='scale_tril'))
+             ]), validate_args=True)
 
-    fake_mvn_static = tfd.TransformedDistribution(
-        distribution=tfd.Sample(
-            base_distribution_class(
-                validate_args=True, **base_distribution_kwargs),
-            sample_shape=event_shape),
-        bijector=tfb.Chain(
-            [tfb.Shift(shift=self._shift),
-             tfb.ScaleMatvecTriL(scale_tril=self._tril)]),
-        validate_args=True)
+    base_dist = fake_mvn.distribution
+    expected_mean = tf.linalg.matvec(
+        tril, tf.broadcast_to(base_dist.mean(), shift.shape)) + shift
+    expected_cov = tf.linalg.matmul(
+        tril,
+        tf.matmul(
+            tf.linalg.diag(tf.broadcast_to(base_dist.variance(), shift.shape)),
+            tril,
+            adjoint_b=True))
+    expected_batch_shape = ps.shape(expected_mean)[:-1]
 
-    actual_mean = np.tile(self._shift, [2, 1])  # ScaleMatvecTriL elided tile.
-    actual_cov = np.matmul(self._tril, np.transpose(self._tril, [0, 2, 1]))
+    if dynamic_shape:
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn.event_shape)
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn.batch_shape)
+    else:
+      self.assertAllEqual(event_shape, fake_mvn.event_shape)
+      self.assertAllEqual(expected_batch_shape, fake_mvn.batch_shape)
 
-    def actual_mvn_log_prob(x):
-      return np.concatenate([[  # pylint: disable=g-complex-comprehension
-          stats.multivariate_normal(actual_mean[i],
-                                    actual_cov[i]).logpdf(x[:, i, :])
-      ] for i in range(len(actual_cov))]).T
-
-    actual_mvn_entropy = np.concatenate(
-        [[stats.multivariate_normal(actual_mean[i], actual_cov[i]).entropy()]
-         for i in range(len(actual_cov))])
-
-    self.assertAllEqual([3], fake_mvn_static.event_shape)
-    self.assertAllEqual([2], fake_mvn_static.batch_shape)
-
-    if not tf.executing_eagerly():
-      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
-      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
-
+    # Ensure sample works by checking first, second moments.
     num_samples = 7e3
-    for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
-      # Ensure sample works by checking first, second moments.
-      y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
-      x = y[0:5, ...]
-      sample_mean = tf.reduce_mean(y, axis=0)
-      centered_y = tf.transpose(a=y - sample_mean, perm=[1, 2, 0])
-      sample_cov = tf.matmul(
-          centered_y, centered_y, transpose_b=True) / num_samples
-      self.evaluate(
-          [v.initializer for v in base_distribution_dynamic_kwargs.values()]
-          + [event_shape_var.initializer])
-      [
-          sample_mean_,
-          sample_cov_,
-          x_,
-          fake_event_shape_,
-          fake_batch_shape_,
-          fake_log_prob_,
-          fake_prob_,
-          fake_mean_,
-          fake_entropy_,
-      ] = self.evaluate([
-          sample_mean,
-          sample_cov,
-          x,
-          fake_mvn.event_shape_tensor(),
-          fake_mvn.batch_shape_tensor(),
-          fake_mvn.log_prob(x),
-          fake_mvn.prob(x),
-          fake_mvn.mean(),
-          fake_mvn.entropy(),
-      ])
+    y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
+    x = y[0:5, ...]
+    self.assertAllClose(expected_mean, tf.reduce_mean(y, axis=0),
+                        atol=0.1, rtol=0.1)
+    self.assertAllClose(expected_cov, tfp.stats.covariance(y, sample_axis=0),
+                        atol=0., rtol=0.1)
 
-      self.assertAllClose(actual_mean, sample_mean_, atol=0.1, rtol=0.1)
-      self.assertAllClose(actual_cov, sample_cov_, atol=0., rtol=0.1)
+    self.assertAllEqual(event_shape, fake_mvn.event_shape_tensor())
+    self.assertAllEqual(expected_batch_shape, fake_mvn.batch_shape_tensor())
+    self.assertAllEqual(
+        ps.concat([[5], expected_batch_shape, event_shape], axis=0),
+        ps.shape(x))
+    self.assertAllClose(expected_mean, fake_mvn.mean())
 
-      # Ensure all other functions work as intended.
-      self.assertAllEqual([5, 2, 3], x_.shape)
-      self.assertAllEqual([3], fake_event_shape_)
-      self.assertAllEqual([2], fake_batch_shape_)
-      self.assertAllClose(
-          actual_mvn_log_prob(x_), fake_log_prob_, atol=0., rtol=1e-6)
-      self.assertAllClose(
-          np.exp(actual_mvn_log_prob(x_)), fake_prob_, atol=0., rtol=1e-5)
-      self.assertAllClose(actual_mean, fake_mean_, atol=0., rtol=1e-6)
-      self.assertAllClose(actual_mvn_entropy, fake_entropy_, atol=0., rtol=1e-6)
+  @parameterized.named_parameters(('static', False), ('dynamic', True))
+  def testMatrixEvent(self, dynamic_shape):
+    if dynamic_shape and tf.executing_eagerly():
+      self.skipTest('Eager execution does not support dynamic shape.')
+    as_tensor = tf.convert_to_tensor
+    if dynamic_shape:
+      as_tensor = lambda v, name: tf1.placeholder_with_default(  # pylint: disable=g-long-lambda
+          v, shape=None, name='dynamic_' + name)
 
-  def testScalarBatchScalarEvent(self):
-    self._testMVN(
-        base_distribution_class=tfd.Normal,
-        base_distribution_kwargs={
-            'loc': [0., 0.],
-            'scale': 1.
-        },
-        event_shape=[3])
-
-  def testScalarBatchNonScalarEvent(self):
-    self._testMVN(
-        base_distribution_class=tfd.MultivariateNormalDiag,
-        base_distribution_kwargs={
-            'loc': [[0., 0., 0.]]*2,
-            'scale_diag': [1., 1., 1.]
-        })
-
-  def testNonScalarBatchScalarEvent(self):
-
-    self._testMVN(
-        base_distribution_class=tfd.Normal,
-        base_distribution_kwargs={
-            'loc': [0., 0],
-            'scale': [1., 1]
-        },
-        event_shape=[3])
-
-  def testMatrixEvent(self):
     loc = 0.
-    batched_loc = [loc] * 2
-    batched_loc_var = tf.Variable(
-        batched_loc,
-        shape=tf.TensorShape(None),
-        name='dynamic_batch_shape')
-
-    event_shape = [2, 3, 3]
-    event_shape_var = tf.Variable(
-        np.int32(event_shape),
-        shape=tf.TensorShape(None),
-        name='dynamic_event_shape')
-
     scale = 2.
-    fake_mvn_dynamic = tfd.TransformedDistribution(
+    fake_mvn = tfd.TransformedDistribution(
         distribution=tfd.Sample(
-            tfd.Normal(loc=batched_loc_var, scale=scale),
-            sample_shape=event_shape_var),
-        bijector=DummyMatrixTransform(),
-        validate_args=True)
-
-    fake_mvn_static = tfd.TransformedDistribution(
-        distribution=tfd.Sample(
-            tfd.Normal(loc=batched_loc, scale=scale),
-            sample_shape=event_shape),
+            tfd.Normal(loc=as_tensor([loc] * 2, name='loc'),
+                       scale=as_tensor(scale, name='scale')),
+            sample_shape=as_tensor(np.int32([2, 3, 3]), name='event_shape')),
         bijector=DummyMatrixTransform(),
         validate_args=True)
 
@@ -736,81 +689,75 @@ class ScalarToMultiTest(test_util.TestCase):
       return (np.sum(stats.norm(loc, scale).logpdf(x), axis=(-1, -2, -3)) +
               np.sum(np.linalg.det(x), axis=-1))
 
-    self.assertAllEqual([2, 3, 3], fake_mvn_static.event_shape)
-    self.assertAllEqual([2], fake_mvn_static.batch_shape)
+    if dynamic_shape:
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn.event_shape)
+      self.assertAllEqual(tf.TensorShape(None), fake_mvn.batch_shape)
+    else:
+      self.assertAllEqual([2, 3, 3], fake_mvn.event_shape)
+      self.assertAllEqual([2], fake_mvn.batch_shape)
 
-    if not tf.executing_eagerly():
-      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.event_shape)
-      self.assertAllEqual(tf.TensorShape(None), fake_mvn_dynamic.batch_shape)
+    # Ensure all other functions work as intended.
+    x = self.evaluate(fake_mvn.sample(5, seed=test_util.test_seed()))
+    self.assertAllEqual([5, 2, 2, 3, 3], x.shape)
+    self.assertAllEqual([2, 3, 3], fake_mvn.event_shape_tensor())
+    self.assertAllEqual([2], fake_mvn.batch_shape_tensor())
+    self.assertAllClose(
+        actual_mvn_log_prob(x), fake_mvn.log_prob(x), atol=0., rtol=1e-6)
+    # With this many dimensions and samples, the direct space probability
+    # may underflow.
+    self.assertAllClose(
+        np.exp(actual_mvn_log_prob(x)),
+        fake_mvn.prob(x),
+        atol=1e-12, rtol=1e-5)
 
-    num_samples = 5e3
-    self.evaluate([event_shape_var.initializer, batched_loc_var.initializer])
-    for fake_mvn in [fake_mvn_static, fake_mvn_dynamic]:
-      # Ensure sample works by checking first, second moments.
-      y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
-      x = y[0:5, ...]
-      [
-          x_,
-          fake_event_shape_,
-          fake_batch_shape_,
-          fake_log_prob_,
-          fake_prob_,
-      ] = self.evaluate([
-          x,
-          fake_mvn.event_shape_tensor(),
-          fake_mvn.batch_shape_tensor(),
-          fake_mvn.log_prob(x),
-          fake_mvn.prob(x),
-      ])
-
-      # Ensure all other functions work as intended.
-      self.assertAllEqual([5, 2, 2, 3, 3], x_.shape)
-      self.assertAllEqual([2, 3, 3], fake_event_shape_)
-      self.assertAllEqual([2], fake_batch_shape_)
-      self.assertAllClose(
-          actual_mvn_log_prob(x_), fake_log_prob_, atol=0., rtol=1e-6)
-      # With this many dimensions and samples, the direct space probability
-      # may underflow.
-      self.assertAllClose(
-          np.exp(actual_mvn_log_prob(x_)), fake_prob_, atol=1e-12, rtol=1e-5)
-
-  def testEmptyEvent(self):
+  @parameterized.named_parameters(
+      {'testcase_name': 'scalar_static',
+       'batch_shape': [],
+       'shapes_are_dynamic': False},
+      {'testcase_name': 'batch_static',
+       'batch_shape': [2],
+       'shapes_are_dynamic': True},
+      {'testcase_name': 'scalar_dynamic',
+       'batch_shape': [],
+       'shapes_are_dynamic': False},
+      {'testcase_name': 'batch_dynamic',
+       'batch_shape': [2],
+       'shapes_are_dynamic': True})
+  def testEmptyEvent(self, batch_shape, shapes_are_dynamic):
     # Verify that zero-dimensional multivariate Normal distributions still
     # return reasonable shapes and a log-prob of 0.0.
 
     event_shape = [0]
-    for batch_shape in ([2], []):
-      for shapes_are_dynamic in (True, False):
-        loc = tf.zeros(batch_shape + event_shape)
-        scale_diag = tf.ones(batch_shape + event_shape)
+    loc = tf.zeros(batch_shape + event_shape)
+    scale_diag = tf.ones(batch_shape + event_shape)
 
-        if shapes_are_dynamic:
-          loc = tf.Variable(
-              loc, shape=tf.TensorShape(None), name='dynamic_loc')
-          scale_diag = tf.Variable(
-              scale_diag, shape=tf.TensorShape(None), name='dynamic_scale_diag')
-          self.evaluate([loc.initializer, scale_diag.initializer])
+    if shapes_are_dynamic:
+      loc = tf.Variable(
+          loc, shape=tf.TensorShape(None), name='dynamic_loc')
+      scale_diag = tf.Variable(
+          scale_diag, shape=tf.TensorShape(None), name='dynamic_scale_diag')
+      self.evaluate([loc.initializer, scale_diag.initializer])
 
-        mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
+    mvn = tfd.MultivariateNormalDiag(loc=loc, scale_diag=scale_diag)
 
-        self.assertAllEqual(self.evaluate(mvn.event_shape_tensor()),
-                            event_shape)
-        self.assertAllEqual(self.evaluate(mvn.batch_shape_tensor()),
-                            batch_shape)
-        if not shapes_are_dynamic:
-          self.assertAllEqual(
-              tensorshape_util.as_list(mvn.event_shape), event_shape)
-          self.assertAllEqual(
-              tensorshape_util.as_list(mvn.batch_shape), batch_shape)
+    self.assertAllEqual(self.evaluate(mvn.event_shape_tensor()),
+                        event_shape)
+    self.assertAllEqual(self.evaluate(mvn.batch_shape_tensor()),
+                        batch_shape)
+    if not shapes_are_dynamic:
+      self.assertAllEqual(
+          tensorshape_util.as_list(mvn.event_shape), event_shape)
+      self.assertAllEqual(
+          tensorshape_util.as_list(mvn.batch_shape), batch_shape)
 
-        for sample_shape in ([3], []):
-          sample_ = self.evaluate(mvn.sample(
-              sample_shape, seed=test_util.test_seed()))
-          self.assertAllEqual(sample_.shape,
-                              sample_shape + batch_shape + event_shape)
-          self.assertAllEqual(
-              self.evaluate(mvn.log_prob(sample_)),
-              np.zeros(sample_shape + batch_shape))
+    for sample_shape in ([3], []):
+      sample_ = self.evaluate(mvn.sample(
+          sample_shape, seed=test_util.test_seed()))
+      self.assertAllEqual(sample_.shape,
+                          sample_shape + batch_shape + event_shape)
+      self.assertAllEqual(
+          self.evaluate(mvn.log_prob(sample_)),
+          np.zeros(sample_shape + batch_shape))
 
   def testConditioning(self):
     conditional_normal = tfd.TransformedDistribution(
@@ -856,19 +803,19 @@ class ExcessiveConcretizationTest(test_util.TestCase):
         'quantile': 2,
 
         'event_shape_tensor': 2,
-        'batch_shape_tensor': 2,
+        'batch_shape_tensor': 3,
     }
 
     self.shape = None
 
   def testExcessiveConcretizationOfParams(self):
+    shape_kwargs = {'shape': self.shape} if self.shape else {}
     loc = tfp_hps.defer_and_count_usage(
-        tf.Variable(0., name='loc', dtype=tf.float32, shape=self.shape))
+        tf.Variable(0., name='loc', dtype=tf.float32, **shape_kwargs))
     scale = tfp_hps.defer_and_count_usage(
-        tf.Variable(2., name='scale', dtype=tf.float32, shape=self.shape))
+        tf.Variable(2., name='scale', dtype=tf.float32, **shape_kwargs))
     bij_scale = tfp_hps.defer_and_count_usage(
-        tf.Variable(2., name='bij_scale', dtype=tf.float32, shape=self.shape))
-
+        tf.Variable(2., name='bij_scale', dtype=tf.float32, **shape_kwargs))
     dist = tfd.TransformedDistribution(
         distribution=tfd.Normal(loc=loc, scale=scale, validate_args=True),
         bijector=tfb.Scale(scale=bij_scale, validate_args=True),
@@ -900,7 +847,7 @@ class ExcessiveConcretizationTestUnknownShape(ExcessiveConcretizationTest):
 
         # extra concretizations primarily of base distribution parameters
         'mean': 2,
-        'sample': 2,
+        'sample': 15,  # Unknown shape forces BatchBroadcast wrapping.
         'log_cdf': 2,
         'cdf': 2,
         'survival_function': 2,
@@ -910,7 +857,7 @@ class ExcessiveConcretizationTestUnknownShape(ExcessiveConcretizationTest):
         'prob': 6,
         'quantile': 2,
         'event_shape_tensor': 2,
-        'batch_shape_tensor': 2,
+        'batch_shape_tensor': 3,
     }
 
     self.shape = tf.TensorShape(None)
