@@ -2109,6 +2109,7 @@ multi_substrate_py_library(
     name = "transformed_distribution",
     srcs = ["transformed_distribution.py"],
     deps = [
+        ":batch_broadcast",
         ":distribution",
         ":kullback_leibler",
         ":log_prob_ratio",

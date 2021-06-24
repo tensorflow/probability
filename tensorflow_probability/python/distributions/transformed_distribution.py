@@ -22,6 +22,7 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import ldj_ratio
+from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
@@ -141,9 +142,30 @@ class TransformedDistribution(distribution_lib.Distribution):
     name='NormalTransformedDistribution')
   ```
 
-  A `TransformedDistribution`'s `batch_shape` is the same as that of the base
-  distribution, and its `event_shape` is the `forward_event_shape` of the
-  bijector applied to the `event_shape` of the base distribution.
+  A `TransformedDistribution`'s `batch_shape` is derived by *broadcasting* the
+  batch shapes of the base distribution and the bijector. The base distribution
+  is then itself implicitly lifted to the broadcast batch shape. For example, in
+
+  ```python
+  tfd = tfp.distributions
+  tfb = tfp.bijectors
+  batch_normal = tfd.TransformedDistribution(
+    distribution=tfd.Normal(loc=0., scale=1.),
+    bijector=tfb.Shift(shift=[-1., 0., 1.]),
+    name='BatchNormalTransformedDistribution')
+  ```
+
+  the base distribution has batch shape `[]`, and the bijector applied to this
+  distribution contributes a batch shape of `[3]` (obtained as
+  `bijector.experimental_batch_shape(
+  x_event_ndims=tf.rank(distribution.event_shape))`, yielding the broadcast
+  shape `batch_normal.batch_shape == [3]`. Although sampling from the base
+  distribution would ordinarily return just a single value, calling
+  `batch_normal.sample()` will return a Tensor of 3 independent values, just as
+  if the base distribution had explicitly followed the broadcast batch shape.
+
+  The `event_shape` of a `TransformedDistribution` is the `forward_event_shape`
+  of the bijector applied to the `event_shape` of the base distribution.
 
   `tfd.Sample` or `tfd.Independent` may be used to add extra IID dimensions to
   the `event_shape` of the base distribution before the bijector operates on it.
@@ -265,6 +287,25 @@ class TransformedDistribution(distribution_lib.Distribution):
         bijector=parameter_properties.BatchedComponentProperties(
             event_ndims=_count_bijector_batch_ndims_used_by_event))
 
+  def _bijector_batch_shape(self):
+    x_event_ndims = tf.nest.map_structure(tensorshape_util.rank,
+                                          self.distribution.event_shape)
+    if any(dim is None for dim in tf.nest.flatten(x_event_ndims)):
+      return tf.TensorShape(None)
+    try:
+      return self.bijector.experimental_batch_shape(x_event_ndims=x_event_ndims)
+    except NotImplementedError:
+      return tf.TensorShape([])
+
+  def _bijector_batch_shape_tensor(self):
+    try:
+      return self.bijector.experimental_batch_shape_tensor(
+          x_event_ndims=tf.nest.map_structure(
+              ps.rank_from_shape,
+              self.distribution.event_shape_tensor()))
+    except NotImplementedError:
+      return []
+
   def _event_shape_tensor(self):
     return self.bijector.forward_event_shape_tensor(
         self.distribution.event_shape_tensor())
@@ -278,13 +319,14 @@ class TransformedDistribution(distribution_lib.Distribution):
   def _batch_shape_tensor(self):
     base_batch_shape_tensor = self.distribution.batch_shape_tensor()
 
-    # The `batch_shape_tensor` of the transformed distribution is the same as
-    # that of the base distribution in all cases except when the following are
-    # both true:
+    # A `TransformedDistribution`'s `batch_shape` is derived by broadcasting the
+    # base distribution's batch shape with the batch shape contributed by the
+    # bijector. If both of the following are true:
     #   - the base distribution is joint with structured `batch_shape_tensor`
     #   - the transformed distribution is not joint.
-    # In this case, the components of the base distribution's
-    # `batch_shape_tensor` are broadcast to obtain the `batch_shape_tensor` of
+    # then the components of the base distribution's
+    # `batch_shape_tensor` are broadcast with *each other*, and also with the
+    # bijector's contribution, to obtain the `batch_shape_tensor` of
     # the transformed distribution. Non-broadcasting components are not
     # supported. (Note that joint distributions may either have a single
     # `batch_shape_tensor` for all components, or a component-wise
@@ -297,14 +339,10 @@ class TransformedDistribution(distribution_lib.Distribution):
       base_batch_shape_tensor = functools.reduce(
           ps.broadcast_shape,
           tf.nest.flatten(base_batch_shape_tensor))
-    return base_batch_shape_tensor
+    return ps.broadcast_shape(base_batch_shape_tensor,
+                              self._bijector_batch_shape_tensor())
 
   def _batch_shape(self):
-    # Notice that this implementation parallels the `_event_shape` except that
-    # the `bijector` doesn't get to alter the `batch_shape`. Recall that
-    # `batch_shape` is a property of a distribution while `event_shape` is
-    # shared between both the `distribution` instance and the `bijector`.
-    #
     # As with `batch_shape_tensor`, if the base distribution is joint with
     # structured batch shape and the transformed distribution is not joint,
     # the batch shape components of the base distribution are broadcast to
@@ -316,7 +354,31 @@ class TransformedDistribution(distribution_lib.Distribution):
             self.dtype, tf.nest.flatten(batch_shape))
       batch_shape = functools.reduce(
           tf.broadcast_static_shape, tf.nest.flatten(batch_shape))
-    return batch_shape
+    return tf.broadcast_static_shape(batch_shape, self._bijector_batch_shape())
+
+  def _maybe_broadcast_distribution_batch_shape(self):
+    """Returns the base distribution broadcast to the TD's full batch shape."""
+    bijector_batch_shape = self._bijector_batch_shape()
+    if tensorshape_util.rank(bijector_batch_shape) == 0:
+      # Bijector batch shape is static and nonexistent: no broadcasting needed.
+      return self.distribution
+    if self._is_joint:
+      # TODO(b/191674464): Support joint distributions in BatchBroadcast.
+      return self.distribution
+
+    distribution_batch_shape = self.distribution.batch_shape
+    if (tensorshape_util.is_fully_defined(distribution_batch_shape) and
+        distribution_batch_shape == tf.broadcast_static_shape(
+            distribution_batch_shape,
+            bijector_batch_shape)):
+      # No need to broadcast if the distribution already has full batch shape.
+      return self.distribution
+
+    if not tensorshape_util.is_fully_defined(bijector_batch_shape):
+      bijector_batch_shape = self._bijector_batch_shape_tensor()
+
+    return batch_broadcast.BatchBroadcast(self.distribution,
+                                          with_shape=bijector_batch_shape)
 
   def _call_sample_n(self, sample_shape, seed, **kwargs):
     # We override `_call_sample_n` rather than `_sample_n` so we can ensure that
@@ -325,9 +387,8 @@ class TransformedDistribution(distribution_lib.Distribution):
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
     # First, generate samples from the base distribution.
-    x = self.distribution.sample(sample_shape=sample_shape,
-                                 seed=seed,
-                                 **distribution_kwargs)
+    x = self._maybe_broadcast_distribution_batch_shape().sample(
+        sample_shape=sample_shape, seed=seed, **distribution_kwargs)
     # Apply the bijector's forward transformation. For caching to
     # work, it is imperative that this is the last modification to the
     # returned result.
@@ -342,8 +403,9 @@ class TransformedDistribution(distribution_lib.Distribution):
 
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x, base_distribution_log_prob = (
-        self.distribution.experimental_sample_and_log_prob(
-            sample_shape, seed, **distribution_kwargs))
+        self._maybe_broadcast_distribution_batch_shape(
+            ).experimental_sample_and_log_prob(
+                sample_shape, seed, **distribution_kwargs))
     y = self.bijector.forward(x, **bijector_kwargs)
     fldj = self.bijector.forward_log_det_jacobian(
         x,

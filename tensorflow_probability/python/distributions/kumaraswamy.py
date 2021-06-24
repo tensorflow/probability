@@ -168,13 +168,9 @@ class Kumaraswamy(transformed_distribution.TransformedDistribution,
           concentration1=concentration1,
           concentration0=concentration0,
           validate_args=validate_args)
-      batch_shape = distribution_util.get_broadcast_shape(
-          concentration1, concentration0)
       super(Kumaraswamy, self).__init__(
-          # TODO(b/137665504): Use batch-adding meta-distribution to set the
-          # batch shape instead of tf.zeros.
           distribution=uniform.Uniform(
-              low=tf.zeros(batch_shape, dtype=dtype),
+              low=tf.zeros([], dtype=dtype),
               high=tf.ones([], dtype=dtype),
               allow_nan_stats=allow_nan_stats),
           bijector=invert.Invert(

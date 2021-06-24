@@ -14,8 +14,6 @@
 # ============================================================================
 """SinhArcsinh transformation of a distribution."""
 
-import functools
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import identity as identity_bijector
@@ -27,7 +25,6 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
@@ -161,14 +158,8 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       #   C := 2 / F_0(2)
       #   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
       if distribution is None:
-        batch_shape = functools.reduce(
-            ps.broadcast_shape,
-            [ps.shape(x)
-             for x in (self._skewness, self._tailweight,
-                       self._loc, self._scale)])
-
         distribution = normal.Normal(
-            loc=tf.zeros(batch_shape, dtype=dtype),
+            loc=tf.zeros([], dtype=dtype),
             scale=tf.ones([], dtype=dtype),
             allow_nan_stats=allow_nan_stats,
             validate_args=validate_args)

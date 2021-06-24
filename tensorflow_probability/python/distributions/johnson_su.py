@@ -14,8 +14,6 @@
 # ============================================================================
 """Johnson's SU distribution class."""
 
-import functools
-
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import invert as invert_bijector
@@ -29,7 +27,6 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -204,17 +201,9 @@ class JohnsonSU(transformed_distribution.TransformedDistribution,
                                    validate_args=validate_args)
 
       bijector = shift(scale(sinh(norm_scale(norm_shift))))
-
-      batch_shape = functools.reduce(
-          ps.broadcast_shape,
-          [ps.shape(x)
-           for x in (self._skewness, self._tailweight, self._loc, self._scale)])
-
       super(JohnsonSU, self).__init__(
-          # TODO(b/160730249): Make `loc` a scalar `0.` when
-          # TransformedDistribution's bijector can modify its `batch_shape`.
           distribution=normal.Normal(
-              loc=tf.zeros(batch_shape, dtype=dtype),
+              loc=tf.zeros([], dtype=dtype),
               scale=tf.ones([], dtype=dtype),
               validate_args=validate_args,
               allow_nan_stats=allow_nan_stats),

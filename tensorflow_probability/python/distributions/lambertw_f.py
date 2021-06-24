@@ -21,14 +21,12 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
-from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 
@@ -121,14 +119,7 @@ class LambertWDistribution(transformed_distribution.TransformedDistribution):
                                           self.scale))
       self._allow_nan_stats = allow_nan_stats
       super(LambertWDistribution, self).__init__(
-          # TODO(b/160730249): Remove broadcasting when
-          # TransformedDistribution's bijector can modify its `batch_shape`.
-          distribution=batch_broadcast.BatchBroadcast(
-              distribution,
-              with_shape=ps.broadcast_shape(
-                  ps.shape(tailweight),
-                  ps.broadcast_shape(ps.shape(shift),
-                                     ps.shape(scale)))),
+          distribution=distribution,
           bijector=tfb.LambertWTail(shift=shift, scale=scale,
                                     tailweight=tailweight,
                                     validate_args=validate_args),
