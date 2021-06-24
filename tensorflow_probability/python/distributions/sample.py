@@ -319,8 +319,11 @@ class Sample(distribution_lib.Distribution):
     bijector = self.distribution.experimental_default_event_space_bijector()
     if bijector is None:
       return None
-    return _DefaultSampleBijector(self.distribution, self.sample_shape,
-                                  self._sum_fn(), bijector=bijector)
+    bijector = _DefaultSampleBijector(
+        self.distribution, self.sample_shape, self._sum_fn(), bijector=bijector)
+    # TODO(b/191803645): Come up with an API to set this.
+    bijector._use_kahan_sum = self._experimental_use_kahan_sum  # pylint: disable=protected-access
+    return bijector
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

@@ -22,7 +22,6 @@ import inspect
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.internal import prefer_static as ps
 
@@ -39,7 +38,7 @@ _ildj_ratio_registry = {}
 
 
 def _reduce_ldj_ratio(unreduced_ldj_ratio, p, q, input_shape, min_event_ndims,
-                      event_ndims, use_kahan_sum):
+                      event_ndims):
   """Reduces an LDJ ratio computed with event_ndims=min_event_ndims."""
   # pylint: disable=protected-access
   have_parameter_batch_shape = (
@@ -61,13 +60,28 @@ def _reduce_ldj_ratio(unreduced_ldj_ratio, p, q, input_shape, min_event_ndims,
                                           q._parts_interact),
       validate_args=p.validate_args or q.validate_args)
 
-  if use_kahan_sum:
-    sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
-  else:
-    sum_fn = tf.reduce_sum
+  sum_fn = getattr(p, '_sum_fn', getattr(q, '_sum_fn', tf.reduce_sum))
   with tf.control_dependencies(assertions):
     return bijector_lib.reduce_jacobian_det_over_shape(
         unreduced_ldj_ratio, reduce_shape=reduce_shape, sum_fn=sum_fn)
+
+
+def _default_fldj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
+  min_event_ndims = p.forward_min_event_ndims
+  unreduced_fldj_ratio = (
+      p.forward_log_det_jacobian(x, event_ndims=min_event_ndims, **p_kwargs) -
+      q.forward_log_det_jacobian(y, event_ndims=min_event_ndims, **q_kwargs))
+  return _reduce_ldj_ratio(unreduced_fldj_ratio, p, q, ps.shape(x),
+                           min_event_ndims, event_ndims)
+
+
+def _default_ildj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
+  min_event_ndims = p.inverse_min_event_ndims
+  unreduced_fldj_ratio = (
+      p.inverse_log_det_jacobian(x, event_ndims=event_ndims, **p_kwargs) -
+      q.inverse_log_det_jacobian(y, event_ndims=event_ndims, **q_kwargs))
+  return _reduce_ldj_ratio(unreduced_fldj_ratio, p, q, ps.shape(x),
+                           min_event_ndims, event_ndims)
 
 
 def _get_ldj_ratio_fn(cls, registry):
@@ -85,7 +99,6 @@ def forward_log_det_jacobian_ratio(
     q,
     y,
     event_ndims,
-    use_kahan_sum=False,
     p_kwargs=None,
     q_kwargs=None,
 ):
@@ -102,9 +115,6 @@ def forward_log_det_jacobian_ratio(
     y: A tensor from the preimage of `q.forward`.
     event_ndims: The number of right-hand dimensions comprising the event shapes
       of `x` and `y`.
-    use_kahan_sum: When `True`, the reduction of any remaining `event_ndims`
-      beyond the minimum is done using Kahan summation. This requires statically
-      known ranks.
     p_kwargs: Keyword args to pass to `p`.
     q_kwargs: Keyword args to pass to `q`.
 
@@ -124,16 +134,6 @@ def forward_log_det_jacobian_ratio(
   fldj_ratio_fn = _get_ldj_ratio_fn(type(p), registry=_fldj_ratio_registry)
   ildj_ratio_fn = _get_ldj_ratio_fn(type(p), registry=_ildj_ratio_registry)
 
-  # TODO(b/191803645): Move this out to global scope when `use_kahan_sum` is
-  # gone.
-  def default_fldj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
-    min_event_ndims = p.forward_min_event_ndims
-    unreduced_fldj_ratio = (
-        p.forward_log_det_jacobian(x, event_ndims=min_event_ndims, **p_kwargs) -
-        q.forward_log_det_jacobian(y, event_ndims=min_event_ndims, **q_kwargs))
-    return _reduce_ldj_ratio(unreduced_fldj_ratio, p, q, ps.shape(x),
-                             min_event_ndims, event_ndims, use_kahan_sum)
-
   def inverse_fldj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
     # p.fldj(x) - q.fldj(y) = q.ildj(q(y)) - p.ildj(p(x))
     return ildj_ratio_fn(q, q.forward(y), p, p.forward(x),
@@ -141,7 +141,7 @@ def forward_log_det_jacobian_ratio(
 
   if fldj_ratio_fn is None:
     if ildj_ratio_fn is None:
-      fldj_ratio_fn = default_fldj_ratio_fn
+      fldj_ratio_fn = _default_fldj_ratio_fn
     else:
       fldj_ratio_fn = inverse_fldj_ratio_fn
 
@@ -154,7 +154,6 @@ def inverse_log_det_jacobian_ratio(
     q,
     y,
     event_ndims,
-    use_kahan_sum=False,
     p_kwargs=None,
     q_kwargs=None,
 ):
@@ -171,9 +170,6 @@ def inverse_log_det_jacobian_ratio(
     y: A tensor from the image of `q.forward`.
     event_ndims: The number of right-hand dimensions comprising the event shapes
       of `x` and `y`.
-    use_kahan_sum: When `True`, the reduction of any remaining `event_ndims`
-      beyond the minimum is done using Kahan summation. This requires statically
-      known ranks.
     p_kwargs: Keyword args to pass to `p`.
     q_kwargs: Keyword args to pass to `q`.
 
@@ -193,16 +189,6 @@ def inverse_log_det_jacobian_ratio(
   ildj_ratio_fn = _get_ldj_ratio_fn(type(p), registry=_ildj_ratio_registry)
   fldj_ratio_fn = _get_ldj_ratio_fn(type(p), registry=_fldj_ratio_registry)
 
-  # TODO(b/191803645): Move this out to global scope when `use_kahan_sum` is
-  # gone.
-  def default_ildj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
-    min_event_ndims = p.inverse_min_event_ndims
-    unreduced_fldj_ratio = (
-        p.inverse_log_det_jacobian(x, event_ndims=event_ndims, **p_kwargs) -
-        q.inverse_log_det_jacobian(y, event_ndims=event_ndims, **q_kwargs))
-    return _reduce_ldj_ratio(unreduced_fldj_ratio, p, q, ps.shape(x),
-                             min_event_ndims, event_ndims, use_kahan_sum)
-
   def inverse_ildj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
     # p.ildj(x) - q.ildj(y) = q.fldj(q^-1(y)) - p.fldj(p^-1(x))
     return fldj_ratio_fn(q, q.inverse(y), p, p.inverse(x),
@@ -210,7 +196,7 @@ def inverse_log_det_jacobian_ratio(
 
   if ildj_ratio_fn is None:
     if fldj_ratio_fn is None:
-      ildj_ratio_fn = default_ildj_ratio_fn
+      ildj_ratio_fn = _default_ildj_ratio_fn
     else:
       ildj_ratio_fn = inverse_ildj_ratio_fn
 
@@ -234,10 +220,7 @@ def inverse_log_det_jacobian_ratio(
         allow_event_shape_broadcasting=True,
         validate_args=p.validate_args or q.validate_args)
 
-    if use_kahan_sum:
-      sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
-    else:
-      sum_fn = tf.reduce_sum
+    sum_fn = getattr(p, '_sum_fn', getattr(q, '_sum_fn', tf.reduce_sum))
     with tf.control_dependencies(assertions):
       return bijector_lib.reduce_jacobian_det_over_shape(
           ildj_ratio_fn(p, x, q, y, min_event_ndims, p_kwargs, q_kwargs),
