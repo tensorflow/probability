@@ -230,6 +230,7 @@ of the various combinators (`Choice`, `Not`, `Star`, etc.). By subclassing
 `Pattern` and implementing the  `match(self, expr, bindings, succeed)` method,
 the class is automatically registered with `matcher`.
 """
+import collections
 import functools
 
 from typing import Any, Callable, Dict, Iterator, Optional, Sequence, TypeVar
@@ -601,7 +602,7 @@ class Segment(Star):
         Dot, name=name, accumulate=accumulate, plus=plus, greedy=greedy)
 
 
-@matcher.register(Sequence)
+@matcher.register(collections.abc.Sequence)
 def sequence_matcher(pattern: Sequence[Any]):
   """Returns a matcher for a given sequence pattern."""
 
