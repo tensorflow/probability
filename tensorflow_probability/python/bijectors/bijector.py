@@ -241,15 +241,15 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
 
   Some examples:
 
-  `AffineScalar:  min_event_ndims=0`
-  `Affine:  min_event_ndims=1`
   `Cholesky:  min_event_ndims=2`
   `Exp:  min_event_ndims=0`
+  `MatvecTriL: min_event_ndims=1`
+  `Scale:  min_event_ndims=0`
   `Sigmoid:  min_event_ndims=0`
   `SoftmaxCentered:  min_event_ndims=1`
 
-  Note the difference between `Affine` and `AffineScalar`. `AffineScalar`
-  operates on scalar events, whereas `Affine` operates on vector-valued events.
+  For multiplicative transformations, note that `Scale` operates on scalar
+  events, whereas the `Matvec*` bijectors operate on vector-valued events.
 
   More generally, there is a `forward_min_event_ndims` and an
   `inverse_min_event_ndims`. In most cases, these will be the same.

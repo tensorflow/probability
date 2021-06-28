@@ -45,7 +45,6 @@ multi_substrate_py_library(
         ":absolute_value",
         ":affine",
         ":affine_linear_operator",
-        ":affine_scalar",
         ":ascending",
         ":batch_normalization",
         ":bijector",
@@ -179,19 +178,6 @@ multi_substrate_py_library(
     deps = [
         ":bijector",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:tensor_util",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "affine_scalar",
-    srcs = ["affine_scalar.py"],
-    deps = [
-        ":bijector",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensor_util",
     ],
@@ -783,7 +769,6 @@ multi_substrate_py_library(
     name = "real_nvp",
     srcs = ["real_nvp.py"],
     deps = [
-        ":affine_scalar",
         ":bijector",
         # numpy dep,
         # tensorflow dep,
@@ -836,7 +821,6 @@ multi_substrate_py_library(
     name = "fill_scale_tril",
     srcs = ["fill_scale_tril.py"],
     deps = [
-        ":affine_scalar",
         ":chain",
         ":fill_triangular",
         ":softplus",
@@ -1138,19 +1122,6 @@ multi_substrate_py_test(
         ":bijectors",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "affine_scalar_test",
-    size = "small",
-    srcs = ["affine_scalar_test.py"],
-    deps = [
-        ":bijector_test_util",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

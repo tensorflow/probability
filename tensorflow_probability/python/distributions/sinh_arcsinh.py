@@ -169,7 +169,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
           skewness=self._skewness, tailweight=self._tailweight,
           validate_args=validate_args)
 
-      # Make the AffineScalar bijector, Z --> loc + scale * Z (2 / F_0(2))
+      # Make the affine scalar bijector, Z --> loc + scale * Z (2 / F_0(2))
       affine = shift_bijector.Shift(shift=self._loc)(
           scale_bijector.Scale(scale=self._scale))
       bijector = chain_bijector.Chain([affine, f])
