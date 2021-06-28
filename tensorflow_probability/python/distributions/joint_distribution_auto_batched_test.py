@@ -709,30 +709,72 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
 
     models = {}
     def coroutine_model():
-      high = yield tfd.LogNormal(0., 1)
-      yield tfd.Uniform(low=[-1., -2.], high=high)
+      high = yield tfd.LogNormal(0., [1.])
+      yield tfd.Uniform(low=[[-1., -2.]], high=high[..., tf.newaxis])
+      yield tfd.Deterministic([[0., 1., 2.]])
     models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
 
     models[tfd.JointDistributionSequentialAutoBatched] = [
-        tfd.LogNormal(0., 1.),
-        lambda high: tfd.Uniform(low=[-1., -2.], high=high)
+        tfd.LogNormal(0., [1.]),
+        lambda high: tfd.Uniform(low=[[-1., -2.]], high=high[..., tf.newaxis]),
+        tfd.Deterministic([[0., 1., 2.]])
     ]
 
     models[tfd.JointDistributionNamedAutoBatched] = collections.OrderedDict((
-        ('high', tfd.LogNormal(0., 1.)),
-        ('x', lambda high: tfd.Uniform(low=[-1., -2.], high=high))))
+        ('high', tfd.LogNormal(0., [1.])),
+        ('x', lambda high: tfd.Uniform(low=[[-1., -2.]],  # pylint: disable=g-long-lambda
+                                       high=high[..., tf.newaxis])),
+        ('y', tfd.Deterministic([[0., 1., 2.]]))))
 
-    joint = jd_class(models[jd_class], validate_args=True)
+    joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
+    self.assertAllEqual(joint.batch_shape, [1])
+    self.assertAllEqualNested(tf.nest.flatten(joint.event_shape),
+                              [[], [2], [3]])
     joint_bijector = joint.experimental_default_event_space_bijector()
 
     y = self.evaluate(joint.sample([2, 3], seed=test_util.test_seed()))
     x = joint_bijector.inverse(y)
-    self.assertAllClose(y, joint_bijector.forward(x))
+    self.assertAllCloseNested(y, joint_bijector.forward(x))
 
-    event_ndims = tf.nest.pack_sequence_as(joint.dtype, [0, 1])
-    fldj = joint_bijector.forward_log_det_jacobian(x, event_ndims=event_ndims)
-    ildj = joint_bijector.inverse_log_det_jacobian(y, event_ndims=event_ndims)
-    self.assertAllEqual(fldj.shape, [2, 3])
+    fldj = joint_bijector.forward_log_det_jacobian(
+        x, event_ndims=tf.nest.pack_sequence_as(joint.dtype, [0, 1, 2]))
+    ildj = joint_bijector.inverse_log_det_jacobian(
+        y, event_ndims=tf.nest.pack_sequence_as(joint.dtype, [0, 1, 1]))
+    self.assertAllEqual(fldj.shape, joint.log_prob(y).shape)
+    self.assertAllClose(fldj, -ildj)
+
+  @parameterized.named_parameters(
+      {'testcase_name': 'coroutine',
+       'jd_class': tfd.JointDistributionCoroutineAutoBatched},
+      {'testcase_name': 'sequential',
+       'jd_class': tfd.JointDistributionSequentialAutoBatched},
+      {'testcase_name': 'named',
+       'jd_class': tfd.JointDistributionNamedAutoBatched})
+  def test_default_event_space_bijector_constant_jacobian(self, jd_class):
+
+    models = {}
+    def coroutine_model():
+      yield tfd.Normal(0., [1., 2.], name='x')
+    models[tfd.JointDistributionCoroutineAutoBatched] = coroutine_model
+
+    models[tfd.JointDistributionSequentialAutoBatched] = [
+        tfd.Normal(0., [1., 2.], name='x')
+    ]
+
+    models[tfd.JointDistributionNamedAutoBatched] = {
+        'x': tfd.Normal(0., [1., 2.], name='x')}
+
+    joint = jd_class(models[jd_class], batch_ndims=1, validate_args=True)
+    self.assertAllEqual(joint.batch_shape, [2])
+    joint_bijector = joint.experimental_default_event_space_bijector()
+
+    y = self.evaluate(joint.sample([3], seed=test_util.test_seed()))
+    x = joint_bijector.inverse(y)
+    self.assertAllCloseNested(y, joint_bijector.forward(x))
+
+    fldj = joint_bijector.forward_log_det_jacobian(x)
+    ildj = joint_bijector.inverse_log_det_jacobian(y)
+    self.assertAllEqual(fldj.shape, joint.log_prob(y).shape)
     self.assertAllClose(fldj, -ildj)
 
   def test_nested_joint_distributions(self):

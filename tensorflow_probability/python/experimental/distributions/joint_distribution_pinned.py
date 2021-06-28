@@ -723,13 +723,13 @@ class _DefaultJointBijectorAutoBatchedWithPins(
       return member_fn(bij, *args)
     vectorized_fn_of_pins = vectorization_util.make_rank_polymorphic(
         build_and_invoke_pinned_bijector,
-        core_ndims=[self._pins_event_ndims] + core_ndims)
+        core_ndims=[self._pins_core_ndims] + core_ndims)
     return lambda *args: vectorized_fn_of_pins(self._jd.pins, *args)
 
   @property
-  def _pins_event_ndims(self):
-    """Returns a map from names of pinned values to their event ndims."""
-    if not hasattr(self, '__pins_event_ndims'):  # Cache on first run.
+  def _pins_core_ndims(self):
+    """Returns a map from names of pinned values to their batch+event ndims."""
+    if not hasattr(self, '__pins_core_ndims'):  # Cache on first run.
       pinned_event_shape = {}
       original_jd = self._jd.distribution
       for name, event_shape in zip(
@@ -739,9 +739,11 @@ class _DefaultJointBijectorAutoBatchedWithPins(
         if name in self._jd.pins:
           pinned_event_shape[name] = event_shape
 
-      self.__pins_event_ndims = tf.nest.map_structure(tensorshape_util.rank,
-                                                      pinned_event_shape)
-      if any(nd is None for nd in self.__pins_event_ndims.values()):
+      self.__pins_core_ndims = tf.nest.map_structure(
+          lambda s: (tensorshape_util.rank(self._jd.batch_shape) +  # pylint: disable=g-long-lambda
+                     tensorshape_util.rank(s)),
+          pinned_event_shape)
+      if any(nd is None for nd in self.__pins_core_ndims.values()):
         # No inherent reason this can't support Tensor-valued event ranks, but
         # it's annoying, so let's punt for now.
         raise ValueError(
@@ -749,4 +751,4 @@ class _DefaultJointBijectorAutoBatchedWithPins(
             'the rank of the underlying model\'s events is not statically '
             'available. Contact tfprobability@tensorflow.org if you need this '
             'functionality.')
-    return self.__pins_event_ndims
+    return self.__pins_core_ndims

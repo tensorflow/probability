@@ -184,22 +184,48 @@ class _DefaultJointBijectorAutoBatched(bijector_lib.Bijector):
         validate_args=self._joint_bijector.validate_args,
         parameters=parameters,
         name=self._joint_bijector.name)
+    # Any batch dimensions of the JD must be included in the core
+    # 'event' processed by autobatched bijector methods. This is because
+    # `vectorized_map` has no visibility into the internal batch vs event
+    # semantics of the methods being vectorized. More precisely, if we
+    # didn't do this, then:
+    #  1. Calling `self.inverse_log_det_jacobian(y)` with a `y` of shape
+    #     `jd.event_shape` would in general return a result of shape
+    #     `jd.batch_shape` (since each batch member can define a different
+    #     transformation).
+    #  2. By the semantics of `vectorized_map`, calling
+    #     `self.inverse_log_det_jacobian(y)` with an `y` of shape
+    #     `concat([jd.batch_shape, jd.event_shape])` would therefore return
+    #     a result of shape `concat([jd.batch_shape, jd.batch_shape])`, in
+    #     which the batch shape appears *twice*.
+    #  3. This breaks the TFP shape contract and is bad.
+    # We avoid this by requiring that `y` is at least of shape
+    # `jd.sample().shape`.
+    jd_batch_ndims = ps.rank_from_shape(jd.batch_shape_tensor())
+    forward_core_ndims = tf.nest.map_structure(
+        lambda nd: jd_batch_ndims + nd, self.forward_min_event_ndims)
+    inverse_core_ndims = tf.nest.map_structure(
+        lambda nd: jd_batch_ndims + nd, self.inverse_min_event_ndims)
     # Wrap the non-batched `joint_bijector` to take batched args.
     # pylint: disable=protected-access
     self._forward = self._vectorize_member_fn(
-        lambda bij, x: bij._forward(x),
-        core_ndims=[self._joint_bijector.forward_min_event_ndims])
+        lambda bij, x: bij._forward(x), core_ndims=[forward_core_ndims])
     self._inverse = self._vectorize_member_fn(
-        lambda bij, y: bij._inverse(y),
-        core_ndims=[self._joint_bijector.inverse_min_event_ndims])
+        lambda bij, y: bij._inverse(y), core_ndims=[inverse_core_ndims])
     self._forward_log_det_jacobian = self._vectorize_member_fn(
-        lambda bij, x: bij._forward_log_det_jacobian(  # pylint: disable=g-long-lambda
-            x, event_ndims=bij.forward_min_event_ndims),
-        core_ndims=[self._joint_bijector.forward_min_event_ndims])
+        # Need to explicitly broadcast LDJ if `bij` has constant Jacobian.
+        lambda bij, x: tf.broadcast_to(  # pylint: disable=g-long-lambda
+            bij._forward_log_det_jacobian(
+                x, event_ndims=self.forward_min_event_ndims),
+            jd.batch_shape_tensor()),
+        core_ndims=[forward_core_ndims])
     self._inverse_log_det_jacobian = self._vectorize_member_fn(
-        lambda bij, y: bij._inverse_log_det_jacobian(  # pylint: disable=g-long-lambda
-            y, event_ndims=bij.inverse_min_event_ndims),
-        core_ndims=[self._joint_bijector.inverse_min_event_ndims])
+        # Need to explicitly broadcast LDJ if `bij` has constant Jacobian.
+        lambda bij, y: tf.broadcast_to(  # pylint: disable=g-long-lambda
+            bij._inverse_log_det_jacobian(
+                y, event_ndims=self.inverse_min_event_ndims),
+            jd.batch_shape_tensor()),
+        core_ndims=[inverse_core_ndims])
     for attr in ('_forward_event_shape',
                  '_forward_event_shape_tensor',
                  '_inverse_event_shape',
