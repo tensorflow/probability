@@ -136,7 +136,11 @@ positive_floats = functools.partial(floats, min_value=1e-6)
 
 
 def shapes(min_dims=0, max_dims=4, min_side=1, max_side=5):
-  strategy = hnp.array_shapes(max(1, min_dims), max_dims, min_side, max_side)
+  strategy = hnp.array_shapes(
+      min_dims=max(1, min_dims),
+      max_dims=max_dims,
+      min_side=min_side,
+      max_side=max_side)
   if min_dims < 1:
     strategy = hps.one_of(hps.just(()), strategy)
   return strategy
