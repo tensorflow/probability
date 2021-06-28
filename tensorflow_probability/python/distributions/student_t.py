@@ -63,7 +63,7 @@ def sample_n(n, df, loc, scale, batch_shape, dtype, seed):
       contain only positive values.
     batch_shape: Callable to compute batch shape
     dtype: Return dtype.
-    seed: Optional seed for random draw.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     samples: a `Tensor` with prepended dimensions `n`.

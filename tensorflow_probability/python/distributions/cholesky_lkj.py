@@ -158,7 +158,7 @@ class CholeskyLKJ(distribution.AutoCompositeTensorDistribution):
 
     Args:
       num_samples: Python `int`. The number of samples to draw.
-      seed: Python integer seed for RNG
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       name: Python `str` name prefixed to Ops created by this function.
 
     Returns:

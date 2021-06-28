@@ -492,7 +492,7 @@ def _von_mises_sample_no_gradient(shape, concentration, seed):
   Args:
     shape: The output sample shape.
     concentration: The concentration parameter of the distribution.
-    seed: The random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     samples: Samples of standardized von Mises.
@@ -635,7 +635,7 @@ def _von_mises_sample_with_gradient(shape, concentration, seed):
   Args:
     shape: The output sample shape.
     concentration: The concentration parameter of the distribution.
-    seed: (optional) The random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     sample: Differentiable samples of standardized von Mises.
@@ -657,7 +657,7 @@ def random_von_mises(shape, concentration, dtype=tf.float32, seed=None):
     shape: The output sample shape.
     concentration: The concentration parameter of the von Mises distribution.
     dtype: The data type of concentration and the outputs.
-    seed: (optional) The random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     Differentiable samples of standardized von Mises.

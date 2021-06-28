@@ -474,7 +474,7 @@ def _random_gamma_no_gradient(
     concentration: Concentration of gamma distribution.
     rate: Rate parameter of gamma distribution.
     log_rate: Log-rate parameter of gamma distribution.
-    seed: int or Tensor seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     log_space: If `True`, draw log-of-gamma samples.
 
   Returns:
@@ -688,7 +688,7 @@ def _random_gamma_rejection(
     log_rate: Floating point tensor, log of the inverse scale params of the
       distribution(s). Must broadcast with `concentration`. If `None`, handled
       as if 0 (but possibly more efficiently). Mutually exclusive with `rate`.
-    seed: (optional) The random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     log_space: Optionally sample log(gamma) variates.
     internal_dtype: dtype to use for internal computations. If unspecified, we
       use the same dtype as the output (i.e. the dtype of `concentration`,

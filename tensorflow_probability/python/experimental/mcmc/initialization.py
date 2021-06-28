@@ -223,7 +223,7 @@ def retry_init(proposal_fn, target_fn, *args, max_trials=50,
       found in this many trials, `retry_init` signals an error.  If
       `None`, there is no limit, and `retry_init` skips the control
       flow cost of checking for success.
-    seed: Optional, a PRNG seed for reproducible sampling.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'mcmc_sample_chain').
     **kwargs: Additional keyword arguments passed to `proposal_fn`.

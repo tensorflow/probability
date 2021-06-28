@@ -164,7 +164,7 @@ def sample_walk(transition_matrix,
        `[B1, .., BN, latent_size]`.
     initial_scale_tril: float `Tensor` of shape
        `[B1, .., BN, latent_size, latent_size]`.
-    seed: Python `int` seed for random ops.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
   Returns:
     x: float `Tensor` of shape `[num_timesteps, B1, .., BN, latent_size]`.
     y: float `Tensor` of shape `[num_timesteps, B1, .., BN, observation_size]`.

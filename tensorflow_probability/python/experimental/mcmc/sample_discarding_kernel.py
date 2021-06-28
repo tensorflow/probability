@@ -102,7 +102,7 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function).
-      seed: Optional seed for reproducible sampling.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       new_chain_state: Newest non-discarded MCMC chain state drawn from

@@ -99,7 +99,7 @@ class TransitionKernel(object):
       previous_kernel_results: A (possibly nested) `tuple`, `namedtuple` or
         `list` of `Tensor`s representing internal calculations made within the
         previous call to this function (or as returned by `bootstrap_results`).
-      seed: Optional, a seed for reproducible sampling.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       next_state: `Tensor` or Python `list` of `Tensor`s representing the

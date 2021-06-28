@@ -502,7 +502,7 @@ def _sample_bates(total_count, low, high, n, seed=None):
     high: (Batches of) upper bounds of the `Uniform` variables to sample. Should
       be the same floating dtype as `low` and broadcastable to the batch shape.
     n: `int32` number of samples to generate.
-    seed: Random seed to pass to `Uniform` sampler.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     samples: Samples of (batches of) the `Bates` variable.  Will have same dtype

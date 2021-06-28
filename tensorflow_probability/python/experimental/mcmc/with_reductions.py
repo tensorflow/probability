@@ -95,7 +95,7 @@ class WithReductions(kernel_base.TransitionKernel):
         `WithReductionsKernelResults` contain the state of
         `reduction_results` and a reference to kernel results of
         nested `TransitionKernel`s.
-      seed: Optional seed for reproducible sampling.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       new_state: Newest MCMC state drawn from the `inner_kernel`.

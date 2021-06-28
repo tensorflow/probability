@@ -220,7 +220,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
       kernel_results: instance of
         `tfp.experimental.mcmc.SequentialMonteCarloResults` representing results
         from a previous step.
-      seed: Optional seed for reproducible sampling.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       state: instance of `tfp.experimental.mcmc.WeightedParticles` representing

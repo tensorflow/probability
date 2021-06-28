@@ -175,7 +175,7 @@ def build_factored_surrogate_posterior(
       Default value: `functools.partial(
         tfp.experimental.vi.build_trainable_location_scale_distribution,
         distribution_fn=tfd.Normal)`, i.e., a trainable Normal distribution.
-    seed: Python integer to seed the random number generator. This is used
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details. This is used
       only when `initial_loc` is not specified.
     validate_args: Python `bool`. Whether to validate input with asserts. This
       imposes a runtime cost. If `validate_args` is `False`, and the inputs are

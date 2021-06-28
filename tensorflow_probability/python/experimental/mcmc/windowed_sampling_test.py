@@ -135,7 +135,7 @@ def _gen_gaussian_updating_example(x_dim, y_dim, seed):
   Args:
     x_dim: int
     y_dim: int
-    seed: For reproducibility
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
   Returns:
     (tfd.JointDistribution, tf.Tensor), representing the joint distribution
     above, and the posterior variance.

@@ -345,7 +345,7 @@ def draw_sample(num_samples, num_classes, logits, num_trials, dtype, seed):
     num_trials: Tensor of number of categorical trials each multinomial consists
       of.  num_trials[..., tf.newaxis] must broadcast with logits.
     dtype: dtype at which to emit samples.
-    seed: Random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     samples: Tensor of given dtype and shape [num_samples] + batch_shape +
@@ -375,7 +375,7 @@ def _sample_multinomial_as_iterated_binomial(
     num_trials: Tensor of number of categorical trials each multinomial consists
       of.  num_trials[..., tf.newaxis] must broadcast with probs.
     dtype: dtype at which to emit samples.
-    seed: Random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     samples: Tensor of given dtype and shape [num_samples] + batch_shape +

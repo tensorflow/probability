@@ -119,7 +119,7 @@ class JointDensityCoroutine(object):
 
     Args:
       sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-      seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       name: name to give to the op.
       **kwargs: Named arguments forwarded to subclass implementation.
 

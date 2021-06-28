@@ -77,7 +77,7 @@ def make_trainable(cls,
       of the trainable parameters.
       Default value: `()`.
     parameter_dtype: Optional float `dtype` for trainable variables.
-    seed: Optional random seed used to determine initial values.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       Default value: `None`.
     **init_kwargs: Additional keyword arguments passed to `cls.__init__()` to
       specify any non-trainable parameters. If a value is passed for

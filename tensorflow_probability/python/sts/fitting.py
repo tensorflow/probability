@@ -49,7 +49,7 @@ def sample_uniform_initial_state(parameter,
       Default value: `True`.
     init_sample_shape: `sample_shape` of the sampled initializations.
       Default value: `[]`.
-    seed: Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     uniform_initializer: `Tensor` of shape `concat([init_sample_shape,
@@ -127,7 +127,7 @@ def build_factored_surrogate_posterior(
     batch_shape: Batch shape (Python `tuple`, `list`, or `int`) of initial
       states to optimize in parallel.
       Default value: `()`. (i.e., just run a single optimization).
-    seed: Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., 'build_factored_surrogate_posterior').
   Returns:
@@ -284,7 +284,7 @@ def fit_with_hmc(model,
       in estimating the variational divergence. Larger values may stabilize
       the optimization, but at higher cost per step in time and memory.
       Default value: `1`.
-    seed: Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., 'fit_with_hmc').
 

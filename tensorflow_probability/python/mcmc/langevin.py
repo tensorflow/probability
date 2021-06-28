@@ -290,7 +290,7 @@ class MetropolisAdjustedLangevinAlgorithm(kernel_base.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
-      seed: Optional, a seed for reproducible sampling.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       next_state: Tensor or Python list of `Tensor`s representing the state(s)

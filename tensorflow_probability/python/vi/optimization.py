@@ -130,7 +130,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
       emit more efficient code. This may drastically improve the performance.
       See the docs for `tf.function`. (In JAX, this will apply `jax.jit`).
       Default value: `None`.
-    seed: Optional seed for reproducible sampling.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to ops created by this function.
       Default value: 'fit_surrogate_posterior'.
 

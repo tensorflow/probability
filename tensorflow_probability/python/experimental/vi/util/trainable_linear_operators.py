@@ -97,7 +97,7 @@ def build_trainable_linear_operator_block(
       `None` and the dimensions are inferred.
     batch_shape: Batch shape of the `LinearOperator`.
     dtype: `tf.dtype` of the `LinearOperator`.
-    seed: Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: str, name for `tf.name_scope`.
 
   Returns:
@@ -169,7 +169,7 @@ def build_trainable_linear_operator_tril(
       `Normal(0, scale_initializer)`.
     diag_bijector: Bijector to apply to the diagonal of the operator.
     dtype: `tf.dtype` of the `LinearOperator`.
-    seed: Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: str, name for `tf.name_scope`.
 
   Returns:
@@ -216,7 +216,7 @@ def build_trainable_linear_operator_diag(
       `Normal(0, scale_initializer)`.
     diag_bijector: Bijector to apply to the diagonal of the operator.
     dtype: `tf.dtype` of the `LinearOperator`.
-    seed: Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: str, name for `tf.name_scope`.
 
   Returns:
@@ -258,7 +258,7 @@ def build_trainable_linear_operator_full_matrix(
     scale_initializer: Variables are initialized with samples from
       `Normal(0, scale_initializer)`.
     dtype: `tf.dtype` of the `LinearOperator`.
-    seed: Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: str, name for `tf.name_scope`.
 
   Returns:
@@ -288,7 +288,7 @@ def build_linear_operator_zeros(
       `b0...bn` are batch dimensions `h` and `w` are the height and width of the
       matrix represented by the `LinearOperator`.
     dtype: `tf.dtype` of the `LinearOperator`.
-    seed: Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: str, name for `tf.name_scope`.
 
   Returns:

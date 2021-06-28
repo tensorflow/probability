@@ -511,7 +511,7 @@ class JointDistributionPinned(object):
 
     Args:
       sample_shape: Shape prefix to use when sampling.
-      seed: Optional seed for reproducible sampling.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       samples: unpinned parts sampled from the underlying distribution.
@@ -532,7 +532,7 @@ class JointDistributionPinned(object):
 
     Args:
       sample_shape: Shape prefix to use when sampling.
-      seed: Optional seed for reproducible sampling.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       samples: unpinned parts drawn from the pinned distribution.

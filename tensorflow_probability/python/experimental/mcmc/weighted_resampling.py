@@ -47,7 +47,7 @@ def resample(particles, log_weights, resample_fn, seed=None):
       Use 'resample_independent' for independent resamples.
       Use 'resample_stratified' for stratified resampling.
       Use 'resample_systematic' for systematic resampling.
-    seed: Python `int` random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     resampled_particles: Nested structure of `Tensor`s, matching `particles`.

@@ -154,7 +154,7 @@ class NoUTurnSampler(kernel_base.TransitionKernel):
         the auto-batching system.  Only works in Eager mode.
       backend: Auto-batching backend object. Falls back to a default
         TensorFlowBackend().
-      seed: Python integer to seed the random number generator.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'nuts_kernel').
     """

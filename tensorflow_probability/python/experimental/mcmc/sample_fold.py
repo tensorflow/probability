@@ -102,7 +102,7 @@ def sample_fold(
       returned results. Defaults to 0 (i.e., no thinning).
     parallel_iterations: The number of iterations allowed to run in parallel. It
       must be a positive integer. See `tf.while_loop` for more details.
-    seed: Optional seed for reproducible sampling.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'mcmc_sample_fold').
 
@@ -240,7 +240,7 @@ def sample_chain_with_burnin(
       that is then traced along with the chain state.
     parallel_iterations: The number of iterations allowed to run in parallel. It
       must be a positive integer. See `tf.while_loop` for more details.
-    seed: Optional, a seed for reproducible sampling.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e.,
       'experimental_mcmc_sample_chain_with_burnin').

@@ -76,8 +76,8 @@ class GradientBasedTrajectoryLengthAdaptationResults(
     criterion: Floating point `Tensor` with shape `[C0, ..., Cb]` with `b > 0`.
       The value of the criterion returned by the `criterion_fn` corresponding to
       each Markov chain.
-    seed: Int32 `Tensor` with shape `[2]`. The random seed used by the kernel in
-      the previous step.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details. The random seed
+      used by the kernel in the previous step.
   """
   __slots__ = ()
 
