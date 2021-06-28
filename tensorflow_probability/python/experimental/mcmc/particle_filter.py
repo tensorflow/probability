@@ -129,7 +129,7 @@ def infer_trajectories(observations,
   """Use particle filtering to sample from the posterior over trajectories.
 
   ${particle_filter_arg_str}
-    seed: Optional seed, for reproducible results.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'infer_trajectories'`).
   Returns:
@@ -316,7 +316,7 @@ def particle_filter(observations,
       Default value: `None`.
     parallel_iterations: Passed to the internal `tf.while_loop`.
       Default value: `1`.
-    seed: Optional seed for reproducible results.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'particle_filter'`).
   Returns:

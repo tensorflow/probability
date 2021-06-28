@@ -145,8 +145,9 @@ def sample_halton_sequence(dim,
       Halton sequence. If True, applies the randomization described in
       [Owen (2017)][1].
       Default value: `True`.
-    seed: (Optional) Seed for reproducible sampling. Only used if `randomized`
-      is True. If not supplied and `randomized` is True, no seed is set.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details. Only used if
+      `randomized` is True. If not supplied and `randomized` is True, no seed is
+      set.
       Default value: `None`.
     name:  (Optional) Python `str` describing ops managed by this function. If
       not supplied the name of this function is used.
@@ -284,7 +285,7 @@ def _get_permutations(num_results, dims, seed=None):
       draws from the discrete uniform distribution over the permutation groups.
     dims: A 1D `Tensor` of the same dtype as `num_results`. The degree of the
       permutation groups from which to sample.
-    seed: (Optional) Seed for reproducible sampling.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     permutations: A `Tensor` of shape `[num_results, sum(dims)]` and the same

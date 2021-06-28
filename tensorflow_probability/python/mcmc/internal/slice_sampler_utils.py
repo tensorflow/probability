@@ -57,7 +57,7 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
       doublings to consider.
     step_size: A real `tf.Tensor` with shape compatible with [num_chains].
       The size of the initial interval.
-    seed: Tensor seed pair. The random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'find_slice_bounds').
 
@@ -332,7 +332,7 @@ def _sample_with_shrinkage(x_initial, target_log_prob, log_slice_heights,
       bounds for each chain.
     upper_bounds: Tensor of same shape and dtype as `x_initial`. Slice upper
       bounds for each chain.
-    seed: Tensor seed pair. The random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'find_slice_bounds').
 

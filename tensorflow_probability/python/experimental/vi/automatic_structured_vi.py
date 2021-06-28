@@ -183,7 +183,7 @@ def build_asvi_surrogate_posterior(
       on the interval [0, 1]. A larger value creates an initial surrogate
       distribution with more dependence on the prior structure. Default value:
       `0.5`.
-    seed: Python `int` seed for random initialization.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Optional string. Default value: `build_asvi_surrogate_posterior`.
 
   Returns:
@@ -277,7 +277,7 @@ def _asvi_surrogate_for_distribution(dist,
       new variables will be created; otherwise, constructs a surrogate posterior
       backed by the passed-in variables.
       Default value: `None`.
-    seed: Python `int` seed for random initialization.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
   Returns:
     surrogate_posterior: Instance of `tfd.Distribution` representing a trainable
       surrogate posterior distribution, with the same structure and `name` as

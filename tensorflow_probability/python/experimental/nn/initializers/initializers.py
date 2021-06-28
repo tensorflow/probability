@@ -41,7 +41,7 @@ def glorot_normal(seed=None):
   output units in the weight tensor.
 
   Args:
-    seed: A Python integer. Used to create random seeds.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       Default value: `None`.
 
   Returns:
@@ -67,7 +67,7 @@ def glorot_uniform(seed=None):
   and `fan_out` is the number of output units in the weight tensor.
 
   Args:
-    seed: A Python integer. Used to create random seeds.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       Default value: `None`.
 
   Returns:
@@ -94,7 +94,7 @@ def he_normal(seed=None):
   input units in the weight tensor.
 
   Args:
-    seed: A Python integer. Used to create random seeds.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       Default value: `None`.
 
   Returns:
@@ -121,7 +121,7 @@ def he_uniform(seed=None):
   where `fan_in` is the number of input units in the weight tensor.
 
   Args:
-    seed: A Python integer. Used to create random seeds.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       Default value: `None`.
 
   Returns:

@@ -204,7 +204,7 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
       Structure of tensors at which to initialize sampling. Should have the
       same shape and structure as
       `model.experimental_pin(**pins).sample_unpinned(n_chains)`.
-    seed: A seed for reproducible sampling.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     **pins:
       Values passed to `model.experimental_pin`.
 
@@ -574,7 +574,7 @@ def windowed_adaptive_nuts(n_draws,
       `trace_fn`.
     discard_tuning: bool
       Whether to return tuning traces and draws.
-    seed: Optional, a seed for reproducible sampling.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     **pins:
       These are used to condition the provided joint distribution, and are
       passed directly to `joint_dist.experimental_pin(**pins)`.
@@ -679,7 +679,7 @@ def windowed_adaptive_hmc(n_draws,
       `trace_fn`.
     discard_tuning: bool
       Whether to return tuning traces and draws.
-    seed: Optional, a seed for reproducible sampling.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     **pins:
       These are used to condition the provided joint distribution, and are
       passed directly to `joint_dist.experimental_pin(**pins)`.

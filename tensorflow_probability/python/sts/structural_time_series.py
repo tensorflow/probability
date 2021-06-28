@@ -185,7 +185,7 @@ class StructuralTimeSeries(object):
         fill with iid samples.
         Default value: `[]` (i.e., draw a single sample and don't expand the
           shape).
-      seed: Python `int` random seed.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       trajectories: `float` `Tensor` of shape

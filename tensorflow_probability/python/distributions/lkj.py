@@ -133,7 +133,7 @@ def sample_lkj(
       distribution.
     cholesky_space: Python `bool`. Whether to take samples from LKJ or
       Chol(LKJ).
-    seed: Python integer seed for RNG
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
 
   Returns:
@@ -389,7 +389,7 @@ class LKJ(distribution.AutoCompositeTensorDistribution):
 
     Args:
       num_samples: Python `int`. The number of samples to draw.
-      seed: Python integer seed for RNG
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       name: Python `str` name prefixed to Ops created by this function.
 
     Returns:

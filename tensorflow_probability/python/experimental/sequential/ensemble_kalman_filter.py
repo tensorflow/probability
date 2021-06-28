@@ -100,7 +100,7 @@ def ensemble_kalman_filter_predict(
       latent state, and any information in the `extra` state.
       Each component should be an instance of
       `MultivariateNormalLinearOperator`.
-    seed: Python `int` seed for random ops.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     inflate_fn: Function that takes in the `particles` and returns a
       new set of `particles`. Used for inflating the covariance of points.
       Note this function should try to preserve the sample mean of the
@@ -162,7 +162,7 @@ def ensemble_kalman_filter_update(
       to be returned in the `EnsembleKalmanFilterState`.
     damping: Floating-point `Tensor` representing how much to damp the
       update by. Used to mitigate filter divergence. Default value: 1.
-    seed: Python `int` seed for random ops.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'ensemble_kalman_filter_update'`).
   Returns:

@@ -255,7 +255,7 @@ class SliceSampler(kernel_base.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
-      seed: Optional, a seed for reproducible sampling.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       next_state: Tensor or Python list of `Tensor`s representing the state(s)
@@ -402,7 +402,7 @@ def _sample_next(target_log_prob_fn,
       this argument is to reduce TF graph size.
     batch_rank: Integer. The number of axes in the state that correspond to
       independent batches.
-    seed: Tensor seed pair.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     experimental_shard_axis_names: A structure of string names indicating how
       members of the state are sharded.
     name: Python `str` name prefixed to Ops created by this function.

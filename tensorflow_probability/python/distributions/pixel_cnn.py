@@ -467,8 +467,7 @@ class PixelCNN(distribution.Distribution):
 
     Args:
       n: `int`, number of samples desired.
-      seed: `int`, seed for RNG. Setting a random seed enforces reproducability
-        of the samples between sessions (not within a single session).
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       conditional_input: `Tensor` on which to condition the distribution (e.g.
         class labels), or `None`.
       training: `bool` or `None`. If `bool`, it controls the dropout layer,
@@ -576,7 +575,7 @@ class PixelCNN(distribution.Distribution):
         channels, or `None` if there is only one channel. Dimensions are
         `[batch_size, height, width, num_logistic_mix, num_coeffs]`, where
         `num_coeffs = num_channels * (num_channels - 1) // 2`.
-      seed: `int`, random seed.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       samples: 4D `Tensor` of sampled image data with autoregression among

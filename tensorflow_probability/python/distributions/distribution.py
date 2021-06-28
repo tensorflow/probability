@@ -1191,7 +1191,7 @@ class Distribution(_BaseDistribution):
 
     Args:
       sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-      seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       name: name to give to the op.
       **kwargs: Named arguments forwarded to subclass implementation.
 
@@ -1241,7 +1241,7 @@ class Distribution(_BaseDistribution):
     Args:
       sample_shape: integer `Tensor` desired shape of samples to draw.
         Default value: `()`.
-      seed: Python integer or `tfp.util.SeedStream` instance, for seeding PRNG.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
         Default value: `None`.
       name: name to give to the op.
         Default value: `'sample_and_log_prob'`.

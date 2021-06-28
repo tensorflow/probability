@@ -86,8 +86,7 @@ def random_walk_normal_fn(scale=1., name=None):
     Args:
       state_parts: A list of `Tensor`s of any shape and real dtype representing
         the state parts of the `current_state` of the Markov chain.
-      seed: `int` or None. The random seed for this `Op`. If `None`, no seed is
-        applied.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       experimental_shard_axis_names: A structure of string names indicating how
         members of the state are sharded.
 
@@ -153,8 +152,7 @@ def random_walk_uniform_fn(scale=1., name=None):
     Args:
       state_parts: A list of `Tensor`s of any shape and real dtype representing
         the state parts of the `current_state` of the Markov chain.
-      seed: `int` or None. The random seed for this `Op`. If `None`, no seed is
-        applied.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       experimental_shard_axis_names: A structure of string names indicating how
         members of the state are sharded.
 
@@ -417,7 +415,7 @@ class RandomWalkMetropolis(kernel_base.TransitionKernel):
       previous_kernel_results: `collections.namedtuple` containing `Tensor`s
         representing values from previous calls to this function (or from the
         `bootstrap_results` function.)
-      seed: Optional, a seed for reproducible sampling.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
       next_state: Tensor or Python list of `Tensor`s representing the state(s)

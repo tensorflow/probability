@@ -247,7 +247,7 @@ def _random_binomial(
     counts: Batch of total_count.
     probs: Batch of p(success).
     output_dtype: DType of samples.
-    seed: int or Tensor seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Optional name for related ops.
 
   Returns:

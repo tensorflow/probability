@@ -714,7 +714,7 @@ class IteratedFilter(object):
         num_particles]).unconstrained_parameters`,
         used to initialize the filter.
         Default value: `None`.
-      seed: int `Tensor` seed for random ops.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       name: `str` name for ops constructed by this method.
       **kwargs: additional keyword arguments passed to
         `tfp.experimental.mcmc.infer_trajectories`.
@@ -770,7 +770,7 @@ class IteratedFilter(object):
         `[0, ..., num_iterations - 1]`. The filter is
         invoked with perturbations of scale
         `initial_perturbation_scale * cooling_schedule(iteration)`.
-      seed: int `Tensor` seed for random ops.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       name: `str` name for ops constructed by this method.
       **kwargs: additional keyword arguments passed to
         `tfp.experimental.mcmc.infer_trajectories`.

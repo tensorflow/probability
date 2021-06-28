@@ -401,7 +401,7 @@ class JointDistribution(distribution_lib.Distribution):
 
     Args:
       sample_shape: 0D or 1D `int32` `Tensor`. Shape of the generated samples.
-      seed: Python integer seed for generating random numbers.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       value: `list` of `Tensor`s in `distribution_fn` order to use to
         parameterize other ("downstream") distribution makers.
         Default value: `None` (i.e., draw a sample from each distribution).

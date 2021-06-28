@@ -44,7 +44,7 @@ def rademacher(shape, dtype=tf.float32, seed=None, name=None):
   Args:
     shape: Vector-shaped, `int` `Tensor` representing shape of output.
     dtype: (Optional) TF `dtype` representing `dtype` of output.
-    seed: (Optional) Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'random_rademacher').
 
@@ -83,7 +83,7 @@ def rayleigh(shape, scale=None, dtype=tf.float32, seed=None, name=None):
       Default value: `None` (i.e., `scale = 1.`).
     dtype: (Optional) TF `dtype` representing `dtype` of output.
       Default value: `tf.float32`.
-    seed: (Optional) Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       Default value: `None` (i.e., no seed).
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'random_rayleigh').
@@ -119,7 +119,7 @@ def spherical_uniform(
       space where the sphere is embedded.
     dtype: (Optional) TF `dtype` representing `dtype` of output.
       Default value: `tf.float32`.
-    seed: (Optional) Python integer to seed the random number generator.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       Default value: `None` (i.e., no seed).
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'random_rayleigh').

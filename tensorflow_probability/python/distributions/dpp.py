@@ -172,7 +172,7 @@ def _sample_from_edpp(eigenvectors, vector_onehot, seed):
     vector_onehot:  A Tensor of shape `[..., n_vecs]` whose innermost
       dimension corresponds to 1-hot subset encodings. The subsets represent the
       subset of eigenvectors of the original DPP that define an elementary DPP.
-    seed: The random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     samples: A many-hot `bool` Tensor of shape `[..., n_points]`

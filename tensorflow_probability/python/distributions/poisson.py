@@ -122,7 +122,7 @@ def random_poisson(
     rates: Batch of rates for Poisson distribution.
     log_rates: Batch of log rates for Poisson distribution.
     output_dtype: DType of samples.
-    seed: int or Tensor seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Optional name for related ops.
 
   Returns:
@@ -426,7 +426,7 @@ def _random_poisson_high_rate(sample_shape,
     sample_shape: The output sample shape. Must broadcast with `log_rate`.
     log_rate: Floating point tensor, log rate.
     internal_dtype: dtype to use for internal computations.
-    seed: (optional) The random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     Samples from the poisson distribution using transformed rejection.
@@ -493,7 +493,7 @@ def _random_poisson_low_rate(sample_shape,
     sample_shape: The output sample shape. Must broadcast with `rate`.
     rate: Floating point tensor, rate.
     internal_dtype: (optional) dtype to use for internal computations.
-    seed: (optional) The random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     Samples from the poisson distribution.

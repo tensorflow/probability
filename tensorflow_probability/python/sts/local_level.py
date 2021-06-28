@@ -188,7 +188,7 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
 
     Args:
       n: `int` `Tensor` number of samples to draw.
-      seed: Optional `int` `Tensor` seed for the random number generator.
+      seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     Returns:
       latents: `float` `Tensor` of shape `concat([[n], self.batch_shape,
         [self.num_timesteps, self.latent_size]], axis=0)` representing samples

@@ -132,7 +132,7 @@ def _uniform_correlation_like_matrix(num_rows, batch_shape, dtype, seed):
     batch_shape: `Tensor` or Python `tuple` of `int` shape of the
       batch to return.
     dtype: `dtype` of the `Tensor` to return.
-    seed: Random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     matrices: A `Tensor` of shape `batch_shape + [num_rows, num_rows]`
@@ -182,7 +182,7 @@ def correlation_matrix_volume_rejection_samples(
     sample_shape: Python `tuple` of `int` shape of the samples to
       compute, excluding the two matrix dimensions.
     dtype: The `dtype` in which to do the computation.
-    seed: Random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     weights: A `Tensor` of shape `sample_shape`.  Each entry is 0 if the
@@ -303,7 +303,7 @@ def compute_true_volumes(
       returned interval separately may be incorrect with probability
       (under the sample of correlation-like matrices drawn internally)
       at most `error_rate`.
-    seed: Random seed.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     bounds: A Python `dict` mapping each determinant bound to the low, high

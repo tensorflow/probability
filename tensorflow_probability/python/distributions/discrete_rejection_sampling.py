@@ -64,7 +64,7 @@ def log_concave_rejection_sampler(
       as unbounded below.
     distribution_maximum: Tensor of type `dtype`. The maximum value
       taken by the distribution. See `distribution_minimum` for details.
-    seed: Python integer or `Tensor` instance, for seeding PRNG.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     samples: a `Tensor` with prepended dimensions `sample_shape`.

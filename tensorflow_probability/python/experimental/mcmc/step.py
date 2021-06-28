@@ -62,7 +62,7 @@ def step_kernel(
       warm restart.
     parallel_iterations: The number of iterations allowed to run in parallel. It
       must be a positive integer. See `tf.while_loop` for more details.
-    seed: Optional, a seed for reproducible sampling.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., 'mcmc_step_kernel').
 
