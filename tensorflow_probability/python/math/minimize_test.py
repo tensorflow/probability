@@ -281,5 +281,23 @@ class MinimizeTests(test_util.TestCase):
     # Final loss should be lower than initial loss.
     self.assertAllGreater(losses_[0], losses_[-1])
 
+  def test_deterministic_results_with_seed(self):
+    stochastic_loss_fn = lambda seed: tf.random.stateless_normal([], seed=seed)
+    optimizer = tf.optimizers.SGD(1e-3)
+    seed = test_util.test_seed(sampler_type='stateless')
+    losses1 = self.evaluate(
+        tfp.math.minimize(loss_fn=stochastic_loss_fn,
+                          num_steps=10,
+                          optimizer=optimizer,
+                          seed=seed))
+    losses2 = self.evaluate(
+        tfp.math.minimize(loss_fn=stochastic_loss_fn,
+                          num_steps=10,
+                          optimizer=optimizer,
+                          seed=seed))
+    self.assertAllEqual(losses1, losses2)
+    # Make sure we got different samples at each step.
+    self.assertAllGreater(tf.abs(losses1[1:] - losses1[:-1]), 1e-4)
+
 if __name__ == '__main__':
   tf.test.main()
