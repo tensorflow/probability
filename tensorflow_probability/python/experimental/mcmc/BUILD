@@ -83,6 +83,7 @@ multi_substrate_py_library(
         ":sample_fold",
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
+        ":sharded",
         ":step",
         ":thermodynamic_integrals",
         ":thinning_kernel",
@@ -1035,5 +1036,33 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "sharded",
+    srcs = ["sharded.py"],
+    srcs_version = "PY3",
+    deps = [
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/mcmc:kernel",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "sharded_test",
+    size = "small",
+    srcs = ["sharded_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":sharded",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/mcmc:kernel",
     ],
 )

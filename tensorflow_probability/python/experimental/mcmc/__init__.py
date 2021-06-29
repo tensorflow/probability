@@ -58,6 +58,7 @@ from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kern
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarlo
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
+from tensorflow_probability.python.experimental.mcmc.sharded import Sharded
 from tensorflow_probability.python.experimental.mcmc.step import step_kernel
 from tensorflow_probability.python.experimental.mcmc.thermodynamic_integrals import remc_thermodynamic_integrals
 from tensorflow_probability.python.experimental.mcmc.thinning_kernel import ThinningKernel
@@ -121,6 +122,7 @@ __all__ = [
     'sample_chain_with_burnin',
     'sample_fold',
     'sample_sequential_monte_carlo',
+    'Sharded',
     'simple_heuristic_tuning',
     'step_kernel',
     'windowed_adaptive_hmc',
