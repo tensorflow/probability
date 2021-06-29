@@ -741,7 +741,7 @@ def _windowed_adaptive_impl(n_draws,
           tf1.get_default_graph())):
     # A Tensor num_draws argument breaks XLA, which requires static TensorArray
     # trace_fn result allocation sizes.
-    num_adaptation_steps = tf.convert_to_tensor(num_adaptation_steps)
+    num_adaptation_steps = ps.convert_to_shape_tensor(num_adaptation_steps)
 
   dual_averaging_kwargs.setdefault('reduce_fn',
                                    generic_math.reduce_log_harmonic_mean_exp)
