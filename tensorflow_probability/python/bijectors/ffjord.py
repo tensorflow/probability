@@ -58,7 +58,7 @@ def trace_jacobian_hutchinson(
       Default value: `tf.random.normal`
     num_samples: `Integer` number of random samples to use for trace estimation.
       Default value: '1'
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+    seed: PRNG seed compatible with `sample_fn`.
 
   Returns:
     augmented_ode_fn: `Callable(time, (state, log_det_jac))` that computes
