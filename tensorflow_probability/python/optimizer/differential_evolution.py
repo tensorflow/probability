@@ -160,7 +160,8 @@ def one_step(
     crossover_prob: Real scalar `Tensor`. Must be between 0 and 1. The
       probability of recombination per site.
       Default value: 0.9
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+    seed: `int` or None. The random seed for this `Op`. If `None`, no seed is
+      applied.
       Default value: None.
     name: (Optional) Python str. The name prefixed to the ops created by this
       function. If not supplied, the default name 'one_step' is

@@ -21,6 +21,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import samplers
 
 
 __all__ = [
@@ -193,11 +194,15 @@ def _sample_distribution(shape, var, distribution, seed, dtype):
   if distribution == 'truncated_normal':
     # constant taken from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
     stddev = prefer_static.sqrt(var) / 0.87962566103423978
-    return tf.random.truncated_normal(shape, 0., stddev, dtype, seed=seed)
+    return tf.random.stateless_truncated_normal(
+        shape, mean=0., stddev=stddev, dtype=dtype,
+        seed=samplers.sanitize_seed(seed))
   elif distribution == 'uniform':
     limit = prefer_static.sqrt(3. * var)
-    return tf.random.uniform(shape, -limit, limit, dtype, seed=seed)
+    return samplers.uniform(shape, minval=-limit, maxval=limit,
+                            dtype=dtype, seed=seed)
   elif distribution == 'untruncated_normal':
     stddev = prefer_static.sqrt(var)
-    return tf.random.normal(shape, 0., stddev, dtype, seed=seed)
+    return samplers.normal(shape, mean=0., stddev=stddev,
+                           dtype=dtype, seed=seed)
   raise ValueError('Unrecognized distribution: "{}".'.format(distribution))
