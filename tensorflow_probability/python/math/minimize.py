@@ -22,6 +22,8 @@ import collections
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import samplers
+
 
 class MinimizeTraceableQuantities(collections.namedtuple(
     'MinimizeTraceableQuantities',
@@ -72,13 +74,16 @@ def _make_optimizer_step_fn(loss_fn, optimizer, trainable_variables):
   """Construct a single optimization step."""
 
   @tf.function(autograph=False)
-  def optimizer_step():
+  def optimizer_step(seed=None):
     """Run a single optimization step."""
     with tf.GradientTape(
         watch_accessed_variables=trainable_variables is None) as tape:
       for v in trainable_variables or []:
         tape.watch(v)
-      loss = loss_fn()
+      try:
+        loss = loss_fn(seed=seed)
+      except TypeError:
+        loss = loss_fn()
     watched_variables = tape.watched_variables()
     grads = tape.gradient(loss, watched_variables)
     train_op = optimizer.apply_gradients(zip(grads, watched_variables))
@@ -94,10 +99,11 @@ def _make_training_loop_body(optimizer_step_fn,
                              trace_fn):
   """Construct the training loop body."""
 
-  def training_loop_body(step, trace_arrays, has_converged=None,
+  def training_loop_body(step, seed, trace_arrays, has_converged=None,
                          convergence_criterion_state=None):
     """Invokes the convergence criterion and trace fn and writes the result."""
-    loss, grads, parameters = optimizer_step_fn()
+    seed, next_seed = samplers.split_seed(seed, n=2)
+    loss, grads, parameters = optimizer_step_fn(seed=seed)
     if convergence_criterion is not None:
       (has_converged,
        convergence_criterion_state) = convergence_criterion.one_step(
@@ -110,7 +116,8 @@ def _make_training_loop_body(optimizer_step_fn,
     trace_arrays = tf.nest.map_structure(
         lambda ta, x: ta.write(step, x), trace_arrays, traced_values)
     potential_new_loop_vars = (
-        step + 1, trace_arrays, has_converged, convergence_criterion_state)
+        step + 1, next_seed, trace_arrays, has_converged,
+        convergence_criterion_state)
     return [x for x in potential_new_loop_vars if x is not None]
 
   return training_loop_body
@@ -144,12 +151,16 @@ def minimize(loss_fn,
              trace_fn=_trace_loss,
              return_full_length_trace=True,
              jit_compile=False,
+             seed=None,
              name='minimize'):
   """Minimize a loss function using a provided optimizer.
 
   Args:
     loss_fn: Python callable with signature `loss = loss_fn()`, where `loss`
-      is a `Tensor` loss to be minimized.
+      is a `Tensor` loss to be minimized. This may optionally take a `seed`
+      keyword argument, used to specify a per-iteration seed for stochastic
+      loss functions (a stateless `Tensor` seed will be passed; see
+      `tfp.random.sanitize_seed`).
     num_steps: Python `int` maximum number of steps to run the optimizer.
     optimizer: Optimizer instance to use. This may be a TF1-style
       `tf.train.Optimizer`, TF2-style `tf.optimizers.Optimizer`, or any Python
@@ -199,6 +210,8 @@ def minimize(loss_fn,
       emit more efficient code. This may drastically improve the performance.
       See the docs for `tf.function`. (In JAX, this will apply `jax.jit`).
       Default value: `False`.
+    seed: PRNG seed for stochastic losses; see `tfp.random.sanitize_seed.`
+      Default value: `None`.
     name: Python `str` name prefixed to ops created by this function.
       Default value: 'minimize'.
 
@@ -308,10 +321,11 @@ def minimize(loss_fn,
       return minimize(**parameters)
     return run_jitted_minimize()
 
-  def convergence_detected(step, trace_arrays,
+  def convergence_detected(step, seed, trace_arrays,
                            has_converged=None,
                            convergence_criterion_state=None):
     del step
+    del seed
     del trace_arrays
     del convergence_criterion_state
     return (has_converged is not None  # Convergence criterion in use.
@@ -319,6 +333,7 @@ def minimize(loss_fn,
 
   # Main optimization routine.
   with tf.name_scope(name) as name:
+    seed = samplers.sanitize_seed(seed, salt='minimize')
 
     # Take an initial training step to obtain the initial loss and values, which
     # will define the shape(s) of the `TensorArray`(s) that we create to hold
@@ -328,7 +343,8 @@ def minimize(loss_fn,
     optimizer_step_fn = _make_optimizer_step_fn(
         loss_fn=loss_fn, optimizer=optimizer,
         trainable_variables=trainable_variables)
-    initial_loss, initial_grads, initial_parameters = optimizer_step_fn()
+    initial_loss, initial_grads, initial_parameters = optimizer_step_fn(
+        seed=seed)
     has_converged = None
     initial_convergence_criterion_state = None
     if convergence_criterion is not None:
@@ -352,8 +368,8 @@ def minimize(loss_fn,
 
     # Run the optimization loop.
     with tf.control_dependencies([initial_loss]):
-      potential_loop_vars = (
-          1, trace_arrays, has_converged, initial_convergence_criterion_state)
+      potential_loop_vars = (1, seed, trace_arrays, has_converged,
+                             initial_convergence_criterion_state)
       results = tf.while_loop(
           cond=lambda *args: tf.logical_not(convergence_detected(*args)),  # pylint: disable=no-value-for-parameter
           body=_make_training_loop_body(
@@ -363,7 +379,7 @@ def minimize(loss_fn,
           loop_vars=[x for x in potential_loop_vars if x is not None],
           parallel_iterations=1,
           maximum_iterations=num_steps - 1)
-      indices, trace_arrays = results[:2]  # Guaranteed to be present.
+      indices, _, trace_arrays = results[:3]  # Guaranteed to be present.
 
       if convergence_criterion is not None and return_full_length_trace:
         # Fill out the trace by tiling the last written values.

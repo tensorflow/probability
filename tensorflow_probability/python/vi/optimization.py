@@ -291,7 +291,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
        Springer, 2006.
   """
 
-  def complete_variational_loss_fn():
+  def complete_variational_loss_fn(seed=None):
     return variational_loss_fn(
         target_log_prob_fn,
         surrogate_posterior,
@@ -305,4 +305,5 @@ def fit_surrogate_posterior(target_log_prob_fn,
                            trace_fn=trace_fn,
                            trainable_variables=trainable_variables,
                            jit_compile=jit_compile,
+                           seed=seed,
                            name=name)
