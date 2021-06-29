@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal import unnest
 
+JAX_MODE = False
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
@@ -597,8 +598,6 @@ def get_joint_distribution(
       name='jd')
 
 
-@test_util.disable_test_for_backend(disable_jax=True,
-                                    reason='Only applies to TF')
 class PrecompiledTest(test_util.TestCase):
 
   def setUp(self):
@@ -606,10 +605,11 @@ class PrecompiledTest(test_util.TestCase):
     arms = 2
     days = 3
 
-    strm = test_util.test_seed_stream()
-    self.trials = tfd.Poisson(100.).sample([arms, days], seed=strm())
+    seed = test_util.test_seed()
+    trial_seed, value_seed = tfp.random.split_seed(seed)
+    self.trials = tfd.Poisson(100.).sample([arms, days], seed=trial_seed)
     dist = get_joint_distribution(self.trials)
-    self.true_values = dist.sample(seed=strm())
+    self.true_values = dist.sample(seed=value_seed)
 
   def nuts_kwargs(self):
     return {'max_tree_depth': 2}
@@ -622,13 +622,16 @@ class PrecompiledTest(test_util.TestCase):
   def test_base_kernel(self, kind):
     self.skip_if_no_xla()
 
-    input_signature = (
-        tf.TensorSpec(
-            shape=[None, None], dtype=tf.float32, name='trials'),
-        tf.TensorSpec(
-            shape=[None, None], dtype=tf.float32, name='successes'),
-        tf.TensorSpec(
-            shape=[2], dtype=tf.int32, name='seed'))
+    if JAX_MODE:
+      input_signature = None
+    else:
+      input_signature = (
+          tf.TensorSpec(
+              shape=[None, None], dtype=tf.float32, name='trials'),
+          tf.TensorSpec(
+              shape=[None, None], dtype=tf.float32, name='successes'),
+          tf.TensorSpec(
+              shape=[2], dtype=tf.int32, name='seed'))
     @tf.function(jit_compile=True, input_signature=input_signature)
     def do(trials, successes, seed):
       if kind == 'hmc':
