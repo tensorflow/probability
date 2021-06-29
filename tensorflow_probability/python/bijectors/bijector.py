@@ -841,8 +841,12 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
         continue
       if tf.is_tensor(p1):
         p1 = tf.get_static_value(p1)
+        if p1 is None:
+          return False
       if tf.is_tensor(p2):
         p2 = tf.get_static_value(p2)
+        if p2 is None:
+          return False
       p1_isarray = getattr(p1, '__array__', None) is not None
       p2_isarray = getattr(p2, '__array__', None) is not None
       if p1_isarray != p2_isarray:

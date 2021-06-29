@@ -92,6 +92,13 @@ class BaseBijectorTest(test_util.TestCase):
         'Cannot derive `forward_log_det_jacobian`'):
       bij.forward_log_det_jacobian(0, event_ndims=0)
 
+  def testVariableEq(self):
+    # Testing for b/186021261, bijector equality in the presence of TF
+    # Variables.
+    v1 = tf.Variable(3, dtype=tf.float32)
+    v2 = tf.Variable(4, dtype=tf.float32)
+    self.assertNotEqual(tfb.SinhArcsinh(v1), tfb.SinhArcsinh(v2))
+
   @test_util.disable_test_for_backend(
       disable_numpy=True,
       reason='`convert_to_tensor` casts instead of raising')
