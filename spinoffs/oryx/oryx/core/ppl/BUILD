@@ -21,6 +21,17 @@ package(default_visibility = ["//visibility:public"])
 
 # pytype_strict
 py_library(
+    name = "ppl",
+    srcs = ["__init__.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":effect_handler",
+        ":transformations",
+    ],
+)
+
+# pytype_strict
+py_library(
     name = "transformations",
     srcs = ["transformations.py"],
     srcs_version = "PY3",
@@ -35,14 +46,6 @@ py_library(
 
 # pytype_strict
 py_library(
-    name = "ppl",
-    srcs = ["__init__.py"],
-    srcs_version = "PY3",
-    deps = [":transformations"],
-)
-
-# pytype_strict
-py_library(
     name = "plate_util",
     srcs = ["plate_util.py"],
     srcs_version = "PY3",
@@ -51,6 +54,17 @@ py_library(
         "//oryx/core:primitive",
         "//oryx/core/interpreters:log_prob",
         "//oryx/core/interpreters:propagate",
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "effect_handler",
+    srcs = ["effect_handler.py"],
+    srcs_version = "PY3",
+    deps = [
+        # jax dep,
+        "//oryx/core:trace_util",
     ],
 )
 
@@ -68,5 +82,20 @@ py_test(
         "//oryx/core/interpreters:log_prob",
         "//oryx/internal:test_util",
         # tensorflow_probability/substrates:jax dep,
+    ],
+)
+
+# py_strict
+py_test(
+    name = "effect_handler_test",
+    srcs = ["effect_handler_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":effect_handler",
+        # absl/testing:absltest dep,
+        # jax dep,
+        "//oryx/core:primitive",
+        "//oryx/internal:test_util",
     ],
 )
