@@ -250,6 +250,7 @@ py_test(
     size = "medium",
     srcs = ["regression_test.py"],
     python_version = "PY3",
+    shard_count = 2,
     srcs_version = "PY3",
     deps = [
         # numpy dep,
