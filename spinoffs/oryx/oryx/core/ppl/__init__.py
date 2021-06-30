@@ -14,6 +14,7 @@
 # ============================================================================
 # Lint as: python3
 """Module for probabilistic programming features."""
+from oryx.core.ppl.effect_handler import make_effect_handler
 from oryx.core.ppl.transformations import block
 from oryx.core.ppl.transformations import conditional
 from oryx.core.ppl.transformations import graph_replace
