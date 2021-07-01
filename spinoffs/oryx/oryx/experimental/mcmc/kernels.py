@@ -25,7 +25,6 @@ from oryx import distributions as bd
 from oryx.core import ppl
 from oryx.core import primitive
 from oryx.core import state as st
-from oryx.core.interpreters import harvest
 
 __all__ = [
     'random_walk',
@@ -87,10 +86,7 @@ def metropolis(unnormalized_log_prob: LogProbFunction,
     state_log_prob = unnormalized_log_prob(state)
     next_state_log_prob = unnormalized_log_prob(next_state)
     log_unclipped_accept_prob = next_state_log_prob - state_log_prob
-    accept_prob = harvest.sow(
-        np.clip(np.exp(log_unclipped_accept_prob), 0., 1.),
-        tag=MCMC_METRICS,
-        name='accept_prob')
+    accept_prob = np.clip(np.exp(log_unclipped_accept_prob), 0., 1.)
     u = primitive.tie_in(accept_prob, random.uniform(accept_key))
     accept = np.log(u) < log_unclipped_accept_prob
     return tree_util.tree_multimap(lambda n, s: np.where(accept, n, s),
@@ -131,10 +127,7 @@ def metropolis_hastings(unnormalized_log_prob: LogProbFunction,
     log_unclipped_accept_prob = (
         next_state_log_prob + backward_transition_log_prob - state_log_prob -
         forward_transition_log_prob)
-    accept_prob = harvest.sow(
-        np.clip(np.exp(log_unclipped_accept_prob), 0., 1.),
-        tag=MCMC_METRICS,
-        name='accept_prob')
+    accept_prob = np.clip(np.exp(log_unclipped_accept_prob), 0., 1.)
     u = primitive.tie_in(accept_prob, random.uniform(accept_key))
     accept = np.log(u) < log_unclipped_accept_prob
     return tree_util.tree_multimap(lambda n, s: np.where(accept, n, s),

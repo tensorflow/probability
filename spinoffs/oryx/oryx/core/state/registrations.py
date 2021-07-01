@@ -55,6 +55,8 @@ type(m)  # ==> list
 api.call(m, 1.)  # ==> 4.
 """
 from jax import random
+from jax import tree_util
+import jax.numpy as jnp
 
 from oryx.core.state import api
 
@@ -101,17 +103,19 @@ def tuple_spec(tupl):
 def list_init(inits, *, name=None):
   """Maps `init` across a tuple."""
   def wrapped(init_key, *args, **kwargs):
+    args = tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype), args)
     if init_key is not None:
       init_keys = random.split(init_key, len(inits))
     else:
       init_keys = (None,) * len(inits)
     modules = []
     for i, (elem_init, init_key) in enumerate(zip(inits, init_keys)):
-      if isinstance(args, api.ArraySpec):
-        args = (args,)
       elem_name = None if name is None else '{}_{}'.format(name, i)
       elem = api.init(elem_init, name=elem_name)(init_key, *args, **kwargs)  # pylint: disable=assignment-from-no-return
       args = api.spec(elem_init)(*args, **kwargs)  # pylint: disable=assignment-from-no-return
+      if isinstance(args, api.ArraySpec):
+        args = (args,)
+      args = tree_util.tree_map(lambda x: jnp.ones(x.shape, x.dtype), args)
       modules.append(elem)
     return inits.__class__(modules)
   return wrapped

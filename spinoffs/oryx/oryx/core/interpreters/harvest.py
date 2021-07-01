@@ -172,6 +172,7 @@ class HarvestSettings:
   blocklist: FrozenSet[str]
   allowlist: Union[FrozenSet[str], None]
   mode: HarvestMode
+  exclusive: bool
 
 
 @dataclasses.dataclass
@@ -187,6 +188,8 @@ class HarvestContext:
   def handle_sow(self, values, *, name, tag, mode, tree):
     """Determines if a value should be planted or reaped and calls the appropriate handler."""
     if tag != self.settings.tag:
+      if self.settings.exclusive:
+        return values
       return sow_p.bind(*values, name=name, tag=tag, mode=mode, tree=tree)
     if (self.settings.allowlist is not None and
         name not in self.settings.allowlist):
@@ -214,7 +217,7 @@ class HarvestContext:
       raise ValueError(f'Invalid sow mode: {mode}')
     return values
 
-  def handle_plant(self, values, *, name, mode, **_):
+  def handle_plant(self, values, *, name, mode, tree, **_):
     """Pulls values from the context."""
     del values
     if mode == 'strict' and name in self._already_planted:
@@ -225,7 +228,11 @@ class HarvestContext:
       if not isinstance(values, HarvestList):
         values = self.plants[name] = HarvestList(values)
       values = values.pop()
-    return tree_util.tree_leaves(values)
+    flat_values, tree2 = tree_util.tree_flatten(values)
+    if tree != tree2:
+      raise ValueError('Must plant with same tree structure as value: '
+                       f'Plant: {tree} vs Value: {tree2}.')
+    return flat_values
 
 
 harvest_custom_rules = {}
@@ -294,6 +301,10 @@ class HarvestTrace(jax_core.Trace):
     tracers = safe_map(self.instantiate_const, tracers)
     if primitive in harvest_custom_rules:
       return harvest_custom_rules[primitive](self, *tracers, **params)
+    return self.default_process_primitive(primitive, tracers, params)
+
+  def default_process_primitive(self, primitive, tracers, params):
+    """Handles primitives without custom harvest rules."""
     if primitive is sow_p:
       return self.handle_sow(*tracers, **params)
     vals = [t.val for t in tracers]
@@ -544,7 +555,8 @@ def harvest(f,
             tag: str,
             allowlist: Union[Iterable[str], None] = None,
             blocklist: Iterable[str] = frozenset(),
-            mode='reap_plant'):
+            mode: str = 'reap_plant',
+            exclusive: bool = False):
   """Transforms a function into a "functionalized" version.
 
   Sown values are namespaced using string "tags", where a value is sown (using
@@ -574,7 +586,8 @@ def harvest(f,
     mode: `str`, either `'reap_plant'` (the default) or `'plant_only'`. In
       `'plant_only'` mode, `harvest` will keep `sow`s in the function that were
       not `plant`-ed.
-
+    exclusive: `bool`, when `True` removes all other tags from the harvested
+      function.
   Returns:
     A function that takes in an additional initial input (a dictionary mapping
     names to values to be injected) and an additional final output (a
@@ -583,7 +596,8 @@ def harvest(f,
   blocklist = frozenset(blocklist)
   if allowlist is not None:
     allowlist = frozenset(allowlist)
-  settings = HarvestSettings(tag, blocklist, allowlist, HarvestMode(mode))
+  settings = HarvestSettings(tag, blocklist, allowlist, HarvestMode(mode),
+                             exclusive)
 
   def wrapped(plants, *args, **kwargs):
     fun = lu.wrap_init(f, kwargs)

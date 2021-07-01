@@ -22,7 +22,6 @@ import jax.numpy as np
 import numpy as onp
 
 from inference_gym import using_jax as inference_gym
-from oryx.core.interpreters import harvest
 from oryx.experimental.mcmc import kernels
 from oryx.experimental.mcmc import utils
 from oryx.internal import test_util
@@ -77,21 +76,15 @@ class KernelsTest(test_util.TestCase):
     unconstrained_log_prob = self._make_unconstrained_log_prob()
     initial_state = self._initialize_state(init_key)
     kernel = make_kernel(unconstrained_log_prob)
-    sample_chain = jax.jit(
-        harvest.harvest(
-            kernels.sample_chain(kernel, num_samples),
-            tag=kernels.MCMC_METRICS))
+    sample_chain = jax.jit(kernels.sample_chain(kernel, num_samples))
 
     true_samples = self.model.sample(sample_shape=4096, seed=sample_key)
-    samples, metrics = sample_chain({}, chain_key, initial_state)
+    samples = sample_chain(chain_key, initial_state)
 
     onp.testing.assert_allclose(
         true_samples.mean(axis=0), samples.mean(axis=0), rtol=0.5, atol=0.1)
     onp.testing.assert_allclose(
         np.cov(true_samples.T), np.cov(samples.T), rtol=0.5, atol=0.1)
-    onp.testing.assert_allclose(target_accept_rate,
-                                metrics['kernel']['accept_prob'].mean(),
-                                atol=1e-2, rtol=1e-2)
 
   @parameterized.named_parameters(MAKE_KERNELS)
   def test_multiple_chains(self, make_kernel, target_accept_rate):
@@ -105,13 +98,10 @@ class KernelsTest(test_util.TestCase):
 
     kernel = make_kernel(unconstrained_log_prob)
     sample_chain = jax.jit(
-        jax.vmap(harvest.harvest(
-            kernels.sample_chain(kernel, num_samples),
-            tag=kernels.MCMC_METRICS)))
+        jax.vmap(kernels.sample_chain(kernel, num_samples)))
 
     true_samples = self.model.sample(sample_shape=4096, seed=sample_key)
-    samples, metrics = sample_chain({}, random.split(chain_key, num_chains),
-                                    initial_states)
+    samples = sample_chain(random.split(chain_key, num_chains), initial_states)
     samples = tf.nest.map_structure(
         lambda s, shape: s.reshape([num_chains * num_samples] + list(shape)),
         samples, self.model.event_shape)
@@ -120,9 +110,6 @@ class KernelsTest(test_util.TestCase):
         true_samples.mean(axis=0), samples.mean(axis=0), rtol=0.1, atol=0.1)
     onp.testing.assert_allclose(
         np.cov(true_samples.T), np.cov(samples.T), rtol=0.1, atol=0.1)
-    onp.testing.assert_allclose(target_accept_rate,
-                                metrics['kernel']['accept_prob'].mean(),
-                                atol=1e-2, rtol=1e-2)
 
 
 if __name__ == '__main__':
