@@ -28,46 +28,13 @@ py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
-        ":autoregressive",
         ":decomposition",
-        ":dynamic_regression",
         ":fitting",
         ":forecast",
-        ":local_level",
-        ":local_linear_trend",
-        ":regression",
         ":regularization",
-        ":seasonal",
-        ":semilocal_linear_trend",
-        ":smooth_seasonal",
         ":structural_time_series",
-        ":sum",
         "//tensorflow_probability/python/internal:all_util",
-    ],
-)
-
-py_library(
-    name = "autoregressive",
-    srcs = ["autoregressive.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "autoregressive_test",
-    size = "medium",
-    srcs = ["autoregressive_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/sts/components",
     ],
 )
 
@@ -92,31 +59,6 @@ py_test(
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
-    name = "dynamic_regression",
-    srcs = ["dynamic_regression.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "dynamic_regression_test",
-    size = "small",
-    srcs = ["dynamic_regression_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -186,82 +128,6 @@ py_test(
 )
 
 py_library(
-    name = "local_level",
-    srcs = ["local_level.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "local_level_test",
-    size = "small",
-    srcs = ["local_level_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
-    name = "local_linear_trend",
-    srcs = ["local_linear_trend.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "local_linear_trend_test",
-    size = "small",
-    srcs = ["local_linear_trend_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
-    name = "regression",
-    srcs = ["regression.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "regression_test",
-    size = "medium",
-    srcs = ["regression_test.py"],
-    python_version = "PY3",
-    shard_count = 2,
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
     name = "regularization",
     srcs = ["regularization.py"],
     srcs_version = "PY2AND3",
@@ -282,83 +148,6 @@ py_test(
         # numpy dep,
         # pandas dep,
         # six dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
-    name = "seasonal",
-    srcs = ["seasonal.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:docstring_util",
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "seasonal_test",
-    size = "medium",
-    srcs = ["seasonal_test.py"],
-    python_version = "PY3",
-    shard_count = 6,
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
-    name = "semilocal_linear_trend",
-    srcs = ["semilocal_linear_trend.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "semilocal_linear_trend_test",
-    size = "small",
-    srcs = ["semilocal_linear_trend_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
-    name = "smooth_seasonal",
-    srcs = ["smooth_seasonal.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "smooth_seasonal_test",
-    size = "small",
-    srcs = ["smooth_seasonal_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
@@ -388,32 +177,6 @@ py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:samplers",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-py_library(
-    name = "sum",
-    srcs = ["sum.py"],
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/sts/internal",
-    ],
-)
-
-py_test(
-    name = "sum_test",
-    size = "medium",
-    srcs = ["sum_test.py"],
-    python_version = "PY3",
-    shard_count = 2,
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
