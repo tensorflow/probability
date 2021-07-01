@@ -141,17 +141,17 @@ Follow the example of the [`SyntheticItemResponseTheory`][irt] model.
 
 See [`inference_gym/tools/get_ground_truth.py`][get_ground_truth].
 
-[model]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/model.py
-[get_ground_truth]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/tools/get_ground_truth.py
-[ground_truth_dir]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/tools/stan
-[bayesian_model]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/bayesian_model.py
-[sparse_logistic_regression]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/sparse_logistic_regression.py
-[logistic_regression]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/logistic_regression.py
-[irt]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/item_response_theory.py
-[gaussian]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/ill_conditioned_gaussian.py
-[vector_model]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/inference_gym/targets/vector_model.py
-[tutorial]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/notebooks/inference_gym_tutorial.ipynb
-[contract]: https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym/model_contract.md
+[model]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/inference_gym/targets/model.py
+[get_ground_truth]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/inference_gym/tools/get_ground_truth.py
+[ground_truth_dir]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/inference_gym/tools/stan
+[bayesian_model]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/inference_gym/targets/bayesian_model.py
+[sparse_logistic_regression]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/inference_gym/targets/sparse_logistic_regression.py
+[logistic_regression]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/inference_gym/targets/logistic_regression.py
+[irt]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/inference_gym/targets/item_response_theory.py
+[gaussian]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/inference_gym/targets/ill_conditioned_gaussian.py
+[vector_model]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/inference_gym/targets/vector_model.py
+[tutorial]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/notebooks/inference_gym_tutorial.ipynb
+[contract]: https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym/model_contract.md
 
 ### Citing Inference Gym
 

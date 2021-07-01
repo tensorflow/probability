@@ -335,7 +335,7 @@ class MySubclass(tfd.SomeDistribution):
     # https://hynek.me/articles/decorators/
     @decorator.decorator
     def wrapped_init(wrapped, self_, *args, **kwargs):
-      """A 'master `__init__`' which is always called."""
+      """A 'top-level `__init__`' which is always called."""
       # We can't use `wrapped` because it results in a self reference which
       # confounds `tf.function`.
       del wrapped
@@ -532,7 +532,7 @@ class Distribution(_BaseDistribution):
 
   For detailed usage examples of TensorFlow Distributions shapes, see
   [this tutorial](
-  https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb)
+  https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb)
 
   #### Parameter values leading to undefined statistics or distributions.
 

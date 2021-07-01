@@ -11,18 +11,18 @@ alternative-substrate packages are assembled.
 ## Alternative backends
 
 In
-[`tensorflow_probability/python/internal/backend`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/internal/backend)
+[`tensorflow_probability/python/internal/backend`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/internal/backend)
 we find the implementations of both the NumPy and JAX backends. These imitate
 the portion of the TensorFlow API used by TFP, but are implemented in terms of
 the corresponding substrate's primitives.
 
 Since JAX provides `jax.numpy`, we are in most cases able to write a single
 NumPy implementation under
-[`tensorflow_probability/python/internal/backend`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/internal/backend),
+[`tensorflow_probability/python/internal/backend`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/internal/backend),
 then use a rewrite script (found at
-[`tensorflow_probability/python/internal/backend/jax/rewrite.py`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/internal/backend/jax/rewrite.py))
+[`tensorflow_probability/python/internal/backend/jax/rewrite.py`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/internal/backend/jax/rewrite.py))
 to generate a JAX variant at `bazel build` time. See the genrules in
-[`tensorflow_probability/python/internal/backend/jax/BUILD`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/internal/backend/jax/BUILD)
+[`tensorflow_probability/python/internal/backend/jax/BUILD`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/internal/backend/jax/BUILD)
 for more details of how this occurs. In cases where JAX provides a different API
 (e.g. `random`) or a more performant API (e.g. batched matrix decompositions,
 vmap, etc.), we will special-case using an `if JAX_MODE:` block.
@@ -132,7 +132,7 @@ vmap, etc.), we will special-case using an `if JAX_MODE:` block.
 
 In a couple cases, we commit into the repository script-munged source from
 TensorFlow. These files can be found under
-[`tensorflow_probability/python/internal/backend/numpy/gen`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/internal/backend/numpy/gen).
+[`tensorflow_probability/python/internal/backend/numpy/gen`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/internal/backend/numpy/gen).
 They currently include:
 
 *   an implementation of `tf.TensorShape`
@@ -140,11 +140,11 @@ They currently include:
     classes
 
 The actual rewriting is accomplished by scripts found under
-[`tensorflow_probability/python/internal/backend/meta`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/internal/backend/meta),
+[`tensorflow_probability/python/internal/backend/meta`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/internal/backend/meta),
 namely `gen_linear_operators.py` and `gen_tensor_shape.py`.
 
 The test
-[`tensorflow_probability/python/internal/backend/numpy/rewrite_equivalence_test.py`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/internal/backend/numpy/rewrite_equivalence_test.py)
+[`tensorflow_probability/python/internal/backend/numpy/rewrite_equivalence_test.py`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/internal/backend/numpy/rewrite_equivalence_test.py)
 verifies that the files in TensorFlow, when rewritten, match the files in the
 `gen/` directory. The test uses `BUILD` dependencies on `genrule`s that apply
 the rewrite scripts, and compares those genrule inputs to the source of the
@@ -163,7 +163,7 @@ With `internal/backend/{numpy,jax}` now ready to provide a `tf2jax` or
 `tf2numpy` backend, we can proceed to the core packages of TFP.
 
 The script
-[`tensorflow_probability/substrates/meta/rewrite.py`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/substrates/meta/rewrite.py)
+[`tensorflow_probability/substrates/meta/rewrite.py`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/substrates/meta/rewrite.py)
 runs on TFP sources to auto-generate JAX and NumPy python source corresponding
 to the given TF source.
 
@@ -196,12 +196,12 @@ from stack traces will be +10 from the raw code._
 
 ## BUILD rules
 
-[`tensorflow_probability/python/build_defs.bzl`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/build_defs.bzl)
+[`tensorflow_probability/python/build_defs.bzl`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/build_defs.bzl)
 defines a pair of `bazel` build rules: `multi_substrate_py_library` and
 `multi_substrate_py_test`.
 
 These rules automatically invoke
-[`tensorflow_probability/substrates/meta/rewrite.py`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/substrates/meta/rewrite.py)
+[`tensorflow_probability/substrates/meta/rewrite.py`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/substrates/meta/rewrite.py)
 to emit JAX/NumPy source variants. The file `bijectors/softplus.py` gets
 rewritten into `bijectors/_generated_jax_softplus.py` (you can view the output
 under the corresponding `bazel-genfiles` directory).
@@ -235,7 +235,7 @@ omitted deps.
 In order to test against the same directory hierarchy as we use for wheel
 packaging, the `multi_substrate_py_library` does some internal gymnastics with a
 custom bazel `rule` which is able to add symlinks into
-[`tensorflow_probability/substrates`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/build_defs.bzl;l=118)
+[`tensorflow_probability/substrates`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/build_defs.bzl;l=118)
 pointing to that point to implementation files generated under
 `bazel-genfiles/tensorflow_probability/python` (details in
 `_substrate_runfiles_symlinks_impl` of `build_defs.bzl`).
@@ -250,9 +250,9 @@ them and fails to include `tfp.substrates`. This `cp -L` command sits in
 ## Integration testing
 
 A couple of integration tests sit in
-[`tensorflow_probability/substrates/meta/jax_integration_test.py`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/substrates/meta/jax_integration_test.py)
+[`tensorflow_probability/substrates/meta/jax_integration_test.py`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/substrates/meta/jax_integration_test.py)
 and
-[`tensorflow_probability/substrates/meta/numpy_integration_test.py`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/substrates/meta/numpy_integration_test.py).
+[`tensorflow_probability/substrates/meta/numpy_integration_test.py`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/substrates/meta/numpy_integration_test.py).
 
 We run these under CI after building and installing a wheel to verify that the
 `tfp.substrates` packages load correctly and do not require a `tensorflow`

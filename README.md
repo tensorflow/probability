@@ -18,13 +18,13 @@ in core TF.
 
 __Layer 1: Statistical Building Blocks__
 
-* Distributions ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions)):
+* Distributions ([`tfp.distributions`](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/python/distributions)):
   A large collection of probability
   distributions and related statistics with batch and
   [broadcasting](https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
   semantics. See the
-  [Distributions Tutorial](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Distributions_Tutorial.ipynb).
-* Bijectors ([`tfp.bijectors`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/bijectors)):
+  [Distributions Tutorial](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Distributions_Tutorial.ipynb).
+* Bijectors ([`tfp.bijectors`](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/python/bijectors)):
   Reversible and composable transformations of random variables. Bijectors
   provide a rich class of transformed distributions, from classical examples
   like the
@@ -34,27 +34,27 @@ __Layer 1: Statistical Building Blocks__
 
 __Layer 2: Model Building__
 
-* Joint Distributions (e.g., [`tfp.distributions.JointDistributionSequential`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/distributions/joint_distribution_sequential.py)):
+* Joint Distributions (e.g., [`tfp.distributions.JointDistributionSequential`](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/python/distributions/joint_distribution_sequential.py)):
     Joint distributions over one or more possibly-interdependent distributions.
     For an introduction to modeling with TFP's `JointDistribution`s, check out
-    [this colab](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Modeling_with_JointDistribution.ipynb)
-* Probabilistic Layers ([`tfp.layers`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/layers)):
+    [this colab](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/Modeling_with_JointDistribution.ipynb)
+* Probabilistic Layers ([`tfp.layers`](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/python/layers)):
   Neural network layers with uncertainty over the functions they represent,
   extending TensorFlow Layers.
 
 __Layer 3: Probabilistic Inference__
 
-* Markov chain Monte Carlo ([`tfp.mcmc`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/mcmc)):
+* Markov chain Monte Carlo ([`tfp.mcmc`](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/python/mcmc)):
   Algorithms for approximating integrals via sampling. Includes
   [Hamiltonian Monte Carlo](https://en.wikipedia.org/wiki/Hamiltonian_Monte_Carlo),
   random-walk Metropolis-Hastings, and the ability to build custom transition
   kernels.
-* Variational Inference ([`tfp.vi`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/vi)):
+* Variational Inference ([`tfp.vi`](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/python/vi)):
   Algorithms for approximating integrals via optimization.
-* Optimizers ([`tfp.optimizer`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/python/optimizer)):
+* Optimizers ([`tfp.optimizer`](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/python/optimizer)):
   Stochastic optimization methods, extending TensorFlow Optimizers. Includes
   [Stochastic Gradient Langevin Dynamics](http://www.icml-2011.org/papers/398_icmlpaper.pdf).
-* Monte Carlo ([`tfp.monte_carlo`](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/monte_carlo)):
+* Monte Carlo ([`tfp.monte_carlo`](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/monte_carlo)):
   Tools for computing Monte Carlo expectations.
 
 TensorFlow Probability is under active development. Interfaces may change at any
@@ -62,43 +62,43 @@ time.
 
 ## Examples
 
-See [`tensorflow_probability/examples/`](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/)
+See [`tensorflow_probability/examples/`](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/)
 for end-to-end examples. It includes tutorial notebooks such as:
 
-* [Linear Mixed Effects Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Linear_Mixed_Effects_Models.ipynb).
+* [Linear Mixed Effects Models](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/Linear_Mixed_Effects_Models.ipynb).
   A hierarchical linear model for sharing statistical strength across examples.
-* [Eight Schools](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Eight_Schools.ipynb).
+* [Eight Schools](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/Eight_Schools.ipynb).
   A hierarchical normal model for exchangeable treatment effects.
-* [Hierarchical Linear Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/HLM_TFP_R_Stan.ipynb).
+* [Hierarchical Linear Models](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/HLM_TFP_R_Stan.ipynb).
   Hierarchical linear models compared among TensorFlow Probability, R, and Stan.
-* [Bayesian Gaussian Mixture Models](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Bayesian_Gaussian_Mixture_Model.ipynb).
+* [Bayesian Gaussian Mixture Models](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/Bayesian_Gaussian_Mixture_Model.ipynb).
   Clustering with a probabilistic generative model.
-* [Probabilistic Principal Components Analysis](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Probabilistic_PCA.ipynb).
+* [Probabilistic Principal Components Analysis](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/Probabilistic_PCA.ipynb).
   Dimensionality reduction with latent variables.
-* [Gaussian Copulas](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Gaussian_Copula.ipynb).
+* [Gaussian Copulas](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/Gaussian_Copula.ipynb).
   Probability distributions for capturing dependence across random variables.
-* [TensorFlow Distributions: A Gentle Introduction](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Distributions_Tutorial.ipynb).
+* [TensorFlow Distributions: A Gentle Introduction](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Distributions_Tutorial.ipynb).
   Introduction to TensorFlow Distributions.
-* [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb).
+* [Understanding TensorFlow Distributions Shapes](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb).
   How to distinguish between samples, batches, and events for arbitrarily shaped
   probabilistic computations.
-* [TensorFlow Probability Case Study: Covariance Estimation](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Probability_Case_Study_Covariance_Estimation.ipynb).
+* [TensorFlow Probability Case Study: Covariance Estimation](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/TensorFlow_Probability_Case_Study_Covariance_Estimation.ipynb).
   A user's case study in applying TensorFlow Probability to estimate covariances.
 
 It also includes example scripts such as:
 
-* [Variational Autoencoders](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vae.py).
+* [Variational Autoencoders](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/vae.py).
   Representation learning with a latent code and variational inference.
-* [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/vq_vae.py).
+* [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/vq_vae.py).
   Discrete representation learning with vector quantization.
-* [Disentangled Sequential Variational Autoencoder](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/disentangled_vae.py)
+* [Disentangled Sequential Variational Autoencoder](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/disentangled_vae.py)
   Disentangled representation learning over sequences with variational inference.
 * Latent Dirichlet Allocation
-  ([Distributions version](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/latent_dirichlet_allocation_distributions.py),
+  ([Distributions version](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/latent_dirichlet_allocation_distributions.py),
   Mixed membership modeling for capturing topics in a document.
-* [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/bayesian_neural_network.py).
+* [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/bayesian_neural_network.py).
   Neural networks with uncertainty over their weights.
-* [Bayesian Logistic Regression](https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples/logistic_regression.py).
+* [Bayesian Logistic Regression](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/logistic_regression.py).
   Bayesian inference for binary classification.
 
 ## Installation

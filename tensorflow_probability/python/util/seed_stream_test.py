@@ -79,7 +79,7 @@ class SeedStreamTest(test_util.TestCase):
 
   def testNestingRobustness(self):
     # SeedStreams started from generated seeds should not collide with
-    # the master or with each other, even if the salts are the same.
+    # the initial seed or with each other, even if the salts are the same.
     strm1 = tfp.util.SeedStream(seed=4, salt='salt')
     strm2 = tfp.util.SeedStream(strm1(), salt='salt')
     strm3 = tfp.util.SeedStream(strm1(), salt='salt')

@@ -36,7 +36,7 @@ setup(
     long_description_content_type='text/markdown',
     author='Google LLC',
     author_email='no-reply@google.com',
-    url='https://github.com/tensorflow/probability/tree/master/spinoffs/inference_gym',
+    url='https://github.com/tensorflow/probability/tree/main/spinoffs/inference_gym',
     license='Apache 2.0',
     packages=find_packages('.'),
     # Add in any packaged data.

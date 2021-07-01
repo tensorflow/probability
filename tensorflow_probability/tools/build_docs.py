@@ -38,7 +38,7 @@ flags.DEFINE_string("output_dir", "/tmp/probability_api",
 
 flags.DEFINE_string(
     "code_url_prefix",
-    ("https://github.com/tensorflow/probability/blob/master/"
+    ("https://github.com/tensorflow/probability/blob/main/"
      "tensorflow_probability"),
     "The url prefix for links to code.")
 
