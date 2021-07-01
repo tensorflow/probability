@@ -27,6 +27,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":missing_values_util",
+        ":seasonality_util",
         ":util",
     ],
 )
@@ -52,6 +53,34 @@ py_test(
     srcs_version = "PY3",
     deps = [
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "seasonality_util",
+    srcs = [
+        "seasonality_util.py",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
+    ],
+)
+
+py_test(
+    name = "seasonality_util_test",
+    size = "small",
+    srcs = ["seasonality_util_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # pandas dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
