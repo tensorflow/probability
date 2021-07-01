@@ -14,8 +14,11 @@
 # ============================================================================
 """MarkovChain distribution."""
 
+import functools
+
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import assert_util
@@ -324,16 +327,11 @@ class MarkovChain(distribution.Distribution):
                          initializer=(loop_seed, prior_result))
 
     # Concatenate prior sample (and lp) with remaining samples (and lps).
-    results = tf.nest.map_structure(
-        lambda a, b: tf.concat([a[tf.newaxis, ...], b], axis=0),
-        prior_result, results)
+    results = tf.nest.map_structure(concat_initial, prior_result, results)
     samples, lp = extract_sample_fn(results), extract_lp_fn(results)
 
     # Move leftmost `num_steps` dimension into the event shape.
-    samples = tf.nest.map_structure(
-        lambda x, axis: distribution_util.move_dimension(x, 0, axis),
-        samples, self._step_axes())
-
+    samples = move_dimensions(samples, 0, self._step_axes())
     return samples, lp
 
   def _sample_n(self, sample_shape, seed=None):
@@ -358,13 +356,9 @@ class MarkovChain(distribution.Distribution):
     # transition model as the leftmost sample dimension rather than as the
     # rightmost batch dimension (which could otherwise conflict with existing
     # batch dimensions).
-    x = tf.nest.map_structure(
-        lambda t, ax: distribution_util.move_dimension(t, ax, 0),
-        x, self._step_axes())
-
+    x = move_dimensions(x, self._step_axes(), 0)
     prior_lp = self.initial_state_prior.log_prob(
         tf.nest.map_structure(lambda state_part: state_part[0], x))
-
     num_steps = ps.shape(tf.nest.flatten(x)[0])[0]
 
     return prior_lp, self.transition_fn(
@@ -389,12 +383,25 @@ class MarkovChain(distribution.Distribution):
             'initial_state_prior.sample()).batch_shape`.')):
       return prior_lp + transition_lp
 
-  def _default_event_space_bijector(self, *args, **kwargs):
-    # TODO(davmre): Support different bijectors for the prior and transitions.
-    # For example, one might want to start a Gaussian random walk at a
-    # deterministic location.
-    return self.initial_state_prior.experimental_default_event_space_bijector(
-        *args, **kwargs)
+  def _default_event_space_bijector(self):
+    transition_dist = self.transition_fn(
+        0, self.initial_state_prior.sample(seed=samplers.zeros_seed()))
+    transition_bijector = (
+        transition_dist.experimental_default_event_space_bijector())
+    # We can share a single bijector across the whole chain if:
+    # 1. The prior and transition distributions use the same bijector, and
+    # 2. This bijector has no batch shape (which could conflict with
+    #    the `num_steps` axis of the chain).
+    if (transition_bijector ==
+        self.initial_state_prior.experimental_default_event_space_bijector()
+        and tensorshape_util.rank(
+            transition_bijector.experimental_batch_shape()) == 0):
+      return transition_bijector
+
+    return _MarkovChainBijector(
+        self,
+        transition_bijector=transition_bijector,
+        bijector_fn=lambda d: d.experimental_default_event_space_bijector())
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
@@ -471,3 +478,305 @@ def _markov_chain_log_prob_ratio(p, x, q, y, name=None):
       transition_lp_ratio = tf.reduce_sum(transition_lp_ratios, axis=0)
     return prior_lp_ratio + transition_lp_ratio
 # pylint: enable=protected-access
+
+
+class _MarkovChainBijector(bijector.Bijector):
+  """Applies distinct bijectors to initial + transition states of a chain."""
+
+  def __init__(self,
+               chain,
+               bijector_fn,
+               transition_bijector,
+               name='markov_chain_bijector'):
+    """Initializes the MarkovChain bijector.
+
+    This bijector maps into the support of the corresponding MarkovChain
+    distribution, using separate bijectors for the head (initial state)
+    and tail (transition states) of the chain. Its input is a pair of
+    unconstrained structures each matching `chain.dtype`, and the output is a
+    constrained structure matching `chain.dtype`. Note that the inputs
+    to the two bijectors may have different shapes, corresponding to the
+    inverse images of the two bijectors, but the outputs must have the same
+    shape in order to support concatenation along the `num_steps` axis.
+
+    Conceptually, the Markov chain bijector performs the same transformation as
+    the `joint_distribution._DefaultJointBijector` for a hypothetical joint
+    distribution that samples from the chain one step at a time:
+
+    ```python
+    @tfd.JointDistributionCoroutineAutoBatched
+    def markov_chain_equivalent():
+      x = yield initial_state_prior
+      for i in range(1, num_steps):
+        x = yield transition_fn(i, x)
+    markov_chain_equivalent_joint_bijector = (
+      markov_chain_equivalent.experimental_default_event_space_bijector())
+    ```
+
+    However, just as `MarkovChain` uses low-level looping and batch operations
+    for better performance than the corresponding joint
+    distribution, the `MarkovChainBijector` is more efficient than the
+    corresponding joint bijector.
+
+    Args:
+      chain: Instance of `tfd.MarkovChain`.
+      bijector_fn: Callable with signature `bij = bijector_fn(dist)`, where
+        `dist` is a `tfd.Distribution` instance. This is applied to the
+        `chain.initial_state_prior` and to distributions returned by
+        `chain.transition_fn(...)`.
+      transition_bijector: Bijector instance for a single step of the
+        transition model. This is typically equal to
+        `bijector_fn(markov_chain.transition_fn(0,
+        markov_chain.initial_state_prior.sample()))`; passing it explicitly
+        avoids the need to recreate it whenever the chain bijector is
+        copied or otherwise re-initialized.
+      name: The name to give ops created by this bijector.
+
+    #### Example
+
+    For example, consider the following chain, which has dtype
+    `{'probs': tf.float32}`, and describes a process in which a 2D vector
+    is sampled from the probability simplex and then gradually corrupted by
+    Gaussian noise (which will in general push it out of the simplex):
+
+    ```python
+    chain = tfd.MarkovChain(
+      initial_state_prior=tfd.JointDistributionNamedAutoBatched(
+          {'probs': tfd.Dirichlet([1., 1.])}),
+      transition_fn=lambda _, x: tfd.JointDistributionNamedAutoBatched(
+          {'probs': tfd.MultivariateNormalDiag(loc=x['probs'],
+                                               scale_diag=[0.1, 0.1])},
+        batch_ndims=ps.rank(x['probs'])),
+      num_steps=10)
+    ```
+
+    Transformations of this distribution apply separate bijectors
+    for the `Dirichlet` initial state and `MultivariateNormalDiag` transitions:
+
+    ```python
+    bij = chain.experimental_default_event_space_bijector()
+    y = chain.sample(5)  # Shape: {'probs': [5, 10, 2]}
+    x = chain.inverse(y)  # Shape: [{'probs': [5, 1]}, {'probs': [5, 9, 2]}]
+    ```
+
+    Note that the pulled-back `x` is a pair of structures, of shapes
+    `{'probs': [5, 1]}` and  `{'probs': [5, 9, 2]}` respectively. The first is
+    the result of pulling the initial state vectors back through the Dirichlet
+    event space bijector, which inverts shape-`[2]` vectors on the simplex to
+    shape-`[1]` unconstrained vectors.  The second comes from pulling the
+    shape-`[2]` chain state at each of the remaining `9` timesteps back through
+    the `MultivariateNormalDiag` event space bijector, which is just
+    the identity bijector, resulting in vectors of shape `[2]`.
+
+    """
+    parameters = dict(locals())
+    with tf.name_scope(name):
+      self._chain = chain
+      self._bijector_fn = bijector_fn
+      self._initial_bijector = bijector_fn(chain.initial_state_prior)
+      self._transition_bijector = transition_bijector
+
+      inverse_min_event_ndims = tf.nest.map_structure(
+          ps.rank_from_shape, chain.event_shape_tensor())
+      super(_MarkovChainBijector, self).__init__(
+          forward_min_event_ndims=(
+              self._initial_bijector.inverse_event_ndims(
+                  tf.nest.map_structure(lambda nd: nd - 1,
+                                        inverse_min_event_ndims)),
+              self._transition_bijector.inverse_event_ndims(
+                  inverse_min_event_ndims)),
+          inverse_min_event_ndims=inverse_min_event_ndims,
+          is_constant_jacobian=(
+              self.initial_bijector.is_constant_jacobian and
+              self.transition_bijector.is_constant_jacobian),
+          validate_args=chain.validate_args,
+          parameters=parameters,
+          name=name)
+
+  @property
+  def bijector_fn(self):
+    return self._bijector_fn
+
+  @property
+  def chain(self):
+    return self._chain
+
+  @property
+  def initial_bijector(self):
+    return self._initial_bijector
+
+  @property
+  def transition_bijector(self):
+    return self._transition_bijector
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        chain=parameter_properties.BatchedComponentProperties(),
+        transition_bijector=parameter_properties.BatchedComponentProperties(
+            # The transition bijector contributes no batch shape
+            # beyond that from the chain itself.
+            event_ndims=None))
+
+  def _apply_forward_scan(self, fn, x0, xs):
+    """Runs the chain forward, accumulating `fn(b, x, y)` vals at every step.
+
+    Args:
+      fn: Callable with signature `result = fn(b, x, y)`.
+      x0: Structure of initial state `Tensors`, each of shape
+          `concat([[batch_shape], unconstrained_prior_event_shape])`.
+      xs: Structure of `Tensors`, each of shape
+          `concat([[batch_shape], [num_steps - 1],
+          unconstrained_transition_event_shape])`.
+    Returns:
+      fs: Result `Tensor` of shape
+        `concat([[num_steps], batch_shape, result_shape])`, where `result_shape`
+        is the shape of the result from an unbatched call to `fn`.
+    """
+    xs_step_axes = tf.nest.map_structure(
+        lambda nd: -nd,
+        self.transition_bijector.inverse_event_ndims(
+            # Outputs `y` have the num_steps axis at `-inverse_min_event_ndims`.
+            self.inverse_min_event_ndims))
+    xs = move_dimensions(xs, source=xs_step_axes, dest=0)
+
+    # Evaluate the initial state.
+    y0 = self.initial_bijector.forward(x0)
+    f0 = fn(self.initial_bijector, x0, y0)
+
+    # Evaluate the rest of the chain.
+    def loop_body(previous_y_and_result, idx):
+      previous_y, _ = previous_y_and_result
+      bij = self.bijector_fn(self.chain.transition_fn(idx, previous_y))
+      x_i = tf.nest.map_structure(lambda x: x[idx - 1], xs)
+      y_i = bij.forward(x_i)
+      f_i = fn(bij, x_i, y_i)
+      return (y_i,
+              tf.nest.map_structure(lambda a, b: tf.cast(a, b.dtype), f_i, f0))
+    _, fs = tf.scan(loop_body,
+                    elems=tf.range(1, self.chain.num_steps),
+                    initializer=(y0, f0))
+    return concat_initial(f0, fs)
+
+  def _apply_batch(self, fn, y):
+    """Applies `fn(b, y)` at each step of the chain.
+
+    Args:
+      fn: Callable with signature `result = fn(b, y)`.
+      y: Structure of `Tensor`s, of shape
+         `batch_shape + self.chain.event_shape`.
+    Returns:
+      f0: `Tensor` of shape `batch_shape + result_shape`.
+      fs: `Tensor` of shape `[num_steps - 1] + batch_shape + result_shape`.
+    """
+    y = move_dimensions(y, source=self.chain._step_axes(), dest=0)  # pylint: disable=protected-access
+    f0 = fn(self.initial_bijector, tf.nest.map_structure(lambda y: y[0], y))
+    transition_dist = self.chain.transition_fn(
+        tf.range(self.chain.num_steps - 1),
+        tf.nest.map_structure(lambda y: y[:-1], y))
+    return (f0,
+            fn(self.bijector_fn(transition_dist),
+               tf.nest.map_structure(lambda y: y[1:], y)))
+
+  def _forward(self, x):
+    x0, xs = x
+    y = self._apply_forward_scan(fn=lambda b, x, y: y, x0=x0, xs=xs)
+    return move_dimensions(y, source=0, dest=self.chain._step_axes())  # pylint: disable=protected-access
+
+  def _inverse(self, y):
+    xs_step_axes = tf.nest.map_structure(
+        lambda nd: -nd,
+        self.transition_bijector.inverse_event_ndims(
+            # Outputs `y` have the num_steps axis at `-inverse_min_event_ndims`.
+            self.inverse_min_event_ndims))
+    x0, xs = self._apply_batch(fn=lambda b, y: b.inverse(y), y=y)
+    return (x0, move_dimensions(xs, source=0, dest=xs_step_axes))
+
+  def _forward_log_det_jacobian(self, x):
+    inverse_ndims_for_one_step = tf.nest.map_structure(
+        lambda nd: nd - 1, self.inverse_min_event_ndims)
+    x0, xs = x
+    fldjs = self._apply_forward_scan(
+        fn=lambda b, x, y: compute_and_maybe_broadcast_ldj(  # pylint: disable=g-long-lambda
+            b, x,
+            event_ndims=b.inverse_event_ndims(inverse_ndims_for_one_step),
+            ldj_fn=lambda b: b.forward_log_det_jacobian),
+        x0=x0, xs=xs)
+    return tf.reduce_sum(fldjs, axis=0)
+
+  def _inverse_log_det_jacobian(self, y):
+    inverse_ndims_for_one_step = tf.nest.map_structure(
+        lambda nd: nd - 1, self.inverse_min_event_ndims)
+    initial_ildj, ildjs = self._apply_batch(
+        fn=lambda b, x: compute_and_maybe_broadcast_ldj(  # pylint: disable=g-long-lambda
+            b, x,
+            event_ndims=inverse_ndims_for_one_step,
+            ldj_fn=lambda b: b.inverse_log_det_jacobian),
+        y=y)
+    return initial_ildj + tf.reduce_sum(ildjs, axis=0)
+
+  def _forward_event_shape(self, event_shape):
+    _, tail_shape = event_shape
+    return tf.nest.map_structure(
+        lambda s: tensorshape_util.concatenate([1 + s[0]], s[1:]),
+        self.transition_bijector.forward_event_shape(tail_shape))
+
+  def _forward_event_shape_tensor(self, event_shape):
+    _, tail_shape = event_shape
+    return tf.nest.map_structure(
+        lambda s: ps.concat([[1 + s[0]], s[1:]], axis=0),
+        self.transition_bijector.forward_event_shape_tensor(tail_shape))
+
+  def _inverse_event_shape(self, event_shape):
+    num_steps = tf.nest.flatten(event_shape)[0][0]
+    head_shape = tf.nest.map_structure(lambda s: s[1:], event_shape)
+    tail_shape = tf.nest.map_structure(
+        lambda s: tensorshape_util.concatenate([num_steps - 1], s[1:]),
+        event_shape)
+    return (self.initial_bijector.inverse_event_shape(head_shape),
+            self.transition_bijector.inverse_event_shape(tail_shape))
+
+  def _inverse_event_shape_tensor(self, event_shape):
+    num_steps = tf.nest.flatten(event_shape)[0][0]
+    head_shape = tf.nest.map_structure(lambda s: s[1:], event_shape)
+    tail_shape = tf.nest.map_structure(
+        lambda s: ps.concat([[num_steps - 1], s[1:]], axis=0),
+        event_shape)
+    return (self.initial_bijector.inverse_event_shape_tensor(head_shape),
+            self.transition_bijector.inverse_event_shape_tensor(tail_shape))
+
+  def _inverse_dtype(self, dtype):
+    return (self.initial_bijector.inverse_dtype(dtype),
+            self.transition_bijector.inverse_dtype(dtype))
+
+  def _forward_dtype(self, dtype):
+    head_dtype, _ = dtype
+    return self.initial_bijector.forward_dtype(head_dtype)
+
+
+def move_dimensions(xs, source, dest):
+  if tf.nest.is_nested(xs):
+    if not tf.nest.is_nested(source):
+      source = tf.nest.map_structure(lambda _: source, xs)
+    if not tf.nest.is_nested(dest):
+      dest = tf.nest.map_structure(lambda _: dest, xs)
+  return tf.nest.map_structure(
+      distribution_util.move_dimension, xs, source, dest)
+
+
+def compute_and_maybe_broadcast_ldj(
+    b, x, event_ndims, ldj_fn=lambda b: b.forward_log_det_jacobian):
+  """Broadcasts the forward/inverse log det jacobian to full batch shape."""
+  ldj = ldj_fn(b)(x, event_ndims=event_ndims)
+  x_batch_shape_parts = [
+      ps.shape(t)[:ps.rank(t) - nd]
+      for (t, nd) in zip(tf.nest.flatten(x), tf.nest.flatten(event_ndims))]
+  return tf.broadcast_to(ldj, functools.reduce(ps.broadcast_shape,
+                                               x_batch_shape_parts,
+                                               ps.shape(ldj)))
+
+
+def concat_initial(x0, xs):
+  return tf.nest.map_structure(
+      lambda x0, xs: tf.concat([x0[tf.newaxis, ...], xs], axis=0),
+      x0, xs)
