@@ -18,7 +18,6 @@ from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
 
-import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -64,24 +63,31 @@ class DistributionBijectorsTest(test_util.TestCase):
                                                       logprob_atol=1e-2,
                                                       grad_atol=1e-2):
     """Verifies that dist's lps and gradients match those of Normal(0., 1.)."""
-    event_ndims = ps.rank_from_shape(dist.event_shape_tensor, dist.event_shape)
-    batch_ndims = ps.rank_from_shape(dist.batch_shape_tensor, dist.batch_shape)
-    dist_shape = ps.concat([dist.batch_shape_tensor(),
-                            dist.event_shape_tensor()], axis=0)
-    reference_dist = tfd.Independent(
-        tfd.Normal(loc=tf.zeros(dist_shape, dtype=dist.dtype), scale=1.),
-        reinterpreted_batch_ndims=event_ndims)
-    zs = tf.reshape([-4., -2., 0., 2., 4.],
-                    ps.concat([[5],
-                               ps.ones([batch_ndims + event_ndims],
-                                       dtype=np.int32)],
-                              axis=0))
-    zs = tf.broadcast_to(zs, ps.concat([[5], dist_shape], axis=0))
-    lp_dist, grad_dist = tfp.math.value_and_gradient(dist.log_prob, zs)
-    lp_reference, grad_reference = tfp.math.value_and_gradient(
-        reference_dist.log_prob, zs)
-    self.assertAllClose(lp_reference, lp_dist, atol=logprob_atol)
-    self.assertAllClose(grad_reference, grad_dist, atol=grad_atol)
+    batch_shape = dist.batch_shape_tensor()
+    def make_reference_values(event_shape):
+      dist_shape = ps.concat([batch_shape, event_shape], axis=0)
+      x = tf.reshape([-4., -2., 0., 2., 4.],
+                     ps.concat([[5], ps.ones_like(dist_shape)], axis=0))
+      return tf.broadcast_to(x, ps.concat([[5], dist_shape], axis=0))
+    flat_event_shape = tf.nest.flatten(dist.event_shape_tensor())
+    zs = [make_reference_values(s) for s in flat_event_shape]
+    lp_dist, grad_dist = tfp.math.value_and_gradient(
+        lambda *xs: dist.log_prob(tf.nest.pack_sequence_as(dist.dtype, xs)), zs)
+
+    def reference_value_and_gradient(z, event_shape):
+      reference_dist = tfd.Independent(
+          tfd.Normal(loc=tf.zeros_like(z), scale=1.),
+          reinterpreted_batch_ndims=ps.rank_from_shape(event_shape))
+      return tfp.math.value_and_gradient(reference_dist.log_prob, z)
+
+    reference_vals_and_grads = [
+        reference_value_and_gradient(z, event_shape)
+        for (z, event_shape) in zip(zs, flat_event_shape)]
+    lps_reference = [lp for lp, grad in reference_vals_and_grads]
+    self.assertAllClose(sum(lps_reference), lp_dist, atol=logprob_atol)
+
+    grads_reference = [grad for lp, grad in reference_vals_and_grads]
+    self.assertAllCloseNested(grads_reference, grad_dist, atol=grad_atol)
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -116,6 +122,32 @@ class DistributionBijectorsTest(test_util.TestCase):
         tfb.Invert(b)(d))
 
   @test_util.numpy_disable_gradient_test
+  def test_markov_chain(self):
+    d = tfd.MarkovChain(
+        initial_state_prior=tfd.Uniform(low=0., high=1.),
+        transition_fn=lambda _, x: tfd.Uniform(low=0., high=tf.nn.softplus(x)),
+        num_steps=10)
+    b = tfp.experimental.bijectors.make_distribution_bijector(d)
+    self.assertDistributionIsApproximatelyStandardNormal(
+        tfb.Invert(b)(d))
+
+  @test_util.numpy_disable_gradient_test
+  def test_markov_chain_joint(self):
+    d = tfd.MarkovChain(
+        initial_state_prior=tfd.JointDistributionSequentialAutoBatched(
+            [tfd.Normal(0., 1.),
+             lambda x: tfd.Uniform(low=0., high=tf.exp(x))]),
+        transition_fn=(
+            lambda _, state: tfd.JointDistributionSequentialAutoBatched(  # pylint: disable=g-long-lambda
+                batch_ndims=ps.rank(state[1]),
+                model=[tfd.Normal(state[1], 1.),
+                       lambda x: tfd.Uniform(low=0., high=tf.nn.softplus(x))])),
+        num_steps=10)
+    b = tfp.experimental.bijectors.make_distribution_bijector(d)
+    self.assertDistributionIsApproximatelyStandardNormal(
+        tfb.Invert(b)(d))
+
+  @test_util.numpy_disable_gradient_test
   def test_nested_joint_distribution(self):
 
     def model():
@@ -125,17 +157,9 @@ class DistributionBijectorsTest(test_util.TestCase):
                       high=1 + tf.exp(x) + tf.nn.softplus(x)),
           lambda v: tfd.Exponential(v)])  # pylint: disable=unnecessary-lambda
     dist = tfd.JointDistributionCoroutineAutoBatched(model)
-    samples = self.evaluate(dist.sample(10000, seed=test_util.test_seed()))
-
     b = tfp.experimental.bijectors.make_distribution_bijector(dist)
-    whitened_samples = b.inverse(samples)
-    x, (v, y) = whitened_samples
-    whitened_vectors = tf.stack([x, v, y], axis=-1)
-    whitened_mean = tf.reduce_mean(whitened_vectors, axis=0)
-    self.assertAllClose(whitened_mean, tf.zeros_like(whitened_mean), atol=1e-1)
-    whitened_cov = tfp.stats.covariance(
-        whitened_vectors, sample_axis=0, event_axis=-1)
-    self.assertAllClose(whitened_cov, tf.eye(3), atol=1e-1)
+    self.assertDistributionIsApproximatelyStandardNormal(
+        tfb.Invert(b)(dist))
 
   @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(

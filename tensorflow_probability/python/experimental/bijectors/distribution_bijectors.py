@@ -25,6 +25,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.distributions import deterministic
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution
+from tensorflow_probability.python.distributions import markov_chain
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -33,6 +34,7 @@ from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.experimental.bijectors import scalar_function_with_inferred_inverse
 from tensorflow_probability.python.internal import callable_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 
 
 # pylint: disable=g-long-lambda,protected-access
@@ -41,6 +43,12 @@ preconditioning_bijector_fns = {
         lambda d: d.experimental_default_event_space_bijector()),
     independent.Independent: lambda d: make_distribution_bijector(
         d.distribution),
+    markov_chain.MarkovChain: lambda d: markov_chain._MarkovChainBijector(
+        chain=d,
+        transition_bijector=make_distribution_bijector(
+            d.transition_fn(
+                0, d.initial_state_prior.sample(seed=samplers.zeros_seed()))),
+        bijector_fn=make_distribution_bijector),
     normal.Normal: lambda d: tfb.Shift(d.loc)(tfb.Scale(d.scale)),
     sample.Sample: lambda d: sample._DefaultSampleBijector(
         distribution=d.distribution,
@@ -201,7 +209,7 @@ def make_distribution_bijector(distribution, name='make_distribution_bijector'):
           make_distribution_bijector(distribution.distribution))
 
     # If we've annotated a specific bijector for this distribution, use that.
-    if type(distribution) in preconditioning_bijector_fns:  # pylint: disable=unidiomatic-typecheck
+    if isinstance(distribution, tuple(preconditioning_bijector_fns)):
       return preconditioning_bijector_fns[type(distribution)](distribution)
 
     # Otherwise, if this distribution implements a CDF and inverse CDF, build
