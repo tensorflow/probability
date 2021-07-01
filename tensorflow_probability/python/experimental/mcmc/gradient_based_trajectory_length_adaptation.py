@@ -144,7 +144,7 @@ def chees_criterion(previous_state,
                     accept_prob,
                     validate_args=False,
                     experimental_shard_axis_names=None,
-                    experimental_chain_axis_names=None):
+                    experimental_reduce_chain_axis_names=None):
   """The ChEES criterion from [1].
 
   ChEES stands for Change in the Estimator of the Expected Square.
@@ -178,8 +178,9 @@ def chees_criterion(previous_state,
     validate_args: Whether to perform non-static argument validation.
     experimental_shard_axis_names: A structure of string names indicating how
       members of the state are sharded.
-    experimental_chain_axis_names: A string or list of string names indicating
-      how batches of chains are sharded.
+    experimental_reduce_chain_axis_names: A string or list of string names
+      indicating which named chain axes to reduce over when computing the
+      criterion.
 
   Returns:
     chees: The value of the ChEES criterion.
@@ -196,12 +197,12 @@ def chees_criterion(previous_state,
   """
   batch_ndims = ps.rank(accept_prob)
   batch_axes = ps.range(batch_ndims, dtype=tf.int32)
-  experimental_chain_axis_names = distribute_lib.canonicalize_named_axis(
-      experimental_chain_axis_names)
+  reduce_chain_axis_names = distribute_lib.canonicalize_named_axis(
+      experimental_reduce_chain_axis_names)
   # Number of total chains is local batch size * distributed axis size
   local_axis_size = ps.maximum(ps.size(accept_prob), 1)
   distributed_axis_size = int(ps.reduce_prod([
-      distribute_lib.get_axis_size(a) for a in experimental_chain_axis_names]))
+      distribute_lib.get_axis_size(a) for a in reduce_chain_axis_names]))
   num_chains = local_axis_size * distributed_axis_size
   num_chains_ = tf.get_static_value(num_chains)
   if num_chains_ is not None:
@@ -220,7 +221,7 @@ def chees_criterion(previous_state,
     # The empirical mean here is a stand-in for the true mean, so we drop the
     # gradient that flows through this term.
     x_mean = _reduce_mean_with_axes(
-        x, batch_axes, experimental_chain_axis_names)
+        x, batch_axes, reduce_chain_axis_names)
     return x - tf.stop_gradient(x_mean)
 
   def _center_proposed_state(x):
@@ -239,9 +240,9 @@ def chees_criterion(previous_state,
     # but we'll discard the resultant gradients later on, so it's fine.
     x_center = (
         _reduce_sum_with_axes(expanded_accept_prob * x_safe, batch_axes,
-                              experimental_chain_axis_names) /
+                              reduce_chain_axis_names) /
         (_reduce_sum_with_axes(expanded_accept_prob, batch_axes,
-                               experimental_chain_axis_names) + 1e-20))
+                               reduce_chain_axis_names) + 1e-20))
 
     return x - tf.stop_gradient(x_center)
 
@@ -382,7 +383,7 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
       proposed_state_getter_fn=hmc_like_proposed_state_getter_fn,
       validate_args=False,
       experimental_shard_axis_names=None,
-      experimental_chain_axis_names=None,
+      experimental_reduce_chain_axis_names=None,
       name=None):
     """Creates the trajectory length adaptation kernel.
 
@@ -439,8 +440,8 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
         outputs.
       experimental_shard_axis_names: A structure of string names indicating how
         members of the state are sharded.
-      experimental_chain_axis_names: A string or list of string names indicating
-        how batches of chains are sharded.
+      experimental_reduce_chain_axis_names: A string or list of string names
+        indicating how batches of chains are sharded.
       name: Python `str` name prefixed to Ops created by this class. Default:
         'simple_step_size_adaptation'.
 
@@ -479,7 +480,7 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
         proposed_state_getter_fn=hmc_like_proposed_state_getter_fn,
         validate_args=validate_args,
         experimental_shard_axis_names=experimental_shard_axis_names,
-        experimental_chain_axis_names=experimental_chain_axis_names,
+        experimental_reduce_chain_axis_names=experimental_reduce_chain_axis_names,
         name=name,
     )
 
@@ -497,9 +498,9 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
 
   def criterion_fn(self, previous_state, proposed_state, accept_prob):
     kwargs = {}
-    if self.experimental_chain_axis_names is not None:
-      kwargs['experimental_chain_axis_names'] = (
-          self.experimental_chain_axis_names)
+    if self.experimental_reduce_chain_axis_names is not None:
+      kwargs['experimental_reduce_chain_axis_names'] = (
+          self.experimental_reduce_chain_axis_names)
     if self.experimental_shard_axis_names is not None:
       kwargs['experimental_shard_axis_names'] = (
           self.experimental_shard_axis_names)
@@ -599,7 +600,7 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
           criterion_fn=self.criterion_fn,
           max_leapfrog_steps=self.max_leapfrog_steps,
           experimental_shard_axis_names=self.experimental_shard_axis_names,
-          experimental_chain_axis_names=self.experimental_chain_axis_names)
+          reduce_chain_axis_names=self.experimental_reduce_chain_axis_names)
 
       # Undo the effect of adaptation if we're not in the burnin phase. We keep
       # the criterion, however, as that's a diagnostic. We also keep the
@@ -655,15 +656,12 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
   def experimental_shard_axis_names(self):
     return self._parameters['experimental_shard_axis_names']
 
-  @property
-  def experimental_chain_axis_names(self):
-    return self._parameters['experimental_chain_axis_names']
-
   def experimental_with_shard_axes(self, shard_axis_names):
     return self.copy(experimental_shard_axis_names=shard_axis_names)
 
-  def experimental_with_chain_axes(self, chain_axis_names):
-    return self.copy(experimental_chain_axis_names=chain_axis_names)
+  @property
+  def experimental_reduce_chain_axis_names(self):
+    return self._parameters['experimental_reduce_chain_axis_names']
 
 
 def _forbid_inner_transformed_kernel(inner_kernel):
@@ -709,7 +707,7 @@ def _update_trajectory_grad(previous_kernel_results, previous_state,
                             trajectory_jitter, accept_prob, step_size,
                             criterion_fn, max_leapfrog_steps,
                             experimental_shard_axis_names=None,
-                            experimental_chain_axis_names=None):
+                            reduce_chain_axis_names=None):
   """Updates the trajectory length."""
   # Compute criterion grads.
   def leapfrog_action(dt):
@@ -733,16 +731,16 @@ def _update_trajectory_grad(previous_kernel_results, previous_state,
   trajectory_grad *= trajectory_jitter
 
   # Weight by acceptance probability.
-  experimental_chain_axis_names = distribute_lib.canonicalize_named_axis(
-      experimental_chain_axis_names)
+  reduce_chain_axis_names = distribute_lib.canonicalize_named_axis(
+      reduce_chain_axis_names)
   trajectory_grad = tf.where(accept_prob > 1e-4, trajectory_grad, 0.)
   trajectory_grad = tf.where(
       tf.math.is_finite(trajectory_grad), trajectory_grad, 0.)
   trajectory_grad = (
       _reduce_sum_with_axes(trajectory_grad * accept_prob,
-                            None, experimental_chain_axis_names) /
+                            None, reduce_chain_axis_names) /
       _reduce_sum_with_axes(accept_prob + 1e-20, None,
-                            experimental_chain_axis_names))
+                            reduce_chain_axis_names))
 
   # Compute Adam/RMSProp step size.
   dtype = previous_kernel_results.adaptation_rate.dtype

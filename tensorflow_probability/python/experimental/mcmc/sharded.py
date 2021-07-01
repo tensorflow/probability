@@ -74,7 +74,7 @@ class Sharded(kernel.TransitionKernel):
 
   @property
   def is_calibrated(self):
-    return self.kernel.is_calibrated
+    return self.inner_kernel.is_calibrated
 
   @property
   def experimental_shard_axis_names(self):

@@ -213,6 +213,7 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       step_size_getter_fn=hmc_like_step_size_getter_fn,
       log_accept_prob_getter_fn=hmc_like_log_accept_prob_getter_fn,
       reduce_fn=reduce_logmeanexp,
+      experimental_reduce_chain_axis_names=None,
       validate_args=False,
       name=None):
     """Initializes this transition kernel.
@@ -257,6 +258,9 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       reduce_fn: A callable with signature `(input_tensor, axis, keepdims) ->
         tensor` that returns a log-reduction of `log_accept_prob`, typically
         some sort of mean. By default, this performs an arithmetic mean.
+      experimental_reduce_chain_axis_names: A `str` or list of `str`s indicating
+        the named axes that should additionally reduced during the log-reduction
+        of `log_accept_prob`.
       validate_args: Python `bool`. When `True` kernel parameters are checked
         for validity. When `False` invalid inputs may silently render incorrect
         outputs.
@@ -308,6 +312,8 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         step_size_getter_fn=step_size_getter_fn,
         log_accept_prob_getter_fn=log_accept_prob_getter_fn,
         reduce_fn=reduce_fn,
+        experimental_reduce_chain_axis_names=(
+            experimental_reduce_chain_axis_names),
         name=name)
 
   @property
@@ -332,9 +338,14 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
   def log_accept_prob_getter_fn(self, kernel_results):
     return self._parameters['log_accept_prob_getter_fn'](kernel_results)
 
-  def reduce_fn(self, input_tensor, axis, keepdims):
+  def reduce_fn(self, input_tensor, axis, keepdims,
+                experimental_named_axis=None):
+    if experimental_named_axis is None:
+      return self._parameters['reduce_fn'](
+          input_tensor, axis=axis, keepdims=keepdims)
     return self._parameters['reduce_fn'](
-        input_tensor, axis=axis, keepdims=keepdims)
+        input_tensor, axis=axis, keepdims=keepdims,
+        experimental_named_axis=experimental_named_axis)
 
   @property
   def parameters(self):
@@ -413,7 +424,8 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     reduced_log_accept_prob = self.reduce_fn(
         log_accept_prob,
         axis=ps.range(num_reduce_dims),
-        keepdims=False)
+        keepdims=False,
+        experimental_named_axis=self.experimental_reduce_chain_axis_names)
 
     # reduced_log_accept_prob must broadcast into step_size on the
     # left, so we do an additional reduction over dimensions where their
@@ -421,7 +433,8 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     reduce_indices = get_differing_dims(
         reduced_log_accept_prob, step_size)
     reduced_log_accept_prob = self.reduce_fn(
-        reduced_log_accept_prob, axis=reduce_indices, keepdims=True)
+        reduced_log_accept_prob, axis=reduce_indices, keepdims=True,
+        experimental_named_axis=self.experimental_reduce_chain_axis_names)
     new_error_sum = (error_sum +
                      target_accept_prob -
                      tf.math.exp(reduced_log_accept_prob))
@@ -556,7 +569,8 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
             ps.rank(state_part) - ps.rank(step_size_part))
         reduced_log_accept_prob = reduce_logmeanexp(
             log_accept_prob,
-            axis=ps.range(num_reduce_dims))
+            axis=ps.range(num_reduce_dims),
+            experimental_named_axis=self.experimental_reduce_chain_axis_names)
         reduce_indices = get_differing_dims(
             reduced_log_accept_prob, step_size_part)
         reduced_log_accept_prob = reduce_logmeanexp(
@@ -600,6 +614,10 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     return self.copy(
         inner_kernel=self.inner_kernel.experimental_with_shard_axes(
             shard_axis_names))
+
+  @property
+  def experimental_reduce_chain_axis_names(self):
+    return self._parameters['experimental_reduce_chain_axis_names']
 
 
 def _maybe_validate_target_accept_prob(target_accept_prob, validate_args):

@@ -406,9 +406,9 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
     kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
                                             step_size=1e-2,
                                             num_leapfrog_steps=2)
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
-        kernel, 10)
-    sharded_kernel = kernel.experimental_with_chain_axes(self.axis_name)
+    sharded_kernel = (
+        tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+            kernel, 10, experimental_reduce_chain_axis_names=self.axis_name))
 
     def run(seed):
       init_seed, sample_seed = samplers.split_seed(seed)
