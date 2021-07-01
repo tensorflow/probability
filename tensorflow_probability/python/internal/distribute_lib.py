@@ -128,9 +128,9 @@ reduce_min = _make_reduce_op(tf.reduce_min, pmin)
 def reduce_logsumexp(x, axis=None, named_axis=None, **kwargs):
   xmax = reduce_max(
       tf.stop_gradient(x), axis=axis, named_axis=named_axis, keepdims=True)
-  xmax = tf.where(tf.is_finite(xmax), xmax, tf.zeros_like(xmax))
-  result = tf.log(
-      reduce_sum(tf.exp(x - xmax), axis=axis, named_axis=named_axis), **kwargs)
+  xmax = tf.where(tf.math.is_finite(xmax), xmax, tf.zeros_like(xmax))
+  result = tf.math.log(
+      reduce_sum(tf.exp(x - xmax), axis=axis, named_axis=named_axis, **kwargs))
   return tf.reshape(xmax, ps.shape(result)) + result
 
 

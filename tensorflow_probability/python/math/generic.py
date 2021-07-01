@@ -27,6 +27,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
+from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -212,7 +213,8 @@ def reduce_kahan_sum(input_tensor, axis=None, keepdims=False, name=None):
         _reduce_kahan_sum(operands, inits, axis=axis, keepdims=keepdims))
 
 
-def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
+def reduce_logmeanexp(input_tensor, axis=None, keepdims=False,
+                      experimental_named_axis=None, name=None):
   """Computes `log(mean(exp(input_tensor)))`.
 
   Reduces `input_tensor` along the dimensions given in `axis`.  Unless
@@ -234,6 +236,8 @@ def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
       rank(input_tensor))`.
     keepdims:  Boolean.  Whether to keep the axis as singleton dimensions.
       Default value: `False` (i.e., squeeze the reduced dimensions).
+    experimental_named_axis: A `str or list of `str` axis names to additionally
+      reduce over. Providing `None` will not reduce over any axes.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., `'reduce_logmeanexp'`).
 
@@ -241,8 +245,13 @@ def reduce_logmeanexp(input_tensor, axis=None, keepdims=False, name=None):
     log_mean_exp: The reduced tensor.
   """
   with tf.name_scope(name or 'reduce_logmeanexp'):
-    lse = tf.reduce_logsumexp(input_tensor, axis=axis, keepdims=keepdims)
+    named_axes = distribute_lib.canonicalize_named_axis(experimental_named_axis)
+    lse = distribute_lib.reduce_logsumexp(input_tensor, axis=axis,
+                                          keepdims=keepdims,
+                                          named_axis=named_axes)
     n = ps.size(input_tensor) // ps.size(lse)
+    for named_axis in named_axes:
+      n = n * distribute_lib.get_axis_size(named_axis)
     log_n = tf.math.log(tf.cast(n, lse.dtype))
     return lse - log_n
 
@@ -252,6 +261,7 @@ def reduce_weighted_logsumexp(logx,
                               axis=None,
                               keep_dims=False,
                               return_sign=False,
+                              experimental_named_axis=None,
                               name=None):
   """Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
 
@@ -304,6 +314,8 @@ def reduce_weighted_logsumexp(logx,
       rank(input_tensor))`.
     keep_dims: If true, retains reduced dimensions with length 1.
     return_sign: If `True`, returns the sign of the result.
+    experimental_named_axis: A `str or list of `str` axis names to additionally
+      reduce over. Providing `None` will not reduce over any axes.
     name: A name for the operation (optional).
 
   Returns:
@@ -313,14 +325,18 @@ def reduce_weighted_logsumexp(logx,
   with tf.name_scope(name or 'reduce_weighted_logsumexp'):
     logx = tf.convert_to_tensor(logx, name='logx')
     if w is None:
-      lswe = tf.reduce_logsumexp(logx, axis=axis, keepdims=keep_dims)
+      lswe = distribute_lib.reduce_logsumexp(logx, axis=axis,
+                                             keepdims=keep_dims,
+                                             named_axis=experimental_named_axis)
       if return_sign:
         sgn = tf.ones_like(lswe)
         return lswe, sgn
       return lswe
     w = tf.convert_to_tensor(w, dtype=logx.dtype, name='w')
     log_absw_x = logx + tf.math.log(tf.abs(w))
-    max_log_absw_x = tf.reduce_max(log_absw_x, axis=axis, keepdims=True)
+    max_log_absw_x = distribute_lib.reduce_max(
+        log_absw_x, axis=axis, keepdims=True,
+        named_axis=experimental_named_axis)
     # If the largest element is `-inf` or `inf` then we don't bother subtracting
     # off the max. We do this because otherwise we'd get `inf - inf = NaN`. That
     # this is ok follows from the fact that we're actually free to subtract any
@@ -330,8 +346,9 @@ def reduce_weighted_logsumexp(logx,
         tf.zeros([], max_log_absw_x.dtype),
         max_log_absw_x)
     wx_over_max_absw_x = (tf.sign(w) * tf.exp(log_absw_x - max_log_absw_x))
-    sum_wx_over_max_absw_x = tf.reduce_sum(
-        wx_over_max_absw_x, axis=axis, keepdims=keep_dims)
+    sum_wx_over_max_absw_x = distribute_lib.reduce_sum(
+        wx_over_max_absw_x, axis=axis, keepdims=keep_dims,
+        named_axis=experimental_named_axis)
     if not keep_dims:
       max_log_absw_x = tf.squeeze(max_log_absw_x, axis)
     sgn = tf.sign(sum_wx_over_max_absw_x)
@@ -344,6 +361,7 @@ def reduce_weighted_logsumexp(logx,
 def reduce_log_harmonic_mean_exp(input_tensor,
                                  axis=None,
                                  keepdims=False,
+                                 experimental_named_axis=None,
                                  name=None):
   """Computes `log(1 / mean(1 / exp(input_tensor)))`.
 
@@ -366,6 +384,8 @@ def reduce_log_harmonic_mean_exp(input_tensor,
       rank(input_tensor))`.
     keepdims:  Boolean.  Whether to keep the axis as singleton dimensions.
       Default value: `False` (i.e., squeeze the reduced dimensions).
+    experimental_named_axis: A `str or list of `str` axis names to additionally
+      reduce over. Providing `None` will not reduce over any axes.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., `'reduce_log_harmonic_mean_exp'`).
 
@@ -373,7 +393,8 @@ def reduce_log_harmonic_mean_exp(input_tensor,
     log_mean_exp: The reduced tensor.
   """
   with tf.name_scope(name or 'reduce_log_harmonic_mean_exp'):
-    return -reduce_logmeanexp(-input_tensor, axis=axis, keepdims=keepdims)
+    return -reduce_logmeanexp(-input_tensor, axis=axis, keepdims=keepdims,
+                              experimental_named_axis=experimental_named_axis)
 
 
 def soft_threshold(x, threshold, name=None):

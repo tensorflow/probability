@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import functools
+import itertools
 import os
 
 # Dependency imports
@@ -29,6 +30,7 @@ from scipy import special as sp_special
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import test_util
 
 from tensorflow_probability.python.math.gradient import batch_jacobian
@@ -701,6 +703,52 @@ class KahanSumTest(_KahanSumTest):
   jit = False
 
 del _KahanSumTest
+
+
+@test_util.test_all_tf_execution_regimes
+class CollectiveTest(distribute_test_lib.DistributedTest):
+
+  @parameterized.named_parameters(*(
+      (f'{name} {ax}', (op, jo), ax)  # pylint: disable=g-complex-comprehension
+      for (name, op, jo), ax in itertools.product((
+          ('logmeanexp', tfp.math.reduce_logmeanexp, True),
+          ('log_harmonicmeanexp', tfp.math.reduce_log_harmonic_mean_exp, True),
+          ('reduce_weighted_logsumexp', tfp.math.reduce_weighted_logsumexp,
+           True),
+          ), (None, 0, 1, 2, [0, 1], [1, 2], [0, 2], [0, 1, 2]))))
+  def test_reduce_with_collectives_matches_reduce_without_collectives(
+      self, op_info, axes):
+    reduce_op, jax_only = op_info
+    if not JAX_MODE and jax_only:
+      self.skipTest('Only supported in JAX.')
+
+    if axes is None:
+      pos_axes = list(range(2))
+      named_axes = [self.axis_name]
+    else:
+      axes = [axes] if not isinstance(axes, list) else axes
+      pos_axes = [x - 1 for x in axes if x != 0]
+      named_axes = [self.axis_name] if 0 in axes else []
+
+    x = tf.reshape(
+        tf.range(distribute_test_lib.NUM_DEVICES * 6.) / 5.,
+        [distribute_test_lib.NUM_DEVICES, 3, 2])
+
+    def run(x):
+      return reduce_op(x, axis=pos_axes, experimental_named_axis=named_axes)
+
+    def distributed_run(x):
+      return self.per_replica_to_tensor(
+          self.strategy_run(run, (self.shard_values(x),)))
+    reduce_out = reduce_op(x, axis=axes)
+    dist_out = distributed_run(x)
+    # If we reduce over the 0 dimension, it will still be present in the
+    # distributed op
+    if axes is None or 0 in axes:
+      for i in range(distribute_test_lib.NUM_DEVICES):
+        self.assertAllClose(reduce_out, dist_out[i])
+    else:
+      self.assertAllClose(reduce_out, dist_out)
 
 
 if __name__ == '__main__':

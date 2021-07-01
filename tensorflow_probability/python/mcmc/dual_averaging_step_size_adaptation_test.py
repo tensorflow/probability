@@ -28,9 +28,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import distribute_test_lib
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.simple_step_size_adaptation import hmc_like_step_size_getter_fn
 
+
+JAX_MODE = False
 
 _INITIAL_T = 10.0
 _EXPLORATION_SHRINKAGE = 0.05
@@ -63,7 +68,7 @@ class FakeMHKernel(tfp.mcmc.TransitionKernel):
 
   def one_step(self, current_state, previous_kernel_results, seed=None):
     new_state, new_accepted_results = self.parameters['inner_kernel'].one_step(
-        current_state, previous_kernel_results.accepted_results)
+        current_state, previous_kernel_results.accepted_results, seed=seed)
     return new_state, previous_kernel_results._replace(
         accepted_results=new_accepted_results)
 
@@ -711,6 +716,67 @@ class TfFunctionTest(test_util.TestCase):
     extra = kernel.bootstrap_results(init)
     seed_stream = test_util.test_seed_stream()
     tf.function(lambda: kernel.one_step(init, extra, seed=seed_stream()))()
+
+
+def reduce_mean(x, experimental_named_axis=None, **kwargs):
+  return distribute_lib.reduce_mean(x, named_axis=experimental_named_axis,
+                                    **kwargs)
+
+
+@test_util.test_all_tf_execution_regimes
+class DistributedDualAveragingStepSizeAdaptationTest(
+    distribute_test_lib.DistributedTest):
+
+  @parameterized.named_parameters(
+      ('mean', reduce_mean),
+      ('logmeanexp', tfp.math.reduce_logmeanexp))
+  @test_util.numpy_disable_test_missing_functionality(
+      'NumPy backend does not support distributed computation.')
+  def test_kernel_can_shard_chains_across_devices(self, reduce_fn):
+    if not JAX_MODE:
+      self.skipTest('`reduce_logmeanexp` not supported in TF backend.')
+
+    def target_log_prob(a, b):
+      return (
+          tfd.Normal(0., 1.).log_prob(a)
+          + tfd.Sample(tfd.Normal(a, 1.), 4).log_prob(b))
+
+    def run(seed, log_accept_ratio):
+      kernel = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(target_log_prob,
+                                                          step_size=1e-2,
+                                                          num_leapfrog_steps=2)
+      kernel = FakeMHKernel(kernel, log_accept_ratio)
+      sharded_kernel = tfp.experimental.mcmc.Sharded(
+          tfp.mcmc.DualAveragingStepSizeAdaptation(
+              kernel, 10, reduce_fn=reduce_fn,
+              target_accept_prob=0.5,
+              experimental_reduce_chain_axis_names=self.axis_name),
+          self.axis_name)
+      init_seed, sample_seed = samplers.split_seed(seed)
+      state_seeds = samplers.split_seed(init_seed)
+      state = [
+          samplers.normal(seed=state_seeds[0], shape=[]),
+          samplers.normal(seed=state_seeds[1], shape=[4])
+      ]
+      kr = sharded_kernel.bootstrap_results(state)
+      _, kr = sharded_kernel.one_step(state, kr, seed=sample_seed)
+      return kr.new_step_size, kr.error_sum
+
+    seeds = self.shard_values(tf.stack(tfp.random.split_seed(
+        samplers.zeros_seed(), distribute_test_lib.NUM_DEVICES)), 0)
+    log_accept_ratios = self.shard_values(tf.convert_to_tensor([
+        -3., -2., -1., 0.
+    ]))
+
+    step_size, error_sum = self.evaluate(
+        self.per_replica_to_tensor(self.strategy_run(
+            run, args=(seeds, log_accept_ratios), axis_name=self.axis_name), 0))
+
+    true_error_sum = 0.5 - tf.math.exp(reduce_fn(log_accept_ratios))
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(error_sum[0][i], true_error_sum)
+      self.assertAllClose(step_size[0], step_size[i])
+
 
 if __name__ == '__main__':
   tf.test.main()

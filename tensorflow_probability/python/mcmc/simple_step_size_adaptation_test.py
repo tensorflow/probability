@@ -28,10 +28,14 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import distribute_test_lib
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
-
+JAX_MODE = False
 _RATE = 1.01
+
 
 FakeMHKernelResults = collections.namedtuple(
     'FakeMHKernelResults', 'accepted_results, log_accept_ratio')
@@ -520,6 +524,63 @@ class SimpleStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
 class SimpleStepSizeAdaptationDynamicBroadcastingTest(
     SimpleStepSizeAdaptationStaticBroadcastingTest):
   use_static_shape = False
+
+
+def reduce_mean(x, experimental_named_axis=None, **kwargs):
+  return distribute_lib.reduce_mean(x, named_axis=experimental_named_axis,
+                                    **kwargs)
+
+
+@test_util.test_all_tf_execution_regimes
+class DistributedSimpleStepSizeAdaptationTest(
+    distribute_test_lib.DistributedTest):
+
+  @parameterized.named_parameters(
+      ('mean', reduce_mean, False),
+      ('logmeanexp', tfp.math.reduce_logmeanexp, True))
+  @test_util.numpy_disable_test_missing_functionality(
+      'NumPy backend does not support distributed computation.')
+  def test_kernel_can_shard_chains_across_devices(self, reduce_fn, jax_only):
+
+    if not JAX_MODE and jax_only:
+      self.skipTest('Reduce not supported in TF backend.')
+
+    def target_log_prob(a, b):
+      return (
+          tfd.Normal(0., 1.).log_prob(a)
+          + tfd.Sample(tfd.Normal(a, 1.), 4).log_prob(b))
+
+    def run(seed, log_accept_ratio):
+      kernel = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(target_log_prob,
+                                                          step_size=1e-2,
+                                                          num_leapfrog_steps=2)
+      kernel = FakeMHKernel(kernel, log_accept_ratio)
+      kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+          kernel, 10, reduce_fn=reduce_fn,
+          experimental_reduce_chain_axis_names=self.axis_name)
+      sharded_kernel = tfp.experimental.mcmc.Sharded(kernel, self.axis_name)
+      init_seed, sample_seed = samplers.split_seed(seed)
+      state_seeds = samplers.split_seed(init_seed)
+      state = [
+          samplers.normal(seed=state_seeds[0], shape=[]),
+          samplers.normal(seed=state_seeds[1], shape=[4])
+      ]
+      kr = sharded_kernel.bootstrap_results(state)
+      _, kr = sharded_kernel.one_step(state, kr, seed=sample_seed)
+      return kr.new_step_size
+
+    seeds = self.shard_values(tf.stack(tfp.random.split_seed(
+        samplers.zeros_seed(), distribute_test_lib.NUM_DEVICES)), 0)
+    log_accept_ratios = self.shard_values(tf.convert_to_tensor([
+        -2., -1., 0., 1.
+    ]))
+
+    step_size = self.evaluate(
+        self.per_replica_to_tensor(self.strategy_run(
+            run, args=(seeds, log_accept_ratios), axis_name=self.axis_name), 0))
+
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      self.assertAllClose(step_size[0], step_size[i])
 
 
 if __name__ == '__main__':
