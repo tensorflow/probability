@@ -36,6 +36,7 @@ py_library(
         ":local_level",
         ":local_linear_trend",
         ":regression",
+        ":regularization",
         ":seasonal",
         ":semilocal_linear_trend",
         ":smooth_seasonal",
@@ -254,6 +255,33 @@ py_test(
     srcs_version = "PY3",
     deps = [
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "regularization",
+    srcs = ["regularization.py"],
+    srcs_version = "PY2AND3",
+    deps = [
+        # enum dep,
+        # numpy dep,
+    ],
+)
+
+py_test(
+    name = "regularization_test",
+    size = "small",
+    srcs = ["regularization_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY2AND3",
+    deps = [
+        ":regularization",
+        # numpy dep,
+        # pandas dep,
+        # six dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

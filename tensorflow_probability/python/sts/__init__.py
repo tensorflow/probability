@@ -38,6 +38,8 @@ from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTren
 from tensorflow_probability.python.sts.local_linear_trend import LocalLinearTrendStateSpaceModel
 from tensorflow_probability.python.sts.regression import LinearRegression
 from tensorflow_probability.python.sts.regression import SparseLinearRegression
+from tensorflow_probability.python.sts.regularization import MissingValuesTolerance
+from tensorflow_probability.python.sts.regularization import regularize_series
 from tensorflow_probability.python.sts.seasonal import ConstrainedSeasonalStateSpaceModel
 from tensorflow_probability.python.sts.seasonal import Seasonal
 from tensorflow_probability.python.sts.seasonal import SeasonalStateSpaceModel
@@ -63,6 +65,7 @@ _allowed_symbols = [
     'LocalLinearTrend',
     'LocalLinearTrendStateSpaceModel',
     'MaskedTimeSeries',
+    'MissingValuesTolerance',
     'Seasonal',
     'SeasonalStateSpaceModel',
     'SemiLocalLinearTrend',
@@ -79,6 +82,7 @@ _allowed_symbols = [
     'forecast',
     'impute_missing_values',
     'one_step_predictive',
+    'regularize_series',
     'sample_uniform_initial_state'
 ]
 
