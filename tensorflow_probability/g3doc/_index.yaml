@@ -61,7 +61,7 @@ landing_page:
         # ==> coeffs is approximately [1.618] (We're golden!)
         </pre>
         {% dynamic if request.tld != 'cn' %}
-        <a class="colab-button" target="_blank" href="https://colab.research.google.com/github/tensorflow/probability/blob/master/tensorflow_probability/g3doc/_index.ipynb">Run in a <span>Notebook</span></a>
+        <a class="colab-button" target="_blank" href="https://colab.research.google.com/github/tensorflow/probability/blob/main/tensorflow_probability/g3doc/_index.ipynb">Run in a <span>Notebook</span></a>
         {% dynamic endif %}
   - classname: devsite-landing-row-cards
     items:

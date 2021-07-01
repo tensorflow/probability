@@ -29,7 +29,7 @@ _disregard any/all of these standards_. We especially recommend you ignore point
 #4.
 
 All TFP code (including `tfp.distributions`) follows the [TFP Style Guide](
-https://github.com/tensorflow/probability/blob/master/STYLE_GUIDE.md#tensorflow-probability-style-guide).
+https://github.com/tensorflow/probability/blob/main/STYLE_GUIDE.md#tensorflow-probability-style-guide).
 
 ## Requirements (Comprehensive)
 
@@ -61,7 +61,7 @@ https://github.com/tensorflow/probability/blob/master/STYLE_GUIDE.md#tensorflow-
 
 6. A `Distribution`'s inputs/outputs are `Tensor`s with ["`Distribution` shape
    semantics."](
-   https://github.com/tensorflow/probability/blob/master/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb)
+   https://github.com/tensorflow/probability/blob/main/tensorflow_probability/examples/jupyter_notebooks/Understanding_TensorFlow_Distributions_Shapes.ipynb)
    For example, functions like `prob` and `cdf` accept a `Tensor` with
    "`Distribution` shape semantics" whereas `sample` returns a `Tensor` with
    "Distribution shape semantics."

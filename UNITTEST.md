@@ -76,7 +76,7 @@ del _DistributionTest  # Don't run tests for the base class.
 ```
 
 These ideas can be extended as appropriate. For example, in the [`Reshape`
-bijector](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/bijectors/reshape_test.py)
+bijector](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/bijectors/reshape_test.py)
 we tested error-checking paths that, given a static-shape input, will raise
 exceptions at graph construction time, but op errors at runtime in the dynamic
 case. To handle these with unified code we can have the static and dynamic
@@ -118,13 +118,13 @@ del _DistributionTest  # Don't run tests for the base class.
 
 Helper class to test vector-event distributions.
 
-[VectorDistributionTestHelpers](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/distributions/python/ops/test_util.py#L193) ([Example Use](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/mixture_same_family_test.py#L91))
+[VectorDistributionTestHelpers](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/distributions/python/ops/test_util.py#L193) ([Example Use](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/distributions/mixture_same_family_test.py#L91))
 
 ## Testing Discrete, Scalar Distributions
 
 Helper class to test scalar variate distributions over integers (or Booleans).
 
-[DiscreteScalarDistributionTestHelpers](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/internal/test_util.py#L32) ([Example Use](https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/distributions/poisson_lognormal_test.py#L34))
+[DiscreteScalarDistributionTestHelpers](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/internal/test_util.py#L32) ([Example Use](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/distributions/poisson_lognormal_test.py#L34))
 
 ## Testing notebooks
 

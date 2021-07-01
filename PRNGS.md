@@ -211,7 +211,7 @@ Import: `from tensorflow_probability.python.internal import samplers`
 ### Usage
 
 As a first, relatively simple example, let's take a look at usage by
-[`beta_binomial.py`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/distributions/beta_binomial.py;l=241?q=beta_binomial%20sample_n).
+[`beta_binomial.py`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/distributions/beta_binomial.py;l=241?q=beta_binomial%20sample_n).
 In the `_sample_n` function for `BetaBinomial`, we can see that the seed is
 split three ways. Typically, we give each subsidiary seed a local variable name
 reflecting the downstream usage. In this case, two seeds are passed to a
@@ -235,7 +235,7 @@ def _sample_n(self, n, seed=None):
 ```
 
 As a more complex example of seed splitting in a loop context, we can look at
-[`hidden_markov_model.py`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/distributions/hidden_markov_model.py;l=283).
+[`hidden_markov_model.py`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/distributions/hidden_markov_model.py;l=283).
 Here we see an initial split into 3 parts:
 
 ```python
@@ -269,4 +269,4 @@ seed splitting and keep underlying `TransitionKernel` subclasses relatively
 simple. `TransitionKernel` takes a `seed` argument to `one_step` and can use
 this to drive randomness, in some cases splitting and passing a separate seed to
 inner kernels. For example, see `tfp.mcmc.MetropolisHastings`
-[`one_step`](https://cs.opensource.google/tensorflow/probability/+/master:tensorflow_probability/python/mcmc/metropolis_hastings.py;l=203?q=MetropolisHastings&ss=tensorflow%2Fprobability).
+[`one_step`](https://cs.opensource.google/tensorflow/probability/+/main:tensorflow_probability/python/mcmc/metropolis_hastings.py;l=203?q=MetropolisHastings&ss=tensorflow%2Fprobability).

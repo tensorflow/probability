@@ -33,7 +33,7 @@ chain Monte Carlo library.
 
 # Maintainer's note: The code may look weird in several respects.  These are due
 # to limitations of the auto-batching system (at the time of writing).  See
-# https://github.com/tensorflow/probability/blob/master/tensorflow_probability/python/internal/auto_batching/README.md.
+# https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/internal/auto_batching/README.md.
 
 from __future__ import absolute_import
 from __future__ import division

@@ -26,7 +26,7 @@ flags.DEFINE_string("output_dir", "/tmp/oryx_api",
 
 flags.DEFINE_string(
     "code_url_prefix",
-    ("https://github.com/tensorflow/probability/blob/master/spinoffs/oryx/"
+    ("https://github.com/tensorflow/probability/blob/main/spinoffs/oryx/"
      "oryx"), "The url prefix for links to code.")
 
 flags.DEFINE_bool("search_hints", True,

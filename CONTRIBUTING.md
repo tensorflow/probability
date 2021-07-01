@@ -16,7 +16,7 @@ minor, then feel free to make them without discussion.
 Want to contribute but not sure of what? Here are a few suggestions:
 
 1. Add a new example or tutorial.  Located in [`examples/`](
-  https://github.com/tensorflow/probability/tree/master/tensorflow_probability/examples),
+  https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples),
   these are a great way to familiarize yourself and others with TFP tools.
 
 2. Solve an [existing issue](https://github.com/tensorflow/probability/issues).
@@ -51,7 +51,7 @@ your change.
 See the [TensorFlow Probability style guide](STYLE_GUIDE.md).  Running `pylint`
 detects many (but certainly not all) style issues.  TensorFlow Probability
 follows a custom [pylint
-configuration](https://github.com/tensorflow/probability/blob/master/testing/pylintrc).
+configuration](https://github.com/tensorflow/probability/blob/main/testing/pylintrc).
 
 ## Unit tests
 
@@ -123,7 +123,7 @@ you, which also does some sanity checks on the environtment:
 ```
 
 See the
-[header comments in that script](https://github.com/tensorflow/probability/blob/master/testing/install_test_dependencies.sh)
+[header comments in that script](https://github.com/tensorflow/probability/blob/main/testing/install_test_dependencies.sh)
 for more details.
 
 ### Additional considerations

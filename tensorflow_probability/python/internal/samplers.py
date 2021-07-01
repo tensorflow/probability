@@ -64,7 +64,7 @@ def sanitize_seed(seed, salt=None, name=None):
   """Map various PRNG seed flavors to a seed `Tensor`.
 
   This function implements TFP's standard PRNG seeding semantics.
-  See https://github.com/tensorflow/probability/blob/master/PRNGS.md
+  See https://github.com/tensorflow/probability/blob/main/PRNGS.md
   for details.
 
   Operationally, `sanitize_seed` maps any seed flavor to a
@@ -114,7 +114,7 @@ def sanitize_seed(seed, salt=None, name=None):
         warnings.warn(
             'Using stateful random seeds in replicated context can yield '
             'unreproducible results. For more details, see '
-            'https://github.com/tensorflow/probability/blob/master/PRNGS.md')
+            'https://github.com/tensorflow/probability/blob/main/PRNGS.md')
 
       # TODO(b/147874898): Deprecate `int` seeds, migrate ints to stateless?
       if salt is not None:
@@ -158,7 +158,7 @@ def fold_in(seed, salt):
 def split_seed(seed, n=2, salt=None, name=None):
   """Splits a seed into `n` derived seeds.
 
-  See https://github.com/tensorflow/probability/blob/master/PRNGS.md
+  See https://github.com/tensorflow/probability/blob/main/PRNGS.md
   for details.
 
   Args:
