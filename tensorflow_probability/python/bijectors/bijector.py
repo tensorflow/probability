@@ -856,7 +856,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
           return False
         if not np.all(np.equal(p1, p2)):
           return False
-      if p1 != p2:
+      elif p1 != p2:
         return False
     return True
 

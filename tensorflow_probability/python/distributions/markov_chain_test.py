@@ -22,6 +22,7 @@ from absl.testing import parameterized
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -290,6 +291,121 @@ class MarkovChainTest(test_util.TestCase):
         (ValueError, tf.errors.InvalidArgumentError),
         'does not match the expected num_steps'):
       p.log_prob(tf.zeros([11]))
+
+
+@test_util.test_graph_and_eager_modes
+class MarkovChainBijectorTest(test_util.TestCase):
+
+  # pylint: disable=g-long-lambda
+  @parameterized.named_parameters(
+      dict(testcase_name='deterministic_prior',
+           prior_fn=lambda: tfd.Deterministic([-100., 0., 100.]),
+           transition_fn=lambda _, x: tfd.Normal(loc=x, scale=1.)),
+      dict(testcase_name='deterministic_transition',
+           prior_fn=lambda: tfd.Normal(loc=[-100., 0., 100.], scale=1.),
+           transition_fn=lambda _, x: tfd.Deterministic(x)),
+      dict(testcase_name='fully_deterministic',
+           prior_fn=lambda: tfd.Deterministic([-100., 0., 100.]),
+           transition_fn=lambda _, x: tfd.Deterministic(x)),
+      dict(testcase_name='mvn_diag',
+           prior_fn=(
+               lambda: tfd.MultivariateNormalDiag(loc=[[2.], [2.]],
+                                                  scale_diag=[1.])),
+           transition_fn=lambda _, x: tfd.VectorDeterministic(x)),
+      dict(testcase_name='docstring_dirichlet',
+           prior_fn=lambda: tfd.JointDistributionNamedAutoBatched(
+               {'probs': tfd.Dirichlet([1., 1.])}),
+           transition_fn=lambda _, x: tfd.JointDistributionNamedAutoBatched(
+               {'probs': tfd.MultivariateNormalDiag(loc=x['probs'],
+                                                    scale_diag=[0.1, 0.1])},
+               batch_ndims=ps.rank(x['probs']))),
+      dict(testcase_name='uniform_step',
+           prior_fn=lambda: tfd.Exponential(tf.ones([4, 1])),
+           transition_fn=lambda _, x: tfd.Uniform(low=x, high=x + 1.)),
+      dict(testcase_name='joint_distribution',
+           prior_fn=lambda: tfd.JointDistributionNamedAutoBatched(
+               batch_ndims=2,
+               model={
+                   'a': tfd.Gamma(tf.zeros([5]), 1.),
+                   'b': lambda a: (
+                       tfb.Reshape(
+                           event_shape_in=[4, 3],
+                           event_shape_out=[2, 3, 2])(
+                               tfd.Independent(
+                                   tfd.Normal(
+                                       loc=tf.zeros([5, 4, 3]),
+                                       scale=a[..., tf.newaxis, tf.newaxis]),
+                                   reinterpreted_batch_ndims=2)))}),
+           transition_fn=lambda _, x: tfd.JointDistributionNamedAutoBatched(
+               batch_ndims=ps.rank_from_shape(x['a'].shape),
+               model={'a': tfd.Normal(loc=x['a'], scale=1.),
+                      'b': lambda a: tfd.Deterministic(
+                          x['b'] + a[..., tf.newaxis, tf.newaxis, tf.newaxis])})
+           ),
+      dict(testcase_name='nested_chain',
+           prior_fn=lambda: tfd.MarkovChain(
+               initial_state_prior=tfb.Split(2)(
+                   tfd.MultivariateNormalDiag(0., [1., 2.])),
+               transition_fn=lambda _, x: tfb.Split(2)(
+                   tfd.MultivariateNormalDiag(x[0], [1., 2.])),
+               num_steps=6),
+           transition_fn=(
+               lambda _, x: tfd.JointDistributionSequentialAutoBatched(
+                   [
+                       tfd.MultivariateNormalDiag(x[0], [1.]),
+                       tfd.MultivariateNormalDiag(x[1], [1.])],
+                   batch_ndims=ps.rank(x[0])))))
+  # pylint: enable=g-long-lambda
+  def test_default_bijector(self, prior_fn, transition_fn):
+    chain = tfd.MarkovChain(initial_state_prior=prior_fn(),
+                            transition_fn=transition_fn,
+                            num_steps=7)
+
+    y = self.evaluate(chain.sample(seed=test_util.test_seed()))
+    bijector = chain.experimental_default_event_space_bijector()
+
+    self.assertAllEqual(chain.batch_shape_tensor(),
+                        bijector.experimental_batch_shape_tensor())
+
+    x = bijector.inverse(y)
+    yy = bijector.forward(
+        tf.nest.map_structure(tf.identity, x))  # Bypass bijector cache.
+    self.assertAllCloseNested(y, yy)
+
+    chain_event_ndims = tf.nest.map_structure(
+        ps.rank_from_shape, chain.event_shape_tensor())
+    self.assertAllEqualNested(bijector.inverse_min_event_ndims,
+                              chain_event_ndims)
+
+    ildj = bijector.inverse_log_det_jacobian(
+        tf.nest.map_structure(tf.identity, y),  # Bypass bijector cache.
+        event_ndims=chain_event_ndims)
+    if not bijector.is_constant_jacobian:
+      self.assertAllEqual(ildj.shape, chain.batch_shape)
+    fldj = bijector.forward_log_det_jacobian(
+        tf.nest.map_structure(tf.identity, x),  # Bypass bijector cache.
+        event_ndims=bijector.inverse_event_ndims(chain_event_ndims))
+    self.assertAllClose(ildj, -fldj)
+
+    # Verify that event shapes are passed through and flattened/unflattened
+    # correctly.
+    inverse_event_shapes = bijector.inverse_event_shape(chain.event_shape)
+    x_event_shapes = tf.nest.map_structure(
+        lambda t, nd: t.shape[ps.rank(t) - nd:],
+        x, bijector.forward_min_event_ndims)
+    self.assertAllEqualNested(inverse_event_shapes, x_event_shapes)
+    forward_event_shapes = bijector.forward_event_shape(inverse_event_shapes)
+    self.assertAllEqualNested(forward_event_shapes, chain.event_shape)
+
+    # Verify that the outputs of other methods have the correct structure.
+    inverse_event_shape_tensors = bijector.inverse_event_shape_tensor(
+        chain.event_shape_tensor())
+    self.assertAllEqualNested(inverse_event_shape_tensors, x_event_shapes)
+    forward_event_shape_tensors = bijector.forward_event_shape_tensor(
+        inverse_event_shape_tensors)
+    self.assertAllEqualNested(forward_event_shape_tensors,
+                              chain.event_shape_tensor())
+
 
 if __name__ == '__main__':
   tf.test.main()
