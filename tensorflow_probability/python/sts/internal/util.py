@@ -24,7 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 from tensorflow_probability.python.internal import distribution_util as dist_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.sts.internal import missing_values_util
 
 tfl = tf.linalg
@@ -99,18 +99,16 @@ def pad_batch_dimension_for_multiple_chains(
             current_batch_and_event_shape], axis=0))
 
   # Padding is only needed if the observed time series has sample shape.
-  observed_time_series = prefer_static.cond(
-      (dist_util.prefer_static_rank(observed_time_series) >
-       model_batch_ndims + event_ndims),
-      lambda: do_padding(observed_time_series),
-      lambda: observed_time_series)
+  observed_time_series = ps.cond(ps.rank(observed_time_series) >
+                                 model_batch_ndims + event_ndims,
+                                 lambda: do_padding(observed_time_series),
+                                 lambda: observed_time_series)
 
   if is_missing is not None:
-    is_missing = prefer_static.cond(
-        (dist_util.prefer_static_rank(is_missing) >
-         model_batch_ndims + event_ndims),
-        lambda: do_padding(is_missing),
-        lambda: is_missing)
+    is_missing = ps.cond(ps.rank(is_missing) >
+                         model_batch_ndims + event_ndims,
+                         lambda: do_padding(is_missing),
+                         lambda: is_missing)
     return missing_values_util.MaskedTimeSeries(observed_time_series,
                                                 is_missing=is_missing)
 
@@ -201,6 +199,9 @@ def empirical_statistics(observed_time_series):
   If a series is entirely unobserved (all values are masked), default statistics
   `mean == 0.`, `stddev == 1.`, and `initial_centered == 0.` are returned.
 
+  To avoid degenerate models, a value of `1.` is returned for `stddev` whenever
+  the input series is entirely constant (when the true `stddev` is `0.`).
+
   Args:
     observed_time_series: `Tensor` representing a time series, or batch of time
        series, of shape either `batch_shape + [num_timesteps, 1]` or
@@ -252,9 +253,13 @@ def empirical_statistics(observed_time_series):
     # Dividing by zero will estimate `inf` or `nan` for the mean and stddev
     # (and thus initial_centered) if a series is entirely masked. Replace these
     # with default values.
-    replace_nans = lambda x, v: tf.where(tf.math.is_finite(x), x, v)
+    replace_nans = (
+        lambda x, v: tf.where(tf.math.is_finite(x), x, tf.cast(v, x.dtype)))
+    # Avoid stddev of zero from a constant series.
+    replace_zeros = (
+        lambda x, v: tf.where(tf.equal(x, 0.), tf.cast(v, x.dtype), x))
     return (replace_nans(observed_mean, 0.),
-            replace_nans(observed_stddev, 1.),
+            replace_zeros(replace_nans(observed_stddev, 1.), 1.),
             replace_nans(observed_initial_centered, 0.))
 
 
@@ -363,8 +368,7 @@ def mix_over_posterior_draws(means, variances):
   # arbitrary axis, and eliminate `move_dimension` calls here.
 
   with tf.name_scope('mix_over_posterior_draws'):
-    num_posterior_draws = dist_util.prefer_static_value(
-        tf.shape(means))[0]
+    num_posterior_draws = ps.shape(means)[0]
 
     component_observations = tfd.Independent(
         distribution=tfd.Normal(
