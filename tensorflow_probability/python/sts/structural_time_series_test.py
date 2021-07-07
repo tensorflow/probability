@@ -210,6 +210,14 @@ class _StsTestHarness(object):
     lp_with_kwargs = self.evaluate(log_joint_fn(**parameters_by_name_))
     self.assertAllClose(lp, lp_with_kwargs)
 
+  def test_constant_series_does_not_induce_constant_prior(self):
+    observed_time_series = np.array([1.0, 1.0, 1.0]).astype(np.float32)
+    model = self._build_sts(observed_time_series=observed_time_series)
+    for parameter in model.parameters:
+      param_samples = self.evaluate(
+          parameter.prior.sample(30, seed=test_util.test_seed()))
+      self.assertAllGreater(tf.math.reduce_std(param_samples), 0.)
+
   def test_log_joint_with_missing_observations(self):
     # Test that this component accepts MaskedTimeSeries inputs. In most
     # cases, it is sufficient that the component accesses only
