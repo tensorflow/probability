@@ -2057,7 +2057,8 @@ def _get_covariance_no_broadcast(dist):
     # Dist is Independent(Normal).
     return tf.linalg.diag(dist.distribution.scale ** 2)
   elif hasattr(dist, 'cov_operator'):
-    return dist.covariance_operator.to_dense()
+    # Dist is MultivariateNormalLowRankUpdateLinearOperatorCovariance.
+    return dist.cov_operator.to_dense()
   elif hasattr(dist, 'scale') and hasattr(dist.scale, 'matmul'):
      # Dist is MultivariateNormalLinearOperator.
     return dist.scale.matmul(dist.scale, adjoint_arg=True).to_dense()
