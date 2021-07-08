@@ -50,11 +50,6 @@ from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as
 
 
 STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST = (
-    'BatchReshape',  # b/183405889
-    'Independent',  # b/183405889
-    'Mixture',  # b/183405889
-    'Sample',  # b/183405889
-    'TransformedDistribution',  # b/183405889
 )
 
 
@@ -139,13 +134,12 @@ class StatisticConsistentShapesTest(test_util.TestCase):
     try:
       with tfp_hps.no_tf_rank_errors():
         result = getattr(dist, statistic)()
-      msg = 'Shape {} not compatible with expected {}.'.format(
-          result.shape, expected_static_shape)
-      self.assertTrue(expected_static_shape.is_compatible_with(
-          tf.broadcast_static_shape(result.shape, expected_static_shape)), msg)
+      msg = 'Shape {} of {} not compatible with expected {}.'.format(
+          result.shape, statistic, expected_static_shape)
+      self.assertTrue(
+          expected_static_shape.is_compatible_with(result.shape), msg)
       self.assertAllEqual(self.evaluate(expected_dynamic_shape),
-                          self.evaluate(tf.broadcast_dynamic_shape(
-                              tf.shape(result), expected_dynamic_shape)))
+                          self.evaluate(tf.shape(result)))
     except NotImplementedError:
       pass
 

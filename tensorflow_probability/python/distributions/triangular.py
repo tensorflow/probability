@@ -251,7 +251,8 @@ class Triangular(distribution.AutoCompositeTensorDistribution):
     return tf.where(x >= high, tf.ones_like(x), result_if_not_big)
 
   def _entropy(self):
-    return 0.5 - np.log(2.) + tf.math.log(self.high - self.low)
+    ans = 0.5 - np.log(2.) + tf.math.log(self.high - self.low)
+    return tf.broadcast_to(ans, self._batch_shape_tensor())
 
   def _mean(self):
     return (self.low + self.high + self.peak) / 3.

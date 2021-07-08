@@ -213,7 +213,8 @@ class PERT(distribution.AutoCompositeTensorDistribution):
     return self._transformed_beta().mean()
 
   def _mode(self):
-    return tf.convert_to_tensor(self.peak)
+    return tf.broadcast_to(tf.convert_to_tensor(self.peak),
+                           self._batch_shape_tensor())
 
   def _variance(self):
     low = tf.convert_to_tensor(self.low)

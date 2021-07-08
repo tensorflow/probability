@@ -290,7 +290,8 @@ class GeneralizedPareto(distribution.AutoCompositeTensorDistribution):
       return result()
 
   def _entropy(self):
-    return tf.math.log(self.scale) + self.concentration + 1
+    ans = tf.math.log(self.scale) + self.concentration + 1
+    return tf.broadcast_to(ans, self._batch_shape_tensor())
 
   # TODO(b/145620027): Finalize choice of bijector.
   def _default_event_space_bijector(self):

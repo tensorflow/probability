@@ -198,10 +198,13 @@ class ExponentiallyModifiedGaussian(
         -u + vsquared / 2. + special_math.log_ndtr((u - vsquared) / v))
 
   def _mean(self):
-    return self.loc + 1 / self.rate
+    return tf.broadcast_to(
+        self.loc + 1 / self.rate, self._batch_shape_tensor())
 
   def _variance(self):
-    return tf.square(self.scale) + 1 / tf.square(self.rate)
+    return tf.broadcast_to(
+        tf.square(self.scale) + 1 / tf.square(self.rate),
+        self._batch_shape_tensor())
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []
