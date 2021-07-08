@@ -28,6 +28,42 @@ from tensorflow_probability.python.internal import test_util
 
 
 tfd = tfp.distributions
+ln_lib = tfd.logitnormal
+
+
+def logit_normal_trapezoid_rule(loc, scale):
+  """Brute-force statistics of LogitNormal(loc, scale) by quadrature."""
+  # LogitNormal samples as
+  #   z ~ Normal(loc, scale)
+  #   return sigmoid(z)
+  # We find the statistics by integrating f(z) * Normal.pdf(z) over z.
+  # The function f is always bounded, and for z outside +-10 * scale,
+  # the Normal cdf is small enough to be negligible.  Thus it suffices
+  # to integrate from loc - 10 * scale to loc + 10 * scale
+  n = 10000
+  width = 10.0
+  xs = tf.linspace(loc - width*scale, loc + width*scale, n)
+  def trapezoid(vals):
+    total = tf.reduce_sum(vals, axis=0) - 0.5 * (vals[0] + vals[-1])
+    return total * 2 * width * scale / tf.cast((n-1), xs.dtype)
+  return xs, trapezoid
+
+
+def logit_normal_mean_trapezoid(loc, scale):
+  """Brute-force the mean of LogitNormal(loc, scale) by quadrature."""
+  dist = tfd.Normal(loc, scale)
+  grid, compute = logit_normal_trapezoid_rule(loc, scale)
+  return compute(tf.sigmoid(grid) * dist.prob(grid))
+
+
+def logit_normal_variance_trapezoid(loc, scale):
+  """Brute-force the variance of LogitNormal(loc, scale) by quadrature."""
+  dist = tfd.Normal(loc, scale)
+  grid, compute = logit_normal_trapezoid_rule(loc, scale)
+  probs = dist.prob(grid)
+  sigmoids = tf.sigmoid(grid)
+  mean = compute(sigmoids * probs)
+  return compute((sigmoids - mean)**2 * probs)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -68,6 +104,34 @@ class LogitNormalTest(test_util.TestCase):
         variance_sample, dist.variance_approx()])
     self.assertAllClose(
         variance_sample_, variance_approx_, atol=1e-4, rtol=0.03)
+
+  def testLogitNormalMeanGH(self):
+    locs, scales = tf.meshgrid(tf.linspace(-10.0, 10.0, 10),
+                               tf.exp(tf.linspace(-3.0, 0.0, 10)))
+    ghs = ln_lib.logit_normal_mean_gh(locs, scales, deg=50)
+    traps = logit_normal_mean_trapezoid(locs, scales)
+    self.assertAllClose(traps, ghs, rtol=1e-4)
+
+  def testLogitNormalVarianceGH(self):
+    locs, scales = tf.meshgrid(tf.linspace(-10.0, 10.0, 10),
+                               tf.exp(tf.linspace(-3.0, 0.0, 10)))
+    ghs = ln_lib.logit_normal_variance_gh(locs, scales, deg=50)
+    traps = logit_normal_variance_trapezoid(locs, scales)
+    self.assertAllClose(traps, ghs, rtol=1e-4)
+
+  def testLogitNormalMeanAndVariance(self):
+    locs, scales = tf.meshgrid(tf.linspace(-10.0, 10.0, 10),
+                               tf.exp(tf.linspace(-3.0, 3.0, 10)))
+    dist = tfd.LogitNormal(
+        loc=locs, scale=scales, validate_args=True,
+        gauss_hermite_scale_limit=1.,
+        num_probit_terms_approx=6)
+    means = dist.mean_approx()
+    trap_means = logit_normal_mean_trapezoid(locs, scales)
+    self.assertAllClose(trap_means, means, rtol=1e-4)
+    variances = dist.variance_approx()
+    trap_variances = logit_normal_variance_trapezoid(locs, scales)
+    self.assertAllClose(trap_variances, variances, rtol=1e-4)
 
   def testLogitNormalLogitNormalKL(self):
     batch_size = 6
