@@ -85,11 +85,13 @@ EVENT_SPACE_BIJECTOR_IS_BROKEN = [
 
 SLICING_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-5)
 SLICING_LOGPROB_ATOL.update({
+    'NormalInverseGaussian': 3e-4,  # b/193076242
     'Weibull': 3e-5,
 })
 
 SLICING_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-5)
 SLICING_LOGPROB_RTOL.update({
+    'NormalInverseGaussian': 5e-3,  # b/193076242
     'Weibull': 3e-5,
 })
 
