@@ -219,9 +219,9 @@ class StructuralTimeSeries(object):
         `1` dimension is optional if `num_timesteps > 1`), where
         `batch_shape` should match `self.batch_shape` (the broadcast batch
         shape of all priors on parameters for this structural time series
-        model). May optionally be an instance of `tfp.sts.MaskedTimeSeries`,
-        which includes a mask `Tensor` to specify timesteps with missing
-        observations.
+        model). Any `NaN`s are interpreted as missing observations; missingness
+        may be also be explicitly specified by passing a
+        `tfp.sts.MaskedTimeSeries` instance.
 
     Returns:
      log_joint_fn: A function taking a `Tensor` argument for each model

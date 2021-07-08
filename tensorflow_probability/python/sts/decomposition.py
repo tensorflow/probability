@@ -124,11 +124,11 @@ def decompose_by_component(model, observed_time_series, parameter_samples):
   Args:
     model: An instance of `tfp.sts.Sum` representing a structural time series
       model.
-    observed_time_series: `float` `Tensor` of shape
-      `batch_shape + [num_timesteps, 1]` (omitting the trailing unit dimension
-      is also supported when `num_timesteps > 1`), specifying an observed time
-      series. May optionally be an instance of `tfp.sts.MaskedTimeSeries`, which
-      includes a mask `Tensor` to specify timesteps with missing observations.
+    observed_time_series: optional `float` `Tensor` of shape
+        `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
+        supported when `T > 1`), specifying an observed time series. Any `NaN`s
+        are interpreted as missing observations; missingness may be also be
+        explicitly specified by passing a `tfp.sts.MaskedTimeSeries` instance.
     parameter_samples: Python `list` of `Tensors` representing posterior
       samples of model parameters, with shapes `[concat([
       [num_posterior_draws], param.prior.batch_shape,

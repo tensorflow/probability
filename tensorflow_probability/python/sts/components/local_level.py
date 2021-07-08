@@ -272,11 +272,11 @@ class LocalLevel(StructuralTimeSeries):
         Default value: `None`.
       observed_time_series: optional `float` `Tensor` of shape
         `batch_shape + [T, 1]` (omitting the trailing unit dimension is also
-        supported when `T > 1`), specifying an observed time series.
+        supported when `T > 1`), specifying an observed time series. Any `NaN`s
+        are interpreted as missing observations; missingness may be also be
+        explicitly specified by passing a `tfp.sts.MaskedTimeSeries` instance.
         Any priors not explicitly set will be given default values according to
-        the scale of the observed time series (or batch of time series). May
-        optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
-        a mask `Tensor` to specify timesteps with missing observations.
+        the scale of the observed time series (or batch of time series).
         Default value: `None`.
       name: the name of this model component.
         Default value: 'LocalLevel'.
