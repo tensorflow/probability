@@ -269,17 +269,18 @@ class LambertWNormal(LambertWDistribution):
         tf.convert_to_tensor(np.inf, dtype=self.dtype))
 
     if self.allow_nan_stats:
-      return tf.where(
+      ans = tf.where(
           tailweight < 1.0,
           result_where_defined,
           tf.convert_to_tensor(np.nan, self.dtype))
     else:
-      return distribution_util.with_dependencies([
+      ans = distribution_util.with_dependencies([
           assert_util.assert_greater_equal(
               tf.ones([], dtype=self.dtype),
               tailweight,
               message="variance not defined for components of tailweight >= 1"),
       ], result_where_defined)
+    return tf.broadcast_to(ans, self._batch_shape_tensor())
 
   def _mode(self):
     # Mode always exists (for any tail parameter) and equals the location / mean
