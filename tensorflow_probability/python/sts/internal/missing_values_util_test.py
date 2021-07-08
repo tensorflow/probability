@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts.internal import missing_values_util
 
@@ -51,16 +52,24 @@ class _MissingValuesUtilityTests(test_util.TestCase):
     if not self.use_static_shape:
       return  # Dynamic rank is not currently supported.
 
-    series = np.random.randn(3, 4)
+    series = tf.random.stateless_normal(
+        [2, 1, 3, 4], seed=test_util.test_seed(sampler_type='stateless'))
     mask = np.array([[False, True, False, True],
                      [True, False, True, False],
                      # Ensure no error if a batch element is fully masked.
                      [True, True, True, True]])
-    expected_initial_values = [series[0, 0], series[1, 1], series[2, 3]]
+    expected_initial_values = distribution_util.move_dimension(
+        tf.convert_to_tensor([series[..., 0, 0],
+                              series[..., 1, 1],
+                              series[..., 2, 3]]),
+        source_idx=0,
+        dest_idx=-1)
 
     initial_values = missing_values_util.initial_value_of_masked_time_series(
-        self._build_tensor(series),
-        broadcast_mask=self._build_tensor(mask, dtype=np.bool_))
+        self._build_tensor(self.evaluate(series)),
+        broadcast_mask=self._build_tensor(
+            self.evaluate(tf.broadcast_to(mask, series.shape)),
+            dtype=np.bool_))
 
     self.assertAllClose(self.evaluate(initial_values), expected_initial_values)
 
@@ -94,5 +103,5 @@ class _MissingValuesUtilityTestsStaticFloat64(_MissingValuesUtilityTests):
 
 del _MissingValuesUtilityTests
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()
