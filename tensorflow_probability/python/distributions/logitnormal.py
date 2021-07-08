@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import numpy as onp
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
@@ -47,6 +49,8 @@ class LogitNormal(transformed_distribution.TransformedDistribution,
                loc,
                scale,
                num_probit_terms_approx=2,
+               gauss_hermite_scale_limit=None,
+               gauss_hermite_degree=20,
                validate_args=False,
                allow_nan_stats=True,
                name='LogitNormal'):
@@ -71,6 +75,18 @@ class LogitNormal(transformed_distribution.TransformedDistribution,
         (inclusive). Using `num_probit_terms_approx=2` should result in
         `mean_approx` error not exceeding `10**-4`.
         Default value: `2`.
+      gauss_hermite_scale_limit: Floating-point `Tensor` or `None`.
+        The (batch-wise) maximum scale at which to compute statistics
+        with Gauss-Hermite quadrature instead of the Monahan-Stefanski
+        approximation [1].  Default: `None`, which recovers the legacy
+        behavior of using Monahan-Stefanski everywhere and does not
+        add TF ops for Gauss-Hermite.  The best value depends on the
+        working precision and the number of terms in the Gauss-Hermite
+        or Monahan-Stefanski approximations being switched between,
+        as well as the expected range of `loc` parameters; but `1` is
+        not unreasonable.
+      gauss_hermite_degree: Python integer giving the number of
+        sample points to use for Gauss-Hermite quadrature.
       validate_args: Python `bool`, default `False`. Whether to validate input
         with asserts. If `validate_args` is `False`, and the inputs are
         invalid, correct behavior is not guaranteed.
@@ -90,6 +106,7 @@ class LogitNormal(transformed_distribution.TransformedDistribution,
          Communications in Statistics-Simulation and Computation 9.4 (1980):
          389-419.
          https://www.tandfonline.com/doi/abs/10.1080/03610918008812164
+
     """
     parameters = dict(locals())
     num_probit_terms_approx = int(num_probit_terms_approx)
@@ -98,6 +115,8 @@ class LogitNormal(transformed_distribution.TransformedDistribution,
           'Argument `num_probit_terms_approx` must be an integer between '
           '`1` and `8` (inclusive).')
     self._num_probit_terms_approx = num_probit_terms_approx
+    self._gauss_hermite_scale_limit = gauss_hermite_scale_limit
+    self._gauss_hermite_degree = gauss_hermite_degree
     with tf.name_scope(name) as name:
       super(LogitNormal, self).__init__(
           distribution=normal_lib.Normal(loc=loc, scale=scale),
@@ -130,6 +149,16 @@ class LogitNormal(transformed_distribution.TransformedDistribution,
   def num_probit_terms_approx(self):
     """Number of `Normal(0, 1).cdf` terms using in `mean_*_approx` functions."""
     return self._num_probit_terms_approx
+
+  @property
+  def gauss_hermite_scale_limit(self):
+    """Largest scale using Gauss-Hermite quadrature in `*_approx` functions."""
+    return self._gauss_hermite_scale_limit
+
+  @property
+  def gauss_hermite_degree(self):
+    """Number of points for Gauss-Hermite quadrature in `*_approx` functions."""
+    return self._gauss_hermite_degree
 
   experimental_is_sharded = False
 
@@ -199,10 +228,19 @@ class LogitNormal(transformed_distribution.TransformedDistribution,
          https://www.tandfonline.com/doi/abs/10.1080/03610918008812164
     """
     with self._name_and_control_scope(name):
-      return approx_expected_sigmoid(
-          self.loc, self.scale,
+      loc = tf.convert_to_tensor(self.loc)
+      scale = tf.convert_to_tensor(self.scale)
+      monahan_stefanski_answer = approx_expected_sigmoid(
+          loc, scale,
           MONAHAN_MIX_PROB[self.num_probit_terms_approx],
           MONAHAN_INVERSE_SCALE[self.num_probit_terms_approx])
+      if self.gauss_hermite_scale_limit is None:
+        return monahan_stefanski_answer
+      else:
+        gauss_hermite_answer = logit_normal_mean_gh(
+            loc, scale, self.gauss_hermite_degree)
+        return tf.where(scale < self.gauss_hermite_scale_limit,
+                        gauss_hermite_answer, monahan_stefanski_answer)
 
   def variance_approx(self, name='variance_approx'):
     """Approximate the variance of a LogitNormal.
@@ -233,10 +271,19 @@ class LogitNormal(transformed_distribution.TransformedDistribution,
          https://www.tandfonline.com/doi/abs/10.1080/03610918008812164
     """
     with self._name_and_control_scope(name):
-      return approx_variance_sigmoid(
-          self.loc, self.scale,
+      loc = tf.convert_to_tensor(self.loc)
+      scale = tf.convert_to_tensor(self.scale)
+      monahan_stefanski_answer = approx_variance_sigmoid(
+          loc, scale,
           MONAHAN_MIX_PROB[self.num_probit_terms_approx],
           MONAHAN_INVERSE_SCALE[self.num_probit_terms_approx])
+      if self.gauss_hermite_scale_limit is None:
+        return monahan_stefanski_answer
+      else:
+        gauss_hermite_answer = logit_normal_variance_gh(
+            loc, scale, self.gauss_hermite_degree)
+        return tf.where(scale < self.gauss_hermite_scale_limit,
+                        gauss_hermite_answer, monahan_stefanski_answer)
 
   def stddev_approx(self, name='stddev_approx'):
     """Approximate the stdandard deviation of a LogitNormal.
@@ -479,3 +526,37 @@ def approx_variance_sigmoid(
         alpha[tf.newaxis, :] * alpha[:, tf.newaxis] * (b + bt),
         axis=[-2, -1])
     return mom2 - approx_expected_sigmoid(m, s, alpha, c)**2.
+
+
+# The above approximations fail for small scales.  We compute
+# statistics for small scales with Gauss-Hermite quadrature.
+
+
+def logit_normal_mean_gh(loc, scale, deg):
+  """Approximates `E_{N(m,s)}[sigmoid(X)]` by Gauss-Hermite quadrature."""
+  # We want to integrate
+  # A = \int_-inf^inf sigmoid(x) * Normal(loc, scale).pdf(x) dx
+  # To bring it into the right form for Gauss-Hermite quadrature,
+  # we make the substitution y = (x - loc) / scale, to get
+  # A = (1/sqrt(2*pi)) * \int_-inf^inf [
+  #       sigmoid(y * scale + loc) * exp(-1/2 y**2) dy]
+  grid, weights = onp.polynomial.hermite_e.hermegauss(deg)
+  grid = tf.cast(grid, dtype=loc.dtype)
+  weights = tf.cast(weights, dtype=loc.dtype)
+  normalizer = tf.constant(onp.sqrt(2 * onp.pi), dtype=loc.dtype)
+  values = tf.sigmoid(grid * scale[..., tf.newaxis] + loc[..., tf.newaxis])
+  return tf.reduce_sum(values * weights, axis=-1) / normalizer
+
+
+def logit_normal_variance_gh(loc, scale, deg):
+  """Approxmates `Var_{N(m,s)}[sigmoid(X)]` by Gauss-Hermite quadrature."""
+  # Since we have to compute sigmoids for variance anyway, we inline
+  # computing the mean by Gauss-Hermite quadrature at the same grid of points.
+  grid, weights = onp.polynomial.hermite_e.hermegauss(deg)
+  grid = tf.cast(grid, dtype=loc.dtype)
+  weights = tf.cast(weights, dtype=loc.dtype)
+  normalizer = tf.constant(onp.sqrt(2 * onp.pi), dtype=loc.dtype)
+  sigmoids = tf.sigmoid(grid * scale[..., tf.newaxis] + loc[..., tf.newaxis])
+  mean = tf.reduce_sum(sigmoids * weights, axis=-1) / normalizer
+  residuals = (sigmoids - mean[..., tf.newaxis])**2
+  return tf.reduce_sum(residuals * weights, axis=-1) / normalizer
