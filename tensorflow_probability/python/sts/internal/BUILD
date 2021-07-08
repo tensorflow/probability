@@ -106,8 +106,10 @@ py_test(
     srcs = ["util_test.py"],
     python_version = "PY3",
     srcs_version = "PY3",
+    tags = ["tf1-broken"],
     deps = [
         # numpy dep,
+        # pandas dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

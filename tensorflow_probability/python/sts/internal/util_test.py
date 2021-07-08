@@ -18,7 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from absl.testing import parameterized
+
 import numpy as np
+import pandas as pd
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -257,7 +260,7 @@ class _UtilityTests(test_util.TestCase):
         sts_util.pad_batch_dimension_for_multiple_chains(
             observed_time_series, model=model, chain_batch_shape=[8, 2]))
     self.assertAllEqual(
-        self._shape_as_list(padded_observed_time_series),
+        self._shape_as_list(padded_observed_time_series.time_series),
         sample_shape + [1, 1] + model_batch_shape + [num_timesteps, 1])
 
   def test_dont_pad_batch_dimension_when_input_has_no_sample_shape(self):
@@ -276,8 +279,65 @@ class _UtilityTests(test_util.TestCase):
         sts_util.pad_batch_dimension_for_multiple_chains(
             observed_time_series, model=model, chain_batch_shape=[8, 2]))
     self.assertAllEqual(
-        self._shape_as_list(padded_observed_time_series),
+        self._shape_as_list(padded_observed_time_series.time_series),
         self._shape_as_list(observed_time_series))
+
+  @parameterized.named_parameters(
+      ('array_with_unit_dim',
+       np.array([[3.], [4.], [5.]]), [3, 1], None),
+      ('array_with_nans',
+       np.array([3., 4., np.nan]), [3, 1], [False, False, True]),
+      ('tensor_with_nans',
+       tf.constant([3., 4., np.nan]), [3, 1], [False, False, True]),
+      ('masked_time_series',
+       tfp.sts.MaskedTimeSeries([1., 2., 3.], [False, True, False]),
+       [3, 1], [False, True, False]),
+      ('masked_time_series_tensor',
+       tfp.sts.MaskedTimeSeries(tf.constant([1., 2., 3.]),
+                                tf.constant([False, True, False])),
+       [3, 1], [False, True, False]),
+      ('series_fully_observed',
+       pd.Series([1., 2., 3.],
+                 index=pd.date_range('2014-01-01', '2014-01-03')),
+       [3, 1], None),
+      ('series_partially_observed',
+       pd.Series([1., np.nan, 3.],
+                 index=pd.date_range('2014-01-01', '2014-01-03')),
+       [3, 1], [False, True, False]),
+      ('series_indexed_by_range_only',
+       pd.Series([1., 2., 3.]), [3, 1], None),
+      ('dataframe_single_column',
+       pd.DataFrame([1., np.nan, 3.],
+                    columns=['value'],
+                    index=pd.date_range('2014-01-01', '2014-01-03')),
+       [3, 1], [False, True, False]),
+      ('dataframe_multi_column',
+       pd.DataFrame([[1., 4.], [np.nan, 2.], [3., np.nan]],
+                    columns=['value1', 'value2'],
+                    index=pd.date_range('2014-01-01', '2014-01-03')),
+       [2, 3, 1], [[False, True, False], [False, False, True]]))
+  def test_canonicalizes_observed_time_series(
+      self, observed_time_series, expected_shape, expected_is_missing):
+    observed_time_series, is_missing = (
+        sts_util.canonicalize_observed_time_series_with_mask(
+            observed_time_series))
+    # Evaluate with explicit identity ops to avoid TF1 error
+    # `RuntimeError: The Session graph is empty.`
+    observed_time_series, is_missing = self.evaluate(
+        (observed_time_series, is_missing))
+    self.assertAllEqual(observed_time_series.shape, expected_shape)
+    if is_missing is None:
+      self.assertIsNone(expected_is_missing)
+    elif expected_is_missing is None:
+      expected_is_missing = np.zeros(is_missing.shape, dtype=np.bool)
+    self.assertAllEqual(expected_is_missing, is_missing)
+
+  def test_series_with_no_fixed_frequency_raises_error(self):
+    with self.assertRaisesRegex(ValueError, 'no set frequency'):
+      observed_time_series = pd.Series(
+          [1., 2., 4.],
+          index=pd.to_datetime(['2014-01-01', '2014-01-02', '2014-01-04']))
+      sts_util.canonicalize_observed_time_series_with_mask(observed_time_series)
 
   def _shape_as_list(self, tensor):
     if self.use_static_shape:
@@ -302,17 +362,17 @@ class _UtilityTests(test_util.TestCase):
         ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
 
+@test_util.test_all_tf_execution_regimes
 class UtilityTestsDynamicFloat32(_UtilityTests):
   use_static_shape = False
   dtype = np.float32
 
 
-@test_util.test_all_tf_execution_regimes
 class UtilityTestsStaticFloat64(_UtilityTests):
   use_static_shape = True
   dtype = np.float64
 
 del _UtilityTests
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   tf.test.main()

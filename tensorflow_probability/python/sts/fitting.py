@@ -244,9 +244,9 @@ def fit_with_hmc(model,
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]])` where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`. May
-      optionally be an instance of `tfp.sts.MaskedTimeSeries`, which includes
-      a mask `Tensor` to specify timesteps with missing observations.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. Any `NaN`s
+        are interpreted as missing observations; missingness may be also be
+        explicitly specified by passing a `tfp.sts.MaskedTimeSeries` instance.
     num_results: Integer number of Markov chain draws.
       Default value: `100`.
     num_warmup_steps: Integer number of steps to take before starting to

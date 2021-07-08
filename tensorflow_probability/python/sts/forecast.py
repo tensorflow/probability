@@ -45,11 +45,11 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
       time-series model. This represents a joint distribution over
       time-series and their parameters with batch shape `[b1, ..., bN]`.
     observed_time_series: `float` `Tensor` of shape
-      `concat([sample_shape, model.batch_shape, [num_timesteps, 1]]) where
+      `concat([sample_shape, model.batch_shape, [num_timesteps, 1]])` where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`. May
-      optionally be an instance of `tfp.sts.MaskedTimeSeries` including a
-      mask `Tensor` to encode the locations of missing observations.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. Any `NaN`s
+        are interpreted as missing observations; missingness may be also be
+        explicitly specified by passing a `tfp.sts.MaskedTimeSeries` instance.
     parameter_samples: Python `list` of `Tensors` representing posterior samples
       of model parameters, with shapes `[concat([[num_posterior_draws],
       param.prior.batch_shape, param.prior.event_shape]) for param in
@@ -190,9 +190,9 @@ def forecast(model,
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]])` where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`. May
-      optionally be an instance of `tfp.sts.MaskedTimeSeries` including a
-      mask `Tensor` to encode the locations of missing observations.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. Any `NaN`s
+        are interpreted as missing observations; missingness may be also be
+        explicitly specified by passing a `tfp.sts.MaskedTimeSeries` instance.
     parameter_samples: Python `list` of `Tensors` representing posterior samples
       of model parameters, with shapes `[concat([[num_posterior_draws],
       param.prior.batch_shape, param.prior.event_shape]) for param in
@@ -402,9 +402,9 @@ def impute_missing_values(model,
     observed_time_series: `float` `Tensor` of shape
       `concat([sample_shape, model.batch_shape, [num_timesteps, 1]])` where
       `sample_shape` corresponds to i.i.d. observations, and the trailing `[1]`
-      dimension may (optionally) be omitted if `num_timesteps > 1`. May
-      optionally be an instance of `tfp.sts.MaskedTimeSeries` including a
-      mask `Tensor` to encode the locations of missing observations.
+      dimension may (optionally) be omitted if `num_timesteps > 1`. Any `NaN`s
+        are interpreted as missing observations; missingness may be also be
+        explicitly specified by passing a `tfp.sts.MaskedTimeSeries` instance.
     parameter_samples: Python `list` of `Tensors` representing posterior
       samples of model parameters, with shapes `[concat([
       [num_posterior_draws], param.prior.batch_shape,

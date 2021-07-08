@@ -18,6 +18,8 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
+import numpy as np
+
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
@@ -103,16 +105,13 @@ def pad_batch_dimension_for_multiple_chains(
                                  model_batch_ndims + event_ndims,
                                  lambda: do_padding(observed_time_series),
                                  lambda: observed_time_series)
-
   if is_missing is not None:
     is_missing = ps.cond(ps.rank(is_missing) >
                          model_batch_ndims + event_ndims,
                          lambda: do_padding(is_missing),
                          lambda: is_missing)
-    return missing_values_util.MaskedTimeSeries(observed_time_series,
-                                                is_missing=is_missing)
-
-  return observed_time_series
+  return missing_values_util.MaskedTimeSeries(observed_time_series,
+                                              is_missing=is_missing)
 
 
 def factored_joint_mvn(distributions):
@@ -310,7 +309,9 @@ def canonicalize_observed_time_series_with_mask(
   Args:
     maybe_masked_observed_time_series: a `Tensor`-like object with shape
       `[..., num_timesteps]` or `[..., num_timesteps, 1]`, or a
-      `tfp.sts.MaskedTimeSeries` containing such an object.
+      `tfp.sts.MaskedTimeSeries` containing such an object, or a Pandas
+      Series or DataFrame instance with set frequency
+      (i.e., `.index.freq is not None`).
   Returns:
     masked_time_series: a `tfp.sts.MaskedTimeSeries` namedtuple, in which
       the `observed_time_series` is converted to `Tensor` with canonical shape
@@ -319,18 +320,42 @@ def canonicalize_observed_time_series_with_mask(
   """
 
   with tf.name_scope('canonicalize_observed_time_series_with_mask'):
-    if hasattr(maybe_masked_observed_time_series, 'is_missing'):
+
+    is_missing_is_specified = hasattr(maybe_masked_observed_time_series,
+                                      'is_missing')
+    if is_missing_is_specified:
+      # Input is a MaskedTimeSeries.
       observed_time_series = (
           maybe_masked_observed_time_series.time_series)
       is_missing = maybe_masked_observed_time_series.is_missing
+    elif (hasattr(maybe_masked_observed_time_series, 'index') and
+          hasattr(maybe_masked_observed_time_series, 'to_numpy')):
+      # Input is a Pandas Series or DataFrame.
+      index = maybe_masked_observed_time_series.index
+      if hasattr(index, 'freq') and index.freq is None:
+        raise ValueError('Pandas DataFrame or Series has a DatetimeIndex with '
+                         'no set frequency, but STS requires regularly spaced '
+                         'observations. Consider using '
+                         '`tfp.sts.regularize_series` to infer a frequency and '
+                         'build a regularly spaced series (by marking '
+                         'unobserved steps as missing observations).')
+      # When a DataFrame has multiple columns representing a batch of series,
+      # we want shape `[batch_size, num_steps]` rather than vice versa.
+      observed_time_series = np.squeeze(np.transpose(
+          maybe_masked_observed_time_series.to_numpy()))
     else:
       observed_time_series = maybe_masked_observed_time_series
-      is_missing = None
 
     observed_time_series = tf.convert_to_tensor(value=observed_time_series,
                                                 name='observed_time_series')
     observed_time_series = _maybe_expand_trailing_dim(observed_time_series)
 
+    # Treat `NaN` values as missing.
+    if not is_missing_is_specified:
+      is_missing = tf.math.is_nan(observed_time_series[..., 0])
+    is_missing_static = tf.get_static_value(is_missing)
+    if is_missing_static is not None and not np.any(is_missing_static):
+      is_missing = None
     if is_missing is not None:
       is_missing = tf.convert_to_tensor(
           value=is_missing, name='is_missing', dtype_hint=tf.bool)
