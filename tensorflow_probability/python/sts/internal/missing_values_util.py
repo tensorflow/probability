@@ -180,7 +180,10 @@ def initial_value_of_masked_time_series(time_series_tensor, broadcast_mask):
         'dynamic rank.')  # `batch_gather` requires static rank
 
   # Extract the initial value for each series in the batch.
-  return tf.squeeze(tf.gather(
-      params=time_series_tensor,
-      indices=safe_unmasked_indices[..., np.newaxis],
-      batch_dims=batch_dims, axis=-1))
+  return tf.squeeze(tf.gather(params=time_series_tensor,
+                              indices=safe_unmasked_indices[..., np.newaxis],
+                              batch_dims=batch_dims,
+                              axis=-1),
+                    # Since we've gathered exactly one step from the
+                    # `num_timesteps` axis, we can remove that axis entirely.
+                    axis=-1)
