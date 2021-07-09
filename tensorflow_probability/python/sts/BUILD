@@ -29,6 +29,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":decomposition",
+        ":default_model",
         ":fitting",
         ":forecast",
         ":regularization",
@@ -60,6 +61,38 @@ py_test(
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "default_model",
+    srcs = ["default_model.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":regularization",
+        ":structural_time_series",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/experimental/sts_gibbs",
+        "//tensorflow_probability/python/experimental/util",
+        "//tensorflow_probability/python/sts/components",
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "default_model_test",
+    size = "medium",
+    srcs = ["default_model_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # pandas dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
