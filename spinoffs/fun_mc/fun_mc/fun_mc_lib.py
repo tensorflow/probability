@@ -84,6 +84,10 @@ __all__ = [
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
     'MetropolisHastingsExtra',
+    'persistent_metropolis_hastings_init',
+    'persistent_metropolis_hastings_step',
+    'PersistentMetropolistHastingsExtra',
+    'PersistentMetropolistHastingsState',
     'potential_scale_reduction_extract',
     'potential_scale_reduction_init',
     'potential_scale_reduction_step',
@@ -1081,6 +1085,97 @@ def metropolis_hastings_step(
       is_accepted, proposed_state, current_state)
   return next_state, MetropolisHastingsExtra(
       is_accepted=is_accepted, log_uniform=log_uniform)
+
+
+class PersistentMetropolistHastingsState(NamedTuple):
+  """Persistent Metropolis Hastings state.
+
+  Attributes:
+    level: Value uniformly distributed on [-1, 1], absolute value of which is
+      used as the slice variable for the acceptance test.
+  """
+  # We borrow the [-1, 1] encoding from the original paper; it has the effect of
+  # flipping the drift direction automatically, which has the effect of
+  # prolonging the persistent bouts of acceptance.
+  level: 'FloatTensor'
+
+
+class PersistentMetropolistHastingsExtra(NamedTuple):
+  """Persistent Metropolis Hastings extra outputs.
+
+  Attributes:
+    is_accepted: Whether the proposed state was accepted.
+    accepted_state: The accepted state.
+  """
+  is_accepted: 'BooleanTensor'
+  accepted_state: 'State'
+
+
+@util.named_call
+def persistent_metropolis_hastings_init(
+    shape: 'IntTensor',
+    dtype: 'tf.DType' = tf.float32,
+    init_level: 'FloatTensor' = 0.,
+) -> 'PersistentMetropolistHastingsState':
+  """Initializes `PersistentMetropolistHastingsState`.
+
+  Args:
+    shape: Shape of the independent levels.
+    dtype: Dtype for the levels.
+    init_level: Initial value for the level. Broadcastable to `shape`.
+
+  Returns:
+    pmh_state: `PersistentMetropolistHastingsState`
+  """
+  return PersistentMetropolistHastingsState(level=init_level +
+                                            tf.zeros(shape, dtype))
+
+
+@util.named_call
+def persistent_metropolis_hastings_step(
+    pmh_state: 'PersistentMetropolistHastingsState',
+    current_state: 'State',
+    proposed_state: 'State',
+    energy_change: 'FloatTensor',
+    drift: 'FloatTensor',
+) -> ('Tuple[PersistentMetropolistHastingsState, '
+      'PersistentMetropolistHastingsExtra]'):
+  """Persistent metropolis hastings step.
+
+  This implements the algorithm from [1]. The net effect of this algorithm is
+  that accepts/rejects are clustered in time, which helps algorithms that rely
+  on persistent momenta. The overall acceptance rate is unaffected. This
+  algorithm assumes that the `energy_change` has a continuous distribution
+  symmetric about 0 to maintain ergodicity.
+
+  Args:
+    pmh_state: `PersistentMetropolistHastingsState`
+    current_state: Current state.
+    proposed_state: Proposed state.
+    energy_change: E(proposed_state) - E(previous_state).
+    drift: How much to shift the level variable at each step.
+
+  Returns:
+    pmh_state: New `PersistentMetropolistHastingsState`.
+    pmh_extra: `PersistentMetropolistHastingsExtra`.
+
+  #### References
+
+  [1]: Neal, R. M. (2020). Non-reversibly updating a uniform [0,1] value for
+       Metropolis accept/reject decisions.
+  """
+  log_accept_ratio = -energy_change
+  is_accepted = tf.math.log(tf.abs(pmh_state.level)) < log_accept_ratio
+  # N.B. we'll never accept when energy_change is NaN, so `level` should remain
+  # non-NaN at all times.
+  level = pmh_state.level
+  level = tf.where(is_accepted, level * tf.exp(energy_change), level)
+  level += drift
+  level = (1 + level) % 2 - 1
+  return pmh_state._replace(level=level), PersistentMetropolistHastingsExtra(
+      is_accepted=is_accepted,
+      accepted_state=choose(is_accepted, proposed_state, current_state),
+  )
 
 
 MomentumSampleFn = Callable[[Any], State]

@@ -1546,6 +1546,48 @@ class FunMCTest(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose([2., 3.], orig_space)
     self.assertAllClose(potential, transformed_potential)
 
+  def testPersistentMH(self):
+
+    def target_log_prob_fn(x):
+      return -x**2 / 2, ()
+
+    def kernel(pmh_state, rwm_state, seed):
+      seed, rwm_seed = util.split_seed(seed, 2)
+      # RWM is used to create a valid sequence of energy changes. The
+      # correctness of the algorithm relies on the energy changes to be
+      # symmetric about 0.
+      rwm_state, rwm_extra = fun_mc.random_walk_metropolis_step(
+          rwm_state,
+          target_log_prob_fn=target_log_prob_fn,
+          proposal_fn=lambda state, seed: fun_mc.gaussian_proposal(  # pylint: disable=g-long-lambda
+              state, seed=seed),
+          seed=rwm_seed)
+      pmh_state, pmh_extra = fun_mc.persistent_metropolis_hastings_step(
+          pmh_state,
+          # Use dummy states for testing.
+          current_state=self._constant(0.),
+          proposed_state=self._constant(1.),
+          # Coprime with 1000 below.
+          drift=0.127,
+          energy_change=-rwm_extra.log_accept_ratio)
+      return (pmh_state, rwm_state,
+              seed), (pmh_extra.is_accepted, pmh_extra.accepted_state,
+                      rwm_extra.is_accepted)
+
+    _, (pmh_is_accepted, pmh_accepted_state, rwm_is_accepted) = fun_mc.trace(
+        (fun_mc.persistent_metropolis_hastings_init([], self._dtype),
+         fun_mc.random_walk_metropolis_init(
+             self._constant(0.), target_log_prob_fn),
+         self._make_seed(_test_seed())), kernel, 1000)
+
+    pmh_is_accepted = tf.cast(pmh_is_accepted, self._dtype)
+    rwm_is_accepted = tf.cast(rwm_is_accepted, self._dtype)
+    self.assertAllClose(
+        tf.reduce_mean(rwm_is_accepted),
+        tf.reduce_mean(pmh_is_accepted),
+        atol=0.05)
+    self.assertAllClose(pmh_is_accepted, pmh_accepted_state)
+
 
 @test_util.multi_backend_test(globals(), 'fun_mc_test')
 class FunMCTest32(FunMCTest):

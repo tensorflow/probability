@@ -291,6 +291,85 @@ class PrefabTest(tfp_test_util.TestCase):
       auto_diff, finite_diff = run(tf.ones(4))
       self.assertAllClose(auto_diff, finite_diff, rtol=0.01)
 
+  def testPHMC(self):
+    step_size = self._constant(0.2)
+    num_steps = 2000
+    num_leapfrog_steps = 10
+    state = tf.ones([16, 2], dtype=self._dtype)
+
+    base_mean = self._constant([2., 3.])
+    base_scale = self._constant([2., 0.5])
+
+    def target_log_prob_fn(x):
+      return -tf.reduce_sum(0.5 * tf.square(
+          (x - base_mean) / base_scale), -1), ()
+
+    def kernel(phmc_state, seed):
+      phmc_seed, seed = util.split_seed(seed, 2)
+      phmc_state, _ = prefab.persistent_hamiltonian_monte_carlo_step(
+          phmc_state,
+          step_size=step_size,
+          num_integrator_steps=num_leapfrog_steps,
+          target_log_prob_fn=target_log_prob_fn,
+          noise_fraction=0.5,
+          mh_drift=0.127,
+          seed=phmc_seed)
+      return (phmc_state, seed), phmc_state.state
+
+    seed = self._make_seed(_test_seed())
+
+    # Subtle: Unlike TF, JAX needs a data dependency from the inputs to outputs
+    # for the jit to do anything.
+    _, chain = tf.function(lambda state, seed: fun_mc.trace(  # pylint: disable=g-long-lambda
+        state=(prefab.persistent_hamiltonian_monte_carlo_init(
+            state, target_log_prob_fn), seed),
+        fn=kernel,
+        num_steps=num_steps))(state, seed)
+    # Discard the warmup samples.
+    chain = chain[1000:]
+
+    sample_mean = tf.reduce_mean(chain, axis=[0, 1])
+    sample_var = tf.math.reduce_variance(chain, axis=[0, 1])
+
+    true_samples = util.random_normal(
+        shape=[4096, 2], dtype=self._dtype, seed=seed) * base_scale + base_mean
+
+    true_mean = tf.reduce_mean(true_samples, axis=0)
+    true_var = tf.math.reduce_variance(true_samples, axis=0)
+
+    self.assertAllClose(true_mean, sample_mean, rtol=0.1, atol=0.1)
+    self.assertAllClose(true_var, sample_var, rtol=0.1, atol=0.1)
+
+  def testPHMCWithLogUniform(self):
+
+    def target_log_prob_fn(x):
+      return -x**2, ()
+
+    phmc_state = prefab.persistent_hamiltonian_monte_carlo_init(
+        self._constant(0.), target_log_prob_fn)
+    seed = self._make_seed(_test_seed())
+    _, accepted_phmc_extra = prefab.persistent_hamiltonian_monte_carlo_step(
+        phmc_state,
+        target_log_prob_fn,
+        step_size=self._constant(0.1),
+        num_integrator_steps=1,
+        noise_fraction=0.5,
+        mh_drift=0.1,
+        log_uniform=tf.math.log(self._constant(0.)),
+        seed=seed)
+    _, rejected_phmc_extra = prefab.persistent_hamiltonian_monte_carlo_step(
+        phmc_state,
+        target_log_prob_fn,
+        step_size=self._constant(0.1),
+        num_integrator_steps=1,
+        noise_fraction=0.5,
+        mh_drift=0.1,
+        log_uniform=0.,
+        seed=seed)
+
+    self.assertTrue(accepted_phmc_extra.is_accepted)
+    self.assertFalse(rejected_phmc_extra.is_accepted)
+
 
 @test_util.multi_backend_test(globals(), 'prefab_test')
 class PrefabTest32(PrefabTest):

@@ -22,6 +22,8 @@ implementations and adjust the pieces that they want. The code in this module
 strives to be easy to copy paste and modify in this manner.
 """
 
+import functools
+import typing
 from typing import Any, Callable, Dict, Iterable, NamedTuple, Optional, Tuple  # pylint: disable=unused-import
 
 import numpy as np
@@ -771,3 +773,325 @@ def hamiltonian_monte_carlo_with_state_grads_step(
     return res, grad
 
   return hmc(trajectory_length)
+
+
+class PersistentHamiltonianMonteCarloState(NamedTuple):
+  """Persistent Hamiltonian Monte Carlo state."""
+  state: 'fun_mc.State'
+  state_grads: 'fun_mc.State'
+  momentum: 'fun_mc.State'
+  target_log_prob: 'fun_mc.FloatTensor'
+  state_extra: 'Any'
+  direction: 'fun_mc.FloatTensor'
+  pmh_state: 'fun_mc.PersistentMetropolistHastingsState'
+
+
+class PersistentHamiltonianMonteCarloExtra(NamedTuple):
+  """Persistent Hamiltonian Monte Carlo extra outputs."""
+  is_accepted: 'fun_mc.BooleanTensor'
+  log_accept_ratio: 'fun_mc.FloatTensor'
+  proposed_phmc_state: 'fun_mc.State'
+  integrator_state: 'fun_mc.IntegratorState'
+  integrator_extra: 'fun_mc.IntegratorExtras'
+  initial_momentum: 'fun_mc.State'
+  energy_change_extra: 'Any'
+
+
+@util.named_call
+def persistent_hamiltonian_monte_carlo_init(
+    state: 'fun_mc.TensorNest',
+    target_log_prob_fn: 'fun_mc.PotentialFn',
+    momentum: 'Optional[fun_mc.State]' = None,
+    init_level: 'fun_mc.FloatTensor' = 0.,
+) -> 'PersistentHamiltonianMonteCarloState':
+  """Initializes the `PersistentHamiltonianMonteCarloState`.
+
+  Args:
+    state: State of the chain.
+    target_log_prob_fn: Target log prob fn.
+    momentum: Initial momentum. Set to all zeros by default.
+    init_level: Initial level for the persistent Metropolis Hastings.
+
+  Returns:
+    hmc_state: `PersistentMetropolistHastingsState`.
+  """
+  state = util.map_tree(tf.convert_to_tensor, state)
+  target_log_prob, state_extra, state_grads = util.map_tree(
+      tf.convert_to_tensor,
+      fun_mc.call_potential_fn_with_grads(target_log_prob_fn, state),
+  )
+  return PersistentHamiltonianMonteCarloState(
+      state=state,
+      state_grads=state_grads,
+      momentum=momentum if momentum is not None else util.map_tree(
+          tf.zeros_like, state),
+      target_log_prob=target_log_prob,
+      state_extra=state_extra,
+      direction=tf.ones_like(target_log_prob),
+      pmh_state=fun_mc.persistent_metropolis_hastings_init(
+          shape=target_log_prob.shape,
+          dtype=target_log_prob.dtype,
+          init_level=init_level),
+  )
+
+
+PersistentMomentumSampleFn = Callable[[fun_mc.State, Any], fun_mc.State]
+
+
+@util.named_call
+def persistent_hamiltonian_monte_carlo_step(
+    phmc_state: 'PersistentHamiltonianMonteCarloState',
+    target_log_prob_fn: 'fun_mc.PotentialFn',
+    step_size: 'Optional[Any]' = None,
+    num_integrator_steps: 'Optional[fun_mc.IntTensor]' = None,
+    noise_fraction: 'Optional[fun_mc.FloatTensor]' = None,
+    mh_drift: 'Optional[fun_mc.FloatTensor]' = None,
+    kinetic_energy_fn: 'Optional[fun_mc.PotentialFn]' = None,
+    momentum_sample_fn: 'Optional[PersistentMomentumSampleFn]' = None,
+    integrator_trace_fn: 'Callable[[fun_mc.IntegratorStepState, '
+    'fun_mc.IntegratorStepExtras], fun_mc.TensorNest]' = lambda *args: (),
+    log_uniform: 'Optional[fun_mc.FloatTensor]' = None,
+    integrator_fn: 'Optional[Callable[[fun_mc.IntegratorState, '
+    'fun_mc.FloatTensor], Tuple[fun_mc.IntegratorState, '
+    'fun_mc.IntegratorExtras]]]' = None,
+    unroll_integrator: 'bool' = False,
+    max_num_integrator_steps: 'Optional[fun_mc.IntTensor]' = None,
+    energy_change_fn: 'Callable[[fun_mc.IntegratorState, '
+    'fun_mc.IntegratorState, fun_mc.IntegratorExtras], '
+    'Tuple[fun_mc.FloatTensor, Any]]' = (
+        fun_mc._default_hamiltonian_monte_carlo_energy_change_fn),  # pylint: disable=protected-access
+    seed=None,
+) -> ('Tuple[PersistentHamiltonianMonteCarloState, '
+      'PersistentHamiltonianMonteCarloExtra]'):
+  """A step of the Persistent Hamiltonian Monte Carlo `TransitionOperator`.
+
+  This is an implementation of the generalized HMC with persistent momentum
+  described in [1] (algorithm 15) combined with the persistent Metropolis
+  Hastings test from [2]. This generalizes the regular HMC with persistent
+  momentum from [3] and the various underdamped langevin dynamics schemes (e.g.
+  [4]).
+
+  The generalization lies in the free choice of `momentum_sample_fn` and
+  `kinetic_energy_fn`. The former forms a Markov Chain with the stationary
+  distribution implied by the `kinetic_energy_fn`. By default, the standard
+  quadratic kinetic energy is used and the underdamped update is used for
+  `momentum_sample_fn`, namely:
+
+  ```none
+  new_momentum = (old_momentum * (1 - noise_fraction**2)**0.5 +
+      noise_fraction * eps)
+  eps ~ Normal(0, 1)
+  ```
+
+  Here are the parameter settings for few special cases:
+
+  1. Persistent Hamiltonian Monte Carlo [1] + persistent MH [2]:
+
+  ```none
+  num_integrator_steps >= 1
+  step_size > 0
+  noise_fraction in [0, 1]
+  mh_drift = 0.03
+  ```
+
+  Empirical results suggest that if `num_integrator_steps == 1`, then a
+  reasonable value for `mh_drift` is `1 - (1 - noise_fraction**2)**0.5`.
+
+  2. Unadjusted Underdamped Langevin Dynamics (see [4]):
+
+  ```none
+  num_integrator_steps = 1
+  step_size > 0
+  noise_fraction = (1 - exp(-2 * step_size * dampening))**0.5
+  # This disables the MH step for all but most extreme divergences.
+  log_uniform = -1000
+  ```
+
+  `dampening` refers to the parameter in the SDE formulation of the algorithm:
+
+  ```none
+  dv_t = -dampening * v_t * dt - grad(f)(x_t) * dt + (2 * dampening)**0.5 * dB_t
+  dx_t = v_t * dt
+  ```
+
+  Args:
+    phmc_state: `PersistentHamiltonianMonteCarloState`.
+    target_log_prob_fn: Target log prob fn.
+    step_size: Step size, structure broadcastable to the `target_log_prob_fn`
+      state. Optional if `integrator_fn` is specified.
+    num_integrator_steps: Number of integrator steps to take. Optional if
+      `integrator_fn` is specified.
+    noise_fraction: Noise fraction when refreshing momentum. Optional if
+      `momentum_sample_fn` is specified.
+    mh_drift: Metropolis Hastings drift term. Optional if `log_uniform` is
+      specified.
+    kinetic_energy_fn: Kinetic energy function.
+    momentum_sample_fn: Sampler for the momentum.
+    integrator_trace_fn: Trace function for the integrator.
+    log_uniform: Optional logarithm of a uniformly distributed random sample in
+      [0, 1], used for the MH accept/reject step.
+    integrator_fn: Integrator to use for the HMC dynamics. Uses a
+      `hamiltonian_integrator` with `leapfrog_step` by default.
+    unroll_integrator: Whether to unroll the loop in the integrator. Only works
+      if `num_integrator_steps`/`max_num_integrator_steps' is statically known.
+      Ignored if `integrator_fn` is specified.
+    max_num_integrator_steps: Maximum number of integrator steps to take. Useful
+      when `num_integrator_steps` is dynamic, and yet you still want
+      gradients/tracing to work. Ignored if `integrator_fn` is specified.
+    energy_change_fn: Callable with signature: `(current_integrator_state,
+      proposed_integrator_state,) -> (energy_change, energy_change_extra)`.
+      Computes the change in energy between current and proposed states. By
+      default, it just substracts the current and proposed energies. A typical
+      reason to override this is to improve numerical stability.
+    seed: For reproducibility.
+
+  Returns:
+    phmc_state: PersistentHamiltonianMonteCarloState
+    phmc_extra: PersistentHamiltonianMonteCarloExtra
+
+  #### References
+
+  [1]: Neklyudov, K., Welling, M., Egorov, E., & Vetrov, D. (2020). Involutive
+       MCMC: a Unifying Framework.
+
+  [2]: Neal, R. M. (2020). Non-reversibly updating a uniform [0,1] value for
+       Metropolis accept/reject decisions.
+
+  [3]: Horowitz, A. M. (1991). A generalized guided Monte Carlo algorithm.
+       Physics Letters. [Part B], 268(2), 247-252.
+
+  [4]: Ma, Y.-A., Chatterji, N., Cheng, X., Flammarion, N., Bartlett, P., &
+       Jordan, M. I. (2019). Is There an Analog of Nesterov Acceleration for
+       MCMC?
+  """
+  state = phmc_state.state
+  momentum = phmc_state.momentum
+  direction = phmc_state.direction
+  state_grads = phmc_state.state_grads
+  target_log_prob = phmc_state.target_log_prob
+  state_extra = phmc_state.state_extra
+  pmh_state = phmc_state.pmh_state
+
+  # Impute the optional args.
+  if kinetic_energy_fn is None:
+    kinetic_energy_fn = fun_mc.make_gaussian_kinetic_energy_fn(
+        len(target_log_prob.shape) if target_log_prob.shape is not None else tf
+        .rank(target_log_prob))
+
+  if momentum_sample_fn is None:
+
+    def _momentum_sample_fn(old_momentum: fun_mc.State,
+                            seed: Any) -> Tuple[fun_mc.State, Tuple[()]]:
+      seeds = util.unflatten_tree(
+          old_momentum,
+          util.split_seed(seed, len(util.flatten_tree(old_momentum))))
+      new_momentum = util.map_tree(
+          lambda om, seed: (  # pylint: disable=g-long-lambda
+              om * (1 - noise_fraction**2)**0.5 + noise_fraction *
+              util.random_normal(om.shape, om.dtype, seed)),
+          old_momentum,
+          seeds)
+      return new_momentum
+
+    momentum_sample_fn = _momentum_sample_fn
+
+  if integrator_fn is None:
+    step_size = util.map_tree(tf.convert_to_tensor, step_size)
+
+    def _integrator_fn(
+        state: fun_mc.IntegratorState, direction: fun_mc.FloatTensor
+    ) -> Tuple[fun_mc.IntegratorState, fun_mc.IntegratorExtras]:
+
+      directional_step_size = util.map_tree(
+          lambda step_size, state: (step_size * tf.reshape(  # pylint: disable=g-long-lambda
+              direction,
+              list(direction.shape) + [1] *
+              (len(state.shape) - len(direction.shape)))), step_size,
+          state.state)
+      # TODO(siege): Ideally we'd pass in the direction here, but the
+      # `hamiltonian_integrator` cannot handle dynamic direction switching like
+      # that.
+      return fun_mc.hamiltonian_integrator(
+          state,
+          num_steps=num_integrator_steps,
+          integrator_step_fn=functools.partial(
+              fun_mc.leapfrog_step,
+              step_size=directional_step_size,
+              target_log_prob_fn=target_log_prob_fn,
+              kinetic_energy_fn=kinetic_energy_fn),
+          kinetic_energy_fn=kinetic_energy_fn,
+          unroll=unroll_integrator,
+          max_num_steps=max_num_integrator_steps,
+          integrator_trace_fn=integrator_trace_fn)
+
+    integrator_fn = _integrator_fn
+
+  seed, sample_seed = util.split_seed(seed, 2)
+  momentum = momentum_sample_fn(momentum, sample_seed)
+
+  initial_integrator_state = fun_mc.IntegratorState(
+      target_log_prob=target_log_prob,
+      momentum=momentum,
+      state=state,
+      state_grads=state_grads,
+      state_extra=state_extra,
+  )
+
+  integrator_state, integrator_extra = integrator_fn(initial_integrator_state,
+                                                     direction)
+
+  proposed_state = phmc_state._replace(
+      state=integrator_state.state,
+      state_grads=integrator_state.state_grads,
+      target_log_prob=integrator_state.target_log_prob,
+      momentum=integrator_state.momentum,
+      state_extra=integrator_state.state_extra,
+      # Flip the direction in the proposal, for reversibility.
+      direction=util.map_tree(lambda d: -d, direction),
+  )
+
+  # Stick the new momentum into phmc_state. We're doing accept/reject purely on
+  # the Hamiltonian proposal, not the momentum refreshment kernel.
+  phmc_state = phmc_state._replace(momentum=momentum)
+
+  energy_change, energy_change_extra = energy_change_fn(
+      initial_integrator_state,
+      integrator_state,
+      integrator_extra,
+  )
+
+  if log_uniform is None:
+    pmh_state, pmh_extra = fun_mc.persistent_metropolis_hastings_step(
+        pmh_state,
+        current_state=phmc_state,
+        proposed_state=proposed_state,
+        energy_change=energy_change,
+        drift=mh_drift)
+    is_accepted = pmh_extra.is_accepted
+    phmc_state = pmh_extra.accepted_state
+  else:
+    # We explicitly don't update the PMH state.
+    phmc_state, mh_extra = fun_mc.metropolis_hastings_step(
+        current_state=phmc_state,
+        proposed_state=proposed_state,
+        energy_change=energy_change,
+        log_uniform=log_uniform)
+    is_accepted = mh_extra.is_accepted
+
+  phmc_state = typing.cast(PersistentHamiltonianMonteCarloState, phmc_state)
+  phmc_state = phmc_state._replace(
+      pmh_state=pmh_state,
+      # Flip the direction unconditionally; when the state is accepted, this
+      # undoes the flip made in the proposal, maintaining the old momentum
+      # direction.
+      direction=util.map_tree(lambda d: -d, phmc_state.direction),
+  )
+
+  return phmc_state, PersistentHamiltonianMonteCarloExtra(
+      is_accepted=is_accepted,
+      proposed_phmc_state=proposed_state,
+      log_accept_ratio=-energy_change,
+      integrator_state=integrator_state,
+      integrator_extra=integrator_extra,
+      energy_change_extra=energy_change_extra,
+      initial_momentum=momentum)
