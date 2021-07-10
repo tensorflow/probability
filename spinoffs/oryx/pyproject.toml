@@ -14,7 +14,7 @@
 # ============================================================================
 [tool.poetry]
 name = "oryx"
-version = "0.2.0"
+version = "0.2.1"
 description = "Probabilistic programming and deep learning in JAX"
 authors = ["Google LLC"]
 license = "Apache 2.0"
@@ -24,7 +24,7 @@ python = "^3.6"
 jax = "0.2.16"
 jaxlib = "0.1.68"
 dataclasses = { version = "*", python = "<3.7" }
-tfp-nightly = {extras = ["jax"], version = "0.14.0-alpha.20210623"}
+tfp-nightly = {extras = ["jax"], version = "0.14.0.dev20210630"}
 
 
 [tool.poetry.dev-dependencies]
