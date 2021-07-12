@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import _resample_using_log_points
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import _scatter_nd_batch
+from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_deterministic_minimum_error
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_independent
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_stratified
@@ -274,6 +275,32 @@ class _SMCResamplersTest(test_util.TestCase):
     indices = sample_fn(
         log_probs_end, sample_shape, log_points_almost_one)
     self.assertAllEqual(indices, tf.fill([n], n - 1))
+
+  def resample_with_target_distribution(self):
+    particles = np.linspace(0., 500., num=2500, dtype=np.float32)
+    log_weights = tfd.Poisson(20.).log_prob(particles)
+
+    # Resample particles to target a Poisson(20.) distribution.
+    new_particles, _, new_log_weights = resample(
+        particles, log_weights,
+        resample_fn=resample_systematic,
+        seed=test_util.test_seed(sampler_type='stateless'))
+    self.assertAllClose(tf.reduce_mean(new_particles), 20., atol=1e-2)
+    self.assertAllClose(
+        tf.reduce_sum(tf.nn.softmax(new_log_weights) * new_particles),
+        20.,
+        atol=1e-2)
+
+    # Reweight the resampled particles to target a Poisson(30.) distribution.
+    new_particles, _, new_log_weights = resample(
+        particles, log_weights,
+        resample_fn=resample_systematic,
+        target_log_weights=tfd.Poisson(30).log_prob(particles),
+        seed=test_util.test_seed(sampler_type='stateless'))
+    self.assertAllClose(tf.reduce_mean(new_particles), 20., atol=1e-2)
+    self.assertAllClose(
+        tf.reduce_sum(tf.nn.softmax(new_log_weights) * new_particles),
+        30., atol=1.)
 
   def maybe_compiler(self, f):
     if self.use_xla:

@@ -541,7 +541,7 @@ def sample_sequential_monte_carlo(
                 smc_kernel_result.particle_info.log_scalings, axis=0))
             )
       (resampled_state,
-       resampled_particle_info), _ = weighted_resampling.resample(
+       resampled_particle_info), _, _ = weighted_resampling.resample(
            particles=(state, smc_kernel_result.particle_info),
            log_weights=log_weights,
            resample_fn=resample_fn,

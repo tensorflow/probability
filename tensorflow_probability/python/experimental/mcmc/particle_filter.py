@@ -94,6 +94,11 @@ Args:
     The default behavior resamples particles when the current effective
     sample size falls below half the total number of particles.
     Default value: `tfp.experimental.mcmc.ess_below_threshold`.
+  unbiased_gradients: If `True`, use the stop-gradient
+    resampling trick of Scibior, Masrani, and Wood [{scibor_ref_idx}] to
+    correct for gradient bias introduced by the discrete resampling step. This
+    will generally increase the variance of stochastic gradients.
+    Default value: `True`.
   rejuvenation_kernel_fn: optional Python `callable` with signature
     `transition_kernel = rejuvenation_kernel_fn(target_log_prob_fn)`
     where `target_log_prob_fn` is a provided callable evaluating
@@ -112,7 +117,7 @@ Args:
 
 
 @docstring_util.expand_docstring(
-    particle_filter_arg_str=particle_filter_arg_str)
+    particle_filter_arg_str=particle_filter_arg_str.format(scibor_ref_idx=2))
 def infer_trajectories(observations,
                        initial_state_prior,
                        transition_fn,
@@ -122,6 +127,7 @@ def infer_trajectories(observations,
                        proposal_fn=None,
                        resample_fn=weighted_resampling.resample_systematic,
                        resample_criterion_fn=smc_kernel.ess_below_threshold,
+                       unbiased_gradients=True,
                        rejuvenation_kernel_fn=None,
                        num_transitions_per_observation=1,
                        seed=None,
@@ -224,6 +230,9 @@ def infer_trajectories(observations,
       filtering and smoothing: Fifteen years later.
       _Handbook of nonlinear filtering_, 12(656-704), 2009.
       https://www.stats.ox.ac.uk/~doucet/doucet_johansen_tutorialPF2011.pdf
+  [2] Adam Scibior, Vaden Masrani, and Frank Wood. Differentiable Particle
+      Filtering without Modifying the Forward Pass. _arXiv preprint
+      arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
 
   """
   with tf.name_scope(name or 'infer_trajectories') as name:
@@ -242,6 +251,7 @@ def infer_trajectories(observations,
          proposal_fn=proposal_fn,
          resample_fn=resample_fn,
          resample_criterion_fn=resample_criterion_fn,
+         unbiased_gradients=unbiased_gradients,
          rejuvenation_kernel_fn=rejuvenation_kernel_fn,
          num_transitions_per_observation=num_transitions_per_observation,
          trace_fn=_default_trace_fn,
@@ -265,7 +275,7 @@ def infer_trajectories(observations,
 
 
 @docstring_util.expand_docstring(
-    particle_filter_arg_str=particle_filter_arg_str)
+    particle_filter_arg_str=particle_filter_arg_str.format(scibor_ref_idx=1))
 def particle_filter(observations,
                     initial_state_prior,
                     transition_fn,
@@ -275,6 +285,7 @@ def particle_filter(observations,
                     proposal_fn=None,
                     resample_fn=weighted_resampling.resample_systematic,
                     resample_criterion_fn=smc_kernel.ess_below_threshold,
+                    unbiased_gradients=True,
                     rejuvenation_kernel_fn=None,  # TODO(davmre): not yet supported. pylint: disable=unused-argument
                     num_transitions_per_observation=1,
                     trace_fn=_default_trace_fn,
@@ -324,6 +335,12 @@ def particle_filter(observations,
       `trace_criterion_fn==None`, this is computed from the final step;
       otherwise, each Tensor will have initial dimension `num_steps_traced`
       and stacks the traced results across all steps.
+
+  #### References
+
+  [1] Adam Scibior, Vaden Masrani, and Frank Wood. Differentiable Particle
+      Filtering without Modifying the Forward Pass. _arXiv preprint
+      arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
   """
 
   init_seed, loop_seed = samplers.split_seed(seed, salt='particle_filter')
@@ -356,7 +373,8 @@ def particle_filter(observations,
     kernel = smc_kernel.SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
         resample_fn=resample_fn,
-        resample_criterion_fn=resample_criterion_fn)
+        resample_criterion_fn=resample_criterion_fn,
+        unbiased_gradients=unbiased_gradients)
 
     # Use `trace_scan` rather than `sample_chain` directly because the latter
     # would force us to trace the state history (with or without thinning),
