@@ -23,7 +23,7 @@ Usage (run from Inference Gym source directory):
 venv=$(mktemp -d)
 virtualenv -p python3.6 $venv
 source $venv/bin/activate
-pip install cmdstanpy==0.9 pandas numpy tf-nightly tfp-nightly tfds-nightly
+pip install 'cmdstanpy>=0.9.0' pandas numpy tf-nightly tfp-nightly tfds-nightly
 install_cmdstan
 
 python -m inference_gym.tools.get_ground_truth \

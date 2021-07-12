@@ -49,7 +49,7 @@ def eight_schools():
     school_effects <- std_school_effects * exp(log_stddev) + avg_effect;
   }
   model {
-    avg_effect ~ normal(0, 5);
+    avg_effect ~ normal(0, 10);
     log_stddev ~ normal(5, 1);
     std_school_effects ~ normal(0, 1);
     treatment_effects ~ normal(school_effects, treatment_stddevs);
