@@ -277,7 +277,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         (resampled_particles,
          resample_indices,
          log_weights) = tf.nest.map_structure(
-             lambda r, p: ps.where(do_resample, r, p),
+             lambda r, p: tf.where(do_resample, r, p),
              (resampled_particles, resample_indices, uniform_weights),
              (state.particles, _dummy_indices_like(resample_indices),
               normalized_log_weights))

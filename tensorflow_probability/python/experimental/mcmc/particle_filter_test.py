@@ -561,6 +561,23 @@ class _ParticleFilterTest(test_util.TestCase):
           run_filter(transition_fn=valid_transition_fn,
                      proposal_fn=transition_fn_no_batch_shape))
 
+  @test_util.jax_disable_test_missing_functionality('Gradient of while_loop.')
+  def test_marginal_likelihood_gradients_are_defined(self):
+
+    def marginal_log_likelihood(level_scale, noise_scale):
+      _, _, _, lps = tfp.experimental.mcmc.particle_filter(
+          observations=tf.convert_to_tensor([1., 2., 3., 4., 5.]),
+          initial_state_prior=tfd.Normal(loc=0, scale=1.),
+          transition_fn=lambda _, x: tfd.Normal(loc=x, scale=level_scale),
+          observation_fn=lambda _, x: tfd.Normal(loc=x, scale=noise_scale),
+          num_particles=4,
+          seed=test_util.test_seed())
+      return tf.reduce_sum(lps)
+
+    _, grads = tfp.math.value_and_gradient(marginal_log_likelihood, 1.0, 1.0)
+    self.assertAllNotNone(grads)
+    self.assertNotAllZero(grads)
+
 
 # TODO(b/186068104): add tests with dynamic shapes.
 class ParticleFilterTestFloat32(_ParticleFilterTest):
