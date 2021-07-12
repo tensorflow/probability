@@ -149,6 +149,12 @@ class BetaBinomialTest(test_util.TestCase):
                          total_count=50.)
     self.assertAllEqual(d.sample(10, seed=seed_stream()), [[0, 50]] * 10)
 
+  def testLogProbCornerCase(self):
+    d = tfd.BetaBinomial(
+        concentration0=2e-8, concentration1=1.0, total_count=1.0)
+    # Numerically 0 is better than numerically +inf
+    self.assertAllEqual(d.log_prob(1.0), 0.0)
+
   def testEmpiricalCdfAgainstDirichletMultinomial(self):
     # This test is too slow for Eager mode.
     if tf.executing_eagerly():
