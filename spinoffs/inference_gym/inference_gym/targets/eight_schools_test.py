@@ -46,7 +46,7 @@ class EightSchoolsTest(test_util.InferenceGymTestCase):
         model,
         num_chains=4,
         num_steps=4000,
-        num_leapfrog_steps=3,
+        num_leapfrog_steps=10,
         step_size=0.4,
     )
 
