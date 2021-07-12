@@ -269,7 +269,7 @@ class BetaBinomial(distribution.AutoCompositeTensorDistribution):
   def _log_prob(self, counts):
     n, c1, c0 = self._params_list_as_tensors()
     return (_log_combinations(n, counts)
-            + tfp_math.lbeta(c1 + counts, n + c0 - counts)
+            + tfp_math.lbeta(c1 + counts, (n - counts) + c0)
             - tfp_math.lbeta(c1, c0))
 
   @distribution_util.AppendDocstring(_beta_binomial_sample_note)
