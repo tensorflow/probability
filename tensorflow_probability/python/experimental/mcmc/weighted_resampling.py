@@ -34,7 +34,8 @@ __all__ = [
 ]
 
 
-def resample(particles, log_weights, resample_fn, seed=None):
+def resample(particles, log_weights, resample_fn, target_log_weights=None,
+             seed=None):
   """Resamples the current particles according to provided weights.
 
   Args:
@@ -47,21 +48,46 @@ def resample(particles, log_weights, resample_fn, seed=None):
       Use 'resample_independent' for independent resamples.
       Use 'resample_stratified' for stratified resampling.
       Use 'resample_systematic' for systematic resampling.
+    target_log_weights: optional float `Tensor` of the same shape and dtype as
+      `log_weights`, specifying the target measure on `particles` if this is
+      different from that implied by normalizing `log_weights`. The
+      returned `log_weights_after_resampling` will represent this measure. If
+      `None`, the target measure is implicitly taken to be the normalized
+      log weights (`log_weights - tf.reduce_logsumexp(log_weights, axis=0)`).
+      Default value: `None`.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
   Returns:
     resampled_particles: Nested structure of `Tensor`s, matching `particles`.
     resample_indices: int `Tensor` of shape `[num_particles, b1, ..., bN]`.
+    log_weights_after_resampling: float `Tensor` of same shape and dtype as
+      `log_weights`, such that weighted sums of the resampled particles are
+      equal (in expectation over the resampling step) to weighted sums of
+      the original particles:
+      `E [ exp(log_weights_after_resampling) * some_fn(resampled_particles) ]
+      == exp(target_log_weights) * some_fn(particles)`.
+      If no `target_log_weights` was specified, the log weights after
+      resampling are uniformly equal to `-log(num_particles)`.
   """
   with tf.name_scope('resample'):
     num_particles = ps.size0(log_weights)
+    log_num_particles = tf.math.log(tf.cast(num_particles, log_weights.dtype))
+
+    # Normalize the weights and sample the ancestral indices.
     log_probs = tf.math.log_softmax(log_weights, axis=0)
     resampled_indices = resample_fn(log_probs, num_particles, (), seed=seed)
-    resampled_particles = tf.nest.map_structure(
-        lambda x: mcmc_util.index_remapping_gather(  # pylint: disable=g-long-lambda
-            x, resampled_indices, axis=0),
-        particles)
-  return resampled_particles, resampled_indices
+
+    gather_ancestors = lambda x: (  # pylint: disable=g-long-lambda
+        mcmc_util.index_remapping_gather(x, resampled_indices, axis=0))
+    resampled_particles = tf.nest.map_structure(gather_ancestors, particles)
+    if target_log_weights is None:
+      log_weights_after_resampling = tf.fill(ps.shape(log_weights),
+                                             -log_num_particles)
+    else:
+      importance_weights = target_log_weights - log_probs - log_num_particles
+      log_weights_after_resampling = tf.nest.map_structure(
+          gather_ancestors, importance_weights)
+  return resampled_particles, resampled_indices, log_weights_after_resampling
 
 
 # TODO(b/153689734): rewrite so as not to use `move_dimension`.

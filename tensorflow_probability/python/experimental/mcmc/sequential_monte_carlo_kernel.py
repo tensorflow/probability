@@ -140,6 +140,7 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
                propose_and_update_log_weights_fn,
                resample_fn=weighted_resampling.resample_systematic,
                resample_criterion_fn=ess_below_threshold,
+               unbiased_gradients=True,
                name=None):
     """Initializes a sequential Monte Carlo transition kernel.
 
@@ -180,11 +181,23 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         default behavior is to resample particles when the effective
         sample size falls below half of the total number of particles.
         Default value: `tfp.experimental.mcmc.ess_below_threshold`.
+      unbiased_gradients: If `True`, use the stop-gradient
+        resampling trick of Scibior, Masrani, and Wood [{scibor_ref_idx}] to
+        correct for gradient bias introduced by the discrete resampling step.
+        This will generally increase the variance of stochastic gradients.
+        Default value: `True`.
       name: Python `str` name for ops created by this kernel.
+
+    #### References
+
+    [1] Adam Scibior, Vaden Masrani, and Frank Wood. Differentiable Particle
+        Filtering without Modifying the Forward Pass. _arXiv preprint
+        arXiv:2106.10314_, 2021. https://arxiv.org/abs/2106.10314
     """
     self._propose_and_update_log_weights_fn = propose_and_update_log_weights_fn
     self._resample_fn = resample_fn
     self._resample_criterion_fn = resample_criterion_fn
+    self._unbiased_gradients = unbiased_gradients
     self._name = name or 'SequentialMonteCarlo'
 
   @property
@@ -202,6 +215,10 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
   @property
   def resample_criterion_fn(self):
     return self._resample_criterion_fn
+
+  @property
+  def unbiased_gradients(self):
+    return self._unbiased_gradients
 
   @property
   def resample_fn(self):
@@ -234,7 +251,6 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         proposal_seed, resample_seed = samplers.split_seed(seed)
 
         state = WeightedParticles(*state)  # Canonicalize.
-        num_particles = ps.size0(state.log_weights)
 
         # Propose new particles and update weights for this step, unless it's
         # the initial step, in which case, use the user-provided initial
@@ -266,19 +282,26 @@ class SequentialMonteCarlo(kernel_base.TransitionKernel):
         # needed---but we're ultimately interested in adaptive resampling
         # for statistical (not computational) purposes, so this isn't a
         # dealbreaker.
-        resampled_particles, resample_indices = weighted_resampling.resample(
-            state.particles,
-            state.log_weights,
-            self.resample_fn,
+        [
+            resampled_particles,
+            resample_indices,
+            weights_after_resampling
+        ] = weighted_resampling.resample(
+            particles=state.particles,
+            # The `stop_gradient` here does not affect discrete resampling
+            # (which is nondifferentiable anyway), but avoids canceling out
+            # the gradient signal from the 'target' log weights, as described in
+            # Scibior, Masrani, and Wood (2021).
+            log_weights=tf.stop_gradient(state.log_weights),
+            resample_fn=self.resample_fn,
+            target_log_weights=(normalized_log_weights
+                                if self.unbiased_gradients else None),
             seed=resample_seed)
-        uniform_weights = tf.fill(
-            ps.shape(state.log_weights),
-            value=-tf.math.log(tf.cast(num_particles, state.log_weights.dtype)))
         (resampled_particles,
          resample_indices,
          log_weights) = tf.nest.map_structure(
              lambda r, p: tf.where(do_resample, r, p),
-             (resampled_particles, resample_indices, uniform_weights),
+             (resampled_particles, resample_indices, weights_after_resampling),
              (state.particles, _dummy_indices_like(resample_indices),
               normalized_log_weights))
 
