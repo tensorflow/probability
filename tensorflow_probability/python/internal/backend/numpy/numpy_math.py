@@ -376,6 +376,8 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
     m = _max_mask_non_finite(input_tensor, axis=axis, keepdims=True)
     y = input_tensor - m
     y = np.exp(y, out=y)
+    if not keepdims:
+      m = np.squeeze(m, axis=_astuple(axis))
     return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
 
 

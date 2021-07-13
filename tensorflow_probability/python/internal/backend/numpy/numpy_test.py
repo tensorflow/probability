@@ -29,8 +29,10 @@ from absl.testing import parameterized
 import hypothesis as hp
 import hypothesis.extra.numpy as hnp
 import hypothesis.strategies as hps
+import mock
 import numpy as np  # Rewritten by script to import jax.numpy
 import numpy as onp  # pylint: disable=reimported
+import scipy.special as scipy_special
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -89,13 +91,21 @@ class TestCase(dict):
   def __init__(self, name, strategy_list, **kwargs):
     self.name = name
 
+    tensorflow_function = kwargs.pop('tensorflow_function', None)
+    if not tensorflow_function:
+      tensorflow_function = _getattr(tf, name)
+
+    numpy_function = kwargs.pop('numpy_function', None)
+    if not numpy_function:
+      numpy_function = _getattr(
+          nptf,
+          name.replace('random.', 'random.stateless_'
+                      ).replace('random.stateless_gamma', 'random.gamma'))
+
     super(TestCase, self).__init__(
         testcase_name='_' + name.replace('.', '_'),
-        tensorflow_function=_getattr(tf, name),
-        numpy_function=_getattr(
-            nptf,
-            name.replace('random.', 'random.stateless_'
-                        ).replace('random.stateless_gamma', 'random.gamma')),
+        tensorflow_function=tensorflow_function,
+        numpy_function=numpy_function,
         strategy_list=strategy_list,
         name=name,
         **kwargs)
@@ -677,6 +687,14 @@ def _eig_post_process(vals):
   return np.einsum('...ab,...b,...bc->...ac', v, e, v.swapaxes(-1, -2))
 
 
+def _reduce_logsumexp_no_scipy(*args, **kwargs):
+  def _not_implemented(*args, **kwargs):
+    raise NotImplementedError()
+
+  with mock.patch.object(scipy_special, 'logsumexp', _not_implemented):
+    return nptf.reduce_logsumexp(*args, **kwargs)
+
+
 # __Currently untested:__
 # broadcast_dynamic_shape
 # broadcast_static_shape
@@ -812,17 +830,19 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, False, False, False, False, False, None))
     TestCase('linalg.matmul', [matmul_compatible_pairs()]),
-    TestCase('linalg.eig', [pd_matrices()], post_processor=_eig_post_process,
-             xla_disabled=True),
-    TestCase('linalg.eigh', [pd_matrices()], post_processor=_eig_post_process),
-    TestCase('linalg.eigvals', [pd_matrices()],
-             post_processor=_eig_post_process, xla_disabled=True),
-    TestCase('linalg.eigvalsh', [pd_matrices()],
-             post_processor=_eig_post_process),
     TestCase(
-        'linalg.det',
-        [nonsingular_matrices()],
-        rtol=1e-3,
+        'linalg.eig', [pd_matrices()],
+        post_processor=_eig_post_process,
+        xla_disabled=True),
+    TestCase('linalg.eigh', [pd_matrices()], post_processor=_eig_post_process),
+    TestCase(
+        'linalg.eigvals', [pd_matrices()],
+        post_processor=_eig_post_process,
+        xla_disabled=True),
+    TestCase(
+        'linalg.eigvalsh', [pd_matrices()], post_processor=_eig_post_process),
+    TestCase(
+        'linalg.det', [nonsingular_matrices()], rtol=1e-3,
         xla_disabled=True),  # TODO(b/162937268): missing kernel.
 
     # ArgSpec(args=['a', 'name', 'conjugate'], varargs=None, keywords=None)
@@ -963,6 +983,14 @@ NUMPY_TEST_CASES = [
     TestCase(
         'math.reduce_logsumexp', [array_axis_tuples(allow_multi_axis=True)],
         xla_const_args=(1,)),
+    TestCase(
+        'math.reduce_logsumexp_no_scipy',
+        [array_axis_tuples(allow_multi_axis=True)],
+        xla_const_args=(1,),
+        tensorflow_function=tf.math.reduce_logsumexp,
+        numpy_function=_reduce_logsumexp_no_scipy,
+        disabled=JAX_MODE,  # JAX always has scipy.
+    ),
     TestCase(
         'math.reduce_max',  # TODO(b/171070692): TF produces nonsense with NaN.
         [array_axis_tuples(allow_nan=False, allow_multi_axis=True)],
