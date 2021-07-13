@@ -866,7 +866,7 @@ def windowed_mean(
     high_indices: An integer `Tensor` defining the upper boundary
       (exclusive) of each window.  Must be broadcast-compatible with
       `low_indices`.  Default: `tf.range(1, N+1)`, i.e., N windows
-      that each end in the corresponding datum from `x` (inclusive)`.
+      that each end in the corresponding datum from `x` (inclusive).
     axis: Scalar `Tensor` designating the axis holding samples.  This
       is the axis of `x` along which we take windows, and therefore
       the axis that `low_indices` and `high_indices` index into.
