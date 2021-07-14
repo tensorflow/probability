@@ -213,22 +213,22 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
           return x
       ```
 
-  - 'Affine'
+  - 'ScaleMatvecTriL'
 
     ```none
-    Y = g(X) = sqrtSigma * X + mu
+    Y = g(X) = sqrtSigma * X
     X ~ MultivariateNormal(0, I_d)
     ```
 
     Implies:
 
     ```none
-      g^{-1}(Y) = inv(sqrtSigma) * (Y - mu)
+      g^{-1}(Y) = inv(sqrtSigma) * Y
       |Jacobian(g^{-1})(y)| = det(inv(sqrtSigma))
-      Y ~ MultivariateNormal(mu, sqrtSigma) , i.e.,
+      Y ~ MultivariateNormal(0, sqrtSigma) , i.e.,
       prob(Y=y) = |Jacobian(g^{-1})(y)| * prob(X=g^{-1}(y))
                 = det(sqrtSigma)^(-d) *
-                  MultivariateNormal(inv(sqrtSigma) * (y - mu); 0, I_d)
+                  MultivariateNormal(inv(sqrtSigma) * y; 0, I_d)
       ```
 
   #### Min_event_ndims and Naming
@@ -319,8 +319,9 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
   However the shape returned by `inverse_log_det_jacobian` is `[4, 2]` because
   the Jacobian determinant is a reduction over the event dimensions.
 
-  Another example is the `Affine` `Bijector`. Because `min_event_ndims = 1`, the
-  Jacobian determinant reduction is over `event_ndims - 1`.
+  Another example is the `ScaleMatvecDiag` `Bijector`. Because
+  `min_event_ndims = 1`, the Jacobian determinant reduction is over
+  `event_ndims - 1`.
 
   It is sometimes useful to implement the inverse Jacobian determinant as the
   negative forward Jacobian determinant. For example,
@@ -367,8 +368,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
   #### Is_constant_jacobian
 
   Certain bijectors will have constant jacobian matrices. For instance, the
-  `Affine` bijector encodes multiplication by a matrix plus a shift, with
-  jacobian matrix, the same aforementioned matrix.
+  `ScaleMatvecTriL` bijector encodes multiplication by a lower triangular
+  matrix, with jacobian matrix equal to the same aforementioned matrix.
 
   `is_constant_jacobian` encodes the fact that the jacobian matrix is constant.
   The semantics of this argument are the following:

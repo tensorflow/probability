@@ -21,8 +21,6 @@ from __future__ import print_function
 # pylint: disable=unused-import,wildcard-import,line-too-long,g-importing-member
 
 from tensorflow_probability.python.bijectors.absolute_value import AbsoluteValue
-from tensorflow_probability.python.bijectors.affine import Affine
-from tensorflow_probability.python.bijectors.affine_linear_operator import AffineLinearOperator
 from tensorflow_probability.python.bijectors.ascending import Ascending
 from tensorflow_probability.python.bijectors.batch_normalization import BatchNormalization
 from tensorflow_probability.python.bijectors.bijector import AutoCompositeTensorBijector
@@ -106,8 +104,6 @@ from tensorflow_probability.python.bijectors.weibull_cdf import WeibullCDF
 
 __all__ = [
     "AbsoluteValue",
-    "Affine",
-    "AffineLinearOperator",
     "Ascending",
     "AutoCompositeTensorBijector",
     "AutoregressiveNetwork",

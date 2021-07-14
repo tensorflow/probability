@@ -168,8 +168,8 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
   def testVariableScaleAssertions(self):
     # We test that changing the scale to be non-invertible raises an exception
     # when validate_args is True. This is really just testing the underlying
-    # AffineLinearOperator instance, but we include it to demonstrate that it
-    # works as expected.
+    # ScaleMatvecLinearOperator instance, but we include it to demonstrate that
+    # it works as expected.
     loc = tf.constant([1., 1.])
     scale_tensor = tf.Variable(np.eye(2, dtype=np.float32))
     scale = tf.linalg.LinearOperatorLowerTriangular(
