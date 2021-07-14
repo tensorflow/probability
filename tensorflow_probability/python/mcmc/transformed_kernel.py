@@ -184,8 +184,8 @@ class TransformedTransitionKernel(kernel_base.TransitionKernel):
 
   The `TransformedTransitionKernel` enables arbitrary bijective transformations
   of arbitrary `TransitionKernel`s, e.g., one could use bijectors
-  `tfp.bijectors.Affine`, `tfp.bijectors.RealNVP`, etc. with transition kernels
-  `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.mcmc.RandomWalkMetropolis`,
+  `tfp.bijectors.ScaleMatvecTriL`, `tfp.bijectors.RealNVP`, etc. with transition
+  kernels `tfp.mcmc.HamiltonianMonteCarlo`, `tfp.mcmc.RandomWalkMetropolis`,
   etc.
 
   ### Transforming nested kernels

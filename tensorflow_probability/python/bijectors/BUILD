@@ -43,8 +43,6 @@ multi_substrate_py_library(
     ],
     deps = [
         ":absolute_value",
-        ":affine",
-        ":affine_linear_operator",
         ":ascending",
         ":batch_normalization",
         ":bijector",
@@ -169,29 +167,6 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "affine_linear_operator",
-    srcs = ["affine_linear_operator.py"],
-    deps = [
-        ":bijector",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:tensor_util",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "affine",
-    srcs = ["affine.py"],
-    deps = [
-        ":bijector",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:distribution_util",
-        "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
 
@@ -1095,32 +1070,6 @@ multi_substrate_py_test(
     srcs = ["absolute_value_test.py"],
     deps = [
         ":bijectors",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "affine_test",
-    size = "small",
-    srcs = ["affine_test.py"],
-    shard_count = 5,
-    tags = ["noasan"],  # times out b/63678675
-    deps = [
-        ":bijectors",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "affine_linear_operator_test",
-    size = "small",
-    srcs = ["affine_linear_operator_test.py"],
-    deps = [
-        ":bijectors",
-        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
