@@ -269,9 +269,8 @@ class DynamicLinearRegression(StructuralTimeSeries):
         Default value: 'DynamicLinearRegression'.
 
     """
-
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'DynamicLinearRegression') as name:
-
       dtype = dtype_util.common_dtype(
           [design_matrix, drift_scale_prior, initial_weights_prior])
 
@@ -306,6 +305,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
                                    tfb.Softplus()]))
           ],
           latent_size=num_features,
+          init_parameters=init_parameters,
           name=name)
 
   @property

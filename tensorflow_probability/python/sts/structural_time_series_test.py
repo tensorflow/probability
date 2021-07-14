@@ -83,6 +83,50 @@ class _StructuralTimeSeriesTests(object):
     self.assertAllEqual(model_batch_shape_tensor_,
                         expected_broadcast_batch_shape)
 
+  def test_addition_raises_error_with_no_observed_time_series(self):
+    c1 = tfp.sts.LocalLevel(level_scale_prior=tfd.Normal(0., 1.),
+                            initial_level_prior=tfd.Normal(0., 1.))
+    c2 = tfp.sts.LocalLevel(level_scale_prior=tfd.Normal(0., 0.1),
+                            initial_level_prior=tfd.Normal(1., 2.))
+    with self.assertRaisesRegex(
+        ValueError, 'Could not automatically create a `Sum` component'):
+      c1 + c2  # pylint: disable=pointless-statement
+
+  def test_adding_two_sums(self):
+    observed_time_series = self._build_placeholder([1., 2., 3., 4., 5.])
+    s1 = tfp.sts.Sum(
+        [tfp.sts.LocalLevel(observed_time_series=observed_time_series)],
+        observed_time_series=observed_time_series)
+    s2 = tfp.sts.Sum(
+        [tfp.sts.LocalLinearTrend(observed_time_series=observed_time_series)],
+        observed_time_series=observed_time_series)
+    s3 = s1 + s2
+    self.assertLen(s3.components, 2)
+
+    observation_noise_scale_prior_sample = (
+        lambda s: s.parameters[0].prior.sample(  # pylint: disable=g-long-lambda
+            seed=test_util.test_seed(sampler_type='stateless')))
+    self.assertAllEqual(observation_noise_scale_prior_sample(s3),
+                        observation_noise_scale_prior_sample(s1))
+    self.assertAllEqual(observation_noise_scale_prior_sample(s3),
+                        observation_noise_scale_prior_sample(s2))
+
+    self.assertAllEqual(s3.constant_offset, s1.constant_offset)
+    self.assertAllEqual(s3.constant_offset, s2.constant_offset)
+
+    with self.assertRaisesRegex(
+        ValueError, 'Cannot add Sum components'):
+      s1.copy(observed_time_series=3 * observed_time_series) + s2  # pylint: disable=expression-not-assigned
+
+    with self.assertRaisesRegex(
+        ValueError, 'Cannot add Sum components'):
+      s1.copy(constant_offset=4.) + s2  # pylint: disable=expression-not-assigned
+
+    with self.assertRaisesRegex(
+        ValueError, 'Cannot add Sum components'):
+      s1.copy(observation_noise_scale_prior=tfd.Normal(  # pylint: disable=expression-not-assigned
+          self._build_placeholder(0.), self._build_placeholder(1.))) + s2
+
   def _build_placeholder(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.
 
@@ -276,6 +320,31 @@ class _StsTestHarness(object):
     ssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=param_samples)
     self.assertEqual(ssm.batch_shape, time_series_sample_shape)
+
+  def test_copy(self):
+    model = self._build_sts()
+    copy = model.copy()
+    self.assertNotEqual(id(model), id(copy))
+    self.assertAllEqual([p.name for p in model.parameters],
+                        [p.name for p in copy.parameters])
+
+  def test_add_component(self):
+    model = self._build_sts(observed_time_series=[1., 2., 3.])
+    new_component = tfp.sts.LocalLevel(name='LocalLevel2')
+    sum_model = model + new_component
+    ledom_mus = new_component + model  # `sum_model` backwards.
+    self.assertIsInstance(sum_model, tfp.sts.Sum)
+    self.assertIsInstance(ledom_mus, tfp.sts.Sum)
+    self.assertEqual(sum_model.components[-1], new_component)
+    self.assertEqual(ledom_mus.components[0], new_component)
+    self.assertEqual(set([p.name for p in sum_model.parameters]),
+                     set([p.name for p in ledom_mus.parameters]))
+    # If we built a new Sum component (rather than extending an existing one),
+    # we should have passed an observed_time_series so that we get reasonable
+    # default priors.
+    if not isinstance(model, tfp.sts.Sum):
+      self.assertIsNotNone(sum_model.init_parameters['observed_time_series'])
+      self.assertIsNotNone(ledom_mus.init_parameters['observed_time_series'])
 
 
 @test_util.test_all_tf_execution_regimes

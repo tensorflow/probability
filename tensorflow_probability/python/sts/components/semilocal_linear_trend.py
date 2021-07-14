@@ -368,7 +368,7 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'SemiLocalLinearTrend'.
     """
-
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'SemiLocalLinearTrend') as name:
       if observed_time_series is not None:
         _, observed_stddev, observed_initial = sts_util.empirical_statistics(
@@ -429,6 +429,7 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
                         autoregressive_coef_bijector),
           ],
           latent_size=2,
+          init_parameters=init_parameters,
           name=name)
 
   @property

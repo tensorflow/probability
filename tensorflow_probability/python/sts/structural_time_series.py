@@ -43,7 +43,8 @@ class StructuralTimeSeries(object):
   structure determined by the child class.
   """
 
-  def __init__(self, parameters, latent_size, name='StructuralTimeSeries'):
+  def __init__(self, parameters, latent_size, init_parameters=None,
+               name='StructuralTimeSeries'):
     """Construct a specification for a structural time series model.
 
     Args:
@@ -54,12 +55,26 @@ class StructuralTimeSeries(object):
         parameter ordering used by fitting and inference algorithms.
       latent_size: Python `int` specifying the dimensionality of the latent
         state space for this model.
+      init_parameters: Python `dict` of parameters used to instantiate this
+        model component.
       name: Python `str` name for this model component.
     """
 
+    self._init_parameters = init_parameters
     self._parameters = parameters
     self._latent_size = latent_size
     self._name = name
+
+  @property
+  def init_parameters(self):
+    """Parameters used to instantiate this `StructuralTimeSeries`."""
+    if self._init_parameters is None:
+      raise ValueError(
+          'Component has `init_parameters` of `None`. See the built-in '
+          'components (e.g., `LocalLevel`) for examples of how to properly '
+          'store parameters to `__init__`.')
+    return {k: v for k, v in self._init_parameters.items()
+            if not k.startswith('__') and v is not self}
 
   @property
   def parameters(self):
@@ -107,6 +122,66 @@ class StructuralTimeSeries(object):
       batch_shape = tf.broadcast_dynamic_shape(
           batch_shape, param.prior.batch_shape_tensor())
     return batch_shape
+
+  def __add__(self, other):
+    """Models the sum of the series from the two components."""
+    # Local import to avoid circular dependency.
+    from tensorflow_probability.python.sts.components import sum as sts_sum  # pylint: disable=g-import-not-at-top
+
+    sum_kwargs = {}
+    if isinstance(self, sts_sum.Sum) and isinstance(other, sts_sum.Sum):
+      # Debatably, a Sum + Sum should sum the `constant_offset` parameters, and
+      # should model the sum of the component observation noises (e.g., if
+      # `noise1 ~ N(0, scale=1)` and `noise2 ~ N(0, scale=1)`, then
+      # `noise1 + noise2 ~ N(0, scale=sqrt(2))`). But this would be surprising
+      # in the likely-common case where both sums are modeling the same
+      # observed_time_series. So we instead treat Sum + Sum as a logical
+      # 'merge' operation on the components, requiring that all other parameters
+      # match.
+      _assert_dict_contents_are_equal(
+          self.init_parameters, other.init_parameters,
+          ignore=['components'],
+          message='Cannot add Sum components with different parameter values.')
+      sum_kwargs = self.init_parameters
+    elif isinstance(self, sts_sum.Sum):
+      sum_kwargs = self.init_parameters
+    elif isinstance(other, sts_sum.Sum):
+      sum_kwargs = other.init_parameters
+    else:
+      # If creating a Sum from scratch, try to infer a heuristic noise prior.
+      observed_time_series = self.init_parameters.get(
+          'observed_time_series', None)
+      if observed_time_series is None:
+        observed_time_series = other.init_parameters.get(
+            'observed_time_series', None)
+      if observed_time_series is None:
+        raise ValueError('Could not automatically create a `Sum` component '
+                         'because neither summand was initialized with an '
+                         '`observed_time_series`. You may still instantiate '
+                         'the component manually as `tfp.sts.Sum(...).')
+      sum_kwargs['observed_time_series'] = observed_time_series
+
+    my_components = getattr(self, 'components', [self])
+    other_components = getattr(other, 'components', [other])
+    sum_kwargs['components'] = list(my_components) + list(other_components)
+    return sts_sum.Sum(**sum_kwargs)
+
+  def copy(self, **override_parameters_kwargs):
+    """Creates a deep copy.
+
+    Note: the copy distribution may continue to depend on the original
+    initialization arguments.
+
+    Args:
+      **override_parameters_kwargs: String/value dictionary of initialization
+        arguments to override with new values.
+    Returns:
+      copy: A new instance of `type(self)` initialized from the union
+        of self.init_parameters and override_parameters_kwargs, i.e.,
+        `dict(self.init_parameters, **override_parameters_kwargs)`.
+    """
+    parameters = dict(self.init_parameters, **override_parameters_kwargs)
+    return type(self)(**parameters)
 
   def _canonicalize_param_vals_as_map(self, param_vals):
     """If given an ordered list of parameter values, build a name:value map.
@@ -278,3 +353,22 @@ class StructuralTimeSeries(object):
         return param_lp + observation_lp
 
     return log_joint_fn
+
+
+def _strict_equals(a, b):
+  try:
+    return bool(a == b)
+  except ValueError:
+    # `a == b` is an array, Tensor, or similar.
+    return id(a) == id(b)
+
+
+def _assert_dict_contents_are_equal(
+    a, b, message, ignore=(), equals_fn=_strict_equals):
+  combined_keys = set(a.keys()) | set(b.keys())
+  for k in combined_keys - set(ignore):
+    a_val = a.get(k, None)
+    b_val = b.get(k, None)
+    if not _strict_equals(a_val, b_val):
+      raise ValueError(message +
+                       ' `{}`: {} vs {}.'.format(k, a_val, b_val))

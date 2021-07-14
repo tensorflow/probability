@@ -350,7 +350,7 @@ class LocalLinearTrend(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'LocalLinearTrend'.
     """
-
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'LocalLinearTrend') as name:
       _, observed_stddev, observed_initial = (
           sts_util.empirical_statistics(observed_time_series)
@@ -400,6 +400,7 @@ class LocalLinearTrend(StructuralTimeSeries):
               Parameter('slope_scale', slope_scale_prior, scaled_softplus)
           ],
           latent_size=2,
+          init_parameters=init_parameters,
           name=name)
 
   @property

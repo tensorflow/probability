@@ -324,6 +324,7 @@ class Autoregressive(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'Autoregressive'.
     """
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'Autoregressive') as name:
       masked_time_series = None
       if observed_time_series is not None:
@@ -386,6 +387,7 @@ class Autoregressive(StructuralTimeSeries):
                                    tfb.Softplus()]))
           ],
           latent_size=order,
+          init_parameters=init_parameters,
           name=name)
 
   @property
