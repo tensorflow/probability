@@ -257,6 +257,52 @@ class _GaussianProcessTest(object):
         np.eye(10),
         gp.get_marginal_distribution().covariance())
 
+  def testGPPosteriorPredictive(self):
+    amplitude = np.float64(.5)
+    length_scale = np.float64(2.)
+    jitter = np.float64(1e-4)
+    observation_noise_variance = np.float64(3e-3)
+    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+
+    index_points = np.random.uniform(-1., 1., 10)[..., np.newaxis]
+
+    gp = tfd.GaussianProcess(
+        kernel,
+        index_points,
+        observation_noise_variance=observation_noise_variance,
+        jitter=jitter,
+        validate_args=True)
+
+    predictive_index_points = np.random.uniform(1., 2., 10)[..., np.newaxis]
+    observations = np.linspace(1., 10., 10)
+
+    expected_gprm = tfd.GaussianProcessRegressionModel(
+        kernel=kernel,
+        observation_index_points=index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        jitter=jitter,
+        index_points=predictive_index_points,
+        validate_args=True)
+
+    actual_gprm = gp.posterior_predictive(
+        predictive_index_points=predictive_index_points,
+        observations=observations)
+
+    samples = self.evaluate(actual_gprm.sample(10, seed=test_util.test_seed()))
+
+    self.assertAllClose(
+        self.evaluate(expected_gprm.log_prob(samples)),
+        self.evaluate(actual_gprm.log_prob(samples)))
+
+    self.assertAllClose(
+        self.evaluate(expected_gprm.mean()),
+        self.evaluate(actual_gprm.mean()))
+
+    self.assertAllClose(
+        self.evaluate(expected_gprm.covariance()),
+        self.evaluate(actual_gprm.covariance()))
+
 
 @test_util.test_all_tf_execution_regimes
 class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):
