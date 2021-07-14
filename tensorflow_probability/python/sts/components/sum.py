@@ -421,7 +421,7 @@ class Sum(StructuralTimeSeries):
     Raises:
       ValueError: if components do not have unique names.
     """
-
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'Sum') as name:
       if observed_time_series is not None:
         observed_mean, observed_stddev, _ = (
@@ -474,6 +474,7 @@ class Sum(StructuralTimeSeries):
           parameters=parameters,
           latent_size=sum(
               [component.latent_size for component in components]),
+          init_parameters=init_parameters,
           name=name)
 
   @property

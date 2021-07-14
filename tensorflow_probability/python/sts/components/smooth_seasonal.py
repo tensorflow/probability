@@ -399,7 +399,7 @@ class SmoothSeasonal(StructuralTimeSeries):
         Default value: 'SmoothSeasonal'.
 
     """
-
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'SmoothSeasonal') as name:
 
       _, observed_stddev, observed_initial = (
@@ -436,6 +436,7 @@ class SmoothSeasonal(StructuralTimeSeries):
       super(SmoothSeasonal, self).__init__(
           parameters=parameters,
           latent_size=latent_size,
+          init_parameters=init_parameters,
           name=name)
 
   @property

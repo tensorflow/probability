@@ -812,7 +812,7 @@ class Seasonal(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'Seasonal'.
     """
-
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'Seasonal') as name:
 
       _, observed_stddev, observed_initial = (
@@ -875,6 +875,7 @@ class Seasonal(StructuralTimeSeries):
           parameters,
           latent_size=(num_seasons - 1
                        if self.constrain_mean_effect_to_zero else num_seasons),
+          init_parameters=init_parameters,
           name=name)
 
   @property

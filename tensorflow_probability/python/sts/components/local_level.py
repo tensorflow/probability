@@ -281,7 +281,7 @@ class LocalLevel(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'LocalLevel'.
     """
-
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'LocalLevel') as name:
 
       dtype = dtype_util.common_dtype([level_scale_prior, initial_level_prior])
@@ -319,6 +319,7 @@ class LocalLevel(StructuralTimeSeries):
                                    tfb.Softplus()])),
           ],
           latent_size=1,
+          init_parameters=init_parameters,
           name=name)
 
   @property

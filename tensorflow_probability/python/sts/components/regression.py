@@ -176,6 +176,7 @@ class LinearRegression(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'LinearRegression'.
     """
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'LinearRegression') as name:
 
       if not isinstance(design_matrix, tfl.LinearOperator):
@@ -225,6 +226,7 @@ class LinearRegression(StructuralTimeSeries):
                   ),
           ],
           latent_size=0,
+          init_parameters=init_parameters,
           name=name)
 
   @property
@@ -412,8 +414,8 @@ class SparseLinearRegression(StructuralTimeSeries):
       name: the name of this model component.
         Default value: 'SparseLinearRegression'.
     """
+    init_parameters = dict(locals())
     with tf.name_scope(name or 'SparseLinearRegression') as name:
-
       if not isinstance(design_matrix, tfl.LinearOperator):
         design_matrix = tfl.LinearOperatorFullMatrix(
             tf.convert_to_tensor(value=design_matrix, name='design_matrix'),
@@ -468,6 +470,7 @@ class SparseLinearRegression(StructuralTimeSeries):
                         bijector=tfb.Identity())
           ],
           latent_size=0,
+          init_parameters=init_parameters,
           name=name)
 
   @property
