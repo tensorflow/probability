@@ -596,6 +596,53 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
   def _default_event_space_bijector(self):
     return identity_bijector.Identity(validate_args=self.validate_args)
 
+  def posterior_predictive(self, observations, predictive_index_points=None):
+    """Return the posterior predictive distribution associated with this distribution.
+
+    Given `predictive_index_points` and `observations`, return the posterior
+    predictive distribution on the `predictive_index_points` conditioned on
+    `index_points` and `observations` associated to `index_points`.
+
+    This is equivalent to using the `GaussianProcessRegressionModel` class.
+
+    Args:
+      observations: `float` `Tensor` representing collection, or batch of
+        collections, of observations corresponding to
+        `self.index_points`. Shape has the form `[b1, ..., bB, e]`, which
+        must be broadcastable with the batch and example shapes of
+        `self.index_points`. The batch shape `[b1, ..., bB]` must be
+        broadcastable with the shapes of all other batched parameters
+      predictive_index_points: `float` `Tensor` representing finite collection,
+        or batch of collections, of points in the index set over which the GP
+        is defined.
+        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
+        number of feature dimensions and must equal `kernel.feature_ndims` and
+        `e` is the number (size) of predictive index points in each batch.
+        The batch shape must be broadcastable with this distributions
+        `batch_shape`.
+        Default value: `None`.
+
+    Returns:
+      gprm: An instance of `Distribution` that represents the posterior
+        predictive.
+    """
+    from tensorflow_probability.python.distributions import gaussian_process_regression_model as gprm  # pylint:disable=g-import-not-at-top
+    if self.index_points is None:
+      raise ValueError(
+          'Expected that `self.index_points` is not `None`. Using '
+          '`self.index_points=None` is equivalent to using a `GaussianProcess` '
+          'prior, which this class encapsulates.')
+    return gprm.GaussianProcessRegressionModel(
+        kernel=self.kernel,
+        observation_index_points=self.index_points,
+        observations=observations,
+        index_points=predictive_index_points,
+        observation_noise_variance=self.observation_noise_variance,
+        mean_fn=self.mean_fn,
+        jitter=self.jitter,
+        validate_args=self.validate_args,
+        allow_nan_stats=self.allow_nan_stats)
+
 
 def _assert_kl_compatible(marginal, other):
   if ((isinstance(marginal, normal.Normal) and
