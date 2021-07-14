@@ -376,7 +376,7 @@ def mix_over_posterior_draws(means, variances):
   Returns:
     mixture_dist: `tfd.MixtureSameFamily(tfd.Independent(tfd.Normal))` instance
       representing a uniform mixture over the posterior samples, with
-      `batch_shape = ...` and `event_shape = [num_timesteps]`.
+      `batch_shape = [..., num_timesteps]` and `event_shape = []`.
 
   """
   # The inputs `means`, `variances` have shape
@@ -387,19 +387,16 @@ def mix_over_posterior_draws(means, variances):
   #      [num_timesteps]])`
   # Because MixtureSameFamily mixes over the rightmost batch dimension,
   # we need to move the `num_posterior_draws` dimension to be rightmost
-  # in the batch shape. This requires use of `Independent` (to preserve
-  # `num_timesteps` as part of the event shape) and `move_dimension`.
+  # in the batch shape.
   # TODO(b/120245392): enhance `MixtureSameFamily` to reduce along an
   # arbitrary axis, and eliminate `move_dimension` calls here.
 
   with tf.name_scope('mix_over_posterior_draws'):
     num_posterior_draws = ps.shape(means)[0]
 
-    component_observations = tfd.Independent(
-        distribution=tfd.Normal(
-            loc=dist_util.move_dimension(means, 0, -2),
-            scale=tf.sqrt(dist_util.move_dimension(variances, 0, -2))),
-        reinterpreted_batch_ndims=1)
+    component_observations = tfd.Normal(
+        loc=dist_util.move_dimension(means, 0, -1),
+        scale=tf.sqrt(dist_util.move_dimension(variances, 0, -1)))
 
     return tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(

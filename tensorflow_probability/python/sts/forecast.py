@@ -25,6 +25,8 @@ from tensorflow_probability.python.experimental import util as tfe_util
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 def _prefer_static_event_ndims(distribution):
   if distribution.event_shape.ndims is not None:
@@ -33,7 +35,18 @@ def _prefer_static_event_ndims(distribution):
     return tf.size(distribution.event_shape_tensor())
 
 
-def one_step_predictive(model, observed_time_series, parameter_samples):
+@deprecation.deprecated_arg_values(
+    '2021-12-31',
+    '`Predictive distributions returned by`tfp.sts.one_step_predictive` will '
+    'soon compute per-timestep probabilities (treating timesteps as part of '
+    'the batch shape) instead of a single probability for an entire series '
+    '(the current approach, in which timesteps are treated as event shape). '
+    'Please update your code to pass `timesteps_are_event_shape=False` (this '
+    'will soon be the default) and to explicitly sum over the per-timestep log '
+    'probabilities if this is required.',
+    timesteps_are_event_shape=True)
+def one_step_predictive(model, observed_time_series, parameter_samples,
+                        timesteps_are_event_shape=True):
   """Compute one-step-ahead predictive distributions for all timesteps.
 
   Given samples from the posterior over parameters, return the predictive
@@ -55,11 +68,16 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
       param.prior.batch_shape, param.prior.event_shape]) for param in
       model.parameters]`. This may optionally also be a map (Python `dict`) of
       parameter names to `Tensor` values.
+    timesteps_are_event_shape: Deprecated, for backwards compatibility only.
+      If `False`, the predictive distribution will return per-timestep
+      probabilities
+      Default value: `True`.
 
   Returns:
-    forecast_dist: a `tfd.MixtureSameFamily` instance with event shape
-      [num_timesteps] and
-      batch shape `concat([sample_shape, model.batch_shape])`, with
+    predictive_dist: a `tfd.MixtureSameFamily` instance with event shape
+      `[num_timesteps] if timesteps_are_event_shape else []` and
+      batch shape `concat([sample_shape, model.batch_shape,
+      [] if timesteps_are_event_shape else [num_timesteps])`, with
       `num_posterior_draws` mixture components. The `t`th step represents the
       forecast distribution `p(observed_time_series[t] |
       observed_time_series[0:t-1], parameter_samples)`.
@@ -168,9 +186,13 @@ def one_step_predictive(model, observed_time_series, parameter_samples):
 
     # Squeeze dims to convert from LGSSM's event shape `[num_timesteps, 1]`
     # to a scalar time series.
-    return sts_util.mix_over_posterior_draws(
+    predictive_dist = sts_util.mix_over_posterior_draws(
         means=observation_means[..., 0],
         variances=observation_covs[..., 0, 0])
+    if timesteps_are_event_shape:
+      predictive_dist = tfd.Independent(
+          predictive_dist, reinterpreted_batch_ndims=1)
+    return predictive_dist
 
 
 def forecast(model,
@@ -383,10 +405,21 @@ def forecast(model,
         components_distribution=forecast_ssm)
 
 
+@deprecation.deprecated_arg_values(
+    '2021-12-31',
+    '`Imputed distributions returned by`tfp.sts.impute_missing_values` will '
+    'soon compute per-timestep probabilities (treating timesteps as part of '
+    'the batch shape) instead of a single probability for an entire series '
+    '(the current approach, in which timesteps are treated as event shape). '
+    'Please update your code to pass `timesteps_are_event_shape=False` (this '
+    'will soon be the default) and to explicitly sum over the per-timestep log '
+    'probabilities if this is required.',
+    timesteps_are_event_shape=True)
 def impute_missing_values(model,
                           observed_time_series,
                           parameter_samples,
-                          include_observation_noise=False):
+                          include_observation_noise=False,
+                          timesteps_are_event_shape=True):
   """Runs posterior inference to impute the missing values in a time series.
 
   This method computes the posterior marginals `p(latent state | observations)`,
@@ -417,11 +450,17 @@ def impute_missing_values(model,
       values that could be *observed* at each timestep, including any i.i.d.
       observation noise.
       Default value: `False`.
+    timesteps_are_event_shape: Deprecated, for backwards compatibility only.
+      If `False`, the predictive distribution will return per-timestep
+      probabilities
+      Default value: `True`.
 
   Returns:
     imputed_series_dist: a `tfd.MixtureSameFamily` instance with event shape
-      [num_timesteps] and batch shape `concat([sample_shape,
-      model.batch_shape])`, with `num_posterior_draws` mixture components.
+      `[num_timesteps] if timesteps_are_event_shape else []` and
+      batch shape `concat([sample_shape, model.batch_shape,
+      [] if timesteps_are_event_shape else [num_timesteps])`, with
+      `num_posterior_draws` mixture components.
 
   #### Example
 
@@ -497,6 +536,10 @@ def impute_missing_values(model,
 
     # Squeeze dims to convert from LGSSM's event shape `[num_timesteps, 1]`
     # to a scalar time series.
-    return sts_util.mix_over_posterior_draws(
+    imputed_values_dist = sts_util.mix_over_posterior_draws(
         means=observation_means[..., 0],
         variances=observation_covs[..., 0, 0])
+    if timesteps_are_event_shape:
+      imputed_values_dist = tfd.Independent(
+          imputed_values_dist, reinterpreted_batch_ndims=1)
+    return imputed_values_dist
