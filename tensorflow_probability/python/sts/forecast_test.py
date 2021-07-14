@@ -56,9 +56,9 @@ class _ForecastTest(object):
                   [observation_noise_scale])}
 
     onestep_dist = tfp.sts.one_step_predictive(model, observed_time_series,
+                                               timesteps_are_event_shape=False,
                                                parameter_samples=params)
-    onestep_mean_, onestep_scale_ = self.evaluate(
-        (onestep_dist.mean(), onestep_dist.stddev()))
+    onestep_mean, onestep_scale = onestep_dist.mean(), onestep_dist.stddev()
 
     # Since Seasonal is just a set of interleaved random walks, it's
     # straightforward to compute the forecast analytically.
@@ -80,8 +80,8 @@ class _ForecastTest(object):
     expected_onestep_scale = np.concatenate([
         [np.sqrt(1.**2 + observation_noise_scale**2)] * 4,
         [np.sqrt(observation_predictive_variance)] * 4])
-    self.assertAllClose(onestep_mean_, expected_onestep_mean)
-    self.assertAllClose(onestep_scale_, expected_onestep_scale)
+    self.assertAllClose(onestep_mean, expected_onestep_mean)
+    self.assertAllClose(onestep_scale, expected_onestep_scale)
 
   def test_one_step_predictive_with_batch_shape(self):
     num_param_samples = 5
@@ -95,16 +95,16 @@ class _ForecastTest(object):
                      for param in model.parameters]
 
     onestep_dist = tfp.sts.one_step_predictive(model, observed_time_series,
+                                               timesteps_are_event_shape=False,
                                                parameter_samples=prior_samples)
 
     self.evaluate(tf1.global_variables_initializer())
-    if self.use_static_shape:
-      self.assertAllEqual(onestep_dist.batch_shape.as_list(), batch_shape)
-    else:
-      self.assertAllEqual(self.evaluate(onestep_dist.batch_shape_tensor()),
-                          batch_shape)
-    onestep_mean_ = self.evaluate(onestep_dist.mean())
-    self.assertAllEqual(onestep_mean_.shape, batch_shape + [num_timesteps])
+    self.assertAllEqual(onestep_dist.batch_shape_tensor(),
+                        batch_shape + [num_timesteps])
+    onestep_mean = onestep_dist.mean()
+    self.assertAllEqual(tf.shape(onestep_mean), batch_shape + [num_timesteps])
+    self.assertAllEqual(tf.shape(onestep_dist.log_prob(onestep_mean)),
+                        batch_shape + [num_timesteps])
 
   def test_forecast_correctness(self):
     observed_time_series_ = np.array([1., -1., -3., 4.])
@@ -125,8 +125,6 @@ class _ForecastTest(object):
                                      include_observation_noise=True)
     forecast_mean = forecast_dist.mean()[..., 0]
     forecast_scale = forecast_dist.stddev()[..., 0]
-    forecast_mean_, forecast_scale_ = self.evaluate(
-        (forecast_mean, forecast_scale))
 
     # Since Seasonal is just a set of interleaved random walks, it's
     # straightforward to compute the forecast analytically.
@@ -143,8 +141,8 @@ class _ForecastTest(object):
     expected_forecast_scale = np.concatenate([
         [np.sqrt(observation_predictive_variance)] * 4,
         [np.sqrt(observation_predictive_variance + drift_scale**2)] * 4])
-    self.assertAllClose(forecast_mean_, expected_forecast_mean)
-    self.assertAllClose(forecast_scale_, expected_forecast_scale)
+    self.assertAllClose(forecast_mean, expected_forecast_mean)
+    self.assertAllClose(forecast_scale, expected_forecast_scale)
 
     # Also test forecasting the noise-free function.
     forecast_dist = tfp.sts.forecast(model, observed_time_series,
@@ -153,15 +151,13 @@ class _ForecastTest(object):
                                      include_observation_noise=False)
     forecast_mean = forecast_dist.mean()[..., 0]
     forecast_scale = forecast_dist.stddev()[..., 0]
-    forecast_mean_, forecast_scale_ = self.evaluate(
-        (forecast_mean, forecast_scale))
 
     noiseless_predictive_variance = (effect_posterior_variance + drift_scale**2)
     expected_forecast_scale = np.concatenate([
         [np.sqrt(noiseless_predictive_variance)] * 4,
         [np.sqrt(noiseless_predictive_variance + drift_scale**2)] * 4])
-    self.assertAllClose(forecast_mean_, expected_forecast_mean)
-    self.assertAllClose(forecast_scale_, expected_forecast_scale)
+    self.assertAllClose(forecast_mean, expected_forecast_mean)
+    self.assertAllClose(forecast_scale, expected_forecast_scale)
 
   def test_forecast_from_hmc(self):
     # test that we can directly plug in the output of an HMC chain as
@@ -220,15 +216,9 @@ class _ForecastTest(object):
                                      num_steps_forecast=num_steps_forecast)
 
     self.evaluate(tf1.global_variables_initializer())
-    if self.use_static_shape:
-      self.assertAllEqual(forecast_dist.batch_shape.as_list(), batch_shape)
-    else:
-      self.assertAllEqual(self.evaluate(forecast_dist.batch_shape_tensor()),
-                          batch_shape)
-    forecast_mean = forecast_dist.mean()[..., 0]
-    forecast_mean_ = self.evaluate(forecast_mean)
-    self.assertAllEqual(forecast_mean_.shape,
-                        batch_shape + [num_steps_forecast])
+    self.assertAllEqual(forecast_dist.batch_shape_tensor(), batch_shape)
+    self.assertAllEqual(tf.shape(forecast_dist.mean()),
+                        batch_shape + [num_steps_forecast, 1])
 
   def test_methods_handle_masked_inputs(self):
     num_param_samples = 5
@@ -268,6 +258,7 @@ class _ForecastTest(object):
     self.assertTrue(np.all(np.isfinite(onestep_stddev_)))
 
   def test_impute_missing(self):
+    num_timesteps = 7
     time_series_with_nans = self._build_tensor(
         [-1., 1., np.nan, 2.4, np.nan, np.nan, 2.])
     observed_time_series = tfp.sts.MaskedTimeSeries(
@@ -288,19 +279,21 @@ class _ForecastTest(object):
     parameter_samples = {'observation_noise_scale': [noise_scale],
                          'seasonal/_drift_scale': [drift_scale]}
     imputed_series_dist = tfp.sts.impute_missing_values(
-        model, observed_time_series, parameter_samples)
+        model, observed_time_series, parameter_samples,
+        timesteps_are_event_shape=False)
     imputed_noisy_series_dist = tfp.sts.impute_missing_values(
         model, observed_time_series, parameter_samples,
+        timesteps_are_event_shape=False,
         include_observation_noise=True)
+    self.assertAllEqual(imputed_noisy_series_dist.batch_shape_tensor(),
+                        [num_timesteps])
 
     # Compare imputed mean to expected mean.
-    mean_, stddev_ = self.evaluate([imputed_series_dist.mean(),
-                                    imputed_series_dist.stddev()])
-    noisy_mean_, noisy_stddev_ = self.evaluate([
-        imputed_noisy_series_dist.mean(),
-        imputed_noisy_series_dist.stddev()])
-    self.assertAllClose(mean_, [-1., 1., 2., 2.4, -1., 1., 2.], atol=1e-2)
-    self.assertAllClose(mean_, noisy_mean_, atol=1e-2)
+    mean, stddev = imputed_series_dist.mean(), imputed_series_dist.stddev()
+    noisy_mean, noisy_stddev = [imputed_noisy_series_dist.mean(),
+                                imputed_noisy_series_dist.stddev()]
+    self.assertAllClose(mean, [-1., 1., 2., 2.4, -1., 1., 2.], atol=1e-2)
+    self.assertAllClose(mean, noisy_mean, atol=1e-2)
 
     # Compare imputed stddevs to expected stddevs.
     drift_plus_noise_scale = np.sqrt(noise_scale**2 + drift_scale**2)
@@ -311,9 +304,9 @@ class _ForecastTest(object):
                                 drift_plus_noise_scale,
                                 drift_plus_noise_scale,
                                 noise_scale])
-    self.assertAllClose(stddev_, expected_stddev, atol=1e-2)
-    self.assertAllClose(noisy_stddev_,
-                        np.sqrt(stddev_**2 + noise_scale**2), atol=1e-2)
+    self.assertAllClose(stddev, expected_stddev, atol=1e-2)
+    self.assertAllClose(noisy_stddev,
+                        tf.sqrt(stddev**2 + noise_scale**2), atol=1e-2)
 
   def _build_tensor(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.
