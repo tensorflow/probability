@@ -19,6 +19,7 @@ import functools
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from inference_gym.internal import test_util
 from inference_gym.targets import brownian_motion
 
@@ -111,6 +112,37 @@ class BrownianMotionTest(test_util.InferenceGymTestCase):
         num_leapfrog_steps=15,
         step_size=0.03,
     )
+
+  def testBrownianMotionMarkovChainLogprobMatchesOriginal(self):
+    model = (
+        brownian_motion.BrownianMotionMissingMiddleObservations(
+            use_markov_chain=False))
+    markov_chain_model = (
+        brownian_motion.BrownianMotionMissingMiddleObservations(
+            use_markov_chain=True))
+
+    x = self.evaluate(model.prior_distribution().sample(
+        400, seed=tfp_test_util.test_seed()))
+    self.assertAllClose(model.unnormalized_log_prob(x),
+                        markov_chain_model.unnormalized_log_prob(
+                            tf.stack(x, axis=-1)),
+                        atol=1e-2)
+
+  def testBrownianMotionUnknownScalesMarkovChainLogprobMatchesOriginal(self):
+    model = (
+        brownian_motion.BrownianMotionUnknownScalesMissingMiddleObservations(
+            use_markov_chain=False))
+    markov_chain_model = (
+        brownian_motion.BrownianMotionUnknownScalesMissingMiddleObservations(
+            use_markov_chain=True))
+
+    x = self.evaluate(model.prior_distribution().sample(
+        400, seed=tfp_test_util.test_seed()))
+    self.assertAllClose(model.unnormalized_log_prob(x),
+                        markov_chain_model.unnormalized_log_prob(
+                            type(markov_chain_model.dtype)(
+                                x[0], x[1], tf.stack(x[2:], axis=-1))),
+                        atol=1e-2)
 
 if __name__ == '__main__':
   tf.test.main()
