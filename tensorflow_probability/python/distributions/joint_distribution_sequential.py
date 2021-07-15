@@ -210,9 +210,12 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       self._build(model)
 
       self._single_sample_distributions = {}
-      self._get_single_sample_distributions(candidate_dists=[
-          None if a else d() for d, a
-          in zip(self._dist_fn_wrapped, self._dist_fn_args)])
+
+      # If the model consists entirely of prebuilt distributions with no
+      # dependencies, cache them directly to avoid a sample call down the road.
+      if not any(self._dist_fn_args):
+        self._get_single_sample_distributions(
+            candidate_dists=[d() for d in self._dist_fn_wrapped])
 
       super(JointDistributionSequential, self).__init__(
           dtype=None,  # Ignored; we'll override.

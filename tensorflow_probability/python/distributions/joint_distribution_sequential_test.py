@@ -176,7 +176,8 @@ class JointDistributionSequentialTest(test_util.TestCase):
     """Test that only non-default args are passed through."""
     with self.assertRaisesWithPredicateMatch(
         ValueError, 'Must pass probs or logits, but not both.'):
-      tfd.JointDistributionSequential([tfd.Normal(0., 1.), tfd.Bernoulli])
+      d = tfd.JointDistributionSequential([tfd.Normal(0., 1.), tfd.Bernoulli])
+      d.sample(seed=test_util.test_seed())
 
   def test_graph_resolution(self):
     d = tfd.JointDistributionSequential(
@@ -766,6 +767,28 @@ class JointDistributionSequentialTest(test_util.TestCase):
         x.shape for x in jdc._model_flatten(
             jdc.sample([5], seed=test_util.test_seed()))]
     self.assertAllEqualNested(sample_shapes, jdc_sample_shapes)
+
+  def test_init_does_not_execute_model(self):
+    model_traces = []
+    def record_model_called(x):
+      model_traces.append(x)
+      return x
+
+    model = tfd.JointDistributionSequential(
+        [
+            tfd.Normal(0., 1.),
+            lambda z: tfd.Normal(record_model_called(z), 1.)
+        ],
+        validate_args=True)
+    # Model should not be called from init.
+    self.assertLen(model_traces, 0)
+    model.sample(seed=test_util.test_seed())
+    # The first sample call will run the model twice (for shape
+    # inference + actually sampling).
+    self.assertLen(model_traces, 2)
+    # Subsequent calls should only run the model once.
+    model.sample([2], seed=test_util.test_seed())
+    self.assertLen(model_traces, 3)
 
 
 class ResolveDistributionNamesTest(test_util.TestCase):
