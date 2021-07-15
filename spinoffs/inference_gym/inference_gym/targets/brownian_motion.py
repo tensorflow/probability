@@ -38,7 +38,17 @@ __all__ = [
 Root = tfd.JointDistributionCoroutine.Root
 
 
-def brownian_motion_prior_fn(num_timesteps, innovation_noise_scale):
+def brownian_motion_as_markov_chain(num_timesteps, innovation_noise_scale):
+  return tfd.MarkovChain(
+      initial_state_prior=tfd.Normal(loc=0., scale=innovation_noise_scale),
+      transition_fn=lambda _, x_t: tfd.Normal(  # pylint: disable=g-long-lambda
+          loc=x_t, scale=innovation_noise_scale),
+      num_steps=num_timesteps,
+      name='locs')
+
+
+def brownian_motion_prior_fn(num_timesteps,
+                             innovation_noise_scale):
   """Generative process for the Brownian Motion model."""
   prior_loc = 0.
   new = yield Root(tfd.Normal(loc=prior_loc,
@@ -50,25 +60,34 @@ def brownian_motion_prior_fn(num_timesteps, innovation_noise_scale):
                            name='x_{}'.format(t))
 
 
-def brownian_motion_unknown_scales_prior_fn(num_timesteps):
+def brownian_motion_unknown_scales_prior_fn(num_timesteps, use_markov_chain):
   """Generative process for the Brownian Motion model with unknown scales."""
   innovation_noise_scale = yield Root(tfd.LogNormal(
       0., 2., name='innovation_noise_scale'))
   _ = yield Root(tfd.LogNormal(0., 2., name='observation_noise_scale'))
-  yield from brownian_motion_prior_fn(
-      num_timesteps,
-      innovation_noise_scale=innovation_noise_scale)
+  if use_markov_chain:
+    yield brownian_motion_as_markov_chain(
+        num_timesteps=num_timesteps,
+        innovation_noise_scale=innovation_noise_scale)
+  else:
+    yield from brownian_motion_prior_fn(
+        num_timesteps,
+        innovation_noise_scale=innovation_noise_scale)
 
 
 def brownian_motion_log_likelihood_fn(values,
                                       observed_locs,
+                                      use_markov_chain,
                                       observation_noise_scale=None):
   """Likelihood of observed data under the Brownian Motion model."""
   if observation_noise_scale is None:
-    (_, observation_noise_scale), values = values[:2], values[2:]
+    (_, observation_noise_scale) = values[:2]
+    latents = values[2] if use_markov_chain else tf.stack(values[2:], axis=-1)
+  else:
+    latents = values if use_markov_chain else tf.stack(values, axis=-1)
+
   observation_noise_scale = tf.convert_to_tensor(
       observation_noise_scale, name='observation_noise_scale')
-  latents = tf.stack(values, axis=-1)
   is_observed = ~tf.math.is_nan(observed_locs)
   lps = tfd.Normal(
       loc=latents, scale=observation_noise_scale[..., tf.newaxis]).log_prob(
@@ -98,6 +117,7 @@ class BrownianMotion(bayesian_model.BayesianModel):
                observed_locs,
                innovation_noise_scale,
                observation_noise_scale,
+               use_markov_chain=False,
                name='brownian_motion',
                pretty_name='Brownian Motion'):
     """Construct the Brownian Motion model.
@@ -107,35 +127,52 @@ class BrownianMotion(bayesian_model.BayesianModel):
         unobserved.
       innovation_noise_scale: Python `float`.
       observation_noise_scale: Python `float`.
+      use_markov_chain: Python `bool` indicating whether to use the
+        `MarkovChain` distribution in place of separate random variables for
+        each time step. The default of `False` is for backwards compatibility;
+        setting this to `True` should significantly improve performance.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
     with tf.name_scope(name):
       num_timesteps = observed_locs.shape[0]
-      self._prior_dist = tfd.JointDistributionCoroutine(
-          functools.partial(
-              brownian_motion_prior_fn,
-              num_timesteps=num_timesteps,
-              innovation_noise_scale=innovation_noise_scale))
+      if use_markov_chain:
+        self._prior_dist = brownian_motion_as_markov_chain(
+            num_timesteps=num_timesteps,
+            innovation_noise_scale=innovation_noise_scale)
+      else:
+        self._prior_dist = tfd.JointDistributionCoroutine(
+            functools.partial(
+                brownian_motion_prior_fn,
+                num_timesteps=num_timesteps,
+                innovation_noise_scale=innovation_noise_scale))
 
       self._log_likelihood_fn = functools.partial(
           brownian_motion_log_likelihood_fn,
           observation_noise_scale=observation_noise_scale,
-          observed_locs=observed_locs)
+          observed_locs=observed_locs,
+          use_markov_chain=use_markov_chain)
 
       def _ext_identity(params):
         return tf.stack(params, axis=-1)
 
+      def _ext_identity_markov_chain(params):
+        return params
+
       sample_transformations = {
           'identity':
               model.Model.SampleTransformation(
-                  fn=_ext_identity,
+                  fn=(_ext_identity_markov_chain
+                      if use_markov_chain else _ext_identity),
                   pretty_name='Identity',
               )
       }
 
-    event_space_bijector = type(
-        self._prior_dist.dtype)(*([tfb.Identity()] * num_timesteps))
+    if use_markov_chain:
+      event_space_bijector = tfb.Identity()
+    else:
+      event_space_bijector = type(
+          self._prior_dist.dtype)(*([tfb.Identity()] * num_timesteps))
     super(BrownianMotion, self).__init__(
         default_event_space_bijector=event_space_bijector,
         event_shape=self._prior_dist.event_shape,
@@ -157,11 +194,12 @@ class BrownianMotionMissingMiddleObservations(BrownianMotion):
 
   GROUND_TRUTH_MODULE = brownian_motion_missing_middle_observations
 
-  def __init__(self):
+  def __init__(self, use_markov_chain=False):
     dataset = data.brownian_motion_missing_middle_observations()
     super(BrownianMotionMissingMiddleObservations, self).__init__(
         name='brownian_motion_missing_middle_observations',
         pretty_name='Brownian Motion Missing Middle Observations',
+        use_markov_chain=use_markov_chain,
         **dataset)
 
 
@@ -188,6 +226,7 @@ class BrownianMotionUnknownScales(bayesian_model.BayesianModel):
 
   def __init__(self,
                observed_locs,
+               use_markov_chain=False,
                name='brownian_motion_unknown_scales',
                pretty_name='Brownian Motion with Unknown Scales'):
     """Construct the Brownian Motion model with unknown scales.
@@ -195,6 +234,11 @@ class BrownianMotionUnknownScales(bayesian_model.BayesianModel):
     Args:
       observed_locs: Array of loc parameters with nan value if loc is
         unobserved.
+      use_markov_chain: Python `bool` indicating whether to use the
+        `MarkovChain` distribution in place of separate random variables for
+        each time step. The default of `False` is for backwards compatibility;
+        setting this to `True` should significantly improve performance.
+        Default value: `False`.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
@@ -203,16 +247,20 @@ class BrownianMotionUnknownScales(bayesian_model.BayesianModel):
       self._prior_dist = tfd.JointDistributionCoroutine(
           functools.partial(
               brownian_motion_unknown_scales_prior_fn,
+              use_markov_chain=use_markov_chain,
               num_timesteps=num_timesteps))
 
       self._log_likelihood_fn = functools.partial(
           brownian_motion_log_likelihood_fn,
+          use_markov_chain=use_markov_chain,
           observed_locs=observed_locs)
 
       def _ext_identity(params):
         return {'innovation_noise_scale': params[0],
                 'observation_noise_scale': params[1],
-                'locs': tf.stack(params[2:], axis=-1)}
+                'locs': (params[2]
+                         if use_markov_chain
+                         else tf.stack(params[2:], axis=-1))}
 
       sample_transformations = {
           'identity':
@@ -228,7 +276,8 @@ class BrownianMotionUnknownScales(bayesian_model.BayesianModel):
         self._prior_dist.dtype)(*(
             [tfb.Softplus(),
              tfb.Softplus()
-             ] + [tfb.Identity()] * num_timesteps))
+             ] + [tfb.Identity()] * (
+                 1 if use_markov_chain else num_timesteps)))
     super(BrownianMotionUnknownScales, self).__init__(
         default_event_space_bijector=event_space_bijector,
         event_shape=self._prior_dist.event_shape,
@@ -252,11 +301,12 @@ class BrownianMotionUnknownScalesMissingMiddleObservations(
   GROUND_TRUTH_MODULE = (
       brownian_motion_unknown_scales_missing_middle_observations)
 
-  def __init__(self):
+  def __init__(self, use_markov_chain=False):
     dataset = data.brownian_motion_missing_middle_observations()
     del dataset['innovation_noise_scale']
     del dataset['observation_noise_scale']
     super(BrownianMotionUnknownScalesMissingMiddleObservations, self).__init__(
         name='brownian_motion_unknown_scales_missing_middle_observations',
         pretty_name='Brownian Motion with Unknown Scales',
+        use_markov_chain=use_markov_chain,
         **dataset)

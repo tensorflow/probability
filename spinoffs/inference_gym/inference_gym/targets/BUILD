@@ -128,8 +128,10 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":brownian_motion",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )
