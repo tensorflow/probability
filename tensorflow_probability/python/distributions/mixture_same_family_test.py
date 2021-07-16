@@ -148,6 +148,40 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     cov_, var_ = self.evaluate([gm.covariance(), gm.variance()])
     self.assertAllClose(cov_.diagonal(), var_, atol=0.)
 
+  def testPosteriorMarginal(self):
+    bm = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(
+            probs=self._build_tensor([0.1, 0.9])),
+        components_distribution=tfd.Categorical(
+            probs=self._build_tensor([[.2, .3, .5],
+                                      [.7, .2, .1]])),
+        validate_args=True)
+    marginal_dist = bm.posterior_marginal(self._build_tensor([0., 1., 2.]))
+    marginals = self.evaluate(marginal_dist.probs_parameter())
+
+    self.assertAllEqual([3, 2], self._shape(marginals))
+
+    expected_marginals = [
+        [(.1*.2)/(.1*.2 + .9*.7), (.9*.7)/(.1*.2 + .9*.7)],
+        [(.1*.3)/(.1*.3 + .9*.2), (.9*.2)/(.1*.3 + .9*.2)],
+        [(.1*.5)/(.1*.5 + .9*.1), (.9*.1)/(.1*.5 + .9*.1)]
+    ]
+
+    self.assertAllClose(marginals, expected_marginals)
+
+  def testPosteriorMode(self):
+    gm = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(
+            probs=self._build_tensor([[0.5, 0.5],
+                                      [0.01, 0.99]])),
+        components_distribution=tfd.Normal(
+            loc=self._build_tensor([[-1., 1.], [-1., 1.]]),
+            scale=self._build_tensor(1.)))
+    mode = gm.posterior_mode(
+        self._build_tensor([[1.], [-1.], [-6.]]))
+    self.assertAllEqual([3, 2], self._shape(mode))
+    self.assertAllEqual([[1, 1], [0, 1], [0, 0]], self.evaluate(mode))
+
   def testReparameterizationOfNonReparameterizedComponents(self):
     with self.assertRaises(ValueError):
       tfd.MixtureSameFamily(

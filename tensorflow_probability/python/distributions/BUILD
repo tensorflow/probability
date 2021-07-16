@@ -1418,6 +1418,7 @@ multi_substrate_py_library(
     name = "mixture_same_family",
     srcs = ["mixture_same_family.py"],
     deps = [
+        ":categorical",
         ":distribution",
         ":independent",
         # tensorflow dep,

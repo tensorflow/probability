@@ -23,6 +23,7 @@ import warnings
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.internal import assert_util
@@ -353,12 +354,30 @@ class MixtureSameFamily(distribution.Distribution):
 
     return ret
 
-  def _log_prob(self, x):
+  def _per_mixture_component_log_prob(self, x):
+    """Per mixture component log probability.
+
+    Args:
+      x: A tensor representing observations from the mixture. Must
+        be broadcastable with the mixture's batch shape.
+
+    Returns:
+      A Tensor representing, for each observation and for each mixture
+      component, the log joint probability of that mixture component and
+      the observation. The shape will be equal to the concatenation of (1) the
+      broadcast shape of the observations and the batch shape, and (2) the
+      number of mixture components.
+    """
     x = self._pad_sample_dims(x)
     log_prob_x = self.components_distribution.log_prob(x)  # [S, B, k]
     log_mix_prob = tf.math.log_softmax(
         self.mixture_distribution.logits_parameter(), axis=-1)  # [B, k]
-    return tf.reduce_logsumexp(log_prob_x + log_mix_prob, axis=-1)  # [S, B]
+    return log_prob_x + log_mix_prob  # [S, B, k]
+
+  def _log_prob(self, x, log_joint=None):
+    if log_joint is None:
+      log_joint = self._per_mixture_component_log_prob(x)
+    return tf.reduce_logsumexp(log_joint, axis=-1)  # [S, B]
 
   def _mean(self):
     probs = self.mixture_distribution.probs_parameter()  # [B, k] or [k]
@@ -423,6 +442,48 @@ class MixtureSameFamily(distribution.Distribution):
         probs * _outer_squared_difference(component_means, mean),
         axis=-3)  # [B, E, E]
     return mean_cond_var + var_cond_mean  # [B, E, E]
+
+  def posterior_marginal(self, observations, name='posterior_marginals'):
+    """Compute the marginal posterior distribution for a batch of observations.
+
+    Note: The behavior of this function is undefined if the `observations`
+    argument represents impossible observations from the model.
+
+    Args:
+      observations: A tensor representing observations from the mixture. Must
+        be broadcastable with the mixture's batch shape.
+      name: A string naming a scope.
+
+    Returns:
+      posterior_marginals: A `Categorical` distribution object representing
+        the marginal probability of the components of the mixture. The batch
+        shape of the `Categorical` will be the broadcast shape of `observations`
+        and the mixture batch shape; the number of classes will equal the
+        number of mixture components.
+    """
+    with self._name_and_control_scope(name):
+      return categorical.Categorical(
+          logits=self._per_mixture_component_log_prob(observations))
+
+  def posterior_mode(self, observations, name='posterior_mode'):
+    """Compute the posterior mode for a batch of distributions.
+
+    Note: The behavior of this function is undefined if the `observations`
+    argument represents impossible observations from the mixture.
+
+    Args:
+      observations: A tensor representing observations from the mixture. Must
+        be broadcastable with the mixture's batch shape.
+      name: A string naming a scope.
+
+    Returns:
+      A Tensor representing the mode (most likely component) for each
+      observation. The shape will be equal to the broadcast shape of the
+      observations and the batch shape.
+    """
+    with self._name_and_control_scope(name):
+      return tf.math.argmax(
+          self._per_mixture_component_log_prob(observations), axis=-1)
 
   def _pad_sample_dims(self, x, event_ndims=None):
     with tf.name_scope('pad_sample_dims'):
