@@ -33,13 +33,13 @@ class MarginalFnsTest(test_util.TestCase):
 
   def testNoBackoff(self):
     matrix = np.array([[2., 1.], [1., 2.]])
-    backoff = marginal_fns.make_backoff_choleksy(lambda x: x)
+    backoff = marginal_fns.make_backoff_cholesky(lambda x: x)
     test, ans = self.evaluate((backoff(matrix), tf.linalg.cholesky(matrix)))
     self.assertAllClose(test, ans)
 
   def testBackoff(self):
     matrix = np.array([[1., 2.], [2., 1.]])
-    backoff = marginal_fns.make_backoff_choleksy(tf.convert_to_tensor)
+    backoff = marginal_fns.make_backoff_cholesky(tf.convert_to_tensor)
     test = self.evaluate(backoff(matrix))
     self.assertAllClose(test, matrix)
 

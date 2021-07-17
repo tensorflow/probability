@@ -22,7 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import mvn_linear_operator
 
 
-def make_backoff_choleksy(alternate_cholesky, name='BackoffCholesky'):
+def make_backoff_cholesky(alternate_cholesky, name='BackoffCholesky'):
   """Make a function that tries Cholesky then the user-specified function.
 
   Warning: This function uses an XLA-compiled `tf.linalg.cholesky` to capture
@@ -64,7 +64,7 @@ def make_cholesky_like_marginal_fn(cholesky_like,
   """Use a Cholesky-like function for `GaussianProcess` `marginal_fn`.
 
   For use with "Cholesky-like" lower-triangular factorizations (LL^T).  See
-  `make_backoff_choleksy` for one way to create such functions.
+  `make_backoff_cholesky` for one way to create such functions.
 
   Args:
     cholesky_like: A callable with the same signature as `tf.linalg.cholesky.`
