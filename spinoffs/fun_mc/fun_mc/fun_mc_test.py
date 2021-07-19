@@ -16,10 +16,12 @@
 
 import collections
 import functools
+import os
 
 # Dependency imports
 
 from absl.testing import parameterized
+import jax
 from jax.config import config as jax_config
 import numpy as np
 import scipy.stats
@@ -42,6 +44,10 @@ TestNamedTuple = collections.namedtuple('TestNamedTuple', 'x, y')
 
 
 BACKEND = None  # Rewritten by backends/rewrite.py.
+
+if BACKEND == 'backend_jax':
+  os.environ['XLA_FLAGS'] = (f'{os.environ.get("XLA_FLAGS", "")} '
+                             '--xla_force_host_platform_device_count=4')
 
 
 def _test_seed():
@@ -1105,6 +1111,36 @@ class FunMCTest(real_tf.test.TestCase, parameterized.TestCase):
     self.assertAllClose(
         scale**2 * tf.ones_like(mean['y']), variance['y'], atol=0.5)
 
+  def testGaussianProposalNamedAxis(self):
+    if BACKEND != 'backend_jax':
+      self.skipTest('JAX-only')
+
+    state = {
+        'sharded': tf.zeros([4], self._dtype),
+        'shared': tf.zeros([], self._dtype),
+    }
+    in_axes = {
+        'sharded': 0,
+        'shared': None,
+    }
+    named_axis = {
+        'sharded': 'named_axis',
+        'shared': None,
+    }
+
+    @functools.partial(
+        jax.pmap, in_axes=(in_axes, None), axis_name='named_axis')
+    def proposal_fn(state, seed):
+      samples, _ = fun_mc.gaussian_proposal(
+          state, scale=1., named_axis=named_axis, seed=seed)
+      return samples
+
+    samples = proposal_fn(state, self._make_seed(_test_seed()))
+
+    self.assertAllClose(samples['shared'][0], samples['shared'][1])
+    self.assertTrue(
+        np.any(np.abs(samples['sharded'][0] - samples['sharded'][1]) > 1e-3))
+
   def testMaximalReflectiveProposal(self):
     state = {
         'x': self._constant([[0., 1.], [2., 3.]]),
@@ -1162,9 +1198,92 @@ class FunMCTest(real_tf.test.TestCase, parameterized.TestCase):
         util.flatten_tree(
             util.map_tree(
                 lambda x: tf.math.reduce_all(  # pylint: disable=g-long-lambda
-                    (x[:, :1] == x[:, 1:]), tuple(range(1, len(x.shape)))),
+                    (x[:, :1] == x[:, 1:]), tuple(range(2, len(x.shape)))),
                 state_samples))).all(0)
     self.assertAllClose(coupling_proposed, coupled)
+
+  def testMaximalReflectiveProposalNamedAxis(self):
+    if BACKEND != 'backend_jax':
+      self.skipTest('JAX-only')
+
+    state = {
+        # The trailing shape is [coupled axis, independent chains].
+        'sharded':
+            tf.zeros([4, 2, 1024], self._dtype) +
+            self._constant([0., 1.])[:, tf.newaxis],
+        'shared':
+            tf.zeros([2, 1024], self._dtype),
+    }
+    in_axes = {
+        'sharded': 0,
+        'shared': None,
+    }
+    named_axis = {
+        'sharded': 'named_axis',
+        'shared': None,
+    }
+
+    @functools.partial(
+        jax.pmap, in_axes=(in_axes, None), axis_name='named_axis')
+    def proposal_fn(state, seed):
+      samples, (extra, _) = fun_mc.maximal_reflection_coupling_proposal(
+          state, chain_ndims=1, scale=1., named_axis=named_axis, seed=seed)
+      return samples, extra
+
+    samples, extra = proposal_fn(state, self._make_seed(_test_seed()))
+
+    self.assertAllClose(samples['shared'][0], samples['shared'][1])
+    self.assertAllClose(extra.log_couple_ratio[0], extra.log_couple_ratio[1])
+    self.assertAllClose(extra.coupling_proposed[0], extra.coupling_proposed[1])
+    self.assertTrue(
+        np.any(np.abs(samples['sharded'][0] - samples['sharded'][1]) > 1e-3))
+
+  def testHMCNamedAxis(self):
+    if BACKEND != 'backend_jax':
+      self.skipTest('JAX-only')
+
+    state = {
+        'sharded': tf.zeros([4, 1024], self._dtype),
+        'shared': tf.zeros([1024], self._dtype),
+    }
+    in_axes = {
+        'sharded': 0,
+        'shared': None,
+    }
+    named_axis = {
+        'sharded': 'named_axis',
+        'shared': None,
+    }
+
+    def target_log_prob_fn(sharded, shared):
+      return -(backend.distribute_lib.psum(tf.square(sharded), 'named_axis') +
+               tf.square(shared)), ()
+
+    @functools.partial(
+        jax.pmap, in_axes=(in_axes, None), axis_name='named_axis')
+    def kernel(state, seed):
+      hmc_state = fun_mc.hamiltonian_monte_carlo_init(
+          state, target_log_prob_fn=target_log_prob_fn)
+      hmc_state, hmc_extra = fun_mc.hamiltonian_monte_carlo_step(
+          hmc_state,
+          step_size=self._constant(0.2),
+          num_integrator_steps=4,
+          target_log_prob_fn=target_log_prob_fn,
+          named_axis=named_axis,
+          seed=seed)
+      return hmc_state, hmc_extra
+
+    seed = self._make_seed(_test_seed())
+    hmc_state, hmc_extra = kernel(state, seed)
+    self.assertAllClose(hmc_state.state['shared'][0],
+                        hmc_state.state['shared'][1])
+    self.assertTrue(
+        np.any(
+            np.abs(hmc_state.state['sharded'][0] -
+                   hmc_state.state['sharded'][1]) > 1e-3))
+    self.assertAllClose(hmc_extra.is_accepted[0], hmc_extra.is_accepted[1])
+    self.assertAllClose(hmc_extra.log_accept_ratio[0],
+                        hmc_extra.log_accept_ratio[1])
 
   def testRandomWalkMetropolis(self):
     num_steps = 1000

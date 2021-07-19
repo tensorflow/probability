@@ -310,9 +310,10 @@ def call_fn(
   Returns:
     ret: Return value of `fn`.
   """
-  if isinstance(args, collections.Sequence) and not _is_namedtuple_like(args):
+  if (isinstance(args, collections.abc.Sequence) and
+      not _is_namedtuple_like(args)):
     return fn(*args)
-  elif isinstance(args, collections.Mapping):
+  elif isinstance(args, collections.abc.Mapping):
     return fn(**args)
   else:
     return fn(args)
@@ -393,7 +394,7 @@ def call_potential_fn(
                     'A common solution is to adjust the `return`s in `fn` to '
                     'be `return args, ()`.')
 
-  if not isinstance(ret, collections.Sequence) or len(ret) != 2:
+  if not isinstance(ret, collections.abc.Sequence) or len(ret) != 2:
     args_s = _tree_repr(args)
     ret_s = _tree_repr(ret)
     raise TypeError(
@@ -434,7 +435,7 @@ def call_transition_operator(
                     'A common solution is to adjust the `return`s in `fn` to '
                     'be `return args, ()`.')
 
-  if not isinstance(ret, collections.Sequence) or len(ret) != 2:
+  if not isinstance(ret, collections.abc.Sequence) or len(ret) != 2:
     args_s = _tree_repr(args)
     ret_s = _tree_repr(ret)
     raise TypeError(
@@ -1185,6 +1186,7 @@ MomentumSampleFn = Callable[[Any], State]
 def gaussian_momentum_sample(state: 'Optional[State]' = None,
                              shape: 'Optional[IntTensor]' = None,
                              dtype: 'Optional[DTypeNest]' = None,
+                             named_axis: 'Optional[StringNest]' = None,
                              seed=None) -> 'State':
   """Generates a sample from a Gaussian (Normal) momentum distribution.
 
@@ -1197,6 +1199,7 @@ def gaussian_momentum_sample(state: 'Optional[State]' = None,
       output.
     shape: A nest of shapes, which matches the output shapes.
     dtype: A nest of dtypes, which matches the output dtypes.
+    named_axis: Named axes of the state, same structure as `state`.
     seed: For reproducibility.
 
   Returns:
@@ -1206,24 +1209,30 @@ def gaussian_momentum_sample(state: 'Optional[State]' = None,
   if dtype is None or shape is None:
     shape = util.map_tree(lambda t: t.shape, state)
     dtype = util.map_tree(lambda t: t.dtype, state)
+  if named_axis is None:
+    named_axis = util.map_tree(lambda _: [], dtype)
 
   num_seeds_needed = len(util.flatten_tree(dtype))
   seeds = list(util.split_seed(seed, num_seeds_needed))
   seeds = util.unflatten_tree(dtype, seeds)
 
-  def _one_part(dtype, shape, seed):
+  def _one_part(dtype, shape, seed, named_axis):
+    seed = backend.distribute_lib.fold_in_axis_index(seed, named_axis)
     return util.random_normal(shape=shape, dtype=dtype, seed=seed)
 
-  return util.map_tree_up_to(dtype, _one_part, dtype, shape, seeds)
+  return util.map_tree_up_to(dtype, _one_part, dtype, shape, seeds, named_axis)
 
 
 def make_gaussian_kinetic_energy_fn(
-    chain_ndims: 'IntTensor') -> 'Callable[..., Tuple[tf.Tensor, TensorNest]]':
+    chain_ndims: 'IntTensor',
+    named_axis: 'Optional[StringNest]' = None,
+) -> 'Callable[..., Tuple[tf.Tensor, TensorNest]]':
   """Returns a function that computes the kinetic energy of a state.
 
   Args:
     chain_ndims: How many leading dimensions correspond to independent
       particles.
+    named_axis: Named axes of the state, same structure as `state`.
 
   Returns:
     kinetic_energy_fn: A callable that takes in the expanded state (see
@@ -1233,13 +1242,29 @@ def make_gaussian_kinetic_energy_fn(
 
   @util.named_call
   def kinetic_energy_fn(*args, **kwargs):
+    state_args = (args, kwargs)
 
-    def one_component(x):
-      return tf.reduce_sum(
-          tf.square(x), axis=tuple(range(chain_ndims, len(x.shape))))
+    if named_axis is None:
+      named_axis_args = util.map_tree(lambda _: [], state_args)
+    else:
+      # We need named_axis to line up with state, but state has been decomposed
+      # into args, kwargs via call_fn which called this function. Normally, we'd
+      # reconstruct the state via recover_state_from_args, but we don't have a
+      # good reference structure (named_axis is no good as it can have tuples as
+      # leaves). Instead, we go the other way, and decompose named_axis into
+      # args, kwargs. These new objects are guaranteed to line up with the
+      # decomposed state.
+      named_axis_args = call_fn(lambda *args, **kwargs: (args, kwargs),
+                                named_axis)
 
-    return (tf.add_n(
-        [one_component(x) for x in util.flatten_tree([args, kwargs])]) / 2.), ()
+    def _one_part(x, named_axis):
+      return backend.distribute_lib.reduce_sum(
+          tf.square(x), tuple(range(chain_ndims, len(x.shape))), named_axis)
+
+    return 0.5 * sum(
+        util.flatten_tree(
+            util.map_tree_up_to(state_args, _one_part, state_args,
+                                named_axis_args))), ()
 
   return kinetic_energy_fn
 
@@ -1315,6 +1340,7 @@ def hamiltonian_monte_carlo_step(
     energy_change_fn:
     'Callable[[IntegratorState, IntegratorState, IntegratorExtras], '
     'Tuple[FloatTensor, Any]]' = _default_hamiltonian_monte_carlo_energy_change_fn,
+    named_axis: 'Optional[StringNest]' = None,
     seed=None,
 ) -> 'Tuple[HamiltonianMonteCarloState, HamiltonianMonteCarloExtra]':
   """Hamiltonian Monte Carlo `TransitionOperator`.
@@ -1381,6 +1407,7 @@ def hamiltonian_monte_carlo_step(
       Computes the change in energy between current and proposed states. By
       default, it just substracts the current and proposed energies. A typical
       reason to override this is to improve numerical stability.
+    named_axis: Named axes of the state, same structure as `hmc_state.state`.
     seed: For reproducibility.
 
   Returns:
@@ -1395,11 +1422,11 @@ def hamiltonian_monte_carlo_step(
   if kinetic_energy_fn is None:
     kinetic_energy_fn = make_gaussian_kinetic_energy_fn(
         len(target_log_prob.shape) if target_log_prob.shape is not None else tf  # pytype: disable=attribute-error
-        .rank(target_log_prob))
+        .rank(target_log_prob), named_axis=named_axis)
 
   if momentum_sample_fn is None:
     momentum_sample_fn = lambda seed: gaussian_momentum_sample(  # pylint: disable=g-long-lambda
-        state=state, seed=seed)
+        state=state, seed=seed, named_axis=named_axis)
 
   if integrator_fn is None:
     integrator_fn = lambda state: hamiltonian_integrator(  # pylint: disable=g-long-lambda
@@ -1817,12 +1844,14 @@ def gradient_descent_step(
 def gaussian_proposal(
     state: 'State',
     scale: 'FloatNest' = 1.,
+    named_axis: 'Optional[StringNest]' = None,
     seed: 'Optional[Any]' = None) -> 'Tuple[State, Tuple[Tuple[()], float]]':
   """Axis-aligned gaussian random-walk proposal.
 
   Args:
     state: Current state.
     scale: Scale of the proposal.
+    named_axis: Named axes of the state, same structure as `state`.
     seed: Random seed.
 
   Returns:
@@ -1832,13 +1861,16 @@ def gaussian_proposal(
   scale = maybe_broadcast_structure(scale, state)
   num_parts = len(util.flatten_tree(state))
   seeds = util.unflatten_tree(state, util.split_seed(seed, num_parts))
+  if named_axis is None:
+    named_axis = util.map_tree(lambda _: [], state)
 
-  new_state = util.map_tree(
-      lambda x, scale, seed: x + scale * util.random_normal(  # pylint: disable=g-long-lambda
-          x.shape, x.dtype, seed),
-      state,
-      scale,
-      seeds)
+  def _sample_part(x, scale, seed, named_axis):
+    seed = backend.distribute_lib.fold_in_axis_index(seed, named_axis)
+    return x + scale * util.random_normal(  # pylint: disable=g-long-lambda
+        x.shape, x.dtype, seed)
+
+  new_state = util.map_tree_up_to(state, _sample_part, state, scale, seeds,
+                                  named_axis)
 
   return new_state, ((), 0.)
 
@@ -1854,6 +1886,7 @@ def maximal_reflection_coupling_proposal(
     state: 'State',
     chain_ndims: 'int' = 0,
     scale: 'FloatNest' = 1,
+    named_axis: 'Optional[StringNest]' = None,
     epsilon: 'FloatTensor' = 1e-20,
     seed: 'Optional[Any]' = None
 ) -> 'Tuple[State, Tuple[MaximalReflectiveCouplingProposalExtra, float]]':
@@ -1869,11 +1902,15 @@ def maximal_reflection_coupling_proposal(
   dimension such that `chain_i` is coupled with `chain_i + num_chains`, where
   `num_chains = state.shape[0] // 2`
 
+  This function supports SPMD via sharded states in the same sense as TensorFlow
+  Probability's `tfp.experimental.distribute.Sharded`.
+
   Args:
     state: Current state of the two sets of chains.
     chain_ndims: How many leading dimensions correspond to independent chains
       (not counting the first one).
     scale: Scale of the proposal.
+    named_axis: Shard axes names, used for SPMD.
     epsilon: Small offset for numerical stability.
     seed: Random seed.
 
@@ -1887,51 +1924,60 @@ def maximal_reflection_coupling_proposal(
     Retrieved from http://arxiv.org/abs/2102.01790
   """
 
+  _sum = backend.distribute_lib.reduce_sum  # pylint: disable=invalid-name
+
   def _struct_sum(s):
     return sum(util.flatten_tree(s))
 
+  if named_axis is None:
+    named_axis = util.map_tree(lambda _: [], state)
   scale = maybe_broadcast_structure(scale, state)
   num_chains = util.flatten_tree(state)[0].shape[0] // 2
   mu1 = util.map_tree(lambda x: x[:num_chains], state)
   mu2 = util.map_tree(lambda x: x[num_chains:], state)
   event_dims = util.map_tree(
-      lambda x: tuple(range(chain_ndims, len(x.shape))),  # pylint: disable=g-long-lambda
+      lambda x: tuple(range(1 + chain_ndims, len(x.shape))),
       mu1)
   z = util.map_tree(lambda s, x1, x2: (x1 - x2) / s, scale, mu1, mu2)
   z_norm = tf.sqrt(
       _struct_sum(
-          util.map_tree_up_to(z, lambda z, ed: tf.reduce_sum(tf.square(z), ed),
-                              z, event_dims)))
+          util.map_tree_up_to(z, lambda z, ed, na: _sum(tf.square(z), ed, na),
+                              z, event_dims, named_axis)))
   e = util.map_tree(
       lambda z: z /  # pylint: disable=g-long-lambda
       (tf.reshape(z_norm, z_norm.shape + (1,) *
                   (len(z.shape) - len(z_norm.shape))) + epsilon),
       z)
-  batch_shape = util.flatten_tree(mu1)[0].shape[:chain_ndims]
+  batch_shape = util.flatten_tree(mu1)[0].shape[1:1 + chain_ndims]
 
   num_parts = len(util.flatten_tree(state))
   all_seeds = util.split_seed(seed, num_parts + 1)
   x_seeds = util.unflatten_tree(state, all_seeds[:num_parts])
   couple_seed = all_seeds[-1]
 
-  x = util.map_tree(lambda x, seed: util.random_normal(x.shape, x.dtype, seed),
-                    mu1, x_seeds)
+  def _sample_part(x, seed, named_axis):
+    seed = backend.distribute_lib.fold_in_axis_index(seed, named_axis)
+    return util.random_normal(x.shape, x.dtype, seed)
+
+  x = util.map_tree_up_to(mu1, _sample_part, mu1, x_seeds, named_axis)
 
   e_dot_x = _struct_sum(
       util.map_tree_up_to(
           x,
-          lambda x, e, ed: tf.reduce_sum(x * e, ed),  # pylint: disable=g-long-lambda
+          lambda x, e, ed, na: _sum(x * e, ed, na),
           x,
           e,
-          event_dims))
+          event_dims,
+          named_axis))
 
   log_couple_ratio = _struct_sum(
       util.map_tree_up_to(
           x,
-          lambda x, z, ed: -tf.reduce_sum(x * z + tf.square(z) / 2, ed),  # pylint: disable=g-long-lambda
+          lambda x, z, ed, na: -_sum(x * z + tf.square(z) / 2, ed, na),
           x,
           z,
-          event_dims))
+          event_dims,
+          named_axis))
 
   p_couple = tf.exp(tf.minimum(0., log_couple_ratio))
   coupling_proposed = util.random_uniform(
