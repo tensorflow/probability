@@ -118,7 +118,7 @@ del _DistributionTest  # Don't run tests for the base class.
 
 Helper class to test vector-event distributions.
 
-[VectorDistributionTestHelpers](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/distributions/python/ops/test_util.py#L193) ([Example Use](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/distributions/mixture_same_family_test.py#L91))
+[VectorDistributionTestHelpers](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/internal/test_util.py#L1085) ([Example Use](https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/distributions/mixture_same_family_test.py#L91))
 
 ## Testing Discrete, Scalar Distributions
 
