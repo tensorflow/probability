@@ -787,9 +787,12 @@ class JointDistribution(distribution_lib.Distribution):
     gen = self._model_coroutine()
     index = 0
     d = next(gen)
-    if self._require_root and not isinstance(d, self.Root):
-      raise ValueError('First distribution yielded by coroutine must '
-                       'be wrapped in `Root`.')
+    if self._require_root:
+      if distribution_util.shape_may_be_nontrivial(
+          sample_shape) and not isinstance(d, self.Root):
+        raise ValueError('First distribution yielded by coroutine must '
+                         'be wrapped in `Root` when requesting a nontrivial '
+                         f'sample_shape = {sample_shape}.')
     try:
       while True:
         actual_distribution = d.distribution if isinstance(d, self.Root) else d
