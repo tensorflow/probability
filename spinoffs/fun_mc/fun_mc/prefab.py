@@ -670,7 +670,7 @@ def hamiltonian_monte_carlo_with_state_grads_step(
     trajectory_length: 'fun_mc.FloatTensor',
     scalar_step_size: 'fun_mc.FloatTensor',
     step_size_scale: 'fun_mc.FloatNest' = 1.,
-    shard_axis_names: 'fun_mc.StringNest' = (),
+    named_axis: 'Optional[fun_mc.StringNest]' = None,
     **hmc_kwargs
 ) -> ('Tuple[fun_mc.HamiltonianMonteCarloState, '
       'HamiltonianMonteCarloWithStateGradsExtra]'):
@@ -686,11 +686,6 @@ def hamiltonian_monte_carlo_with_state_grads_step(
   `trajectory_length` based on criteria that depend on the `proposed_state`
   (e.g. [1]).
 
-  This function supports SPMD via sharded states in the same sense as TensorFlow
-  Probability's `tfp.experimental.distribute.Sharded`. Certain state tensors can
-  be annotated as having different values on different devices, with
-  cross-device reductions being inserted accordingly.
-
   Args:
     hmc_state: `fun_mc.HamiltonianMonteCarloState`.
     trajectory_length: Trajectory length used by HMC.
@@ -698,7 +693,7 @@ def hamiltonian_monte_carlo_with_state_grads_step(
       steps).
     step_size_scale: Step size scale, structure broadcastable to the
       `hmc_state.state`.
-    shard_axis_names: Shard axes names, used for SPMD.
+    named_axis: Named axes of the state. Same structure as `hmc_state.state`.
     **hmc_kwargs: Passed to `fun_mc.hamiltonian_monte_carlo_step`.
 
   Returns:
@@ -724,6 +719,7 @@ def hamiltonian_monte_carlo_with_state_grads_step(
         num_integrator_steps=num_integrator_steps,
         step_size=util.map_tree(lambda s: s * scalar_step_size,
                                 step_size_scale),
+        named_axis=named_axis,
         **hmc_kwargs)
     hmc_with_grads_extra = HamiltonianMonteCarloWithStateGradsExtra(
         proposed_state=hmc_extra.proposed_hmc_state.state,
@@ -753,22 +749,20 @@ def hamiltonian_monte_carlo_with_state_grads_step(
                                   hmc_extra.integrator_extra.momentum_grads,
                                   grads[1].proposed_state)
 
-      def do_sum(x, shard_axis_names):
-        res = tf.reduce_sum(
-            x, list(range(len(trajectory_length.shape), len(x.shape))))
-        if shard_axis_names:
-          res = backend.distribute_lib.psum(res, shard_axis_names)
-        return res
+      def do_sum(x, named_axis):
+        return backend.distribute_lib.reduce_sum(
+            x, list(range(len(trajectory_length.shape), len(x.shape))),
+            named_axis)
 
-      if shard_axis_names:
-        shard_axis_names_bc = shard_axis_names
+      if named_axis is None:
+        named_axis_bc = util.map_tree(lambda _: [], state_grads)
       else:
-        shard_axis_names_bc = util.map_tree(lambda _: [], state_grads)
+        named_axis_bc = named_axis
 
       return sum(
           util.flatten_tree(
               util.map_tree_up_to(state_grads, do_sum, state_grads,
-                                  shard_axis_names_bc)))
+                                  named_axis_bc)))
 
     return res, grad
 
@@ -860,6 +854,7 @@ def persistent_hamiltonian_monte_carlo_step(
     'fun_mc.IntegratorState, fun_mc.IntegratorExtras], '
     'Tuple[fun_mc.FloatTensor, Any]]' = (
         fun_mc._default_hamiltonian_monte_carlo_energy_change_fn),  # pylint: disable=protected-access
+    named_axis: 'Optional[fun_mc.StringNest]' = None,
     seed=None,
 ) -> ('Tuple[PersistentHamiltonianMonteCarloState, '
       'PersistentHamiltonianMonteCarloExtra]'):
@@ -878,7 +873,8 @@ def persistent_hamiltonian_monte_carlo_step(
   `momentum_sample_fn`, namely:
 
   ```none
-  new_momentum = (old_momentum * (1 - noise_fraction**2)**0.5 +
+  new_momentum = (
+      (1 - noise_fraction**2)**0.5 * old_momentum  +
       noise_fraction * eps)
   eps ~ Normal(0, 1)
   ```
@@ -943,6 +939,7 @@ def persistent_hamiltonian_monte_carlo_step(
       Computes the change in energy between current and proposed states. By
       default, it just substracts the current and proposed energies. A typical
       reason to override this is to improve numerical stability.
+    named_axis: Named axes of the state, same structure as `hmc_state.state`.
     seed: For reproducibility.
 
   Returns:
@@ -976,37 +973,46 @@ def persistent_hamiltonian_monte_carlo_step(
   if kinetic_energy_fn is None:
     kinetic_energy_fn = fun_mc.make_gaussian_kinetic_energy_fn(
         len(target_log_prob.shape) if target_log_prob.shape is not None else tf
-        .rank(target_log_prob))
+        .rank(target_log_prob), named_axis=named_axis)
 
   if momentum_sample_fn is None:
+    if named_axis is None:
+      named_axis = util.map_tree(lambda _: [], state)
 
     def _momentum_sample_fn(old_momentum: fun_mc.State,
                             seed: Any) -> Tuple[fun_mc.State, Tuple[()]]:
       seeds = util.unflatten_tree(
           old_momentum,
           util.split_seed(seed, len(util.flatten_tree(old_momentum))))
-      new_momentum = util.map_tree(
-          lambda om, seed: (  # pylint: disable=g-long-lambda
-              om * (1 - noise_fraction**2)**0.5 + noise_fraction *
-              util.random_normal(om.shape, om.dtype, seed)),
-          old_momentum,
-          seeds)
+
+      def _sample_part(old_momentum, seed, named_axis):
+        seed = backend.distribute_lib.fold_in_axis_index(seed, named_axis)
+        return (
+            tf.math.sqrt(1 - tf.square(noise_fraction)) * old_momentum +
+            noise_fraction *
+            util.random_normal(old_momentum.shape, old_momentum.dtype, seed))
+
+      new_momentum = util.map_tree_up_to(state, _sample_part, old_momentum,
+                                         seeds, named_axis)
       return new_momentum
 
     momentum_sample_fn = _momentum_sample_fn
 
   if integrator_fn is None:
     step_size = util.map_tree(tf.convert_to_tensor, step_size)
+    step_size = fun_mc.maybe_broadcast_structure(step_size, state)
 
     def _integrator_fn(
         state: fun_mc.IntegratorState, direction: fun_mc.FloatTensor
     ) -> Tuple[fun_mc.IntegratorState, fun_mc.IntegratorExtras]:
 
       directional_step_size = util.map_tree(
-          lambda step_size, state: (step_size * tf.reshape(  # pylint: disable=g-long-lambda
-              direction,
-              list(direction.shape) + [1] *
-              (len(state.shape) - len(direction.shape)))), step_size,
+          lambda step_size, state: (  # pylint: disable=g-long-lambda
+              step_size * tf.reshape(
+                  direction,
+                  list(direction.shape) + [1] *
+                  (len(state.shape) - len(direction.shape)))),
+          step_size,
           state.state)
       # TODO(siege): Ideally we'd pass in the direction here, but the
       # `hamiltonian_integrator` cannot handle dynamic direction switching like

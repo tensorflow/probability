@@ -253,7 +253,7 @@ class PrefabTest(tfp_test_util.TestCase):
               seed=seed,
               kinetic_energy_fn=kinetic_energy_fn,
               momentum_sample_fn=momentum_sample_fn,
-              shard_axis_names=model.experimental_shard_axis_names))
+              named_axis=model.experimental_shard_axis_names))
 
       def sum_state(x, axis_name):
         res = tf.reduce_sum(x**2)
@@ -311,8 +311,8 @@ class PrefabTest(tfp_test_util.TestCase):
           step_size=step_size,
           num_integrator_steps=num_leapfrog_steps,
           target_log_prob_fn=target_log_prob_fn,
-          noise_fraction=0.5,
-          mh_drift=0.127,
+          noise_fraction=self._constant(0.5),
+          mh_drift=self._constant(0.127),
           seed=phmc_seed)
       return (phmc_state, seed), phmc_state.state
 
@@ -353,8 +353,8 @@ class PrefabTest(tfp_test_util.TestCase):
         target_log_prob_fn,
         step_size=self._constant(0.1),
         num_integrator_steps=1,
-        noise_fraction=0.5,
-        mh_drift=0.1,
+        noise_fraction=self._constant(0.5),
+        mh_drift=self._constant(0.1),
         log_uniform=tf.math.log(self._constant(0.)),
         seed=seed)
     _, rejected_phmc_extra = prefab.persistent_hamiltonian_monte_carlo_step(
@@ -362,13 +362,62 @@ class PrefabTest(tfp_test_util.TestCase):
         target_log_prob_fn,
         step_size=self._constant(0.1),
         num_integrator_steps=1,
-        noise_fraction=0.5,
-        mh_drift=0.1,
+        noise_fraction=self._constant(0.5),
+        mh_drift=self._constant(0.1),
         log_uniform=0.,
         seed=seed)
 
     self.assertTrue(accepted_phmc_extra.is_accepted)
     self.assertFalse(rejected_phmc_extra.is_accepted)
+
+  def testPHMCNamedAxis(self):
+    if BACKEND != 'backend_jax':
+      self.skipTest('JAX-only')
+
+    state = {
+        'sharded': tf.zeros([4, 1024], self._dtype),
+        'shared': tf.zeros([1024], self._dtype),
+    }
+    in_axes = {
+        'sharded': 0,
+        'shared': None,
+    }
+    named_axis = {
+        'sharded': 'named_axis',
+        'shared': None,
+    }
+
+    def target_log_prob_fn(sharded, shared):
+      return -(backend.distribute_lib.psum(tf.square(sharded), 'named_axis') +
+               tf.square(shared)), ()
+
+    @functools.partial(
+        jax.pmap, in_axes=(in_axes, None), axis_name='named_axis')
+    def kernel(state, seed):
+      phmc_state = prefab.persistent_hamiltonian_monte_carlo_init(
+          state, target_log_prob_fn=target_log_prob_fn)
+      phmc_state, phmc_extra = prefab.persistent_hamiltonian_monte_carlo_step(
+          phmc_state,
+          step_size=self._constant(0.2),
+          num_integrator_steps=4,
+          noise_fraction=0.5,
+          mh_drift=0.1,
+          target_log_prob_fn=target_log_prob_fn,
+          named_axis=named_axis,
+          seed=seed)
+      return phmc_state, phmc_extra
+
+    seed = self._make_seed(_test_seed())
+    phmc_state, phmc_extra = kernel(state, seed)
+    self.assertAllClose(phmc_state.state['shared'][0],
+                        phmc_state.state['shared'][1])
+    self.assertTrue(
+        np.any(
+            np.abs(phmc_state.state['sharded'][0] -
+                   phmc_state.state['sharded'][1]) > 1e-3))
+    self.assertAllClose(phmc_extra.is_accepted[0], phmc_extra.is_accepted[1])
+    self.assertAllClose(phmc_extra.log_accept_ratio[0],
+                        phmc_extra.log_accept_ratio[1])
 
 
 @test_util.multi_backend_test(globals(), 'prefab_test')
