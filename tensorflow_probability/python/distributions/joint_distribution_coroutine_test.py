@@ -86,7 +86,11 @@ def singleton_jdn_model_fn():
 @test_util.test_all_tf_execution_regimes
 class JointDistributionCoroutineTest(test_util.TestCase):
 
-  def test_batch_and_event_shape_no_plate(self):
+  @parameterized.named_parameters(
+      ('_with_root', True),
+      ('_without_root', False),
+  )
+  def test_batch_and_event_shape_no_plate(self, use_root):
     # The joint distribution specified below corresponds to this
     # graphical model
     #
@@ -95,8 +99,10 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     #     \     v
     #      `->-(c)
 
+    root = Root if use_root else lambda x: x
+
     def dist():
-      a = yield Root(tfd.Bernoulli(probs=0.5,
+      a = yield root(tfd.Bernoulli(probs=0.5,
                                    dtype=tf.float32))
       b = yield tfd.Bernoulli(probs=0.25 + 0.5*a,
                               dtype=tf.float32)
@@ -135,7 +141,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllEqual(batch_shape[1], [])
     self.assertAllEqual(batch_shape[2], [])
 
-  def test_batch_and_event_shape_with_plate(self):
+  @parameterized.named_parameters(
+      ('_with_root', True),
+      ('_without_root', False),
+  )
+  def test_batch_and_event_shape_with_plate(self, use_root):
     # The joint distribution specified below corresponds to this
     # graphical model
     #
@@ -146,9 +156,11 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     # (df)--+-->---(x)  |
     #       +--------20-+
 
+    root = Root if use_root else lambda x: x
+
     def dist():
-      g = yield Root(tfd.Gamma(2, 2))
-      df = yield Root(tfd.Exponential(1.))
+      g = yield root(tfd.Gamma(2, 2))
+      df = yield root(tfd.Exponential(1.))
       loc = yield tfd.Sample(tfd.Normal(0, g), 20)
       yield tfd.Independent(tfd.StudentT(tf.expand_dims(df, -1), loc, 1), 1)
 
@@ -395,7 +407,7 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     with self.assertRaisesRegexp(
         Exception,
         'must be wrapped in `Root`'):
-      self.evaluate(joint.sample(seed=test_util.test_seed()))
+      self.evaluate(joint.sample(2, seed=test_util.test_seed()))
 
   @parameterized.named_parameters(
       ('basic', basic_model_with_names_fn),

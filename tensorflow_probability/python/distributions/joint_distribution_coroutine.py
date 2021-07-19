@@ -78,7 +78,8 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   The distributions that have been wrapped in the
   `JointDistributionCoroutine.Root` class will be called with `sample_shape` as
   the `sample_shape` argument, and the unwrapped distributions
-  will be called with `()` as the `sample_shape` argument.
+  will be called with `()` as the `sample_shape` argument. The `Root` annotation
+  can be omitted if you never intend to use a `sample_shape` other than `()`.
 
   It is the user's responsibility to ensure that
   each of the distributions generates samples with the specified sample
