@@ -46,7 +46,7 @@ def _implement_sharded_lp_fn(fn_name):
 class Sharded(distribution_lib.Distribution):
   """A meta-distribution meant for use in an SPMD distributed context.
 
-  `Sharded` is a meta-distribution enables distributions to be used in SPMD
+  `Sharded` is a meta-distribution that enables distributions to be used in SPMD
   programs. A `Sharded` distribution represents a random variable that has
   been split across a set of devices. The number of shards is the number of
   devices in the current TensorFlow DistributionStrategy or the provided JAX
