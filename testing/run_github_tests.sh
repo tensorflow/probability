@@ -36,7 +36,7 @@ fi
 
 install_bazel() {
   # Install Bazel for tests. Based on instructions at
-  # https://docs.bazel.build/versions/master/install-ubuntu.html#install-on-ubuntu
+  # https://docs.bazel.build/versions/main/install-ubuntu.html#install-on-ubuntu
   # (We skip the openjdk8 install step, since travis lets us have that by
   # default).
 
