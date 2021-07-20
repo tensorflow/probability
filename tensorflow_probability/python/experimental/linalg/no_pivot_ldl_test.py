@@ -80,6 +80,34 @@ class NoPivotLDLTest(test_util.TestCase):
     eigv, _ = self.evaluate(tf.linalg.eigh(reconstruct))
     self.assertAllTrue(eigv > 0.)
 
+  def testXlaCompileBug(self):
+    inp = tf.Variable([[2., 1.], [1., 2.]])
+    self.evaluate(inp.initializer)
+    alt_chol = simple_robustified_cholesky
+    alt_chol_nojit = tf.function(alt_chol, autograph=False, jit_compile=False)
+    alt_chol_jit = tf.function(alt_chol, autograph=False, jit_compile=True)
+    answer = np.array([[1.4142135, 0.], [0.70710677, 1.2247449]])
+
+    self.assertAllClose(self.evaluate(alt_chol(inp)), answer)
+    self.assertAllClose(self.evaluate(alt_chol_nojit(inp)), answer)
+    self.assertAllClose(self.evaluate(alt_chol_jit(inp)), answer)
+
+    with tf.GradientTape():
+      chol_with_grad = alt_chol(inp)
+      chol_nojit_with_grad = alt_chol_nojit(inp)
+      # Not supported by TF-XLA (WAI), see b/193584244
+      # chol_jit_with_grad = alt_chol_jit(inp)
+    self.assertAllClose(self.evaluate(chol_with_grad), answer)
+    self.assertAllClose(self.evaluate(chol_nojit_with_grad), answer)
+
+    # But wrapping the tape in tf.function should work.
+    @tf.function(autograph=False, jit_compile=True)
+    def jit_with_grad(mat):
+      with tf.GradientTape():
+        return alt_chol_jit(mat)
+
+    self.assertAllClose(self.evaluate(jit_with_grad(inp)), answer)
+
 
 if __name__ == '__main__':
   tf.test.main()

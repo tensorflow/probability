@@ -83,5 +83,6 @@ py_test(
         "//tensorflow_probability/python/experimental/linalg:no_pivot_ldl",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )

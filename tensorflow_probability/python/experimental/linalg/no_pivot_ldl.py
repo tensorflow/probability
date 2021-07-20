@@ -59,9 +59,11 @@ def no_pivot_ldl(matrix, name='no_pivot_ldl'):
 
   Performs the LDL factorization, using the outer product algorithm from [1]. No
   pivoting (or block pivoting) is done, so this should be less stable than
-  e.g. Bunch-Kaufman sytrf. This is implemented as a tf.while_loop, so should
-  have gradients and be accelerator-friendly, but is not particularly
-  performant.
+  e.g. Bunch-Kaufman sytrf. This is implemented as a tf.foldl, so should have
+  gradients and be accelerator-friendly, but is not particularly performant.
+
+  If compiling with XLA, make sure any surrounding GradientTape is also
+  XLA-compiled (b/193584244).
 
   #### References
   [1]: Gene H. Golub, Charles F. Van Loan. Matrix Computations, 4th ed., 2013.
@@ -83,7 +85,7 @@ def no_pivot_ldl(matrix, name='no_pivot_ldl'):
     # TODO(b/182276317) Deal with dynamic ranks better.
     slix = _Slice2Idx(triangular_factor)
 
-    def body(i, triangular_factor):
+    def fn(triangular_factor, i):
       column_head = triangular_factor[..., i, i, tf.newaxis]
       column_tail = triangular_factor[..., i+1:, i]
       rescaled_tail = column_tail / column_head
@@ -97,12 +99,12 @@ def no_pivot_ldl(matrix, name='no_pivot_ldl'):
           tf.linalg.band_part(
               tf.einsum('...i,...j->...ij', column_tail, rescaled_tail),
               num_lower=-1, num_upper=0))
-      return i+1, triangular_factor
+      return triangular_factor
 
-    _, triangular_factor = tf.while_loop(
-        cond=lambda i, _: i < tf.shape(triangular_factor)[-1],
-        body=body,
-        loop_vars=(0, triangular_factor))
+    triangular_factor = tf.foldl(
+        fn=fn,
+        elems=tf.range(tf.shape(triangular_factor)[-1]),
+        initializer=triangular_factor)
 
     diag = tf.linalg.diag_part(triangular_factor)
     triangular_factor = tf.linalg.set_diag(
