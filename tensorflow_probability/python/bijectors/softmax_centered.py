@@ -34,7 +34,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class SoftmaxCentered(bijector.AutoCompositeTensorBijector):
   """Bijector which computes `Y = g(X) = exp([X 0]) / sum(exp([X 0]))`.
 

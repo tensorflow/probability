@@ -35,7 +35,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class ShiftedGompertzCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 - exp(-rate * X)) * exp(-c * exp(-rate * X))`.
 

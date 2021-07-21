@@ -28,7 +28,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Tanh(bijector.AutoCompositeTensorBijector):
   """Bijector that computes `Y = tanh(X)`, therefore `Y in (-1, 1)`.
 

@@ -34,7 +34,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class KumaraswamyCDF(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X) = (1 - X**a)**b, X in [0, 1]`.
 

@@ -32,7 +32,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class CholeskyToInvCholesky(bijector.AutoCompositeTensorBijector):
   """Maps the Cholesky factor of `M` to the Cholesky factor of `M^{-1}`.
 

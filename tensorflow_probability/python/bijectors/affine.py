@@ -213,7 +213,6 @@ def _as_tensor(x, name, dtype):
   return None if x is None else tf.convert_to_tensor(x, name=name, dtype=dtype)
 
 
-@bijector.auto_composite_tensor_bijector
 class Affine(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X; shift, scale) = scale @ X + shift`.
 

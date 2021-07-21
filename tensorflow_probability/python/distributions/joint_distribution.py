@@ -81,27 +81,36 @@ def trace_distributions_and_values(dist, sample_shape, seed, value=None):
   """Draws a sample, and traces both the distribution and sampled value."""
   if value is None:
     value = dist.sample(sample_shape, seed=seed)
+  elif tf.nest.is_nested(dist.dtype) and any(
+      v is None for v in tf.nest.flatten(value)):
+    # TODO(siege): This is making an assumption that nested dtype => partial
+    # value support, which is not necessarily reasonable.
+    value = dist.sample(sample_shape, seed=seed, value=value)
   return ValueWithTrace(value=value, traced=(dist, value))
 
 
 def trace_distributions_only(dist, sample_shape, seed, value=None):
   """Draws a sample, and traces the sampled value."""
-  if value is None:
-    value = dist.sample(sample_shape, seed=seed)
-  return ValueWithTrace(value=value, traced=dist)
+  ret = trace_distributions_and_values(dist, sample_shape, seed, value)
+  return ret._replace(traced=ret.traced[0])
 
 
 def trace_values_only(dist, sample_shape, seed, value=None):
   """Draws a sample, and traces the sampled value."""
-  if value is None:
-    value = dist.sample(sample_shape, seed=seed)
-  return ValueWithTrace(value=value, traced=value)
+  ret = trace_distributions_and_values(dist, sample_shape, seed, value)
+  return ret._replace(traced=ret.traced[1])
 
 
 def trace_values_and_log_probs(dist, sample_shape, seed, value=None):
   """Draws a sample, and traces both the sampled value and its log density."""
   if value is None:
     value, lp = dist.experimental_sample_and_log_prob(sample_shape, seed=seed)
+  elif tf.nest.is_nested(dist.dtype) and any(
+      v is None for v in tf.nest.flatten(value)):
+    # TODO(siege): This is making an assumption that nested dtype => partial
+    # value support, which is not necessarily reasonable.
+    value, lp = dist.experimental_sample_and_log_prob(
+        sample_shape, seed=seed, value=value)
   else:
     lp = dist.log_prob(value)
   return ValueWithTrace(value=value, traced=(value, lp))
@@ -210,7 +219,9 @@ class JointDistribution(distribution_lib.Distribution):
   - `_model_coroutine`: A generator that yields a sequence of
     `tfd.Distribution`-like instances.
 
-  - `_model_flatten`: takes a structured input and returns a sequence.
+  - `_model_flatten`: takes a structured input and returns a sequence. The
+    sequence order must match the order distributions are yielded from
+    `_model_coroutine`.
 
   - `_model_unflatten`: takes a sequence and returns a structure matching the
     semantics of the `JointDistribution` subclass.
@@ -613,33 +624,14 @@ class JointDistribution(distribution_lib.Distribution):
              if dists is None else dists)
     return (getattr(d, attr)() for d in dists)
 
-  def _sanitize_value(self, value):
-    """Ensures `value` matches `self.dtype` with `Tensor` or `None` elements."""
-    if value is None:
-      return value
-
-    if len(value) < len(self.dtype):
-      # Fill in missing entries with `None`.
-      if hasattr(self.dtype, 'keys'):
-        value = {k: value.get(k, None) for k in self.dtype.keys()}
-      else:  # dtype is a sequence.
-        value = [value[i] if i < len(value) else None
-                 for i in range(len(self.dtype))]
-
-    value = nest_util.cast_structure(value, self.dtype)
-    return nest.map_structure_up_to(
-        self.dtype,
-        lambda x, d: x if x is None else tf.convert_to_tensor(x, dtype_hint=d),
-        value, self.dtype)
-
   def _resolve_value(self, *args, allow_partially_specified=False, **kwargs):
     """Resolves a `value` structure from user-passed arguments."""
     value = kwargs.pop('value', None)
     if not (args or kwargs):
-       # Fast path when `value` is the only kwarg. The case where `value` is
-       # passed as a positional arg is handled by `_resolve_value_from_args`
-       # below.
-      return self._sanitize_value(value)
+      # Fast path when `value` is the only kwarg. The case where `value` is
+      # passed as a positional arg is handled by `_resolve_value_from_args`
+      # below.
+      return _sanitize_value(self, value)
     elif value is not None:
       raise ValueError('Supplied both `value` and keyword '
                        'arguments to parameterize sampling. Supplied keyword '
@@ -665,7 +657,7 @@ class JointDistribution(distribution_lib.Distribution):
           'Found unexpected keyword arguments. Distribution names '
           'are\n{}\nbut received\n{}\nThese names were '
           'invalid:\n{}'.format(dist_name_str, kwarg_names, unmatched_str))
-    return self._sanitize_value(value)
+    return _sanitize_value(self, value)
 
   def _call_execute_model(self,
                           sample_shape=(),
@@ -793,17 +785,7 @@ class JointDistribution(distribution_lib.Distribution):
         value_at_index = None
         if (value is not None and len(value) > index and
             value[index] is not None):
-
-          def convert_tree_to_tensor(x, dtype_hint):
-            return tf.convert_to_tensor(x, dtype_hint=dtype_hint)
-
-          # This signature does not allow kwarg names. Applies
-          # `convert_to_tensor` on the next value.
-          value_at_index = nest.map_structure_up_to(
-              actual_distribution.dtype,  # shallow_tree
-              convert_tree_to_tensor,  # func
-              value[index],  # x
-              actual_distribution.dtype)  # dtype_hint
+          value_at_index = _sanitize_value(actual_distribution, value[index])
         try:
           next_value, traced_values = sample_and_trace_fn(
               actual_distribution,
@@ -1173,6 +1155,46 @@ class _DefaultJointBijector(composition.Composition):
   def _inverse_log_det_jacobian(self, y, event_ndims, **kwargs):
     return super(_DefaultJointBijector, self)._inverse_log_det_jacobian(
         y, event_ndims, _jd_conditioning=y, **kwargs)
+
+
+def _sanitize_value(distribution, value):
+  """Ensures `value` matches `distribution.dtype`, adding `None`s as needed."""
+  if value is None:
+    return value
+
+  if not tf.nest.is_nested(distribution.dtype):
+    return tf.convert_to_tensor(value, dtype_hint=distribution.dtype)
+
+  if len(value) < len(distribution.dtype):
+    # Fill in missing entries with `None`.
+    if hasattr(distribution.dtype, 'keys'):
+      value = {k: value.get(k, None) for k in distribution.dtype.keys()}
+    else:  # dtype is a sequence.
+      value = [value[i] if i < len(value) else None
+               for i in range(len(distribution.dtype))]
+
+  value = nest_util.cast_structure(value, distribution.dtype)
+  jdlike_attrs = [
+      '_get_single_sample_distributions',
+      '_model_flatten',
+      '_model_unflatten',
+  ]
+  if all(hasattr(distribution, attr) for attr in jdlike_attrs):
+    flat_dists = distribution._get_single_sample_distributions()
+    flat_value = distribution._model_flatten(value)
+    flat_value = map(_sanitize_value, flat_dists, flat_value)
+    return distribution._model_unflatten(flat_value)
+  else:
+    # A joint distribution that isn't tfd.JointDistribution-like; assume it has
+    # some reasonable dtype semantics. We can't use this for
+    # tfd.JointDistribution because we might have a None standing in for a
+    # sub-tree (e.g. consider omitting a nested JD).
+    return nest.map_structure_up_to(
+        distribution.dtype,
+        lambda x, d: x if x is None else tf.convert_to_tensor(x, dtype_hint=d),
+        value,
+        distribution.dtype,
+    )
 
 
 @log_prob_ratio.RegisterLogProbRatio(JointDistribution)

@@ -44,7 +44,6 @@ def unique_token_set(source_structure):
   return flat_token_set
 
 
-@bijector.auto_composite_tensor_bijector
 class Restructure(bijector.AutoCompositeTensorBijector):
   """Converts between nested structures of Tensors.
 

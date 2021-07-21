@@ -30,7 +30,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class AffineLinearOperator(bijector.AutoCompositeTensorBijector):
   """Compute `Y = g(X; shift, scale) = scale @ X + shift`.
 

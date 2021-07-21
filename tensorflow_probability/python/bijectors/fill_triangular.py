@@ -35,7 +35,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class FillTriangular(bijector.AutoCompositeTensorBijector):
   """Transforms vectors to triangular.
 

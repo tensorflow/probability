@@ -28,7 +28,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Sinh(bijector.AutoCompositeTensorBijector):
   """Bijector that computes `Y = sinh(X)`.
 

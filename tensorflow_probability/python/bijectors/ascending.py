@@ -29,7 +29,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Ascending(bijector.AutoCompositeTensorBijector):
   """Maps unconstrained R^n to R^n in ascending order.
 

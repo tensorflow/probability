@@ -20,11 +20,9 @@ from __future__ import print_function
 
 import abc
 import contextlib
-import functools
 
 # Dependency imports
 import numpy as np
-import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
@@ -91,8 +89,8 @@ class _BijectorMeta(abc.ABCMeta):
     tree_util.register_pytree_node(cls, flatten, unflatten)
 
 
-@six.add_metaclass(_BijectorMeta)
-class Bijector(tf.Module):
+# TODO(emilyaf): Look at using `__init_subclass__` instead of a metaclass.
+class Bijector(tf.Module, metaclass=_BijectorMeta):
   r"""Interface for transformations of a `Distribution` sample.
 
   Bijectors can be used to represent any differentiable and injective
@@ -1779,33 +1777,39 @@ class Bijector(tf.Module):
       return ()
 
 
+class _AutoCompositeTensorBijectorMeta(_BijectorMeta):
+  """Metaclass for `AutoCompositeTensorBijector`."""
+
+  def __new__(mcs, classname, baseclasses, attrs):  # pylint: disable=bad-mcs-classmethod-argument
+    """Give subclasses their own type_spec, not an inherited one."""
+
+    cls = super(_AutoCompositeTensorBijectorMeta, mcs).__new__(  # pylint: disable=too-many-function-args
+        mcs, classname, baseclasses, attrs)
+    return auto_composite_tensor.auto_composite_tensor(
+        cls,
+        omit_kwargs=('parameters',),
+        non_identifying_kwargs=('name',),
+        module_name='tfp.bijectors')
+
+
 class AutoCompositeTensorBijector(
-    Bijector, auto_composite_tensor.AutoCompositeTensor):
+    Bijector, auto_composite_tensor.AutoCompositeTensor,
+    metaclass=_AutoCompositeTensorBijectorMeta):
   r"""Base for `CompositeTensor` bijectors with auto-generated `TypeSpec`s.
 
   `CompositeTensor` objects are able to pass in and out of `tf.function` and
   `tf.while_loop`, or serve as part of the signature of a TF saved model.
   `Bijector` subclasses that follow the contract of
   `tfp.experimental.auto_composite_tensor` may be defined as `CompositeTensor`s
-  by inheriting from `AutoCompositeTensorBijector` and applying a class
-  decorator as shown here:
+  by inheriting from `AutoCompositeTensorBijector`:
 
   ```python
-  @tfp.experimental.auto_composite_tensor(
-    omit_kwargs=('name',), module_name='my_module')
   class MyBijector(tfb.AutoCompositeTensorBijector):
 
     # The remainder of the subclass implementation is unchanged.
   ```
   """
   pass
-
-
-auto_composite_tensor_bijector = functools.partial(
-    auto_composite_tensor.auto_composite_tensor,
-    omit_kwargs=('parameters',),
-    non_identifying_kwargs=('name',),
-    module_name='tfp.bijectors')
 
 
 def check_valid_ndims(ndims, validate=True):

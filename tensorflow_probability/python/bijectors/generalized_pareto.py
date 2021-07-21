@@ -34,7 +34,6 @@ __all__ = [
 ]
 
 
-@bijector_lib.auto_composite_tensor_bijector
 class GeneralizedPareto(bijector_lib.AutoCompositeTensorBijector):
   """Bijector mapping R**n to non-negative reals.
 

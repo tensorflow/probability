@@ -28,7 +28,6 @@ from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.bijectors import joint_map
 from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.internal import assert_util
-from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -270,8 +269,7 @@ def _validate_block_sizes(block_sizes, bijectors, validate_args):
   return block_sizes
 
 
-@bijector_lib.auto_composite_tensor_bijector
-class Blockwise(_Blockwise, auto_composite_tensor.AutoCompositeTensor):
+class Blockwise(_Blockwise, bijector_lib.AutoCompositeTensorBijector):
 
   def __new__(cls, *args, **kwargs):
     """Returns a `_Blockwise` if any of `bijectors` is not `CompositeTensor."""

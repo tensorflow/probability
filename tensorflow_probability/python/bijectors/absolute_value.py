@@ -29,7 +29,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class AbsoluteValue(bijector.AutoCompositeTensorBijector):
   """Computes `Y = g(X) = Abs(X)`, element-wise.
 

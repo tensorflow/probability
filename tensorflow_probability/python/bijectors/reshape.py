@@ -37,7 +37,6 @@ __all__ = [
 ]
 
 
-@bijector.auto_composite_tensor_bijector
 class Reshape(bijector.AutoCompositeTensorBijector):
   """Reshapes the `event_shape` of a `Tensor`.
 

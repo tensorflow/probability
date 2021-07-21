@@ -80,6 +80,7 @@ SPECIAL_DISTS = (
     'LambertWDistribution',
     'MatrixNormalLinearOperator',
     'MatrixTLinearOperator',
+    'MarkovChain',
     'Masked',  # (has strategy)
     'Mixture',  # (has strategy)
     'MixtureSameFamily',  # (has strategy)
