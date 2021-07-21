@@ -421,11 +421,11 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
     model1.compile(optimizer='sgd', loss='mean_squared_error')
     model2.compile(optimizer='sgd', loss='mean_squared_error')
-    xs = np.array([-1.0, 0.0, 1.0, 2.0, 3.0, 4.0])
+    xs = np.expand_dims(np.array([-1.0, 0.0, 1.0, 2.0, 3.0, 4.0]), axis=-1)
     ys = np.array([-3.0, -1.0, 1.0, 3.0, 5.0, 7.0])
     model1.fit(xs, ys, epochs=500)
     model2.fit(xs, ys, epochs=500, steps_per_epoch=5)
-    x_test = np.array([10.0])
+    x_test = np.expand_dims(np.array([10.0]), axis=-1)
     model1.predict(x_test, steps=1)
     model2.predict(x_test, steps=1)
 
