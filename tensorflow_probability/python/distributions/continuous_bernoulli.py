@@ -32,7 +32,6 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 def _log_xexp_ratio(x):
@@ -118,14 +117,10 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
       https://arxiv.org/abs/1907.06845
   """
 
-  @deprecation.deprecated_args(
-      '2021-03-09', 'The `lims` argument is deprecated.'
-      ' ContinuousBernoulli ignores this parameter.', 'lims')
   def __init__(
       self,
       logits=None,
       probs=None,
-      lims=(0.499, 0.501),
       dtype=tf.float32,
       validate_args=False,
       allow_nan_stats=True,
@@ -143,7 +138,6 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
        continuous Bernoulli distribution. Only one of `logits` or `probs`
        should be passed in. Note that this also does not correspond to a
        probability as in the Bernoulli case.
-      lims: Deprecated. Is not needed for numerical stability anymore.
       dtype: The type of the event samples. Default: `float32`.
        validate_args: Python `bool`, default `False`. When `True`
        distribution parameters are checked for validity despite possibly
