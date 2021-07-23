@@ -764,6 +764,24 @@ def no_tf_rank_errors():
 
 
 @contextlib.contextmanager
+def no_cholesky_decomposition_errors():
+  # Use this to suppress Cholesky errors if needed in tests where the
+  # numerics are beside the point.
+  pat = ('Cholesky decomposition was not successful. '
+         'The input might not be valid. [Op:Cholesky]')
+  try:
+    yield
+  except tf.errors.InvalidArgumentError as e:
+    msg = str(e)
+    if pat in msg:
+      # Tried an input regime where a Cholesky decomposition failed
+      # and crashed the program.
+      hp.assume(False)
+    else:
+      raise
+
+
+@contextlib.contextmanager
 def finite_ground_truth_only():
   # Recognizing the error message from python/internal/numerics_testing.py
   pat = 'Cannot check accuracy if ground truth or derivatives are not finite'

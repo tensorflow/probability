@@ -372,7 +372,8 @@ class ParameterPropertiesTest(test_util.TestCase):
   def testInferredBatchShapeMatchesTrueBatchShape(self, dist_name, data):
     dist = data.draw(
         dhps.distributions(dist_name=dist_name, validate_args=False))
-    lp = dist.log_prob(dist.sample(seed=test_util.test_seed()))
+    with tfp_hps.no_cholesky_decomposition_errors():
+      lp = dist.log_prob(dist.sample(seed=test_util.test_seed()))
 
     self.assertAllEqual(dist.batch_shape_tensor(), tf.shape(lp))
     self.assertAllEqual(dist.batch_shape, tf.shape(lp))
