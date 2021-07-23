@@ -455,8 +455,8 @@ class UncalibratedLangevin(kernel_base.TransitionKernel):
             self.parallel_iterations)
 
         seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
-        seeds = samplers.split_seed(
-            seed, n=len(current_state_parts), salt='langevin.one_step')
+        seeds = list(samplers.split_seed(
+            seed, n=len(current_state_parts), salt='langevin.one_step'))
         seeds = distribute_lib.fold_in_axis_index(
             seeds, self.experimental_shard_axis_names)
 

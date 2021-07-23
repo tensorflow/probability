@@ -160,12 +160,13 @@ def split_seed(seed, n=2, salt=None, name=None):
 
   See https://github.com/tensorflow/probability/blob/main/PRNGS.md
   for details.
-
   Args:
     seed: The seed to split; may be an `int`, an `(int, int) tuple`, or a
       `Tensor`. `int` seeds are converted to `Tensor` seeds using
       `tf.random.uniform` stateful sampling. Tuples are converted to `Tensor`.
-    n: The number of splits to return.
+    n: The number of splits to return. In TensorFlow, if `n` is an integer, this
+      function returns a list of seeds and otherwise returns a `Tensor` of
+      seeds.  In JAX, this function always returns an array of seeds.
     salt: Optional `str` salt to mix with the seed.
     name: Optional name to scope related ops.
 
@@ -184,7 +185,7 @@ def split_seed(seed, n=2, salt=None, name=None):
     seed = sanitize_seed(seed, salt=salt)
     if JAX_MODE:
       from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
-      return list(jaxrand.split(seed, n))
+      return jaxrand.split(seed, n)
     seeds = tf.random.stateless_uniform(
         [n, 2], seed=seed, minval=None, maxval=None, dtype=SEED_DTYPE)
     if isinstance(n, six.integer_types):

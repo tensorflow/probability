@@ -104,7 +104,7 @@ def random_walk_normal_fn(scale=1., name=None):
       if len(state_parts) != len(scales):
         raise ValueError('`scale` must broadcast with `state_parts`.')
 
-      part_seeds = samplers.split_seed(seed, n=len(state_parts))
+      part_seeds = list(samplers.split_seed(seed, n=len(state_parts)))
       part_seeds = distribute_lib.fold_in_axis_index(
           part_seeds, experimental_shard_axis_names)
 

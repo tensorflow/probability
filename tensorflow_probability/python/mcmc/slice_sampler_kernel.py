@@ -351,7 +351,7 @@ class SliceSampler(kernel_base.TransitionKernel):
 def _choose_random_direction(current_state_parts, batch_rank, seed=None,
                              experimental_shard_axis_names=None):
   """Chooses a random direction in the event space."""
-  seeds = samplers.split_seed(seed, n=len(current_state_parts))
+  seeds = list(samplers.split_seed(seed, n=len(current_state_parts)))
   seeds = distribute_lib.fold_in_axis_index(
       seeds, experimental_shard_axis_names)
   # Sample random directions across each of the input components.

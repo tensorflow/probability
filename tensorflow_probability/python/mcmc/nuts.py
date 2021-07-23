@@ -519,7 +519,7 @@ class NoUTurnSampler(TransitionKernel):
   def _start_trajectory_batched(self, state, target_log_prob, seed):
     """Computations needed to start a trajectory."""
     with tf.name_scope('start_trajectory_batched'):
-      seeds = samplers.split_seed(seed, n=len(state) + 1)
+      seeds = list(samplers.split_seed(seed, n=len(state) + 1))
       momentum_seeds = distribute_lib.fold_in_axis_index(
           seeds[:-1], self.experimental_shard_axis_names)
       momentum = [
