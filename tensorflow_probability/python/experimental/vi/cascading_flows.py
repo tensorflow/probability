@@ -42,9 +42,10 @@ from tensorflow_probability.python.distributions import \
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
-from tensorflow_probability.python.experimental.bijectors import \
-    build_trainable_highway_flow
+
+from tensorflow_probability.python.experimental.bijectors import build_trainable_highway_flow
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import prefer_static as ps
 
 __all__ = [
   'build_cascading_flow_surrogate_posterior'
@@ -52,12 +53,13 @@ __all__ = [
 
 Root = joint_distribution_coroutine.JointDistributionCoroutine.Root
 
-
+# todo: add check that id use_global_auxiliary_variables is true then num_auxiliary variables must be >=1
 def build_cascading_flow_surrogate_posterior(
     prior,
     num_auxiliary_variables=0,
     initial_prior_weight=0.98,
     num_layers=3,
+    use_global_auxiliary_variables=False,
     seed=None,
     name=None):
   """Builds a structured surrogate posterior with cascading flows.
@@ -190,6 +192,8 @@ def build_cascading_flow_surrogate_posterior(
   models." International Conference on Machine Learning. PMLR, 2016.
 
   """
+  if num_auxiliary_variables == 0 and use_global_auxiliary_variables == True:
+    raise ValueError('cannot use global auxiliary variables if auxiliary variables is 0')
   with tf.name_scope(name or 'build_cascading_flow_surrogate_posterior'):
     surrogate_posterior, variables = _cascading_flow_surrogate_for_distribution(
       dist=prior,
@@ -197,9 +201,11 @@ def build_cascading_flow_surrogate_posterior(
         _cascading_flow_update_for_base_distribution,
         initial_prior_weight=initial_prior_weight,
         num_auxiliary_variables=num_auxiliary_variables,
-        num_layers=num_layers),
+        num_layers=num_layers,
+        use_global_auxiliary_variables=use_global_auxiliary_variables,),
       num_auxiliary_variables=num_auxiliary_variables,
       num_layers=num_layers,
+      use_global_auxiliary_variables=use_global_auxiliary_variables,
       seed=seed)
     surrogate_posterior.also_track = variables
     return surrogate_posterior
@@ -209,6 +215,7 @@ def _cascading_flow_surrogate_for_distribution(dist,
                                    base_distribution_surrogate_fn,
                                    num_auxiliary_variables,
                                    num_layers,
+                                   use_global_auxiliary_variables,
                                    global_auxiliary_variables=None,
                                    variables=None,
                                    seed=None):
@@ -250,11 +257,13 @@ def _cascading_flow_surrogate_for_distribution(dist,
       variables=variables,
       num_auxiliary_variables=num_auxiliary_variables,
       num_layers=num_layers,
+      use_global_auxiliary_variables=use_global_auxiliary_variables,
       global_auxiliary_variables=global_auxiliary_variables,
       seed=seed)
   else:
     surrogate_posterior, variables = base_distribution_surrogate_fn(
       dist=dist, variables=variables,
+      use_global_auxiliary_variables=use_global_auxiliary_variables,
       global_auxiliary_variables=global_auxiliary_variables,
       num_layers=num_layers,
       seed=seed)
@@ -283,7 +292,7 @@ def _build_highway_flow_block(num_layers, width,
 
 def _cascading_flow_surrogate_for_joint_distribution(
     dist, base_distribution_surrogate_fn, variables,
-    num_auxiliary_variables, num_layers, global_auxiliary_variables,
+    num_auxiliary_variables, num_layers, use_global_auxiliary_variables, global_auxiliary_variables,
     seed=None):
   """Builds a structured joint surrogate posterior for a joint model."""
 
@@ -292,15 +301,16 @@ def _cascading_flow_surrogate_for_joint_distribution(
     variables) if variables else None  # pylint: disable=protected-access
   prior_coroutine = dist._model_coroutine  # pylint: disable=protected-access
   prior_batch_shape = dist.batch_shape_tensor()
+  #fixme
   if tf.nest.is_nested(prior_batch_shape):
-    prior_batch_shape = functools.reduce(tf.broadcast_static_shape,
+    prior_batch_shape = functools.reduce(ps.broadcast_shape,
                                          dist._model_flatten(prior_batch_shape))
 
   def posterior_generator(seed=seed):
     prior_gen = prior_coroutine()
     dist = next(prior_gen)
 
-    if num_auxiliary_variables > 0:
+    if use_global_auxiliary_variables == True:
       i = 1
 
       if flat_variables:
@@ -344,10 +354,11 @@ def _cascading_flow_surrogate_for_joint_distribution(
           num_auxiliary_variables=num_auxiliary_variables,
           num_layers=num_layers,
           variables=flat_variables[i] if flat_variables else None,
+          use_global_auxiliary_variables=use_global_auxiliary_variables,
           global_auxiliary_variables=global_auxiliary_variables,
           seed=init_seed)
 
-        if was_root and num_auxiliary_variables == 0:
+        if was_root and use_global_auxiliary_variables == False:
           surrogate_posterior = Root(surrogate_posterior)
         # If variables were not given---i.e., we're creating new
         # variables---then yield the new variables along with the surrogate
@@ -379,6 +390,7 @@ def _cascading_flow_surrogate_for_joint_distribution(
       base_distribution_surrogate_fn=base_distribution_surrogate_fn,
       num_auxiliary_variables=num_auxiliary_variables,
       num_layers=num_layers,
+      use_global_auxiliary_variables=use_global_auxiliary_variables,
       global_auxiliary_variables=global_auxiliary_variables,
       variables=dist._model_unflatten(
         # pylint: disable=protected-access
@@ -405,11 +417,19 @@ def _cascading_flow_surrogate_for_joint_distribution(
         input_structure=tokenize(surrogate_posterior))(
         surrogate_posterior, name=_get_name(dist))
 
-  else:
+  elif use_global_auxiliary_variables:
     surrogate_posterior = restructure.Restructure(
       output_structure=(
         tf.nest.map_structure(lambda k: 2 * k + 1, dist_tokens),
         [0] + [2 * k + 2 for k in tf.nest.flatten(dist_tokens)]),
+      input_structure=tokenize(surrogate_posterior))(
+      surrogate_posterior, name=_get_name(dist))
+
+  else:
+    surrogate_posterior = restructure.Restructure(
+      output_structure=(
+        tf.nest.map_structure(lambda k: 2 * k, dist_tokens),
+        [2 * k + 1 for k in tf.nest.flatten(dist_tokens)]),
       input_structure=tokenize(surrogate_posterior))(
       surrogate_posterior, name=_get_name(dist))
 
@@ -420,17 +440,18 @@ def _cascading_flow_update_for_base_distribution(dist,
                                             initial_prior_weight,
                                             num_auxiliary_variables,
                                             num_layers,
+                                            use_global_auxiliary_variables,
                                             global_auxiliary_variables,
                                             variables,
                                             seed=None):
   """Creates a trainable surrogate for a (non-meta, non-joint) distribution."""
   event_shape = dist.event_shape_tensor()
   flat_event_shape = tf.nest.flatten(event_shape)
-  flat_event_size = tf.nest.map_structure(tf.reduce_prod, flat_event_shape)
-  ndims = int(tf.reduce_sum(flat_event_size))
+  flat_event_size = tf.nest.map_structure(ps.reduce_prod, flat_event_shape)
+  ndims = ps.reduce_sum(flat_event_size)
   constraining_bijector = dist.experimental_default_event_space_bijector()
   flatten_bijector = reshape.Reshape(
-    event_shape_out=[-1],
+    event_shape_out=flat_event_size,
     event_shape_in=dist.event_shape_tensor())
 
   constraining_and_flattening_bijector = chain.Chain([flatten_bijector, constraining_bijector])
@@ -450,7 +471,7 @@ def _cascading_flow_update_for_base_distribution(dist,
 
     variables = chain.Chain(bijectors=list(reversed(bijectors)))
 
-  if num_auxiliary_variables > 0:
+  if num_auxiliary_variables > 0 and use_global_auxiliary_variables == True:
     batch_shape = global_auxiliary_variables.shape[:-1] if len(
       global_auxiliary_variables.shape) > 1 else []
     cascading_flows = split.Split(
@@ -466,6 +487,18 @@ def _cascading_flow_update_for_base_distribution(dist,
     cascading_flows = joint_map.JointMap(
       [invert.Invert(constraining_and_flattening_bijector), identity.Identity()])(cascading_flows)
 
+  elif num_auxiliary_variables > 0 and use_global_auxiliary_variables == False:
+    cascading_flows = split.Split(
+      [-1, num_auxiliary_variables])(
+      transformed_distribution.TransformedDistribution(
+        distribution=blockwise.Blockwise([processed_dist,
+          batch_broadcast.BatchBroadcast(
+            sample.Sample(normal.Normal(0.,1.), num_auxiliary_variables), to_shape=processed_dist.batch_shape)]),
+        bijector=variables))
+
+    cascading_flows = joint_map.JointMap(
+      [invert.Invert(constraining_and_flattening_bijector),
+       identity.Identity()])(cascading_flows)
   else:
     cascading_flows = transformed_distribution.TransformedDistribution(
       distribution=processed_dist,
