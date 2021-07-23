@@ -276,7 +276,7 @@ class EndToEndTest(test_util.TestCase):
     ])
 
     decoder_model = tfk.Sequential([
-        tfkl.InputLayer(input_shape=[self.encoded_size]),
+        tfkl.InputLayer(input_shape=[None, self.encoded_size]),
         tfkl.Dense(10, activation='relu'),
         tfkl.Dense(tfpl.IndependentBernoulli.params_size(
             self.input_shape)),
@@ -859,7 +859,8 @@ class _IndependentLayerTest(object):
         batch_shape + [params_size], seed=42))
 
     model = tfk.Sequential([
-        tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
+        tfkl.Dense(params_size, input_shape=batch_shape[1:] + [params_size],
+                   dtype=self.dtype),
         self.layer_class(event_shape, validate_args=True, dtype=self.dtype),
     ])
 
@@ -1222,12 +1223,12 @@ class _MixtureLayerTest(object):
     n = 3
     event_shape = []
     params_size = self.layer_class.params_size(n, event_shape)
-    batch_shape = [4, 1]
+    batch_size = 7
 
     low = self._build_tensor(-3., dtype=self.dtype)
     high = self._build_tensor(3., dtype=self.dtype)
     x = self.evaluate(tfd.Uniform(low, high).sample(
-        batch_shape + [params_size], seed=42))
+        [batch_size] + [params_size], seed=42))
 
     model = tfk.Sequential([
         tfkl.Dense(params_size, input_shape=(params_size,), dtype=self.dtype),
@@ -1243,7 +1244,7 @@ class _MixtureLayerTest(object):
 
     self.assertEqual(self.dtype, model(x).mean().dtype.as_numpy_dtype)
 
-    ones = np.ones([7] + batch_shape + event_shape, dtype=self.dtype)
+    ones = np.ones([3, 2] + [batch_size] + event_shape, dtype=self.dtype)
     self.assertAllEqual(self.evaluate(model(x).log_prob(ones)),
                         self.evaluate(model_copy(x).log_prob(ones)))
 
