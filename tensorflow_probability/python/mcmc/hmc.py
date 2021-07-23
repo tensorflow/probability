@@ -720,7 +720,7 @@ class UncalibratedHamiltonianMonteCarlo(kernel_base.TransitionKernel):
           state_gradients_are_stopped=self.state_gradients_are_stopped)
 
       seed = samplers.sanitize_seed(seed)  # Retain for diagnostics.
-      seeds = samplers.split_seed(seed, n=len(current_state_parts))
+      seeds = list(samplers.split_seed(seed, n=len(current_state_parts)))
       seeds = distribute_lib.fold_in_axis_index(
           seeds, self.experimental_shard_axis_names)
 
