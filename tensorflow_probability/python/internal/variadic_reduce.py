@@ -123,20 +123,11 @@ def make_variadic_reduce(reducer, vjp_bwd, tangents_fn):
   def _xla_reduce(operands, inits, axis):
     """JIT-ed wrapper for TF `xla.variadic_reduce(..., reducer)`."""
     from tensorflow.compiler.tf2xla.python import xla  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
-    try:
-      result = xla.variadic_reduce(
-          operands,
-          init_values=inits,
-          dimensions_to_reduce=axis,
-          reducer=tf.function(reducer).get_concrete_function(inits, inits))
-    except TypeError:
-      # TODO(necula): This is needed only temporarily, until cl/384088502
-      # makes it in tf-nightly.
-      result = xla.variadic_reduce_v2(
-          operands,
-          init_values=inits,
-          dimensions_to_reduce=axis,
-          reducer=tf.function(reducer).get_concrete_function(inits, inits))
+    result = xla.variadic_reduce(
+        operands,
+        init_values=inits,
+        dimensions_to_reduce=axis,
+        reducer=tf.function(reducer).get_concrete_function(inits, inits))
     # Graph mode: variadic reduce doesn't specify output shapes. Patch that.
     shp = operands[0].shape
     for arg in operands:
