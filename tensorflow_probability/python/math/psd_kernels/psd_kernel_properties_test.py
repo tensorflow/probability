@@ -140,7 +140,8 @@ class KernelPropertiesTest(test_util.TestCase):
         example_ndims=1,
         feature_dim=2,
         feature_ndims=1)))
-    diag = kernel.apply(xs, xs, example_ndims=1)
+    with tfp_hps.no_tf_rank_errors():
+      diag = kernel.apply(xs, xs, example_ndims=1)
 
     # Test flatten/unflatten.
     flat = tf.nest.flatten(kernel, expand_composites=True)
@@ -152,8 +153,9 @@ class KernelPropertiesTest(test_util.TestCase):
       return k.apply(xs, xs, example_ndims=1)
 
     self.evaluate([v.initializer for v in kernel.variables])
-    self.assertAllClose(diag, diag_fn(kernel))
-    self.assertAllClose(diag, diag_fn(unflat))
+    with tfp_hps.no_tf_rank_errors():
+      self.assertAllClose(diag, diag_fn(kernel))
+      self.assertAllClose(diag, diag_fn(unflat))
 
 
 CONSTRAINTS = {
