@@ -33,7 +33,7 @@
 # # ==> /absolute/path/to/testing/run_tfp_lints.sh
 
 # Get the absolute path to the directory containing this script
-DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
+DIR=$(cd $(dirname "${BASH_SOURCE[0]:-$0}") && pwd)
 
 # Read alias name from the first argument to the script, with a default of
 # `tfp_lints`.
