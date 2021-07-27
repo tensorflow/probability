@@ -374,10 +374,9 @@ class MixtureSameFamily(distribution.Distribution):
         self.mixture_distribution.logits_parameter(), axis=-1)  # [B, k]
     return log_prob_x + log_mix_prob  # [S, B, k]
 
-  def _log_prob(self, x, log_joint=None):
-    if log_joint is None:
-      log_joint = self._per_mixture_component_log_prob(x)
-    return tf.reduce_logsumexp(log_joint, axis=-1)  # [S, B]
+  def _log_prob(self, x):
+    return tf.reduce_logsumexp(
+        self._per_mixture_component_log_prob(x), axis=-1)  # [S, B]
 
   def _mean(self):
     probs = self.mixture_distribution.probs_parameter()  # [B, k] or [k]
