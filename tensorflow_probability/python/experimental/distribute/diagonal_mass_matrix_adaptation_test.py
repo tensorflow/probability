@@ -24,6 +24,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 tfd = tfp.distributions
 tfp_dist = tfp.experimental.distribute
@@ -55,8 +56,16 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
     state = tf.zeros(3)
     pkr = kernel.bootstrap_results(state)
     draws = np.random.randn(10, 3).astype(np.float32)
-    for draw, seed in zip(draws, samplers.split_seed(self.key, draws.shape[0])):
-      _, pkr = kernel.one_step(draw, pkr, seed=seed)
+
+    def body(pkr_seed, draw):
+      pkr, seed = pkr_seed
+      seed, kernel_seed = samplers.split_seed(seed)
+      _, pkr = kernel.one_step(draw, pkr, seed=kernel_seed)
+      return (pkr, seed)
+
+    (pkr, _), _ = mcmc_util.trace_scan(body,
+                                       (pkr, samplers.sanitize_seed(self.key)),
+                                       draws, lambda _: ())
 
     running_variance = pkr.running_variance[0]
     emp_mean = draws.sum(axis=0) / 20.
@@ -80,26 +89,31 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
           tfp.experimental.stats.RunningVariance.from_stats(
               num_samples=10., mean=tf.zeros(3), variance=tf.ones(3)))
       pkr = kernel.bootstrap_results(state)
-      draws = []
-      for seed in seeds:
+
+      def body(draw_pkr, seed):
+        _, pkr = draw_pkr
         draw_seed, step_seed = samplers.split_seed(seed)
         draw = dist.sample(seed=draw_seed)
         _, pkr = kernel.one_step(draw, pkr, seed=step_seed)
-        draws.append(draw)
+        return draw, pkr
+
+      (_, pkr), draws = mcmc_util.trace_scan(body,
+                                             (tf.zeros(dist.event_shape), pkr),
+                                             seeds, lambda v: v[0])
+
       return draws, pkr
 
     draws, pkr = self.strategy_run(run, (self.key,), in_axes=None)
-    draws = tf.stack(self.evaluate(self.per_replica_to_tensor(draws)), axis=0)
-
     running_variance = self.per_replica_to_composite_tensor(
         pkr.running_variance[0])
+    draws = self.per_replica_to_tensor(draws, axis=1)
+    mean, sum_squared_residuals, draws = self.evaluate(
+        (running_variance.mean, running_variance.sum_squared_residuals, draws))
     emp_mean = tf.reduce_sum(draws, axis=0) / 20.
-    emp_squared_residuals = (tf.reduce_sum((draws - emp_mean) ** 2, axis=0) +
-                             10 * emp_mean ** 2 +
-                             10)
-    self.assertAllClose(emp_mean, running_variance.mean)
-    self.assertAllClose(emp_squared_residuals,
-                        running_variance.sum_squared_residuals)
+    emp_squared_residuals = (
+        tf.reduce_sum((draws - emp_mean)**2, axis=0) + 10 * emp_mean**2 + 10)
+    self.assertAllClose(emp_mean, mean)
+    self.assertAllClose(emp_squared_residuals, sum_squared_residuals)
 
   def test_diagonal_mass_matrix_sample(self):
     @tf.function(autograph=False)
@@ -114,25 +128,29 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
           tfp.experimental.stats.RunningVariance.from_stats(
               num_samples=10., mean=tf.zeros(3), variance=tf.ones(3)))
       pkr = kernel.bootstrap_results(state)
-      draws = []
-      for seed in seeds:
+      def body(draw_pkr, seed):
+        _, pkr = draw_pkr
         draw_seed, step_seed = samplers.split_seed(seed)
         draw = dist.sample(seed=draw_seed)
         _, pkr = kernel.one_step(draw, pkr, seed=step_seed)
-        draws.append(draw)
+        return draw, pkr
+
+      (_, pkr), draws = mcmc_util.trace_scan(body,
+                                             (tf.zeros(dist.event_shape), pkr),
+                                             seeds, lambda v: v[0])
       return draws, pkr
 
     draws, pkr = self.strategy_run(run, (self.key,), in_axes=None)
-    draws = tf.stack(self.evaluate(self.per_replica_to_tensor(draws)), axis=0)
-
     running_variance = self.per_replica_to_composite_tensor(
         pkr.running_variance[0])
+    draws = self.per_replica_to_tensor(draws, axis=1)
+    mean, sum_squared_residuals, draws = self.evaluate(
+        (running_variance.mean, running_variance.sum_squared_residuals, draws))
     emp_mean = tf.reduce_sum(draws, axis=0) / 20.
     emp_squared_residuals = tf.reduce_sum(
         (draws - emp_mean[None, ...])**2, axis=0) + 10 * emp_mean**2 + 10
-    self.assertAllClose(emp_mean, running_variance.mean)
-    self.assertAllClose(emp_squared_residuals,
-                        running_variance.sum_squared_residuals)
+    self.assertAllClose(emp_mean, mean)
+    self.assertAllClose(emp_squared_residuals, sum_squared_residuals)
 
 
 if __name__ == '__main__':
