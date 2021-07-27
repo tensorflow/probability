@@ -41,7 +41,6 @@ multi_substrate_py_library(
     substrates_omit_deps = [
         ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
         "//tensorflow_probability/python/experimental/nn",
@@ -57,7 +56,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/bijectors",
         "//tensorflow_probability/python/experimental/distribute",
         "//tensorflow_probability/python/experimental/distributions",
-        "//tensorflow_probability/python/experimental/lazybones",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
         "//tensorflow_probability/python/experimental/mcmc",
