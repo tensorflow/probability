@@ -35,6 +35,7 @@ py_library(
         ":regularization",
         ":structural_time_series",
         "//tensorflow_probability/python/internal:all_util",
+        "//tensorflow_probability/python/sts/anomaly_detection",
         "//tensorflow_probability/python/sts/components",
     ],
 )
