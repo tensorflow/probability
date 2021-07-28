@@ -106,7 +106,7 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
     if repro_seed is not None:
       # This implements the semantics of TFP_HYPOTHESIS_REPRODUCE via
       # the `hp.reproduce_failure` decorator.
-      test_method = hp.reproduce_failure('3.56.5', repro_seed)(test_method)
+      test_method = hp.reproduce_failure('3.88.3', repro_seed)(test_method)
     elif randomize_hypothesis():
       # Hypothesis defaults to seeding its internal PRNG from the system time,
       # so since we actually want randomization (including across machines) we
