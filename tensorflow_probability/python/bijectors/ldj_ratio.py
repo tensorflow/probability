@@ -32,7 +32,6 @@ __all__ = [
     'RegisterILDJRatio',
 ]
 
-
 _fldj_ratio_registry = {}
 _ildj_ratio_registry = {}
 
@@ -45,9 +44,8 @@ def _reduce_ldj_ratio(unreduced_ldj_ratio, p, q, input_shape, min_event_ndims,
       p._parameter_batch_shape is not None and
       q._parameter_batch_shape is not None)
   if have_parameter_batch_shape:
-    parameter_batch_shape = ps.broadcast_shape(
-        p._parameter_batch_shape,
-        q._parameter_batch_shape)
+    parameter_batch_shape = ps.broadcast_shape(p._parameter_batch_shape,
+                                               q._parameter_batch_shape)
   else:
     parameter_batch_shape = None
 
@@ -78,8 +76,8 @@ def _default_fldj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
 def _default_ildj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs):
   min_event_ndims = p.inverse_min_event_ndims
   unreduced_fldj_ratio = (
-      p.inverse_log_det_jacobian(x, event_ndims=event_ndims, **p_kwargs) -
-      q.inverse_log_det_jacobian(y, event_ndims=event_ndims, **q_kwargs))
+      p.inverse_log_det_jacobian(x, event_ndims=min_event_ndims, **p_kwargs) -
+      q.inverse_log_det_jacobian(y, event_ndims=min_event_ndims, **q_kwargs))
   return _reduce_ldj_ratio(unreduced_fldj_ratio, p, q, ps.shape(x),
                            min_event_ndims, event_ndims)
 
@@ -200,32 +198,7 @@ def inverse_log_det_jacobian_ratio(
     else:
       ildj_ratio_fn = inverse_ildj_ratio_fn
 
-  if tf.nest.is_nested(p.inverse_min_event_ndims):
-    # See the comment in forward_log_det_jacobian_ratio about why we do this.
-    return ildj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs)
-  else:
-    # Evaluate the ratio at minimum event ndims, and then reduce the unreduced
-    # LDJ.
-    min_event_ndims = p.inverse_min_event_ndims
-    have_parameter_batch_shape = (
-        p._parameter_batch_shape is not None and  # pylint: disable=protected-access
-        q._parameter_batch_shape is not None)  # pylint: disable=protected-access
-    reduce_shape, assertions = bijector_lib.ldj_reduction_shape(
-        ps.shape(x),
-        event_ndims=event_ndims,
-        min_event_ndims=min_event_ndims,
-        parameter_batch_shape=(ps.broadcast_shape(p._parameter_batch_shape,  # pylint: disable=protected-access
-                                                  q._parameter_batch_shape)  # pylint: disable=protected-access
-                               if have_parameter_batch_shape else None),
-        allow_event_shape_broadcasting=True,
-        validate_args=p.validate_args or q.validate_args)
-
-    sum_fn = getattr(p, '_sum_fn', getattr(q, '_sum_fn', tf.reduce_sum))
-    with tf.control_dependencies(assertions):
-      return bijector_lib.reduce_jacobian_det_over_shape(
-          ildj_ratio_fn(p, x, q, y, min_event_ndims, p_kwargs, q_kwargs),
-          reduce_shape=reduce_shape,
-          sum_fn=sum_fn)
+  return ildj_ratio_fn(p, x, q, y, event_ndims, p_kwargs, q_kwargs)
 
 
 class RegisterFLDJRatio(object):

@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 # Description:
-#   Utilities for lazybones symbolic execution/analysis.
+#   Gibbs sampling for Bayesian structural time series models
 
 licenses(["notice"])
 
@@ -26,74 +26,47 @@ package(
 exports_files(["LICENSE"])
 
 py_library(
-    name = "utils",
+    name = "anomaly_detection",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
-        ":probability",
-        ":special_methods",
-        ":utils_impl",
-        ":weak_container",
+        ":anomaly_detection_lib",
     ],
 )
 
 py_library(
-    name = "special_methods",
-    srcs = ["special_methods.py"],
-    srcs_version = "PY3",
-    deps = [
-        # tensorflow dep,
-    ],
-)
-
-py_library(
-    name = "utils_impl",
-    srcs = ["utils.py"],
-    srcs_version = "PY3",
-    deps = [
-        "//tensorflow_probability/python/experimental/lazybones:deferred",
-    ],
-)
-
-py_test(
-    name = "utils_test",
-    size = "small",
-    srcs = ["utils_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # absl/testing:absltest dep,
-        "//tensorflow_probability",
-    ],
-)
-
-py_library(
-    name = "probability",
-    srcs = ["probability.py"],
-    srcs_version = "PY3",
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/experimental/lazybones:deferred",
-        "//tensorflow_probability/python/experimental/lazybones:deferred_scope",
-    ],
-)
-
-py_test(
-    name = "probability_test",
-    srcs = ["probability_test.py"],
-    python_version = "PY3",
+    name = "anomaly_detection_lib",
+    srcs = ["anomaly_detection_lib.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,
-        # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/experimental/sts_gibbs:gibbs_sampler",
+        "//tensorflow_probability/python/experimental/util",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/sts:fitting",
+        "//tensorflow_probability/python/sts:forecast",
+        "//tensorflow_probability/python/sts:regularization",
+        "//tensorflow_probability/python/sts/components",
+        "//tensorflow_probability/python/sts/internal",
     ],
 )
 
-py_library(
-    name = "weak_container",
-    srcs = ["weak_container.py"],
+py_test(
+    name = "anomaly_detection_test",
+    size = "medium",
+    srcs = ["anomaly_detection_test.py"],
     srcs_version = "PY3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # pandas dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/sts_gibbs",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
 )

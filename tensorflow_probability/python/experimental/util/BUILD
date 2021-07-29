@@ -52,9 +52,9 @@ py_library(
     srcs = ["deferred_module.py"],
     srcs_version = "PY3",
     deps = [
+        ":special_methods",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/experimental/lazybones/utils:special_methods",
         "//tensorflow_probability/python/internal:nest_util",
     ],
 )
@@ -99,6 +99,15 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+py_library(
+    name = "special_methods",
+    srcs = ["special_methods.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
     ],
 )
 

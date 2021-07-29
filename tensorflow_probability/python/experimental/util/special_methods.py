@@ -29,12 +29,6 @@ import sys
 import tensorflow.compat.v2 as tf
 
 
-__all__ = [
-    'ObjectProxy',
-    'SpecialMethods',
-]
-
-
 # According to:
 #
 # https://docs.python.org/3/reference/datamodel.html#special-lookup
