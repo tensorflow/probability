@@ -485,20 +485,23 @@ class DistributionSlicingTest(test_util.TestCase):
     # slicing the samples from the original.
     self.assertAllEqual(sliced_samples.shape, sliced_dist_samples.shape)
 
-    # Check that a sliced distribution can compute the log_prob of its own
-    # samples (up to numerical validation errors).
+    # Check that the sliced dist's log_prob agrees with slicing the original's
+    # log_prob.
+    # First, we make sure that the original sample we have passes the
+    # original distribution's validations.  We break the bijector cache here
+    # because slicing will break it later too.
     with tfp_hps.no_tf_rank_errors():
       try:
-        lp = self.evaluate(dist.log_prob(samples))
+        lp = self.evaluate(dist.log_prob(
+            samples + tf.constant(0, dtype=samples.dtype)))
       except tf.errors.InvalidArgumentError:
         # TODO(b/129271256): d.log_prob(d.sample()) should not fail
         #     validate_args checks.
-        # We only tolerate this case for the non-sliced dist.
+        # `return` here passes the example.  If we `hp.assume(False)`
+        # instead, that would demand from Hypothesis that it find many
+        # examples where this check (and the next one) passes;
+        # empirically, it seems to complain that that's too hard.
         return
-      sliced_lp = self.evaluate(sliced_dist.log_prob(sliced_samples))
-
-    # Check that the sliced dist's log_prob agrees with slicing the original's
-    # log_prob.
 
     # This `hp.assume` is suppressing array sizes that cause the sliced and
     # non-sliced distribution to follow different Eigen code paths.  Those
@@ -517,6 +520,10 @@ class DistributionSlicingTest(test_util.TestCase):
         _all_non_packetized(samples) and _all_non_packetized(sliced_samples))
     hp.note('Non-packetization check {}'.format(all_non_packetized))
     hp.assume(all_packetized or all_non_packetized)
+
+    # Actually evaluate and test the sliced log_prob
+    with tfp_hps.no_tf_rank_errors():
+      sliced_lp = self.evaluate(sliced_dist.log_prob(sliced_samples))
 
     self.assertAllClose(lp[slices], sliced_lp,
                         atol=SLICING_LOGPROB_ATOL[dist_name],
