@@ -26,9 +26,12 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.ode import base
 from tensorflow_probability.python.math.ode import bdf_util
 from tensorflow_probability.python.math.ode import util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'BDF',
@@ -83,6 +86,10 @@ class BDF(base.Solver):
        Journal on Scientific Computing_ 18(1):1-22, 1997.
   """
 
+  @deprecation.deprecated_args(
+      '2021-11-01',
+      'use_pfor_to_compute_jacobian is deprecated, and does nothing.',
+      'use_pfor_to_compute_jacobian')
   def __init__(
       self,
       rtol=1e-3,
@@ -175,8 +182,8 @@ class BDF(base.Solver):
       name: Python `str` name prefixed to Ops created by this function.
         Default value: `None` (i.e., 'bdf').
     """
+    del use_pfor_to_compute_jacobian
     super(BDF, self).__init__(
-        use_pfor_to_compute_jacobian=use_pfor_to_compute_jacobian,
         make_adjoint_solver_fn=make_adjoint_solver_fn,
         validate_args=validate_args,
         name=name,
@@ -428,7 +435,7 @@ class BDF(base.Solver):
           backward_differences.dtype,
           size=bdf_util.MAX_ORDER + 3,
           clear_after_read=False,
-          element_shape=next_backward_difference.get_shape()).unstack(
+          element_shape=next_backward_difference.shape).unstack(
               backward_differences)
       new_order = order
       new_error_ratio = error_ratio
@@ -485,7 +492,7 @@ class BDF(base.Solver):
           initial_time=initial_time,
       )
 
-      if jacobian_fn is None and p.common_state_dtype.is_complex:
+      if jacobian_fn is None and dtype_util.is_complex(p.common_state_dtype):
         raise NotImplementedError('The BDF solver does not support automatic '
                                   'Jacobian computations for complex dtypes.')
 
@@ -494,7 +501,6 @@ class BDF(base.Solver):
           jacobian_fn,
           p.ode_fn_vec,
           p.state_shape,
-          use_pfor=self._use_pfor_to_compute_jacobian,
           dtype=p.common_state_dtype,
       )
 
@@ -559,7 +565,7 @@ class BDF(base.Solver):
           p.common_state_dtype,
           size=num_solution_times,
           dynamic_size=solution_times_chosen_by_solver,
-          element_shape=p.initial_state_vec.get_shape())
+          element_shape=p.initial_state_vec.shape)
       time_array = tf.TensorArray(
           p.real_dtype,
           size=num_solution_times,
@@ -640,10 +646,12 @@ class BDF(base.Solver):
         states = util.get_state_from_vec(state_vec_array.stack(), p.state_shape)
         times = time_array.stack()
         if not solution_times_chosen_by_solver:
-          times.set_shape(solution_times.get_shape())
+          tensorshape_util.set_shape(times, solution_times.shape)
           tf.nest.map_structure(
-              lambda s, ini_s: s.set_shape(solution_times.get_shape(  # pylint: disable=g-long-lambda
-              ).concatenate(ini_s.shape)), states, p.initial_state)
+              lambda s, ini_s: tensorshape_util.set_shape(  # pylint: disable=g-long-lambda
+                  s,
+                  tensorshape_util.concatenate(solution_times.shape, ini_s.shape
+                                              )), states, p.initial_state)
         return base.Results(
             times=times,
             states=states,
@@ -680,14 +688,14 @@ class BDF(base.Solver):
             p.initial_state_vec[tf.newaxis, :],
             first_order_backward_difference[tf.newaxis, :],
             tf.zeros(
-                tf.stack([bdf_util.MAX_ORDER + 1, p.num_odes]),
+                ps.stack([bdf_util.MAX_ORDER + 1, p.num_odes]),
                 dtype=p.common_state_dtype),
         ],
         axis=0,
     )
     return _BDFSolverInternalState(
         backward_differences=backward_differences,
-        order=1,
+        order=tf.ones([], tf.int32),
         step_size=first_step_size)
 
   def _prepare_coefficients(self, dtype):
@@ -696,10 +704,12 @@ class BDF(base.Solver):
     if self._validate_args:
       bdf_coefficients = tf.ensure_shape(bdf_coefficients, [6])
     util.error_if_not_vector(bdf_coefficients, 'bdf_coefficients')
+    np_dtype = dtype_util.as_numpy_dtype(bdf_coefficients.dtype)
     newton_coefficients = 1. / (
-        (1. - bdf_coefficients) * bdf_util.RECIPROCAL_SUMS)
-    error_coefficients = bdf_coefficients * bdf_util.RECIPROCAL_SUMS + 1. / (
-        bdf_util.ORDERS + 1)
+        (1. - bdf_coefficients) * bdf_util.RECIPROCAL_SUMS.astype(np_dtype))
+    error_coefficients = (
+        bdf_coefficients * bdf_util.RECIPROCAL_SUMS.astype(np_dtype) + 1. /
+        (bdf_util.ORDERS.astype(np_dtype) + 1))
 
     return newton_coefficients, error_coefficients
 
@@ -710,7 +720,7 @@ class BDF(base.Solver):
     initial_state = tf.nest.map_structure(tf.convert_to_tensor, initial_state)
     tf.nest.map_structure(error_if_wrong_dtype, initial_state)
 
-    state_shape = tf.nest.map_structure(tf.shape, initial_state)
+    state_shape = tf.nest.map_structure(ps.shape, initial_state)
     common_state_dtype = dtype_util.common_dtype(initial_state)
     real_dtype = dtype_util.real_dtype(common_state_dtype)
     # Use tf.cast instead of tf.convert_to_tensor for differentiable

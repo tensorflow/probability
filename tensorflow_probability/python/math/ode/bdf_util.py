@@ -22,6 +22,9 @@ import collections
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 
 MAX_ORDER = 5
 ORDERS = np.arange(0, MAX_ORDER + 1)
@@ -79,8 +82,8 @@ def interpolate_backward_differences(backward_differences, order,
   interpolated_backward_differences = tf.concat([
       tf.gather(backward_differences, [0]),
       interpolated_backward_differences_orders_one_to_five,
-      tf.zeros(
-          tf.stack([2, tf.shape(backward_differences)[1]]), dtype=state_dtype),
+      ps.zeros(
+          ps.stack([2, ps.shape(backward_differences)[1]]), dtype=state_dtype),
   ], 0)
   return interpolated_backward_differences
 
@@ -116,9 +119,12 @@ def newton(backward_differences, max_num_iters, newton_coefficient, ode_fn_vec,
           tf.zeros_like(backward_differences)[:MAX_ORDER + 1]),
       axis=0)
 
+  np_dtype = np_dtype = dtype_util.as_numpy_dtype(backward_differences.dtype)
+
   rhs_constant_term = newton_coefficient * tf.reduce_sum(
       tf1.where(
-          tf.range(1, MAX_ORDER + 1) <= order, RECIPROCAL_SUMS[1:, np.newaxis] *
+          tf.range(1, MAX_ORDER + 1) <= order,
+          RECIPROCAL_SUMS[1:, np.newaxis].astype(np_dtype) *
           backward_differences[1:MAX_ORDER + 1],
           tf.zeros_like(backward_differences)[1:MAX_ORDER + 1]),
       axis=0)
@@ -204,7 +210,7 @@ _NewtonIterand = collections.namedtuple('NewtonIterand', [
 
 def newton_qr(jacobian_mat, newton_coefficient, step_size):
   """QR factorizes the matrix used in each iteration of Newton's method."""
-  identity = tf.eye(tf.shape(jacobian_mat)[0], dtype=jacobian_mat.dtype)
+  identity = tf.eye(ps.shape(jacobian_mat)[0], dtype=jacobian_mat.dtype)
   step_size_cast = tf.cast(step_size, jacobian_mat.dtype)
   newton_matrix = (
       identity - step_size_cast * newton_coefficient * jacobian_mat)
@@ -219,13 +225,13 @@ def update_backward_differences(backward_differences, next_backward_difference,
       backward_differences.dtype,
       size=MAX_ORDER + 3,
       clear_after_read=False,
-      element_shape=next_backward_difference.get_shape()).unstack(
+      element_shape=next_backward_difference.shape).unstack(
           backward_differences)
   new_backward_differences_array = tf.TensorArray(
       backward_differences.dtype,
       size=MAX_ORDER + 3,
       clear_after_read=False,
-      element_shape=next_backward_difference.get_shape())
+      element_shape=next_backward_difference.shape)
   new_backward_differences_array = new_backward_differences_array.write(
       order + 2,
       next_backward_difference - backward_differences_array.read(order + 1))
@@ -246,5 +252,6 @@ def update_backward_differences(backward_differences, next_backward_difference,
   new_backward_differences_array = new_backward_differences_array.write(
       0, next_state_vec)
   new_backward_differences = new_backward_differences_array.stack()
-  new_backward_differences.set_shape(tf.TensorShape([MAX_ORDER + 3, None]))
+  tensorshape_util.set_shape(new_backward_differences,
+                             tf.TensorShape([MAX_ORDER + 3, None]))
   return new_backward_differences
