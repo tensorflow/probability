@@ -249,6 +249,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
         self.assertAllCloseAccordingToType(1, self.evaluate(step))
 
   def testSparseBasic(self):
+    self.skipTest('b/195306553')
     if tf.executing_eagerly():
       return
 
