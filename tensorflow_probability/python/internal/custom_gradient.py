@@ -92,14 +92,25 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None,
               args = args[1:]
           val, aux = vjp_fwd(*reconstruct_args, **kwargs)
 
-          def vjp_bwd_wrapped(*g):
+          def vjp_bwd_wrapped(*g, **kwargs):
+            # We don't want to use an explicit `variables` arg, because TF will
+            # complain if the wrapped function doesn't actually have variables
+            # in it. TF will only specify this arg if there are variables.
+            variables = kwargs.get('variables', ())
             nondiff_args = [closure[i] for i in nondiff_argnums]
-            result = tf.nest.flatten(
-                vjp_bwd(*nondiff_args, aux, tf.nest.pack_sequence_as(val, g)))
+            result = vjp_bwd(*nondiff_args, aux,
+                             tf.nest.pack_sequence_as(val, g), **kwargs)
+            if variables:
+              result, variables = result
+            result = tf.nest.flatten(result)
             for i in nondiff_argnums:
               result = tuple(result[:i]) + (None,) + tuple(result[i:])
             result = [a for i, a in enumerate(result) if i not in closure]
-            return tf.nest.pack_sequence_as(args_structure, result)
+            result = tf.nest.pack_sequence_as(args_structure, result)
+            if variables:
+              return result, variables
+            else:
+              return result
 
           return val, vjp_bwd_wrapped
 
