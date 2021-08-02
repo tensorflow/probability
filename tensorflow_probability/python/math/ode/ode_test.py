@@ -24,10 +24,41 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient as tfp_gradient
 from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
 
 _RTOL = 1e-8
 _ATOL = 1e-12
+
+NUMPY_MODE = False
+JAX_MODE = False
+
+
+def _test_cases(bdf_only=False):
+  # JAX cannot deal with ChosenBySolver as that requires dynamic TensorArrays.
+  # NumPy cannot deal with BDF due to the Newton's method inside of it.
+
+  def _fixed_fn(final_time):
+    return [final_time]
+
+  test_cases = []
+  if not bdf_only:
+    if not JAX_MODE:
+      test_cases.append(('dormand_prince', tfp.math.ode.DormandPrince,
+                         tfp.math.ode.ChosenBySolver))
+    test_cases.append(
+        ('dormand_prince_fixed', tfp.math.ode.DormandPrince, _fixed_fn))
+  if not NUMPY_MODE:
+    if not JAX_MODE:
+      test_cases.append(('bdf', tfp.math.ode.BDF, tfp.math.ode.ChosenBySolver))
+    test_cases.append(('bdf_fixed', tfp.math.ode.BDF, _fixed_fn))
+  if not test_cases:
+    # This is here just to appease parameterized.named_parameters, as it needs
+    # at least 1 test case. We'll be disabling the entire test manually in this
+    # case.
+    test_cases.append(('disabled', None, None))
+
+  return test_cases
 
 
 class StepSizeHeuristicAdjointSolver(tfp.math.ode.Solver):
@@ -38,7 +69,6 @@ class StepSizeHeuristicAdjointSolver(tfp.math.ode.Solver):
     self._make_solver_fn = make_solver_fn
     solver = make_solver_fn(first_step_size)
     super(StepSizeHeuristicAdjointSolver, self).__init__(
-        use_pfor_to_compute_jacobian=solver._use_pfor_to_compute_jacobian,
         validate_args=solver._validate_args,
         make_adjoint_solver_fn=None,
         name='Adjoint' + solver.name,
@@ -59,12 +89,10 @@ class StepSizeHeuristicAdjointSolver(tfp.math.ode.Solver):
 
 
 @test_util.test_all_tf_execution_regimes
-@parameterized.named_parameters([
-    ('bdf', tfp.math.ode.BDF),
-    ('dormand_prince', tfp.math.ode.DormandPrince)])
+@parameterized.named_parameters(_test_cases())
 class NonStiffTest(test_util.TestCase):
 
-  def test_zero_dims(self, solver):
+  def test_zero_dims(self, solver, solution_times_fn):
     ode_fn = lambda time, state: -state
     initial_time = 0.
     initial_state = np.float64(1.)
@@ -74,13 +102,13 @@ class NonStiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=tfp.math.ode.ChosenBySolver(1.),
+        solution_times=solution_times_fn(1.),
         jacobian_fn=jacobian)
     times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(-times) * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_state_with_matrix_shape(self, solver):
+  def test_state_with_matrix_shape(self, solver, solution_times_fn):
     ode_fn = lambda time, state: -state
     initial_time = 0.
     initial_state = np.float64([[1., 2.], [3., 4.]])
@@ -92,13 +120,13 @@ class NonStiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=tfp.math.ode.ChosenBySolver(1.),
+        solution_times=solution_times_fn(1.),
         jacobian_fn=jacobian)
     times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(-times)[:, np.newaxis, np.newaxis] * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_ode_fn_is_zero(self, solver):
+  def test_ode_fn_is_zero(self, solver, solution_times_fn):
     initial_time = 0.
     initial_state = np.float64([1., 2., 3.])
     ode_fn = lambda time, state: np.zeros_like(initial_state)
@@ -108,13 +136,13 @@ class NonStiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=tfp.math.ode.ChosenBySolver(1.),
+        solution_times=solution_times_fn(1.),
         jacobian_fn=jacobian)
     times, states = self.evaluate([results.times, results.states])
     states_exact = np.ones([times.size, initial_state.size]) * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_linear_ode(self, solver):
+  def test_linear_ode(self, solver, solution_times_fn):
     jacobian_diag_part = np.float64([-0.5, -1.])
     ode_fn = lambda time, state: jacobian_diag_part * state
     initial_time = 0.
@@ -125,14 +153,14 @@ class NonStiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=tfp.math.ode.ChosenBySolver(1.),
+        solution_times=solution_times_fn(1.),
         jacobian_fn=jacobian)
     times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_linear_ode_jacobian_fn_unspecified(self, solver):
+  def test_linear_ode_jacobian_fn_unspecified(self, solver, solution_times_fn):
     jacobian_diag_part = np.float64([-0.5, -1.])
     ode_fn = lambda time, state: jacobian_diag_part * state
     initial_time = 0.
@@ -142,13 +170,13 @@ class NonStiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=tfp.math.ode.ChosenBySolver(1.))
+        solution_times=solution_times_fn(1.))
     times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_linear_ode_complex(self, solver):
+  def test_linear_ode_complex(self, solver, solution_times_fn):
     jacobian_diag_part = np.complex128([1j - 0.1, 1j])
     ode_fn = lambda time, state: jacobian_diag_part * state
     initial_time = 0.
@@ -159,14 +187,14 @@ class NonStiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=tfp.math.ode.ChosenBySolver(1.),
+        solution_times=solution_times_fn(1.),
         jacobian_fn=jacobian)
     times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *
                           times[:, np.newaxis]) * initial_state
     self.assertAllClose(states, states_exact)
 
-  def test_linear_ode_dense(self, solver):
+  def test_linear_ode_dense(self, solver, solution_times_fn):
     np.random.seed(0)
     initial_time = 0.
     num_odes = 20
@@ -182,7 +210,7 @@ class NonStiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=[final_time],
+        solution_times=solution_times_fn(final_time),
         jacobian_fn=jacobian)
     final_state = self.evaluate(results.states[-1])
     # Exact solution is obtained by diagonalizing the Jacobian by
@@ -194,7 +222,7 @@ class NonStiffTest(test_util.TestCase):
     final_state_exact = np.matmul(eigvecs, final_state_changed_exact)
     self.assertAllClose(final_state, final_state_exact)
 
-  def test_riccati(self, solver):
+  def test_riccati(self, solver, solution_times_fn):
     ode_fn = lambda time, state: (state - time)**2 + 1.
     initial_time = 0.
     initial_state = np.float64(0.5)
@@ -204,13 +232,13 @@ class NonStiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=tfp.math.ode.ChosenBySolver(1.),
+        solution_times=solution_times_fn(1.),
         jacobian_fn=jacobian_fn)
     times, states = self.evaluate([results.times, results.states])
     states_exact = (1. / (1. / initial_state - times) + times)
     self.assertAllClose(states, states_exact)
 
-  def test_forward_tuple(self, solver):
+  def test_forward_tuple(self, solver, solution_times_fn):
     jacobian_diag_a = np.float64([0.5, 1.])
     jacobian_diag_b = np.float64([1.5, 0.734])
     initial_time = 0.
@@ -242,12 +270,12 @@ class NonStiffTest(test_util.TestCase):
     self.assertAllClose(states[0], states_exact_a)
     self.assertAllClose(states[1], states_exact_b)
 
-  def test_forward_multilevel(self, solver):
+  def test_forward_multilevel(self, solver, solution_times_fn):
     jacobian_diag_a = np.float64([0.5, 1.])
     jacobian_diag_b = np.float64([1.5, 0.734])
     jacobian_diag_c = np.float64([-2.5])
     initial_time = 0.
-    solution_times = [0.2]
+    solution_times = solution_times_fn(0.2)
     initial_state = (
         np.float64([1., 2.]), (np.float64([5., 2.]), np.float64([9.])))
 
@@ -282,7 +310,7 @@ class NonStiffTest(test_util.TestCase):
     self.assertAllClose(states[1][0], states_exact_b)
     self.assertAllClose(states[1][1], states_exact_c)
 
-  def test_linear_ode_dense_tuple(self, solver):
+  def test_linear_ode_dense_tuple(self, solver, solution_times_fn):
     np.random.seed(0)
     initial_time = 0.
     num_odes = 20
@@ -303,7 +331,7 @@ class NonStiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=[final_time],
+        solution_times=solution_times_fn(final_time),
         jacobian_fn=jacobian)
     final_state = self.evaluate(
         tf.nest.map_structure(lambda s: s[-1], results.states))
@@ -322,11 +350,12 @@ class NonStiffTest(test_util.TestCase):
     self.assertAllClose(final_state, final_state_exact)
 
 
+@test_util.numpy_disable_gradient_test
 @test_util.test_all_tf_execution_regimes
-@parameterized.named_parameters([('bdf', tfp.math.ode.BDF)])
+@parameterized.named_parameters(_test_cases(bdf_only=True))
 class StiffTest(test_util.TestCase):
 
-  def test_van_der_pol(self, solver):
+  def test_van_der_pol(self, solver, solution_times_fn):
 
     def ode_fn(_, state):
       return tf.stack([
@@ -347,12 +376,12 @@ class StiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=[3000.],
+        solution_times=solution_times_fn(3000.),
         jacobian_fn=jacobian_fn)
     self.assertAllClose(
         self.evaluate(results.states[-1, 0]), -1.5, rtol=0., atol=0.05)
 
-  def test_van_der_pol_tuple(self, solver):
+  def test_van_der_pol_tuple(self, solver, solution_times_fn):
 
     def ode_fn(_, state):
       return (state[1], 1000. * (1. - state[0]**2) * state[1] - state[0])
@@ -370,19 +399,18 @@ class StiffTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=[3000.],
+        solution_times=solution_times_fn(3000.),
         jacobian_fn=jacobian_fn)
     self.assertAllClose(
         self.evaluate(results.states[0][-1]), -1.5, rtol=0., atol=0.05)
 
 
+@test_util.numpy_disable_gradient_test
 @test_util.test_all_tf_execution_regimes
-@parameterized.named_parameters([
-    ('bdf', tfp.math.ode.BDF),
-    ('dormand_prince', tfp.math.ode.DormandPrince)])
+@parameterized.named_parameters(_test_cases())
 class GradientTest(test_util.TestCase):
 
-  def test_riccati(self, solver):
+  def test_riccati(self, solver, solution_times_fn):
     ode_fn = lambda time, state: (state - time)**2 + 1.
     initial_time = 0.
     initial_state_value = 0.5
@@ -390,29 +418,36 @@ class GradientTest(test_util.TestCase):
     final_time = 1.
     jacobian_fn = lambda time, state: 2. * (state - time)
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    with tf.GradientTape() as tape:
-      tape.watch(initial_state)
+
+    def grad_fn(initial_state):
       results = solver_instance.solve(
           ode_fn,
           initial_time,
           initial_state,
-          solution_times=[final_time],
+          solution_times=solution_times_fn(final_time),
           jacobian_fn=jacobian_fn)
-      final_state = results.states[-1]
-    grad = self.evaluate(tape.gradient(final_state, initial_state))
+      return results.states[-1]
+
+    grad = self.evaluate(
+        tfp_gradient.value_and_gradient(grad_fn, initial_state)[1])
     grad_exact = 1. / (1. - initial_state_value * final_time)**2
     self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
 
-  def test_riccati_custom_adjoint_solver(self, solver):
+  @test_util.jax_disable_variable_test
+  def test_riccati_custom_adjoint_solver(self, solver, solution_times_fn):
     ode_fn = lambda time, state: (state - time)**2 + 1.
     initial_time = 0.
     initial_state_value = 0.5
     initial_state = tf.constant(initial_state_value, dtype=tf.float64)
     final_time = 1.
-    solution_times = np.linspace(initial_time, final_time, 4)
+    solution_times = solution_times_fn(final_time)
     jacobian_fn = lambda time, state: 2. * (state - time)
 
-    # Instrument the adjoint solver for testing.
+    if not isinstance(solution_times, tfp.math.ode.ChosenBySolver):
+      self.skipTest('b/194468619')
+
+    # Instrument the adjoint solver for testing. We have to do this because the
+    # API doesn't provide access to the adjoint solver's diagnostics.
     first_step_size = np.float64(1.)
     last_initial_step_size = tf.Variable(0., dtype=tf.float64)
     self.evaluate(last_initial_step_size.initializer)
@@ -435,8 +470,8 @@ class GradientTest(test_util.TestCase):
 
     solver_instance = solver(
         rtol=_RTOL, atol=_ATOL, make_adjoint_solver_fn=lambda: adjoint_solver)
-    with tf.GradientTape() as tape:
-      tape.watch(initial_state)
+
+    def grad_fn(initial_state):
       results = solver_instance.solve(
           ode_fn,
           initial_time,
@@ -444,8 +479,9 @@ class GradientTest(test_util.TestCase):
           solution_times=solution_times,
           jacobian_fn=jacobian_fn)
       final_state = results.states[-1]
-    grad = self.evaluate(tape.gradient(final_state, initial_state))
-    last_initial_step_size = self.evaluate(last_initial_step_size)
+      return final_state
+    _, grad = tfp_gradient.value_and_gradient(grad_fn, initial_state)
+    grad, last_initial_step_size = self.evaluate((grad, last_initial_step_size))
     grad_exact = 1. / (1. - initial_state_value * final_time)**2
     self.assertAllClose(grad, grad_exact, rtol=1e-3, atol=1e-3)
     # This indicates that the adaptation carried over to the final solve. We
@@ -453,7 +489,7 @@ class GradientTest(test_util.TestCase):
     # step size way too large.
     self.assertLess(last_initial_step_size, first_step_size)
 
-  def test_linear_ode(self, solver):
+  def test_linear_ode(self, solver, solution_times_fn):
     if not tf2.enabled():
       self.skipTest('b/152464477')
     jacobian_diag_part = tf.constant([-0.5, -1.], dtype=tf.float64)
@@ -461,28 +497,33 @@ class GradientTest(test_util.TestCase):
     initial_time = 0.
     initial_state = np.float64([1., 2.])
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    with tf.GradientTape() as tape:
-      tape.watch(jacobian_diag_part)
+
+    def grad_fn(jacobian_diag_part):
       results = solver_instance.solve(
           ode_fn,
           initial_time,
           initial_state,
-          solution_times=tfp.math.ode.ChosenBySolver(1.),
+          solution_times=solution_times_fn(1.),
           constants={'jacobian_diag_part': jacobian_diag_part})
-    grad = tape.gradient(results.states, jacobian_diag_part)
-    times, grad = self.evaluate([results.times, grad])
+      return results.states, results.times
 
-    with tf.GradientTape() as tape:
-      tape.watch(jacobian_diag_part)
+    (_, times), grad = tfp_gradient.value_and_gradient(
+        grad_fn, jacobian_diag_part, has_aux=True)
+    times, grad = self.evaluate([times, grad])
+
+    def exact_grad_fn(jacobian_diag_part):
       states_exact = tf.exp(jacobian_diag_part[tf.newaxis, :] *
                             times[:, tf.newaxis]) * initial_state
-    exact_grad = tape.gradient(states_exact, jacobian_diag_part)
+      return states_exact
+    _, exact_grad = tfp_gradient.value_and_gradient(
+        exact_grad_fn, jacobian_diag_part)
     exact_grad = self.evaluate(exact_grad)
     self.assertAllClose(exact_grad, grad, atol=1e-5)
 
 
 # Running pfor repeatedly to rebuild the Jacobian graph is too slow in Eager
 # mode.
+@test_util.numpy_disable_gradient_test
 @test_util.test_graph_mode_only
 @parameterized.named_parameters([
     ('bdf', tfp.math.ode.BDF),
@@ -502,15 +543,18 @@ class GradientTestPforJacobian(test_util.TestCase):
     intermediate_time = 1.
     final_time = 2.
     solver_instance = solver(rtol=_RTOL, atol=_ATOL)
-    with tf.GradientTape() as tape:
-      tape.watch(initial_state)
+
+    def grad_fn(initial_state):
       results = solver_instance.solve(
           ode_fn,
           initial_time,
           initial_state,
           solution_times=[intermediate_time, final_time])
       intermediate_state = results.states[0]
-    grad = self.evaluate(tape.gradient(intermediate_state, initial_state))
+      return intermediate_state
+
+    grad = self.evaluate(
+        tfp_gradient.value_and_gradient(grad_fn, initial_state)[1])
     matrix_exponential_of_jacobian = np.float64(
         [[+2.3703878775011322, +0.2645063729368097, -0.8413751316275110],
          [-0.0900545996427410, +0.7326649140674798, -0.4446155722222950],
@@ -519,6 +563,54 @@ class GradientTestPforJacobian(test_util.TestCase):
     self.assertAllClose(grad, grad_exact)
 
   def test_tuple(self, solver):
+    if not tf2.enabled():
+      self.skipTest('b/152464477')
+
+    alpha = np.float32(0.7)
+    beta = np.float32(2.2)
+
+    def ode_fn(time, state, alpha, beta):
+      del time
+      x, y = state
+      return alpha * x, (alpha + beta) * y
+
+    initial_time = 0.
+    initial_x = np.float32(3.2)
+    initial_y = np.float32(-4.2)
+    initial_state = (initial_x, initial_y)
+    final_time = 0.5
+
+    solver_instance = solver(rtol=_RTOL, atol=_ATOL)
+
+    def grad_fn(alpha, beta):
+      results = solver_instance.solve(
+          ode_fn, initial_time, initial_state, solution_times=[final_time],
+          constants={'alpha': alpha, 'beta': beta})
+      final_state = results.states
+      return final_state
+
+    actual_grad_1 = self.evaluate(
+        tfp_gradient.value_and_gradient(lambda alpha: grad_fn(alpha, beta)[0],
+                                        alpha)[1])
+    actual_grad_2 = self.evaluate(
+        tfp_gradient.value_and_gradient(lambda alpha: grad_fn(alpha, beta)[1],
+                                        alpha)[1])
+    actual_grad_3 = self.evaluate(
+        tfp_gradient.value_and_gradient(lambda beta: grad_fn(alpha, beta)[1],
+                                        beta)[1])
+
+    expected_grad_1 = (
+        initial_x * final_time * np.exp(alpha * final_time))
+    expected_grad_2 = (
+        initial_y * final_time *
+        np.exp((alpha + beta) * final_time))
+    expected_grad_3 = expected_grad_2
+    self.assertAllClose(actual_grad_1, expected_grad_1, rtol=1e-4, atol=1e-4)
+    self.assertAllClose(actual_grad_2, expected_grad_2, rtol=1e-4, atol=1e-4)
+    self.assertAllClose(actual_grad_3, expected_grad_3, rtol=1e-4, atol=1e-4)
+
+  @test_util.jax_disable_variable_test
+  def test_tuple_variables(self, solver):
     alpha = np.float32(0.7)
     beta = np.float32(2.2)
     variable_1 = tf.Variable(alpha, name='alpha')
@@ -559,9 +651,9 @@ class GradientTestPforJacobian(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-@parameterized.named_parameters([
-    ('bdf', tfp.math.ode.BDF),
-    ('dormand_prince', tfp.math.ode.DormandPrince)])
+@parameterized.named_parameters(
+    [('dormand_prince', tfp.math.ode.DormandPrince)] +
+    ([] if NUMPY_MODE else [('bdf', tfp.math.ode.BDF)]))
 class GeneralTest(test_util.TestCase):
 
   def test_bad_initial_state_dtype(self, solver):
@@ -596,6 +688,7 @@ class GeneralTest(test_util.TestCase):
     self.assertGreaterEqual(num_jacobian_evaluations, 0)
     self.assertGreaterEqual(num_matrix_factorizations, 0)
 
+  @test_util.jax_disable_test_missing_functionality('b/194468988')
   def test_previous_solver_internal_state(self, solver):
     jacobian_diag_part = np.float64([-0.5, -1.])
     ode_fn = lambda time, state: jacobian_diag_part * state
@@ -633,7 +726,7 @@ class GeneralTest(test_util.TestCase):
         ode_fn,
         initial_time,
         initial_state,
-        solution_times=tfp.math.ode.ChosenBySolver(final_time),
+        solution_times=[final_time],
         previous_solver_internal_state=solver_internal_state)
     times, states = self.evaluate([results.times, results.states])
     states_exact = np.exp(jacobian_diag_part[np.newaxis, :] *

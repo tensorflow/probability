@@ -28,6 +28,7 @@ from tensorflow_probability.python.math.ode import base
 from tensorflow_probability.python.math.ode import runge_kutta_util as rk_util
 from tensorflow_probability.python.math.ode import util
 
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'DormandPrince',
@@ -143,7 +144,6 @@ class DormandPrince(base.Solver):
         Default value: `None` (i.e., 'dormand_prince').
     """
     super(DormandPrince, self).__init__(
-        use_pfor_to_compute_jacobian=True,
         make_adjoint_solver_fn=make_adjoint_solver_fn,
         validate_args=validate_args,
         name=name,
@@ -220,13 +220,16 @@ class DormandPrince(base.Solver):
             dynamic_size=False,
             element_shape=[]).unstack(solution_times)
 
-      solutions_arrays = [
-          tf.TensorArray(dtype=component_dtype, size=num_solution_times,
-                         dynamic_size=solution_times_by_solver)
-          for component_dtype in tf.nest.flatten(p.state_dtypes)
-      ]
-      solutions_arrays = tf.nest.pack_sequence_as(
-          p.initial_state, solutions_arrays)
+      solutions_arrays = nest.map_structure_up_to(
+          p.state_dtypes,
+          lambda shape, dtype: tf.TensorArray(  # pylint: disable=g-long-lambda
+              dtype=dtype,
+              size=num_solution_times,
+              element_shape=shape,
+              dynamic_size=solution_times_by_solver),
+          p.state_shapes,
+          p.state_dtypes,
+      )
 
       rk_step = functools.partial(
           self._step,
@@ -321,14 +324,14 @@ class DormandPrince(base.Solver):
     )
 
   def _prepare_common_params(self, initial_state, initial_time):
-    get_dtype = lambda x: x.dtype
     error_if_wrong_dtype = functools.partial(
         util.error_if_not_real_or_complex, identifier='initial_state')
 
     initial_state = tf.nest.map_structure(tf.convert_to_tensor, initial_state)
     tf.nest.map_structure(error_if_wrong_dtype, initial_state)
 
-    state_dtypes = tf.nest.map_structure(get_dtype, initial_state)
+    state_dtypes = tf.nest.map_structure(lambda x: x.dtype, initial_state)
+    state_shapes = tf.nest.map_structure(lambda x: x.shape, initial_state)
     common_state_dtype = dtype_util.common_dtype(initial_state)
     real_dtype = dtype_util.real_dtype(common_state_dtype)
 
@@ -337,6 +340,7 @@ class DormandPrince(base.Solver):
     return util.Bunch(
         initial_state=initial_state,
         state_dtypes=state_dtypes,
+        state_shapes=state_shapes,
         real_dtype=real_dtype,
         initial_time=initial_time,
     )

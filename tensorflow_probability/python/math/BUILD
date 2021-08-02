@@ -36,7 +36,6 @@ multi_substrate_py_library(
     substrates_omit_deps = [
         ":minimize",
         ":sparse",
-        "//tensorflow_probability/python/math/ode",
     ],
     deps = [
         ":bessel",
