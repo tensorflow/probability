@@ -34,6 +34,7 @@ def value_and_gradient(f,
                        output_gradients=None,
                        use_gradient_tape=False,
                        auto_unpack_single_arg=True,
+                       has_aux=False,
                        name=None,
                        **kwargs):
   """Computes `f(*args, **kwargs)` and its gradients wrt to `args`, `kwargs`.
@@ -92,13 +93,20 @@ def value_and_gradient(f,
     auto_unpack_single_arg: Python `bool` which when `False` means the single
       arg case will not be interpreted as a list of arguments. (See case 2.)
       Default value: `True`.
+    has_aux: Whether `f(*args, **kwargs)` actually returns two outputs, the
+      first being `y` and the second being an auxiliary output that does not get
+      gradients computed.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., `'value_and_gradient'`).
     **kwargs: Named arguments as in `f(*args, **kwargs)` and basis for gradient.
 
   Returns:
-    y: `y = f(*args, **kwargs)`.
-    dydx: Gradients of `y` with respect to each of `args` and `kwargs`.
+    If `has_aux` is `False`:
+      y: `y = f(*args, **kwargs)`.
+      dydx: Gradients of `y` with respect to each of `args` and `kwargs`.
+    otherwise:
+      A tuple `((y, aux), dydx)`, where `y, aux = f(*args, **kwargs)` and `dydx`
+      are the gradients of `y` with respect to each of `args` and `kwargs`.
   """
   with tf.name_scope(name or 'value_and_gradient'):
     return _value_and_grad_impl(
@@ -109,6 +117,7 @@ def value_and_gradient(f,
         output_gradients=output_gradients,
         auto_unpack_single_arg=auto_unpack_single_arg,
         expand_tf_modules_as_trainable_vars=False,
+        has_aux=has_aux,
         **kwargs)
 
 
@@ -117,6 +126,7 @@ def value_and_gradient_with_auto_expansion(f,
                                            output_gradients=None,
                                            use_gradient_tape=False,
                                            auto_unpack_single_arg=True,
+                                           has_aux=False,
                                            name=None,
                                            **kwargs):
   """Computes `f(*args, **kwargs)` and its gradients wrt to `args`, `kwargs`.
@@ -190,13 +200,20 @@ def value_and_gradient_with_auto_expansion(f,
     auto_unpack_single_arg: Python `bool` which when `False` means the single
       arg case will not be interpreted as a list of arguments. (See case 2.)
       Default value: `True`.
+    has_aux: Whether `f(*args, **kwargs)` actually returns two outputs, the
+      first being `y` and the second being an auxiliary output that does not get
+      gradients computed.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., `'value_and_gradient'`).
     **kwargs: Named arguments as in `f(*args, **kwargs)` and basis for gradient.
 
   Returns:
-    y: `y = f(*args, **kwargs)`.
-    dydx: Gradients of `y` with respect to each of `args` and `kwargs`.
+    If `has_aux` is `False`:
+      y: `y = f(*args, **kwargs)`.
+      dydx: Gradients of `y` with respect to each of `args` and `kwargs`.
+    otherwise:
+      A tuple `((y, aux), dydx)`, where `y, aux = f(*args, **kwargs)` and `dydx`
+      are the gradients of `y` with respect to each of `args` and `kwargs`.
   """
   with tf.name_scope(name or 'value_and_gradient'):
     return _value_and_grad_impl(
@@ -207,12 +224,14 @@ def value_and_gradient_with_auto_expansion(f,
         output_gradients=output_gradients,
         auto_unpack_single_arg=auto_unpack_single_arg,
         expand_tf_modules_as_trainable_vars=True,
+        has_aux=has_aux,
         **kwargs)
 
 
 def value_and_batch_jacobian(f,
                              *args,
                              auto_unpack_single_arg=True,
+                             has_aux=False,
                              name=None,
                              **kwargs):
   """Computes `f(*args, **kwargs)` and batch Jacobian wrt to `args`, `kwargs`.
@@ -225,6 +244,9 @@ def value_and_batch_jacobian(f,
     auto_unpack_single_arg: Python `bool` which when `False` means the single
       arg case will not be interpreted as a list of arguments.
       Default value: `True`.
+    has_aux: Whether `f(*args, **kwargs)` actually returns two outputs, the
+      first being `y` and the second being an auxiliary output that does not get
+      gradients computed.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., `'value_and_gradient'`).
     **kwargs: Named arguments as in `f(*args, **kwargs)` and basis for Jacobian.
@@ -232,8 +254,13 @@ def value_and_batch_jacobian(f,
       multiple are provided, a tuple of jacobians are returned.
 
   Returns:
-    y: `y = f(*args, **kwargs)`.
-    jacobian: A `(batch, n, n)` shaped `Tensor`, `dy/dx`, or a tuple thereof.
+    If `has_aux` is `False`:
+      y: `y = f(*args, **kwargs)`.
+      jacobian: A `(batch, n, n)` shaped `Tensor`, `dy/dx`, or a tuple thereof.
+    otherwise:
+      A tuple `((y, aux), jacobian)`, where `y, aux = f(*args, **kwargs)` and
+      `jacobian` is a `(batch, n, n)` shaped `Tensor`, `dy/dx`, or a tuple
+      thereof.
   """
   with tf.name_scope(name or 'value_and_batch_jacobian'):
     return _value_and_grad_impl(
@@ -243,12 +270,14 @@ def value_and_batch_jacobian(f,
         output_gradients=None,
         auto_unpack_single_arg=auto_unpack_single_arg,
         expand_tf_modules_as_trainable_vars=False,
+        has_aux=has_aux,
         **kwargs)
 
 
 def batch_jacobian(f,
                    *args,
                    auto_unpack_single_arg=True,
+                   has_aux=False,
                    name=None,
                    **kwargs):
   """Computes batch Jacobian of `f(*args, **kwargs)` wrt to `args`, `kwargs`.
@@ -261,6 +290,9 @@ def batch_jacobian(f,
     auto_unpack_single_arg: Python `bool` which when `False` means the single
       arg case will not be interpreted as a list of arguments.
       Default value: `True`.
+    has_aux: Whether `f(*args, **kwargs)` actually returns two outputs, the
+      first being `y` and the second being an auxiliary output that does not get
+      gradients computed.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., `'value_and_gradient'`).
     **kwargs: Named arguments as in `f(*args, **kwargs)` and basis for Jacobian.
@@ -268,28 +300,39 @@ def batch_jacobian(f,
       multiple are provided, a tuple of jacobians are returned.
 
   Returns:
-    jacobian: A `(batch, n, n)` shaped `Tensor`, `dy/dx`, or a tuple thereof.
+    If `has_aux` is `False`:
+      jacobian: A `(batch, n, n)` shaped `Tensor`, `dy/dx`, or a tuple thereof.
+    otherwise:
+      jacobian: A `(batch, n, n)` shaped `Tensor`, `dy/dx`, or a tuple thereof.
+      aux: The auxiliary output of the function `y, aux = f(*args, **kwargs)`.
   """
-  return value_and_batch_jacobian(
+  res = value_and_batch_jacobian(
       f,
       *args,
       auto_unpack_single_arg=auto_unpack_single_arg,
       name=name,
-      **kwargs)[1]
+      has_aux=has_aux,
+      **kwargs)
+  if has_aux:
+    (_, aux), jacobian = res
+    return jacobian, aux
+  else:
+    _, jacobian = res
+    return jacobian
 
 
 def _gradient_new(f, xs, grad_ys):
   with tf.GradientTape(watch_accessed_variables=False) as tape:
     for x in xs:
       tape.watch(x)
-    y = f()
-  return y, tape.gradient(y, xs, output_gradients=grad_ys)
+    y, aux = f()
+  return y, tape.gradient(y, xs, output_gradients=grad_ys), aux
 
 
 def _gradient_old(f, xs, grad_ys):
   assert not tf.executing_eagerly()
-  y = f()
-  return y, tf.gradients(y, xs, grad_ys=grad_ys)
+  y, aux = f()
+  return y, tf.gradients(y, xs, grad_ys=grad_ys), aux
 
 
 def _jacobian(f, xs, grad_ys):
@@ -297,17 +340,18 @@ def _jacobian(f, xs, grad_ys):
   with tf.GradientTape(persistent=True, watch_accessed_variables=False) as tape:
     for x in xs:
       tape.watch(x)
-    y = f()
+    y, aux = f()
   try:
-    return y, tuple(tape.batch_jacobian(y, x) for x in xs)
+    return y, tuple(tape.batch_jacobian(y, x) for x in xs), aux
   except ValueError:  # Fallback to for-loop jacobian.
     return y, tuple(tape.batch_jacobian(y, x, experimental_use_pfor=False)
-                    for x in xs)
+                    for x in xs), aux
 
 
 def _value_and_grad_impl(f, grad_fn, *args, output_gradients,
                          auto_unpack_single_arg,
                          expand_tf_modules_as_trainable_vars=False,
+                         has_aux=False,
                          **kwargs):
   """Helper which generalizes gradient / Jacobian."""
   if not args and not kwargs:
@@ -329,18 +373,31 @@ def _value_and_grad_impl(f, grad_fn, *args, output_gradients,
         [args, kwargs])
   else:
     expand_args, expand_kwargs = args, kwargs
-  y, dydx = grad_fn(lambda: f(*args, **kwargs) if _has_args(f) else f(),
-                    tf.nest.flatten([expand_args, expand_kwargs]),
-                    output_gradients)
+
+  if not has_aux:
+    real_f = f
+    f = lambda *args, **kwargs: (real_f(*args, **kwargs)  # pylint: disable=g-long-lambda
+                                 if _has_args(real_f) else real_f(), ())
+
+  y, dydx, aux = grad_fn(lambda: f(*args, **kwargs) if _has_args(f) else f(),
+                         tf.nest.flatten([expand_args, expand_kwargs]),
+                         output_gradients)
   dydx_args, dydx_kwargs = tf.nest.pack_sequence_as(
       [expand_args, expand_kwargs], dydx)
   if len(args) == 1 and not do_unpack:
     dydx_args = dydx_args[0]
-  if not kwargs:
-    return y, dydx_args
-  if not args:
-    return y, dydx_kwargs
-  return y, dydx_args, dydx_kwargs
+
+  if has_aux:
+    res = ((y, aux),)
+  else:
+    res = (y,)
+
+  if args:
+    res += (dydx_args,)
+  if kwargs:
+    res += (dydx_kwargs,)
+
+  return res
 
 
 def _prepare_args(args, kwargs):
@@ -380,8 +437,9 @@ if JAX_MODE:
                          *args,
                          output_gradients=None,
                          use_gradient_tape=False,  # pylint: disable=unused-argument
-                         name=None,  # pylint: disable=unused-argument
                          auto_unpack_single_arg=True,
+                         has_aux=False,
+                         name=None,  # pylint: disable=unused-argument
                          **kwargs):
     """Computes `f(*args)` and its gradients wrt to `*args`."""
     if kwargs:
@@ -392,16 +450,27 @@ if JAX_MODE:
     if do_unpack:
       args = args[0]
     args, _ = _prepare_args(args, {})
-    y, f_vjp = jax.vjp(f, *args)
+    if has_aux:
+      y, f_vjp, aux = jax.vjp(f, *args, has_aux=True)
+    else:
+      y, f_vjp = jax.vjp(f, *args)
     if output_gradients is None:
       output_gradients = tf.nest.map_structure(np.ones_like, y)
     dydx = list(f_vjp(output_gradients))
     if len(args) == 1 and not do_unpack:
       dydx = dydx[0]
-    return y, dydx
+    if has_aux:
+      return (y, aux), dydx
+    else:
+      return y, dydx
 
   def value_and_batch_jacobian(  # pylint: disable=function-redefined
-      f, *args, auto_unpack_single_arg=True, name=None, **kwargs):  # pylint: disable=unused-argument
+      f,
+      *args,
+      auto_unpack_single_arg=True,
+      has_aux=False,
+      name=None,  # pylint: disable=unused-argument
+      **kwargs):
     """JAX implementation of value_and_batch_jacobian."""
     if kwargs:
       raise NotImplementedError('Jax version of `value_and_batch_jacobian` '
@@ -411,7 +480,10 @@ if JAX_MODE:
     if do_unpack:
       args = args[0]
     args, _ = _prepare_args(args, {})
-    y, f_vjp = jax.vjp(f, *args)
+    if has_aux:
+      y, f_vjp, aux = jax.vjp(f, *args, has_aux=True)
+    else:
+      y, f_vjp = jax.vjp(f, *args)
 
     # Let `[B, E_1, ..., E_k]` be the shape of `y`, where the first dimension
     # is a batch dimension.  We construct a basis for the cotangent space
@@ -426,13 +498,28 @@ if JAX_MODE:
     dydx = [x.reshape(y.shape + x.shape[2:]) for x in dydx]
     if len(args) == 1 and not do_unpack:
       dydx = dydx[0]
-    return y, dydx
+    if has_aux:
+      return (y, aux), dydx
+    else:
+      return y, dydx
 
   def batch_jacobian(  # pylint: disable=function-redefined
-      f, *args, auto_unpack_single_arg=True, name=None, **kwargs):  # pylint: disable=unused-argument
+      f,
+      *args,
+      auto_unpack_single_arg=True,
+      has_aux=False,
+      name=None,
+      **kwargs):  # pylint: disable=unused-argument
     """Computes the batch jacobian of `f(xs)` w.r.t. `xs`."""
-    return value_and_batch_jacobian(
+    res = value_and_batch_jacobian(
         f,
         *args,
         auto_unpack_single_arg=auto_unpack_single_arg,
-        **kwargs)[1]
+        has_aux=has_aux,
+        **kwargs)
+    if has_aux:
+      (_, aux), jacobian = res
+      return jacobian, aux
+    else:
+      _, jacobian = res
+      return jacobian

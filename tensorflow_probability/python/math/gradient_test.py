@@ -253,6 +253,63 @@ class GradientTest(test_util.TestCase):
       self.assertAllClose(grad[0], jac[0][idx])
       self.assertAllClose(grad[1], jac[1][idx])
 
+  @test_util.numpy_disable_gradient_test
+  def test_aux(self):
+    x = tf.constant([[2.]])
+
+    def f(x):
+      return x**2, x
+
+    (y, aux), dx = tfm.value_and_gradient(f, x, has_aux=True)
+
+    self.assertAllClose(x**2, y)
+    self.assertAllClose(2 * x, dx)
+    self.assertAllClose(x, aux)
+
+    dx, aux = batch_jacobian(f, x, has_aux=True)
+
+    self.assertAllClose((2 * x)[..., tf.newaxis], dx)
+    self.assertAllClose(x, aux)
+
+  @test_util.numpy_disable_gradient_test
+  def test_aux_multi_arg(self):
+    x = tf.constant([[2.]])
+    z = tf.constant([[3.]])
+
+    def f(x, z):
+      return x**2 + z**2, (x, z)
+
+    (y, aux), (dx, dz) = tfm.value_and_gradient(f, (x, z), has_aux=True)
+
+    self.assertAllClose(x**2 + z**2, y)
+    self.assertAllClose(2 * x, dx)
+    self.assertAllClose(2 * z, dz)
+    self.assertAllClose(x, aux[0])
+    self.assertAllClose(z, aux[1])
+
+    (dx, dz), aux = batch_jacobian(f, (x, z), has_aux=True)
+
+    self.assertAllClose((2 * x)[..., tf.newaxis], dx)
+    self.assertAllClose((2 * z)[..., tf.newaxis], dz)
+    self.assertAllClose(x, aux[0])
+    self.assertAllClose(z, aux[1])
+
+  @test_util.numpy_disable_gradient_test
+  def test_aux_grads(self):
+    """Tests that gradients flow through the auxiliary output."""
+    x = tf.constant([[2.]])
+
+    def f(x):
+      return x**2, x**2
+
+    def f2(x):
+      (_, aux), _ = tfm.value_and_gradient(f, x, has_aux=True)
+      return aux
+
+    y, dx = tfm.value_and_gradient(f2, x)
+    self.assertAllClose(x**2, y)
+    self.assertAllClose(2 * x, dx)
+
 
 if __name__ == '__main__':
   tf.test.main()
