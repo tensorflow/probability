@@ -309,6 +309,7 @@ class VariationalSGDTest(test_util.TestCase):
             init_step_value + 1, self.evaluate(sgd_optimizer.iterations))
 
   def testSparseBasic(self):
+    self.skipTest('b/195306553')
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
         var0 = tf.Variable([[1.1], [2.1]], dtype=dtype)
