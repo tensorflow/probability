@@ -251,8 +251,9 @@ class VariationalSGD(tf.optimizers.Optimizer):
         self._burnin_max_learning_rate, self._max_learning_rate)
 
     learn_rate = tf.clip_by_value(
-        self._get_coordinatewise_learning_rate(grad, var), 0.,
-        tf.cast(max_learning_rate, var.dtype))
+        self._get_coordinatewise_learning_rate(
+            tf.IndexedSlices(grad, indices), var),
+        0., tf.cast(max_learning_rate, var.dtype))
     delta = grad * learn_rate
 
     return self._resource_scatter_add(var, indices, -delta)
