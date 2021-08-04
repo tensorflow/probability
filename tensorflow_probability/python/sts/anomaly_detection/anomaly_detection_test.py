@@ -128,6 +128,33 @@ class AnomalyDetectionTests(test_util.TestCase):
                         tf.ones_like(predictions.mean),
                         atol=0.1)
 
+  @parameterized.named_parameters(('', False),
+                                  ('_gibbs_predictive', True))
+  def test_predictions_align_with_series(self, use_gibbs_predictive_dist):
+    np.random.seed(0)
+    # Simulate data with very clear daily and hourly effects, so that an
+    # off-by-one error will almost certainly lead to out-of-bounds predictions.
+    daily_effects = [100., 0., 20., -50., -100., -20., 70.]
+    hourly_effects = [
+        20., 0., 10., -10., 0., -20., -10., -30., -15., -5., -10., 0.] * 2
+    effects = [daily_effects[(t // 24) % 7] + hourly_effects[t % 24]
+               for t in range(24 * 7 * 2)]
+    series = pd.Series(effects + np.random.randn(len(effects)),
+                       index=pd.date_range('2020-01-01',
+                                           periods=len(effects),
+                                           freq=pd.DateOffset(hours=1)))
+    predictions = anomaly_detection.detect_anomalies(
+        series,
+        seed=test_util.test_seed(sampler_type='stateless'),
+        num_samples=100,
+        num_warmup_steps=50,
+        use_gibbs_predictive_dist=use_gibbs_predictive_dist,
+        jit_compile=False)
+    # An off-by-one error in the predictive distribution would generate
+    # anomalies at most steps.
+    num_anomalies = tf.reduce_sum(tf.cast(predictions.is_anomaly, tf.int32))
+    self.assertLessEqual(self.evaluate(num_anomalies), 5)
+
 
 if __name__ == '__main__':
   tf.test.main()

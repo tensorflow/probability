@@ -24,7 +24,6 @@ from tensorflow_probability.python.experimental.sts_gibbs import gibbs_sampler
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.sts import regularization
 from tensorflow_probability.python.sts.forecast import one_step_predictive
-from tensorflow_probability.python.sts.internal import missing_values_util
 from tensorflow_probability.python.sts.internal import seasonality_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
@@ -177,24 +176,8 @@ def _detect_anomalies_inner(observed_time_series,
       predictive_dist = gibbs_sampler.one_step_predictive(model,
                                                           posterior_samples)
     else:
-      # Build the filtering predictive distribution.
-      # First, pad the time series with an unobserved point at time -1, so that
-      # we get a 'prediction' (which will just be the prior) at time 0, matching
-      # the shape of the input (and of the Gibbs predictive distribution).
-      is_missing = observed_time_series.is_missing
-      if is_missing is None:
-        is_missing = tf.zeros(tf.shape(observed_time_series.time_series)[:-1],
-                              dtype=tf.bool)
-      initial_value = observed_time_series.time_series[..., 0:1, :]
-      padded_series = missing_values_util.MaskedTimeSeries(
-          time_series=tf.concat(
-              [initial_value,
-               observed_time_series.time_series[..., :-1, :]], axis=-2),
-          is_missing=tf.concat(
-              [tf.ones(tf.shape(initial_value)[:-1], dtype=tf.bool),
-               is_missing[..., :-1]], axis=-1))
       predictive_dist = one_step_predictive(model,
-                                            padded_series,
+                                            observed_time_series,
                                             timesteps_are_event_shape=False,
                                             parameter_samples=parameter_samples)
 

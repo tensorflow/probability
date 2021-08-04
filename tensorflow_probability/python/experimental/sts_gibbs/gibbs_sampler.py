@@ -340,9 +340,9 @@ def one_step_predictive(model,
       distribution of each timestep given previous timesteps.
   """
   dtype = dtype_util.common_dtype([
-      posterior_samples.level_scale.dtype,
-      posterior_samples.observation_noise_scale.dtype,
-      posterior_samples.level.dtype,
+      posterior_samples.level_scale,
+      posterior_samples.observation_noise_scale,
+      posterior_samples.level,
       original_mean,
       original_scale], dtype_hint=tf.float32)
   num_observed_steps = prefer_static.shape(posterior_samples.level)[-1]
