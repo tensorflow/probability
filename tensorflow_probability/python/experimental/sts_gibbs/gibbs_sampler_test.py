@@ -202,7 +202,7 @@ class GibbsSamplerTests(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': 'float32_xla', 'dtype': tf.float32, 'use_xla': True},
-      {'testcase_name': 'float16', 'dtype': tf.float16, 'use_xla': False})
+      {'testcase_name': 'float64', 'dtype': tf.float64, 'use_xla': False})
   def test_end_to_end_prediction_works_and_is_deterministic(
       self, dtype, use_xla):
     if not tf.executing_eagerly():
@@ -211,7 +211,8 @@ class GibbsSamplerTests(test_util.TestCase):
     model, observed_time_series, is_missing = self._build_test_model(
         num_timesteps=5,
         batch_shape=[3],
-        prior_class=gibbs_sampler.XLACompilableInverseGamma)
+        prior_class=gibbs_sampler.XLACompilableInverseGamma,
+        dtype=dtype)
 
     @tf.function(jit_compile=use_xla)
     def do_sampling(observed_time_series, is_missing):
