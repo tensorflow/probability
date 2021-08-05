@@ -81,6 +81,23 @@ class AnomalyDetectionTests(test_util.TestCase):
         num_samples=5,
         jit_compile=True)
 
+  def test_plot_predictions_runs(self):
+    series = self._build_test_series(shape=[28], freq=pd.DateOffset(days=1))
+    predictions = anomaly_detection.detect_anomalies(
+        series, anomaly_threshold=0.01, use_gibbs_predictive_dist=False,
+        seed=test_util.test_seed(sampler_type='stateless'),
+        num_warmup_steps=5,
+        num_samples=5)
+    predictions = tf.nest.map_structure(
+        lambda x: self.evaluate(x) if tf.is_tensor(x) else x, predictions)
+    anomaly_detection.plot_predictions(predictions)
+
+    batch_predictions = tf.nest.map_structure(
+        lambda x: np.stack([x, x], axis=0) if isinstance(x, np.ndarray) else x,
+        predictions)
+    with self.assertRaisesRegex(ValueError, 'must be one-dimensional'):
+      anomaly_detection.plot_predictions(batch_predictions)
+
   def test_adapts_to_series_scale(self):
     # Create a batch of two series with very different means and stddevs.
     freq = pd.DateOffset(hours=1)

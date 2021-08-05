@@ -15,7 +15,9 @@
 """Utilities for anomaly detection with STS models and Gibbs sampling."""
 
 import collections
+import datetime
 
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
@@ -31,6 +33,7 @@ __all__ = [
     'PredictionOutput',
     'detect_anomalies',
     'compute_predictive_bounds',
+    'plot_predictions'
 ]
 
 
@@ -290,3 +293,82 @@ def compute_predictive_bounds(predictive_dist, anomaly_threshold=0.01):
       low=predictive_mean - 100 * predictive_stddev,
       high=predictive_mean + 100 * predictive_stddev)
   return limits[0], limits[1], predictive_mean
+
+
+def plot_predictions(predictions,
+                     view_date_begin=None,
+                     view_date_end=None,
+                     ax=None):
+  """Creates a plot of the observed series and model predictions.
+
+  Creates a `matplotlib` plot of the observed time series with intervals from
+  the model, predictions for any unobserved points, and the locations of any
+  anomalies.
+
+  Args:
+    predictions: instance of `PredictionOutput` as returned by
+      `detect_anomalies`. This should contain predictions for a single series
+      with no batch dimensions.
+    view_date_begin: Optional `datetime.datetime` instance.
+    view_date_end: Optional `datetime.datetime` instance.
+    ax: Optional `matplotlib` figure axis.
+  """
+  # pylint: disable=g-import-not-at-top
+  from matplotlib import pylab as plt
+  from matplotlib import dates as mdates
+  # pylint: enable=g-import-not-at-top
+
+  if len(predictions.observed_time_series.shape) > 1:
+    raise ValueError('Time series must be one-dimensional; batches are not '
+                     'supported. Saw shape: {}.'.format(
+                         predictions.observed_time_series.shape))
+
+  num_steps = len(predictions.times)
+  time_delta = predictions.times[1] - predictions.times[0]
+  time_period_length = predictions.times[-1] - predictions.times[0]
+  if view_date_begin is None:
+    view_date_begin = predictions.times[0] - 0.04 * time_period_length
+  if view_date_end is None:
+    view_date_end = predictions.times[-1] + 0.04 * time_period_length
+  if not (isinstance(view_date_begin, datetime.datetime)
+          and isinstance(view_date_end, datetime.datetime)):
+    raise ValueError('View date start and end must be `datetime.datetime` '
+                     'instances.')
+
+  if ax is None:  # Create default axis.
+    fig = plt.figure(figsize=(15, 5), constrained_layout=True)
+    ax = fig.add_subplot(1, 1, 1)
+
+  # Plot series with upper and lower limits.
+  ax.plot(predictions.times,
+          predictions.observed_time_series,
+          color='black', alpha=0.8)
+  ax.fill_between(predictions.times,
+                  predictions.lower_limit,
+                  predictions.upper_limit,
+                  color='tab:blue', alpha=0.3)
+  # At steps where no time series was observed, plot the predictive mean.
+  ax.plot(predictions.times,
+          np.where(np.isnan(predictions.observed_time_series),
+                   predictions.mean,
+                   np.nan),
+          color='black', alpha=0.8, ls='--')
+
+  # Highlight anomalies.
+  for anomaly_idx in np.flatnonzero(predictions.is_anomaly):
+    x = predictions.times[anomaly_idx]
+    y = predictions.observed_time_series[anomaly_idx]
+    ax.scatter(x, y, s=100, alpha=0.4, c='red')
+    ax.annotate(str(x), (x, y))
+  ax.set_ylabel('Series')
+  ax.label_outer()
+
+  # Use smart date formatting for the x axis.
+  locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
+  ax.xaxis.set_major_locator(locator)
+  ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
+  ax.set_xlim([view_date_begin, view_date_end])
+  ax.grid(True, color='whitesmoke')
+  # Display the grid *underneath* the rest of the plot
+  # (see https://github.com/matplotlib/matplotlib/issues/5045/).
+  ax.set_axisbelow(True)
