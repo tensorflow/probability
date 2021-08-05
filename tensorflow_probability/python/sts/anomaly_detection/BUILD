@@ -62,6 +62,7 @@ py_test(
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
+        # matplotlib dep,
         # numpy dep,
         # pandas dep,
         # tensorflow dep,

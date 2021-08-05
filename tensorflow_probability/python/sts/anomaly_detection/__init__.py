@@ -16,10 +16,12 @@
 
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.sts.anomaly_detection.anomaly_detection_lib import detect_anomalies
+from tensorflow_probability.python.sts.anomaly_detection.anomaly_detection_lib import plot_predictions
 from tensorflow_probability.python.sts.anomaly_detection.anomaly_detection_lib import PredictionOutput
 
 _allowed_symbols = [
     'detect_anomalies',
+    'plot_predictions',
     'PredictionOutput'
 ]
 
