@@ -15,11 +15,50 @@
 """Utilities for holiday regressors."""
 
 __all__ = [
+    'get_default_holidays',
     'create_holiday_regressors',
 ]
 
 # Defines expected holiday file fields.
 _HOLIDAY_FILE_FIELDS = frozenset({'geo', 'holiday', 'date'})
+
+
+# TODO(b/195771744): Add holidays as unofficial TFP dependency.
+def get_default_holidays(times, country):
+  """Creates default holidays for a specific country.
+
+  Args:
+    times: a Pandas `DatetimeIndex` that indexes time series data.
+    country: `str`, two-letter upper-case [ISO 3166-1 alpha-2 country code](
+      https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) for using holiday
+        regressors from a particular country.
+
+  Returns:
+    holidays: a Pandas `DataFrame` with default holidays relevant to the input
+      times. The `DataFrame` should have the following columns:
+      * `geo`: `str`, two-letter upper-case country code
+      * `holiday`: `str`, the name of the holiday
+      * `date`: `str`, dates in the form of `YYYY-MM-DD`
+  """
+  # pylint: disable=g-import-not-at-top
+  import pandas as pd
+  import holidays
+  # pylint: enable=g-import-not-at-top
+
+  years = range(times.min().year, times.max().year + 1)
+  holidays = holidays.CountryHoliday(country, years=years, expand=False)
+  holidays = pd.DataFrame(
+      [(country, holidays.get_list(date), date) for date in holidays],
+      columns=['geo', 'holiday', 'date'])
+  holidays = holidays.explode('holiday')
+  # Ensure that only holiday dates covered by times are used.
+  holidays = holidays[(holidays['date'] >= times.min())
+                      & (holidays['date'] <= times.max())]
+  holidays = holidays.reset_index(drop=True)
+  holidays['date'] = pd.to_datetime(holidays['date'])
+  holidays = holidays.sort_values('date')
+  holidays['date'] = holidays['date'].dt.strftime('%Y-%m-%d')
+  return holidays
 
 
 def create_holiday_regressors(times, holidays):
