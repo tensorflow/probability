@@ -32,6 +32,7 @@ py_library(
         ":default_model",
         ":fitting",
         ":forecast",
+        ":holiday_effects",
         ":regularization",
         ":structural_time_series",
         "//tensorflow_probability/python/internal:all_util",
@@ -154,6 +155,34 @@ py_test(
     shard_count = 6,
     srcs_version = "PY3",
     deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "holiday_effects",
+    srcs = ["holiday_effects.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/util",
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "holiday_effects_test",
+    size = "medium",
+    srcs = ["holiday_effects_test.py"],
+    python_version = "PY3",
+    shard_count = 6,
+    srcs_version = "PY3",
+    deps = [
+        # holidays dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
