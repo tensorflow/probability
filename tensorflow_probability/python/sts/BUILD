@@ -167,6 +167,7 @@ py_library(
     srcs = ["holiday_effects.py"],
     srcs_version = "PY3",
     deps = [
+        # holidays dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/util",
@@ -181,6 +182,8 @@ py_test(
     python_version = "PY3",
     shard_count = 6,
     srcs_version = "PY3",
+    # TODO(gcluo): Add the holidays package to the OSS testing setup.
+    tags = ["no-oss-ci"],
     deps = [
         # holidays dep,
         # numpy dep,

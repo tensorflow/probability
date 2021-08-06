@@ -24,6 +24,32 @@ HOLIDAY_FILE_FIELDS = ['geo', 'holiday', 'date']
 
 class HolidayEffectsTest(test_util.TestCase):
 
+  def test_get_default_holidays_invalid_country(self):
+    times = pd.to_datetime(['2012-12-25', '2013-01-01'])
+    country = 'AA'
+    with self.assertRaises(Exception):
+      holiday_effects.get_default_holidays(times, country)
+
+  def test_get_default_holidays_invalid_times(self):
+    times = ['2012-12-25', '2013-01-01']
+    country = 'US'
+    with self.assertRaises(Exception):
+      holiday_effects.get_default_holidays(times, country)
+
+  @parameterized.named_parameters(
+      ('united_states_holidays', 'US',
+       pd.DataFrame([['US', 'Christmas Day', '2012-12-25'],
+                     ['US', 'New Year\'s Day', '2013-01-01']],
+                    columns=HOLIDAY_FILE_FIELDS)),
+      ('egypt_holidays', 'EG',
+       pd.DataFrame([['EG', 'New Year\'s Day - Bank Holiday', '2013-01-01']],
+                    columns=HOLIDAY_FILE_FIELDS)))
+  def test_get_default_holidays(self, country, expected):
+    times = pd.date_range(
+        start='2012-12-25', end='2013-01-01', freq=pd.DateOffset(days=1))
+    holidays = holiday_effects.get_default_holidays(times, country)
+    self.assertTrue(holidays.equals(expected))
+
   @parameterized.named_parameters(
       ('date_wrong_order',
        pd.DataFrame([['US', 'TestHoliday', '12-20-2013']],
