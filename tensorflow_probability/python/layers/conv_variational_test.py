@@ -609,7 +609,8 @@ class ConvVariational(object):
     outputs = self.maybe_transpose_tensor(outputs)
 
     net = tf.keras.Sequential([
-        layer_class(filters=2, kernel_size=3, data_format=self.data_format),
+        layer_class(filters=2, kernel_size=3, data_format=self.data_format,
+                   input_shape = inputs.shape.as_list()[1:]),
         layer_class(filters=2, kernel_size=1, data_format=self.data_format)])
 
     net.compile(loss='mse', optimizer='adam')
