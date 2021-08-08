@@ -15,6 +15,12 @@
 # Description:
 #   TensorFlow Probability ODE solvers.
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
@@ -23,18 +29,20 @@ package(
 
 licenses(["notice"])
 
-py_library(
+multi_substrate_py_library(
     name = "base",
     srcs = ["base.py"],
     srcs_version = "PY3",
     deps = [
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "bdf",
     srcs = ["bdf.py"],
     srcs_version = "PY3",
@@ -45,10 +53,12 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "dormand_prince",
     srcs = ["dormand_prince.py"],
     srcs_version = "PY3",
@@ -61,17 +71,20 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "bdf_util",
     srcs = ["bdf_util.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "bdf_util_test",
     size = "small",
     srcs = ["bdf_util_test.py"],
@@ -87,7 +100,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "runge_kutta_util",
     srcs = ["runge_kutta_util.py"],
     srcs_version = "PY3",
@@ -99,7 +112,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "runge_kutta_util_test",
     size = "small",
     srcs = ["runge_kutta_util_test.py"],
@@ -113,7 +126,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "ode",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
@@ -124,12 +137,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "ode_test",
     size = "large",
     srcs = ["ode_test.py"],
     python_version = "PY3",
-    shard_count = 6,
+    shard_count = 8,
     srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
@@ -183,17 +196,18 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "util",
     srcs = ["util.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:gradient",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "util_test",
     size = "small",
     srcs = ["util_test.py"],

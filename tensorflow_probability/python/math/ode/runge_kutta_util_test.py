@@ -22,6 +22,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.ode import runge_kutta_util as rk_util
 
@@ -123,7 +124,7 @@ class RungeKuttaUtilTest(test_util.TestCase):
 
   def test_nest_rms_norm_on_tensor(self, dtype):
     test_values = np.array([1.4 -1j, 2.7 + 0.23j, 7.3 + 9.4j])
-    test_values = test_values.astype(dtype.as_numpy_dtype)
+    test_values = test_values.astype(dtype_util.as_numpy_dtype(dtype))
     input_values = tf.cast(test_values, dtype=dtype)
     actual_norm = rk_util.nest_rms_norm(input_values)
     expected_norm = np.linalg.norm(test_values) / np.sqrt(test_values.size)
@@ -140,7 +141,7 @@ class RungeKuttaUtilTest(test_util.TestCase):
     self.assertAllClose(expected_norm_nest, actual_norm_nest)
 
   def test_nest_constant(self, dtype):
-    ndtype = dtype.as_numpy_dtype
+    ndtype = dtype_util.as_numpy_dtype(dtype)
     input_structure = (
         np.ones(4, dtype=ndtype),
         (np.eye(3, dtype=ndtype), np.zeros(4, dtype=ndtype))

@@ -49,7 +49,7 @@ def _possibly_nonzero(value):
 
 def abs_square(x):
   """Returns the squared value of `tf.abs(x)` for real and complex dtypes."""
-  if x.dtype.is_complex:
+  if dtype_util.is_complex(x.dtype):
     return tf.math.square(tf.math.real(x)) + tf.math.square(tf.math.imag(x))
   else:
     return tf.math.square(x)

@@ -233,6 +233,17 @@ multi_substrate_py_library(
     ],
 )
 
+multi_substrate_py_test(
+    name = "custom_gradient_test",
+    srcs = ["custom_gradient_test.py"],
+    deps = [
+        ":custom_gradient",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
+    ],
+)
+
 py_test(
     name = "cache_util_test",
     size = "small",

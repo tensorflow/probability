@@ -296,6 +296,18 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
         dtype, convert_fn, value, dtype, dtype_hint, check_types=False)
 
 
+class _DotString(object):
+
+  def __str__(self):
+    return '.'
+
+  def __repr__(self):
+    return '.'
+
+
+_DOT = _DotString()
+
+
 # pylint: disable=protected-access
 # TODO(b/173044916): Support namedtuple interop in nest and remove this method.
 def coerce_structure(shallow_tree, input_tree):
@@ -333,8 +345,8 @@ def coerce_structure(shallow_tree, input_tree):
   try:
     return _coerce_structure(shallow_tree, input_tree)
   except (ValueError, TypeError) as e:
-    str1 = str(nest.map_structure(lambda _: nest._DOT, shallow_tree))
-    str2 = str(nest.map_structure(lambda _: nest._DOT, input_tree))
+    str1 = str(nest.map_structure(lambda _: _DOT, shallow_tree))
+    str2 = str(nest.map_structure(lambda _: _DOT, input_tree))
     raise type(e)(('{}\n'
                    'Entire first structure:\n{}\n'
                    'Entire second structure:\n{}'
