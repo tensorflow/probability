@@ -332,10 +332,8 @@ def _cascading_flow_surrogate_for_joint_distribution(
 
       eps = Root(eps)
 
-      value_out = yield (eps if flat_variables
+      global_auxiliary_variables = yield (eps if flat_variables
                          else (eps, variables))
-
-      global_auxiliary_variables = value_out
 
     else:
       global_auxiliary_variables = None
@@ -417,7 +415,8 @@ def _cascading_flow_surrogate_for_joint_distribution(
         input_structure=tokenize(surrogate_posterior))(
         surrogate_posterior, name=_get_name(dist))
 
-  elif use_global_auxiliary_variables:
+  #FIXME: this part is commented out as blows up RAM memory
+  '''elif use_global_auxiliary_variables:
     surrogate_posterior = restructure.Restructure(
       output_structure=(
         tf.nest.map_structure(lambda k: 2 * k + 1, dist_tokens),
@@ -431,7 +430,7 @@ def _cascading_flow_surrogate_for_joint_distribution(
         tf.nest.map_structure(lambda k: 2 * k, dist_tokens),
         [2 * k + 1 for k in tf.nest.flatten(dist_tokens)]),
       input_structure=tokenize(surrogate_posterior))(
-      surrogate_posterior, name=_get_name(dist))
+      surrogate_posterior, name=_get_name(dist))'''
 
   return surrogate_posterior, variables
 
@@ -454,7 +453,7 @@ def _cascading_flow_update_for_base_distribution(dist,
     event_shape_out=flat_event_size,
     event_shape_in=dist.event_shape_tensor())
 
-  constraining_and_flattening_bijector = chain.Chain([flatten_bijector, constraining_bijector])
+  constraining_and_flattening_bijector = chain.Chain([flatten_bijector, invert.Invert(constraining_bijector)])
   processed_dist = transformed_distribution.TransformedDistribution(distribution=dist,
                                                                     bijector=constraining_and_flattening_bijector)
   if variables is None:
