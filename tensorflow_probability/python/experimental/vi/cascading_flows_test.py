@@ -92,9 +92,9 @@ class _TrainableCFSurrogate(object):
 
     # Test that the sample shape is correct
     three_posterior_samples = surrogate_posterior.sample(
-      3, seed=test_util.test_seed(sampler_type='stateless'))
+      3, seed=(0,0))
     three_prior_samples = prior_dist.sample(
-      3, seed=test_util.test_seed(sampler_type='stateless'))
+      3, seed=(0,0))
     self.assertAllEqualNested(
       [s.shape for s in tf.nest.flatten(three_prior_samples)],
       [s.shape for s in tf.nest.flatten(three_posterior_samples)])
@@ -102,7 +102,7 @@ class _TrainableCFSurrogate(object):
     # Test that gradients are available wrt the variational parameters.
     with tf.GradientTape() as tape:
       posterior_sample = surrogate_posterior.sample(
-        seed=test_util.test_seed(sampler_type='stateless'))
+        seed=(0,0))
       posterior_logprob = surrogate_posterior.log_prob(posterior_sample)
     grad = tape.gradient(posterior_logprob,
                          surrogate_posterior.trainable_variables)
@@ -113,19 +113,19 @@ class _TrainableCFSurrogate(object):
 
     surrogate_posterior = tfp.experimental.vi.build_cascading_flow_surrogate_posterior(
       prior=prior_dist,
-      seed=test_util.test_seed(sampler_type='stateless'))
+      seed=(0,0))
     self.evaluate(
       [v.initializer for v in surrogate_posterior.trainable_variables])
     posterior_sample = surrogate_posterior.sample(
-      seed=test_util.test_seed(sampler_type='stateless'))
+      seed=(0,0))
 
     surrogate_posterior2 = tfp.experimental.vi.build_cascading_flow_surrogate_posterior(
       prior=prior_dist,
-      seed=test_util.test_seed(sampler_type='stateless'))
+      seed=(0,0))
     self.evaluate(
       [v.initializer for v in surrogate_posterior2.trainable_variables])
     posterior_sample2 = surrogate_posterior2.sample(
-      seed=test_util.test_seed(sampler_type='stateless'))
+      seed=(0,0))
 
     self.assertAllEqualNested(posterior_sample, posterior_sample2)
 
@@ -133,9 +133,9 @@ class _TrainableCFSurrogate(object):
     prior_dist = self.make_prior_dist()
     surrogate_posterior = tfp.experimental.vi.build_cascading_flow_surrogate_posterior(
       prior=prior_dist,
-      seed=test_util.test_seed(sampler_type='stateless'))
+      seed=(0,0))
     self.assertAllFinite(prior_dist.log_prob(
-      surrogate_posterior.sample(10, seed=test_util.test_seed())))
+      surrogate_posterior.sample(10, seed=(0,0))))
 
 @test_util.test_all_tf_execution_regimes
 class CFSurrogatePosteriorTestBrownianMotion(test_util.TestCase,
@@ -192,7 +192,7 @@ class CFSurrogatePosteriorTestBrownianMotion(test_util.TestCase,
       target_log_prob,
       surrogate_posterior,
       num_steps=5,  # Don't optimize to completion.
-      optimizer=tf.optimizers.Adam(0.1),
+      optimizer=tf.optimizers.Adam(1e-3),
       sample_size=10)
 
     # Compute posterior statistics.
