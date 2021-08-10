@@ -167,6 +167,7 @@ XLA_LOGPROB_ATOL.update({
     'Multinomial': 2e-4,
     'OneHotCategorical': 1e-5,
     'PowerSpherical': 2e-5,
+    'RelaxedBernoulli': 2e-5,
     'SigmoidBeta': 5e-4,
     'Skellam': 1e-4,
     'TruncatedCauchy': 1e-5,
