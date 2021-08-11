@@ -57,7 +57,7 @@ class HiddenMarkovModel(distribution.Distribution):
   which distribution `z[i + 1]` is drawn from.  The distributions corresponding
   to the probability of `z[i + 1]` conditional on `z[i] == k` is given by the
   elements of the batch whose rightmost coordinate is `k`.
-  Similarly, the conditional distribution of `z[i]` given `x[i]` is given by
+  Similarly, the conditional distribution of `x[i]` given `z[i]` is given by
   the batch of `observation_distribution`.
   When the rightmost coordinate of `observation_distribution` is `k` it
   gives the conditional probabilities of `x[i]` given `z[i] == k`.
