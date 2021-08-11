@@ -45,8 +45,8 @@ from tensorflow_probability.python.experimental import stats
 from tensorflow_probability.python.experimental import substrates
 from tensorflow_probability.python.experimental import util
 from tensorflow_probability.python.experimental import vi
-from tensorflow_probability.python.experimental.composite_tensor import as_composite
-from tensorflow_probability.python.experimental.composite_tensor import register_composite
+from tensorflow_probability.python.experimental.util.composite_tensor import as_composite
+from tensorflow_probability.python.experimental.util.composite_tensor import register_composite
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.internal.auto_composite_tensor import auto_composite_tensor
 from tensorflow_probability.python.internal.auto_composite_tensor import AutoCompositeTensor

@@ -39,7 +39,6 @@ multi_substrate_py_library(
     ],
     srcs_version = "PY3",
     substrates_omit_deps = [
-        ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
@@ -49,9 +48,9 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/substrates",
         "//tensorflow_probability/python/experimental/vi",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/experimental/util:composite_tensor",
     ],
     deps = [
-        ":composite_tensor",
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/experimental/bijectors",
         "//tensorflow_probability/python/experimental/distribute",
@@ -66,31 +65,9 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/experimental/substrates",
         "//tensorflow_probability/python/experimental/util",
+        "//tensorflow_probability/python/experimental/util:composite_tensor",
         "//tensorflow_probability/python/experimental/vi",
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
-    ],
-)
-
-py_library(
-    name = "composite_tensor",
-    srcs = ["composite_tensor.py"],
-    srcs_version = "PY3",
-    deps = [
-        # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
-    ],
-)
-
-py_test(
-    name = "composite_tensor_test",
-    srcs = ["composite_tensor_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
     ],
 )
