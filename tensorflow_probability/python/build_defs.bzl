@@ -28,7 +28,11 @@ RUNFILES_ROOT = "tensorflow_probability/"
 
 def _substrate_src(src, substrate):
     """Rewrite a single src filename for the given substrate."""
-    return "_{}/_generated_{}".format(substrate, src)
+
+    # When src's are sourced from a different package we cut away the package
+    # name.
+    parts = src.split(":")
+    return "_{}/_generated_{}".format(substrate, parts[-1])
 
 def _substrate_srcs(srcs, substrate):
     """Rewrite src filenames for the given substrate."""
@@ -271,6 +275,7 @@ def multi_substrate_py_test(
         srcs = [],
         main = None,
         deps = [],
+        jax_extra_deps = [],
         tags = [],
         numpy_tags = [],
         jax_tags = [],
@@ -279,7 +284,8 @@ def multi_substrate_py_test(
         srcs_version = "PY3",
         python_version = "PY3",
         timeout = None,
-        shard_count = None):
+        shard_count = None,
+        args = []):
     """A TFP `py_test` for each of TF, NumPy, and JAX.
 
     Args:
@@ -296,6 +302,7 @@ def multi_substrate_py_test(
             use-case of the `main` argument is a secondary, i.e. GPU, test.
         deps: As with `py_test`. The list is rewritten to depend on
             substrate-specific libraries for substrate variants.
+        jax_extra_deps: Extra dependencies for the JAX substrate.
         tags: Tags global to this test target. NumPy also gets a `'tfp_numpy'`
             tag, and JAX gets a `'tfp_jax'` tag. A `f'_{name}'` tag is used
             to produce the `test_suite`.
@@ -308,6 +315,7 @@ def multi_substrate_py_test(
         python_version: As with `py_test`.
         timeout: As with `py_test`.
         shard_count: As with `py_test`.
+        args: As with `py_test`.
     """
 
     tags = [t for t in tags]
@@ -325,6 +333,7 @@ def multi_substrate_py_test(
         python_version = python_version,
         timeout = timeout,
         shard_count = shard_count,
+        args = args,
     )
     test_targets.append(":{}.tf".format(name))
 
@@ -349,6 +358,7 @@ def multi_substrate_py_test(
             python_version = "PY3",
             timeout = timeout,
             shard_count = shard_count,
+            args = args,
         )
         test_targets.append(":{}.numpy".format(name))
 
@@ -362,7 +372,7 @@ def multi_substrate_py_test(
                 cmd = "$(location {}) $(SRCS) --numpy_to_jax > $@".format(REWRITER_TARGET),
                 exec_tools = [REWRITER_TARGET],
             )
-        jax_deps = _substrate_deps(deps, "jax")
+        jax_deps = _substrate_deps(deps, "jax") + jax_extra_deps
         # [internal] Add JAX build dep
         native.py_test(
             name = "{}.jax".format(name),
@@ -375,6 +385,7 @@ def multi_substrate_py_test(
             python_version = "PY3",
             timeout = timeout,
             shard_count = shard_count,
+            args = args,
         )
         test_targets.append(":{}.jax".format(name))
 

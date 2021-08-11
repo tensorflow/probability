@@ -57,6 +57,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/distributions",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
+        "//tensorflow_probability/python/experimental/math",
         "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/experimental/nn",
         "//tensorflow_probability/python/experimental/parallel_filter",
