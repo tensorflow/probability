@@ -459,6 +459,12 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertEqual((2, 64, 10, 3), states['x'].shape)
     self.assertEqual((2, 10, 1), trace['step_size'].shape)
 
+  def test_bijector(self):
+    dist = tfd.JointDistributionSequential([tfd.Dirichlet(tf.ones(2))])
+    bij, _ = windowed_sampling._get_flat_unconstraining_bijector(dist)
+    draw = dist.sample(seed=test_util.test_seed())
+    self.assertAllCloseNested(bij.inverse(bij(draw)), draw)
+
 
 @test_util.test_graph_and_eager_modes
 class WindowedSamplingStepSizeTest(test_util.TestCase):

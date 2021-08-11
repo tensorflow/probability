@@ -168,8 +168,8 @@ def _get_flat_unconstraining_bijector(jd_model):
   event_space_bij = jd_model.experimental_default_event_space_bijector()
   flat_bijector = restructure.pack_sequence_as(jd_model.event_shape_tensor())
 
-  unconstrained_shapes = flat_bijector.inverse_event_shape_tensor(
-      jd_model.event_shape_tensor())
+  unconstrained_shapes = event_space_bij(
+      flat_bijector).inverse_event_shape_tensor(jd_model.event_shape_tensor())
 
   # this reshaping is required as as split can produce a tensor of shape [1]
   # when the distribution event shape is []
