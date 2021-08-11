@@ -450,6 +450,12 @@ class PoissonSamplingTest(test_util.TestCase):
   def testSampleXLA(self):
     self.skip_if_no_xla()
     if not tf.executing_eagerly(): return  # jit_compile is eager-only.
+
+    # TODO(b/195975508): Reloading the function to reset the cache.
+    if not test_util.JAX_MODE:
+      poisson_lib.random_poisson = tf.function(
+          poisson_lib.random_poisson._python_function)
+
     log_rates = np.random.rand(4, 3).astype(np.float32)
     dist = tfd.Poisson(log_rate=log_rates, validate_args=True)
     # Verify the compile succeeds going all the way through the distribution.
