@@ -381,7 +381,7 @@ class _ConvVariational(tf.keras.layers.Layer):
         # As of Mar 2017, direct addition is significantly slower than
         # bias_add when computing gradients. To use bias_add, we collapse Z
         # and Y into a single dimension to obtain a 4D input tensor.
-        outputs_shape = outputs.shape.as_list()
+        outputs_shape = tf.shape(outputs)
         outputs_4d = tf.reshape(outputs,
                                 [outputs_shape[0], outputs_shape[1],
                                  outputs_shape[2] * outputs_shape[3],
