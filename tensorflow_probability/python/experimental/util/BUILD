@@ -37,10 +37,12 @@ multi_substrate_py_library(
     numpy_omit_deps = [":jit_public_methods"],
     srcs_version = "PY3",
     substrates_omit_deps = [
+        ":composite_tensor",
         ":deferred_module",
         ":trainable",
     ],
     deps = [
+        ":composite_tensor",
         ":deferred_module",
         ":jit_public_methods",
         ":trainable",
@@ -128,6 +130,29 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
+    name = "composite_tensor",
+    srcs = ["composite_tensor.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
+py_test(
+    name = "composite_tensor_test",
+    srcs = ["composite_tensor_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
