@@ -96,7 +96,7 @@ class MarkovChainTest(test_util.TestCase):
         num_steps=7)
 
     x = markov_chain.sample(5, seed=seed)
-    self.assertAllClose(lgssm.log_prob(x), markov_chain.log_prob(x))
+    self.assertAllClose(lgssm.log_prob(x), markov_chain.log_prob(x), rtol=1e-5)
 
   @test_util.numpy_disable_test_missing_functionality(
       'JointDistributionNamedAutoBatched')
