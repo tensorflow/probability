@@ -23,17 +23,14 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 
 __all__ = [
     'build_default_model',
+    'model_from_seasonal_structure'
 ]
 
 
 # TODO(davmre): before exposing publicly, consider simplifying this function
-# (e.g., not exposing prior specification args) and/or renaming it to something
-# like `auto_build_model`.
+# and/or renaming it to something like `auto_build_model`.
 def build_default_model(observed_time_series,
                         base_component=sts_components.LocalLinearTrend,
-                        observation_noise_scale_prior=None,
-                        drift_scale_prior=None,
-                        allow_seasonal_effect_drift=True,
                         name=None):
   """Builds a model with seasonality from a Pandas Series or DataFrame.
 
@@ -52,22 +49,6 @@ def build_default_model(observed_time_series,
       a class with specific priors set; if not provided, such an instance will
       be constructed with heuristic default priors.
       Default value: `tfp.sts.LocalLinearTrend`.
-    observation_noise_scale_prior: Optional `tfd.Distribution` instance
-      specifying a prior on `observation_noise_scale`. If `None`, a heuristic
-      default prior is constructed based on the provided `observed_time_series`.
-      Default value: `None`.
-    drift_scale_prior: Optional `tfd.Distribution` instance
-      specifying a prior on the `drift_scale` parameter of Seasonal components.
-      If `None`, a heuristic default prior is constructed based on the provided
-      `observed_time_series`.
-      Default value: `None`.
-    allow_seasonal_effect_drift: optional Python `bool` specifying whether the
-      seasonal effects can drift over time.  Setting this to `False`
-      removes the `drift_scale` parameter from the model. This is
-      mathematically equivalent to `drift_scale_prior = tfd.Deterministic(0.)`,
-      but removing drift directly is preferred because it avoids the use of a
-      degenerate prior.
-      Default value: `True`.
     name: Python `str` name for ops created by this function.
       Default value: `None` (i.e., 'build_default_model').
   Returns:
@@ -156,19 +137,22 @@ def build_default_model(observed_time_series,
       # Build a component of the given type using default priors.
       base_component = base_component(observed_time_series=observed_time_series)
 
-    components = [base_component]
     seasonal_structure = seasonality_util.create_seasonal_structure(
         frequency=frequency,
         num_steps=int(observed_time_series.time_series.shape[-2]))
-    for season_type, season in seasonal_structure.items():
-      components.append(
-          sts_components.Seasonal(num_seasons=season.num,
+    return base_component + model_from_seasonal_structure(
+        seasonal_structure, observed_time_series)
+
+
+def model_from_seasonal_structure(seasonal_structure,
+                                  observed_time_series,
+                                  allow_drift=True):
+  return sts_components.Sum(
+      [
+          sts_components.Seasonal(num_seasons=season.num,  # pylint: disable=g-complex-comprehension
                                   num_steps_per_season=season.duration,
-                                  drift_scale_prior=drift_scale_prior,
-                                  allow_drift=allow_seasonal_effect_drift,
+                                  allow_drift=allow_drift,
                                   observed_time_series=observed_time_series,
-                                  name=str(season_type)))
-    return sts_components.Sum(
-        components,
-        observed_time_series=observed_time_series,
-        observation_noise_scale_prior=observation_noise_scale_prior)
+                                  name=str(season_type))
+          for season_type, season in seasonal_structure.items()
+      ], observed_time_series=observed_time_series)

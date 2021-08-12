@@ -24,6 +24,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.experimental.sts_gibbs import gibbs_sampler
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.sts import default_model
 from tensorflow_probability.python.sts import regularization
 from tensorflow_probability.python.sts.forecast import one_step_predictive
 from tensorflow_probability.python.sts.internal import seasonality_util
@@ -179,7 +180,19 @@ def _detect_anomalies_inner(observed_time_series,
       predictive_dist = gibbs_sampler.one_step_predictive(model,
                                                           posterior_samples)
     else:
-      predictive_dist = one_step_predictive(model,
+      # Rebuild the model using appropriate Seasonal components, throwing away
+      # the seasonal effects fit by the Gibbs sampler. Instead, the predictive
+      # model incorporates the seasonal effects in its state space, so their
+      # posterior is tracked exactly (rather than by sampling) and is updated
+      # with each step of the series. This avoids the learning-from-the-future
+      # behavior of the Gibbs-estimated effects.
+      seasonal_model = (model.components[0] +  # LocalLinearTrend component.
+                        default_model.model_from_seasonal_structure(
+                            seasonal_structure,
+                            observed_time_series,
+                            # Gibbs sampling didn't fit a drift scale(s).
+                            allow_drift=False))
+      predictive_dist = one_step_predictive(seasonal_model,
                                             observed_time_series,
                                             timesteps_are_event_shape=False,
                                             parameter_samples=parameter_samples)
