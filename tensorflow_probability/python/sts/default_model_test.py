@@ -56,7 +56,7 @@ class DefaultModelTests(test_util.TestCase):
     self.assertIsInstance(model.components[2], tfp.sts.Seasonal)
     self.assertContainsSubsequence(model.components[2].name, 'DAY_OF_WEEK')
 
-  def test_explicit_base_component_and_priors(self):
+  def test_explicit_base_component(self):
     series = self._build_test_series(shape=[48], freq=pd.DateOffset(hours=1))
     model = default_model.build_default_model(
         series,
@@ -66,17 +66,13 @@ class DefaultModelTests(test_util.TestCase):
             slope_mean_prior=tfd.Normal(0., 100.),
             constrain_ar_coef_positive=True,
             constrain_ar_coef_stationary=True,
-            observed_time_series=series),
-        observation_noise_scale_prior=tfd.Exponential(3.),
-        drift_scale_prior=tfd.Exponential(1.))
+            observed_time_series=series))
     self.assertLen(model.components, 2)
 
     param_by_name = lambda n: [p for p in model.parameters if n in p.name][0]
     self.assertAllClose(param_by_name('level_scale').prior.rate, 5.)
     self.assertAllClose(param_by_name('slope_mean').prior.scale, 100.)
     self.assertAllClose(param_by_name('slope_scale').prior.rate, 0.1)
-    self.assertAllClose(param_by_name('drift_scale').prior.rate, 1.)
-    self.assertAllClose(param_by_name('observation_noise_scale').prior.rate, 3.)
 
   def test_creates_batch_model_from_multiple_series(self):
     model = default_model.build_default_model(

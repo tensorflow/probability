@@ -123,10 +123,10 @@ class AnomalyDetectionTests(test_util.TestCase):
     ones = tf.ones(predictions.mean[0, :].shape, dtype=predictions.mean.dtype)
     self.assertAllClose(predictions.mean[0, :],
                         ones * np.nanmean(df.series0),
-                        atol=stddev0 * 2)
+                        atol=stddev0 * 4)
     self.assertAllClose(predictions.mean[1, :],
                         ones * np.nanmean(df.series1),
-                        atol=stddev1 * 2)
+                        atol=stddev1 * 4)
 
   def test_constant_series(self):
     values = np.concatenate([np.nan * np.ones([5]),
