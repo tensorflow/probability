@@ -264,5 +264,26 @@ class LinearTest(test_util.TestCase):
     self.assertAllClose(x.dot(y.T), self.evaluate(k.matrix(x, y)))
 
 
+@test_util.test_all_tf_execution_regimes
+class ConstantTest(test_util.TestCase):
+  """Test the Constant kernel."""
+
+  def testValuesAreCorrect(self):
+    val = 0.1
+    k = tfp.math.psd_kernels.Constant(constant=val)
+    x = np.random.uniform(-1, 1, size=[5, 3]).astype(np.float32)
+    y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
+    self.assertAllClose(np.full((5, 4), val), self.evaluate(k.matrix(x, y)))
+
+  def testGradsAreNotNone(self):
+    val = 0.1
+    k = tfp.math.psd_kernels.Constant(constant=val)
+    x = tf.constant([5.], dtype=np.float32)
+    value, grads = self.evaluate(
+        tfp.math.value_and_gradient(lambda x: k.apply(x, x), x))
+    self.assertAllClose(value, val)
+    self.assertAllClose(grads[0], 0.0)
+
+
 if __name__ == '__main__':
   tf.test.main()
