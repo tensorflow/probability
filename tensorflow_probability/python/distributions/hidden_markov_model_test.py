@@ -1695,6 +1695,69 @@ class _HiddenMarkovModelTest(
     mode = self.evaluate(model.posterior_mode(observations_data_likely))
     self.assertAllClose(mode[0, 0], [0., 0., 0., 1.], 1e-2)
 
+  @parameterized.named_parameters(('', False),
+                                  ('_dynamic', True))
+  def test_log_prob_mask(self, dynamic):
+    num_steps = 4
+    initial_prob = tf.constant([0.999, 0.001], dtype=self.dtype)
+    transition_matrix = tf.constant([[0.999, 0.001],
+                                     [0.001, 0.999]],
+                                    dtype=self.dtype)
+    observation_scale = tf.constant(0.1, dtype=self.dtype)
+    observation_locs = tf.constant([0.0, 1.0], dtype=self.dtype)
+    observations_unlikely = tf.constant([0.0, 1.0, 0.0, 1.0],
+                                        dtype=self.dtype)
+    mask_none = tf.constant([False, False, False, False])
+    mask_all = tf.constant([True, True, True, True])
+    mask_unlikely = tf.constant([False, True, False, True])
+    mask_batch = tf.stack([mask_none, mask_all, mask_unlikely], axis=0)
+
+    if dynamic:
+      (initial_prob, transition_matrix, observation_scale,
+       observations_unlikely, observation_locs, mask_none, mask_all,
+       mask_unlikely, mask_batch, num_steps) = self.make_placeholders(
+           [initial_prob, transition_matrix, observation_scale,
+            observations_unlikely, observation_locs,
+            mask_none, mask_all, mask_unlikely, mask_batch, num_steps])
+
+    model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs, scale=observation_scale),
+        num_steps=num_steps,
+        mask=mask_unlikely,
+        validate_args=True)
+    log_prob_mask_unlikely = self.evaluate(
+        model.log_prob(observations_unlikely))
+    log_prob_mask_unlikely_explicit = self.evaluate(
+        model.log_prob(observations_unlikely, mask=mask_unlikely))
+    self.assertAllEqual(log_prob_mask_unlikely, log_prob_mask_unlikely_explicit)
+    log_prob_mask_all = self.evaluate(
+        model.log_prob(observations_unlikely, mask=mask_all))
+    self.assertAllClose(log_prob_mask_all, 0.)
+    log_prob_mask_none = self.evaluate(
+        model.log_prob(observations_unlikely, mask=mask_none))
+    self.assertLess(log_prob_mask_none, log_prob_mask_unlikely)
+
+    log_prob_mask_batch = self.evaluate(
+        model.log_prob(observations_unlikely, mask=mask_batch))
+    self.assertAllClose(log_prob_mask_batch,
+                        [log_prob_mask_none,
+                         log_prob_mask_all,
+                         log_prob_mask_unlikely])
+
+    batch_model = tfd.HiddenMarkovModel(
+        tfd.Categorical(probs=initial_prob),
+        tfd.Categorical(probs=transition_matrix),
+        tfd.Normal(loc=observation_locs, scale=observation_scale),
+        num_steps=num_steps,
+        mask=mask_batch,
+        validate_args=True)
+    self.assertAllEqual(batch_model.batch_shape_tensor(), [3])
+    self.assertAllClose(
+        log_prob_mask_batch,
+        batch_model.log_prob(observations_unlikely))
+
 
 class HiddenMarkovModelTestFloat32(_HiddenMarkovModelTest):
   dtype = tf.float32

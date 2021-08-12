@@ -122,6 +122,7 @@ class HiddenMarkovModel(distribution.Distribution):
                allow_nan_stats=True,
                time_varying_transition_distribution=False,
                time_varying_observation_distribution=False,
+               mask=None,
                name='HiddenMarkovModel'):
     """Initialize hidden Markov model.
 
@@ -164,6 +165,13 @@ class HiddenMarkovModel(distribution.Distribution):
         on the corresponding timestep. This dimension size should always match
         num_steps and is the second-to-last batch axis in the batch dimensions
         (just to the left of the dimension for the number of states).
+      mask: optional bool-type `tensor` with rightmost dimension matching
+        `num_steps`, indicating which observations should be ignored
+        (not conditioned on) for posterior inference and `log_prob` evaluation.
+        This may be overridden by passing the `mask` arg to individual methods.
+        When the mask has value `True`, the corresponding observations aren't
+        used. If `mask` is `None` then all of the observations are used.
+        Default value: `None`.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: "HiddenMarkovModel".
 
@@ -190,6 +198,8 @@ class HiddenMarkovModel(distribution.Distribution):
           time_varying_observation_distribution)
       self._time_varying_transition_distribution = (
           time_varying_transition_distribution)
+      self._mask = tensor_util.convert_nonref_to_tensor(
+          mask, dtype_hint=tf.bool, name='mask')
 
       num_steps_ = tf.get_static_value(num_steps)
       if num_steps_ is not None:
@@ -238,6 +248,13 @@ class HiddenMarkovModel(distribution.Distribution):
   def _event_shape(self):
     return self._static_event_shape
 
+  def _get_mask(self, mask):
+    """Falls back to `self.mask` if the passed-in mask is None."""
+    mask = self.mask if mask is None else mask
+    if mask is not None:
+      return tf.convert_to_tensor(mask, dtype_hint=tf.bool, name='mask')
+    return mask
+
   @property
   def initial_distribution(self):
     return self._initial_distribution
@@ -249,6 +266,10 @@ class HiddenMarkovModel(distribution.Distribution):
   @property
   def observation_distribution(self):
     return self._observation_distribution
+
+  @property
+  def mask(self):
+    return self._mask
 
   @property
   def num_steps(self):
@@ -287,7 +308,8 @@ class HiddenMarkovModel(distribution.Distribution):
                 event_ndims=(
                     lambda self: (2
                                   if self._time_varying_observation_distribution
-                                  else 1)))))
+                                  else 1)))),
+        mask=parameter_properties.ParameterProperties(event_ndims=1))
     # pylint: enable=g-long-lambda,protected-access
 
   def _sample_n(self, n, seed=None):
@@ -432,18 +454,26 @@ class HiddenMarkovModel(distribution.Distribution):
 
     return observations
 
-  def _log_prob(self, value):
+  @distribution_util.AppendDocstring(kwargs_dict={
+      'mask':
+      'optional bool-type `tensor` with rightmost dimension matching'
+      ' `num_steps`, indicating which observations should be ignored (not'
+      ' conditioned on). When the mask has value'
+      ' `True`, the corresponding observations aren\'t used.'
+      ' If no mask is specified (`mask` and `self.mask` are both `None`) then '
+      ' all of the observations  are used. The leftmost'
+      ' dimensions `shape(mask)[:-1]` must broadcast with `self.batch_shape`.'
+      ' shape of `x`. Default value: `None`  (falls back to `self.mask`).'})
+  def _log_prob(self, value, mask=None):
+    mask = self._get_mask(mask)
+
     # The argument `value` is a tensor of sequences of observations.
     # `observation_batch_shape` is the shape of that tensor with the
     # sequence part removed.
-    # `observation_batch_shape` is then broadcast to the full batch shape
-    # to give the `batch_shape` that defines the shape of the result.
-    observation_tensor_shape = ps.shape(value)
-    observation_distribution = self.observation_distribution
-    underlying_event_rank = ps.size(
-        observation_distribution.event_shape_tensor())
-    observation_batch_shape = observation_tensor_shape[
-        :-1 - underlying_event_rank]
+    observation_log_probs = self._observation_log_probs(value, mask=mask)
+    # observation_log_probs :: num_steps batch_shape num_states
+    observation_batch_shape = ps.shape(observation_log_probs)[1:-1]
+
     # value :: observation_batch_shape num_steps observation_event_shape
     batch_shape = ps.broadcast_shape(observation_batch_shape,
                                      self.batch_shape_tensor())
@@ -459,36 +489,6 @@ class HiddenMarkovModel(distribution.Distribution):
                                         self.transition_distribution,
                                         move_time_dimension=False)
 
-    # `observation_event_shape` is the shape of each sequence of observations
-    # emitted by the model.
-    observation_event_shape = observation_tensor_shape[
-        -1 - underlying_event_rank:]
-    working_obs = tf.broadcast_to(value,
-                                  ps.concat([batch_shape,
-                                             observation_event_shape],
-                                            axis=0))
-    # working_obs :: batch_shape observation_event_shape
-    r = underlying_event_rank
-
-    # Move index into sequence of observations to front so we can apply
-    # tf.foldl
-    if self._time_varying_observation_distribution:
-      working_obs = tf.expand_dims(working_obs, -1 - r)
-      # working_obs :: batch_shape num_steps 1 underlying_event_shape
-      observation_probs = observation_distribution.log_prob(working_obs)
-      # observation_probs :: batch_shape num_steps num_states
-      observation_probs = distribution_util.move_dimension(
-          observation_probs, -2, 0)
-      # observation_probs :: num_steps batch_shape num_states
-    else:
-      working_obs = distribution_util.move_dimension(working_obs, -1 - r, 0)
-      # working_obs :: num_steps batch_shape underlying_event_shape
-      working_obs = tf.expand_dims(working_obs, -1 - r)
-      # working_obs :: num_steps batch_shape 1 underlying_event_shape
-
-      observation_probs = observation_distribution.log_prob(working_obs)
-      # observation_probs :: num_steps batch_shape num_states
-
     if self._time_varying_transition_distribution:
       log_transition = distribution_util.move_dimension(log_transition, -3, 0)
       def dynamic_forward_step(log_prev_step, log_transition_and_observation):
@@ -496,15 +496,15 @@ class HiddenMarkovModel(distribution.Distribution):
         return _log_vector_matrix(log_prev_step,
                                   log_transition) + log_prob_observation
       fwd_prob = tf.foldl(dynamic_forward_step,
-                          (log_transition, observation_probs[1:]),
-                          initializer=log_init + observation_probs[0])
+                          (log_transition, observation_log_probs[1:]),
+                          initializer=log_init + observation_log_probs[0])
     else:
       def forward_step(log_prev_step, log_prob_observation):
         return _log_vector_matrix(log_prev_step,
                                   log_transition) + log_prob_observation
 
-      fwd_prob = tf.foldl(forward_step, observation_probs[1:],
-                          initializer=log_init + observation_probs[0])
+      fwd_prob = tf.foldl(forward_step, observation_log_probs[1:],
+                          initializer=log_init + observation_log_probs[0])
     # fwd_prob :: batch_shape num_states
 
     log_prob = tf.reduce_logsumexp(fwd_prob, axis=-1)
@@ -682,7 +682,7 @@ class HiddenMarkovModel(distribution.Distribution):
     # reshape and broadcast it up to shape
     #
     # mask : [M] batch [N]
-
+    mask = self._get_mask(mask)
     observation_distribution = self.observation_distribution
     underlying_event_rank = ps.size(
         observation_distribution.event_shape_tensor())
@@ -791,12 +791,13 @@ class HiddenMarkovModel(distribution.Distribution):
         object.  The other dimensions are the dimensions of the batch and these
         are broadcast with the hidden Markov model's parameters.
       mask: optional bool-type `tensor` with rightmost dimension matching
-        `num_steps` indicating which observations the result of this
-        function should be conditioned on. When the mask has value
-        `True` the corresponding observations aren't used.
-        if `mask` is `None` then all of the observations are used.
-        the `mask` dimensions left of the last are broadcast with the
-        hmm batch as well as with the observations.
+        `num_steps`, indicating which observations should be ignored
+        (not conditioned on). When the mask has value `True`, the corresponding
+        observations aren't used. If no mask is specified (`mask` and
+        `self.mask` are both `None`) then all of the observations are used. The
+        leftmost dimensions `shape(mask)[:-1]` must broadcast with
+        `self.batch_shape`.
+        Default value: `None` (falls back to `self.mask`).
       name: Python `str` name prefixed to Ops created by this class.
         Default value: "HiddenMarkovModel".
 
@@ -812,7 +813,6 @@ class HiddenMarkovModel(distribution.Distribution):
       ValueError: if rightmost dimension of `observations` does not
       have size `num_steps`.
     """
-
     with self._name_and_control_scope(name):
       num_states = self.transition_distribution.batch_shape_tensor()[-1]
       log_transition = _extract_log_probs(
@@ -853,6 +853,7 @@ class HiddenMarkovModel(distribution.Distribution):
       observation_log_probs: a Tensor containing `log p(x[t])` with shape
         `[num_steps] + batch_shape`.
     """
+    mask = self._get_mask(mask)
     num_states = self.transition_distribution.batch_shape_tensor()[-1]
     log_init = _extract_log_probs(num_states,
                                   self.initial_distribution,
@@ -1021,12 +1022,12 @@ class HiddenMarkovModel(distribution.Distribution):
         object.  The other dimensions are the dimensions of the batch and these
         are broadcast with the hidden Markov model's parameters.
       mask: optional bool-type `tensor` with rightmost dimension matching
-        `num_steps` indicating which observations the result of this
-        function should be conditioned on. When the mask has value
-        `True` the corresponding observations aren't used.
-        if `mask` is `None` then all of the observations are used.
-        the `mask` dimensions left of the last are broadcast with the
-        hmm batch as well as with the observations.
+        `num_steps`, indicating which observations should be ignored
+        (not conditioned on). When the mask has value `True`, the corresponding
+        observations aren't used. If no mask is specified (`mask` and
+        `self.mask` are both `None`) then all of the observations are used. The
+        leftmost dimensions `shape(mask)[:-1]` must broadcast with
+        `self.batch_shape`.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: "HiddenMarkovModel".
 
@@ -1086,15 +1087,14 @@ class HiddenMarkovModel(distribution.Distribution):
     """
 
     with self._name_and_control_scope(name):
+      mask = self._get_mask(mask)
+      mask_tensor_shape = ps.shape(mask) if mask is not None else None
       observations = tf.convert_to_tensor(observations, name='observations')
-      if mask is not None:
-        mask = tf.convert_to_tensor(mask, name='mask', dtype_hint=tf.bool)
       num_states = self.transition_distribution.batch_shape_tensor()[-1]
       observation_distribution = self.observation_distribution
       underlying_event_rank = ps.size(
           observation_distribution.event_shape_tensor())
       observation_tensor_shape = ps.shape(observations)
-      mask_tensor_shape = ps.shape(mask) if mask is not None else None
       with self._observation_mask_shape_preconditions(observation_tensor_shape,
                                                       mask_tensor_shape,
                                                       underlying_event_rank):
