@@ -23,8 +23,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "rethinking",
     srcs = ["__init__.py"],

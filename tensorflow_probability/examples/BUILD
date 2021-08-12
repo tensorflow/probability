@@ -23,8 +23,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 py_binary(
     name = "bayesian_neural_network",
     srcs = ["bayesian_neural_network.py"],
