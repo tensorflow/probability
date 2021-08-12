@@ -166,7 +166,9 @@ class Composition(bijector.Bijector):
         is_permutation &= bij._is_permutation
 
       # Copy the nested structure so we don't mutate arguments during tracking.
-      self._bijectors = nest.map_structure(lambda b: b, bijectors)
+      bijectors = nest.map_structure(lambda b: b, bijectors)
+      self._bijectors_trackable = bijectors
+      self._bijectors = self._no_dependency(bijectors)
       self._validate_event_size = validate_event_size
       self.__is_injective = is_injective
       self.__is_permutation = is_permutation
@@ -665,6 +667,35 @@ class Composition(bijector.Bijector):
           lambda b, nd, **kwds: b.inverse_event_ndims(nd, **kwds),
           event_ndims, **kwargs)
     return super(Composition, self).inverse_event_ndims(event_ndims, **kwargs)
+
+  def __str__(self):
+    bijector_strs = tf.nest.map_structure(_bijector_type_str, self.bijectors)
+    return '{}, bijectors={})'.format(
+        super().__str__()[:-1],  # Strip final `)` from original str.
+        # Remove quotes around individual bijectors, e.g., ['Exp'] -> [Exp].
+        str(bijector_strs).replace('\'', ''))
+
+  def __repr__(self):
+    return '{} bijectors={}>'.format(
+        super().__repr__()[:-1],  # Strip final `>`.
+        str(tf.nest.map_structure(repr, self.bijectors)).replace('"', ''))
+
+
+def _bijector_type_str(bij):
+  """Recursively format types of component bijectors."""
+  # Example output: "JointMap({a: Invert(Split), b: Chain([Exp, Scale])})"
+  s = type(bij).__name__
+  if hasattr(bij, 'bijectors'):  # bij is a Composition.
+    s = '{}({})'.format(
+        s, tf.nest.map_structure(_bijector_type_str, bij.bijectors))
+    # Remove quotes around individual bijectors, e.g.,
+    # `Chain(['Exp']) -> Chain([Exp])`. We must do this at every level of the
+    # recursion; otherwise `str(structure_of_strings)` will start to use
+    # double-quotes `"` and escaped quotes `\'` which becomes a big mess.
+    s = s.replace('\'', '')
+  elif hasattr(bij, 'bijector'):  # bij is Invert.
+    s = '{}({})'.format(s, _bijector_type_str(bij.bijector))
+  return s
 
 
 def _update_forward_min_event_ndims(

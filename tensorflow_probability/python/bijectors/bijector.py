@@ -1812,6 +1812,62 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
     else:
       return tf.reduce_sum(x, axis=axis)
 
+  def __str__(self):
+    try:
+      batch_shape_str = _str_tensorshape(self.experimental_batch_shape())
+    except:  # pylint: disable=bare-except
+      # Some bijectors like `JointMap([Scale(ones([2])), Scale(ones([3]))])`
+      # may not have a coherent batch shape at their min_event_ndims.
+      batch_shape_str = '?'
+    # Drop batch shape if it's not statically defined or otherwise unavailable.
+    maybe_batch_shape = ('' if batch_shape_str == '?'
+                         else ', batch_shape={}'.format(batch_shape_str))
+    if self.dtype is not None:
+      maybe_dtype = ', dtype=' + _str_dtype(self.dtype).replace('\'', '')
+    else:
+      maybe_dtype = ''
+    if self.forward_min_event_ndims == self.inverse_min_event_ndims:
+      maybe_min_ndims = ', min_event_ndims={}'.format(
+          self.forward_min_event_ndims)
+    else:
+      maybe_min_ndims = (
+          ', forward_min_event_ndims={}, inverse_min_event_ndims={}'.format(
+              self.forward_min_event_ndims, self.inverse_min_event_ndims))
+    maybe_min_ndims = maybe_min_ndims.replace('\'', '')
+    return ('tfp.bijectors.{type_name}('
+            '"{self_name}"'
+            '{maybe_batch_shape}'
+            '{maybe_min_ndims}'
+            '{maybe_dtype})'.format(
+                type_name=type(self).__name__,
+                self_name=self.name or '<unknown>',
+                maybe_batch_shape=maybe_batch_shape,
+                maybe_min_ndims=maybe_min_ndims,
+                maybe_dtype=maybe_dtype))
+
+  def __repr__(self):
+    try:
+      batch_shape_str = _str_tensorshape(self.experimental_batch_shape())
+    except:  # pylint: disable=bare-except
+      # Some bijectors like `JointMap([Scale(ones([2])), Scale(ones([3]))])`
+      # may not have a coherent batch shape at their min_event_ndims.
+      batch_shape_str = '?'
+
+    return ('<tfp.bijectors.{type_name} '
+            '\'{self_name}\''
+            ' batch_shape={batch_shape}'
+            ' forward_min_event_ndims={forward_min_event_ndims}'
+            ' inverse_min_event_ndims={inverse_min_event_ndims}'
+            ' dtype_x={dtype_x}'
+            ' dtype_y={dtype_y}>'.format(
+                type_name=type(self).__name__,
+                self_name=self.name or '<unknown>',
+                batch_shape=batch_shape_str,
+                forward_min_event_ndims=self.forward_min_event_ndims,
+                inverse_min_event_ndims=self.inverse_min_event_ndims,
+                dtype_x=_str_dtype(self.inverse_dtype()),
+                dtype_y=_str_dtype(self.forward_dtype())))
+
 
 class _AutoCompositeTensorBijectorMeta(_BijectorMeta):
   """Metaclass for `AutoCompositeTensorBijector`."""
@@ -2220,3 +2276,24 @@ def _deep_tuple(x):
   elif isinstance(x, (list, tuple)):
     return tuple(map(_deep_tuple, x))
   return x
+
+
+class _PrettyDtype(object):
+
+  def __init__(self, dtype):
+    self.dtype = dtype
+
+  def __repr__(self):
+    if self.dtype is None:
+      return '?'
+    return dtype_util.name(self.dtype)
+
+
+def _str_dtype(x):
+  return str(tf.nest.map_structure(_PrettyDtype, x))
+
+
+def _str_tensorshape(x):
+  if tensorshape_util.rank(x) is None:
+    return '?'
+  return str(tensorshape_util.as_list(x)).replace('None', '?')

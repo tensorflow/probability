@@ -213,6 +213,167 @@ class BaseBijectorTest(test_util.TestCase):
     self.assertEqual(base_params, copy_params)
 
 
+@test_util.test_graph_and_eager_modes
+class BijectorStringReprTest(test_util.TestCase):
+
+  def _tensor(self, x, dynamic=True):
+    if dynamic:
+      return tf.Variable(x, shape=tf.TensorShape(None))
+    return tf.convert_to_tensor(x)
+
+  def test_single_part_str_repr_match_expected(self):
+    bij = tfb.Exp()
+    self.assertContainsInOrder(
+        ['tfp.bijectors.Exp("exp", batch_shape=[], min_event_ndims=0)'],
+        str(bij))
+    self.assertContainsInOrder(
+        ["<tfp.bijectors.Exp 'exp' batch_shape=[] forward_min_event_ndims=0 "
+         "inverse_min_event_ndims=0 dtype_x=? dtype_y=?>"],
+        repr(bij))
+
+    bij = tfb.Scale([1., 1.], name='myscale')
+    self.assertContainsInOrder(
+        ['tfp.bijectors.Scale("myscale", batch_shape=[2], min_event_ndims=0, '
+         'dtype=float32)'],
+        str(bij))
+    self.assertContainsInOrder(
+        ["<tfp.bijectors.Scale 'myscale' batch_shape=[2] "
+         "forward_min_event_ndims=0 inverse_min_event_ndims=0 dtype_x=float32 "
+         "dtype_y=float32>"],
+        repr(bij))
+
+    bij = tfb.Split([3, 4, 2], name='s_p_l_i_t')
+    self.assertContainsInOrder(
+        ['tfp.bijectors.Split("s_p_l_i_t", batch_shape=[], '
+         'forward_min_event_ndims=1, inverse_min_event_ndims=[1, 1, 1])'],
+        str(bij))
+    self.assertContainsInOrder(
+        ["<tfp.bijectors.Split 's_p_l_i_t' batch_shape=[] "
+         "forward_min_event_ndims=1 inverse_min_event_ndims=[1, 1, 1] "
+         "dtype_x=? dtype_y=[?, ?, ?]>"
+         ], repr(bij))
+
+  @test_util.jax_disable_test_missing_functionality('dynamic shape')
+  @test_util.numpy_disable_test_missing_functionality('dynamic shape')
+  def test_single_part_str_repr_match_expected_dynamic_shape(self):
+    bij = tfb.Scale(self._tensor([1., 1.]), name='dynamic_shape_scale')
+    self.assertContainsInOrder(
+        ['tfp.bijectors.Scale("dynamic_shape_scale", min_event_ndims=0, '
+         'dtype=float32)'],
+        str(bij))
+    self.assertContainsInOrder(
+        ["<tfp.bijectors.Scale 'dynamic_shape_scale' batch_shape=? "
+         "forward_min_event_ndims=0 inverse_min_event_ndims=0 dtype_x=float32 "
+         "dtype_y=float32>"],
+        repr(bij))
+
+  def test_invert_str_and_repr_match_expected(self):
+    bij = tfb.Invert(tfb.Split([3, 4, 2]))
+    self.assertContainsInOrder(
+        ['tfp.bijectors.Invert("invert_split", batch_shape=[], '
+         'forward_min_event_ndims=[1, 1, 1], inverse_min_event_ndims=1, '
+         'bijector=Split)'],
+        str(bij))
+    self.assertContainsInOrder(
+        ["<tfp.bijectors.Invert 'invert_split' batch_shape=[] "
+         "forward_min_event_ndims=[1, 1, 1] inverse_min_event_ndims=1 "
+         "dtype_x=[?, ?, ?] dtype_y=? "
+         "bijector=<tfp.bijectors.Split 'split' batch_shape=[] "
+         "forward_min_event_ndims=1 inverse_min_event_ndims=[1, 1, 1] "
+         "dtype_x=? dtype_y=[?, ?, ?]>>"
+         ],
+        repr(bij))
+
+  def test_composition_str_and_repr_match_expected(self):
+    bij = tfb.Chain([tfb.Exp(), tfb.Shift([1., 2.]), tfb.SoftmaxCentered()])
+    self.assertContainsInOrder(
+        ['tfp.bijectors.Chain(',
+         ('batch_shape=[], min_event_ndims=1, '
+          'bijectors=[Exp, Shift, SoftmaxCentered])')],
+        str(bij))
+    self.assertContainsInOrder(
+        ['<tfp.bijectors.Chain ',
+         ('batch_shape=[] forward_min_event_ndims=1 inverse_min_event_ndims=1 '
+          'dtype_x=float32 dtype_y=float32 bijectors=[<tfp.bijectors.Exp'),
+         '>, <tfp.bijectors.Shift',
+         '>, <tfp.bijectors.SoftmaxCentered',
+         '>]>'],
+        repr(bij))
+
+    bij = tfb.Chain(
+        [
+            tfb.JointMap({'a': tfb.Exp(),
+                          'b': tfb.ScaleMatvecDiag([2., 2.])}),
+            tfb.Restructure({'a': 0, 'b': 1}, [0, 1]),
+            tfb.Split(2),
+            tfb.Invert(tfb.SoftmaxCentered()),
+        ])
+    self.assertContainsInOrder(
+        ['tfp.bijectors.Chain(',
+         ('batch_shape=[], forward_min_event_ndims=1, '
+          'inverse_min_event_ndims={a: 1, b: 1}, '
+          'bijectors=[JointMap({a: Exp, b: ScaleMatvecDiag}), '
+          'Restructure, Split, Invert(SoftmaxCentered)])')],
+        str(bij))
+    self.assertContainsInOrder(
+        ['<tfp.bijectors.Chain ',
+         ('batch_shape=[] forward_min_event_ndims=1 '
+          "inverse_min_event_ndims={'a': 1, 'b': 1} dtype_x=float32 "
+          "dtype_y={'a': ?, 'b': float32} "
+          "bijectors=[<tfp.bijectors.JointMap "),
+         '>, <tfp.bijectors.Restructure',
+         '>, <tfp.bijectors.Split',
+         '>, <tfp.bijectors.Invert',
+         '>]>'],
+        repr(bij))
+
+  @test_util.jax_disable_test_missing_functionality('dynamic shape')
+  @test_util.numpy_disable_test_missing_functionality('dynamic shape')
+  def test_composition_str_and_repr_match_expected_dynamic_shape(self):
+    bij = tfb.Chain([tfb.Exp(),
+                     tfb.Shift(self._tensor([1., 2.])),
+                     tfb.SoftmaxCentered()])
+    self.assertContainsInOrder(
+        ['tfp.bijectors.Chain(',
+         ('min_event_ndims=1, bijectors=[Exp, Shift, SoftmaxCentered])')],
+        str(bij))
+    self.assertContainsInOrder(
+        ['<tfp.bijectors.Chain ',
+         ('batch_shape=? forward_min_event_ndims=1 inverse_min_event_ndims=1 '
+          'dtype_x=float32 dtype_y=float32 bijectors=[<tfp.bijectors.Exp'),
+         '>, <tfp.bijectors.Shift',
+         '>, <tfp.bijectors.SoftmaxCentered',
+         '>]>'],
+        repr(bij))
+
+    bij = tfb.Chain(
+        [
+            tfb.JointMap({'a': tfb.Exp(),
+                          'b': tfb.ScaleMatvecDiag(self._tensor([2., 2.]))}),
+            tfb.Restructure({'a': 0, 'b': 1}, [0, 1]),
+            tfb.Split(2),
+            tfb.Invert(tfb.SoftmaxCentered()),
+        ])
+    self.assertContainsInOrder(
+        ['tfp.bijectors.Chain(',
+         ('forward_min_event_ndims=1, '
+          'inverse_min_event_ndims={a: 1, b: 1}, '
+          'bijectors=[JointMap({a: Exp, b: ScaleMatvecDiag}), '
+          'Restructure, Split, Invert(SoftmaxCentered)])')],
+        str(bij))
+    self.assertContainsInOrder(
+        ['<tfp.bijectors.Chain ',
+         ('batch_shape=? forward_min_event_ndims=1 '
+          "inverse_min_event_ndims={'a': 1, 'b': 1} dtype_x=float32 "
+          "dtype_y={'a': ?, 'b': float32} "
+          "bijectors=[<tfp.bijectors.JointMap "),
+         '>, <tfp.bijectors.Restructure',
+         '>, <tfp.bijectors.Split',
+         '>, <tfp.bijectors.Invert',
+         '>]>'],
+        repr(bij))
+
+
 class IntentionallyMissingError(Exception):
   pass
 
