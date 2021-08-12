@@ -29,14 +29,16 @@ from tensorflow_probability.python.math.psd_kernels.matern import MaternFiveHalv
 from tensorflow_probability.python.math.psd_kernels.matern import MaternOneHalf
 from tensorflow_probability.python.math.psd_kernels.matern import MaternThreeHalves
 from tensorflow_probability.python.math.psd_kernels.parabolic import Parabolic
+from tensorflow_probability.python.math.psd_kernels.pointwise_exponential import PointwiseExponential
+from tensorflow_probability.python.math.psd_kernels.polynomial import Constant
 from tensorflow_probability.python.math.psd_kernels.polynomial import Linear
 from tensorflow_probability.python.math.psd_kernels.polynomial import Polynomial
 from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 from tensorflow_probability.python.math.psd_kernels.rational_quadratic import RationalQuadratic
 from tensorflow_probability.python.math.psd_kernels.schur_complement import SchurComplement
 
-
 _allowed_symbols = [
+    'Constant',
     'ExponentiatedQuadratic',
     'ExpSinSquared',
     'FeatureScaled',
@@ -48,6 +50,7 @@ _allowed_symbols = [
     'MaternOneHalf',
     'MaternThreeHalves',
     'Parabolic',
+    'PointwiseExponential',
     'Polynomial',
     'PositiveSemidefiniteKernel',
     'RationalQuadratic',

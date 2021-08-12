@@ -39,6 +39,7 @@ multi_substrate_py_library(
         ":kumaraswamy_transformed",
         ":matern",
         ":parabolic",
+        ":pointwise_exponential",
         ":polynomial",
         ":positive_semidefinite_kernel",
         ":rational_quadratic",
@@ -213,6 +214,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
+        "//tensorflow_probability/python/util",
     ],
 )
 
@@ -366,5 +368,26 @@ py_test(
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels:hypothesis_testlib",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "pointwise_exponential",
+    srcs = ["pointwise_exponential.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "pointwise_exponential_test",
+    srcs = ["pointwise_exponential_test.py"],
+    deps = [
+        ":pointwise_exponential",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
