@@ -29,8 +29,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "init",
     srcs = ["__init__.py"],

@@ -23,8 +23,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "turnkey_inference_candidate",
     srcs = ["__init__.py"],

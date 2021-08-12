@@ -22,8 +22,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "benchmarking",
     srcs = ["__init__.py"],

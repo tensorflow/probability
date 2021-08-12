@@ -25,8 +25,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "python",
     srcs = ["__init__.py"],

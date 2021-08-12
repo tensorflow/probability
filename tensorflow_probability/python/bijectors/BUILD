@@ -30,8 +30,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "bijectors",
     srcs = ["__init__.py"],
