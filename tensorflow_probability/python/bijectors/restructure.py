@@ -232,10 +232,14 @@ class Restructure(bijector.AutoCompositeTensorBijector):
   def inverse_event_shape_tensor(self, y_shape, **kwargs):
     return self._inverse(y_shape)
 
-  def forward_dtype(self, x_dtype, **kwargs):
+  def forward_dtype(self, x_dtype=bijector.UNSPECIFIED, **kwargs):
+    if x_dtype is bijector.UNSPECIFIED:
+      x_dtype = tf.nest.map_structure(lambda _: None, self._input_structure)
     return self._forward(x_dtype)
 
-  def inverse_dtype(self, y_dtype, **kwargs):
+  def inverse_dtype(self, y_dtype=bijector.UNSPECIFIED, **kwargs):
+    if y_dtype is bijector.UNSPECIFIED:
+      y_dtype = tf.nest.map_structure(lambda _: None, self._output_structure)
     return self._inverse(y_dtype)
 
   def forward_event_ndims(self, x_ndims, **kwargs):

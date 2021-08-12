@@ -146,6 +146,16 @@ class _Invert(bijector_lib.Bijector):
   def forward_event_ndims(self, event_ndims, **kwargs):
     return self.bijector.inverse_event_ndims(event_ndims, **kwargs)
 
+  def __str__(self):
+    return '{}, bijector={})'.format(
+        super().__str__()[:-1],  # Strip final `)`.
+        type(self.bijector).__name__)
+
+  def __repr__(self):
+    return '{} bijector={}>'.format(
+        super().__repr__()[:-1],  # Strip final `>`.
+        repr(self.bijector))
+
 
 class Invert(_Invert, bijector_lib.AutoCompositeTensorBijector):
 
