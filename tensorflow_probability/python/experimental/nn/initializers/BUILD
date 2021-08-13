@@ -20,8 +20,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "initializers",
     srcs = ["__init__.py"],

@@ -24,8 +24,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "substrates",
     srcs = [

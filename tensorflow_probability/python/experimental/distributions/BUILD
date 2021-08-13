@@ -28,8 +28,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "distributions",
     srcs = ["__init__.py"],

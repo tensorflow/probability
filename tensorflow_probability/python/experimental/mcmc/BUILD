@@ -32,8 +32,6 @@ package(
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "mcmc",
     srcs = ["__init__.py"],
