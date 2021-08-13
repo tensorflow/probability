@@ -869,6 +869,13 @@ class PositiveSemidefiniteKernel(tf.Module):
           "Can't add non-kernel (of type '%s') to kernel" % type(k))
     return _SumKernel([self, k])
 
+  def __radd__(self, lhs):
+    # Special-case `0 + kernel` so that sum(list_of_kernels) works (it appears
+    # to be implemented as a fold with initial value `0`.
+    if lhs == 0:
+      return self
+    return self + lhs
+
   def __iadd__(self, k):
     return self.__add__(k)
 
