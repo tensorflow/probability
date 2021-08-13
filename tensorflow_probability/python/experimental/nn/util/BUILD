@@ -21,8 +21,6 @@ package(
     ],
 )
 
-exports_files(["LICENSE"])
-
 py_library(
     name = "convolution_util",
     srcs = ["convolution_util.py"],

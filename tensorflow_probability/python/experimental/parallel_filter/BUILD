@@ -25,8 +25,6 @@ package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])
 
-exports_files(["LICENSE"])
-
 multi_substrate_py_library(
     name = "parallel_filter",
     srcs = ["__init__.py"],
