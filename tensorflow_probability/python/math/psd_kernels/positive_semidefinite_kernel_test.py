@@ -321,6 +321,11 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
     self.assertLen(product_kernel.kernels, 5)
     self.assertNotIsInstance(product_kernel, tf.__internal__.CompositeTensor)
 
+    # This works because we special-case (0 + kernel), which is how sum is
+    # initialized.
+    sum_of_list_of_kernels = sum([k0, k0, k0])
+    self.assertLen(sum_of_list_of_kernels.kernels, 3)
+
   def testOperatorOverloadsCompositeTensor(self):
     k0 = CompositeTensorTestKernel(PARAMS_0)
     sum_kernel = k0 + k0 + k0
