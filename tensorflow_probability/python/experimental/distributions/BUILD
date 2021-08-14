@@ -37,7 +37,6 @@ multi_substrate_py_library(
     ],
     deps = [
         ":increment_log_prob",
-        ":joint_density_coroutine",
         ":joint_distribution_pinned",
         ":marginal_fns",
         ":mvn_precision_factor_linop",
@@ -56,23 +55,9 @@ multi_substrate_py_library(
     ],
 )
 
-multi_substrate_py_library(
-    name = "joint_density_coroutine",
-    srcs = ["joint_density_coroutine.py"],
-    srcs_version = "PY3",
-    deps = [
-        ":increment_log_prob",
-        # numpy dep,
-        # tensorflow dep,
-    ],
-)
-
 multi_substrate_py_test(
-    name = "joint_density_coroutine_test",
-    size = "small",
-    srcs = ["joint_density_coroutine_test.py"],
-    jax_size = "small",
-    shard_count = 1,
+    name = "increment_log_prob_test",
+    srcs = ["increment_log_prob_test.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,

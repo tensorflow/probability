@@ -21,7 +21,6 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.distribute import sharded
 from tensorflow_probability.python.experimental.distributions import increment_log_prob
-from tensorflow_probability.python.experimental.distributions import joint_density_coroutine
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
 from tensorflow_probability.python.internal import test_util
 
@@ -351,7 +350,7 @@ class ShardTest(test_lib.DistributedTest):
 
     def ulp_grad(w, x):
 
-      @joint_density_coroutine.JointDensityCoroutine
+      @tfp.experimental.distribute.JointDistributionCoroutine
       def sharded_model():
         w = yield root(tfd.Normal(prior_mean, 1.))
         yield root(
@@ -368,7 +367,7 @@ class ShardTest(test_lib.DistributedTest):
 
     def true_ulp_grad(w, x):
 
-      @joint_density_coroutine.JointDensityCoroutine
+      @tfd.JointDistributionCoroutine
       def model():
         w = yield root(tfd.Normal(prior_mean, 1.))
         yield root(increment_log_prob.IncrementLogProb(custom_ll(w, x)))
