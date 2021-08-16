@@ -23,6 +23,7 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import prefer_static as ps
 from inference_gym.targets import model as model_lib
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 
@@ -109,9 +110,25 @@ class VectorModel(model_lib.Model):
             self._model, flatten_sample_transformations),
     )
 
+  @property
+  def model(self):
+    return self._model
+
+  def structured_event_to_vector(self, x):
+    """Converts an event from the wrapped model to this model's event."""
+    first_element = tf.nest.flatten(x)[0]
+    first_shape = nest.flatten_up_to(self.model.dtype,
+                                     self.model.event_shape)[0]
+    batch_shape = first_element.shape[:-len(first_shape)]
+    return _flatten_and_concat(x, batch_shape, self.dtype)
+
+  def vector_event_to_structured(self, x):
+    """Converts this model's event to an event from the wrapped model."""
+    return _split_and_reshape_event(x, self.model)
+
   def _unnormalized_log_prob(self, value):
     return self._model.unnormalized_log_prob(
-        _split_and_reshape_event(value, self._model))
+        self.vector_event_to_structured(value))
 
 
 def _flatten_and_concat(x, batch_shape, dtype):
