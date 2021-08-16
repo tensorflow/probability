@@ -451,24 +451,28 @@ class PoissonSamplingTest(test_util.TestCase):
     self.skip_if_no_xla()
     if not tf.executing_eagerly(): return  # jit_compile is eager-only.
 
-    # TODO(b/195975508): Reloading the function to reset the cache.
-    if not test_util.JAX_MODE:
-      poisson_lib.random_poisson = tf.function(
-          poisson_lib.random_poisson._python_function)
+    try:
+      old_random_poisson = poisson_lib.random_poisson
+      # TODO(b/195975508): Reloading the function to reset the cache.
+      if not test_util.JAX_MODE:
+        poisson_lib.random_poisson = tf.function(
+            poisson_lib.random_poisson._python_function)
 
-    log_rates = np.random.rand(4, 3).astype(np.float32)
-    dist = tfd.Poisson(log_rate=log_rates, validate_args=True)
-    # Verify the compile succeeds going all the way through the distribution.
-    self.evaluate(
-        tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
-                    jit_compile=True)())
-    # Also test the low-level sampler and verify the XLA-friendly variant.
-    _, runtime = self.evaluate(
-        tf.function(poisson_lib.random_poisson, jit_compile=True)(
-            shape=tf.constant([], dtype=tf.int32),
-            rates=tf.constant(10.),
-            seed=test_util.test_seed()))
-    self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
+      log_rates = np.random.rand(4, 3).astype(np.float32)
+      dist = tfd.Poisson(log_rate=log_rates, validate_args=True)
+      # Verify the compile succeeds going all the way through the distribution.
+      self.evaluate(
+          tf.function(lambda: dist.sample(5, seed=test_util.test_seed()),
+                      jit_compile=True)())
+      # Also test the low-level sampler and verify the XLA-friendly variant.
+      _, runtime = self.evaluate(
+          tf.function(poisson_lib.random_poisson, jit_compile=True)(
+              shape=tf.constant([], dtype=tf.int32),
+              rates=tf.constant(10.),
+              seed=test_util.test_seed()))
+      self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
+    finally:
+      poisson_lib.random_poisson = old_random_poisson
 
   def testSamplePoissonLowRates(self):
     # Low log rate (< log(10.)) samples would use Knuth's algorithm.
