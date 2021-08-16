@@ -21,10 +21,12 @@ from __future__ import print_function
 import contextlib
 import functools
 import os
+import re
 import unittest
 
 from absl import flags
 from absl import logging
+from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 import six
@@ -46,6 +48,7 @@ __all__ = [
     'jax_disable_variable_test',
     'jax_disable_test_missing_functionality',
     'disable_test_for_backend',
+    'main',
     'test_all_tf_execution_regimes',
     'test_graph_and_eager_modes',
     'test_graph_mode_only',
@@ -61,6 +64,11 @@ __all__ = [
 JAX_MODE = False
 NUMPY_MODE = False
 
+flags.DEFINE_string('test_regex', '',
+                    ('If set, only run test cases for which this regex '
+                     'matches "<TestCase>.<test_method>".'),
+                    allow_override=True)
+
 # Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
                   ('Whether to vary the PRNG seed unpredictably.  '
@@ -73,6 +81,8 @@ flags.DEFINE_string('fixed_seed', None,
                     allow_override=True,
                     allow_override_cpp=False,
                     allow_hide_cpp=True)
+
+FLAGS = flags.FLAGS
 
 
 class TestCase(tf.test.TestCase, parameterized.TestCase):
@@ -1282,3 +1292,29 @@ def _vec_outer_square(x, name=None):
   """Computes the outer-product of a vector, i.e., x.T x."""
   with tf.name_scope(name or 'vec_osquare'):
     return x[..., :, tf.newaxis] * x[..., tf.newaxis, :]
+
+
+class _TestLoader(absltest.TestLoader):
+  """A custom TestLoader that allows for Regex filtering test cases."""
+
+  def getTestCaseNames(self, testCaseClass):  # pylint:disable=invalid-name
+    names = super().getTestCaseNames(testCaseClass)
+    if FLAGS.test_regex:
+      pattern = re.compile(FLAGS.test_regex)
+      names = [
+          name for name in names
+          if pattern.search(f'{testCaseClass.__name__}.{name}')
+      ]
+    return names
+
+
+def main():
+  """Test main function that injects a custom loader."""
+  if JAX_MODE:
+    from jax.config import config  # pylint: disable=g-import-not-at-top
+    config.update('jax_enable_x64', True)
+  else:
+    from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
+    test_util.InstallStackTraceHandler()
+
+  absltest.main(testLoader=_TestLoader())
