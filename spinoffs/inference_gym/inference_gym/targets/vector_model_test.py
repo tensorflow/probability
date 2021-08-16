@@ -202,6 +202,12 @@ class VectorModelTest(test_util.InferenceGymTestCase, parameterized.TestCase):
     )
     vec_x = vec_model.default_event_space_bijector(vec_z)
 
+    # Utility transforms.
+    self.assertAllEqualNested(structured_x,
+                              vec_model.vector_event_to_structured(vec_x))
+    self.assertAllEqual(vec_x,
+                        vec_model.structured_event_to_vector(structured_x))
+
     self.assertAllEqual(
         base_model.unnormalized_log_prob(structured_x),
         vec_model.unnormalized_log_prob(vec_x))
