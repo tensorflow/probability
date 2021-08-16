@@ -22,16 +22,16 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
+from tensorflow_probability.python.distributions import log_prob_ratio
+from tensorflow_probability.python.internal import callable_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
     'IncrementLogProb',
 ]
-
-JAX_MODE = False  # Overwritten by rewrite script.
 
 
 class IncrementLogProb(object):
@@ -53,26 +53,50 @@ class IncrementLogProb(object):
       validate_args=False,
       allow_nan_stats=False,  # pylint: disable=unused-argument
       reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,  # pylint: disable=unused-argument
-      name='IncrementLogProb'):
+      log_prob_ratio_fn=None,
+      name='IncrementLogProb',
+      **kwargs):
     """Construct a `IncrementLogProb` distribution-like object.
 
     Args:
-      log_prob_increment: Log probability/density to increment by.
+      log_prob_increment: Float Tensor or callable returning a float Tensor. Log
+        probability/density to increment by.
       validate_args: This argument is ignored, but is present because it is used
         in certain situations where `Distribution`s are expected.
       allow_nan_stats: This argument is ignored, but is present because it is
         used in certain situations where `Distribution`s are expected.
       reparameterization_type: This argument is ignored, but is present because
         it is used in certain situations where `Distribution`s are expected.
+      log_prob_ratio_fn: Optional callable with signature `(p_kwargs, q_kwargs)
+        -> log_prob_ratio`, used to implement a custom `p_log_prob_increment -
+        q_log_prob_increment` computation.
       name: Python `str` name prefixed to Ops created by this class.
+      **kwargs: Passed to `log_prob_increment` if it is callable.
     """
     self._parameters = dict(locals())
+
     with tf.name_scope(name) as name:
-      self._log_prob_increment = tensor_util.convert_nonref_to_tensor(
-          log_prob_increment)
-      self._dtype = self._log_prob_increment.dtype
+      if callable(log_prob_increment):
+        log_prob_increment_fn = lambda: tensor_util.convert_nonref_to_tensor(  # pylint: disable=g-long-lambda
+            log_prob_increment(**kwargs))
+        spec = callable_util.get_output_spec(log_prob_increment_fn)
+      else:
+        if kwargs:
+          raise ValueError(
+              '`kwargs` is only valid when `log_prob_increment` is callable.')
+        log_prob_increment = tensor_util.convert_nonref_to_tensor(
+            log_prob_increment)
+        log_prob_increment_fn = lambda: log_prob_increment
+        spec = log_prob_increment
+
+      self._log_prob_increment_fn = log_prob_increment_fn
+      self._log_prob_increment = log_prob_increment
+      self._dtype = spec.dtype
+      self._batch_shape = spec.shape
       self._name = name
       self._validate_args = validate_args
+      self._log_prob_ratio_fn = log_prob_ratio_fn
+      self._kwargs = kwargs
 
   @property
   def validate_args(self):
@@ -80,7 +104,6 @@ class IncrementLogProb(object):
 
   @property
   def log_prob_increment(self):
-    """The amount to increment log probability by."""
     return self._log_prob_increment
 
   @property
@@ -96,11 +119,11 @@ class IncrementLogProb(object):
     return self._dtype
 
   def unnormalized_log_prob(self, _):
-    return self.log_prob_increment
+    return self._log_prob_increment_fn()
 
   @property
   def batch_shape(self):
-    return self.log_prob_increment.shape
+    return self._batch_shape
 
   def batch_shape_tensor(self, name='batch_shape_tensor'):
     """Shape of a single sample from a single event index as a 1-D `Tensor`.
@@ -116,14 +139,13 @@ class IncrementLogProb(object):
     """
     with tf.name_scope(name):
 
-      def conversion_fn(s):
-        return tf.identity(
-            tf.convert_to_tensor(s, dtype=tf.int32), name='batch_shape')
+      if tensorshape_util.is_fully_defined(self.batch_shape):
+        batch_shape = self.batch_shape
+      else:
+        batch_shape = ps.shape(self._log_prob_increment_fn())
 
-      if JAX_MODE:
-        conversion_fn = ps.convert_to_shape_tensor
-      return nest.map_structure_up_to(
-          None, conversion_fn, self.batch_shape, check_types=False)
+      return ps.identity(
+          ps.convert_to_shape_tensor(batch_shape, name='batch_shape'))
 
   @property
   def event_shape(self):
@@ -140,14 +162,7 @@ class IncrementLogProb(object):
     """
     with tf.name_scope(name):
 
-      def conversion_fn(s):
-        return tf.identity(
-            tf.convert_to_tensor(s, dtype=tf.int32), name='event_shape')
-
-      if JAX_MODE:
-        conversion_fn = ps.convert_to_shape_tensor
-      return nest.map_structure_up_to(
-          None, conversion_fn, self.event_shape, check_types=False)
+      return ps.convert_to_shape_tensor(self.event_shape, name='event_shape')
 
   @property
   def allow_nan_stats(self):
@@ -181,3 +196,15 @@ class IncrementLogProb(object):
 
   def experimental_default_event_space_bijector(self):
     return identity_bijector.Identity(validate_args=self.validate_args)
+
+
+@log_prob_ratio.RegisterLogProbRatio(IncrementLogProb)
+def _increment_log_prob_log_prob_ratio(p, x, q, y, name=None):
+  del x, y
+  # pylint: disable=protected-access
+  with tf.name_scope(name or 'increment_log_prob_log_prob_ratio'):
+    if (p._log_prob_ratio_fn is not None and
+        p._log_prob_ratio_fn is q._log_prob_ratio_fn):
+      return p._log_prob_ratio_fn(p._kwargs, q._kwargs)
+    else:
+      return p.unnormalized_log_prob(()) - q.unnormalized_log_prob(())
