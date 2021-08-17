@@ -4111,7 +4111,7 @@ py_test(
     size = "large",
     srcs = ["numerical_properties_test.py"],
     python_version = "PY3",
-    shard_count = 20,
+    shard_count = 50,
     srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
