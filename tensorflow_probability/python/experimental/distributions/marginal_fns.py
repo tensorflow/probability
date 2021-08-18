@@ -136,3 +136,92 @@ def make_eigh_marginal_fn(tol=1e-6,
           name=name)
 
   return eigh_marginal_fn
+
+
+def retrying_cholesky(
+    matrix, jitter=None, max_iters=5, name='retrying_cholesky'):
+  """Computes a modified Cholesky decomposition for a batch of square matrices.
+
+  Given a symmetric matrix `A`, this function attempts to give a factorization
+  `A + E = LL^T` where `L` is lower triangular, `LL^T` is positive definite, and
+  `E` is small in some suitable sense. This is useful for nearly positive
+  definite symmetric matrices that are otherwise numerically difficult to
+  Cholesky factor.
+
+  In particular, this function first attempts a Cholesky decomposition of
+  the input matrix.  If that decomposition fails, exponentially-increasing
+  diagonal jitter is added to the matrix until either a Cholesky decomposition
+  succeeds or until the maximum specified number of iterations is reached.
+
+  This function is similar in spirit to a true modified Cholesky factorization
+  ([1], [2]). However, it does not use pivoting or other strategies to ensure
+  stability, so may not work well for e.g. ill-conditioned matrices.  Further,
+  this function may perform multiple Cholesky factorizations, while a true
+  modified Cholesky can be done with only slightly more work than a single
+  decomposition.
+
+  #### References
+
+  [1]: Nicholas Higham. What is a modified Cholesky factorization?
+    https://nhigham.com/2020/12/22/what-is-a-modified-cholesky-factorization/
+
+  [2]: Sheung Hun Cheng and Nicholas Higham, A Modified Cholesky Algorithm Based
+    on a Symmetric Indefinite Factorization, SIAM J. Matrix Anal. Appl. 19(4),
+    1097–1110, 1998.
+
+  Args:
+    matrix: A batch of symmetric square matrices, with shape `[..., n, n]`.
+    jitter: Initial jitter to add to the diagnoal.  Default: 1e-6, unless
+      `matrix.dtype` is float64, in which case the default is 1e-10.
+    max_iters: Maximum number of times to retry the Cholesky decomposition
+      with larger diagonal jitter.  Default: 5.
+    name: Python `str` name prefixed to Ops created by this function.
+      Default value: 'retrying_cholesky'.
+
+  Returns:
+    triangular_factor: A Tensor with shape `[..., n, n]`.  The lower triangular
+      Cholesky factor, modified as above.  If the Cholesky decomposition failed
+      for a batch member, then all lower triangular entries returned for that
+      batch member will be NaN.
+    diagonal_shift: A tensor of shape `[...]`. `diag_shift[i]` is the value
+      added to the diagonal of `matrix[i]` in computing `triangular_factor[i]`.
+  """
+  with tf.name_scope(name) as name:
+    matrix = tf.convert_to_tensor(matrix)
+    if jitter is None:
+      jitter = 1e-10 if matrix.dtype == tf.float64 else 1e-6
+    jitter = tf.convert_to_tensor(jitter, dtype=matrix.dtype)
+
+    n = tf.compat.dimension_value(matrix.shape[-1])
+    if n is None:
+      n = tf.shape(matrix)[-1]
+
+    one = tf.convert_to_tensor(1., dtype=matrix.dtype)
+    ten = tf.convert_to_tensor(10., dtype=matrix.dtype)
+
+    def cond(i, _, triangular_factor):
+      return ((i < max_iters)
+              & tf.reduce_any(tf.math.is_nan(triangular_factor[..., 0, 0])))
+
+    def body(i, shift, triangular_factor):
+      triangular_factor = tf.linalg.cholesky(
+          tf.linalg.set_diag(matrix, tf.linalg.diag_part(matrix) + shift))
+      shift = shift * tf.where(
+          tf.math.is_nan(triangular_factor[..., :1, 0]), ten, one)
+      return [i + 1, shift, triangular_factor]
+
+    triangular_factor = tf.linalg.cholesky(matrix)
+    shift = tf.where(tf.math.is_nan(triangular_factor[..., :1, 0]), jitter, 0.)
+    _, shift, triangular_factor = tf.while_loop(
+        cond, body,
+        loop_vars=[tf.convert_to_tensor(0), shift, triangular_factor],
+        maximum_iterations=max_iters)
+
+    # To avoid NaN gradients, run the Cholesky decomposition again.
+    #
+    # TODO(jburnim): Implement a version of `retrying_cholesky` that uses
+    # `tf.custom_gradient` to avoid having this redundant `tf.linalg.cholesky`.
+    shift = tf.stop_gradient(shift)
+    triangular_factor = tf.linalg.cholesky(
+        tf.linalg.set_diag(matrix, tf.linalg.diag_part(matrix) + shift))
+    return triangular_factor, shift[..., 0]
