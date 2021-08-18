@@ -163,7 +163,8 @@ def make_trainable(cls,
         seed, init_seed = samplers.split_seed(seed)
         initial_value = constraining_bijector.forward(
             unconstrained_init_fn(
-                constraining_bijector.inverse_event_shape(parameter_shape),
+                constraining_bijector.inverse_event_shape_tensor(
+                    parameter_shape),
                 seed=init_seed,
                 dtype=parameter_dtype))
       init_kwargs[parameter_name] = deferred_tensor.TransformedVariable(

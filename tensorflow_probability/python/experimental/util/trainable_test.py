@@ -148,6 +148,18 @@ class TestTrainableDistributionsAndBijectors(test_util.TestCase):
     self.assertLen(distribution.trainable_variables, 1)
     self.assertAllEqual(distribution.sample().shape, [2, 2])
 
+  def test_dynamic_shape(self):
+    batch_and_event_shape = tf1.placeholder_with_default(
+        [4, 3, 2], shape=None)
+    distribution = tfp.experimental.util.make_trainable(
+        tfd.Normal,
+        batch_and_event_shape=batch_and_event_shape,
+        seed=test_util.test_seed(),
+        validate_args=True)
+    self.evaluate([v.initializer for v in distribution.trainable_variables])
+    x = self.evaluate(distribution.sample())
+    self.assertAllEqual(x.shape, batch_and_event_shape)
+
   def test_docstring_example_normal(self):
     samples = [4.57, 6.37, 5.93, 7.98, 2.03, 3.59, 8.55, 3.45, 5.06, 6.44]
     model = tfp.experimental.util.make_trainable(
