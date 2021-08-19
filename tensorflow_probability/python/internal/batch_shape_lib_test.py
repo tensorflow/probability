@@ -18,15 +18,32 @@
 
 from absl import logging
 from absl.testing import parameterized
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability import bijectors as tfb
 from tensorflow_probability import distributions as tfd
 from tensorflow_probability.python.internal import batch_shape_lib
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python.platform import test as tf_test  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
+
+
+class _MVNTriLWithDynamicParamNdims(tfd.MultivariateNormalTriL):
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(
+            event_ndims=lambda _: None,
+            event_ndims_tensor=(
+                lambda _: tf1.placeholder_with_default(1, shape=None))),
+        scale_tril=parameter_properties.ParameterProperties(
+            event_ndims=lambda _: None,
+            event_ndims_tensor=(
+                lambda _: tf1.placeholder_with_default(2, shape=None))))
 
 
 @test_util.test_graph_and_eager_modes
@@ -47,6 +64,12 @@ class BatchShapeInferenceTests(test_util.TestCase):
            loc=0., scale_diag=tf.convert_to_tensor([[1., 1.], [1., 1.]])),
        'expected_batch_shape_parts': {'loc': [], 'scale_diag': [2]},
        'expected_batch_shape': [2]},
+      {'testcase_name': '_dynamic_event_ndims',
+       'value_fn': lambda: _MVNTriLWithDynamicParamNdims(  # pylint: disable=g-long-lambda
+           loc=[[0., 0.], [1., 1.], [2., 2.]],
+           scale_tril=[[1., 0.], [-1., 1.]]),
+       'expected_batch_shape_parts': {'loc': [3], 'scale_tril': []},
+       'expected_batch_shape': [3]},
       {'testcase_name': '_mixture_same_family',
        'value_fn': lambda: tfd.MixtureSameFamily(  # pylint: disable=g-long-lambda
            mixture_distribution=tfd.Categorical(
@@ -92,17 +115,17 @@ class BatchShapeInferenceTests(test_util.TestCase):
     self.assertIsInstance(batch_shape, tf.TensorShape)
     self.assertTrue(batch_shape.is_compatible_with(expected_batch_shape))
 
-  def test_additional_event_ndims(self):
+  def test_bijector_event_ndims(self):
     bij = tfb.Sigmoid(low=tf.zeros([2]), high=tf.ones([3, 2]))
     self.assertAllEqual(batch_shape_lib.inferred_batch_shape(bij), [3, 2])
     self.assertAllEqual(batch_shape_lib.inferred_batch_shape_tensor(bij),
                         [3, 2])
     self.assertAllEqual(
-        batch_shape_lib.inferred_batch_shape(bij, additional_event_ndims=1),
+        batch_shape_lib.inferred_batch_shape(bij, bijector_x_event_ndims=1),
         [3])
     self.assertAllEqual(
         batch_shape_lib.inferred_batch_shape_tensor(
-            bij, additional_event_ndims=1),
+            bij, bijector_x_event_ndims=1),
         [3])
 
 
