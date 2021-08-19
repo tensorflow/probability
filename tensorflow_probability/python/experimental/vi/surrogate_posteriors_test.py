@@ -408,7 +408,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 
   @parameterized.named_parameters(
       {'testcase_name': 'TensorEvent',
-       'event_shape': [3],
+       'event_shape': tf.TensorShape([3]),
        'operators': [tf.linalg.LinearOperatorDiag],
        'batch_shape': (),
        'bijector': tfb.Exp(),
@@ -439,22 +439,32 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'bijector': [tfb.Softplus(), None,],
        'dtype': np.float32,
        'is_static': True},
+      {'testcase_name': 'DynamicBatchShape',
+       'event_shape': [tf.TensorShape([3]), tf.TensorShape([])],
+       'operators': 'tril',
+       'batch_shape': (2, 1),
+       'bijector': [tfb.Softplus(), None,],
+       'dtype': np.float32,
+       'is_static': False},
   )
   def test_constrained_affine_from_event_shape(
       self, event_shape, operators, bijector, batch_shape, dtype, is_static):
-    if not tf.executing_eagerly() and not is_static:
-      self.skipTest('tfb.Reshape requires statically known shapes in graph'
-                    ' mode.')
+    if not is_static:
+      event_shape = tf.nest.map_structure(
+          lambda s: tf1.placeholder_with_default(  # pylint: disable=g-long-lambda
+              np.array(s, dtype=np.int32),
+              # Reshape bijector needs to know event_ndims statically.
+              shape=[len(s)]),
+          event_shape)
+
     surrogate_posterior = (
         tfp.experimental.vi.
         build_affine_surrogate_posterior(
-            event_shape=tf.nest.map_structure(
-                lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
-                    np.array(s, dtype=np.int32), is_static=is_static),
-                event_shape),
+            event_shape=event_shape,
             operators=operators,
             bijector=bijector,
-            batch_shape=batch_shape,
+            batch_shape=self.maybe_static(np.int32(batch_shape),
+                                          is_static=is_static),
             dtype=dtype,
             validate_args=True))
 

@@ -40,6 +40,7 @@ from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.experimental.vi.util import trainable_linear_operators
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -457,11 +458,16 @@ def build_affine_surrogate_posterior(
           bijector.inverse_event_shape_tensor(event_shape))
 
     standard_base_distribution = nest.map_structure(
-        lambda s: sample.Sample(  # pylint: disable=g-long-lambda
-            base_distribution(loc=tf.zeros([], dtype=dtype), scale=1.),
-            sample_shape=s, validate_args=validate_args),
+        lambda s: base_distribution(loc=tf.zeros([], dtype=dtype), scale=1.),
         unconstrained_event_shape)
-    if batch_shape:
+    standard_base_distribution = nest.map_structure(
+        lambda d, s: (  # pylint: disable=g-long-lambda
+            sample.Sample(d, sample_shape=s, validate_args=validate_args)
+            if distribution_util.shape_may_be_nontrivial(s)
+            else d),
+        standard_base_distribution,
+        unconstrained_event_shape)
+    if distribution_util.shape_may_be_nontrivial(batch_shape):
       standard_base_distribution = nest.map_structure(
           lambda d: batch_broadcast.BatchBroadcast(  # pylint: disable=g-long-lambda
               d, to_shape=batch_shape, validate_args=validate_args),
