@@ -84,5 +84,31 @@ class JointDistributionUtilTest(test_util.TestCase):
                     'c': (tfd.Dirichlet([1., 1.]),)}],
         expect_isinstance=tfd.JointDistributionSequential)
 
+  def test_batch_ndims_nested_input(self):
+    dist = tfd.independent_joint_distribution_from_structure(
+        [tfd.Normal(0., tf.ones([5, 4])),
+         {'b': tfd.Poisson(tf.ones([5])),
+          'c': tfd.Dirichlet(tf.ones([5, 3]))}],
+        batch_ndims=1)
+    self.assertAllEqualNested(dist.event_shape, [[4], {'b': [], 'c': [3]}])
+    self.assertAllEqual(dist.batch_shape, [5])
+
+  def test_batch_ndims_single_distribution_input(self):
+    dist = tfd.independent_joint_distribution_from_structure(
+        tfd.Normal(0., tf.ones([5, 4])), batch_ndims=2)
+    self.assertAllEqual(dist.event_shape, [])
+    self.assertAllEqual(dist.batch_shape, [5, 4])
+
+    dist = tfd.independent_joint_distribution_from_structure(
+        tfd.Normal(0., tf.ones([5, 4])), batch_ndims=1)
+    self.assertAllEqual(dist.event_shape, [4])
+    self.assertAllEqual(dist.batch_shape, [5])
+
+    dist = tfd.independent_joint_distribution_from_structure(
+        tfd.Normal(0., tf.ones([5, 4])), batch_ndims=0)
+    self.assertAllEqual(dist.event_shape, [5, 4])
+    self.assertAllEqual(dist.batch_shape, [])
+
+
 if __name__ == '__main__':
   tf.test.main()
