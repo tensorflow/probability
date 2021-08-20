@@ -74,13 +74,7 @@ def gram_schmidt(vectors, num_vectors=None):
 
     def body_fn(vecs, i):
       # Slice out the vector w.r.t. which we're orthogonalizing the rest.
-      vecs_ndims = ps.rank(vecs)
-      select_axis = (ps.range(vecs_ndims) == vecs_ndims - 1)
-      start = ps.where(select_axis, i, ps.zeros([vecs_ndims], i.dtype))
-      size = ps.where(select_axis, 1, ps.shape(vecs))
-      u = tf.math.l2_normalize(tf.slice(vecs, start, size), axis=-2)
-      # TODO(b/171730305): XLA can't handle this line...
-      # u = tf.math.l2_normalize(vecs[..., i, tf.newaxis], axis=-2)
+      u = tf.math.l2_normalize(vecs[..., i, tf.newaxis], axis=-2)
       # Find weights by dotting the d x 1 against the d x n.
       weights = tf.einsum('...dm,...dn->...n', u, vecs)
       # Project out vector `u` from the trailing vectors.
