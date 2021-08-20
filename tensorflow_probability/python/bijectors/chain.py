@@ -22,6 +22,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 
 
@@ -131,6 +132,12 @@ class _Chain(composition.Composition):
           inverse_min_event_ndims=inverse_min_event_ndims,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(
+        bijectors=parameter_properties.BatchedComponentProperties(
+            event_ndims=lambda self: [None for _ in self.bijectors]))
 
   def _is_increasing(self, **kwargs):
     # desc(desc)=>asc, asc(asc)=>asc, other cases=>desc.
