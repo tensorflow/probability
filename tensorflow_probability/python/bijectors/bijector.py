@@ -1127,7 +1127,9 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
     # independent parts will need to override this method, or inherit from a
     # class (such as Composition) that does so.
     return batch_shape_lib.inferred_batch_shape(
-        self, bijector_x_event_ndims=x_event_ndims)
+        self,
+        additional_event_ndims=_unique_difference(x_event_ndims,
+                                                  self.forward_min_event_ndims))
 
   def experimental_batch_shape(self, x_event_ndims=None, y_event_ndims=None):
     """Returns the batch shape of this bijector for inputs of the given rank.
@@ -1177,8 +1179,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
       self._cached_batch_shapes = self._no_dependency({})
     key = _deep_tuple(x_event_ndims)  # Avoid hashing lists/dicts.
     if key not in self._cached_batch_shapes:
-      self._cached_batch_shapes[key] = tf.TensorShape(
-          self._batch_shape(x_event_ndims))
+      self._cached_batch_shapes[key] = self._batch_shape(x_event_ndims)
     return self._cached_batch_shapes[key]
 
   def _batch_shape_tensor(self, x_event_ndims):
@@ -1193,7 +1194,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
     # independent parts will need to override this method, or inherit from a
     # class (such as Composition) that does so.
     return batch_shape_lib.inferred_batch_shape_tensor(
-        self, bijector_x_event_ndims=x_event_ndims)
+        self, additional_event_ndims=_unique_difference(
+            x_event_ndims, self.forward_min_event_ndims))
 
   def experimental_batch_shape_tensor(self,
                                       x_event_ndims=None,
@@ -1244,8 +1246,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
       # Try to get the static batch shape.
       batch_shape = self.experimental_batch_shape(x_event_ndims=x_event_ndims)
       if not tensorshape_util.is_fully_defined(batch_shape):
-        batch_shape = ps.convert_to_shape_tensor(
-            self._batch_shape_tensor(x_event_ndims))
+        batch_shape = self._batch_shape_tensor(x_event_ndims)
       return batch_shape
 
   @classmethod
@@ -2256,6 +2257,16 @@ def _autodiff_log_det_jacobian(fn, x):
     raise ValueError('Cannot compute log det jacobian; function {} has `None` '
                      'gradient.'.format(fn))
   return tf.math.log(tf.abs(grads))
+
+
+def _unique_difference(structure1, structure2):
+  differences = [a - b
+                 for a, b in
+                 zip(tf.nest.flatten(structure1), tf.nest.flatten(structure2))]
+  if all([d == differences[0] for d in differences]):
+    return differences[0]
+  raise ValueError('Could not find unique difference between {} and {}'
+                   .format(structure1, structure2))
 
 
 def _deep_tuple(x):

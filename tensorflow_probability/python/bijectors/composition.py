@@ -30,7 +30,6 @@ from tensorflow_probability.python.bijectors import ldj_ratio as ldj_ratio_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
-from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -201,18 +200,7 @@ class Composition(bijector.Bijector):
 
   @classmethod
   def _parameter_properties(cls, dtype):
-
-    def get_parameter_event_ndims(self, x_event_ndims):
-      return nest.map_structure_up_to(
-          self.bijectors,  # Recurse up to the BijectorWithMetadata tuples.
-          lambda bm: bm.x_event_ndims,
-          self._get_bijectors_with_metadata(  # pylint: disable=protected-access
-              event_ndims=x_event_ndims,
-              pack_as_original_structure=True))
-
-    return dict(
-        bijectors=parameter_properties.BatchedComponentProperties(
-            event_ndims=get_parameter_event_ndims))
+    return dict()
 
   @property
   def bijectors(self):
@@ -426,17 +414,12 @@ class Composition(bijector.Bijector):
   ## LDJ Methods
 
   def _get_bijectors_with_metadata(self,
-                                   x=None,
-                                   event_ndims=None,
+                                   x,
+                                   event_ndims,
                                    forward=True,
-                                   pack_as_original_structure=False,
                                    **kwargs):
     """Trace bijectors + metadata forward/backward."""
     bijectors_with_metadata = []
-
-    compute_x_values = x is not None
-    if event_ndims is None:
-      event_ndims = self.forward_min_event_ndims
 
     if forward:
       forward_fn = lambda bij, *args, **kwargs: bij.forward(*args, **kwargs)
@@ -451,7 +434,7 @@ class Composition(bijector.Bijector):
 
     def step(bij, x, x_event_ndims, increased_dof, **kwargs):  # pylint: disable=missing-docstring
       # Transform inputs for the next bijector.
-      y = forward_fn(bij, x, **kwargs) if compute_x_values else None
+      y = forward_fn(bij, x, **kwargs)
       y_event_ndims = forward_event_ndims_fn(bij, x_event_ndims, **kwargs)
 
       # Check if the inputs to this bijector have increased degrees of freedom
@@ -459,7 +442,7 @@ class Composition(bijector.Bijector):
       # produced a valid LDJ, but this one does not (unless LDJ is 0, in which
       # case it doesn't matter).
       increased_dof = ps.reduce_any(nest.flatten(increased_dof))
-      if compute_x_values and self.validate_event_size:
+      if self.validate_event_size:
         assertions = [
             self._maybe_warn_increased_dof(
                 component_name=bij.name, increased_dof=increased_dof)
@@ -469,9 +452,7 @@ class Composition(bijector.Bijector):
       else:
         assertions = []
 
-      y = nest_util.broadcast_structure(y_event_ndims, y)
-      increased_dof = nest_util.broadcast_structure(y_event_ndims,
-                                                    increased_dof)
+      increased_dof = nest_util.broadcast_structure(y, increased_dof)
       bijectors_with_metadata.append(
           BijectorWithMetadata(
               bijector=bij,
@@ -482,14 +463,8 @@ class Composition(bijector.Bijector):
           ))
       return y, y_event_ndims, increased_dof
 
-    x = nest_util.broadcast_structure(event_ndims, x)
     increased_dof = nest_util.broadcast_structure(event_ndims, False)
     walk_forward_fn(step, x, event_ndims, increased_dof, **kwargs)
-
-    if pack_as_original_structure:
-      bijector_map = {id(bm.bijector): bm for bm in bijectors_with_metadata}
-      bijectors_with_metadata = tf.nest.map_structure(
-          lambda b: bijector_map[id(b)], self.bijectors)
     return bijectors_with_metadata
 
   def _call_forward_log_det_jacobian(self, x, event_ndims, name, **kwargs):
@@ -568,6 +543,36 @@ class Composition(bijector.Bijector):
 
     with tf.control_dependencies(assertions):
       return tf.identity(ldj_sum, name='ildj')
+
+  def _batch_shape(self, x_event_ndims):
+    """Broadcasts the batch shapes of component bijectors."""
+    batch_shapes_at_components = []
+
+    def _accumulate_batch_shapes_forward(bij, event_ndims):
+      batch_shapes_at_components.append(
+          bij.experimental_batch_shape(x_event_ndims=event_ndims))
+      return bij.forward_event_ndims(event_ndims)
+
+    # Populate 'batch_shapes_at_components' by walking forwards.
+    self._walk_forward(_accumulate_batch_shapes_forward, x_event_ndims)
+    return functools.reduce(tf.broadcast_static_shape,
+                            batch_shapes_at_components,
+                            tf.TensorShape([]))
+
+  def _batch_shape_tensor(self, x_event_ndims):
+    """Broadcasts the batch shapes of component bijectors."""
+    batch_shapes_at_components = []
+
+    def _accumulate_batch_shapes_forward(bij, event_ndims):
+      batch_shapes_at_components.append(
+          bij.experimental_batch_shape_tensor(x_event_ndims=event_ndims))
+      return bij.forward_event_ndims(event_ndims)
+
+    # Populate 'batch_shapes_at_components' by walking forwards.
+    self._walk_forward(_accumulate_batch_shapes_forward, x_event_ndims)
+    return functools.reduce(ps.broadcast_shape,
+                            batch_shapes_at_components,
+                            [])
 
   def _maybe_warn_increased_dof(self,
                                 component_name,

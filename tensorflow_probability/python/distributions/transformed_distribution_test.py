@@ -1040,62 +1040,6 @@ class MultipartBijectorsTest(test_util.TestCase):
         self.evaluate(transformed_dist.batch_shape_tensor()), dist_batch_shape)
     self.assertAllEqualNested(dist_batch_shape, base_dist.batch_shape)
 
-  @parameterized.named_parameters(
-      {'testcase_name': 'sequential',
-       'split_sizes': [1, 3, 2]},
-      {'testcase_name': 'named',
-       'split_sizes': {'a': 1, 'b': 3, 'c': 2}},)
-  @test_util.numpy_disable_test_missing_functionality('vectorized_map')
-  def test_transform_autobatched_joint_to_joint(self, split_sizes):
-    dist_batch_shape = tf.nest.pack_sequence_as(
-        split_sizes,
-        [tensorshape_util.constant_value_as_shape(s)
-         for s in [[2, 3], [2, 1], [1, 3]]])
-    bijector_batch_shape = [1, 3]
-
-    # Build a joint distribution with parts of the specified sizes.
-    seed = test_util.test_seed_stream()
-    component_dists = tf.nest.map_structure(
-        lambda size, batch_shape: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
-            loc=tf.random.normal(batch_shape + [size], seed=seed()),
-            scale_diag=tf.random.uniform(
-                minval=1., maxval=2.,
-                shape=batch_shape + [size], seed=seed())),
-        split_sizes, dist_batch_shape)
-    if isinstance(split_sizes, dict):
-      base_dist = tfd.JointDistributionNamedAutoBatched(
-          component_dists, batch_ndims=2)
-    else:
-      base_dist = tfd.JointDistributionSequentialAutoBatched(
-          component_dists, batch_ndims=2)
-
-    # Transform the distribution by applying a separate bijector to each part.
-    bijectors = [tfb.Exp(),
-                 tfb.Scale(
-                     tf.random.uniform(
-                         minval=1., maxval=2.,
-                         shape=bijector_batch_shape, seed=seed())),
-                 tfb.Reshape([2, 1])]
-    bijector = tfb.JointMap(tf.nest.pack_sequence_as(split_sizes, bijectors),
-                            validate_args=True)
-
-    transformed_dist = tfd.TransformedDistribution(base_dist, bijector)
-
-    self.assertRegex(
-        str(transformed_dist),
-        '{}.*batch_shape.*event_shape.*dtype'.format(transformed_dist.name))
-
-    self.assertAllEqualNested(
-        transformed_dist.event_shape,
-        bijector.forward_event_shape(base_dist.event_shape))
-    self.assertAllEqualNested(*self.evaluate((
-        transformed_dist.event_shape_tensor(),
-        bijector.forward_event_shape_tensor(base_dist.event_shape_tensor()))))
-
-    self.assertAllEqualNested(transformed_dist.batch_shape, [2, 3])
-    self.assertAllEqualNested(
-        self.evaluate(transformed_dist.batch_shape_tensor()), [2, 3])
-
     # Check transformed `log_prob` against the base distribution.
     sample_shape = [3]
     sample = base_dist.sample(sample_shape, seed=seed())
