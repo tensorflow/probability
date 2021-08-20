@@ -123,7 +123,7 @@ class SampleChainTest(test_util.TestCase):
         trace_fn=None,
         seed=test_util.test_seed())
     if not tf.executing_eagerly():
-      self.assertAllEqual(dict(target_calls=4), counter)
+      self.assertAllEqual(dict(target_calls=2), counter)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
     sample_mean = tf.reduce_mean(states, axis=0)

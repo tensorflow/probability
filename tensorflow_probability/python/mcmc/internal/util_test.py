@@ -170,6 +170,18 @@ class GradientTest(test_util.TestCase):
     self.assertAllEqual(False, fn_result is None)
     self.assertAllEqual([False], [g is None for g in grads])
 
+  @test_util.numpy_disable_gradient_test
+  def testGradientWorksForMultivariateNormalTriL(self):
+    # TODO(b/72831017): Remove this once bijector cacheing is fixed for
+    # graph mode.
+    if not tf.executing_eagerly():
+      self.skipTest('Gradients get None values in graph mode.')
+    d = tfd.MultivariateNormalTriL(scale_tril=tf.eye(2))
+    x = d.sample(seed=(0, 0))
+    fn_result, grads = util.maybe_call_fn_and_grads(d.log_prob, x)
+    self.assertAllEqual(False, fn_result is None)
+    self.assertAllEqual([False], [g is None for g in grads])
+
   @test_util.jax_disable_test_missing_functionality('None gradients')
   @test_util.numpy_disable_gradient_test
   def testNoGradientsNiceError(self):
@@ -192,6 +204,23 @@ class GradientTest(test_util.TestCase):
       with self.assertRaisesRegexp(
           ValueError, 'Encountered `None`.*\n.*fn_arg_list.*arg1.*\n.*None'):
         util.maybe_call_fn_and_grads(fn, fn_args)
+
+  @test_util.numpy_disable_gradient_test
+  def testGradientNumBodyCalls(self):
+    counter = collections.Counter()
+
+    dtype = np.float32
+
+    def fn(x, y):
+      counter['body_calls'] += 1
+      return x**2 + y**2
+
+    fn_args = [dtype(3), dtype(3)]
+    # Convert function input to a list of tensors.
+    fn_args = [tf.convert_to_tensor(value=arg) for arg in fn_args]
+    util.maybe_call_fn_and_grads(fn, fn_args)
+    expected_num_calls = 1 if JAX_MODE or not tf.executing_eagerly() else 2
+    self.assertEqual(expected_num_calls, counter['body_calls'])
 
 
 @test_util.test_all_tf_execution_regimes

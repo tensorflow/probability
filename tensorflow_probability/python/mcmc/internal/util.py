@@ -223,9 +223,17 @@ def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
                    else [fn_arg_list])
     fn_arg_list = _convert_to_tensor(fn_arg_list, 'fn_arg')
 
+    if result is None and grads is None and (JAX_MODE or
+                                             not tf.executing_eagerly()):
+      # Currently, computing gradient is not working well with caching in
+      # tensorflow eager mode (see below), so we will handle that case
+      # separately.
+      return tfp_math_value_and_gradients(fn, fn_arg_list)
+
     if result is None:
       result = fn(*fn_arg_list)
-      if grads is None and tf.executing_eagerly():
+      if grads is None:
+        assert tf.executing_eagerly()
         # Ensure we disable bijector cacheing in eager mode.
         # TODO(b/72831017): Remove this once bijector cacheing is fixed for
         # eager mode.
@@ -237,19 +245,7 @@ def _value_and_gradients(fn, fn_arg_list, result=None, grads=None, name=None):
       grads = _convert_to_tensor(grads, 'fn_grad')
       return result, grads
 
-    if is_list_like(result) and len(result) == len(fn_arg_list):
-      # Compute the block diagonal of Jacobian.
-      # TODO(b/79158574): Guard this calculation by an arg which explicitly
-      # requests block diagonal Jacobian calculation.
-      def fn_slice(i):
-        """Needed to prevent `cell-var-from-loop` pylint warning."""
-        return lambda x: fn(*(fn_arg_list[:i] + [x] + fn_arg_list[i+1:]))
-      grads = [
-          tfp_math_value_and_gradients(fn_slice(i), fn_arg_list[i])[1]
-          for i in range(len(result))
-      ]
-    else:
-      _, grads = tfp_math_value_and_gradients(fn, fn_arg_list)
+    _, grads = tfp_math_value_and_gradients(fn, fn_arg_list)
 
     return result, grads
 

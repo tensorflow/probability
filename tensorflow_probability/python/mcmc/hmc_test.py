@@ -156,7 +156,7 @@ class HMCTest(test_util.TestCase):
       # should be. I.e., `expected_calls = (150 + 150) * 2 + 1`.
       expected_calls = 1202
     else:
-      expected_calls = 4
+      expected_calls = 2
     self.assertAllEqual(dict(target_calls=expected_calls), counter)
 
     expected_x = (tf.math.digamma(self._shape_param) - np.log(self._rate_param))
@@ -522,7 +522,7 @@ class HMCTest(test_util.TestCase):
       # should be. I.e., `expected_calls = (num_results + 200) * 2 * 2 + 1`.
       expected_calls = 6802
     else:
-      expected_calls = 4
+      expected_calls = 2
     self.assertAllEqual(dict(target_calls=expected_calls), counter)
 
     states = tf.stack(states, axis=-1)

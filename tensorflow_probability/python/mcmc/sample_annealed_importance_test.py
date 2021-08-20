@@ -46,7 +46,7 @@ def _maybe_seed(s, sampler_type='stateful'):
 @test_util.test_all_tf_execution_regimes
 class SampleAnnealedImportanceTest(test_util.TestCase):
 
-  def setUp(self):
+  def setUp(self):  # pylint: disable=g-missing-super-call
     self._shape_param = 5.
     self._rate_param = 10.
 
@@ -110,7 +110,7 @@ class SampleAnnealedImportanceTest(test_util.TestCase):
     # another call to the `convex_combined_log_prob_fn`. We could refactor
     # things to avoid this, if needed (eg, b/72994218).
     if not tf.executing_eagerly():
-      self.assertAllEqual(dict(target_calls=5, proposal_calls=5), counter)
+      self.assertAllEqual(dict(target_calls=3, proposal_calls=3), counter)
 
     event_shape = tf.shape(init)[independent_chain_ndims:]
     event_size = tf.reduce_prod(event_shape)
