@@ -367,7 +367,7 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
       raise ValueError(
           f'Cannot serialize object with callable parameters that are not '
           f'`CompositeTensor`s: {self._callable_params.keys()}.')
-    super(_AutoCompositeTensorTypeSpec, self).__reduce__()
+    return super(_AutoCompositeTensorTypeSpec, self).__reduce__()
 
   def __eq__(self, other):
     return (type(other) is type(self) and
