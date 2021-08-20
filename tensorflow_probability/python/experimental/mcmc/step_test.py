@@ -147,7 +147,8 @@ class StepKernelTest(test_util.TestCase):
         return_final_kernel_results=False,
         seed=test_util.test_seed())
 
-    self.assertAllEqual(dict(target_calls=4), counter)
+    target_calls = 4 if tf.executing_eagerly() else 2
+    self.assertAllEqual(dict(target_calls=target_calls), counter)
 
 
 if __name__ == '__main__':
