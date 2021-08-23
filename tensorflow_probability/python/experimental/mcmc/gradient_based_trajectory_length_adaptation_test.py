@@ -439,4 +439,4 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
 del _GradientBasedTrajectoryLengthAdaptationTest
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

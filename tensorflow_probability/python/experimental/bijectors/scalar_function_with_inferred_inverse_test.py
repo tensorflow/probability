@@ -253,4 +253,4 @@ class TestMakeGradientFunctionOfY(test_util.TestCase):
     self.assertAllClose(grad_dy_dpower_wrt_power, true_grad_dy_dpower_wrt_power)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

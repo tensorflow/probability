@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.eight_schools_hmc import EightSchoolsHmcBenchmarkTestHarness
 
 
@@ -22,4 +23,4 @@ class GraphEightSchoolsHmcBenchmark(
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

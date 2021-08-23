@@ -123,4 +123,4 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
     self.assertAllEqual(all_samples, all_samples_2)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

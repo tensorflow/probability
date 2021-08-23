@@ -108,4 +108,4 @@ class RandomRayleighDynamic64(test_util.TestCase, _RandomRayleigh):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

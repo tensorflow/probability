@@ -205,4 +205,4 @@ class SemiLocalLinearTrendStateSpaceModelTestStaticShape64(
   use_static_shape = True
 
 if __name__ == "__main__":
-  tf.test.main()
+  test_util.main()

@@ -463,4 +463,4 @@ class ChainBijectorTest(test_util.TestCase):
     self.assertAllClose(chain.forward([1.]), exp.forward(scale.forward([1.])))
 
 if __name__ == "__main__":
-  tf.test.main()
+  test_util.main()

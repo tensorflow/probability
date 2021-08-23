@@ -106,4 +106,4 @@ def distributed_set_up():
 
 def main():
   distributed_set_up()
-  tf.test.main()
+  test_util.main()

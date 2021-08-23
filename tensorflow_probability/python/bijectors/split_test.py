@@ -369,4 +369,4 @@ class SplitBijectorTestDynamic(test_util.TestCase, _SplitBijectorTest):
     self._testAssertRaisesMismatchedOutputShapes()
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

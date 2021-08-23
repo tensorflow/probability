@@ -141,4 +141,4 @@ class SequentialMonteCarloTestFloat32(_SequentialMonteCarloTest):
 del _SequentialMonteCarloTest
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -735,4 +735,4 @@ class ConvVariationalTestChannelsLast(test_util.TestCase, ConvVariational):
   data_format = 'channels_last'
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

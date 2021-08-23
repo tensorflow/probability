@@ -14,6 +14,7 @@
 # ============================================================================
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.eight_schools_hmc import EightSchoolsHmcBenchmarkTestHarness
 
 
@@ -26,4 +27,4 @@ class EagerEightSchoolsHmcBenchmark(
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

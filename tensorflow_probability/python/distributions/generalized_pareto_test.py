@@ -399,4 +399,4 @@ class GeneralizedParetoTest(test_util.TestCase):
     print(q.shape, q_scipy.shape)
     self.assertAllClose(q, q_scipy, rtol=1.e-5)
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

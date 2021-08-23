@@ -351,4 +351,4 @@ class KalmanFilterTestFloat64(_KalmanFilterTest):
 del _KalmanFilterTest  # Don't run base class tests.
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

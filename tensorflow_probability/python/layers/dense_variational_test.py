@@ -531,4 +531,4 @@ class DenseVariational(test_util.TestCase):
     self.assertAllNotNone(grads)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

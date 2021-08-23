@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import lowering
@@ -66,4 +65,4 @@ class LoweringTest(tfp_test_util.TestCase):
         _is_even_lowered_execute([5, 6, 8, 9, 0], NP_BACKEND))
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

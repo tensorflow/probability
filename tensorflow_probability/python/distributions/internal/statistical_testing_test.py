@@ -531,4 +531,4 @@ class StatisticalTestingTest(test_util.TestCase):
     assert_catches_mistake([0, 0], [[1, 0.3], [0.3, 1]])
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

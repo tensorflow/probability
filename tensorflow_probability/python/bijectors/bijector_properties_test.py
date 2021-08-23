@@ -1011,4 +1011,4 @@ def constraint_for(bijector_name=None, param=None):
 
 if __name__ == '__main__':
   np.set_printoptions(floatmode='unique', precision=None)
-  tf.test.main()
+  test_util.main()

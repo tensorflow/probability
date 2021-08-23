@@ -22,6 +22,7 @@ import contextlib
 import functools
 import os
 import re
+import sys
 import unittest
 
 from absl import flags
@@ -1308,13 +1309,23 @@ class _TestLoader(absltest.TestLoader):
     return names
 
 
-def main():
+def main(jax_mode=JAX_MODE):
   """Test main function that injects a custom loader."""
-  if JAX_MODE:
+  if jax_mode:
     from jax.config import config  # pylint: disable=g-import-not-at-top
     config.update('jax_enable_x64', True)
+
+  # This logic is borrowed from TensorFlow.
+  run_benchmarks = any(
+      arg.startswith('--benchmarks=') or arg.startswith('-benchmarks=')
+      for arg in sys.argv)
+
+  if run_benchmarks:
+    # TensorFlow will use its benchmarks runner in this case, which is separate
+    # from the regular unittests and wouldn't be able to use the loaders anyway
+    # (and it already supports regexes).
+    tf.test.main()
   else:
     from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
     test_util.InstallStackTraceHandler()
-
-  absltest.main(testLoader=_TestLoader())
+    absltest.main(testLoader=_TestLoader())

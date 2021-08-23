@@ -457,4 +457,4 @@ class VonMisesTestDynamicShapeFloat64(test_util.TestCase, _VonMisesTest):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

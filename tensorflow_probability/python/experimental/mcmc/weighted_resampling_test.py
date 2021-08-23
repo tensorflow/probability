@@ -327,4 +327,4 @@ del _SMCResamplersTest  # Don't try to run tests from the base class.
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

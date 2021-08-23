@@ -216,4 +216,4 @@ class BetaQuotientTestFloat64(test_util.TestCase, _BetaQuotientTest):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

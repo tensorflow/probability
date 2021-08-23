@@ -154,4 +154,4 @@ class LossNotDecreasingTests(test_util.TestCase):
       self.assertEqual(component_has_converged_[-1][i], True)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

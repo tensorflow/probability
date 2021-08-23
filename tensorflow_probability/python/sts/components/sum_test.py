@@ -462,4 +462,4 @@ class AdditiveStateSpaceModelTestStaticShape64(_AdditiveStateSpaceModelTest):
 del _AdditiveStateSpaceModelTest  # Don't run tests for the base class.
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

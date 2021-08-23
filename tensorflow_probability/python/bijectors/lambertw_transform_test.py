@@ -179,4 +179,4 @@ class LambertWGaussianizationTest(test_util.TestCase, parameterized.TestCase):
 
 if __name__ == "__main__":
   np.random.seed(10)
-  tf.test.main()
+  test_util.main()

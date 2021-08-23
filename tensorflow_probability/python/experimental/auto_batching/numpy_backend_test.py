@@ -23,7 +23,6 @@ import hypothesis as hp
 from hypothesis import strategies as hps
 from hypothesis.extra import numpy as hpnp
 import numpy as np
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import backend_test_lib as backend_test
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst
@@ -85,4 +84,4 @@ class NumpyVariableTest(tfp_test_util.TestCase, backend_test.VariableTestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

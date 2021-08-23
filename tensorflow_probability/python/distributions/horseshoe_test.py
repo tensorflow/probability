@@ -278,4 +278,4 @@ class HorseshoeTestDynamicShapeFloat64(test_util.TestCase, _HorseshoeTest):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

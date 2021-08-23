@@ -207,4 +207,4 @@ def _build_shape(shape, is_static):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

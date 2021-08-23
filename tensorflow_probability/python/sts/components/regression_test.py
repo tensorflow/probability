@@ -232,4 +232,4 @@ del _LinearRegressionTest  # Don't try to run base class tests.
 del _SparseLinearRegressionTest  # Don't try to run base class tests.
 
 if __name__ == "__main__":
-  tf.test.main()
+  test_util.main()

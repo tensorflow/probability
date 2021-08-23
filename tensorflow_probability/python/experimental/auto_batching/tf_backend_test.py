@@ -104,4 +104,4 @@ class TFVariableTest(test_util.TestCase, backend_test.VariableTestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

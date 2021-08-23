@@ -178,4 +178,4 @@ def constraint_for(kernel_name=None, param=None):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

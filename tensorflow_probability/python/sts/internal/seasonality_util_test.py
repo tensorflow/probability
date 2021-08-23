@@ -19,8 +19,6 @@ from absl.testing import parameterized
 import numpy as np
 import pandas as pd
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts.internal import seasonality_util
 
@@ -150,4 +148,4 @@ class SeasonalityUtilsTest(test_util.TestCase):
       self.assertEqual(value, seasonal_structure[key])
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

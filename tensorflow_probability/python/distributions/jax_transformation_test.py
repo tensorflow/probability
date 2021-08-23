@@ -407,4 +407,4 @@ class PytreeTest(test_util.TestCase):
 
 if __name__ == '__main__':
   os.environ['XLA_FLAGS'] = '--xla_force_host_platform_device_count=8'
-  tf.test.main()
+  test_util.main()

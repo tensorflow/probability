@@ -22,7 +22,6 @@ from __future__ import print_function
 
 import numpy as np
 from scipy import fftpack
-import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_util
@@ -74,4 +73,4 @@ class DiscreteCosineTransformTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

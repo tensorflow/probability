@@ -132,4 +132,4 @@ class ParametersAsKwargsTest(test_util.TestCase):
     self.assertEqual(1, mock_warning.call_count)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

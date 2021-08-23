@@ -211,4 +211,4 @@ class TypeInferenceTest(test_util.TestCase):
               lowered, inputs_t, int(np.max(inputs)) + 3, TF_BACKEND)))
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

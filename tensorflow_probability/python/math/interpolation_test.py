@@ -938,4 +938,4 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     self.assertAllClose([0.0], self.evaluate(y))
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

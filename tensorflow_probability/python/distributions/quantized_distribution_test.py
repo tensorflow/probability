@@ -530,4 +530,4 @@ class QuantizedDistributionTest(test_util.TestCase):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

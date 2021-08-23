@@ -344,4 +344,4 @@ class ForecastTestStatic64(test_util.TestCase, _ForecastTest):
   use_static_shape = True
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -155,4 +155,4 @@ class CorrelationMatrixVolumesTest(tfp_test_util.TestCase):
       self.assertGreater(computed_high, volume)
 
 if __name__ == "__main__":
-  tf.test.main()
+  tfp_test_util.main()

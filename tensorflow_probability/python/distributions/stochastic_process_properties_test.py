@@ -525,4 +525,4 @@ def constraint_for(process=None, param=None):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

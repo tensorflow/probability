@@ -300,4 +300,4 @@ class MinimizeTests(test_util.TestCase):
     self.assertAllGreater(tf.abs(losses1[1:] - losses1[:-1]), 1e-4)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

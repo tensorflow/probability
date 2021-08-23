@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import collections
 
-import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal import unnest
 
@@ -334,4 +333,4 @@ class UnnestingWrapperTests(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

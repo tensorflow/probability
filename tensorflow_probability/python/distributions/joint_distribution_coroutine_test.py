@@ -1440,4 +1440,4 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertLen(model_executions, 1)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -304,4 +304,4 @@ class MoyalTestFloat64DynamicShape(test_util.TestCase, _MoyalTest):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -316,4 +316,4 @@ class WeibullTestDynamicShapeFloat64(test_util.TestCase, _WeibullTest):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -168,4 +168,4 @@ class OptimizationTests(test_util.TestCase):
     self.assertAllClose(sample_path_[-1], np.log(observed_counts), atol=1.0)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

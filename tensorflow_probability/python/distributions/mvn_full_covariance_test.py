@@ -187,4 +187,4 @@ def _compute_non_batch_kl(mu_a, sigma_a, mu_b, sigma_b):
 
 
 if __name__ == "__main__":
-  tf.test.main()
+  test_util.main()

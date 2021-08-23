@@ -323,4 +323,4 @@ class HMCTestsStatic64(test_util.TestCase, _HMCTests):
   use_static_shape = True
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

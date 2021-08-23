@@ -204,4 +204,4 @@ class VMTest(test_util.TestCase):
     self._tfTestHelper(_asserts_fn, execute)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -108,4 +108,4 @@ class CumsumBijectorTestWithDynamicShape(_CumsumBijectorTest):
 del _CumsumBijectorTest  # Don't run tests for the base class.
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

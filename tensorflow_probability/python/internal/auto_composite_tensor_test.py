@@ -695,4 +695,4 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
     self.assertEqual(repr(spec), f'_TestTypeSpec{spec_data}')
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

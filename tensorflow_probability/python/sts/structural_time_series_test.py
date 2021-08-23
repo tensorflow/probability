@@ -518,4 +518,4 @@ class DynamicLinearRegressionTest(test_util.TestCase, _StsTestHarness):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()
