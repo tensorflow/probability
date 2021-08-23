@@ -468,4 +468,4 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
           dist.experimental_default_event_space_bijector().inverse(x[1]))
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

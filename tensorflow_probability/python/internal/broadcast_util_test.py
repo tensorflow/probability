@@ -14,7 +14,6 @@
 # ============================================================================
 """Tests for broadcast_util."""
 
-import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import test_util
 
@@ -68,4 +67,4 @@ class BroadcastUtilTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

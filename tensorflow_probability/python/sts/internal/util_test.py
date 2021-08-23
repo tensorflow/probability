@@ -375,4 +375,4 @@ class UtilityTestsStaticFloat64(_UtilityTests):
 del _UtilityTests
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

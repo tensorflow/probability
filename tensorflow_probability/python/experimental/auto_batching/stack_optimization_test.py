@@ -17,7 +17,6 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import stack_optimization as stack
 from tensorflow_probability.python.experimental.auto_batching import test_programs
@@ -94,4 +93,4 @@ def main(n):
 """.strip()
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

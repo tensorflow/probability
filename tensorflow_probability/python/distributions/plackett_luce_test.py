@@ -170,4 +170,4 @@ class PlackettLuceFromVariableTest(test_util.TestCase):
       self.evaluate([v.initializer for v in d.variables])
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

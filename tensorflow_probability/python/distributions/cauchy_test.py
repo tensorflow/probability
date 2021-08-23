@@ -483,4 +483,4 @@ class CauchyTest(test_util.TestCase):
     self.assertAllClose(reverse_kl_val, kl_sample_val, atol=0.0, rtol=1e-2)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

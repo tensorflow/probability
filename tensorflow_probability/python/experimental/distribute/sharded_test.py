@@ -461,4 +461,4 @@ class ShardTest(test_lib.DistributedTest):
       sharded.Sharded(tfd.Normal(0., 1.), shard_axis_name=['i', 'i'])
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

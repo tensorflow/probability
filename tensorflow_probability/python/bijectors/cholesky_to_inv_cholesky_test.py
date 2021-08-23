@@ -135,4 +135,4 @@ class CholeskyToInvCholeskyTest(test_util.TestCase):
     self.assertAllClose(fldj_[1], fldj1_, rtol=1e-5)
 
 if __name__ == "__main__":
-  tf.test.main()
+  test_util.main()

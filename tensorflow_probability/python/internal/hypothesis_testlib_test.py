@@ -25,7 +25,6 @@ from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
 import numpy as np
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
@@ -49,4 +48,4 @@ class HypothesisTestlibTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -15,7 +15,6 @@
 """Tests for holiday_effects."""
 from absl.testing import parameterized
 import pandas as pd
-import tensorflow as tf
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import holiday_effects
 
@@ -119,4 +118,4 @@ class HolidayEffectsTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -143,4 +143,4 @@ class DoublesidedMaxwellTest(test_util.TestCase):
     self.assertAllEqual((n, 3,), samples.shape)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -245,4 +245,4 @@ class ExpectationTest(tfp_test_util.TestCase):
     self.assertAllClose(total_variance_without_reparam_, 2., atol=0.2)
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

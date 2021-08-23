@@ -404,4 +404,4 @@ class TriangularTestDynamicShape(test_util.TestCase, _TriangularTest):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -43,10 +43,6 @@ def main(argv):
       'import tensorflow_probability.substrates.jax as tfp')
   contents = contents.replace('scipy.linalg', 'jax.scipy.linalg')
   contents = contents.replace('scipy.special', 'jax.scipy.special')
-  contents = contents.replace(
-      'tf.test.main()',
-      'from jax.config import config; config.update("jax_enable_x64", True); '
-      'tf.test.main()')
   if FLAGS.rewrite_numpy_import:
     contents = contents.replace('\nimport numpy as np',
                                 '\nimport numpy as onp\nimport jax.numpy as np')

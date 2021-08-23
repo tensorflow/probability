@@ -117,4 +117,4 @@ class JacobianTest(test_util.TestCase):
                         atol=0.01, rtol=0.01)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

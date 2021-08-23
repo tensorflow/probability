@@ -104,4 +104,4 @@ class _MissingValuesUtilityTestsStaticFloat64(_MissingValuesUtilityTests):
 del _MissingValuesUtilityTests
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

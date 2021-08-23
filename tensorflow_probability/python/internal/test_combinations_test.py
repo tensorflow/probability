@@ -21,7 +21,6 @@ from __future__ import print_function
 from collections import OrderedDict
 
 # Dependency imports
-import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
 
@@ -100,4 +99,4 @@ class CombineTheTestSuite(test_util.TestCase):
 
 
 if __name__ == "__main__":
-  tf.test.main()
+  test_util.main()

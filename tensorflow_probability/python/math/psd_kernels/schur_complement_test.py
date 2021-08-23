@@ -238,4 +238,4 @@ class SchurComplementTest(test_util.TestCase):
     schur_complement.matrix(fixed_inputs, fixed_inputs)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

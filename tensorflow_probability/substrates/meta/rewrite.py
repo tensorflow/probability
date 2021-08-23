@@ -250,13 +250,6 @@ def main(argv):
     contents = contents.replace('JAX_MODE = False', 'JAX_MODE = True')
     contents = contents.replace('SKIP_DTYPE_CHECKS = True',
                                 'SKIP_DTYPE_CHECKS = False')
-    is_test = lambda x: x.endswith('_test.py') or x.endswith('_test_util.py')
-    if is_test(argv[1]):  # Test-only rewrites.
-      contents = contents.replace(
-          'tf.test.main()',
-          'from jax.config import config; '
-          'config.update("jax_enable_x64", True); '
-          'tf.test.main()')
 
   substrate = 'jax' if FLAGS.numpy_to_jax else 'numpy'
   path = filename.split('/python/')[1]

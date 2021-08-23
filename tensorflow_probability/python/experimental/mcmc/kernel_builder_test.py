@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import kernel_builder
 from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
 from tensorflow_probability.python.experimental.mcmc import with_reductions
@@ -127,4 +126,4 @@ class TestKernelBuilder(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

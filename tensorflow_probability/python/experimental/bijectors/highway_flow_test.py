@@ -184,4 +184,4 @@ class HighwayFlowTests(test_util.TestCase):
     self.assertAllClose(bijector1.forward(x), bijector2.forward(x))
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

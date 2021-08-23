@@ -19,7 +19,6 @@ from __future__ import division
 from __future__ import print_function
 
 # Dependency imports
-import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
@@ -75,4 +74,4 @@ class KernelBiasTest(test_util.TestCase):
     self.assertAllEqual(bias.shape, bias_shape)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

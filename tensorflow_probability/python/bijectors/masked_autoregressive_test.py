@@ -972,4 +972,4 @@ class ConditionalTests(test_util.TestCase):
 del _MaskedAutoregressiveFlowTest
 
 if __name__ == "__main__":
-  tf.test.main()
+  test_util.main()

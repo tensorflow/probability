@@ -479,4 +479,4 @@ class CompositeTensorTest(tfp_test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

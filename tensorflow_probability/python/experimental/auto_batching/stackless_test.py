@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 
 import tensorflow.compat.v1 as tf1
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import numpy_backend
@@ -83,4 +82,4 @@ class StacklessTest(tfp_test_util.TestCase):
 
 if __name__ == '__main__':
   tf1.enable_eager_execution()
-  tf.test.main()
+  tfp_test_util.main()

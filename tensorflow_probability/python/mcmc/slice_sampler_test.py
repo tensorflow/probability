@@ -283,4 +283,4 @@ class DistributedRWMTest(distribute_test_lib.DistributedTest):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

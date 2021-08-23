@@ -379,4 +379,4 @@ class BetaBinomialFromVariableTest(test_util.TestCase):
     self.assertAllNotNone(grad)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

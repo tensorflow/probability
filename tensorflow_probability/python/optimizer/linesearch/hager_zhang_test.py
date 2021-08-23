@@ -334,4 +334,4 @@ class HagerZhangTest(test_util.TestCase):
                                     0.9))
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
@@ -85,4 +83,4 @@ class DocstringUtil(tfp_test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

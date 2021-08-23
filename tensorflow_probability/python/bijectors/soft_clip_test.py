@@ -120,4 +120,4 @@ class SoftClip64Test(_SoftClipBijectorBase):
 del _SoftClipBijectorBase
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

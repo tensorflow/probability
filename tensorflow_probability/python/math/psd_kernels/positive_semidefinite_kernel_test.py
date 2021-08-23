@@ -438,4 +438,4 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
       _ = float32_kernel * float64_kernel
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

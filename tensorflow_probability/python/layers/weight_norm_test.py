@@ -324,4 +324,4 @@ class WeightNormTest(test_util.TestCase):
     checkpoint.save(file_prefix=model_dir)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

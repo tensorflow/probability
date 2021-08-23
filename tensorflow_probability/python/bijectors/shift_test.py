@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 
 from absl.testing import parameterized
-import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.internal import test_util
 
@@ -55,4 +54,4 @@ class ShiftTest(test_util.TestCase, parameterized.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -202,4 +202,4 @@ class DistributionBijectorsTest(test_util.TestCase):
     do_sample()
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

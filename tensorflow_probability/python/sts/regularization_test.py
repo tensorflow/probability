@@ -21,7 +21,6 @@ from absl.testing import parameterized
 import numpy as np
 import pandas as pd
 
-import tensorflow as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
@@ -215,4 +214,4 @@ class RegularizationTest(test_util.TestCase):
                         [[1., 7.], [2., 8.], [np.nan, np.nan], [4., 10.]])
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

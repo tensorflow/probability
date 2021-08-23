@@ -66,4 +66,4 @@ class NumericsTestingTest(test_util.TestCase):
         tf.math.log1p, small)), 0)
 
 if __name__ == "__main__":
-  tf.test.main()
+  test_util.main()

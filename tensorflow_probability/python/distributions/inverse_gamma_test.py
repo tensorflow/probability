@@ -374,4 +374,4 @@ class InverseGammaTest(test_util.TestCase):
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

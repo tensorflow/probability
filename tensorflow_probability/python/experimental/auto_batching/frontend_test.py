@@ -681,4 +681,4 @@ class TestTFDynamicBatchSize(test_util.TestCase, _TestHidingTFBatchSize):
   use_static_batch_size = False
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

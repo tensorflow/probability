@@ -417,4 +417,4 @@ class JointDistributionTest(test_lib.DistributedTest):
     self.assertAllCloseNested(true_g, g)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

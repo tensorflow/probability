@@ -264,4 +264,4 @@ class GammaGammaTest(test_util.TestCase):
           ).inverse([-4.2, -0.3, -1e-6])
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -1763,4 +1763,4 @@ if __name__ == '__main__':
   # Need to enable V2 control flow so we can use GradientTape for the graph-mode
   # tests. See b/75979076.
   tf1.enable_control_flow_v2()
-  tf.test.main()
+  test_util.main()

@@ -404,4 +404,4 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
     self.assertAllClose(sample_mean, true_mean, atol=0.15, rtol=0.1)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

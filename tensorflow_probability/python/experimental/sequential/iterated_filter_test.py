@@ -159,4 +159,4 @@ class IteratedFilterTest(test_util.TestCase):
           parameterized_observation_fn=lambda s: tfd.Normal(s, 1.))
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import numpy as np
 
-import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
@@ -100,4 +99,4 @@ class SeedStreamTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

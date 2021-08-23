@@ -20,7 +20,6 @@ from __future__ import print_function
 
 # Dependency imports
 
-import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
@@ -122,4 +121,4 @@ class RunTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

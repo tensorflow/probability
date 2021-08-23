@@ -1883,4 +1883,6 @@ class NumpyTest(test_util.TestCase):
                          [(4, 3), (3, 2)])
 
 if __name__ == '__main__':
-  tf.test.main()
+  # A rewrite oddity: the test_util we import here doesn't come from a rewritten
+  # dependency, so we need to tell it that it's meant to be for JAX.
+  test_util.main(jax_mode=JAX_MODE)

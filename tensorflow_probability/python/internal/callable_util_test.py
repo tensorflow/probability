@@ -89,4 +89,4 @@ class CallableUtilTest(test_util.TestCase):
         tf.nest.map_structure(lambda x: x.dtype, results))
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

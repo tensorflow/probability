@@ -21,7 +21,6 @@ from __future__ import print_function
 # Dependency imports
 from absl.testing import parameterized
 import numpy as np
-import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
@@ -155,4 +154,4 @@ del _KumaraswamyTransformedTest
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

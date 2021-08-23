@@ -94,4 +94,4 @@ class SuccessiveGradientsAreUncorrelatedTests(test_util.TestCase):
         tf.reduce_mean(scales), target_dist.stddev())), atol=0.5)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

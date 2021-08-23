@@ -559,4 +559,4 @@ class SampleDistributionTest(test_util.TestCase):
 if __name__ == '__main__':
   # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.
   os.environ['XLA_FLAGS'] = '--xla_cpu_enable_fast_math=false'
-  tf.test.main()
+  test_util.main()

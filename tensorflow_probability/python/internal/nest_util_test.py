@@ -403,4 +403,4 @@ class NestUtilTest(test_util.TestCase):
       nest_util.coerce_structure(target, source)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

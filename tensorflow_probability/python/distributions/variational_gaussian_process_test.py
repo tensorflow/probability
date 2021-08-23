@@ -381,4 +381,4 @@ class VariationalGaussianProcessTest(test_util.TestCase):
         quadrature_size=20)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

@@ -163,4 +163,4 @@ class DecompositionTestDynamic64(_DecompositionTest):
 del _DecompositionTest  # Don't run tests for the base class.
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

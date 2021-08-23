@@ -613,4 +613,4 @@ class SplitFlowSurrogatePosterior(
     self._test_dtype(surrogate_posterior, dtype, seed())
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

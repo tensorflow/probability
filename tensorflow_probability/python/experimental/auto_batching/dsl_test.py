@@ -204,4 +204,4 @@ class AutoBatchingTest(test_util.TestCase):
       self.assertAllEqual(expected, obtained)
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

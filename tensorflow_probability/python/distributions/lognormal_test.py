@@ -134,4 +134,4 @@ class LogNormalTest(test_util.TestCase):
           [-4.2, -1e-6, -1.3])
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()
