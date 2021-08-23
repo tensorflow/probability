@@ -109,14 +109,14 @@ def plot_weight_posteriors(names, qm_vals, qs_vals, fname):
 
   ax = fig.add_subplot(1, 2, 1)
   for n, qm in zip(names, qm_vals):
-    sns.distplot(tf.reshape(qm, shape=[-1]), ax=ax, label=n)
+    sns.distplot(qm.reshape([-1]), ax=ax, label=n)
   ax.set_title('weight means')
   ax.set_xlim([-1.5, 1.5])
   ax.legend()
 
   ax = fig.add_subplot(1, 2, 2)
   for n, qs in zip(names, qs_vals):
-    sns.distplot(tf.reshape(qs, shape=[-1]), ax=ax)
+    sns.distplot(qs.reshape([-1]), ax=ax)
   ax.set_title('weight stddevs')
   ax.set_xlim([0, 1.])
 
@@ -152,7 +152,7 @@ def plot_heldout_prediction(input_vals, probs,
     ax.set_title('posterior samples')
 
     ax = fig.add_subplot(n, 3, 3*i + 3)
-    sns.barplot(np.arange(10), tf.reduce_mean(probs[:, i, :], axis=0), ax=ax)
+    sns.barplot(np.arange(10), np.mean(probs[:, i, :], axis=0), ax=ax)
     ax.set_ylim([0, 1])
     ax.set_title('predictive probs')
   fig.suptitle(title)
@@ -342,10 +342,10 @@ def main(argv):
         if HAS_SEABORN:
           names = [layer.name for layer in model.layers
                    if 'flipout' in layer.name]
-          qm_vals = [layer.kernel_posterior.mean()
+          qm_vals = [layer.kernel_posterior.mean().numpy()
                      for layer in model.layers
                      if 'flipout' in layer.name]
-          qs_vals = [layer.kernel_posterior.stddev()
+          qs_vals = [layer.kernel_posterior.stddev().numpy()
                      for layer in model.layers
                      if 'flipout' in layer.name]
           plot_weight_posteriors(names, qm_vals, qs_vals,
@@ -353,7 +353,7 @@ def main(argv):
                                      FLAGS.model_dir,
                                      'epoch{}_step{:05d}_weights.png'.format(
                                          epoch, step)))
-          plot_heldout_prediction(heldout_seq.images, probs,
+          plot_heldout_prediction(heldout_seq.images, probs.numpy(),
                                   fname=os.path.join(
                                       FLAGS.model_dir,
                                       'epoch{}_step{}_pred.png'.format(
