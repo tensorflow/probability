@@ -46,7 +46,7 @@ class ReparameterizationType(object):
     self._rep_type = rep_type
 
   def __repr__(self):
-    return "<Reparameteriation Type: %s>" % self._rep_type
+    return "<Reparameterization Type: %s>" % self._rep_type
 
   def __hash__(self):
     return hash(self._rep_type)
