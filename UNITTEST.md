@@ -1,5 +1,22 @@
 # TFP Unit-Test Best Practices
 
+## Use `test_util.main` instead of `tf.test.main` or `absltest.main`
+
+```python
+from tensorflow_probability.python.internal import test_util
+
+if __name__ == '__main__':
+  test_util.main()
+```
+
+This performs additional setup TFP requires as well as enabling regex filtering
+via the `--test_regex` flag, e.g.:
+
+```bash
+bazel test -c opt tensorflow_probability/python/distributions:normal_test \
+    --test_arg=--test_regex=testNormalSurvivalFunction
+```
+
 ## Recipe to easily test static and dynamic shape.
 
 tl;dr: [See this example.](https://github.com/tensorflow/probability/commit/748af84a032cde7cb256457dba59985f2f483923)
