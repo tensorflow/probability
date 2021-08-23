@@ -54,16 +54,10 @@ py_test(
     args = [
         "--fake_data",
         "--num_epochs=1",
-        "--viz_steps=1000",
+        "--num_monte_carlo=4",
     ],
     main = "bayesian_neural_network.py",
     python_version = "PY3",
-    tags = [
-        "tf2-kokoro-broken",
-        # TODO(b/147689726) Re-enable this test after contrib references are
-        # rm'ed.
-        "notap",
-    ],
     deps = [
         ":bayesian_neural_network_lib",
     ],
@@ -110,13 +104,6 @@ py_test(
     ],
     main = "disentangled_vae.py",
     python_version = "PY3",
-    tags = [
-        "no-oss-ci",
-        "tf2-kokoro-broken",
-        # TODO(b/147689726) Re-enable this test after contrib references are
-        # rm'ed.
-        "notap",
-    ],
     deps = [
         ":disentangled_vae_lib",
     ],
