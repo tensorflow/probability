@@ -321,6 +321,12 @@ class Categorical(distribution.AutoCompositeTensorDistribution):
         tf.math.multiply_no_nan(masked_logits, tf.math.exp(logits)),
         axis=-1) / tf.math.exp(lse_logits)
 
+  def _mean(self):
+    x = self._probs if self._logits is None else self._logits
+    mean = tf.cast(tf.reduce_mean(x, axis=-1), self.dtype)
+    tensorshape_util.set_shape(mean, x.shape[:-1])
+    return mean      
+
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
     mode = tf.cast(tf.argmax(x, axis=-1), self.dtype)
