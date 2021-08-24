@@ -18,6 +18,8 @@ import collections
 import functools
 import operator
 
+from absl.testing import parameterized
+
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
@@ -29,6 +31,7 @@ from tensorflow_probability.python.internal import test_util
 tfd = tfp.distributions
 
 
+@test_util.test_graph_and_eager_modes()
 class _ScanAssociativeTest(test_util.TestCase):
 
   def test_cumulative_sum_size_zero(self):
@@ -62,6 +65,18 @@ class _ScanAssociativeTest(test_util.TestCase):
         self.evaluate(tfp.math.scan_associative(operator.add, elems,
                                                 max_num_levels=8)),
         self.evaluate(tf.cumsum(elems)))
+
+  @parameterized.parameters((0,), (1,), (2,), (-2,), (-1,))
+  def test_cumulative_sum_custom_axis(self, axis):
+    elems = self._maybe_static(
+        tf.random.stateless_normal(
+            [4, 32, 31, 1], seed=test_util.test_seed(sampler_type='stateless')))
+
+    axis = self._maybe_static(axis)
+    expected_result = self.evaluate(tf.cumsum(elems, axis=axis))
+    result = tfp.math.scan_associative(
+        operator.add, elems, axis=axis, max_num_levels=8)
+    self.assertAllClose(self.evaluate(result), expected_result, rtol=1e-5)
 
   def test_counting_by_matmul_example(self):
     num_elems = 2**4 + 1
@@ -163,7 +178,7 @@ class _ScanAssociativeTest(test_util.TestCase):
       return (a[0] + b[0], a[1] + b[1])
 
     with self.assertRaisesRegexp(
-        Exception, 'Input `Tensor`s must have the same first dimension'):
+        Exception, 'Inputs must have the same size along the given axis'):
       self.evaluate(tfp.math.scan_associative(
           extended_add,
           (self._maybe_static(elems0), self._maybe_static(elems1)),
@@ -189,7 +204,7 @@ class _ScanAssociativeTest(test_util.TestCase):
         tfd.Uniform(-1., 1.).sample([512], seed=test_util.test_seed()))
 
     with self.assertRaisesRegexp(
-        Exception, 'Input `Tensor`s must have first axis dimension less than'):
+        Exception, 'Input `Tensor`s must have dimension less than'):
       self.evaluate(tfp.math.scan_associative(
           operator.add,
           self._maybe_static(elems),
@@ -197,10 +212,10 @@ class _ScanAssociativeTest(test_util.TestCase):
           validate_args=True))
 
 
-@test_util.test_all_tf_execution_regimes
 class ScanAssociativeTestStatic(_ScanAssociativeTest):
 
   # XLA requires static shapes.
+  @test_util.test_graph_and_eager_modes
   def test_cumulative_sum_with_xla(self):
     elems = self._maybe_static(tf.range(0, 2**4 - 1, dtype=tf.int64))
 

@@ -28,7 +28,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import distribute_lib
-from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import variadic_reduce
@@ -111,15 +110,11 @@ def log_cumsum_exp(x, axis=-1, name=None):
   """
   with tf.name_scope(name or 'cumulative_logsumexp'):
     x = tf.convert_to_tensor(x, name='x')
-    # TODO(b/154873585) Support `axis` in scan_associative to avoid transposing.
     def safe_logsumexp(x, y):
       result = log_add_exp(x, y)
       # Remove spurious `NaN`s that arise from subtracting infinities.
       return tf.where(tf.math.is_finite(result), result, -np.inf)
-    x = dist_util.move_dimension(x, source_idx=axis, dest_idx=0)
-    return dist_util.move_dimension(scan_associative(safe_logsumexp, x),
-                                    source_idx=0,
-                                    dest_idx=axis)
+    return scan_associative(safe_logsumexp, x, axis=axis)
 
 
 def _kahan_reduction(x, y):
