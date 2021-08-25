@@ -16,6 +16,7 @@
 
 import collections
 
+import tensorflow as tf
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 
 __all__ = [
@@ -38,7 +39,8 @@ def SHAPE_FN_NOT_IMPLEMENTED(sample_shape):  # pylint: disable=invalid-name
 
 class ParameterProperties(
     collections.namedtuple('ParameterProperties', [
-        'event_ndims', 'shape_fn', 'default_constraining_bijector_fn',
+        'event_ndims', 'event_ndims_tensor',
+        'shape_fn', 'default_constraining_bijector_fn',
         'is_preferred', 'is_tensor', 'specifies_shape'
     ])):
   """Annotates expected properties of a `Tensor`-valued distribution parameter.
@@ -54,6 +56,10 @@ class ParameterProperties(
       a batch-shape-vs-event-shape distinction (for example, if the parameter
       cannot have batch dimensions, or if its value itself specifies a shape).
       Default value: `0`.
+    event_ndims_tensor: optional value like `event_ndims`, except that callables
+      are allowed to perform Tensor operations. Defaults to `event_ndims` if not
+      provided.
+      Default value: `None`.
     shape_fn: Python `callable` with signature
       `parameter_shape = shape_fn(shape)`. Given the desired shape of
       an 'output' from this instance, returns the expected shape of the
@@ -87,84 +93,167 @@ class ParameterProperties(
       may depend on the *value* (rather than just the shape) of this parameter.
       Default value: `False`.
 
-  #### Definition of `event_ndims`
+  #### Batch shapes and parameter `event_ndims`
 
-  The `event_ndims` of a parameter is the number of rightmost dimensions of
-  its Tensor shape required to describe
-  a single event (when parameterizing a distribution) or a single transformation
-  (when parameterizing a bijector; this is the action of `self.forward(x)`
-  when `rank(x) == self.forward_min_event_ndims`). Equivalently, the
-  `event_ndims` of a parameter is the minimal Tensor rank of a valid value for
-  that parameter. For non-Tensor parameters such as Distributions and
-  Bijectors, the concepts of Tensor shape and Tensor rank naturally
-  generalize to the parameter's `batch_shape` and batch rank, as discussed
-  below.
+  The `batch_shape` of a distribution/bijector/linear operator/PSD kernel/etc.
+  instance is the shape of distinct parameterizations represented by that
+  instance. It is computed by broadcasting the batch shapes of that instance's
+  parameters, where an individual parameter's 'batch shape' is the shape of
+  values specified for that parameter.
 
-  Since the `tfd.Normal` distribution can draw a (scalar) event
-  given scalar `loc` and `scale` parameters, it would set `event_ndims=0`
-  for both of those parameters, indicating that scalar values are valid. On
-  the other hand, `tfd.MultivariateNormalTriL` requires a `loc` vector and a
-  `scale_tril` matrix, so it would set `event_ndims=1` for `loc` and
-  `event_ndims=2` for `scale_tril`.
+  To compute the batch shape of a given parameter, we need to know what counts
+  as a 'single value' of that parameter. For example, the `scale` parameter of
+  `tfd.Normal` is semantically scalar-valued, so a value of shape `[d]`
+  would have batch shape `[d]`. On the other hand, the `scale_diag` parameter
+  of `tfd.MultivariateNormalDiag` is semantically vector-valued, so in this
+  context a value of shaped `[d]` would have batch shape `[]`. TFP formalizes
+  this by annotating the `scale` parameter with `event_ndims=0`, and the
+  `scale_diag` parameter with `event_ndims=1`.
 
-  Similarly, the `scale` parameter of a `tfb.Scale` bijector may be a scalar
-  (this is sufficient to transform a minimal input to the bijector---which
-  itself is also a scalar because `tfb.Scale.forward_min_event_ndims==0`), so
-  it has `event_dims=0`. By contrast, the `scale_tril` parameter of a
-  `tfb.ScaleMatvecTriL` must be a matrix, so it would set `event_ndims=2`.
-
-  The portion of each parameter's shape that remains after slicing off the
-  rightmost `event_ndims` is its 'batch shape'. The batch shape(s) of all
-  parameters must broadcast with each other, and this broadcast shape is the
-  `batch_shape` of the distribution (or bijector, etc) instance. For
-  example, in a `tfd.MultivariateNormalTriL(loc, scale_tril)` distribution,
-  where `loc.shape == [3, 2]` and `scale_tril.shape == [4, 1, 2, 2]`, the
-  parameter batch shapes are `[3]` and `[4, 1]` respectively, and these
+  In general, the `event_ndims` of a `Tensor`-valued parameter is the number of
+  rightmost dimensions of its shape used to describe a single event of the
+  parameterized instance. Equivalently, it is the minimal Tensor rank of a valid
+  value for that parameter. The portion of each Tensor parameter's shape that
+  remains after slicing off the rightmost `event_ndims` is its 'parameter
+  batch shape'. The batch shape(s) of all parameters must broadcast with each
+  other. For example, in a `tfd.MultivariateNormalDiag(loc, scale_diag)`
+  distribution, where `loc.shape == [3, 2]` and `scale_diag.shape == [4, 1, 2]`,
+  the parameter batch shapes are `[3]` and `[4, 1]` respectively, and these
   broadcast to an overall batch shape of `[4, 3]`.
 
-  **Non-Tensor parameters (nested Distributions, Bijectors, etc):** When a
-  distribution takes another distribution as a parameter, an event of the
-  outer distribution may sample multiple events from the inner
-  distribution (the reverse, in which a single inner event generates multiple
-  outer events, is not possible; events are taken to be indivisible). For
-  example, in `tfd.Independent(inner_dist, reinterpreted_batch_ndims=nd)`,
-  a single event of the outer Independent distribution consumes a batch of
-  events of shape `inner_dist.batch_shape[-nd:]` from the inner
-  `distribution`. In general, the
-  `event_ndims` of a non-Tensor parameter is the number of rightmost
-  dimensions of its *batch* shape required to describe an event of the outer
-  distribution: here, we would take `event_ndims=nd` for the `distribution`
-  parameter of `tfd.Independent`. This is analogous to the definition for Tensor
-  parameters, simply replacing Tensor shape with `batch_shape`.
+  #### Instance-dependent (callable) `event_ndims`
 
-  It is important to distinguish between the properties of the inner
-  distribution (which will itself have an `event_shape` whose rank we
-  might colloquially refer to as its 'event ndims'), versus the parameter
-  `event_ndims` we are discussing here, which is a property solely of the outer
-  distribution. The latter describes an index into the
-  *batch* (rather than event) shape of the inner distribution instance.
+  A parameter's `event_ndims` may be specified as a *callable* that returns an
+  integer and takes as its argument an instance `self` of the class being
+  parameterized. This allows parameters whose interpretation depends on other
+  parameters. Callables for `Bijector` parameters must also accept
+  a second argument `x_event_ndims`, described below.
 
-  **Instance-dependent `event_ndims`**. A parameter's `event_ndims` may be a
-  callable that returns an integer (or a structure of integers; see below),
-  rather than just a static integer. This callable must take as its sole
-  argument an instance of the class being parameterized (`self`). For example,
-  for the `distribution` parameter of the `Independent` distribution given
-  above we would specify
-  `event_ndims=lambda self: self.reinterpreted_batch_ndims`, indicating that the
-  outer class's relationship to the inner distribution depends on another
-  instance parameter (`reinterpreted_batch_ndims`). The returned value may be
-  a Python `int` or an integer `Tensor`, but the callable itself may not cause
-  graph side effects (e.g., creating new Tensors).
+  For example, for the `distribution` parameter of `tfd.Independent`, we
+  would specify `event_ndims=lambda self: self.reinterpreted_batch_ndims`,
+  indicating that the outer class's relationship to the inner distribution
+  depends on another instance parameter (`reinterpreted_batch_ndims`). The
+  value returned from an `event_ndims` callable may be a Python `int` or an
+  integer `Tensor`, but the callable itself may not cause graph side effects
+  (e.g., create new Tensors). In cases where graph ops can't be avoided,
+  the `event_ndims` callable should return `None`, and a separate callable
+  `event_ndims_tensor` must be provided.
 
-  **Structured parameters.** A parameter's `event_ndims` may be a nested
-  structure (list, dict, etc.) of integers, if and only if the parameter value
-  *itself* is a nested structure of Tensors or non-Tensor objects. For
-  example, in the joint bijector
-  `tfb.JointMap(bijectors=[tfb.Softplus(), tfb.Exp()])`,
-  the `event_ndims` of the `bijectors` parameter would be `[0, 0]`, matching
-  the structure of the `bijectors` value (note that since this structure is
-  instance-dependent, the `event_ndims` would need to be specified using a
-  callable, as detailed above).
+  #### Parameters of non-`Distribution` objects
+
+  The notion of an 'event' generalizes beyond distributions. In general, an
+  `event` refers to an instance of an object with `batch_shape==[]`, and the
+  `event_ndims` of a parameter describes the parameter value that would define
+  such an instance. For example:
+
+  * `tf.linalg.LinearOperator`s: an 'event' of a linear operator is a single
+    linear transformation. For example, the `diag` parameter
+    to `tf.linalg.LinearOperatorDiag` has `event_ndims=1`, because a
+    diagonal matrix is defined by the vector of values along the diagonal.
+
+  * `tfp.math.psd_kernels.PositiveSemidefiniteKernel`s: an event of a PSD kernel
+    defines a single kernel function. For example, the `amplitude`
+    parameter to `tf.math.psd_kernels.ExponentiatedQuadratic` has
+    `event_ndims=0`, since a scalar amplitude is sufficient to specify the
+    kernel (more precisely, because dimensions *above* a scalar will induce
+    batch shape, describing a batch of kernels).
+
+  * `tfb.Bijector`s: the notion of an 'event' for bijectors varies according to
+    the `event_ndims` of the value being transformed. TFP supports two
+    approaches to annotating the `event_ndims` of Bijector parameters:
+
+    - Using `min_event_ndims` (static): the parameter `event_ndims` is
+      a static integer corresponding to the parameter's rank
+      when transforming an event of rank `forward_min_event_ndims`.
+      For example, `tfb.ScaleMatvecTriL` has `forward_min_event_ndims==1`,
+      indicating that it can transform vector events, so we would annotate its
+      `scale_tril` parameter with `event_ndims=2` to indicate that such a
+      transformation is parameterized by a matrix-valued `scale_tril`. This
+      implies that transformations of matrix events would in general
+      be parameterized by a rank-3 `scale_tril` parameter (with lower-rank
+      parameter values implicitly broadcasting to rank 3), and so on.
+
+    - Callable `event_ndims`: Alternately, a parameter's `event_ndims` may be
+      specified as callable `event_ndims(bijector_instance, x_event_ndims)` that
+      returns the rank of the parameter used to transform an event of rank
+      `x_event_ndims`. This more general annotation strategy is
+      required for multipart bijectors that define `_parts_interact=False`,
+      since their parameters may interact with only some parts of the event.
+      For example, the bijector `tfb.JointMap([tfb.Scale(scale=tf.ones([2])),
+      tfb.Scale(scale=tf.ones([3]))])` is parameterized by two `Scale` bijectors
+      (themselves each parameterized by a `scale` `Tensor`), each
+      of which applies separately to the corresponding event part. When
+      transforming events with `event_ndims=[0, 1]`, `[1, 0]`, or `[1, 1]`,
+      the `bijectors` parameter to the `JointMap` may therefore have
+      `event_ndims` of `[0, 1]`, `[1, 0]`, or `[1, 1]`,  respectively (implying
+      contextual batch shape of `[2]`, `[3]`, or `[]` respectively). We could
+      annotate this as a callable parameter `event_ndims` given by
+      `lambda self, x_event_ndims: x_event_ndims` (the actual generic `JointMap`
+      annotation is more complex, but will ground out to this in this case).
+      Note that this bijector *cannot* transform an event with
+      `event_ndims=[0, 0]`, since this would imply a contextual batch shape of
+      `broadcast_shape([2], [3])`, which is not defined.
+
+  ### Non-Tensor-valued parameters (Distributions, Bijectors, etc).
+
+  The previous section discussed annotating parameters of
+  non-Distribution objects. We'll now consider the orthogonal generalization:
+  parameters that *themselves* take non-Tensor values. For example, the
+  `distribution` and `bijector` parameters of `tfd.TransformedDistribution` are
+  themselves a distribution and a bijector, respectively.
+
+  * `Distribution`, `LinearOperator`, `PositiveSemidefiniteKernel`, and other
+  batchable parameters: the `event_ndims` annotation for a parameter that
+  has a (context-independent) batch shape is the number of rightmost dimensions
+  of that batch shape required to describe an event of the
+  parameterized object. For example, in `tfd.Independent(inner_dist,
+  reinterpreted_batch_ndims=nd)`, a single event of the outer Independent
+  distribution consumes a batch of events of shape
+  `inner_dist.batch_shape[-nd:]` from the inner `distribution`. Here, we
+  would take `event_ndims=nd` for the `distribution` parameter of
+  `tfd.Independent`. This is analogous to the definition for
+  Tensor parameters, simply replacing Tensor shape with `batch_shape`.
+
+  * `Bijector`-valued parameters: the `event_ndims` annotation for a
+  bijector-valued parameter is the rank of the `x` values *with which the
+  bijector will be invoked* during an event of the outer object . For example,
+  an event of `TransformedDistribution(distribution, bijector)` invokes the
+  bijector with events of rank `rank_from_shape(distribution.event_shape)`.
+
+  #### Structured parameter `event_ndims`
+
+  A parameter's `event_ndims` will be a nested structure of integers
+  (list, dict, etc.) if either of the following applies:
+
+  1. The parameter value itself is a nested structure. For example, in the
+     joint bijector `tfb.JointMap(bijectors=[tfb.Softplus(), tfb.Exp()])`,
+     the `event_ndims` of the `bijectors` parameter would be `[0, 0]`, matching
+     the structure of the `bijectors` value (note that since this structure is
+     instance-dependent, the `event_ndims` would need to be specified using a
+     callable, as detailed above).
+
+  2. The parameter is a Bijector with structured `forward_min_event_ndims`.
+     For example, in
+     `tfb.JointMap(bijectors=[tfb.Softplus(), tfb.Invert(tfb.Split(2))])`,
+     the `event_ndims` of the `bijectors` parameter would be `[0, [1, 1]]`,
+     since the inverse of the Split bijector has
+     `forward_min_event_ndims=[1, 1]`.
+
+  Any ambiguity between these two uses for structured `event_ndims` can
+  be resolved by examining the parameter value. For example,
+  `event_ndims = [[2, 1], [1, 0]]` could describe a nested structure containing
+  four Tensors (or distributions, single-part bijectors, etc.), a list
+  containing two structured bijectors, or a single bijector operating on nested
+  lists of Tensors, but we can always tell which of these is the case by
+  examining the actually instantiated parameter.
+
+  Note that `JointDistribution`-valued parameters never have structured
+  `event_ndims`, despite having structured event shapes, because the
+  `event_ndims` annotation of a Distribution parameter describes the
+  number of that distribution's *batch* dimensions that contribute to an event
+  of the outer parameterized object. Bijectors require additional annotation
+  not because they operate on structured events, but rather because they operate
+  in a context-specific manner depending on the event being transformed.
 
   #### Choice of constraining bijectors
 
@@ -195,29 +284,66 @@ class ParameterProperties(
   # Specify default properties.
   def __new__(cls,
               event_ndims=0,
+              event_ndims_tensor=None,
               shape_fn=lambda sample_shape: sample_shape,
               default_constraining_bijector_fn=identity_bijector.Identity,
               is_preferred=True,
               is_tensor=True,
               specifies_shape=False):
 
+    if event_ndims_tensor is None:
+      event_ndims_tensor = event_ndims
+
     return super(ParameterProperties, cls).__new__(
         cls,
         event_ndims=event_ndims,
+        event_ndims_tensor=event_ndims_tensor,
         shape_fn=shape_fn,
         default_constraining_bijector_fn=default_constraining_bijector_fn,
         is_preferred=is_preferred,
         is_tensor=is_tensor,
         specifies_shape=specifies_shape)
 
-  def instance_event_ndims(self, instance):
-    if callable(self.event_ndims):
+  def instance_event_ndims(self, instance, require_static=False):
+    event_ndims = (self.event_ndims if require_static
+                   else self.event_ndims_tensor)
+    if callable(event_ndims):
       if instance is None:
         raise ValueError('Attempting to get the per-event rank of a parameter '
                          'for which this is instance-dependent, but no '
                          'instance was provided.')
-      return self.event_ndims(instance)  # Must not have graph side effects.
-    return self.event_ndims
+      return event_ndims(instance)
+    return event_ndims
+
+  def bijector_instance_event_ndims(self,
+                                    bijector,
+                                    x_event_ndims,
+                                    require_static=False):
+    """Computes parameter event_ndims when parameterizing a bijector."""
+    event_ndims = (self.event_ndims if require_static
+                   else self.event_ndims_tensor)
+    # Multipart bijectors with `_parts_interact=False` should
+    # annotate parameter `event_ndims` callables that take the structured
+    # `x_event_ndims` of the event being transformed and return the
+    # (potentially structured) event_ndims of the corresponding parameter.
+    if callable(event_ndims):
+      if bijector is None:
+        raise ValueError('Attempting to get the per-event rank of a parameter '
+                         'for which this is instance-dependent, but no '
+                         'instance was provided.')
+      return event_ndims(bijector, x_event_ndims)
+    if event_ndims is None:
+      return None
+    # Multipart bijectors with `_parts_interact=True` (e.g.,
+    # `_DefaultJointBijector`, or compositions that include Split/Concat
+    # bijectors) reduce a single joint LDJ, as opposed to individual LDJs for
+    # each part, so they require that the number of reduction dimensions is the
+    # same across all parts. That is, there should be a unique value for the
+    # difference between the actual `x_event_ndims` and the minimum event ndims.
+    additional_event_ndims = _unique_difference(
+        x_event_ndims, bijector.forward_min_event_ndims)
+    return tf.nest.map_structure(lambda nd: nd + additional_event_ndims,
+                                 event_ndims)
 
 
 class BatchedComponentProperties(ParameterProperties):
@@ -225,11 +351,13 @@ class BatchedComponentProperties(ParameterProperties):
 
   def __new__(cls,
               event_ndims=0,
+              event_ndims_tensor=None,
               default_constraining_bijector_fn=None,
               is_preferred=True):
     return super(BatchedComponentProperties, cls).__new__(  # pylint: disable=redundant-keyword-arg
         cls=cls,
         event_ndims=event_ndims,
+        event_ndims_tensor=event_ndims_tensor,
         # TODO(davmre): do we need/want shape annotations for non-Tensor params?
         shape_fn=SHAPE_FN_NOT_IMPLEMENTED,
         default_constraining_bijector_fn=default_constraining_bijector_fn,
@@ -250,3 +378,13 @@ class ShapeParameterProperties(ParameterProperties):
         is_preferred=is_preferred,
         is_tensor=True,
         specifies_shape=True)
+
+
+def _unique_difference(structure1, structure2):
+  differences = [a - b
+                 for a, b in
+                 zip(tf.nest.flatten(structure1), tf.nest.flatten(structure2))]
+  if all([d == differences[0] for d in differences]):
+    return differences[0]
+  raise ValueError('Could not find unique difference between {} and {}'
+                   .format(structure1, structure2))

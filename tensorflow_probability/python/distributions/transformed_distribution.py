@@ -17,8 +17,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import ldj_ratio
@@ -285,26 +283,10 @@ class TransformedDistribution(distribution_lib.Distribution):
     return dict(
         distribution=parameter_properties.BatchedComponentProperties(),
         bijector=parameter_properties.BatchedComponentProperties(
-            event_ndims=_count_bijector_batch_ndims_used_by_event))
-
-  def _bijector_batch_shape(self):
-    x_event_ndims = tf.nest.map_structure(tensorshape_util.rank,
-                                          self.distribution.event_shape)
-    if any(dim is None for dim in tf.nest.flatten(x_event_ndims)):
-      return tf.TensorShape(None)
-    try:
-      return self.bijector.experimental_batch_shape(x_event_ndims=x_event_ndims)
-    except NotImplementedError:
-      return tf.TensorShape([])
-
-  def _bijector_batch_shape_tensor(self):
-    try:
-      return self.bijector.experimental_batch_shape_tensor(
-          x_event_ndims=tf.nest.map_structure(
-              ps.rank_from_shape,
-              self.distribution.event_shape_tensor()))
-    except NotImplementedError:
-      return []
+            event_ndims=lambda td: tf.nest.map_structure(  # pylint: disable=g-long-lambda
+                tensorshape_util.rank, td.distribution.event_shape),
+            event_ndims_tensor=lambda td: tf.nest.map_structure(  # pylint: disable=g-long-lambda
+                ps.rank_from_shape, td.distribution.event_shape_tensor())))
 
   def _event_shape_tensor(self):
     return self.bijector.forward_event_shape_tensor(
@@ -318,67 +300,39 @@ class TransformedDistribution(distribution_lib.Distribution):
 
   def _batch_shape_tensor(self):
     base_batch_shape_tensor = self.distribution.batch_shape_tensor()
-
-    # A `TransformedDistribution`'s `batch_shape` is derived by broadcasting the
-    # base distribution's batch shape with the batch shape contributed by the
-    # bijector. If both of the following are true:
-    #   - the base distribution is joint with structured `batch_shape_tensor`
-    #   - the transformed distribution is not joint.
-    # then the components of the base distribution's
-    # `batch_shape_tensor` are broadcast with *each other*, and also with the
-    # bijector's contribution, to obtain the `batch_shape_tensor` of
-    # the transformed distribution. Non-broadcasting components are not
-    # supported. (Note that joint distributions may either have a single
-    # `batch_shape_tensor` for all components, or a component-wise
-    # `batch_shape_tensor` with the same nested structure as the distribution's
-    # dtype.)
-    if tf.nest.is_nested(base_batch_shape_tensor):
-      if self._is_joint:
-        return tf.nest.pack_sequence_as(
-            self.dtype, tf.nest.flatten(base_batch_shape_tensor))
-      base_batch_shape_tensor = functools.reduce(
-          ps.broadcast_shape,
-          tf.nest.flatten(base_batch_shape_tensor))
-    return ps.broadcast_shape(base_batch_shape_tensor,
-                              self._bijector_batch_shape_tensor())
+    if tf.nest.is_nested(base_batch_shape_tensor) and self._is_joint:
+      # Pass-through rudimentary support for JDs with structured batch shape.
+      # TODO(b/194742372): remove support for structured batch shape.
+      return tf.nest.pack_sequence_as(
+          self.dtype, tf.nest.flatten(base_batch_shape_tensor))
+    return super()._batch_shape_tensor()
 
   def _batch_shape(self):
-    # As with `batch_shape_tensor`, if the base distribution is joint with
-    # structured batch shape and the transformed distribution is not joint,
-    # the batch shape components of the base distribution are broadcast to
-    # obtain the batch shape of the transformed distribution.
     batch_shape = self.distribution.batch_shape
-    if tf.nest.is_nested(batch_shape):
-      if self._is_joint:
-        return tf.nest.pack_sequence_as(
-            self.dtype, tf.nest.flatten(batch_shape))
-      batch_shape = functools.reduce(
-          tf.broadcast_static_shape, tf.nest.flatten(batch_shape))
-    return tf.broadcast_static_shape(batch_shape, self._bijector_batch_shape())
+    if tf.nest.is_nested(batch_shape) and self._is_joint:
+      # Pass-through rudimentary support for JDs with structured batch shape.
+      # TODO(b/194742372): remove support for structured batch shape.
+      return tf.nest.pack_sequence_as(
+          self.dtype, tf.nest.flatten(batch_shape))
+    return super()._batch_shape()
 
   def _maybe_broadcast_distribution_batch_shape(self):
     """Returns the base distribution broadcast to the TD's full batch shape."""
-    bijector_batch_shape = self._bijector_batch_shape()
-    if tensorshape_util.rank(bijector_batch_shape) == 0:
-      # Bijector batch shape is static and nonexistent: no broadcasting needed.
-      return self.distribution
-    if self._is_joint:
+    distribution_batch_shape = self.distribution.batch_shape
+    if tf.nest.is_nested(distribution_batch_shape) or self._is_joint:
       # TODO(b/191674464): Support joint distributions in BatchBroadcast.
       return self.distribution
 
-    distribution_batch_shape = self.distribution.batch_shape
-    if (tensorshape_util.is_fully_defined(distribution_batch_shape) and
-        distribution_batch_shape == tf.broadcast_static_shape(
-            distribution_batch_shape,
-            bijector_batch_shape)):
+    overall_batch_shape = self.batch_shape
+    if (tensorshape_util.is_fully_defined(overall_batch_shape) and
+        distribution_batch_shape == overall_batch_shape):
       # No need to broadcast if the distribution already has full batch shape.
       return self.distribution
 
-    if not tensorshape_util.is_fully_defined(bijector_batch_shape):
-      bijector_batch_shape = self._bijector_batch_shape_tensor()
-
-    return batch_broadcast.BatchBroadcast(self.distribution,
-                                          with_shape=bijector_batch_shape)
+    if not tensorshape_util.is_fully_defined(overall_batch_shape):
+      overall_batch_shape = self.batch_shape_tensor()
+    return batch_broadcast.BatchBroadcast(
+        self.distribution, with_shape=overall_batch_shape)
 
   def _call_sample_n(self, sample_shape, seed, **kwargs):
     # We override `_call_sample_n` rather than `_sample_n` so we can ensure that
@@ -659,62 +613,3 @@ def _transformed_log_prob_ratio(p, x, q, y, name=None):
         p.bijector, x, q.bijector, y, event_ndims)
     return base_log_prob_ratio + tf.cast(ildj_ratio, base_log_prob_ratio.dtype)
 
-
-def _count_bijector_batch_ndims_used_by_event(transformed_distribution):
-  """Counts the bijector batch rank used when sampling an event.
-
-  This is defined as the maximum amount by which the base
-  distribution's event ndims exceeds the bijector's `min_event_ndims`, taken
-  over all parts of the sampled value.
-
-  Note that the bijector batch dimensions may in many cases be trivial and
-  implicit.  For example, we would say that the transformation
-
-  ```python
-  td = TransformedDistribution(tfd.WishartTriL(...), tfb.Exp())
-  ```
-
-  uses two 'batch dimensions' of the Exp bijector implicitly via broadcasting,
-  even though the Exp bijector itself has only a trivial batch shape of `[]`.
-
-  Args:
-    transformed_distribution: instance of `tfd.TransformedDistribution`.
-  Returns:
-    ndims_used: Python scalar `int` bijector batch rank assumed
-      (implicitly or explicitly) when sampling a single event from
-      `transformed_distribution`.
-  """
-  # Get the rank of the base distribution's event (or event parts).
-  base_event_ndims = tf.nest.map_structure(
-      tensorshape_util.rank,
-      transformed_distribution.distribution.event_shape)
-
-  # To avoid introducing a distinction in ParameterProperties between
-  # `event_ndims` and `event_ndims_tensor`, let's assume for now that the event
-  # rank is always static, even if the shape itself is unknown.
-  # TODO(davmre): Investigate how safe this assumption is.
-  if any(nd is None for nd in tf.nest.flatten(base_event_ndims)):
-    raise NotImplementedError(
-        'Batch shape inference is not yet implemented for '
-        'TransformedDistributions when the base distribution has non-static '
-        'event rank. (saw base distribution {} with event shape {})'.format(
-            transformed_distribution.distribution,
-            transformed_distribution.distribution.event_shape))
-
-  bijector_batch_ndims_used_at_each_part = tf.nest.map_structure(
-      lambda a, b: max(  # pylint: disable=g-long-lambda
-          a - b,  # Avoid negative values if event_ndims < min_event_ndims. This
-          0),     # should never happen, but if it does, the bijector will
-                  # throw a more informative error than we'd get here.
-      base_event_ndims,
-      transformed_distribution.bijector.forward_min_event_ndims)
-
-  # TODO(b/184890269): handle batch broadcasting and structured-batch bijectors.
-  flat_ndims = tf.nest.flatten(bijector_batch_ndims_used_at_each_part)
-  if any(nd != flat_ndims[0] for nd in flat_ndims):
-    raise NotImplementedError(
-        'Batch broadcasting for multipart bijectors is not yet supported. '
-        'Please ensure that all values being transformed have the same '
-        'number of batch dimensions (defined as dimensions beyond the number '
-        'specified in `bijector.forward_min_event_ndims`).')
-  return flat_ndims[0]

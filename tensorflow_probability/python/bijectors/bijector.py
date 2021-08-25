@@ -1127,9 +1127,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
     # independent parts will need to override this method, or inherit from a
     # class (such as Composition) that does so.
     return batch_shape_lib.inferred_batch_shape(
-        self,
-        additional_event_ndims=_unique_difference(x_event_ndims,
-                                                  self.forward_min_event_ndims))
+        self, bijector_x_event_ndims=x_event_ndims)
 
   def experimental_batch_shape(self, x_event_ndims=None, y_event_ndims=None):
     """Returns the batch shape of this bijector for inputs of the given rank.
@@ -1179,7 +1177,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
       self._cached_batch_shapes = self._no_dependency({})
     key = _deep_tuple(x_event_ndims)  # Avoid hashing lists/dicts.
     if key not in self._cached_batch_shapes:
-      self._cached_batch_shapes[key] = self._batch_shape(x_event_ndims)
+      self._cached_batch_shapes[key] = tf.TensorShape(
+          self._batch_shape(x_event_ndims))
     return self._cached_batch_shapes[key]
 
   def _batch_shape_tensor(self, x_event_ndims):
@@ -1194,8 +1193,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
     # independent parts will need to override this method, or inherit from a
     # class (such as Composition) that does so.
     return batch_shape_lib.inferred_batch_shape_tensor(
-        self, additional_event_ndims=_unique_difference(
-            x_event_ndims, self.forward_min_event_ndims))
+        self, bijector_x_event_ndims=x_event_ndims)
 
   def experimental_batch_shape_tensor(self,
                                       x_event_ndims=None,
@@ -1246,7 +1244,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
       # Try to get the static batch shape.
       batch_shape = self.experimental_batch_shape(x_event_ndims=x_event_ndims)
       if not tensorshape_util.is_fully_defined(batch_shape):
-        batch_shape = self._batch_shape_tensor(x_event_ndims)
+        batch_shape = ps.convert_to_shape_tensor(
+            self._batch_shape_tensor(x_event_ndims))
       return batch_shape
 
   @classmethod
@@ -1706,7 +1705,27 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
       return input_dtype
 
   def forward_event_ndims(self, event_ndims, **kwargs):
-    """Returns the number of event dimensions produced by `forward`."""
+    """Returns the number of event dimensions produced by `forward`.
+
+    Args:
+      event_ndims: Structure of Python and/or Tensor `int`s, and/or `None`
+        values. The structure should match that of
+        `self.forward_min_event_ndims`, and all non-`None` values must be
+        greater than or equal to the corresponding value in
+        `self.forward_min_event_ndims`.
+      **kwargs: Optional keyword arguments forwarded to nested bijectors.
+    Returns:
+      forward_event_ndims: Structure of integers and/or `None` values matching
+        `self.inverse_min_event_ndims`. These are computed using 'prefer static'
+        semantics: if any inputs are `None`, some or all of the outputs may be
+        `None`, indicating that the output dimension could not be inferred
+        (conversely, if all inputs are non-`None`, all outputs will be
+        non-`None`). If all input `event_ndims` are Python `int`s, all of the
+        (non-`None`) outputs will be Python `int`s; otherwise, some or
+        all of the outputs may be `Tensor` `int`s.
+    """
+    if any(nd is None for nd in tf.nest.flatten(event_ndims)):
+      return nest.map_structure(lambda _: None, self.inverse_min_event_ndims)
     ldj_reduce_ndims = ldj_reduction_ndims(
         nest_util.coerce_structure(self.forward_min_event_ndims, event_ndims),
         self._forward_min_event_ndims)
@@ -1715,7 +1734,27 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
         self._inverse_min_event_ndims)
 
   def inverse_event_ndims(self, event_ndims, **kwargs):
-    """Returns the number of event dimensions produced by `inverse`."""
+    """Returns the number of event dimensions produced by `inverse`.
+
+    Args:
+      event_ndims: Structure of Python and/or Tensor `int`s, and/or `None`
+        values. The structure should match that of
+        `self.inverse_min_event_ndims`, and all non-`None` values must be
+        greater than or equal to the corresponding value in
+        `self.inverse_min_event_ndims`.
+      **kwargs: Optional keyword arguments forwarded to nested bijectors.
+    Returns:
+      inverse_event_ndims: Structure of integers and/or `None` values matching
+        `self.forward_min_event_ndims`. These are computed using 'prefer static'
+        semantics: if any inputs are `None`, some or all of the outputs may be
+        `None`, indicating that the output dimension could not be inferred
+        (conversely, if all inputs are non-`None`, all outputs will be
+        non-`None`). If all input `event_ndims` are Python `int`s, all of the
+        (non-`None`) outputs will be Python `int`s; otherwise, some or
+        all of the outputs may be `Tensor` `int`s.
+    """
+    if any(nd is None for nd in tf.nest.flatten(event_ndims)):
+      return nest.map_structure(lambda _: None, self.forward_min_event_ndims)
     ldj_reduce_ndims = ldj_reduction_ndims(
         nest_util.coerce_structure(self.inverse_min_event_ndims, event_ndims),
         self._inverse_min_event_ndims)
@@ -2257,16 +2296,6 @@ def _autodiff_log_det_jacobian(fn, x):
     raise ValueError('Cannot compute log det jacobian; function {} has `None` '
                      'gradient.'.format(fn))
   return tf.math.log(tf.abs(grads))
-
-
-def _unique_difference(structure1, structure2):
-  differences = [a - b
-                 for a, b in
-                 zip(tf.nest.flatten(structure1), tf.nest.flatten(structure2))]
-  if all([d == differences[0] for d in differences]):
-    return differences[0]
-  raise ValueError('Could not find unique difference between {} and {}'
-                   .format(structure1, structure2))
 
 
 def _deep_tuple(x):
