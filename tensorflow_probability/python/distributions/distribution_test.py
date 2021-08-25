@@ -25,7 +25,10 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import batch_shape_lib
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -861,6 +864,67 @@ class BatchShapeInferenceTests(test_util.TestCase):
     self.assertTrue(
         batch_shape.is_compatible_with(expected_batch_shape))
 
+  def assert_all_parameters_have_full_batch_shape(
+      self, dist, expected_batch_shape):
+    self.assertAllEqual(expected_batch_shape, dist.batch_shape_tensor())
+    param_batch_shapes = batch_shape_lib.batch_shape_parts(dist)
+    for param_batch_shape in param_batch_shapes.values():
+      self.assertAllEqual(expected_batch_shape, param_batch_shape)
+
+  @parameterized.named_parameters(
+      {'testcase_name': '_trivial',
+       'dist_fn': lambda: tfd.Normal(loc=0., scale=1.)},
+      {'testcase_name': '_simple_tensor_broadcasting',
+       'dist_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+           loc=[0., 0.],
+           scale_diag=[[1., 1.], [1., 1.]])},
+      {'testcase_name': '_rank_deficient_tensor_broadcasting',
+       'dist_fn': lambda: tfd.MultivariateNormalDiag(  # pylint: disable=g-long-lambda
+           loc=0.,
+           scale_diag=[[1., 1.], [1., 1.]])},
+      {'testcase_name': '_deeply_nested',
+       'dist_fn': lambda: tfd.Independent(  # pylint: disable=g-long-lambda
+           tfd.Independent(
+               tfd.Independent(
+                   tfd.Independent(
+                       tfd.Normal(loc=0.,
+                                  scale=[[[[[[[[1.]]]]]]]]),
+                       reinterpreted_batch_ndims=2),
+                   reinterpreted_batch_ndims=0),
+               reinterpreted_batch_ndims=1),
+           reinterpreted_batch_ndims=1)},
+      {'testcase_name': '_transformed_dist_simple',
+       'dist_fn': lambda: tfd.TransformedDistribution(  # pylint: disable=g-long-lambda
+           tfd.Normal(loc=[[1., 2., 3.], [3., 4., 5.]], scale=[1.]),
+           tfb.Scale(scale=[2., 3., 4.]))},
+      {'testcase_name': '_transformed_dist_with_chain',
+       'dist_fn': lambda: tfd.TransformedDistribution(  # pylint: disable=g-long-lambda
+           tfd.Normal(loc=[[1., 2., 3.], [3., 4., 5.]], scale=[1.]),
+           tfb.Shift(-4.)(tfb.Scale(scale=[2., 3., 4.])))},
+      {'testcase_name': '_transformed_dist_multipart_nested',
+       'dist_fn': lambda: tfd.TransformedDistribution(  # pylint: disable=g-long-lambda
+           tfd.TransformedDistribution(
+               tfd.TransformedDistribution(
+                   tfd.MultivariateNormalDiag(tf.zeros([4, 6]), tf.ones([6])),
+                   tfb.Split([3, 3])),
+               tfb.JointMap([tfb.Identity(), tfb.Reshape([3, 1])])),
+           tfb.JointMap([tfb.Scale(scale=[2., 3., 4.]), tfb.Shift(1.)]))}
+      )
+  def test_batch_broadcasting(self, dist_fn):
+    dist = dist_fn()
+    broadcast_dist = dist._broadcast_parameters_with_batch_shape(
+        dist.batch_shape)
+    self.assert_all_parameters_have_full_batch_shape(
+        broadcast_dist,
+        expected_batch_shape=broadcast_dist.batch_shape_tensor())
+
+    expanded_batch_shape = ps.concat([[7, 4], dist.batch_shape], axis=0)
+    broadcast_params = batch_shape_lib.broadcast_parameters_with_batch_shape(
+        dist, expanded_batch_shape)
+    broadcast_dist = dist.copy(**broadcast_params)
+    self.assert_all_parameters_have_full_batch_shape(
+        broadcast_dist,
+        expected_batch_shape=expanded_batch_shape)
 
 if __name__ == '__main__':
   test_util.main()

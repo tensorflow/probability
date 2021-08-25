@@ -1115,6 +1115,27 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
           'Only one of `x_event_ndims` and `y_event_ndims` may be specified.')
     return x_event_ndims
 
+  def _broadcast_parameters_with_batch_shape(self, batch_shape, x_event_ndims):
+    """Broadcasts each parameter's batch shape with the given `batch_shape`.
+
+    Args:
+      batch_shape: Integer `Tensor` batch shape.
+      x_event_ndims: Python `int` (structure) number of dimensions in
+        a probabilistic event passed to `forward`; this must be greater than
+        or equal to `self.forward_min_event_ndims`.
+    Returns:
+      broadcast_bijector: copy of this bijector in which each parameter's
+        batch shape is determined by broadcasting its current batch shape with
+        the given `batch_shape`.
+    """
+    if not self._params_event_ndims():
+      return self
+    return self.copy(
+        **batch_shape_lib.broadcast_parameters_with_batch_shape(
+            self,
+            batch_shape=batch_shape,
+            bijector_x_event_ndims=x_event_ndims))
+
   def _batch_shape(self, x_event_ndims):
     if not self._params_event_ndims():
       # Skip requirement for a unique difference in event ndims if this bijector
