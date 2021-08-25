@@ -32,6 +32,7 @@ from tensorflow_probability.python.math.psd_kernels.internal import util
 
 
 __all__ = [
+    'AutoCompositeTensorPsdKernel',
     'PositiveSemidefiniteKernel',
 ]
 
@@ -933,16 +934,25 @@ class PositiveSemidefiniteKernel(tf.Module):
     return ()
 
 
+class _AutoCompositeTensorPsdKernelMeta(abc.ABCMeta):
+  """Metaclass for `AutoCompositeTensorPsdKernel`."""
+
+  def __new__(mcs, classname, baseclasses, attrs):  # pylint: disable=bad-mcs-classmethod-argument
+    """Give subclasses their own type_spec, not an inherited one."""
+
+    cls = super(_AutoCompositeTensorPsdKernelMeta, mcs).__new__(  # pylint: disable=too-many-function-args
+        mcs, classname, baseclasses, attrs)
+    return auto_composite_tensor.auto_composite_tensor(
+        cls,
+        omit_kwargs=('parameters',),
+        non_identifying_kwargs=('name',),
+        module_name='tfp.math._psdkernels')
+
+
 class AutoCompositeTensorPsdKernel(PositiveSemidefiniteKernel,
-                                   auto_composite_tensor.AutoCompositeTensor):
+                                   auto_composite_tensor.AutoCompositeTensor,
+                                   metaclass=_AutoCompositeTensorPsdKernelMeta):
   pass
-
-
-auto_composite_tensor_psd_kernel = functools.partial(
-    auto_composite_tensor.auto_composite_tensor,
-    omit_kwargs=('parameters',),
-    non_identifying_kwargs=('name',),
-    module_name='tfp.math._psdkernels')
 
 
 def _flatten_summand_list(kernels):
@@ -1072,9 +1082,7 @@ class _NonCompositeTensorSumKernel(PositiveSemidefiniteKernel):
                             [k.batch_shape_tensor() for k in self.kernels])
 
 
-@auto_composite_tensor_psd_kernel
-class _SumKernel(_NonCompositeTensorSumKernel,
-                 auto_composite_tensor.AutoCompositeTensor):
+class _SumKernel(_NonCompositeTensorSumKernel, AutoCompositeTensorPsdKernel):
 
   def __new__(cls, kernels, name=None):
     if cls is _SumKernel:
@@ -1173,9 +1181,8 @@ class _NonCompositeTensorProductKernel(PositiveSemidefiniteKernel):
                             [k.batch_shape_tensor() for k in self.kernels])
 
 
-@auto_composite_tensor_psd_kernel
 class _ProductKernel(_NonCompositeTensorProductKernel,
-                     auto_composite_tensor.AutoCompositeTensor):
+                     AutoCompositeTensorPsdKernel):
 
   def __new__(cls, kernels, name=None):
     if cls is _ProductKernel:

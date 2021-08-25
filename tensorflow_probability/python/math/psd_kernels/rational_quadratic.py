@@ -30,7 +30,6 @@ from tensorflow_probability.python.math.psd_kernels.internal import util
 __all__ = ['RationalQuadratic']
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class RationalQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
   """RationalQuadratic Kernel.
 

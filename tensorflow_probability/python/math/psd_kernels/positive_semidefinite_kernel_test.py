@@ -28,7 +28,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util as kernels_util
@@ -92,9 +91,8 @@ class TestKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
     return value
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class CompositeTensorTestKernel(
-    TestKernel, auto_composite_tensor.AutoCompositeTensor):
+    TestKernel, psd_kernel.AutoCompositeTensorPsdKernel):
   pass
 
 

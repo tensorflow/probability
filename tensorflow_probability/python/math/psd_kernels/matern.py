@@ -111,7 +111,6 @@ class _AmplitudeLengthScaleMixin(object):
         example_ndims=(x1_example_ndims + x2_example_ndims))
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class GeneralizedMatern(_AmplitudeLengthScaleMixin,
                         psd_kernel.AutoCompositeTensorPsdKernel):
   """Generalized Matern Kernel.
@@ -226,7 +225,6 @@ class GeneralizedMatern(_AmplitudeLengthScaleMixin,
     return assertions
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class MaternOneHalf(_AmplitudeLengthScaleMixin,
                     psd_kernel.AutoCompositeTensorPsdKernel):
   """Matern Kernel with parameter 1/2.
@@ -299,7 +297,6 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
     return tf.exp(log_result)
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class MaternThreeHalves(_AmplitudeLengthScaleMixin,
                         psd_kernel.AutoCompositeTensorPsdKernel):
   """Matern Kernel with parameter 3/2.
@@ -369,7 +366,6 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
     return tf.exp(log_result)
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class MaternFiveHalves(_AmplitudeLengthScaleMixin,
                        psd_kernel.AutoCompositeTensorPsdKernel):
   """Matern 5/2 Kernel.

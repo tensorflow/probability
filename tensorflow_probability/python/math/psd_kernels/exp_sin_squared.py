@@ -28,7 +28,6 @@ from tensorflow_probability.python.math.psd_kernels.internal import util
 __all__ = ['ExpSinSquared']
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class ExpSinSquared(psd_kernel.AutoCompositeTensorPsdKernel):
   """Exponentiated Sine Squared Kernel.
 

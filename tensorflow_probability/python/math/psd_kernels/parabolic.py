@@ -29,7 +29,6 @@ from tensorflow_probability.python.math.psd_kernels.internal import util
 __all__ = ['Parabolic']
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class Parabolic(psd_kernel.AutoCompositeTensorPsdKernel):
   """The Parabolic kernel.
 

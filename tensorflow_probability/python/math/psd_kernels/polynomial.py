@@ -46,7 +46,6 @@ def _maybe_shape_dynamic(tensor):
   return tf.shape(tensor)
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
   """Polynomial Kernel.
 
@@ -213,7 +212,6 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
     return assertions
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class Linear(Polynomial):
   """Linear Kernel.
 
@@ -276,7 +274,6 @@ class Linear(Polynomial):
         name=name)
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class Constant(Linear):
   """Kernel that just outputs positive constant values.
 

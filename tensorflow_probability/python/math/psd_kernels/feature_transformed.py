@@ -25,7 +25,6 @@ from tensorflow_probability.python.math.psd_kernels import positive_semidefinite
 __all__ = ['FeatureTransformed']
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class FeatureTransformed(psd_kernel.AutoCompositeTensorPsdKernel):
   """Input transformed kernel.
 
