@@ -949,6 +949,36 @@ class Distribution(_BaseDistribution):
     # pylint: enable=protected-access
     return d
 
+  def _broadcast_parameters_with_batch_shape(self, batch_shape):
+    """Broadcasts each parameter's batch shape with the given `batch_shape`.
+
+    This is semantically equivalent to wrapping with the `BatchBroadcast`
+    distribution, but returns a distribution of the same type as the original
+    in which all parameter Tensors are reified at the the broadcast batch shape.
+    It can be understood as a pseudo-inverse operation to batch slicing:
+
+    ```python
+    dist = tfd.Normal(0., 1.)
+    # ==> `dist.batch_shape == []`
+    broadcast_dist = dist._broadcast_parameters_with_batch_shape([3])
+    # ==> `broadcast_dist.batch_shape == [3]`
+    #     `broadcast_dist.loc.shape == [3]`
+    #     `broadcast_dist.scale.shape == [3]`
+    sliced_dist = broadcast_dist[0]
+    # ==> `sliced_dist.batch_shape == []`.
+    ```
+
+    Args:
+      batch_shape: Integer `Tensor` batch shape.
+    Returns:
+      broadcast_dist: copy of this distribution in which each parameter's
+        batch shape is determined by broadcasting its current batch shape with
+        the given `batch_shape`.
+    """
+    return self.copy(
+        **batch_shape_lib.broadcast_parameters_with_batch_shape(
+            self, batch_shape))
+
   def _batch_shape_tensor(self, **parameter_kwargs):
     """Infers batch shape from parameters.
 

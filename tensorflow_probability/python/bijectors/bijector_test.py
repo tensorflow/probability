@@ -27,6 +27,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -655,6 +656,60 @@ class BijectorBatchShapesTest(test_util.TestCase):
     with  self.assertRaisesRegex(
         ValueError, 'Only one of `x_event_ndims` and `y_event_ndims`'):
       bijector.experimental_batch_shape_tensor(x_event_ndims=0, y_event_ndims=0)
+
+  @parameterized.named_parameters(
+      ('scale', lambda: tfb.Scale(tf.ones([4, 2])), None),
+      ('sigmoid', lambda: tfb.Sigmoid(low=tf.zeros([3]), high=tf.ones([4, 1])),
+       None),
+      ('invert', lambda: tfb.Invert(tfb.ScaleMatvecDiag(tf.ones([2, 1]))),
+       None),
+      ('chain',
+       lambda: tfb.Chain([tfb.Power(power=[[2.], [3.]]),  # pylint: disable=g-long-lambda
+                          tfb.Invert(tfb.Split(2))]),
+       None),
+      ('jointmap_01', lambda: tfb.JointMap(  # pylint: disable=g-long-lambda
+          [tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [0, 1]),
+      ('jointmap_11', lambda: tfb.JointMap(  # pylint: disable=g-long-lambda
+          [tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [1, 1]),
+      ('jointmap_20', lambda: tfb.JointMap(  # pylint: disable=g-long-lambda
+          [tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [2, 0]),
+      ('jointmap_22', lambda: tfb.JointMap(  # pylint: disable=g-long-lambda
+          [tfb.Scale([5, 3]), tfb.Scale([1, 4])]), [2, 2]),
+      ('nested_jointmap',
+       lambda: tfb.JointMap([tfb.JointMap({'a': tfb.Scale([1.]),  # pylint: disable=g-long-lambda
+                                           'b': tfb.Exp()}),
+                             tfb.Scale([1, 4])(tfb.Invert(tfb.Split(2)))]),
+       [{'a': 0, 'b': 0}, [2, 2]]))
+  def test_with_broadcast_batch_shape(self, bijector_fn, x_event_ndims=None):
+    bijector = bijector_fn()
+    if x_event_ndims is None:
+      x_event_ndims = bijector.forward_min_event_ndims
+    batch_shape = bijector.experimental_batch_shape(x_event_ndims=x_event_ndims)
+    param_batch_shapes = batch_shape_lib.batch_shape_parts(
+        bijector, bijector_x_event_ndims=x_event_ndims)
+
+    new_batch_shape = [4, 2, 1, 1, 1]
+    broadcast_bijector = bijector._broadcast_parameters_with_batch_shape(
+        new_batch_shape, x_event_ndims)
+    broadcast_batch_shape = broadcast_bijector.experimental_batch_shape_tensor(
+        x_event_ndims=x_event_ndims)
+    self.assertAllEqual(broadcast_batch_shape,
+                        ps.broadcast_shape(batch_shape, new_batch_shape))
+
+    # Check that all params have the expected batch shape.
+    broadcast_param_batch_shapes = batch_shape_lib.batch_shape_parts(
+        broadcast_bijector, bijector_x_event_ndims=x_event_ndims)
+
+    def _maybe_broadcast_param_batch_shape(p, s):
+      if isinstance(p, tfb.Invert) and not p.bijector._params_event_ndims():
+        return s  # Can't broadcast a bijector that doesn't itself have params.
+      return ps.broadcast_shape(s, new_batch_shape)
+    expected_broadcast_param_batch_shapes = tf.nest.map_structure(
+        _maybe_broadcast_param_batch_shape,
+        {param: getattr(bijector, param) for param in param_batch_shapes},
+        param_batch_shapes)
+    self.assertAllEqualNested(broadcast_param_batch_shapes,
+                              expected_broadcast_param_batch_shapes)
 
 
 @test_util.test_all_tf_execution_regimes

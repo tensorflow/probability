@@ -205,6 +205,73 @@ def batch_shape_parts(batch_object,
       **parameter_kwargs)
 
 
+def broadcast_parameters_with_batch_shape(batch_object,
+                                          batch_shape,
+                                          bijector_x_event_ndims=None):
+  """Broadcasts each parameter's batch shape with the given `batch_shape`.
+
+  This returns a dict of parameters to `batch_object` broadcast with the given
+  batch shape. It can be understood as a pseudo-inverse operation to batch
+  slicing:
+
+  ```python
+  dist = tfd.Normal(0., 1.)
+  # ==> `dist.batch_shape == []`
+  broadcast_dist = dist._broadcast_parameters_with_batch_shape([3])
+  # ==> `broadcast_dist.batch_shape == [3]`
+  #     `broadcast_dist.loc.shape == [3]`
+  #     `broadcast_dist.scale.shape == [3]`
+  sliced_dist = broadcast_dist[0]
+  # ==> `sliced_dist.batch_shape == []`.
+  ```
+
+  Args:
+    batch_object: Python object, typically a `tfd.Distribution` or
+      `tfb.Bijector`. This must implement the method
+      `batched_object.parameter_properties()` and expose a dict
+      `batched_object.parameters` of the parameters passed to its constructor.
+    batch_shape: Integer `Tensor` batch shape.
+    bijector_x_event_ndims: If `batch_object` is a bijector, this is the
+      (structure of) integer(s) value of `x_event_ndims` in the current context
+      (for example, as passed to `experimental_batch_shape`). Otherwise, this
+      argument should be `None`.
+      Default value: `None`.
+
+  Returns:
+    updated_parameters: Python `dict` mapping names of parameters from
+      `batch_object.parameter_properties()` to broadcast values.
+  """
+  return map_fn_over_parameters_with_event_ndims(
+      batch_object,
+      functools.partial(
+          _broadcast_parameter_with_batch_shape, batch_shape=batch_shape),
+      bijector_x_event_ndims=bijector_x_event_ndims)
+
+
+def _broadcast_parameter_with_batch_shape(param,
+                                          param_event_ndims,
+                                          batch_shape):
+  """Broadcasts `param` with the given batch shape, recursively."""
+  if hasattr(param, 'forward_min_event_ndims'):
+    # Bijector-valued params are responsible for handling any structure in
+    # their event ndims.
+    return param._broadcast_parameters_with_batch_shape(  # pylint: disable=protected-access
+        batch_shape, x_event_ndims=param_event_ndims)
+
+  # Otherwise, param_event_ndims is a single integer, corresponding to the
+  # number of batch dimensions of the parameter that were
+  # treated as event dimensions by the outer context.
+  base_shape = ps.concat([batch_shape,
+                          ps.ones([param_event_ndims], dtype=np.int32)],
+                         axis=0)
+  if hasattr(param, '_broadcast_parameters_with_batch_shape'):
+    return param._broadcast_parameters_with_batch_shape(base_shape)  # pylint: disable=protected-access
+  elif hasattr(param, 'matmul'):
+    # TODO(davmre): support broadcasting LinearOperator parameters.
+    return param
+  return tf.broadcast_to(param, ps.broadcast_shape(base_shape, ps.shape(param)))
+
+
 def map_fn_over_parameters_with_event_ndims(batch_object,
                                             fn,
                                             bijector_x_event_ndims=None,
