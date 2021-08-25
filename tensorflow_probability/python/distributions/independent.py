@@ -253,9 +253,9 @@ class Independent(distribution_lib.Distribution):
     if not tensorshape_util.is_fully_defined(event_shape):
       event_shape = self.distribution.event_shape_tensor()
     return ps.concat([
-        batch_shape[
+        ps.convert_to_shape_tensor(batch_shape)[
             batch_ndims - self._get_reinterpreted_batch_ndims(batch_shape):],
-        event_shape,
+        event_shape
     ], axis=0)
 
   def _event_shape(self):
