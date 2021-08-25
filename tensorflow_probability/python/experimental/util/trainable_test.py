@@ -108,6 +108,27 @@ class TestTrainableDistributionsAndBijectors(test_util.TestCase):
         tf.convert_to_tensor(distribution.scale),
         [1e-4, 1e-4, 1e-4])
 
+  def test_can_specify_callable_initializer(self):
+
+    def uniform_initializer(_, shape, dtype, seed,
+                            constraining_bijector):
+      return constraining_bijector.forward(
+          tf.random.stateless_uniform(
+              constraining_bijector.inverse_event_shape_tensor(shape),
+              dtype=dtype, seed=seed))
+
+    distribution = tfp.experimental.util.make_trainable(
+        tfd.Normal,
+        initial_parameters=uniform_initializer,
+        batch_and_event_shape=[3, 4],
+        seed=test_util.test_seed(),
+        validate_args=True)
+    for v in distribution.trainable_variables:
+      self.evaluate(v.initializer)
+      # Unconstrained variables should be uniform in [0, 1].
+      self.assertAllGreater(v, 0.)
+      self.assertAllLess(v, 1.)
+
   def test_initialization_is_deterministic_with_seed(self):
     distribution1 = tfp.experimental.util.make_trainable(
         tfd.Normal,

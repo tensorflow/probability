@@ -39,9 +39,36 @@ def _get_arg_value(arg_name, f, kwargs):
   return (argspec.kwonlydefaults or {}).get(arg_name)
 
 
+def _default_parameter_init_fn(initial_parameters):
+  """Builds a function to specify user-provided initial values."""
+
+  def _initialize_with_sampler_fallback(parameter_name,
+                                        shape,
+                                        dtype,
+                                        seed,
+                                        constraining_bijector):
+    if parameter_name in initial_parameters:
+      # Ensure that the variable we initialize has full shape. For example,
+      # trainable(tfd.Normal,
+      #           batch_and_event_shape=[100],
+      #           initial_parameters={'scale': 1e-4})
+      # should create a batch of 100 scale variables, not a single scalar
+      # variable shared over all batch elements.
+      return tf.broadcast_to(tf.cast(initial_parameters[parameter_name],
+                                     dtype=dtype),
+                             shape)
+    # If no value was provided, sample an appropriately constrained value.
+    return constraining_bijector.forward(
+        samplers.normal(
+            constraining_bijector.inverse_event_shape_tensor(shape),
+            dtype=dtype,
+            seed=seed))
+
+  return _initialize_with_sampler_fallback
+
+
 def make_trainable(cls,
                    initial_parameters=None,
-                   unconstrained_init_fn=samplers.normal,
                    batch_and_event_shape=(),
                    parameter_dtype=tf.float32,
                    seed=None,
@@ -58,20 +85,13 @@ def make_trainable(cls,
   Args:
     cls: Python class that implements `cls.parameter_properties()`, e.g., a TFP
       distribution (`tfd.Normal`) or bijector (`tfb.Scale`).
-    initial_parameters: Optional `str : Tensor` dictionary specifying initial
-      values for some or all of the trainable parameters. These values are
-      used directly and must lie in the parameter domain, e.g., the initial
-      value for a scale parameter must be positive. If no initial value is
-      provided for a parameter, it will be initialized randomly as determined
-      by the `unconstrained_unit_fn`.
-      Default value: `None`.
-    unconstrained_init_fn: Python `callable` that takes `shape`, `seed`, and
-      `dtype` arguments, and returns a random real-valued `Tensor` of the
-      specified shape and dtype. Any domain constraints, e.g. a requirement that
-      a parameter must be positive, are applied by passing the sampled values
-      through the default constraining bijectors specified in
-      `cls.parameter_properties()`.
-      Default value: `tf.random.stateless_normal`.
+    initial_parameters: a dictionary containing initial values for some or
+      all of the parameters to `cls`, OR a Python `callable` with signature
+      `value = parameter_init_fn(parameter_name, shape, dtype, seed,
+      constraining_bijector)`. If a dictionary is provided, any parameters not
+      specified will be initialized to a random value in their domain.
+      Default value: `None` (equivalent to `{}`; all parameters are
+        initialized randomly).
     batch_and_event_shape: Optional int `Tensor` desired shape of samples
       (for distributions) or inputs (for bijectors), used to determine the shape
       of the trainable parameters.
@@ -131,8 +151,12 @@ def make_trainable(cls,
   with tf.name_scope(
       ((name_arg + '_') if name_arg else '') + 'trainable_variables'):
 
+    # Canonicalize initial parameter specification as `parameter_init_fn`.
     if initial_parameters is None:
       initial_parameters = {}
+    parameter_init_fn = initial_parameters
+    if not callable(parameter_init_fn):
+      parameter_init_fn = _default_parameter_init_fn(initial_parameters)
 
     # Create a trainable variable for each parameter.
     for parameter_name, properties in cls.parameter_properties(
@@ -146,29 +170,14 @@ def make_trainable(cls,
 
       parameter_shape = properties.shape_fn(batch_and_event_shape)
       constraining_bijector = properties.default_constraining_bijector_fn()
-      if parameter_name in initial_parameters:
-        # Ensure that the variable we initialize has full shape. For example,
-        # trainable(tfd.Normal,
-        #           batch_and_event_shape=[100],
-        #           initial_parameters={'scale': 1e-4})
-        # should create a batch of 100 scale variables, not a single scalar
-        # variable shared over all batch elements. (A user who wants the latter
-        # can always construct it manually, but that's a niche case and enough
-        # of a footgun that we want to avoid going there automatically).
-        initial_value = tf.broadcast_to(
-            tf.cast(initial_parameters[parameter_name],
-                    dtype=parameter_dtype),
-            shape=parameter_shape)
-      else:
-        seed, init_seed = samplers.split_seed(seed)
-        initial_value = constraining_bijector.forward(
-            unconstrained_init_fn(
-                constraining_bijector.inverse_event_shape_tensor(
-                    parameter_shape),
-                seed=init_seed,
-                dtype=parameter_dtype))
+      seed, init_seed = samplers.split_seed(seed)
       init_kwargs[parameter_name] = deferred_tensor.TransformedVariable(
-          initial_value,
+          parameter_init_fn(
+              parameter_name,
+              shape=parameter_shape,
+              dtype=parameter_dtype,
+              seed=init_seed,
+              constraining_bijector=constraining_bijector),
           constraining_bijector,
           name=parameter_name)
 
