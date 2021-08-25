@@ -33,11 +33,13 @@ from tensorflow_probability.python.math.psd_kernels.pointwise_exponential import
 from tensorflow_probability.python.math.psd_kernels.polynomial import Constant
 from tensorflow_probability.python.math.psd_kernels.polynomial import Linear
 from tensorflow_probability.python.math.psd_kernels.polynomial import Polynomial
+from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import AutoCompositeTensorPsdKernel
 from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 from tensorflow_probability.python.math.psd_kernels.rational_quadratic import RationalQuadratic
 from tensorflow_probability.python.math.psd_kernels.schur_complement import SchurComplement
 
 _allowed_symbols = [
+    'AutoCompositeTensorPsdKernel',
     'Constant',
     'ExponentiatedQuadratic',
     'ExpSinSquared',

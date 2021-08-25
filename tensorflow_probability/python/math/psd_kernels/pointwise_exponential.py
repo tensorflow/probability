@@ -24,7 +24,6 @@ from tensorflow_probability.python.math.psd_kernels import positive_semidefinite
 __all__ = ['PointwiseExponential']
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class PointwiseExponential(psd_kernel.AutoCompositeTensorPsdKernel):
   """Pointwise exponential of a positive semi-definite kernel.
 

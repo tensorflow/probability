@@ -46,7 +46,6 @@ def _add_diagonal_shift(matrix, shift):
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   """The SchurComplement kernel.
 

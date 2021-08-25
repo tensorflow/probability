@@ -43,7 +43,6 @@ __all__ = [
 ]
 
 
-@psd_kernel.auto_composite_tensor_psd_kernel
 class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
   """A PSDKernel which computes the variational kernel from [Titsias, 2009].
 
