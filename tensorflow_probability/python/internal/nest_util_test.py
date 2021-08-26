@@ -110,6 +110,43 @@ class NestUtilTest(test_util.TestCase):
     ret = nest_util.broadcast_structure(to_structure, from_structure)
     self.assertAllEqual(expected, ret)
 
+  def testMapStructureWithNamedArgs(self):
+    x = {'a': [1., 2., (3., 4.)], 'b': -4., 'c': {'d': 10., 'e': (0., 0.)}}
+    powers = {'a': [1., 1., (2., 3.)],
+              'b': 3.,
+              'c': {'d': 0.5, 'e': (1., 1.)}}
+    coefs = {'a': [1., 1., (1., 1.)],
+             'b': -1.,
+             'c': {'d': 10., 'e': (10., 10.)}}
+    intercepts = {'a': [-3., -6., (24., -19.)],
+                  'b': 0.,
+                  'c': {'d': 100., 'e': (-3., -9.)}}
+    func = lambda x, power, coef, intercept: coef * (x**power + intercept)
+    expected_result = tf.nest.map_structure(func, x, powers, coefs, intercepts)
+
+    # Call with positional args.
+    self.assertAllEqualNested(
+        tf.nest.map_structure(func, x, powers, coefs, intercepts),
+        nest_util.map_structure_with_named_args(
+            func, x, powers, coefs, intercepts))
+
+    # Call with named args only.
+    self.assertAllEqualNested(
+        expected_result,
+        nest_util.map_structure_with_named_args(
+            func, x=x, intercept=intercepts, coef=coefs, power=powers))
+
+    # Call with both positional and named args.
+    self.assertAllEqualNested(
+        expected_result,
+        nest_util.map_structure_with_named_args(
+            func, x, powers, intercept=intercepts, coef=coefs))
+
+    # Out-of-order arguments raise an error.
+    with self.assertRaisesRegex(TypeError, 'got multiple values for argument'):
+      nest_util.map_structure_with_named_args(
+          func, powers, coefs, intercepts, x=x)
+
   # pylint: disable=bad-whitespace
   @parameterized.parameters(
       # Input                Output
