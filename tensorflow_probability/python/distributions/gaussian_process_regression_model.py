@@ -24,8 +24,11 @@ import functools
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import gaussian_process
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -379,6 +382,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
   [1]: Carl Rasmussen, Chris Williams. Gaussian Processes For Machine Learning,
        2006.
   """
+  # pylint:disable=invalid-name
 
   def __init__(self,
                kernel,
@@ -391,7 +395,9 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
                jitter=1e-6,
                validate_args=False,
                allow_nan_stats=False,
-               name='GaussianProcessRegressionModel'):
+               name='GaussianProcessRegressionModel',
+               _conditional_kernel=None,
+               _conditional_mean_fn=None):
     """Construct a GaussianProcessRegressionModel instance.
 
     Args:
@@ -460,6 +466,8 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
         Default value: `False`.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: 'GaussianProcessRegressionModel'.
+      _conditional_kernel: Internal parameter -- do not use.
+      _conditional_mean_fn: Internal parameter -- do not use.
 
     Raises:
       ValueError: if either
@@ -487,7 +495,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       predictive_noise_variance = tensor_util.convert_nonref_to_tensor(
           predictive_noise_variance,
           dtype=dtype,
-          name='observation_noise_variance')
+          name='predictive_noise_variance')
       if predictive_noise_variance is None:
         predictive_noise_variance = observation_noise_variance
       jitter = tensor_util.convert_nonref_to_tensor(
@@ -514,42 +522,47 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       self._validate_args = validate_args
 
       with tf.name_scope('init'):
-        conditional_kernel = tfpk.SchurComplement(
-            base_kernel=kernel,
-            fixed_inputs=observation_index_points,
-            diag_shift=tfp_util.DeferredTensor(
-                observation_noise_variance, lambda x: jitter + x))
+        if _conditional_kernel is None:
+          _conditional_kernel = tfpk.SchurComplement(
+              base_kernel=kernel,
+              fixed_inputs=observation_index_points,
+              diag_shift=tfp_util.DeferredTensor(
+                  observation_noise_variance, lambda x: jitter + x))
         # Special logic for mean_fn only; SchurComplement already handles the
         # case of empty observations (ie, falls back to base_kernel).
         if _is_empty_observation_data(
             feature_ndims=kernel.feature_ndims,
             observation_index_points=observation_index_points,
             observations=observations):
-          conditional_mean_fn = mean_fn
+          if _conditional_mean_fn is None:
+            _conditional_mean_fn = mean_fn
         else:
           _validate_observation_data(
               kernel=kernel,
               observation_index_points=observation_index_points,
               observations=observations)
 
-          def conditional_mean_fn(x):
-            """Conditional mean."""
-            observations = tf.convert_to_tensor(self._observations)
-            observation_index_points = tf.convert_to_tensor(
-                self._observation_index_points)
-            k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
-                kernel.matrix(x, observation_index_points))
-            chol_linop = tf.linalg.LinearOperatorLowerTriangular(
-                conditional_kernel.divisor_matrix_cholesky(
-                    fixed_inputs=observation_index_points))
+          if _conditional_mean_fn is None:
 
-            diff = observations - mean_fn(observation_index_points)
-            return mean_fn(x) + k_x_obs_linop.matvec(
-                chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
+            def conditional_mean_fn(x):
+              """Conditional mean."""
+              observations = tf.convert_to_tensor(self._observations)
+              observation_index_points = tf.convert_to_tensor(
+                  self._observation_index_points)
+              k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
+                  kernel.matrix(x, observation_index_points))
+              chol_linop = tf.linalg.LinearOperatorLowerTriangular(
+                  _conditional_kernel.divisor_matrix_cholesky(
+                      fixed_inputs=observation_index_points))
+
+              diff = observations - mean_fn(observation_index_points)
+              return mean_fn(x) + k_x_obs_linop.matvec(
+                  chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
+            _conditional_mean_fn = conditional_mean_fn
 
         super(GaussianProcessRegressionModel, self).__init__(
-            kernel=conditional_kernel,
-            mean_fn=conditional_mean_fn,
+            kernel=_conditional_kernel,
+            mean_fn=_conditional_mean_fn,
             index_points=index_points,
             jitter=jitter,
             # What the GP super class calls "observation noise variance" we call
@@ -560,6 +573,183 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
             validate_args=validate_args,
             allow_nan_stats=allow_nan_stats, name=name)
         self._parameters = parameters
+
+  @staticmethod
+  def precompute_regression_model(
+      kernel,
+      observation_index_points,
+      observations,
+      index_points=None,
+      observation_noise_variance=0.,
+      predictive_noise_variance=None,
+      mean_fn=None,
+      jitter=1e-6,
+      validate_args=False,
+      allow_nan_stats=False,
+      name='PrecomputedGaussianProcessRegressionModel'):
+    """Returns a GaussianProcessRegressionModel with precomputed quantities.
+
+    This differs from the constructor by precomputing quantities associated with
+    observations in a non-tape safe way. `index_points` is the only parameter
+    that is allowed to vary (i.e. is a `Variable` / changes after
+    initialization).
+
+    Specifically:
+
+    * We make `observation_index_points` and `observations` mandatory
+      parameters.
+    * We precompute `kernel(observation_index_points, observation_index_points)`
+      along with any other associated quantities relating to the `kernel`,
+      `observations` and `observation_index_points`.
+
+    A typical usecase would be optimizing kernel hyperparameters for a
+    `GaussianProcess`, and computing the posterior predictive with respect to
+    those optimized hyperparameters and observation / index-points pairs.
+
+    WARNING: This method assumes `index_points` is the only varying parameter
+    (i.e. is a `Variable` / changes after initialization) and hence is not
+    tape-safe.
+
+    Args:
+      kernel: `PositiveSemidefiniteKernel`-like instance representing the
+        GP's covariance function.
+      observation_index_points: `float` `Tensor` representing finite collection,
+        or batch of collections, of points in the index set for which some data
+        has been observed. Shape has the form `[b1, ..., bB, e, f1, ..., fF]`
+        where `F` is the number of feature dimensions and must equal
+        `kernel.feature_ndims`, and `e` is the number (size) of index points in
+        each batch. `[b1, ..., bB, e]` must be broadcastable with the shape of
+        `observations`, and `[b1, ..., bB]` must be broadcastable with the
+        shapes of all other batched parameters (`kernel.batch_shape`,
+        `index_points`, etc). The default value is `None`, which corresponds to
+        the empty set of observations, and simply results in the prior
+        predictive model (a GP with noise of variance
+        `predictive_noise_variance`).
+      observations: `float` `Tensor` representing collection, or batch of
+        collections, of observations corresponding to
+        `observation_index_points`. Shape has the form `[b1, ..., bB, e]`, which
+        must be brodcastable with the batch and example shapes of
+        `observation_index_points`. The batch shape `[b1, ..., bB]` must be
+        broadcastable with the shapes of all other batched parameters
+        (`kernel.batch_shape`, `index_points`, etc.). The default value is
+        `None`, which corresponds to the empty set of observations, and simply
+        results in the prior predictive model (a GP with noise of variance
+        `predictive_noise_variance`).
+      index_points: `float` `Tensor` representing finite collection, or batch of
+        collections, of points in the index set over which the GP is defined.
+        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
+        number of feature dimensions and must equal `kernel.feature_ndims` and
+        `e` is the number (size) of index points in each batch. Ultimately this
+        distribution corresponds to an `e`-dimensional multivariate normal. The
+        batch shape must be broadcastable with `kernel.batch_shape` and any
+        batch dims yielded by `mean_fn`.
+      observation_noise_variance: `float` `Tensor` representing the variance
+        of the noise in the Normal likelihood distribution of the model. May be
+        batched, in which case the batch shape must be broadcastable with the
+        shapes of all other batched parameters (`kernel.batch_shape`,
+        `index_points`, etc.).
+        Default value: `0.`
+      predictive_noise_variance: `float` `Tensor` representing the variance in
+        the posterior predictive model. If `None`, we simply re-use
+        `observation_noise_variance` for the posterior predictive noise. If set
+        explicitly, however, we use this value. This allows us, for example, to
+        omit predictive noise variance (by setting this to zero) to obtain
+        noiseless posterior predictions of function values, conditioned on noisy
+        observations.
+      mean_fn: Python `callable` that acts on `index_points` to produce a
+        collection, or batch of collections, of mean values at `index_points`.
+        Takes a `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a
+        `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
+        Default value: `None` implies the constant zero function.
+      jitter: `float` scalar `Tensor` added to the diagonal of the covariance
+        matrix to ensure positive definiteness of the covariance matrix.
+        Default value: `1e-6`.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+        Default value: `False`.
+      allow_nan_stats: Python `bool`, default `True`. When `True`,
+        statistics (e.g., mean, mode, variance) use the value `NaN` to
+        indicate the result is undefined. When `False`, an exception is raised
+        if one or more of the statistic's batch members are undefined.
+        Default value: `False`.
+      name: Python `str` name prefixed to Ops created by this class.
+        Default value: 'PrecomputedGaussianProcessRegressionModel'.
+    Returns
+      An instance of `GaussianProcessRegressionModel` with precomputed
+      quantities associated with observations.
+    """
+
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([
+          index_points, observation_index_points, observations,
+          observation_noise_variance, predictive_noise_variance, jitter
+      ], tf.float32)
+
+      # Convert to tensor arguments that are expected to not be Variables / not
+      # going to change.
+      jitter = tf.convert_to_tensor(jitter, dtype=dtype)
+
+      observation_index_points = tf.convert_to_tensor(
+          observation_index_points, dtype=dtype)
+      observation_noise_variance = tf.convert_to_tensor(
+          observation_noise_variance, dtype=dtype)
+      observations = tf.convert_to_tensor(observations, dtype=dtype)
+
+      observation_cholesky = kernel.matrix(
+          observation_index_points, observation_index_points)
+
+      broadcast_shape = distribution_util.get_broadcast_shape(
+          observation_cholesky,
+          observation_noise_variance[..., tf.newaxis, tf.newaxis])
+
+      observation_cholesky = tf.broadcast_to(
+          observation_cholesky, broadcast_shape)
+
+      observation_cholesky = tf.linalg.set_diag(
+          observation_cholesky,
+          tf.linalg.diag_part(observation_cholesky) +
+          jitter +
+          observation_noise_variance[..., tf.newaxis])
+      observation_cholesky = tf.linalg.cholesky(observation_cholesky)
+      observation_cholesky_operator = tf.linalg.LinearOperatorLowerTriangular(
+          observation_cholesky)
+
+      conditional_kernel = tfpk.SchurComplement.with_precomputed_divisor(
+          base_kernel=kernel,
+          fixed_inputs=observation_index_points,
+          diag_shift=observation_noise_variance + jitter)
+
+      if mean_fn is None:
+        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
+      else:
+        if not callable(mean_fn):
+          raise ValueError('`mean_fn` must be a Python callable')
+
+      diff = observations - mean_fn(observation_index_points)
+      solve_on_observation = observation_cholesky_operator.solvevec(
+          observation_cholesky_operator.solvevec(diff), adjoint=True)
+
+      def conditional_mean_fn(x):
+        k_x_obs = kernel.matrix(x, observation_index_points)
+        return mean_fn(x) + tf.linalg.matvec(k_x_obs, solve_on_observation)
+
+      gprm = GaussianProcessRegressionModel(
+          kernel=kernel,
+          observation_index_points=observation_index_points,
+          observations=observations,
+          index_points=index_points,
+          observation_noise_variance=observation_noise_variance,
+          predictive_noise_variance=predictive_noise_variance,
+          jitter=jitter,
+          _conditional_kernel=conditional_kernel,
+          _conditional_mean_fn=conditional_mean_fn,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          name=name)
+
+    return gprm
 
   @property
   def observation_index_points(self):
@@ -572,6 +762,32 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
   @property
   def predictive_noise_variance(self):
     return self._predictive_noise_variance
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
+        observations=parameter_properties.ParameterProperties(
+            event_ndims=1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        observation_index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
+        kernel=parameter_properties.BatchedComponentProperties(),
+        observation_noise_variance=parameter_properties.ParameterProperties(
+            event_ndims=0,
+            shape_fn=lambda sample_shape: sample_shape[:-1],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        predictive_noise_variance=parameter_properties.ParameterProperties(
+            event_ndims=0,
+            shape_fn=lambda sample_shape: sample_shape[:-1],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   def _batch_shape_tensor(self, index_points=None):
     index_points = (

@@ -46,6 +46,22 @@ def _add_diagonal_shift(matrix, shift):
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
+def _compute_divisor_matrix(
+    base_kernel,
+    diag_shift,
+    fixed_inputs):
+  """Compute the the modified kernel with respect to the fixed inputs."""
+  divisor_matrix = base_kernel.matrix(fixed_inputs, fixed_inputs)
+  if diag_shift is not None:
+    diag_shift = tf.convert_to_tensor(diag_shift)
+    broadcast_shape = distribution_util.get_broadcast_shape(
+        divisor_matrix, diag_shift[..., tf.newaxis, tf.newaxis])
+    divisor_matrix = tf.broadcast_to(divisor_matrix, broadcast_shape)
+    divisor_matrix = _add_diagonal_shift(
+        divisor_matrix, diag_shift[..., tf.newaxis])
+  return divisor_matrix
+
+
 class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   """The SchurComplement kernel.
 
@@ -162,13 +178,15 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   ```
 
   """
+  # pylint:disable=invalid-name
 
   def __init__(self,
                base_kernel,
                fixed_inputs,
                diag_shift=None,
                validate_args=False,
-               name='SchurComplement'):
+               name='SchurComplement',
+               _precomputed_divisor_matrix_cholesky=None):
     """Construct a SchurComplement kernel instance.
 
     Args:
@@ -199,6 +217,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         Default value: `False`
       name: Python `str` name prefixed to Ops created by this class.
         Default value: `"SchurComplement"`
+      _precomputed_divisor_matrix_cholesky: Internal parameter -- do not use.
     """
     parameters = dict(locals())
 
@@ -210,7 +229,10 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     # pylint: enable=g-import-not-at-top
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
-          [base_kernel, fixed_inputs, diag_shift], tf.float32)
+          [base_kernel,
+           fixed_inputs,
+           diag_shift,
+           _precomputed_divisor_matrix_cholesky], tf.float32)
       self._base_kernel = base_kernel
       self._diag_shift = tensor_util.convert_nonref_to_tensor(
           diag_shift, dtype=dtype, name='diag_shift')
@@ -218,11 +240,87 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
           fixed_inputs, dtype=dtype, name='fixed_inputs')
       self._cholesky_bijector = invert.Invert(
           cholesky_outer_product.CholeskyOuterProduct())
+      self._precomputed_divisor_matrix_cholesky = _precomputed_divisor_matrix_cholesky
+      if self._precomputed_divisor_matrix_cholesky is not None:
+        self._precomputed_divisor_matrix_cholesky = tf.convert_to_tensor(
+            self._precomputed_divisor_matrix_cholesky, dtype)
       super(SchurComplement, self).__init__(
           base_kernel.feature_ndims,
           dtype=dtype,
           name=name,
           parameters=parameters)
+
+  @staticmethod
+  def with_precomputed_divisor(
+      base_kernel,
+      fixed_inputs,
+      diag_shift=None,
+      validate_args=False,
+      name='PrecomputedSchurComplement'):
+    """Returns a `SchurComplement` with a precomputed divisor matrix.
+
+    This method is the same as creating a `SchurComplement` kernel, but assumes
+    that `fixed_inputs`, `diag_shift` and `base_kernel` are unchanging /
+    not parameterized by any mutable state. We explicitly read / concretize
+    these values when this method is called, since we can precompute some
+    factorizations in order to speed up subsequent invocations of the kernel.
+
+    WARNING: This method assumes passed in arguments are not parameterized
+    by mutable state (`fixed_inputs`, `diag_shift` and `base_kernel`), and hence
+    is not tape-safe.
+
+    Args:
+      base_kernel: A `PositiveSemidefiniteKernel` instance, the kernel used to
+        build the block matrices of which this kernel computes the Schur
+        complement.
+      fixed_inputs: A Tensor, representing a collection of inputs. The Schur
+        complement that this kernel computes comes from a block matrix, whose
+        bottom-right corner is derived from `base_kernel.matrix(fixed_inputs,
+        fixed_inputs)`, and whose top-right and bottom-left pieces are
+        constructed by computing the base_kernel at pairs of input locations
+        together with these `fixed_inputs`. `fixed_inputs` is allowed to be an
+        empty collection (either `None` or having a zero shape entry), in which
+        case the kernel falls back to the trivial application of `base_kernel`
+        to inputs. See class-level docstring for more details on the exact
+        computation this does; `fixed_inputs` correspond to the `Z` structure
+        discussed there. `fixed_inputs` is assumed to have shape `[b1, ..., bB,
+        N, f1, ..., fF]` where the `b`'s are batch shape entries, the `f`'s are
+        feature_shape entries, and `N` is the number of fixed inputs. Use of
+        this kernel entails a 1-time O(N^3) cost of computing the Cholesky
+        decomposition of the k(Z, Z) matrix. The batch shape elements of
+        `fixed_inputs` must be broadcast compatible with
+        `base_kernel.batch_shape`.
+      diag_shift: A floating point scalar to be added to the diagonal of the
+        divisor_matrix before computing its Cholesky.
+      validate_args: If `True`, parameters are checked for validity despite
+        possibly degrading runtime performance.
+        Default value: `False`
+      name: Python `str` name prefixed to Ops created by this class.
+        Default value: `"PrecomputedSchurComplement"`
+    """
+    dtype = dtype_util.common_dtype(
+        [base_kernel, fixed_inputs, diag_shift], tf.float32)
+    fixed_inputs = tf.convert_to_tensor(fixed_inputs, dtype)
+    if diag_shift is not None:
+      diag_shift = tf.convert_to_tensor(diag_shift, dtype)
+
+    # TODO(b/196219597): Add a check to ensure that we have a `base_kernel`
+    # that is explicitly concretized.
+    divisor_matrix_cholesky = tf.linalg.cholesky(
+        _compute_divisor_matrix(
+            base_kernel,
+            diag_shift=diag_shift,
+            fixed_inputs=fixed_inputs))
+
+    schur_complement = SchurComplement(
+        base_kernel=base_kernel,
+        fixed_inputs=fixed_inputs,
+        diag_shift=diag_shift,
+        validate_args=validate_args,
+        _precomputed_divisor_matrix_cholesky=divisor_matrix_cholesky,
+        name=name)
+
+    return schur_complement
 
   def _is_fixed_inputs_empty(self):
     # If fixed_inputs are `None` or have size 0, we consider this empty and fall
@@ -352,22 +450,21 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   def _divisor_matrix(self, fixed_inputs=None):
     fixed_inputs = tf.convert_to_tensor(
         self._fixed_inputs if fixed_inputs is None else fixed_inputs)
-    divisor_matrix = self._base_kernel.matrix(fixed_inputs, fixed_inputs)
-    if self._diag_shift is not None:
-      diag_shift = tf.convert_to_tensor(self._diag_shift)
-      broadcast_shape = distribution_util.get_broadcast_shape(
-          divisor_matrix, diag_shift[..., tf.newaxis, tf.newaxis])
-      divisor_matrix = tf.broadcast_to(divisor_matrix, broadcast_shape)
-      divisor_matrix = _add_diagonal_shift(
-          divisor_matrix, diag_shift[..., tf.newaxis])
-    return divisor_matrix
+    return _compute_divisor_matrix(
+        self._base_kernel,
+        diag_shift=self._diag_shift,
+        fixed_inputs=fixed_inputs)
 
   def divisor_matrix(self):
     return self._divisor_matrix()
 
   def _divisor_matrix_cholesky(self, fixed_inputs=None):
+    if self._precomputed_divisor_matrix_cholesky is not None:
+      return self._precomputed_divisor_matrix_cholesky
     return self.cholesky_bijector.forward(
         self._divisor_matrix(fixed_inputs))
 
   def divisor_matrix_cholesky(self, fixed_inputs=None):
+    if self._precomputed_divisor_matrix_cholesky is not None:
+      return self._precomputed_divisor_matrix_cholesky
     return self._divisor_matrix_cholesky(fixed_inputs)
