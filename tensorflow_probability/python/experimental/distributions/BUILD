@@ -32,9 +32,6 @@ multi_substrate_py_library(
     name = "distributions",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
-    substrates_omit_deps = [
-        ":marginal_fns",
-    ],
     deps = [
         ":increment_log_prob",
         ":joint_distribution_pinned",
@@ -98,7 +95,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "marginal_fns",
     srcs = ["marginal_fns.py"],
     srcs_version = "PY3",
@@ -108,9 +105,10 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "marginal_fns_test",
     srcs = ["marginal_fns_test.py"],
+    numpy_tags = ["notap"],
     python_version = "PY3",
     deps = [
         # numpy dep,
