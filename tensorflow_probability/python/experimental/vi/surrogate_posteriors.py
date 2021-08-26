@@ -22,7 +22,6 @@ from __future__ import print_function
 import functools
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import identity
 from tensorflow_probability.python.bijectors import invert
@@ -31,72 +30,20 @@ from tensorflow_probability.python.bijectors import reshape
 from tensorflow_probability.python.bijectors import restructure
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.bijectors import shift
-from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.distributions import batch_broadcast
-from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_util
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.experimental import util as tfe_util
 from tensorflow_probability.python.experimental.vi.util import trainable_linear_operators
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
-
-
-def build_trainable_location_scale_distribution(initial_loc,
-                                                initial_scale,
-                                                event_ndims,
-                                                distribution_fn=normal.Normal,
-                                                validate_args=False,
-                                                name=None):
-  """Builds a variational distribution from a location-scale family.
-
-  Args:
-    initial_loc: Float `Tensor` initial location.
-    initial_scale: Float `Tensor` initial scale.
-    event_ndims: Integer `Tensor` number of event dimensions in `initial_loc`.
-    distribution_fn: Optional constructor for a `tfd.Distribution` instance
-      in a location-scale family. This should have signature `dist =
-      distribution_fn(loc, scale, validate_args)`.
-      Default value: `tfd.Normal`.
-    validate_args: Python `bool`. Whether to validate input with asserts. This
-      imposes a runtime cost. If `validate_args` is `False`, and the inputs are
-      invalid, correct behavior is not guaranteed.
-      Default value: `False`.
-    name: Python `str` name prefixed to ops created by this function.
-      Default value: `None` (i.e.,
-        'build_trainable_location_scale_distribution').
-
-  Returns:
-    posterior_dist: A `tfd.Distribution` instance.
-  """
-  with tf.name_scope(name or 'build_trainable_location_scale_distribution'):
-    dtype = dtype_util.common_dtype([initial_loc, initial_scale],
-                                    dtype_hint=tf.float32)
-    initial_loc = initial_loc * tf.ones(tf.shape(initial_scale), dtype=dtype)
-    initial_scale = initial_scale * tf.ones_like(initial_loc)
-
-    loc = tf.Variable(initial_value=initial_loc, name='loc')
-    scale = tfp_util.TransformedVariable(
-        initial_scale, softplus.Softplus(), name='scale')
-    posterior_dist = distribution_fn(loc=loc, scale=scale,
-                                     validate_args=validate_args)
-
-    # Ensure the distribution has the desired number of event dimensions.
-    static_event_ndims = tf.get_static_value(event_ndims)
-    if static_event_ndims is None or static_event_ndims > 0:
-      posterior_dist = independent.Independent(
-          posterior_dist,
-          reinterpreted_batch_ndims=event_ndims,
-          validate_args=validate_args)
-
-  return posterior_dist
 
 
 def _get_event_shape_shallow_structure(event_shape):
@@ -109,29 +56,13 @@ def _get_event_shape_shallow_structure(event_shape):
   return nest.get_traverse_shallow_structure(_not_list_of_ints, event_shape)
 
 
-# Default constructors for `build_factored_surrogate_posterior`.
-_sample_uniform_initial_loc = functools.partial(
-    samplers.uniform, minval=-2., maxval=2., dtype=tf.float32)
-_build_trainable_normal_dist = functools.partial(
-    build_trainable_location_scale_distribution,
-    distribution_fn=normal.Normal)
-
-
-@deprecation.deprecated(
-    '2021-07-01',
-    '`build_factored_surrogate_posterior` is deprecated. Use '
-    '`build_affine_surrogate_posterior` with `operators="diag"` instead.')
-@deprecation.deprecated_args(
-    '2021-03-15',
-    '`constraining_bijectors` is deprecated, use `bijector` instead',
-    'constraining_bijectors')
-def build_factored_surrogate_posterior(
+def build_factored_surrogate_posterior(  # pylint: disable=dangerous-default-value
     event_shape=None,
     bijector=None,
-    constraining_bijectors=None,
-    initial_unconstrained_loc=_sample_uniform_initial_loc,
-    initial_unconstrained_scale=1e-2,
-    trainable_distribution_fn=_build_trainable_normal_dist,
+    batch_shape=(),
+    base_distribution_cls=normal.Normal,
+    initial_parameters={'scale': 1e-2},
+    dtype=tf.float32,
     seed=None,
     validate_args=False,
     name=None):
@@ -153,31 +84,27 @@ def build_factored_surrogate_posterior(
       `tfd.TransformedDistribution(underlying_dist, bijector)` if a
       corresponding constraining bijector is specified, otherwise it is modeled
       as supported on the unconstrained real line.
-    constraining_bijectors: Deprecated alias for `bijector`.
-    initial_unconstrained_loc: Optional Python `callable` with signature
-      `tensor = initial_unconstrained_loc(shape, seed)` used to sample
-      real-valued initializations for the unconstrained representation of each
-      variable. May alternately be a nested structure of
-      `Tensor`s, giving specific initial locations for each variable; these
-      must have structure matching `event_shape` and shapes determined by the
-      inverse image of `event_shape` under `bijector`, which may optionally be
-      prefixed with a common batch shape.
-      Default value: `functools.partial(tf.random.stateless_uniform,
-        minval=-2., maxval=2., dtype=tf.float32)`.
-    initial_unconstrained_scale: Optional scalar float `Tensor` initial
-      scale for the unconstrained distributions, or a nested structure of
-      `Tensor` initial scales for each variable.
-      Default value: `1e-2`.
-    trainable_distribution_fn: Optional Python `callable` with signature
-      `trainable_dist = trainable_distribution_fn(initial_loc, initial_scale,
-      event_ndims, validate_args)`. This is called for each model variable to
-      build the corresponding factor in the surrogate posterior. It is expected
-      that the distribution returned is supported on unconstrained real values.
-      Default value: `functools.partial(
-        tfp.experimental.vi.build_trainable_location_scale_distribution,
-        distribution_fn=tfd.Normal)`, i.e., a trainable Normal distribution.
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details. This is used
-      only when `initial_loc` is not specified.
+    batch_shape: The `batch_shape` of the output distribution.
+      Default value: `()`.
+    base_distribution_cls: Subclass of `tfd.Distribution` that is instantiated
+      and optionally transformed by the bijector to define the component
+      distributions. May optionally be a structure of such subclasses
+      matching `event_shape`.
+      Default value: `tfd.Normal`.
+    initial_parameters: Optional `str : Tensor` dictionary specifying initial
+      values for some or all of the base distribution's trainable parameters,
+      or a Python `callable` with signature
+      `value = parameter_init_fn(parameter_name, shape, dtype, seed,
+      constraining_bijector)`, passed to `tfp.experimental.util.make_trainable`.
+      May optionally be a structure matching `event_shape` of such dictionaries
+      and/or callables. Dictionary entries that do not correspond to parameter
+      names are ignored.
+      Default value: `{'scale': 1e-2}` (ignored when `base_distribution` does
+        not have a `scale` parameter).
+    dtype: Optional float `dtype` for trainable parameters. May
+      optionally be a structure of such `dtype`s matching `event_shape`.
+      Default value: `tf.float32`.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     validate_args: Python `bool`. Whether to validate input with asserts. This
       imposes a runtime cost. If `validate_args` is `False`, and the inputs are
       invalid, correct behavior is not guaranteed.
@@ -238,32 +165,23 @@ def build_factored_surrogate_posterior(
   ```
 
   If we wanted to initialize the optimization at a specific location, we can
-  specify one when we build the surrogate posterior. This function requires the
-  initial location to be specified in *unconstrained* space; we do this by
-  inverting the constraining bijectors (note this section also demonstrates the
-  creation of a dict-structured model).
+  specify initial parameters when we build the surrogate posterior. Note that
+  these parameterize the distribution(s) over unconstrained values,
+  so we need to transform our desired constrained locations using the inverse
+  of the constraining bijector(s).
 
   ```python
-  initial_loc = {'concentration': 0.4, 'rate': 0.2}
-  bijector={'concentration': tfb.Softplus(),   # Rate is positive.
-            'rate': tfb.Softplus()}   # Concentration is positive.
-  initial_unconstrained_loc = tf.nest.map_fn(
-    lambda b, x: b.inverse(x) if b is not None else x, bijector, initial_loc)
   surrogate_posterior = tfp.experimental.vi.build_factored_surrogate_posterior(
     event_shape=tf.nest.map_fn(tf.shape, initial_loc),
-    bijector=bijector,
-    initial_unconstrained_loc=initial_unconstrained_state,
-    initial_unconstrained_scale=1e-4)
+    bijector={'concentration': tfb.Softplus(),   # Rate is positive.
+              'rate': tfb.Softplus()}   # Concentration is positive.
+    initial_parameters={
+      'concentration': {'loc': tfb.Softplus().inverse(0.4), 'scale': 1e-2},
+      'rate': {'loc': tfb.Softplus().inverse(0.2), 'scale': 1e-2}})
   ```
 
   """
-
   with tf.name_scope(name or 'build_factored_surrogate_posterior'):
-    bijector = deprecation.deprecated_argument_lookup(
-        'bijector', bijector, 'constraining_bijectors', constraining_bijectors)
-
-    seed = tfp_util.SeedStream(seed, salt='build_factored_surrogate_posterior')
-
     # Convert event shapes to Tensors.
     shallow_structure = _get_event_shape_shallow_structure(event_shape)
     event_shape = nest.map_structure_up_to(
@@ -271,16 +189,10 @@ def build_factored_surrogate_posterior(
         event_shape)
 
     if nest.is_nested(bijector):
-      bijector = nest.map_structure(
-          lambda b: identity.Identity() if b is None else b,
-          bijector)
-
-      # Support mismatched nested structures for backwards compatibility (e.g.
-      # non-nested `event_shape` and a single-element list of `bijector`s).
-      bijector = nest.pack_sequence_as(event_shape, nest.flatten(bijector))
-
       event_space_bijector = joint_map.JointMap(
-          bijector, validate_args=validate_args)
+          nest.map_structure(lambda b: identity.Identity() if b is None else b,
+                             nest_util.coerce_structure(event_shape, bijector)),
+          validate_args=validate_args)
     else:
       event_space_bijector = bijector
 
@@ -289,40 +201,43 @@ def build_factored_surrogate_posterior(
     else:
       unconstrained_event_shape = (
           event_space_bijector.inverse_event_shape_tensor(event_shape))
-
-    # Construct initial locations for the internal unconstrained dists.
-    if callable(initial_unconstrained_loc):  # Sample random initialization.
-      initial_unconstrained_loc = nest.map_structure(
-          lambda s: initial_unconstrained_loc(shape=s, seed=seed()),
-          unconstrained_event_shape)
-
-    if not nest.is_nested(initial_unconstrained_scale):
-      initial_unconstrained_scale = nest.map_structure(
-          lambda _: initial_unconstrained_scale,
-          unconstrained_event_shape)
-
-    # Extract the rank of each event, so that we build distributions with the
-    # correct event shapes.
-    unconstrained_event_ndims = nest.map_structure(
-        ps.rank_from_shape,
+    unconstrained_batch_and_event_shape = tf.nest.map_structure(
+        lambda s: ps.concat([batch_shape, s], axis=0),
         unconstrained_event_shape)
 
-    # Build the component surrogate posteriors.
-    unconstrained_distributions = nest.map_structure_up_to(
-        unconstrained_event_shape,
-        lambda loc, scale, ndims: trainable_distribution_fn(  # pylint: disable=g-long-lambda
-            loc, scale, ndims, validate_args=validate_args),
-        initial_unconstrained_loc,
-        initial_unconstrained_scale,
-        unconstrained_event_ndims)
+    base_distribution_cls = nest_util.broadcast_structure(
+        event_shape, base_distribution_cls)
+    try:
+      # Check that we have initial parameters for each event part.
+      nest.assert_shallow_structure(event_shape, initial_parameters)
+    except (ValueError, TypeError):
+      # If not, broadcast the parameters to match the event structure.
+      # We do this manually rather than using `nest_util.broadcast_structure`
+      # because the initial parameters can themselves be structures (dicts).
+      initial_parameters = nest.map_structure(lambda x: initial_parameters,
+                                              event_shape)
 
-    base_distribution = (
+    unconstrained_trainable_distributions = (
+        nest_util.map_structure_with_named_args(
+            tfe_util.make_trainable,
+            cls=base_distribution_cls,
+            initial_parameters=initial_parameters,
+            batch_and_event_shape=unconstrained_batch_and_event_shape,
+            parameter_dtype=nest_util.broadcast_structure(event_shape, dtype),
+            seed=tf.nest.pack_sequence_as(
+                event_shape,
+                samplers.split_seed(seed,
+                                    n=len(tf.nest.flatten(event_shape)))),
+            _up_to=event_shape))
+    unconstrained_trainable_distribution = (
         joint_distribution_util.independent_joint_distribution_from_structure(
-            unconstrained_distributions, validate_args=validate_args))
+            unconstrained_trainable_distributions,
+            batch_ndims=ps.rank_from_shape(batch_shape),
+            validate_args=validate_args))
     if event_space_bijector is None:
-      return base_distribution
+      return unconstrained_trainable_distribution
     return transformed_distribution.TransformedDistribution(
-        base_distribution, event_space_bijector)
+        unconstrained_trainable_distribution, event_space_bijector)
 
 
 def build_affine_surrogate_posterior(
@@ -479,6 +394,12 @@ def build_affine_surrogate_posterior(
         bijector=bijector,
         seed=seed,
         validate_args=validate_args)
+
+
+# Default constructors for
+# `build_affine_surrogate_posterior_from_base_distribution`.
+_sample_uniform_initial_loc = functools.partial(
+    samplers.uniform, minval=-2., maxval=2., dtype=tf.float32)
 
 
 def build_affine_surrogate_posterior_from_base_distribution(

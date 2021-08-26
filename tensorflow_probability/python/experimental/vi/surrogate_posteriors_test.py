@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 
 from absl.testing import parameterized
@@ -27,6 +25,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
@@ -34,53 +33,6 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
-
-
-@test_util.test_all_tf_execution_regimes
-class TrainableLocationScale(test_util.TestCase):
-
-  @parameterized.named_parameters(
-      {'testcase_name': 'ScalarLaplace',
-       'event_shape': [],
-       'batch_shape': [],
-       'distribution_fn': tfd.Laplace,
-       'dtype': np.float64,
-       'is_static': True},
-      {'testcase_name': 'VectorNormal',
-       'event_shape': [2],
-       'batch_shape': [3, 1],
-       'distribution_fn': tfd.Normal,
-       'dtype': np.float32,
-       'is_static': False},)
-  def test_has_correct_ndims_and_gradients(
-      self, event_shape, batch_shape, distribution_fn, dtype, is_static):
-
-    initial_loc = np.ones(batch_shape + event_shape)
-    dist = tfp.experimental.vi.build_trainable_location_scale_distribution(
-        initial_loc=self.maybe_static(np.array(initial_loc, dtype=dtype),
-                                      is_static=is_static),
-        initial_scale=1e-6,
-        event_ndims=len(event_shape),
-        distribution_fn=distribution_fn,
-        validate_args=True)
-    self.evaluate([v.initializer for v in dist.trainable_variables])
-    self.assertAllClose(self.evaluate(dist.sample()),
-                        initial_loc,
-                        atol=1e-4)  # Much larger than initial_scale.
-    self.assertAllEqual(
-        self.evaluate(dist.event_shape_tensor()), event_shape)
-    self.assertAllEqual(
-        self.evaluate(dist.batch_shape_tensor()), batch_shape)
-    for v in dist.trainable_variables:
-      self.assertAllEqual(ps.shape(v), batch_shape + event_shape)
-
-    # Test that gradients are available wrt the variational parameters.
-    self.assertNotEmpty(dist.trainable_variables)
-    with tf.GradientTape() as tape:
-      posterior_logprob = dist.log_prob(initial_loc)
-    grad = tape.gradient(posterior_logprob,
-                         dist.trainable_variables)
-    self.assertTrue(all(g is not None for g in grad))
 
 
 class _SurrogatePosterior(object):
@@ -170,7 +122,7 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
   @parameterized.named_parameters(
       {'testcase_name': 'TensorEvent',
        'event_shape': tf.TensorShape([4]),
-       'bijector': [tfb.Sigmoid()],
+       'bijector': tfb.Sigmoid(),
        'dtype': np.float64,
        'is_static': True},
       {'testcase_name': 'ListEvent',
@@ -203,8 +155,7 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
                     np.array(s, dtype=np.int32), is_static=is_static),
                 event_shape),
             bijector=bijector,
-            initial_unconstrained_loc=functools.partial(
-                tf.random.uniform, minval=-2., maxval=2., dtype=dtype),
+            dtype=dtype,
             seed=seed(),
             validate_args=True))
     self.evaluate([v.initializer
@@ -220,7 +171,7 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
       {'testcase_name': 'TensorEvent',
        'event_shape': [4],
        'initial_loc': np.array([[[0.9, 0.1, 0.5, 0.7]]]),
-       'implicit_batch_shape': [1, 1],
+       'batch_shape': [1, 1],
        'bijector': tfb.Sigmoid(),
        'dtype': np.float32,
        'is_static': False},
@@ -229,7 +180,7 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'initial_loc': [np.array([0.1, 7., 3.]),
                        0.1,
                        np.array([[1., 0], [-4., 2.]])],
-       'implicit_batch_shape': [],
+       'batch_shape': [],
        'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
        'dtype': np.float64,
        'is_static': True},
@@ -237,14 +188,20 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'event_shape': {'x': [2], 'y': []},
        'initial_loc': {'x': np.array([[0.9, 1.2]]),
                        'y': np.array([-4.1])},
-       'implicit_batch_shape': [1],
+       'batch_shape': [1],
+       'bijector': None,
+       'dtype': np.float32,
+       'is_static': False},
+      {'testcase_name': 'ExplicitBatchShape',
+       'event_shape': [[3], [4]],
+       'initial_loc': [0., 0.],
+       'batch_shape': [5, 1],
        'bijector': None,
        'dtype': np.float32,
        'is_static': False},
   )
   def test_specifying_initial_loc(
-      self, event_shape, initial_loc, implicit_batch_shape, bijector, dtype,
-      is_static):
+      self, event_shape, initial_loc, batch_shape, bijector, dtype, is_static):
     initial_loc = tf.nest.map_structure(
         lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
             np.array(s, dtype=dtype), is_static=is_static),
@@ -260,8 +217,11 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
     surrogate_posterior = (
         tfp.experimental.vi.build_factored_surrogate_posterior(
             event_shape=event_shape,
-            initial_unconstrained_loc=initial_unconstrained_loc,
-            initial_unconstrained_scale=1e-6,
+            initial_parameters=tf.nest.map_structure(
+                lambda x: {'loc': x, 'scale': 1e-6},
+                initial_unconstrained_loc),
+            batch_shape=batch_shape,
+            dtype=dtype,
             bijector=bijector,
             validate_args=True))
     self.evaluate([v.initializer
@@ -269,14 +229,48 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 
     seed = test_util.test_seed_stream()
     self._test_shapes(
-        surrogate_posterior, batch_shape=implicit_batch_shape,
+        surrogate_posterior, batch_shape=batch_shape,
         event_shape=event_shape, seed=seed())
     self._test_gradients(surrogate_posterior, seed=seed())
     self._test_dtype(surrogate_posterior, dtype, seed())
 
     # Check that the sampled values are close to the initial locs.
     posterior_sample_ = self.evaluate(surrogate_posterior.sample(seed=seed()))
-    self.assertAllCloseNested(initial_loc, posterior_sample_, atol=1e-4)
+    self.assertAllCloseNested(
+        tf.nest.map_structure(lambda x, y: tf.broadcast_to(x, ps.shape(y)),
+                              initial_loc, posterior_sample_),
+        posterior_sample_,
+        atol=1e-4)
+
+  @parameterized.named_parameters(
+      {'testcase_name': 'TensorEventAllDeterministic',
+       'event_shape': [4],
+       'base_distribution_cls': tfd.Deterministic},
+      {'testcase_name': 'ListEventSingleDeterministic',
+       'event_shape': [[3], [], [2, 2]],
+       'base_distribution_cls': tfd.Deterministic},
+      {'testcase_name': 'ListEventDeterministicNormalStudentT',
+       'event_shape': [[3], [], [2, 2]],
+       'base_distribution_cls': [tfd.Deterministic, tfd.Normal, tfd.StudentT]},
+  )
+  def test_specifying_distribution_type(
+      self, event_shape, base_distribution_cls):
+    surrogate_posterior = (
+        tfp.experimental.vi.build_factored_surrogate_posterior(
+            event_shape=event_shape,
+            base_distribution_cls=base_distribution_cls,
+            validate_args=True))
+
+    # Test that the surrogate uses the expected distribution types.
+    if tf.nest.is_nested(surrogate_posterior.event_shape):
+      ds, _ = surrogate_posterior.sample_distributions()
+    else:
+      ds = [surrogate_posterior]
+    for cls, d in zip(
+        nest_util.broadcast_structure(ds, base_distribution_cls), ds):
+      while isinstance(d, tfd.Independent):
+        d = d.distribution
+      self.assertIsInstance(d, cls)
 
   def test_that_gamma_fitting_example_runs(self):
     model = self._make_gamma_model()
@@ -297,8 +291,6 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
             event_shape=dist.event_shape,
             bijector=(
                 dist.experimental_default_event_space_bijector()),
-            initial_unconstrained_loc=functools.partial(
-                tf.random.uniform, minval=-2., maxval=2.),
             validate_args=True))
     self.evaluate([v.initializer
                    for v in surrogate_posterior.trainable_variables])

@@ -27,12 +27,16 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 __all__ = [
     'broadcast_structure',
+    'call_fn',
     'cast_structure',
     'expand_as_args',
-    'call_fn',
+    'map_structure_with_named_args'
 ]
 
 _is_namedtuple = nest._is_namedtuple  # pylint: disable=protected-access
+
+
+UNSPECIFIED = object()
 
 
 def broadcast_structure(to_structure, from_structure):
@@ -77,6 +81,63 @@ def cast_structure(value, structure):
     else:
       return type(structure)(value)
   return value
+
+
+def map_structure_with_named_args(func,
+                                  *structures,
+                                  _check_types=True,  # pylint: disable=invalid-name
+                                  _expand_composites=False,  # pylint: disable=invalid-name
+                                  _up_to=UNSPECIFIED,  # pylint: disable=invalid-name
+                                  **named_structures):
+  """Calls `nest.map_structure` with named args.
+
+  Args:
+    func: a callable that accepts one or more named arguments.
+    *structures: Structures of arguments passed positionally to `func`.
+    _check_types: Forwarded as `map_structure(..., check_types=_check_types)`.
+    _expand_composites: Forwarded as
+      `map_structure(..., expand_composites=_expand_composites)`.
+    _up_to: Optional shallow structure to map up to. If provided,
+      `nest.map_structure_up_to` is called rather than `nest.map_structure`.
+      Default value: `UNSPECIFIED`.
+    **named_structures: Structures of arguments passed by name to `func`.
+  Returns:
+    A new structure matching that of the input structures (or the shallow
+      structure `_up_to`, if specified), in which each element is computed
+      by applying `func` to the corresponding elements of the input structures.
+
+  #### Examples
+
+  ```python
+  func = lambda x, y: 2 * x + 3 * y
+
+  map_structure_with_named_args(func, [1, 2], [10, 11])
+  # ==> [32, 37]
+
+  map_structure_with_named_args(func, [1, 2], y=[10, 11])
+  # ==> [32, 37]
+
+  map_structure_with_named_args(func, x=[1, 2], y=[10, 11])
+  # ==> [32, 37]
+
+  map_structure_with_named_args(func, [10, 11], x=[1, 2])
+  # ==> TypeError: <lambda>() got multiple values for argument 'x'.
+  ```
+
+  """
+  names, named_values = (zip(*named_structures.items())
+                         if named_structures else ((), ()))
+  # Wrapper function that takes positional args and passes keyword args.
+  def kwarg_passing_fn(*leaf_values):
+    return func(*leaf_values[:len(structures)],
+                **dict(zip(names, leaf_values[len(structures):])))
+
+  map_fn = (nest.map_structure if _up_to is UNSPECIFIED
+            else lambda *a, **kw: nest.map_structure_up_to(_up_to, *a, **kw))
+  return map_fn(kwarg_passing_fn,
+                *(structures + named_values),
+                check_types=_check_types,
+                expand_composites=_expand_composites)
 
 
 def _force_leaf(struct):
