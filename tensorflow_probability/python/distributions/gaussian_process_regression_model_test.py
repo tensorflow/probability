@@ -180,6 +180,91 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     self.assertAllClose(expected_mean,
                         self.evaluate(gprm_no_predictive_noise.mean()))
 
+  def testMeanVarianceAndCovariancePrecomputed(self):
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
+    length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
+    observation_noise_variance = np.array([1e-9], np.float64)
+
+    jitter = np.float64(1e-6)
+    observation_index_points = (
+        np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
+    observations = np.random.uniform(-1., 1., (1, 1, 7)).astype(np.float64)
+
+    index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
+
+    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+    gprm = tfd.GaussianProcessRegressionModel(
+        kernel=kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        jitter=jitter,
+        validate_args=True)
+
+    precomputed_gprm = tfd.GaussianProcessRegressionModel.precompute_regression_model(
+        kernel=kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        jitter=jitter,
+        validate_args=True)
+
+    self.assertAllClose(self.evaluate(precomputed_gprm.covariance()),
+                        self.evaluate(gprm.covariance()))
+    self.assertAllClose(self.evaluate(precomputed_gprm.variance()),
+                        self.evaluate(gprm.variance()))
+    self.assertAllClose(self.evaluate(precomputed_gprm.mean()),
+                        self.evaluate(gprm.mean()))
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX have no notion of CompositeTensor/saved_model')
+  def testPrecomputedCompositeTensor(self):
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
+    length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
+    observation_noise_variance = np.array([1e-9], np.float64)
+
+    jitter = np.float64(1e-6)
+    observation_index_points = (
+        np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
+    observations = np.random.uniform(-1., 1., (1, 1, 7)).astype(np.float64)
+
+    index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
+
+    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+
+    precomputed_gprm = tfd.GaussianProcessRegressionModel.precompute_regression_model(
+        kernel=kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        jitter=jitter,
+        validate_args=True)
+
+    flat = tf.nest.flatten(precomputed_gprm, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        precomputed_gprm, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfd.GaussianProcessRegressionModel)
+    # Check that we don't recompute the divisor matrix on flattening /
+    # unflattening.
+    self.assertIs(precomputed_gprm.kernel._precomputed_divisor_matrix_cholesky,
+                  unflat.kernel._precomputed_divisor_matrix_cholesky)
+
+    # TODO(b/196219597): Enable this test once GPRM works across TF function
+    # boundaries.
+    # index_observations = np.random.uniform(-1., 1., (6,)).astype(np.float64)
+    # @tf.function
+    # def log_prob(d):
+    #   return d.log_prob(index_observations)
+
+    # lp = self.evaluate(precomputed_gprm.log_prob(index_observations))
+
+    # self.assertAllClose(lp, self.evaluate(log_prob(precomputed_gprm)))
+    # self.assertAllClose(lp, self.evaluate(log_prob(unflat)))
+
   def testEmptyDataMatchesGPPrior(self):
     amp = np.float64(.5)
     len_scale = np.float64(.2)

@@ -252,6 +252,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
                jitter=1e-6,
                validate_args=False,
                allow_nan_stats=False,
+               parameters=None,
                name='GaussianProcess'):
     """Instantiate a GaussianProcess Distribution.
 
@@ -297,13 +298,14 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
         indicate the result is undefined. When `False`, an exception is raised
         if one or more of the statistic's batch members are undefined.
         Default value: `False`.
+      parameters: For subclasses, a dict of constructor arguments.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: "GaussianProcess".
 
     Raises:
       ValueError: if `mean_fn` is not `None` and is not callable.
     """
-    parameters = dict(locals())
+    parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
           [index_points, observation_noise_variance, jitter], tf.float32)
@@ -596,14 +598,21 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
   def _default_event_space_bijector(self):
     return identity_bijector.Identity(validate_args=self.validate_args)
 
-  def posterior_predictive(self, observations, predictive_index_points=None):
+  def posterior_predictive(
+      self, observations, predictive_index_points=None, **kwargs):
     """Return the posterior predictive distribution associated with this distribution.
 
-    Given `predictive_index_points` and `observations`, return the posterior
-    predictive distribution on the `predictive_index_points` conditioned on
-    `index_points` and `observations` associated to `index_points`.
+    Returns the posterior predictive distribution `p(Y' | X, Y, X')` where:
+      * `X'` is `predictive_index_points`
+      * `X` is `self.index_points`.
+      * `Y` is `observations`.
 
-    This is equivalent to using the `GaussianProcessRegressionModel` class.
+    This is equivalent to using the
+    `GaussianProcessRegressionModel.precompute_regression_model` method.
+
+    WARNING: This method assumes `index_points` is the only varying parameter
+    (i.e. is a `Variable` / changes after initialization) and hence is not
+    tape-safe.
 
     Args:
       observations: `float` `Tensor` representing collection, or batch of
@@ -621,6 +630,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
         The batch shape must be broadcastable with this distributions
         `batch_shape`.
         Default value: `None`.
+      **kwargs: Any other keyword arguments to pass / override.
 
     Returns:
       gprm: An instance of `Distribution` that represents the posterior
@@ -632,16 +642,21 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
           'Expected that `self.index_points` is not `None`. Using '
           '`self.index_points=None` is equivalent to using a `GaussianProcess` '
           'prior, which this class encapsulates.')
-    return gprm.GaussianProcessRegressionModel(
-        kernel=self.kernel,
-        observation_index_points=self.index_points,
-        observations=observations,
-        index_points=predictive_index_points,
-        observation_noise_variance=self.observation_noise_variance,
-        mean_fn=self.mean_fn,
-        jitter=self.jitter,
-        validate_args=self.validate_args,
-        allow_nan_stats=self.allow_nan_stats)
+    argument_dict = {
+        'kernel': self.kernel,
+        'observation_index_points': self.index_points,
+        'observations': observations,
+        'index_points': predictive_index_points,
+        'observation_noise_variance': self.observation_noise_variance,
+        'mean_fn': self.mean_fn,
+        'jitter': self.jitter,
+        'validate_args': self.validate_args,
+        'allow_nan_stats': self.allow_nan_stats
+    }
+    argument_dict.update(**kwargs)
+
+    return gprm.GaussianProcessRegressionModel.precompute_regression_model(
+        **argument_dict)
 
 
 def _assert_kl_compatible(marginal, other):

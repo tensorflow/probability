@@ -30,6 +30,8 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 
+tfpk = tfp.math.psd_kernels
+
 
 # A shape broadcasting fn
 def broadcast_shapes(*shapes):
@@ -56,11 +58,11 @@ def broadcast_shapes(*shapes):
 class SchurComplementTest(test_util.TestCase):
 
   def testMismatchedFloatTypesAreBad(self):
-    base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    base_kernel = tfpk.ExponentiatedQuadratic(
         np.float64(5.), np.float64(.2))
 
     # Should be OK
-    tfp.math.psd_kernels.SchurComplement(
+    tfpk.SchurComplement(
         base_kernel=base_kernel,  # float64
         fixed_inputs=np.random.uniform(-1., 1., [2, 1]))
 
@@ -68,7 +70,7 @@ class SchurComplementTest(test_util.TestCase):
       float32_inputs = np.random.uniform(
           -1., 1., [2, 1]).astype(np.float32)
 
-      tfp.math.psd_kernels.SchurComplement(
+      tfpk.SchurComplement(
           base_kernel=base_kernel, fixed_inputs=float32_inputs)
 
   @parameterized.parameters(
@@ -86,12 +88,12 @@ class SchurComplementTest(test_util.TestCase):
 
     shape = [dims] * feature_ndims
 
-    base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    base_kernel = tfpk.ExponentiatedQuadratic(
         np.float64(5.), np.float64(.2), feature_ndims=feature_ndims)
 
     fixed_inputs = np.random.uniform(-1., 1., size=[num_obs] + shape)
 
-    k = tfp.math.psd_kernels.SchurComplement(
+    k = tfpk.SchurComplement(
         base_kernel=base_kernel, fixed_inputs=fixed_inputs)
 
     k_obs = self.evaluate(base_kernel.matrix(fixed_inputs, fixed_inputs))
@@ -136,11 +138,11 @@ class SchurComplementTest(test_util.TestCase):
       x = np.ones(x_shape, np.float64)
       z = np.random.uniform(-1., 1., size=z_shape)
 
-      base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+      base_kernel = tfpk.ExponentiatedQuadratic(
           amplitude=np.ones([next(ints), 1, 1], np.float64),
           feature_ndims=len(feature_shape))
 
-      k = tfp.math.psd_kernels.SchurComplement(base_kernel, fixed_inputs=z)
+      k = tfpk.SchurComplement(base_kernel, fixed_inputs=z)
 
       expected = broadcast_shapes(
           base_kernel.batch_shape, x_batch_shape, z_batch_shape) + num_x
@@ -171,11 +173,11 @@ class SchurComplementTest(test_util.TestCase):
         y = np.ones(y_shape, np.float64)
         z = np.random.uniform(-1., 1., size=z_shape)
 
-        base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+        base_kernel = tfpk.ExponentiatedQuadratic(
             amplitude=np.ones([next(ints), 1, 1, 1], np.float64),
             feature_ndims=len(feature_shape))
 
-        k = tfp.math.psd_kernels.SchurComplement(base_kernel, fixed_inputs=z)
+        k = tfpk.SchurComplement(base_kernel, fixed_inputs=z)
 
         expected = broadcast_shapes(
             base_kernel.batch_shape,
@@ -190,9 +192,9 @@ class SchurComplementTest(test_util.TestCase):
         self.assertAllEqual(expected, actual)
 
   def testEmptyFixedInputs(self):
-    base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(1., 1.)
+    base_kernel = tfpk.ExponentiatedQuadratic(1., 1.)
     fixed_inputs = tf.ones([0, 2], np.float32)
-    schur = tfp.math.psd_kernels.SchurComplement(base_kernel, fixed_inputs)
+    schur = tfpk.SchurComplement(base_kernel, fixed_inputs)
 
     x = np.ones([4, 3], np.float32)
     y = np.ones([5, 3], np.float32)
@@ -202,15 +204,15 @@ class SchurComplementTest(test_util.TestCase):
         self.evaluate(schur.matrix(x, y)))
 
     # Test batch shapes
-    base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic([1., 2.])
+    base_kernel = tfpk.ExponentiatedQuadratic([1., 2.])
     fixed_inputs = tf.ones([0, 2], np.float32)
-    schur = tfp.math.psd_kernels.SchurComplement(base_kernel, fixed_inputs)
+    schur = tfpk.SchurComplement(base_kernel, fixed_inputs)
     self.assertAllEqual([2], schur.batch_shape)
     self.assertAllEqual([2], self.evaluate(schur.batch_shape_tensor()))
 
   def testNoneFixedInputs(self):
-    base_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(1., 1.)
-    schur = tfp.math.psd_kernels.SchurComplement(base_kernel, fixed_inputs=None)
+    base_kernel = tfpk.ExponentiatedQuadratic(1., 1.)
+    schur = tfpk.SchurComplement(base_kernel, fixed_inputs=None)
 
     x = np.ones([4, 3], np.float32)
     y = np.ones([5, 3], np.float32)
@@ -227,15 +229,59 @@ class SchurComplementTest(test_util.TestCase):
 
     # Should raise when there's an explicit mismatch.
     with self.assertRaises(TypeError):
-      schur_complement = tfp.math.psd_kernels.SchurComplement(
-          tfp.math.psd_kernels.ExponentiatedQuadratic(np.float32(1)),
+      schur_complement = tfpk.SchurComplement(
+          tfpk.ExponentiatedQuadratic(np.float32(1)),
           fixed_inputs)
 
     # Should not throw an exception when the kernel doesn't get an explicit
     # dtype from its inputs.
-    schur_complement = tfp.math.psd_kernels.SchurComplement(
-        tfp.math.psd_kernels.ExponentiatedQuadratic(), fixed_inputs)
+    schur_complement = tfpk.SchurComplement(
+        tfpk.ExponentiatedQuadratic(), fixed_inputs)
     schur_complement.matrix(fixed_inputs, fixed_inputs)
+
+  def testSchurComplementWithPrecomputedDivisor(self):
+    base_kernel = tfpk.ExponentiatedQuadratic([1., 2.])
+    fixed_inputs = tf.ones([0, 2], np.float32)
+    schur = tfpk.SchurComplement(base_kernel, fixed_inputs)
+    schur_with_divisor = tfpk.SchurComplement.with_precomputed_divisor(
+        base_kernel, fixed_inputs)
+
+    x = np.ones([4, 3], np.float32)
+    y = np.ones([5, 3], np.float32)
+
+    self.assertAllClose(
+        self.evaluate(schur_with_divisor.matrix(x, y)),
+        self.evaluate(schur.matrix(x, y)))
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX have no notion of CompositeTensor/saved_model')
+  def testPrecomputedDivisorCompositeTensor(self):
+    base_kernel = tfpk.ExponentiatedQuadratic([1., 2.])
+    fixed_inputs = tf.ones([0, 2], np.float32)
+    schur_with_divisor = tfpk.SchurComplement.with_precomputed_divisor(
+        base_kernel, fixed_inputs)
+
+    x = np.ones([4, 3], np.float32)
+    y = np.ones([5, 3], np.float32)
+
+    flat = tf.nest.flatten(schur_with_divisor, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        schur_with_divisor, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfpk.SchurComplement)
+    self.assertIsNotNone(
+        schur_with_divisor._precomputed_divisor_matrix_cholesky)
+
+    actual = self.evaluate(schur_with_divisor.matrix(x, y))
+
+    self.assertAllClose(self.evaluate(unflat.matrix(x, y)), actual)
+
+    @tf.function
+    def matrix(k):
+      return k.matrix(x, y)
+    self.assertAllClose(actual, matrix(schur_with_divisor))
+    self.assertAllClose(actual, matrix(unflat))
+
 
 if __name__ == '__main__':
   test_util.main()

@@ -292,16 +292,16 @@ class _GaussianProcessTest(object):
     samples = self.evaluate(actual_gprm.sample(10, seed=test_util.test_seed()))
 
     self.assertAllClose(
-        self.evaluate(expected_gprm.log_prob(samples)),
-        self.evaluate(actual_gprm.log_prob(samples)))
-
-    self.assertAllClose(
         self.evaluate(expected_gprm.mean()),
         self.evaluate(actual_gprm.mean()))
 
     self.assertAllClose(
         self.evaluate(expected_gprm.covariance()),
         self.evaluate(actual_gprm.covariance()))
+
+    self.assertAllClose(
+        self.evaluate(expected_gprm.log_prob(samples)),
+        self.evaluate(actual_gprm.log_prob(samples)))
 
 
 @test_util.test_all_tf_execution_regimes
