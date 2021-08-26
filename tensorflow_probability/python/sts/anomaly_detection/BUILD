@@ -55,7 +55,7 @@ py_library(
 
 py_test(
     name = "anomaly_detection_test",
-    size = "medium",
+    size = "large",
     srcs = ["anomaly_detection_test.py"],
     srcs_version = "PY3",
     deps = [
