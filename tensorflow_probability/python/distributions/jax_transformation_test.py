@@ -96,6 +96,7 @@ VJP_LOGPROB_PARAM_BLOCKLIST = (
 PYTREE_BLOCKLIST = (
     'Bates',
     'MixtureSameFamily',  # Too slow: http://b/170871051
+    'Poisson',  # Too slow: http://b/170871051
     'Sample',  # Too slow: http://b/170871051
     'SinhArcsinh',  # b/183670203
     'TransformedDistribution',
