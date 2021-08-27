@@ -789,7 +789,7 @@ polygamma = utils.copy_docstring(
 
 polyval = utils.copy_docstring(
     'tf.math.polyval',
-    lambda coeffs, x, name=None: np.polyval(coeffs, x))
+    lambda coeffs, x, name=None: np.polyval(np.asarray(coeffs), np.asarray(x)))
 
 pow = utils.copy_docstring(  # pylint: disable=redefined-builtin
     'tf.math.pow',
