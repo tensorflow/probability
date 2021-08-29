@@ -322,10 +322,22 @@ class Categorical(distribution.AutoCompositeTensorDistribution):
         axis=-1) / tf.math.exp(lse_logits)
 
   def _mean(self):
-    x = self._probs if self._logits is None else self._logits
-    mean = tf.cast(tf.reduce_mean(x, axis=-1), self.dtype)
-    tensorshape_util.set_shape(mean, x.shape[:-1])
-    return mean      
+    if self._logits is None:
+      # If we only have probs, there's not much we can do to ensure numerical
+      # precision.
+      probs = tf.convert_to_tensor(self._probs)
+      return tf.reduce_sum(
+          tf.math.multiply_no_nan(i , probs(x=i)) for i in range(self._num_categories),
+          axis=-1)
+     
+      # If we have logits. 
+    logits = tf.convert_to_tensor(self._logits)
+    masked_logits = tf.where(
+        (tf.math.is_inf(logits) & (logits < 0)),
+        tf.cast(1.0, dtype=logits.dtype), logits)
+    return tf.reduce_sum(
+        tf.math.multiply_no_nan(masked_logits,tf.math.exp(-logits)),
+        axis=-1) /tf.math.square(1 + tf.math.exp(-logits))
 
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
@@ -372,17 +384,17 @@ class Categorical(distribution.AutoCompositeTensorDistribution):
     return maybe_assert_categorical_param_correctness(
         is_init, self.validate_args, self._probs, self._logits)
 
-  def _sample_control_dependencies(self, x):
+  def _sample_control_dependencies(self,value):
     assertions = []
     if not self.validate_args:
       return assertions
     assertions.append(distribution_util.assert_casting_closed(
-        x, target_dtype=tf.int32))
+        value, target_dtype=tf.int32))
     assertions.append(assert_util.assert_non_negative(
-        x, message='Categorical samples must be non-negative.'))
+        value, message='Categorical samples must be non-negative.'))
     assertions.append(
         assert_util.assert_less_equal(
-            x, tf.cast(self._num_categories(), x.dtype),
+            value, tf.cast(self._num_categories(), value.dtype),
             message=('Categorical samples must be between `0` and `n-1` '
                      'where `n` is the number of categories.')))
     return assertions
