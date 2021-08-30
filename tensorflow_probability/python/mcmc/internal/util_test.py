@@ -124,6 +124,29 @@ class ChooseTest(test_util.TestCase):
           loop_vars=(init,))
     try_me(5)
 
+  def test_choose_from(self):
+    options = [
+        [{
+            'value': 1.
+        }, (2., 3)],
+        [{
+            'value': 2.
+        }, (3., 4)],
+        [{
+            'value': 3.
+        }, (4., 5)],
+    ]
+    first_option = util.choose_from(tf.constant(0), options)
+    second_option = util.choose_from(tf.constant(1), options)
+    third_option = util.choose_from(2, options)
+    negative_option = util.choose_from(tf.constant(-10), options)
+    large_option = util.choose_from(tf.constant(10), options)
+    self.assertAllEqualNested(first_option, options[0], check_types=True)
+    self.assertAllEqualNested(second_option, options[1], check_types=True)
+    self.assertAllEqualNested(third_option, options[2], check_types=True)
+    self.assertAllEqualNested(negative_option, options[0], check_types=True)
+    self.assertAllEqualNested(large_option, options[2], check_types=True)
+
 
 class IsNamedTupleLikeTest(test_util.TestCase):
 

@@ -193,6 +193,10 @@ def maybe_make_list_and_batch_broadcast(momentum_distribution, batch_shape):
         [momentum_distribution], name='joint_momentum')
   if (isinstance(momentum_distribution, jds.JointDistributionSequential) and
       not isinstance(momentum_distribution, jdn.JointDistributionNamed) and
+      # Skip this step if we already batch broadcast.
+      not all(
+          isinstance(md, batch_broadcast.BatchBroadcast)
+          for md in momentum_distribution.model) and
       not any(callable(dist_fn) for dist_fn in momentum_distribution.model)):
     momentum_distribution = momentum_distribution.copy(model=[
         _CompositeBatchBroadcast(md, with_shape=batch_shape)

@@ -37,6 +37,7 @@ from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tenso
 
 __all__ = [
     'choose',
+    'choose_from',
     'enable_store_parameters_in_results',
     'index_remapping_gather',
     'is_list_like',
@@ -160,6 +161,37 @@ def _choose_recursive(is_accepted, proposed, current, name=None, addr='<root>'):
 def choose(is_accepted, proposed, current, name=None):
   """Helper which expand_dims `is_accepted` then applies tf.where."""
   return _choose_recursive(is_accepted, proposed, current, name=name)
+
+
+def _nest_choose(is_accepted, proposed, current):
+  """Like `choose` but not limited to list, tuple, namedtuple."""
+  result_parts = choose(is_accepted,
+                        tf.nest.flatten(proposed, expand_composites=True),
+                        tf.nest.flatten(current, expand_composites=True))
+  return tf.nest.pack_sequence_as(
+      proposed, result_parts, expand_composites=True)
+
+
+def choose_from(n, options):
+  """Helper to select the n-th option from a list of options.
+
+  This is useful when `n` is not a concrete value. Also note that
+  the value of `n` will be clipped to the edges of the interval
+  `[0, len(options) - 1]`.
+
+  Args:
+    n: Scalar `int` `Tensor` option.
+    options: List of options to choose from. All the options should have the
+      same nested structure.
+
+  Returns:
+    The n-th option among `options`.
+  """
+  if len(options) == 1:
+    return options[0]
+  m = len(options) // 2
+  return _nest_choose(n < m, choose_from(n, options[:m]),
+                      choose_from(n - m, options[m:]))
 
 
 def strip_seeds(obj):

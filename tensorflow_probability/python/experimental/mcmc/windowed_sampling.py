@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import functools
 import warnings
 
@@ -34,7 +35,6 @@ from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc a
 from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts as pnuts
 from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
 from tensorflow_probability.python.experimental.stats import sample_stats
-from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -42,7 +42,9 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import unnest
 from tensorflow_probability.python.math import generic as generic_math
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
+from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import sample
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -301,133 +303,8 @@ def make_slow_adapt_kernel(*,
           kind=kind,
           proposal_kernel_kwargs=proposal_kernel_kwargs,
           dual_averaging_kwargs=dual_averaging_kwargs),
-      initial_running_variance=initial_running_variance)
-
-
-def _fast_window(*,
-                 kind,
-                 proposal_kernel_kwargs,
-                 dual_averaging_kwargs,
-                 num_draws,
-                 initial_position,
-                 bijector,
-                 trace_fn,
-                 seed):
-  """Sample using just step size adaptation."""
-  dual_averaging_kwargs = dict(dual_averaging_kwargs)
-  dual_averaging_kwargs.update({'num_adaptation_steps': num_draws})
-  kernel = make_fast_adapt_kernel(
-      kind=kind,
-      proposal_kernel_kwargs=proposal_kernel_kwargs,
-      dual_averaging_kwargs=dual_averaging_kwargs)
-  with warnings.catch_warnings():
-    warnings.simplefilter('ignore')
-    draws, trace, fkr = sample.sample_chain(
-        num_draws,
-        initial_position,
-        kernel=kernel,
-        return_final_kernel_results=True,
-        # pylint: disable=g-long-lambda
-        trace_fn=lambda state, pkr: trace_fn(
-            state, bijector, tf.constant(True), pkr.inner_results),
-        seed=seed)
-    # pylint: enable=g-long-lambda
-
-  draw_and_chain_axes = [0, 1]
-  weighted_running_variance = []
-  for d in list(draws):
-    prev_mean, prev_var = tf.nn.moments(d[-num_draws // 2:],
-                                        axes=draw_and_chain_axes)
-    num_samples = tf.cast(
-        num_draws / 2,
-        dtype=dtype_util.common_dtype([prev_mean, prev_var], tf.float32))
-    weighted_running_variance.append(sample_stats.RunningVariance.from_stats(
-        num_samples=num_samples,
-        mean=prev_mean,
-        variance=prev_var))
-
-  step_size = unnest.get_outermost(fkr, 'step_size')
-  return draws, trace, step_size, weighted_running_variance
-
-
-def _slow_window(*,
-                 kind,
-                 proposal_kernel_kwargs,
-                 dual_averaging_kwargs,
-                 num_draws,
-                 initial_position,
-                 initial_running_variance,
-                 bijector,
-                 trace_fn,
-                 seed):
-  """Sample using both step size and mass matrix adaptation."""
-  dual_averaging_kwargs = dict(dual_averaging_kwargs)
-  dual_averaging_kwargs.setdefault('num_adaptation_steps', num_draws)
-  kernel = make_slow_adapt_kernel(
-      kind=kind,
-      proposal_kernel_kwargs=proposal_kernel_kwargs,
-      dual_averaging_kwargs=dual_averaging_kwargs,
-      initial_running_variance=initial_running_variance)
-  with warnings.catch_warnings():
-    warnings.simplefilter('ignore')
-
-    draws, trace, fkr = sample.sample_chain(
-        num_draws,
-        initial_position,
-        kernel=kernel,
-        return_final_kernel_results=True,
-        # pylint: disable=g-long-lambda
-        trace_fn=lambda state, pkr: trace_fn(state,
-                                             bijector,
-                                             tf.constant(True),
-                                             pkr.inner_results.inner_results),
-        seed=seed)
-    # pylint: enable=g-long-lambda
-
-  draw_and_chain_axes = [0, 1]
-  weighted_running_variance = []
-  for d in list(draws):
-    prev_mean, prev_var = tf.nn.moments(d[-num_draws // 2:],
-                                        axes=draw_and_chain_axes)
-    num_samples = tf.cast(
-        num_draws / 2,
-        dtype=dtype_util.common_dtype([prev_mean, prev_var], tf.float32))
-    weighted_running_variance.append(sample_stats.RunningVariance.from_stats(
-        num_samples=num_samples,
-        mean=prev_mean,
-        variance=prev_var))
-
-  step_size = unnest.get_outermost(fkr, 'step_size')
-  momentum_distribution = unnest.get_outermost(fkr, 'momentum_distribution')
-
-  return draws, trace, step_size, weighted_running_variance, momentum_distribution
-
-
-def _do_sampling(*,
-                 kind,
-                 proposal_kernel_kwargs,
-                 num_draws,
-                 initial_position,
-                 trace_fn,
-                 bijector,
-                 return_final_kernel_results,
-                 seed):
-  """Sample from base HMC kernel."""
-  kernel = _make_base_kernel(
-      kind=kind,
-      proposal_kernel_kwargs=proposal_kernel_kwargs)
-  return sample.sample_chain(
-      num_draws,
-      initial_position,
-      kernel=kernel,
-      # pylint: disable=g-long-lambda
-      trace_fn=lambda state, pkr: trace_fn(state,
-                                           bijector,
-                                           tf.constant(False),
-                                           pkr),
-      # pylint: enable=g-long-lambda
-      return_final_kernel_results=return_final_kernel_results,
-      seed=seed)
+      initial_running_variance=initial_running_variance,
+      num_estimation_steps=dual_averaging_kwargs['num_adaptation_steps'])
 
 
 def _get_window_sizes(num_adaptation_steps):
@@ -440,23 +317,214 @@ def _get_window_sizes(num_adaptation_steps):
   slow window: 50 steps
   slow window: 100 steps
   slow window: 200 steps
-  fast window: 75 steps
+  fast window: 50 steps
 
-  Which is a total of 525 steps.
+  Which is a total of 500 steps.
 
   Args:
-    num_adaptation_steps: int
-      Number of adaptation steps to run
+    num_adaptation_steps: int Number of adaptation steps to run.
 
   Returns:
-    The first window size, the initial slow window size, the last window size
+    The first window size, the initial slow window size, the last window size.
   """
-  slow_window_size = num_adaptation_steps // 21
+  slow_window_size = num_adaptation_steps // 20
   first_window_size = 3 * slow_window_size
   last_window_size = (num_adaptation_steps -
                       15 * slow_window_size -
                       first_window_size)
   return first_window_size, slow_window_size, last_window_size
+
+
+class WindowedAdaptationResults(mcmc_util.PrettyNamedTupleMixin,
+                                collections.namedtuple(
+                                    'WindowedAdaptationResults', [
+                                        'inner_results',
+                                        'step',
+                                    ])):
+  """Results of the WindowedAdaptation TransitionKernel.
+
+  Attributes:
+    inner_results: Results of the inner kernel.
+    step: Int32 scalar `Tensor`. The current step number as perceived by this
+      kernel. Increases by 1 for every call to `one_step`.
+  """
+  __slots__ = ()
+
+
+class WindowedAdaptation(kernel_base.TransitionKernel):
+  """A transition kernel to control warmup adaptation.
+
+  This assumes we do something proportional to
+
+  fast window: 75 steps
+  slow window: 25 steps
+  slow window: 50 steps
+  slow window: 100 steps
+  slow window: 200 steps
+  fast window: 50 steps
+
+  Which is a total of 500 steps.
+
+  We will adapt step size during both fast and slow windows. Mass matrix is
+  only adapted during the slow windows.
+  """
+
+  def __init__(self, inner_kernel, num_adaptation_steps, name=None):
+    """Initializes this transition kernel.
+
+    Args:
+      inner_kernel: `TransitionKernel`-like object.
+      num_adaptation_steps: Scalar `int` `Tensor` number of initial steps during
+        which to adjust the step size and mass matrix. This may be greater, less
+        than, or equal to the number of burnin steps.
+      name: Python `str` name prefixed to Ops created by this class. Default:
+        'windowed_adaptation'.
+    """
+    inner_kernel = mcmc_util.enable_store_parameters_in_results(inner_kernel)
+    self._parameters = dict(
+        inner_kernel=inner_kernel,
+        num_adaptation_steps=num_adaptation_steps,
+        name=name,
+    )
+
+  @property
+  def inner_kernel(self):
+    return self._parameters['inner_kernel']
+
+  @property
+  def num_adaptation_steps(self):
+    return self._parameters['num_adaptation_steps']
+
+  @property
+  def name(self):
+    return self._parameters['name']
+
+  def one_step(self, current_state, previous_kernel_results, seed=None):
+    previous_inner_results = previous_kernel_results.inner_results
+    previous_step = previous_kernel_results.step
+    num_adaptation_steps = tf.cast(self.num_adaptation_steps, dtype=tf.int32)
+    first_window_size, slow_window_size, last_window_size = _get_window_sizes(
+        num_adaptation_steps)
+
+    def first_fast_window_update():
+      dmma_results = previous_inner_results
+      dassa_results = dmma_results.inner_results._replace(
+          num_adaptation_steps=first_window_size + slow_window_size)
+      return dmma_results._replace(
+          inner_results=dassa_results,
+          # Skip mass matrix adaptation.
+          num_estimation_steps=tf.constant(-1, dtype=tf.int32))
+
+    def first_slow_window_update():
+      dmma_results = previous_inner_results
+      # Start mass matrix adaptation.
+      return dmma_results._replace(
+          step=tf.constant(0, dtype=tf.int32),
+          num_estimation_steps=slow_window_size)
+
+    def slow_window_update():
+      curr_slow_window_size = previous_step - first_window_size + slow_window_size
+      # Reset mass matrix adaptation.
+      dmma_results = self.inner_kernel._bootstrap_from_inner_results(  # pylint: disable=protected-access
+          current_state, previous_inner_results.inner_results)
+      # Reset step size adaptation.
+      dassa_inner_results = self.inner_kernel.inner_kernel.step_size_setter_fn(
+          dmma_results.inner_results.inner_results,
+          dmma_results.inner_results.new_step_size)
+      dassa_results = self.inner_kernel.inner_kernel._bootstrap_from_inner_results(  # pylint: disable=protected-access
+          current_state, dassa_inner_results)
+      dassa_results = dassa_results._replace(
+          num_adaptation_steps=curr_slow_window_size)
+      return dmma_results._replace(
+          inner_results=dassa_results,
+          num_estimation_steps=curr_slow_window_size)
+
+    def last_window_update():
+      dmma_results = previous_inner_results
+      # Reset step size adaptation.
+      dassa_inner_results = self.inner_kernel.inner_kernel.step_size_setter_fn(
+          dmma_results.inner_results.inner_results,
+          dmma_results.inner_results.new_step_size)
+      dassa_results = self.inner_kernel.inner_kernel._bootstrap_from_inner_results(  # pylint: disable=protected-access
+          current_state, dassa_inner_results)
+      dassa_results = dassa_results._replace(
+          num_adaptation_steps=last_window_size)
+      return dmma_results._replace(inner_results=dassa_results)
+
+    is_first_fast_window_start = tf.equal(previous_step,
+                                          tf.constant(0, dtype=tf.int32))
+    is_first_slow_window_start = tf.equal(previous_step, first_window_size)
+    # Currently, we use 4 slow windows in the function _get_window_sizes.
+    num_slow_windows = 4
+    is_slow_window_start = tf.reduce_any(
+        tf.equal(
+            previous_step, first_window_size + slow_window_size * tf.constant(
+                [2**i - 1
+                 for i in range(1, num_slow_windows)], dtype=tf.int32)))
+    is_last_window_start = tf.equal(
+        previous_step,
+        first_window_size + (2**num_slow_windows - 1) * slow_window_size)
+    option = (
+        tf.cast(is_first_fast_window_start, dtype=tf.int32) +
+        tf.cast(is_first_slow_window_start, dtype=tf.int32) * 2 +
+        tf.cast(is_slow_window_start, dtype=tf.int32) * 3 +
+        tf.cast(is_last_window_start, dtype=tf.int32) * 4)
+    previous_inner_results = mcmc_util.choose_from(option, [
+        previous_inner_results,
+        first_fast_window_update(),
+        first_slow_window_update(),
+        slow_window_update(),
+        last_window_update()
+    ])
+    new_state, new_inner_results = self.inner_kernel.one_step(
+        current_state, previous_inner_results, seed=seed)
+    return new_state, previous_kernel_results._replace(
+        inner_results=new_inner_results, step=previous_step + 1)
+
+  def bootstrap_results(self, init_state):
+    return WindowedAdaptationResults(
+        inner_results=self.inner_kernel.bootstrap_results(init_state),
+        step=tf.constant(0, dtype=tf.int32))
+
+  @property
+  def is_calibrated(self):
+    return self.inner_kernel.is_calibrated
+
+
+def make_windowed_adapt_kernel(*, kind, proposal_kernel_kwargs,
+                               dual_averaging_kwargs, initial_running_variance):
+  return WindowedAdaptation(
+      make_slow_adapt_kernel(
+          kind=kind,
+          proposal_kernel_kwargs=proposal_kernel_kwargs,
+          dual_averaging_kwargs=dual_averaging_kwargs,
+          initial_running_variance=initial_running_variance),
+      num_adaptation_steps=dual_averaging_kwargs['num_adaptation_steps'])
+
+
+def _do_sampling(*, kind, proposal_kernel_kwargs, dual_averaging_kwargs,
+                 num_draws, num_burnin_steps, initial_position,
+                 initial_running_variance, trace_fn, bijector,
+                 return_final_kernel_results, seed):
+  """Sample from base HMC kernel."""
+  kernel = make_windowed_adapt_kernel(
+      kind=kind,
+      proposal_kernel_kwargs=proposal_kernel_kwargs,
+      dual_averaging_kwargs=dual_averaging_kwargs,
+      initial_running_variance=initial_running_variance)
+  return sample.sample_chain(
+      num_draws,
+      initial_position,
+      kernel=kernel,
+      num_burnin_steps=num_burnin_steps,
+      # pylint: disable=g-long-lambda
+      trace_fn=lambda state, pkr: trace_fn(
+          state, bijector, pkr.step <= dual_averaging_kwargs[
+              'num_adaptation_steps'], pkr.inner_results.inner_results.
+          inner_results),
+      # pylint: enable=g-long-lambda
+      return_final_kernel_results=return_final_kernel_results,
+      seed=seed)
 
 
 def _get_step_size(initial_transformed_position, log_prob_fn):
@@ -498,7 +566,7 @@ def windowed_adaptive_nuts(n_draws,
                            joint_dist,
                            *,
                            n_chains=64,
-                           num_adaptation_steps=525,
+                           num_adaptation_steps=500,
                            current_state=None,
                            init_step_size=None,
                            dual_averaging_kwargs=None,
@@ -525,7 +593,7 @@ def windowed_adaptive_nuts(n_draws,
     n_chains: int
       Number of independent chains to run MCMC with.
     num_adaptation_steps: int
-      Number of draws used to adapt step size and
+      Number of draws used to adapt step size and mass matrix.
     current_state: Optional
       Structure of tensors at which to initialize sampling. Should have the
       same shape and structure as
@@ -589,6 +657,7 @@ def windowed_adaptive_nuts(n_draws,
   """
   if dual_averaging_kwargs is None:
     dual_averaging_kwargs = {}
+  dual_averaging_kwargs = dict(dual_averaging_kwargs)
   dual_averaging_kwargs.setdefault('target_accept_prob', 0.85)
   proposal_kernel_kwargs = {
       'step_size': init_step_size,
@@ -617,7 +686,7 @@ def windowed_adaptive_hmc(n_draws,
                           *,
                           num_leapfrog_steps,
                           n_chains=64,
-                          num_adaptation_steps=525,
+                          num_adaptation_steps=500,
                           current_state=None,
                           init_step_size=None,
                           dual_averaging_kwargs=None,
@@ -642,7 +711,7 @@ def windowed_adaptive_hmc(n_draws,
     n_chains: int
       Number of independent chains to run MCMC with.
     num_adaptation_steps: int
-      Number of draws used to adapt step size and
+      Number of draws used to adapt step size and mass matrix.
     current_state: Optional
       Structure of tensors at which to initialize sampling. Should have the
       same shape and structure as
@@ -694,6 +763,7 @@ def windowed_adaptive_hmc(n_draws,
   """
   if dual_averaging_kwargs is None:
     dual_averaging_kwargs = {}
+  dual_averaging_kwargs = dict(dual_averaging_kwargs)
   dual_averaging_kwargs.setdefault('target_accept_prob', 0.75)
   proposal_kernel_kwargs = {
       'num_leapfrog_steps': num_leapfrog_steps,
@@ -743,10 +813,18 @@ def _windowed_adaptive_impl(n_draws,
     # trace_fn result allocation sizes.
     num_adaptation_steps = ps.convert_to_shape_tensor(num_adaptation_steps)
 
+  if 'num_adaptation_steps' in dual_averaging_kwargs:
+    warnings.warn('Dual averaging adaptation will use the value specified in'
+                  ' the `num_adaptation_steps` argument for its construction,'
+                  ' hence there is no need to specify it in the'
+                  ' `dual_averaging_kwargs` argument.')
+
+  # TODO(b/180011931): if num_adaptation_steps is small, this throws an error.
+  dual_averaging_kwargs['num_adaptation_steps'] = num_adaptation_steps
   dual_averaging_kwargs.setdefault('reduce_fn',
                                    generic_math.reduce_log_harmonic_mean_exp)
-  setup_seed, init_seed, seed = samplers.split_seed(
-      samplers.sanitize_seed(seed), n=3)
+  setup_seed, sample_seed = samplers.split_seed(
+      samplers.sanitize_seed(seed), n=2)
   (target_log_prob_fn, initial_transformed_position, bijector,
    step_broadcast, batch_shape) = _setup_mcmc(
        joint_dist,
@@ -773,134 +851,36 @@ def _windowed_adaptive_impl(n_draws,
           initial_transformed_position,
           batch_shape=ps.concat([[n_chains], batch_shape], axis=0))})
 
-  first_window_size, slow_window_size, last_window_size = _get_window_sizes(
-      num_adaptation_steps)
-
-  all_traces = []
-  # Using tf.function here and on _slow_window_closure caches tracing
-  # of _fast_window and _slow_window, respectively, within a single
-  # call to windowed sampling.  Why not annotate _fast_window and
-  # _slow_window directly?  Two reasons:
-  # - Caching across calls to windowed sampling is probably futile,
-  #   because the trace function and bijector will be different Python
-  #   objects, preventing cache hits.
-  # - The cache of a global tf.function sticks around for the lifetime
-  #   of the Python process, potentially leaking memory.
-  @tf.function(autograph=False)
-  def _fast_window_closure(proposal_kernel_kwargs,
-                           window_size,
-                           initial_position,
-                           seed):
-    return _fast_window(
-        kind=kind,
-        proposal_kernel_kwargs=proposal_kernel_kwargs,
-        dual_averaging_kwargs=dual_averaging_kwargs,
-        num_draws=window_size,
-        initial_position=initial_position,
-        bijector=bijector,
-        trace_fn=trace_fn,
-        seed=seed)
-  draws, trace, step_size, running_variances = _fast_window_closure(
-      proposal_kernel_kwargs=proposal_kernel_kwargs,
-      window_size=first_window_size,
-      initial_position=initial_transformed_position,
-      seed=init_seed)
-  proposal_kernel_kwargs.update({'step_size': step_size})
-
-  all_draws = [[d] for d in draws]
-  all_traces.append(trace)
-  *slow_seeds, seed = samplers.split_seed(seed, n=5)
-  @tf.function(autograph=False)
-  def _slow_window_closure(proposal_kernel_kwargs,
-                           window_size,
-                           initial_position,
-                           running_variances,
-                           seed):
-    return _slow_window(
-        kind=kind,
-        proposal_kernel_kwargs=proposal_kernel_kwargs,
-        dual_averaging_kwargs=dual_averaging_kwargs,
-        num_draws=window_size,
-        initial_position=initial_position,
-        initial_running_variance=running_variances,
-        bijector=bijector,
-        trace_fn=trace_fn,
-        seed=seed)
-  for idx, slow_seed in enumerate(slow_seeds):
-    window_size = slow_window_size * (2**idx)
-
-    # TODO(b/180011931): if num_adaptation_steps is small, this throws an error.
-    (draws, trace, step_size, running_variances, momentum_distribution
-     ) = _slow_window_closure(
-         proposal_kernel_kwargs=proposal_kernel_kwargs,
-         window_size=window_size,
-         initial_position=[d[-1] for d in draws],
-         running_variances=running_variances,
-         seed=slow_seed)
-    for all_d, d in zip(all_draws, draws):
-      all_d.append(d)
-    all_traces.append(trace)
-    proposal_kernel_kwargs.update(
-        {'step_size': step_size,
-         'momentum_distribution': momentum_distribution})
-
-  fast_seed, sample_seed = samplers.split_seed(seed)
-  draws, trace, step_size, _ = _fast_window_closure(
-      proposal_kernel_kwargs=proposal_kernel_kwargs,
-      window_size=last_window_size,
-      initial_position=[d[-1] for d in draws],
-      seed=fast_seed)
-  proposal_kernel_kwargs.update({'step_size': step_size})
-  for all_d, d in zip(all_draws, draws):
-    all_d.append(d)
-  all_traces.append(trace)
-
+  initial_running_variance = [
+      sample_stats.RunningVariance.from_shape(
+          shape=state_part.shape, dtype=state_part.dtype)
+      for state_part in initial_transformed_position
+  ]
+  # TODO(phandu): Consider splitting out warmup and post warmup phases
+  # to avoid executing adaptation code during the post warmup phase.
   ret = _do_sampling(
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
-      num_draws=n_draws,
-      initial_position=[d[-1] for d in draws],
+      dual_averaging_kwargs=dual_averaging_kwargs,
+      num_draws=n_draws if discard_tuning else n_draws + num_adaptation_steps,
+      num_burnin_steps=num_adaptation_steps if discard_tuning else 0,
+      initial_position=initial_transformed_position,
+      initial_running_variance=initial_running_variance,
       bijector=bijector,
       trace_fn=trace_fn,
       return_final_kernel_results=return_final_kernel_results,
       seed=sample_seed)
 
-  if discard_tuning:
-    if return_final_kernel_results:
-      draws, trace, fkr = ret
-      return sample.CheckpointableStatesAndTrace(
-          all_states=bijector.inverse(draws),
-          trace=trace,
-          final_kernel_results=fkr)
-    else:
-      draws, trace = ret
-      if no_trace:
-        return bijector.inverse(draws)
-      else:
-        return sample.StatesAndTrace(all_states=bijector.inverse(draws),
-                                     trace=trace)
+  if return_final_kernel_results:
+    draws, trace, fkr = ret
+    return sample.CheckpointableStatesAndTrace(
+        all_states=bijector.inverse(draws),
+        trace=trace,
+        final_kernel_results=fkr)
   else:
-    if return_final_kernel_results:
-      draws, trace, fkr = ret
-      for all_d, d in zip(all_draws, draws):
-        all_d.append(d)
-      all_traces.append(trace)
-      return sample.CheckpointableStatesAndTrace(
-          all_states=bijector.inverse(
-              [tf.concat(d, axis=0) for d in all_draws]),
-          trace=tf.nest.map_structure(lambda *s: tf.concat(s, axis=0),
-                                      *all_traces, expand_composites=True),
-          final_kernel_results=fkr)
+    draws, trace = ret
+    if no_trace:
+      return bijector.inverse(draws)
     else:
-      draws, trace = ret
-      for all_d, d in zip(all_draws, draws):
-        all_d.append(d)
-      all_states = bijector.inverse([tf.concat(d, axis=0) for d in all_draws])
-      if no_trace:
-        return all_states
-      else:
-        all_traces.append(trace)
-        return sample.StatesAndTrace(
-            all_states=all_states,
-            trace=tf.nest.map_structure(lambda *s: tf.concat(s, axis=0),
-                                        *all_traces, expand_composites=True))
+      return sample.StatesAndTrace(
+          all_states=bijector.inverse(draws), trace=trace)

@@ -333,7 +333,7 @@ class UncalibratedPreconditionedHamiltonianMonteCarlo(
 
       state_parts, _ = mcmc_util.prepare_state_parts(init_state,
                                                      name='current_state')
-      target_log_prob = self.target_log_prob_fn(*state_parts)
+      target_log_prob = result.target_log_prob
       if (not self._store_parameters_in_results or
           self.momentum_distribution is None):
         momentum_distribution = pu.make_momentum_distribution(

@@ -256,12 +256,11 @@ class RunningCovariance(ACClass):
       return self.sum_squared_residuals / (self.num_samples - ddof)
 
   def __repr__(self):
-    return (
-        'RunningCovariance(\n'
-        f'    num_samples={self.num_samples!r},\n'
-        f'    mean={self.mean!r},\n'
-        f'    sum_sqared_residuals={self.sum_squared_residuals!r},\n'
-        f'    event_ndims={self.event_ndims!r})')
+    return ('RunningCovariance(\n'
+            f'    num_samples={self.num_samples!r},\n'
+            f'    mean={self.mean!r},\n'
+            f'    sum_squared_residuals={self.sum_squared_residuals!r},\n'
+            f'    event_ndims={self.event_ndims!r})')
 
 
 def _default_covariance_event_ndims(event_ndims, shape):
@@ -411,11 +410,10 @@ class RunningVariance(RunningCovariance):
                event_ndims=0)
 
   def __repr__(self):
-    return (
-        'RunningVariance(\n'
-        f'    num_samples={self.num_samples!r},\n'
-        f'    mean={self.mean!r},\n'
-        f'    sum_sqared_residuals={self.sum_squared_residuals!r})')
+    return ('RunningVariance(\n'
+            f'    num_samples={self.num_samples!r},\n'
+            f'    mean={self.mean!r},\n'
+            f'    sum_squared_residuals={self.sum_squared_residuals!r})')
 
 
 @ac_decorator(omit_kwargs='name')
