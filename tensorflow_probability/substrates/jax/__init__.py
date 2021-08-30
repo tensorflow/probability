@@ -41,6 +41,7 @@ _ensure_jax_install()
 del _ensure_jax_install  # Cleanup symbol to avoid polluting namespace.
 
 from tensorflow_probability.python.version import __version__
+# from tensorflow_probability.substrates.jax.google import staging  # DisableOnExport  # pylint:disable=line-too-long
 from tensorflow_probability.substrates.jax import bijectors
 from tensorflow_probability.substrates.jax import distributions
 from tensorflow_probability.substrates.jax import experimental

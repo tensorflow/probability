@@ -98,7 +98,7 @@ DISABLED_BY_PKG = {
          'marginalize', 'nn', 'sequential', 'substrates', 'vi'),
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
-        'optimizer', 'random', 'stats', 'util')
+        'optimizer', 'random', 'staging', 'stats', 'util')
 INTERNALS = ('assert_util', 'auto_composite_tensor',
              'batched_rejection_sampler',
              'batch_shape_lib', 'broadcast_util', 'cache_util',
@@ -122,7 +122,10 @@ def main(argv):
 
   disabled_by_pkg = dict(DISABLED_BY_PKG)
   for dep in FLAGS.omit_deps:
-    pkg = dep.split('/python/')[1].split(':')[0].replace('/', '.')
+    if '/python/' in dep:
+      pkg = 'python.' + dep.split('/python/')[1].split(':')[0].replace('/', '.')
+    elif '/google/' in dep:
+      pkg = 'google.' + dep.split('/google/')[1].split(':')[0].replace('/', '.')
     lib = dep.split(':')[1]
     if pkg.endswith('.{}'.format(lib)):
       pkg = pkg.replace('.{}'.format(lib), '')
@@ -135,13 +138,13 @@ def main(argv):
   replacements = collections.OrderedDict(TF_REPLACEMENTS)
   for pkg, disabled in disabled_by_pkg.items():
     replacements.update({
-        'from tensorflow_probability.python.{}.{} '.format(pkg, item):
-        '# from tensorflow_probability.python.{}.{} '.format(pkg, item)
+        'from tensorflow_probability.{}.{} '.format(pkg, item):
+        '# from tensorflow_probability.{}.{} '.format(pkg, item)
         for item in disabled
     })
     replacements.update({
-        'from tensorflow_probability.python.{} import {}'.format(pkg, item):
-        '# from tensorflow_probability.python.{} import {}'.format(pkg, item)
+        'from tensorflow_probability.{} import {}'.format(pkg, item):
+        '# from tensorflow_probability.{} import {}'.format(pkg, item)
         for item in disabled
     })
   replacements.update({
@@ -150,18 +153,19 @@ def main(argv):
       for lib in LIBS
   })
   replacements.update({
-      'tensorflow_probability.python import {} as'.format(lib):
-      'tensorflow_probability.substrates.numpy import {} as'.format(lib)
-      for lib in LIBS
-  })
-  replacements.update({
       'tensorflow_probability.python import {}'.format(lib):
       'tensorflow_probability.substrates.numpy import {}'.format(lib)
       for lib in LIBS
   })
   replacements.update({
-      # Permits distributions.internal, psd_kernels.internal.
-      # 'as psd_kernels as': 'as',
+      'tensorflow_probability.google.{}'.format(lib):
+      'tensorflow_probability.substrates.numpy.google.{}'.format(lib)
+      for lib in LIBS
+  })
+  replacements.update({
+      'tensorflow_probability.google import {}'.format(lib):
+      'tensorflow_probability.substrates.numpy.google import {}'.format(lib)
+      for lib in LIBS
   })
   replacements.update({
       'tensorflow_probability.python.internal.{}'.format(internal):
@@ -221,11 +225,11 @@ def main(argv):
               '"{}"'.format(name): '# "{}"'.format(name),
               '\'{}\''.format(name): '# \'{}\''.format(name),
           })
-        if 'from tensorflow_probability.python.{} import {}'.format(
+        if 'from tensorflow_probability.{} import {}'.format(
             pkg, item) in contents:
           disable_all(item)
         for segment in contents.split(
-            'from tensorflow_probability.python.{}.{} import '.format(
+            'from tensorflow_probability.{}.{} import '.format(
                 pkg, item)):
           disable_all(segment.split('\n')[0])
 
@@ -252,7 +256,10 @@ def main(argv):
                                 'SKIP_DTYPE_CHECKS = False')
 
   substrate = 'jax' if FLAGS.numpy_to_jax else 'numpy'
-  path = filename.split('/python/')[1]
+  if '/python/' in filename:
+    path = filename.split('/python/')[1]
+  elif '/google/' in filename:
+    path = 'google/' + filename.split('/google/')[1]
   footer = '\n'.join([
       '\n',
       '# ' + '@' * 78,
