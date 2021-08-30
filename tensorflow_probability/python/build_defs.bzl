@@ -125,6 +125,14 @@ def _substrate_runfiles_symlinks_impl(ctx):
                 post.replace(file_substr, ""),
             )
             runfiles_dict[RUNFILES_ROOT + out_path] = f
+        elif "tensorflow_probability/google" in f.dirname and file_substr in f.short_path:
+            pre, post = f.short_path.split("/google/")
+            out_path = "{}/substrates/{}/google/{}".format(
+                pre,
+                substrate,
+                post.replace(file_substr, ""),
+            )
+            runfiles_dict[RUNFILES_ROOT + out_path] = f
 
     # Construct the output structures to pass along Python srcs/deps/etc.
     py_info = PyInfo(
@@ -168,8 +176,8 @@ def multi_substrate_py_library(
         substrates_omit_deps = [],
         jax_omit_deps = [],
         numpy_omit_deps = [],
-        testonly = 0,
-        srcs_version = "PY3"):
+        srcs_version = "PY3",
+        **kwargs):
     """A TFP `py_library` for each of TF, NumPy, and JAX.
 
     Args:
@@ -183,8 +191,8 @@ def multi_substrate_py_library(
             rewritten for the substrates.
         jax_omit_deps: List of deps to omit for the JAX substrate.
         numpy_omit_deps: List of deps to omit for the NumPy substrate.
-        testonly: As with `py_library`.
         srcs_version: As with `py_library`.
+        **kwargs: Additional keyword arguments for targets.
     """
 
     if srcs_version != "PY3":
@@ -195,7 +203,7 @@ def multi_substrate_py_library(
         srcs = srcs,
         deps = deps,
         srcs_version = srcs_version,
-        testonly = testonly,
+        **kwargs
     )
     remove_deps = [
         "//third_party/py/tensorflow",
@@ -224,7 +232,7 @@ def multi_substrate_py_library(
         srcs = _substrate_srcs(srcs, "numpy"),
         deps = _substrate_deps(trimmed_deps, "numpy"),
         srcs_version = srcs_version,
-        testonly = testonly,
+        **kwargs
     )
 
     # Add symlinks under tfp/substrates/numpy.
@@ -232,7 +240,7 @@ def multi_substrate_py_library(
         name = "{}.numpy".format(name),
         substrate = "numpy",
         deps = [":{}.numpy.raw".format(name)],
-        testonly = testonly,
+        **kwargs
     )
 
     resolved_omit_deps_jax = [
@@ -256,7 +264,7 @@ def multi_substrate_py_library(
         srcs = jax_srcs,
         deps = _substrate_deps(trimmed_deps, "jax"),
         srcs_version = srcs_version,
-        testonly = testonly,
+        **kwargs
     )
 
     # Add symlinks under tfp/substrates/jax.
@@ -264,7 +272,7 @@ def multi_substrate_py_library(
         name = "{}.jax".format(name),
         substrate = "jax",
         deps = [":{}.jax.raw".format(name)],
-        testonly = testonly,
+        **kwargs
     )
 
 def multi_substrate_py_test(

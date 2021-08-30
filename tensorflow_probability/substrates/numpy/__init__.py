@@ -17,6 +17,8 @@
 
 # pylint: disable=g-bad-import-order
 
+# from tensorflow_probability.substrates.numpy.google import staging  # DisableOnExport  # pylint:disable=line-too-long
+
 from tensorflow_probability.python.version import __version__
 from tensorflow_probability.substrates.numpy import bijectors
 from tensorflow_probability.substrates.numpy import distributions

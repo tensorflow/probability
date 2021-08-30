@@ -45,6 +45,8 @@ py_library(
     srcs_version = "PY3",
     tags = ["alt_dep=//tensorflow_probability:jax"],
     deps = [
+#         "//tensorflow_probability/google:google.jax",  # DisableOnExport
+#         "//tensorflow_probability/google/staging:staging.jax",  # DisableOnExport
         "//tensorflow_probability/python:version",
         "//tensorflow_probability/python/bijectors:bijectors.jax",
         "//tensorflow_probability/python/distributions:distributions.jax",
@@ -65,6 +67,8 @@ py_library(
     srcs_version = "PY3",
     tags = ["alt_dep=//tensorflow_probability:numpy"],
     deps = [
+#         "//tensorflow_probability/google:google.numpy",  # DisableOnExport
+#         "//tensorflow_probability/google/staging:staging.numpy",  # DisableOnExport
         "//tensorflow_probability/python:version",
         "//tensorflow_probability/python/bijectors:bijectors.numpy",
         "//tensorflow_probability/python/distributions:distributions.numpy",
