@@ -52,6 +52,7 @@ class Restructure(bijector.AutoCompositeTensorBijector):
     arguments to downstream multipart bijectors.
 
     Example Usage:
+
       ```python
 
       # Pack a 3-element list of tensors into a dict. The output structure,
