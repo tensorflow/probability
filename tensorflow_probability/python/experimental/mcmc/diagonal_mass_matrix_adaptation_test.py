@@ -250,7 +250,7 @@ class DiagonalMassMatrixAdaptationTest(test_util.TestCase):
                         results.final_precision)
     self.assertAllClose(results.final_mean, tf.reduce_mean(draws, axis=0))
     self.assertAllClose(results.final_precision,
-                        tf.math.reduce_variance(draws[:-1], axis=0))
+                        tf.math.reduce_variance(draws, axis=0))
 
   def testDoesRegularize(self):
     # Make sure that using regularization makes the final estimate closer to

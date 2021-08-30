@@ -205,8 +205,7 @@ class WindowedSamplingTest(test_util.TestCase):
     draws, _ = do_sample(test_util.test_seed())
     self.evaluate(draws)
 
-  # TODO(b/186878587) Figure out what's wrong and re-enable.
-  def disabled_test_hmc_samples_well(self):
+  def test_hmc_samples_well(self):
     model = eight_schools_named()
     pins = {'treatment_effects': tf.constant(TREATMENT_EFFECTS)}
 
@@ -243,8 +242,8 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertLess(self.evaluate(max_scale_reduction), 1.05)
 
   @parameterized.named_parameters(
-      dict(testcase_name=f'_{num_draws}', num_draws=num_draws) for num_draws in
-      [0, 1, 525, 524, 100, 10000])
+      dict(testcase_name=f'_{num_draws}', num_draws=num_draws)
+      for num_draws in [0, 1, 500, 499, 100, 10000])
   def test_get_window_sizes(self, num_draws):
     [first_window,
      slow_window,
@@ -255,10 +254,10 @@ class WindowedSamplingTest(test_util.TestCase):
                      4 * slow_window +
                      8 * slow_window +
                      last_window, num_draws)
-    if num_draws == 525:
+    if num_draws == 500:
       self.assertEqual(slow_window, 25)
       self.assertEqual(first_window, 75)
-      self.assertEqual(last_window, 75)
+      self.assertEqual(last_window, 50)
 
   def test_explicit_init(self):
     sample_dist = tfd.JointDistributionSequential(
@@ -349,7 +348,8 @@ class WindowedSamplingTest(test_util.TestCase):
       _, trace = tfp.experimental.mcmc.windowed_adaptive_hmc(
           1,
           jd_model,
-          num_adaptation_steps=525,
+          n_chains=1,
+          num_adaptation_steps=10000,
           num_leapfrog_steps=16,
           discard_tuning=False,
           y=y_val,
@@ -378,7 +378,8 @@ class WindowedSamplingTest(test_util.TestCase):
       _, trace = tfp.experimental.mcmc.windowed_adaptive_nuts(
           1,
           jd_model,
-          num_adaptation_steps=525,
+          n_chains=1,
+          num_adaptation_steps=10000,
           max_tree_depth=5,
           discard_tuning=False,
           y=y_val,
@@ -406,18 +407,12 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertAllFinite(init_step_size)
 
   def test_batch_of_problems_autobatched(self):
-    use_multinomial = tf.executing_eagerly()
 
     def model_fn():
       x = yield tfd.MultivariateNormalDiag(
           tf.zeros([10, 3]), tf.ones(3), name='x')
-      if use_multinomial:
-        # TODO(b/188215322): Use Multinomial in graph mode.
-        yield tfd.Multinomial(
-            logits=tfb.Pad([(0, 1)])(x), total_count=10, name='y')
-      else:
-        yield tfd.MultivariateNormalDiag(
-            tfb.Pad([(0, 1)])(x), tf.ones(4), name='y')
+      yield tfd.Multinomial(
+          logits=tfb.Pad([(0, 1)])(x), total_count=10, name='y')
 
     model = tfd.JointDistributionCoroutineAutoBatched(model_fn, batch_ndims=1)
     samp = model.sample(seed=test_util.test_seed())
@@ -432,13 +427,9 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertEqual((2, 10, 1), trace['step_size'].shape)
 
   def test_batch_of_problems_named(self):
-    use_multinomial = tf.executing_eagerly()
 
     def mk_y(x):
-      if use_multinomial:
-        # TODO(b/188215322): Use Multinomial in graph mode.
-        return tfd.Multinomial(logits=tfb.Pad([(0, 1)])(x), total_count=10)
-      return tfd.MultivariateNormalDiag(tfb.Pad([(0, 1)])(x), tf.ones(4))
+      return tfd.Multinomial(logits=tfb.Pad([(0, 1)])(x), total_count=10)
 
     model = tfd.JointDistributionNamed(dict(
         x=tfd.MultivariateNormalDiag(tf.zeros([10, 3]), tf.ones(3)),

@@ -395,11 +395,9 @@ class NutsTest(test_util.TestCase):
           step_size=tf.constant([sigma1, sigma2], dtype))
       chain_state = tfp.mcmc.sample_chain(
           num_results=num_steps,
-          num_burnin_steps=20,
+          num_burnin_steps=25,
           current_state=initial_state,
-          kernel=tfp.mcmc.DualAveragingStepSizeAdaptation(
-              nuts_kernel, 20, .8),
-
+          kernel=tfp.mcmc.DualAveragingStepSizeAdaptation(nuts_kernel, 25, .8),
           seed=strm(),
           trace_fn=None)
       variance_est = tf.square(chain_state - mu)

@@ -42,7 +42,7 @@ class DualAveragingStepSizeAdaptationResults(
         'DualAveragingStepSizeAdaptationResults',
         'inner_results, target_accept_prob, log_shrinkage_target, '
         'exploration_shrinkage, step_count_smoothing, decay_rate, error_sum, '
-        'log_averaging_step, step, new_step_size')):
+        'log_averaging_step, step, num_adaptation_steps, new_step_size')):
   """Results of the DualAveragingStepSizeAdaptation TransitionKernel.
 
   Attributes:
@@ -66,6 +66,8 @@ class DualAveragingStepSizeAdaptationResults(
       for (each `state_part`). Smoothed version of the step size.
     step: Int32 scalar `Tensor`. The current step number as perceived by this
       kernel. Increases by 1 for every call to `one_step`.
+    num_adaptation_steps: Scalar `int` `Tensor` number of initial steps to
+      during which to adjust the step size.
     new_step_size:  Floating point scalar `Tensor` or a list thereof (one for
       each `state_part`). Step size that will be passed to the inner kernel
       during the next step.
@@ -465,16 +467,15 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
     # - If still adapting, return an exploring step size,
     # - If just finished, return the averaging step size
     # - Otherwise, do not update
+    num_adaptation_steps = previous_kernel_results.num_adaptation_steps
+    step = previous_kernel_results.step + 1
     new_step_size = tf.where(
-        previous_kernel_results.step < self.num_adaptation_steps,
-        tf.math.exp(new_log_step),
-        tf.where(previous_kernel_results.step > self.num_adaptation_steps,
-                 step_size,
+        step < num_adaptation_steps, tf.math.exp(new_log_step),
+        tf.where(step > num_adaptation_steps, step_size,
                  tf.math.exp(new_log_averaging_step)))
-    new_log_averaging_step = tf.where(
-        previous_kernel_results.step > self.num_adaptation_steps,
-        log_averaging_step,
-        new_log_averaging_step)
+    new_log_averaging_step = tf.where(step > num_adaptation_steps,
+                                      log_averaging_step,
+                                      new_log_averaging_step)
     return new_step_size, new_log_averaging_step, new_error_sum
 
   def one_step(self, current_state, previous_kernel_results, seed=None):
@@ -539,68 +540,72 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
         mcmc_util.make_name(self.name, 'dual_averaging_step_size_adaptation',
                             'bootstrap_results')):
       inner_results = self.inner_kernel.bootstrap_results(init_state)
-      step_size = self.step_size_getter_fn(inner_results)
+      return self._bootstrap_from_inner_results(init_state, inner_results)
 
-      log_accept_prob = self.log_accept_prob_getter_fn(inner_results)
+  # Pulled out to a separate method to enable more efficient windowed
+  # sampling kernel.
+  def _bootstrap_from_inner_results(self, init_state, inner_results):
+    step_size = self.step_size_getter_fn(inner_results)
 
-      state_parts = tf.nest.flatten(init_state)
-      step_size_parts = tf.nest.flatten(step_size)
+    log_accept_prob = self.log_accept_prob_getter_fn(inner_results)
 
-      if self._parameters['shrinkage_target'] is None:
-        shrinkage_target_parts = [None] * len(step_size_parts)
+    state_parts = tf.nest.flatten(init_state)
+    step_size_parts = tf.nest.flatten(step_size)
+
+    if self._parameters['shrinkage_target'] is None:
+      shrinkage_target_parts = [None] * len(step_size_parts)
+    else:
+      shrinkage_target_parts = tf.nest.flatten(
+          self._parameters['shrinkage_target'])
+      if len(shrinkage_target_parts) not in [1, len(step_size_parts)]:
+        raise ValueError(
+            '`shrinkage_target` should be a Tensor or list of tensors of '
+            'same length as `step_size`. Found len(`step_size`) = {} and '
+            'len(shrinkage_target) = {}'.format(
+                len(step_size_parts), len(shrinkage_target_parts)))
+      if len(shrinkage_target_parts) < len(step_size_parts):
+        shrinkage_target_parts *= len(step_size_parts)
+
+    dtype = dtype_util.common_dtype(step_size_parts, tf.float32)
+    error_sum, log_averaging_step, log_shrinkage_target = [], [], []
+    for state_part, step_size_part, shrinkage_target_part in zip(
+        state_parts, step_size_parts, shrinkage_target_parts):
+      num_reduce_dims = ps.minimum(
+          ps.rank(log_accept_prob),
+          ps.rank(state_part) - ps.rank(step_size_part))
+      reduced_log_accept_prob = reduce_logmeanexp(
+          log_accept_prob,
+          axis=ps.range(num_reduce_dims),
+          experimental_named_axis=self.experimental_reduce_chain_axis_names)
+      reduce_indices = get_differing_dims(reduced_log_accept_prob,
+                                          step_size_part)
+      reduced_log_accept_prob = reduce_logmeanexp(
+          reduced_log_accept_prob, axis=reduce_indices, keepdims=True)
+      error_sum.append(tf.zeros_like(reduced_log_accept_prob, dtype=dtype))
+      log_averaging_step.append(tf.zeros_like(step_size_part, dtype=dtype))
+
+      if shrinkage_target_part is None:
+        log_shrinkage_target.append(
+            float(np.log(10.)) + tf.math.log(step_size_part))
       else:
-        shrinkage_target_parts = tf.nest.flatten(
-            self._parameters['shrinkage_target'])
-        if len(shrinkage_target_parts) not in [1, len(step_size_parts)]:
-          raise ValueError(
-              '`shrinkage_target` should be a Tensor or list of tensors of '
-              'same length as `step_size`. Found len(`step_size`) = {} and '
-              'len(shrinkage_target) = {}'.format(
-                  len(step_size_parts), len(shrinkage_target_parts)))
-        if len(shrinkage_target_parts) < len(step_size_parts):
-          shrinkage_target_parts *= len(step_size_parts)
+        log_shrinkage_target.append(
+            tf.math.log(tf.cast(shrinkage_target_part, dtype)))
 
-      dtype = dtype_util.common_dtype(step_size_parts, tf.float32)
-      error_sum, log_averaging_step, log_shrinkage_target = [], [], []
-      for state_part, step_size_part, shrinkage_target_part in zip(
-          state_parts, step_size_parts, shrinkage_target_parts):
-        num_reduce_dims = ps.minimum(
-            ps.rank(log_accept_prob),
-            ps.rank(state_part) - ps.rank(step_size_part))
-        reduced_log_accept_prob = reduce_logmeanexp(
-            log_accept_prob,
-            axis=ps.range(num_reduce_dims),
-            experimental_named_axis=self.experimental_reduce_chain_axis_names)
-        reduce_indices = get_differing_dims(
-            reduced_log_accept_prob, step_size_part)
-        reduced_log_accept_prob = reduce_logmeanexp(
-            reduced_log_accept_prob,
-            axis=reduce_indices,
-            keepdims=True)
-        error_sum.append(tf.zeros_like(reduced_log_accept_prob, dtype=dtype))
-        log_averaging_step.append(tf.zeros_like(step_size_part, dtype=dtype))
-
-        if shrinkage_target_part is None:
-          log_shrinkage_target.append(
-              float(np.log(10.)) + tf.math.log(step_size_part))
-        else:
-          log_shrinkage_target.append(
-              tf.math.log(tf.cast(shrinkage_target_part, dtype)))
-
-      return DualAveragingStepSizeAdaptationResults(
-          inner_results=inner_results,
-          step=tf.constant(0, dtype=tf.int32),
-          target_accept_prob=tf.cast(self.parameters['target_accept_prob'],
-                                     log_accept_prob.dtype),
-          log_shrinkage_target=log_shrinkage_target,
-          exploration_shrinkage=tf.cast(
-              self.parameters['exploration_shrinkage'], dtype),
-          step_count_smoothing=tf.cast(
-              self.parameters['step_count_smoothing'], dtype),
-          decay_rate=tf.cast(self.parameters['decay_rate'], dtype),
-          error_sum=error_sum,
-          log_averaging_step=log_averaging_step,
-          new_step_size=step_size)
+    return DualAveragingStepSizeAdaptationResults(
+        inner_results=inner_results,
+        step=tf.constant(0, dtype=tf.int32),
+        target_accept_prob=tf.cast(self.parameters['target_accept_prob'],
+                                   log_accept_prob.dtype),
+        log_shrinkage_target=log_shrinkage_target,
+        exploration_shrinkage=tf.cast(self.parameters['exploration_shrinkage'],
+                                      dtype),
+        step_count_smoothing=tf.cast(self.parameters['step_count_smoothing'],
+                                     dtype),
+        decay_rate=tf.cast(self.parameters['decay_rate'], dtype),
+        error_sum=error_sum,
+        log_averaging_step=log_averaging_step,
+        new_step_size=step_size,
+        num_adaptation_steps=tf.cast(self.num_adaptation_steps, dtype=tf.int32))
 
   @property
   def is_calibrated(self):
