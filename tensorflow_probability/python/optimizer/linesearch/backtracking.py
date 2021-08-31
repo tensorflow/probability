@@ -32,16 +32,7 @@ def backtracking ( function,
                    beta = 0.707,
                    alpha = 1): 
 
-  while function(value-(alpha*differentiation(value)))>function(value) -(alpha/2)*((differentiation(value))**2):
+  while function(value-(alpha*differentiation(value)))>function(value) - 
+  (alpha/2)*((differentiation(value))**2):
     alpha *= beta
   return alpha
-
-backtracking(function,differentiation,value)
-
-
-
-
-
-
-  
-  
