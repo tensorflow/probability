@@ -20,10 +20,12 @@ from __future__ import print_function
 
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.optimizer.linesearch.hager_zhang import hager_zhang
+from tensorflow_probability.python.optimizer.linesearch.backtracking import backtracking
 
 
 _allowed_symbols = [
     'hager_zhang',
+    'backtracking',
 ]
 
 all_util.remove_undocumented(__name__, _allowed_symbols)
