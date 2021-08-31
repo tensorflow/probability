@@ -66,17 +66,6 @@ class JointDensityCoroutineTest(test_util.TestCase):
     self.assertEqual(increment_log_prob_sample.shape,
                      tf.TensorShape(sample_shape) + tf.TensorShape([0]))
 
-  def test_log_prob(self):
-
-    @tfd.JointDistributionCoroutine
-    def model():
-      w = yield tfd.Normal(0., 1.)
-      yield tfd.Normal(w, 1.)
-      yield tfed.IncrementLogProb(5.)
-
-    with self.assertRaises(AttributeError):
-      self.evaluate(model.log_prob(2., 3., ()))
-
   def test_unnormalized_log_prob(self):
     increment_amount = 5.
 
