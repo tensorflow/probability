@@ -35,16 +35,24 @@ __all__ = [
 
 
 class IncrementLogProb(object):
-  """A distribution-like object representing an unnormalized density at a point.
+  """A distribution-like object for an unnormalized measure on a singleton set.
 
-  `IncrementLogProb` is a distribution-like class that represents an
-  unnormalized density, sometimes called a "factor".  Its raison d'être is to
-  provide an overall offset to the log probability of a JointDensity.
+  `IncrementLogProb` is a distribution-like class that represents a
+  "factor", which can also be thought of as a measure of the given size
+  on a sample space consisting of a single element.  Its raison d'être
+  is to provide a computed offset to the log probability of a
+  `JointDistribution`.  A `JointDistribution` containing an
+  `IncrementLogProb` still represents a measure, but that measure is
+  no longer in general a probability measure (i.e., the probability
+  may no longer integrate to 1).
 
-  It has no `log_prob` method, instead surfacing the unnormalized log
-  probability/density through its `unnormalized_log_prob` method.  It retains a
-  `sample` method, which returns an empty tensor with the same `dtype` as the
-  `increment_log_prob` argument provided to it originally.
+  Even though sampling from any measure represented by
+  `IncrementLogProb` is information-free, `IncrementLogProb` retains a
+  `sample` method for API compatibility with other Distributions.
+  This `sample` method returns a (batch) shape-[0] Tensor with the
+  same `dtype` as the `increment_log_prob` argument provided
+  originally.
+
   """
 
   def __init__(
@@ -117,6 +125,26 @@ class IncrementLogProb(object):
   @property
   def dtype(self):
     return self._dtype
+
+  def log_prob(self, _):
+    """Log probability mass function."""
+    # TODO(axch): Arguably, this method should do some shape checking
+    # on its argument to be really consistent with the Distribution
+    # contract.  To wit, it should expect the argument to be a single
+    # Tensor of shape `sample_shape + batch_shape + [0]`, and should
+    # return `self.log_prob_increment` (which is of shape
+    # `batch_shape`) broadcasted to shape `sample_shape +
+    # batch_shape`.  This broadcasting only appears here because this
+    # is the unique (currently present) Distribution whose `log_prob`
+    # doesn't depend on the query point.  If the input Tensor's shape
+    # is not compatible, we should raise an error, as we do with other
+    # Distributions when they are queried at a point of inconsistent
+    # shape.
+    #
+    # Status quo is OK for now, because IncrementLogProb is expected to
+    # only be used in JointDistribution-type contexts, where the implicit
+    # summation will produce the desired broadcasting.
+    return self.log_prob_increment
 
   def unnormalized_log_prob(self, _):
     return self._log_prob_increment_fn()
