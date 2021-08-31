@@ -18,13 +18,9 @@ BFGS, conjugate gradient, ISTA, FISTA etc). Sophisticated line search methods
 aim to find the appropriate step length.
 This module implements the Backtracking Line Search Algorithm.
 """
-
-function = lambda x: x**2 +3*x
-differentiation = lambda x: 2*x + 3
-value = 11
-
-
-
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 def backtracking ( function,
                    differentiation,
