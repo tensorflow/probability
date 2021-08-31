@@ -50,15 +50,23 @@ class PolynomialTest(test_util.TestCase):
         bias_variance=np.float32(1.), slope_variance=1., shift=0., exponent=1.)
 
   def testValidateArgsNonPositiveAreBad(self):
-    with self.assertRaisesOpError('Condition x > 0 did not hold'):
+    with self.assertRaisesOpError('`bias_variance` must be non-negative'):
       k = tfp.math.psd_kernels.Polynomial(bias_variance=-1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
-    with self.assertRaisesOpError('Condition x > 0 did not hold'):
+    with self.assertRaisesOpError('`slope_variance` must be non-negative'):
       k = tfp.math.psd_kernels.Polynomial(
           slope_variance=-1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
-    with self.assertRaisesOpError('Condition x > 0 did not hold'):
+    with self.assertRaisesOpError('`exponent` must be positive'):
       k = tfp.math.psd_kernels.Polynomial(exponent=-1., validate_args=True)
+      self.evaluate(k.apply([1.], [1.]))
+
+    with self.assertRaisesOpError(
+        '`slope_variance` and `bias_variance` can not both be zero.'):
+      k = tfp.math.psd_kernels.Polynomial(
+          bias_variance=0.,
+          slope_variance=0.,
+          validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
   def testShifttNonPositiveIsOk(self):
@@ -267,6 +275,13 @@ class LinearTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class ConstantTest(test_util.TestCase):
   """Test the Constant kernel."""
+
+  def testBatchShape(self):
+    constant = tf.ones([5, 2, 3], dtype=tf.float32)
+    k = tfp.math.psd_kernels.Constant(constant=constant)
+    print(k.parameters)
+    print(k.parameter_properties())
+    self.assertAllEqual([5, 2, 3], k.batch_shape)
 
   def testValuesAreCorrect(self):
     val = 0.1

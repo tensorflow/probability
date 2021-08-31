@@ -86,6 +86,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -112,6 +113,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -138,6 +140,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -165,6 +168,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -189,6 +193,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -214,6 +219,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
         "//tensorflow_probability/python/util",
     ],
@@ -242,6 +248,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:cholesky_outer_product",
         "//tensorflow_probability/python/bijectors:invert",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
@@ -269,6 +276,7 @@ multi_substrate_py_library(
         ":feature_transformed",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -294,6 +302,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -352,7 +361,7 @@ py_test(
     size = "medium",
     srcs = ["psd_kernel_properties_test.py"],
     python_version = "PY3",
-    shard_count = 6,
+    shard_count = 20,
     srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [

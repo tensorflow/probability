@@ -18,11 +18,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
@@ -333,24 +332,6 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       return True
     return False
 
-  def _batch_shape(self):
-    args = [self._base_kernel.batch_shape]
-    if not self._is_fixed_inputs_empty():
-      args.append(self._fixed_inputs.shape[:-(
-          self._base_kernel.feature_ndims + 1)])
-    if self.diag_shift is not None:
-      args.append(self.diag_shift.shape)
-    return functools.reduce(tf.broadcast_static_shape, args)
-
-  def _batch_shape_tensor(self):
-    args = [self._base_kernel.batch_shape_tensor()]
-    if not self._is_fixed_inputs_empty():
-      args.append(tf.shape(self._fixed_inputs)[
-          :-(self._base_kernel.feature_ndims + 1)])
-    if self.diag_shift is not None:
-      args.append(tf.shape(self.diag_shift))
-    return functools.reduce(tf.broadcast_dynamic_shape, args)
-
   def _apply(self, x1, x2, example_ndims):
     # In the shape annotations below,
     #
@@ -446,6 +427,17 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   @property
   def cholesky_bijector(self):
     return self._cholesky_bijector
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
+    return dict(
+        base_kernel=parameter_properties.BatchedComponentProperties(),
+        fixed_inputs=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.base_kernel.feature_ndims + 1),
+        diag_shift=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
 
   def _divisor_matrix(self, fixed_inputs=None):
     fixed_inputs = tf.convert_to_tensor(

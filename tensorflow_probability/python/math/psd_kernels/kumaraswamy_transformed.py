@@ -18,11 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import feature_transformed
 from tensorflow_probability.python.math.psd_kernels.internal import util
@@ -101,19 +101,19 @@ class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
   def concentration0(self):
     return self._concentration0
 
-  def _batch_shape(self):
-    return functools.reduce(
-        tf.broadcast_static_shape,
-        [self.kernel.batch_shape,
-         self.concentration1.shape[:-self.kernel.feature_ndims],
-         self.concentration0.shape[:-self.kernel.feature_ndims]])
-
-  def _batch_shape_tensor(self):
-    return functools.reduce(
-        tf.broadcast_dynamic_shape,
-        [self.kernel.batch_shape_tensor(),
-         tf.shape(self.concentration1)[:-self.kernel.feature_ndims],
-         tf.shape(self.concentration0)[:-self.kernel.feature_ndims]])
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
+    return dict(
+        kernel=parameter_properties.BatchedComponentProperties(),
+        concentration1=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims,
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        concentration0=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims,
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
