@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math import bessel as tfp_math
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
@@ -67,16 +68,16 @@ class _AmplitudeLengthScaleMixin(object):
     """Length scale parameter."""
     return self._length_scale
 
-  def _batch_shape(self):
-    scalar_shape = tf.TensorShape([])
-    return tf.broadcast_static_shape(
-        scalar_shape if self.amplitude is None else self.amplitude.shape,
-        scalar_shape if self.length_scale is None else self.length_scale.shape)
-
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        [] if self.amplitude is None else tf.shape(self.amplitude),
-        [] if self.length_scale is None else tf.shape(self.length_scale))
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
+    return dict(
+        amplitude=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        length_scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
 
   def _parameter_control_dependencies(self, is_init):
     """Control dependencies for parameters."""
@@ -163,16 +164,19 @@ class GeneralizedMatern(_AmplitudeLengthScaleMixin,
     """Degree of Freedom parameter."""
     return self._df
 
-  def _batch_shape(self):
-    scalar_shape = tf.TensorShape([])
-    return tf.broadcast_static_shape(
-        super(GeneralizedMatern, self)._batch_shape(),
-        scalar_shape if self.df is None else self.df.shape)
-
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        super(GeneralizedMatern, self)._batch_shape_tensor(),
-        [] if self.df is None else tf.shape(self.df))
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
+    return dict(
+        amplitude=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        df=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        length_scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
 
   def _apply_with_distance(
       self, x1, x2, pairwise_square_distance, example_ndims=0):

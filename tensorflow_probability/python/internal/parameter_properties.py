@@ -17,7 +17,6 @@
 import collections
 
 import tensorflow as tf
-from tensorflow_probability.python.bijectors import identity as identity_bijector
 
 __all__ = [
     'BIJECTOR_NOT_IMPLEMENTED',
@@ -35,6 +34,11 @@ def SHAPE_FN_NOT_IMPLEMENTED(sample_shape):  # pylint: disable=invalid-name
   del sample_shape  # Unused.
   raise NotImplementedError('No shape function is implemented for this '
                             'parameter.')
+
+
+def _default_constraining_bijector_fn():
+  from tensorflow_probability.python.bijectors import identity as identity_bijector  # pylint:disable=g-import-not-at-top
+  return identity_bijector.Identity()
 
 
 class ParameterProperties(
@@ -286,7 +290,8 @@ class ParameterProperties(
               event_ndims=0,
               event_ndims_tensor=None,
               shape_fn=lambda sample_shape: sample_shape,
-              default_constraining_bijector_fn=identity_bijector.Identity,
+              default_constraining_bijector_fn=(
+                  _default_constraining_bijector_fn),
               is_preferred=True,
               is_tensor=True,
               specifies_shape=False):

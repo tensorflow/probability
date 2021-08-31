@@ -18,11 +18,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
@@ -186,27 +186,19 @@ class RationalQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
     """scale_mixture_rate parameter."""
     return self._scale_mixture_rate
 
-  def _batch_shape(self):
-    shape_list = [
-        x.shape for x in [  # pylint: disable=g-complex-comprehension
-            self.amplitude,
-            self.scale_mixture_rate,
-            self.length_scale
-        ] if x is not None
-    ]
-    if not shape_list:
-      return tf.TensorShape([])
-    return functools.reduce(tf.broadcast_static_shape, shape_list)
-
-  def _batch_shape_tensor(self):
-    shape_list = [
-        tf.shape(x)
-        for x in [self.amplitude, self.scale_mixture_rate, self.length_scale]
-        if x is not None
-    ]
-    if not shape_list:
-      return tf.constant([], dtype=tf.int32)
-    return functools.reduce(tf.broadcast_dynamic_shape, shape_list)
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
+    return dict(
+        amplitude=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        length_scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        scale_mixture_rate=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

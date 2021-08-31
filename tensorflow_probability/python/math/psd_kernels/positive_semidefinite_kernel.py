@@ -25,8 +25,11 @@ import operator
 import six
 import tensorflow.compat.v2 as tf
 
+
 from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
@@ -35,6 +38,9 @@ __all__ = [
     'AutoCompositeTensorPsdKernel',
     'PositiveSemidefiniteKernel',
 ]
+
+
+JAX_MODE = False  # Overwritten by rewrite script.
 
 
 @six.add_metaclass(abc.ABCMeta)
@@ -239,6 +245,50 @@ class PositiveSemidefiniteKernel(tf.Module):
       self._initial_parameter_control_dependencies = (
           tf.group(*self._initial_parameter_control_dependencies),)
 
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    raise NotImplementedError(
+        '_parameter_properties` is not implemented: {}'.format(cls.__name__))
+
+  @property
+  def parameters(self):
+    """Dictionary of parameters used to instantiate this `PSDKernel`."""
+    # Remove 'self', '__class__', or other special variables. These can appear
+    # if the subclass used: `parameters = dict(locals())`.
+    if (not hasattr(self, '_parameters_sanitized') or
+        not self._parameters_sanitized):
+      p = self._parameters() if callable(self._parameters) else self._parameters
+      self._parameters = self._no_dependency({
+          k: v for k, v in p.items()
+          if not k.startswith('__') and v is not self})
+      self._parameters_sanitized = True
+    # In some situations, the PSDKernel metaclass logic defers the evaluation
+    # of parameters, but at this point we actually want to evaluate the
+    # parameters.
+    return dict(
+        self._parameters() if callable(self._parameters) else self._parameters)
+
+  @classmethod
+  def parameter_properties(cls, dtype=tf.float32):
+    """Returns a dict mapping constructor arg names to property annotations.
+
+    This dict should include an entry for each of the kernel's
+    `Tensor`-valued constructor arguments.
+
+    Args:
+      dtype: Optional float `dtype` to assume for continuous-valued parameters.
+        Some constraining bijectors require advance knowledge of the dtype
+        because certain constants (e.g., `tfb.Softplus.low`) must be
+        instantiated with the same dtype as the values to be transformed.
+    Returns:
+      parameter_properties: A
+        `str -> `tfp.python.internal.parameter_properties.ParameterProperties`
+        dict mapping constructor argument names to `ParameterProperties`
+        instances.
+    """
+    with tf.name_scope('parameter_properties'):
+      return cls._parameter_properties(dtype)
+
   @property
   def feature_ndims(self):
     """The number of feature dimensions.
@@ -274,50 +324,105 @@ class PositiveSemidefiniteKernel(tf.Module):
     """Python `bool` indicating possibly expensive checks are enabled."""
     return self._validate_args
 
-  @property
-  def batch_shape(self):
-    """The batch_shape property of a PositiveSemidefiniteKernel.
+  def _batch_shape_tensor(self, **parameter_kwargs):
+    """Infers batch shape from parameters.
 
-    This property describes the fully broadcast shape of all kernel parameters.
-    For example, consider an ExponentiatedQuadratic kernel, which is
-    parameterized by an amplitude and length_scale:
-
-    ```none
-    exp_quad(x, x') := amplitude ** 2 * exp(||x - x'||**2 / length_scale**2)
-    ```
-
-    The batch_shape of such a kernel is derived from broadcasting the shapes of
-    `amplitude` and `length_scale`. E.g., if their shapes were
+    The overall batch shape is inferred by broadcasting the batch shapes of
+    all parameters,
 
     ```python
-    amplitude.shape = [2, 1, 1]
-    length_scale.shape = [1, 4, 3]
+    parameter_batch_shapes = []
+    for name, properties in self.parameter_properties.items():
+      parameter = self.parameters[name]
+      parameter_batch_shapes.append(
+        base_shape(parameter)[:-properties.instance_event_ndims(parameter)])
     ```
 
-    then `exp_quad`'s batch_shape would be `[2, 4, 3]`.
+    where a parameter's `base_shape` is its batch shape if it
+    defines one (e.g., if it is a PSDKernel, LinearOperator, etc.), and its
+    Tensor shape otherwise.
 
-    Note that this property defers to the private _batch_shape method, which
-    concrete implementation sub-classes are obliged to provide.
+    Args:
+      **parameter_kwargs: Optional keyword arguments overriding the parameter
+        values in `self.parameters`. Typically this is used to avoid multiple
+        Tensor conversions of the same value.
+    Returns:
+      batch_shape_tensor: `Tensor` broadcast batch shape of all parameters.
+    """
+    try:
+      return batch_shape_lib.inferred_batch_shape_tensor(
+          self, **parameter_kwargs)
+    except NotImplementedError:
+      raise NotImplementedError('Cannot compute batch shape of PSDKernel '
+                                '{}: you must implement at least one of '
+                                '`_batch_shape_tensor` or '
+                                '`_parameter_properties`.'.format(self))
+
+  def batch_shape_tensor(self, name='batch_shape_tensor'):
+    """Shape of a single sample from a single event index as a 1-D `Tensor`.
+
+    The batch dimensions are indexes into independent, non-identical
+    parameterizations of this `PositiveSemidefiniteKernel`.
+
+    Args:
+      name: name to give to the op
 
     Returns:
-        `TensorShape` instance describing the fully broadcast shape of all
-        kernel parameters.
+      batch_shape: `Tensor`.
     """
-    return self._batch_shape()
+    with self._name_and_control_scope(name):
+      # Try to get the static batch shape.
+      batch_shape = self.batch_shape
+      if not tensorshape_util.is_fully_defined(batch_shape):
+        batch_shape = self._batch_shape_tensor()
+        batch_shape = ps.convert_to_shape_tensor(
+            self._batch_shape_tensor())
+      return ps.convert_to_shape_tensor(batch_shape)
 
-  def batch_shape_tensor(self):
-    """The batch_shape property of a PositiveSemidefiniteKernel as a `Tensor`.
+  def _batch_shape(self):
+    """Infers static batch shape from parameters.
+
+    The overall batch shape is inferred by broadcasting the batch shapes of
+    all parameters
+
+    ```python
+    parameter_batch_shapes = []
+    for name, properties in self.parameter_properties.items():
+      parameter = self.parameters[name]
+      parameter_batch_shapes.append(
+        base_shape(parameter)[:-properties.instance_event_ndims(parameter)])
+    ```
+
+    where a parameter's `base_shape` is its batch shape if it
+    defines one (e.g., if it is a PSDKernel, LinearOperator, etc.), and its
+    Tensor shape otherwise.
 
     Returns:
-        `Tensor` which evaluates to a vector of integers which are the
-        fully-broadcast shapes of the kernel parameters.
+      batch_shape: `tf.TensorShape` broadcast batch shape of all parameters; may
+        be partially defined or unknown.
     """
-    with tf.name_scope(self._name):
-      if tensorshape_util.is_fully_defined(self.batch_shape):
-        return tf.convert_to_tensor(
-            self.batch_shape, dtype=tf.int32, name='batch_shape')
-      with tf.name_scope('batch_shape_tensor'):
-        return self._batch_shape_tensor()
+    try:
+      return batch_shape_lib.inferred_batch_shape(self)
+    except NotImplementedError:
+      # If a kernel doesn't implement `_parameter_properties` or its own
+      # `_batch_shape` method, we can only return the most general shape.
+      return tf.TensorShape(None)
+
+  @property
+  def batch_shape(self):
+    """Shape of a single sample from a single event index as a `TensorShape`.
+
+    May be partially defined or unknown.
+
+    The batch dimensions are indexes into independent, non-identical
+    parameterizations of this `PositiveSemidefiniteKernel`.
+
+    Returns:
+      batch_shape: `TensorShape`, possibly unknown.
+    """
+    if not hasattr(self, '__cached_batch_shape'):
+      self.__cached_batch_shape = self._no_dependency(self._batch_shape())
+    return self.__cached_batch_shape
 
   @contextlib.contextmanager
   def _name_and_control_scope(self, name=None):
@@ -856,13 +961,6 @@ class PositiveSemidefiniteKernel(tf.Module):
 
     return self._call_apply(
         x1, x2, example_ndims=(x1_example_ndims + x2_example_ndims))
-
-  def _batch_shape(self):
-    raise NotImplementedError('Subclasses must provide batch_shape property.')
-
-  def _batch_shape_tensor(self):
-    raise NotImplementedError(
-        'Subclasses must provide batch_shape_tensor implementation')
 
   def __add__(self, k):
     if not isinstance(k, PositiveSemidefiniteKernel):

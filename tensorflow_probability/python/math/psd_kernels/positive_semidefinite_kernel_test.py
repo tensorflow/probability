@@ -173,12 +173,6 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
     with self.assertRaises(NotImplementedError):
       k.apply(x, x)
 
-    with self.assertRaises(NotImplementedError):
-      _ = k.batch_shape
-
-    with self.assertRaises(NotImplementedError):
-      _ = k.batch_shape_tensor()
-
   @parameterized.named_parameters(
       ('String feature_ndims', 'non-integer'),
       ('Float feature_ndims', 4.2),

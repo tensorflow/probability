@@ -22,25 +22,9 @@ import hypothesis as hp
 from hypothesis import strategies as hps
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
-
-
-TF2_FRIENDLY_KERNELS = (
-    'ExpSinSquared',
-    'ExponentiatedQuadratic',
-    'FeatureScaled',
-    'Linear',
-    'MaternOneHalf',
-    'MaternThreeHalves',
-    'MaternFiveHalves',
-    # TODO(b/146073659): Polynomial as currently configured often produces
-    # numerically ill-conditioned matrices. Disabled until we can make it more
-    # reliable in the context of hypothesis tests.
-    # 'Polynomial',
-    'RationalQuadratic',
-    'SchurComplement',
-)
 
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
@@ -48,9 +32,18 @@ TF2_FRIENDLY_KERNELS = (
 
 # pylint: disable=no-value-for-parameter
 
+EXTRA_TENSOR_CONVERSION_KERNELS = {
+    # The transformation is applied to each input individually.
+    'KumaraswamyTransformed': 1,
+}
+
 
 def assert_no_none_grad(kernel, method, wrt_vars, grads):
   for var, grad in zip(wrt_vars, grads):
+    # For the GeneralizedMatern kernel, gradients with respect to `df` don't
+    # exist.
+    if tensor_util.is_ref(var) and var.name.strip('_0123456789:') == 'df':
+      continue
     if grad is None:
       raise AssertionError('Missing `{}` -> {} grad for kernel {}'.format(
           method, var, kernel))
@@ -59,8 +52,10 @@ def assert_no_none_grad(kernel, method, wrt_vars, grads):
 @test_util.test_all_tf_execution_regimes
 class KernelPropertiesTest(test_util.TestCase):
 
-  @parameterized.named_parameters(dict(testcase_name=kname, kernel_name=kname)
-                                  for kname in TF2_FRIENDLY_KERNELS)
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'kernel_name': dname}
+      for dname in sorted(list(kernel_hps.INSTANTIABLE_BASE_KERNELS.keys()) +
+                          list(kernel_hps.SPECIAL_KERNELS)))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(
       default_max_examples=10,
@@ -85,6 +80,8 @@ class KernelPropertiesTest(test_util.TestCase):
     # Check that variable parameters get passed to the kernel.variables
     kernel_variables_names = [
         v.name.strip('_0123456789:') for v in kernel.variables]
+    kernel_parameter_variable_names = [
+        n.strip('_0123456789:') for n in kernel_parameter_variable_names]
     self.assertEqual(
         set(kernel_parameter_variable_names),
         set(kernel_variables_names))
@@ -102,9 +99,13 @@ class KernelPropertiesTest(test_util.TestCase):
     wrt_vars = [xs] + list(kernel.variables)
     self.evaluate([v.initializer for v in kernel.variables])
 
+    max_permissible = 2 + EXTRA_TENSOR_CONVERSION_KERNELS.get(kernel_name, 0)
+
     with tf.GradientTape() as tape:
       with tfp_hps.assert_no_excessive_var_usage(
-          'method `apply` of {}'.format(kernel)):
+          'method `apply` of {}'.format(kernel),
+          max_permissible=max_permissible
+      ):
         tape.watch(wrt_vars)
         with tfp_hps.no_tf_rank_errors():
           diag = kernel.apply(xs, xs, example_ndims=example_ndims)
@@ -117,8 +118,10 @@ class KernelPropertiesTest(test_util.TestCase):
           xs, xs, example_ndims=example_ndims))
     self.assertAllClose(diag, diag2)
 
-  @parameterized.named_parameters(dict(testcase_name=kname, kernel_name=kname)
-                                  for kname in TF2_FRIENDLY_KERNELS)
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'kernel_name': dname}
+      for dname in sorted(list(kernel_hps.INSTANTIABLE_BASE_KERNELS.keys()) +
+                          list(kernel_hps.SPECIAL_KERNELS)))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings(
       default_max_examples=10,
@@ -156,25 +159,6 @@ class KernelPropertiesTest(test_util.TestCase):
     with tfp_hps.no_tf_rank_errors():
       self.assertAllClose(diag, diag_fn(kernel))
       self.assertAllClose(diag, diag_fn(unflat))
-
-
-CONSTRAINTS = {
-    # Keep amplitudes large enough so that the matrices are well conditioned.
-    'amplitude': tfp_hps.softplus_plus_eps(1.),
-    'bias_variance': tfp_hps.softplus_plus_eps(1.),
-    'slope_variance': tfp_hps.softplus_plus_eps(1.),
-    'exponent': tfp_hps.softplus_plus_eps(),
-    'length_scale': tfp_hps.softplus_plus_eps(),
-    'period': tfp_hps.softplus_plus_eps(),
-    'scale_mixture_rate': tfp_hps.softplus_plus_eps(),
-}
-
-
-def constraint_for(kernel_name=None, param=None):
-  if param is not None:
-    return CONSTRAINTS.get('{}.{}'.format(kernel_name, param),
-                           CONSTRAINTS.get(param, tfp_hps.identity_fn))
-  return CONSTRAINTS.get(kernel_name, tfp_hps.identity_fn)
 
 
 if __name__ == '__main__':

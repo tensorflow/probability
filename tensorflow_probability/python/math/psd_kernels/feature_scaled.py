@@ -20,6 +20,8 @@ from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import feature_transformed
 from tensorflow_probability.python.math.psd_kernels.internal import util
@@ -90,15 +92,15 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
   def scale_diag(self):
     return self._scale_diag
 
-  def _batch_shape(self):
-    return tf.broadcast_static_shape(
-        self.kernel.batch_shape,
-        self.scale_diag.shape[:-self.kernel.feature_ndims])
-
-  def _batch_shape_tensor(self):
-    return tf.broadcast_dynamic_shape(
-        self.kernel.batch_shape_tensor(),
-        tf.shape(self.scale_diag)[:-self.kernel.feature_ndims])
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
+    return dict(
+        kernel=parameter_properties.BatchedComponentProperties(),
+        scale_diag=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims,
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
