@@ -81,7 +81,7 @@ class Einsum(jr.JaxExpression):
     operands: The inputs to the Einsum.
   """
   formula: Union[Pattern, str]
-  operands: Union[Pattern, Tuple[Any]]
+  operands: Union[Pattern, Tuple[Any, ...]]
 
   @functools.lru_cache(None)
   def shape_dtype(self) -> jax.ShapeDtypeStruct:
@@ -159,8 +159,9 @@ def reconstitute_einsum_formula(input_formulas: Sequence[str],
   return f'{joined_input_formula}->{output_formula}'
 
 
-def compose_einsums(parent_formula: str, left_args: Tuple[Any],
-                    child_einsum: Einsum, right_args: Tuple[Any]) -> Einsum:
+def compose_einsums(parent_formula: str, left_args: Tuple[Any, ...],
+                    child_einsum: Einsum, right_args: Tuple[Any,
+                                                            ...]) -> Einsum:
   """Combines nested einsums into a single einsum.
 
   Einsums are linear functions and thus the composition of two (or more) einsums

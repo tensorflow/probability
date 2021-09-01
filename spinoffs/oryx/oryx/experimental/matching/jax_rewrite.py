@@ -190,11 +190,12 @@ new_f = rewrite(f, exp_to_log_rule)
 f(1.) # ==> 1. (i.e. log(1.) + 1.)
 ```
 """
+import abc
+import dataclasses
 import functools
 
 from typing import Any, Callable, Dict, Iterator, Optional, Sequence, Tuple, Union
 
-import dataclasses
 import jax
 from jax import core as jax_core
 from jax import linear_util as lu
@@ -249,7 +250,7 @@ def evaluate_tuple(expr: Tuple[Any], env: Env) -> Tuple[Any]:
   return tuple(map(lambda e: evaluate(e, env), expr))
 
 
-class JaxExpression(rules.Expression):
+class JaxExpression(rules.Expression, metaclass=abc.ABCMeta):
   """A node in an expression tree.
 
   `JAXExpression`s are subclasses of `rules.Expression` so if the `tree_map`
@@ -258,16 +259,17 @@ class JaxExpression(rules.Expression):
   interface in `matcher`, the `match` method needs to be implemented too.
   """
 
-  @property
+  @abc.abstractproperty
   def shape(self):
-    raise NotImplementedError
+    pass
 
-  @property
+  @abc.abstractproperty
   def dtype(self):
-    raise NotImplementedError
+    pass
 
+  @abc.abstractmethod
   def evaluate(self, env: Env) -> Any:
-    raise NotImplementedError
+    pass
 
 
 @evaluate.register(JaxExpression)
@@ -450,8 +452,8 @@ class Primitive(JaxExpression):
       primitive when a `Primitive` is evaluated.
   """
   primitive: Union[matcher.Pattern, jax_core.Primitive]
-  operands: Tuple[Any]
-  params: Params
+  operands: Tuple[Any, ...]
+  params: Union[matcher.Pattern, Params]
 
   def __post_init__(self):
     self._shape_dtype = None
@@ -502,7 +504,9 @@ class Primitive(JaxExpression):
   def __str__(self):
     return f'({self.primitive} {" ".join(map(str, self.operands))})'
 
-  def __eq__(self, other):
+  def __eq__(self, other: Any) -> bool:
+    if not isinstance(other, Primitive):
+      return False
     return (self.primitive == other.primitive and
             self.operands == other.operands and self.params == other.params)
 

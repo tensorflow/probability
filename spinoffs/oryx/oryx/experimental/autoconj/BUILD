@@ -31,6 +31,20 @@ py_library(
     ],
 )
 
+# pytype_strict
+py_library(
+    name = "canonicalize",
+    srcs = ["canonicalize.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":einsum",
+        # jax dep,
+        "//oryx/experimental/matching:jax_rewrite",
+        "//oryx/experimental/matching:matcher",
+        "//oryx/experimental/matching:rules",
+    ],
+)
+
 # py_strict
 py_test(
     name = "einsum_test",
@@ -45,6 +59,23 @@ py_test(
         "//oryx/experimental/matching:jax_rewrite",
         "//oryx/experimental/matching:matcher",
         "//oryx/experimental/matching:rules",
+        "//oryx/internal:test_util",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "canonicalize_test",
+    srcs = ["canonicalize_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":canonicalize",
+        ":einsum",
+        # absl/testing:absltest dep,
+        # jax dep,
+        # numpy dep,
+        "//oryx/experimental/matching:jax_rewrite",
         "//oryx/internal:test_util",
     ],
 )
