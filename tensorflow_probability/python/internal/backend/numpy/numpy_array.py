@@ -107,6 +107,8 @@ def _gather(  # pylint: disable=unused-argument
   # ndarray and use in-place updates.  For the Jax backend, this function
   # vmaps `np.take`.
   if JAX_MODE:
+    params = np.asarray(params)
+    indices = np.asarray(indices)
     take = lambda params, indices: np.take(params, indices,  # pylint: disable=g-long-lambda
                                            axis=axis - batch_dims)
     take = functools.reduce(
