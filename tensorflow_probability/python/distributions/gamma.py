@@ -313,6 +313,25 @@ class Gamma(distribution.AutoCompositeTensorDistribution):
   def _default_event_space_bijector(self):
     return softplus_bijector.Softplus(validate_args=self.validate_args)
 
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    expected_x = tf.reduce_mean(value, axis=0)
+    log_expected_x = tf.math.log(expected_x)
+    expected_log_x = tf.reduce_mean(tf.math.log(value), axis=0)
+    # The following implements the generalized Newton iteration
+    # proposed as eqn (10) in Tom Minka's note "Estimating a Gamma Distribution"
+    # (2002, https://tminka.github.io/papers/minka-gamma.pdf).
+    inv_concentration = 2. * (log_expected_x - expected_log_x)
+    for _ in range(5):  #  Typically sufficient for float64 convergence.
+      concentration = 1. / inv_concentration
+      inv_concentration += (
+          expected_log_x - log_expected_x +
+          tf.math.log(concentration) - tf.math.digamma(concentration)) / (
+              concentration**2 * (
+                  inv_concentration - tf.math.polygamma(1., concentration)))
+    concentration = 1. / inv_concentration
+    return {'concentration': concentration, 'rate': concentration / expected_x}
+
   def _sample_control_dependencies(self, x):
     assertions = []
     if not self.validate_args:

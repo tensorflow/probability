@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python import stats as tfp_stats
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import cholesky_outer_product as cholesky_outer_product_bijector
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
@@ -198,6 +199,13 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
             allow_nan_stats=allow_nan_stats,
             name=name)
     self._parameters = parameters
+
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'loc': tf.reduce_mean(value, axis=0),
+            'covariance_matrix': tfp_stats.covariance(value,
+                                                      sample_axis=0,
+                                                      event_axis=-1)}
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):

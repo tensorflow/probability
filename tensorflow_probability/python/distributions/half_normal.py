@@ -186,6 +186,10 @@ class HalfNormal(distribution.AutoCompositeTensorDistribution):
   def _default_event_space_bijector(self):
     return softplus_bijector.Softplus(validate_args=self.validate_args)
 
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'scale': tf.sqrt(tf.reduce_mean(value**2, axis=0))}
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

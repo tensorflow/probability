@@ -229,6 +229,11 @@ class Normal(distribution.AutoCompositeTensorDistribution):
   def _default_event_space_bijector(self):
     return identity_bijector.Identity(validate_args=self.validate_args)
 
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'loc': tf.reduce_mean(value, axis=0),
+            'scale': tf.math.reduce_std(value, axis=0)}
+
   def _parameter_control_dependencies(self, is_init):
     assertions = []
 

@@ -300,3 +300,7 @@ class Geometric(distribution.AutoCompositeTensorDistribution):
             probs, dtype_util.as_numpy_dtype(self.dtype)(1.),
             message='Argument `probs` must be less than or equal to 1.'))
     return assertions
+
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'logits': -tf.math.log(tf.reduce_mean(value, axis=0))}

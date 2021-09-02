@@ -183,6 +183,10 @@ class Bernoulli(distribution.AutoCompositeTensorDistribution):
   def _default_event_space_bijector(self):
     return
 
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'probs': tf.reduce_mean(value, axis=0)}
+
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_bernoulli_param_correctness(
         is_init, self.validate_args, self._probs, self._logits)

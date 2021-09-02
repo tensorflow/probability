@@ -205,6 +205,11 @@ class Uniform(distribution.AutoCompositeTensorDistribution):
     return sigmoid_bijector.Sigmoid(
         low=self.low, high=self.high, validate_args=self.validate_args)
 
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'low': tf.reduce_min(value, axis=0),
+            'high': tf.reduce_max(value, axis=0)}
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

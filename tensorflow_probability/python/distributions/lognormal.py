@@ -137,6 +137,12 @@ class LogNormal(transformed_distribution.TransformedDistribution,
   def _default_event_space_bijector(self):
     return exp_bijector.Exp(validate_args=self.validate_args)
 
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    log_x = tf.math.log(value)
+    return {'loc': tf.reduce_mean(log_x, axis=0),
+            'scale': tf.math.reduce_std(log_x, axis=0)}
+
 
 @kullback_leibler.RegisterKL(LogNormal, LogNormal)
 def _kl_lognormal_lognormal(a, b, name=None):
