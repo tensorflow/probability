@@ -290,3 +290,8 @@ class MultivariateNormalDiag(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype))),
             is_preferred=False))
     # pylint: enable=g-long-lambda
+
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'loc': tf.reduce_mean(value, axis=0),
+            'scale_diag': tf.math.reduce_std(value, axis=0)}

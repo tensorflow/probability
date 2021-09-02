@@ -383,6 +383,10 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
   def _default_event_space_bijector(self):
     return
 
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'log_rate': tf.math.log(tf.reduce_mean(value, axis=0))}
+
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []

@@ -29,6 +29,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -577,6 +578,75 @@ class DistributionTest(test_util.TestCase):
       self.evaluate(normal.quantile(-.01))
     with self.assertRaisesOpError(r'must be <= 1'):
       self.evaluate(normal.quantile(1.01))
+
+
+@test_util.test_all_tf_execution_regimes
+class DistributionFittingTest(test_util.TestCase):
+
+  def _sample_xs(self, batch_shape, sample_shape):
+    loc_seed, sample_seed = samplers.split_seed(
+        test_util.test_seed(sampler_type='stateless'),
+        n=2)
+    return self.evaluate(
+        tfd.Normal(
+            loc=tf.random.stateless_normal(batch_shape, seed=loc_seed),
+            scale=3.14159).sample(
+                sample_shape=sample_shape, seed=sample_seed))
+
+  def testConstructFittedDistribution(self):
+    xs = self._sample_xs(batch_shape=[2], sample_shape=[3, 2, 1])
+    dist = tfd.Normal.experimental_fit(
+        xs,
+        sample_ndims=3,
+        name='elizabeth',
+        validate_args=True)
+    self.assertAllEqual(dist.batch_shape, [2])
+    self.assertTrue(dist.validate_args)
+    self.assertEqual(dist.name, 'elizabeth')
+
+    dist = tfd.Normal.experimental_fit(xs, sample_ndims=2)
+    self.assertAllEqual(dist.batch_shape, [1, 2])
+
+    dist = tfd.Normal.experimental_fit(xs)
+    self.assertAllEqual(dist.batch_shape, [2, 1, 2])
+
+    with self.assertRaisesRegex(ValueError, 'must be a positive integer'):
+      dist = tfd.Normal.experimental_fit(xs, sample_ndims=0)
+
+  def testParamOverride(self):
+    dist = tfd.Normal.experimental_fit(
+        self._sample_xs(batch_shape=[], sample_shape=[20]),
+        scale=42.)
+    self.assertAllEqual(dist.batch_shape, [])
+    self.assertAllClose(dist.scale, 42.)
+
+  def testDynamicShapeInputs(self):
+    if tf.executing_eagerly():
+      self.skipTest('Dynamic shape.')
+
+    xs = self._sample_xs(batch_shape=[2], sample_shape=[3, 2, 1])
+
+    # Dynamic `xs` and `sample_ndims`.
+    dist = tfd.Normal.experimental_fit(
+        tf1.placeholder_with_default(xs, shape=None),
+        sample_ndims=tf1.placeholder_with_default(1, shape=[]))
+    self.assertAllEqual(dist.batch_shape, tf.TensorShape(None))
+    self.assertAllEqual(dist.batch_shape_tensor(), [2, 1, 2])
+
+    # Dynamic `sample_ndims` only.
+    dist = tfd.Normal.experimental_fit(
+        xs, sample_ndims=tf1.placeholder_with_default(1, shape=[]))
+    self.assertAllEqual(dist.batch_shape, tf.TensorShape(None))
+    self.assertAllEqual(dist.batch_shape_tensor(), [2, 1, 2])
+
+    # Invalid `sample_ndims`.
+    with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
+                                'must be a positive integer'):
+      dist = tfd.Normal.experimental_fit(
+          xs,
+          sample_ndims=tf1.placeholder_with_default(0, shape=[]),
+          validate_args=True)
+      self.evaluate(dist.mean())
 
 
 class Dummy(tfd.Distribution):

@@ -40,6 +40,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import samplers
@@ -142,6 +143,65 @@ class StatisticConsistentShapesTest(test_util.TestCase):
                           self.evaluate(tf.shape(result)))
     except NotImplementedError:
       pass
+
+
+def _constrained_zeros_fn(shape, dtype, constraint_fn):
+  """Generates dummy parameters initialized to a valid default value."""
+  return hps.just(constraint_fn(tf.fill(shape, tf.cast(0., dtype))))
+
+
+MLE_AT_CONSTRAINT_BOUNDARY = [
+    'Uniform'
+]
+
+
+@test_util.test_all_tf_execution_regimes
+class FittingTest(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testDistribution(self, dist_name, data):
+    dist = data.draw(dhps.base_distributions(
+        dist_name=dist_name,
+        enable_vars=False,
+        # Unregularized MLEs can be numerically problematic, e.g., empirical
+        # (co)variances can be singular. To avoid such numerical issues, we
+        # sanity-check the MLE only for a fixed sample with assumed-sane
+        # parameter values (zeros constrained to the parameter support).
+        param_strategy_fn=_constrained_zeros_fn,
+        batch_shape=data.draw(
+            tfp_hps.shapes(min_ndims=0, max_ndims=2, max_side=5))))
+    x, lp = self.evaluate(dist.experimental_sample_and_log_prob(
+        10, seed=test_util.test_seed(sampler_type='stateless')))
+
+    try:
+      parameters = self.evaluate(type(dist)._maximum_likelihood_parameters(x))
+    except NotImplementedError:
+      self.skipTest('Fitting not implemented.')
+
+    flat_params = tf.nest.flatten(parameters)
+    lp_fn = lambda *flat_params: type(dist)(  # pylint: disable=g-long-lambda
+        validate_args=True,
+        **tf.nest.pack_sequence_as(parameters, flat_params)).log_prob(x)
+    lp_mle, grads = self.evaluate(
+        tfp_math.value_and_gradient(lp_fn, flat_params))
+
+    # Likelihood of MLE params should be higher than of the original params.
+    self.assertAllGreaterEqual(
+        tf.reduce_sum(lp_mle, axis=0) - tf.reduce_sum(lp, axis=0),
+        -1e-4)
+
+    if dist_name not in MLE_AT_CONSTRAINT_BOUNDARY:
+      # MLE parameters should be a critical point of the log prob.
+      for g in grads:
+        if np.any(np.isnan(g)):
+          # Skip parameters with undefined or unstable gradients (e.g.,
+          # Categorical `num_classes`).
+          continue
+        self.assertAllClose(tf.zeros_like(g), g, atol=1e-2)
 
 
 @test_util.test_all_tf_execution_regimes

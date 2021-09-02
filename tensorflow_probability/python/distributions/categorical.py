@@ -362,6 +362,16 @@ class Categorical(distribution.AutoCompositeTensorDistribution):
   def _default_event_space_bijector(self):
     return
 
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {
+        'probs': tf.reduce_mean(
+            tf.one_hot(value,
+                       depth=tf.reduce_max(value) + 1,
+                       dtype=(value.dtype if dtype_util.is_floating(value.dtype)
+                              else tf.float32)),
+            axis=0)}
+
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_categorical_param_correctness(
         is_init, self.validate_args, self._probs, self._logits)

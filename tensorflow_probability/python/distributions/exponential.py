@@ -33,7 +33,7 @@ from tensorflow_probability.python.internal import tensor_util
 
 
 __all__ = [
-    "Exponential",
+    'Exponential',
 ]
 
 
@@ -75,7 +75,7 @@ class Exponential(gamma.Gamma):
                force_probs_to_zero_outside_support=False,
                validate_args=False,
                allow_nan_stats=True,
-               name="Exponential"):
+               name='Exponential'):
     """Construct Exponential distribution with parameter `rate`.
 
     Args:
@@ -110,7 +110,7 @@ class Exponential(gamma.Gamma):
     with tf.name_scope(name) as name:
       self._rate = tensor_util.convert_nonref_to_tensor(
           rate,
-          name="rate",
+          name='rate',
           dtype=dtype_util.common_dtype([rate], dtype_hint=tf.float32))
       super(Exponential, self).__init__(
           concentration=1.,
@@ -174,3 +174,7 @@ class Exponential(gamma.Gamma):
 
   def _default_event_space_bijector(self):
     return softplus_bijector.Softplus(validate_args=self.validate_args)
+
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'rate': 1. / tf.reduce_mean(value, axis=0)}

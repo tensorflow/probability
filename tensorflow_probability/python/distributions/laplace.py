@@ -22,6 +22,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import stats as tfp_stats
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -210,6 +211,12 @@ class Laplace(distribution.AutoCompositeTensorDistribution):
 
   def _default_event_space_bijector(self):
     return identity_bijector.Identity(validate_args=self.validate_args)
+
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    median = tfp_stats.percentile(value, 50., axis=0, interpolation='linear')
+    return {'loc': median,
+            'scale': tf.reduce_mean(tf.abs(value - median), axis=0)}
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:

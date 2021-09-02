@@ -21,6 +21,7 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python import stats as tfp_stats
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import distribution_util
@@ -250,6 +251,12 @@ class MultivariateNormalTriL(
             default_constraining_bijector_fn=lambda: fill_scale_tril_bijector.
             FillScaleTriL(diag_shift=dtype_util.eps(dtype))))
     # pylint: enable=g-long-lambda
+
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    return {'loc': tf.reduce_mean(value, axis=0),
+            'scale_tril': tf.linalg.cholesky(
+                tfp_stats.covariance(value, sample_axis=0, event_axis=-1))}
 
   @property
   def scale_tril(self):

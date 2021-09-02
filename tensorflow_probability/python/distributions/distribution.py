@@ -449,7 +449,8 @@ class Distribution(_BaseDistribution):
   - `_default_event_space_bijector`.
   - `_parameter_properties` (to support automatic batch shape derivation,
     batch slicing and other features).
-  - `_sample_and_log_prob`.
+  - `_sample_and_log_prob`,
+  - `_maximum_likelihood_parameters`.
 
   Note that subclasses of existing Distributions that redefine `__init__` do
   *not* automatically inherit
@@ -1822,6 +1823,79 @@ class Distribution(_BaseDistribution):
       event_space_bijector: `Bijector` instance or `None`.
     """
     return self._default_event_space_bijector(*args, **kwargs)
+
+  @classmethod
+  def experimental_fit(cls, value, sample_ndims=1, validate_args=False,
+                       **init_kwargs):
+    """Instantiates a distribution that maximizes the likelihood of `x`.
+
+    Args:
+      value: a `Tensor` valid sample from this distribution family.
+      sample_ndims: Positive `int` Tensor number of leftmost dimensions of
+        `value` that index i.i.d. samples.
+        Default value: `1`.
+      validate_args: Python `bool`, default `False`. When `True`, distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False`, invalid inputs may silently render incorrect
+        outputs.
+        Default value: `False`.
+      **init_kwargs: Additional keyword arguments passed through to
+        `cls.__init__`. These take precedence in case of collision with the
+        fitted parameters; for example,
+        `tfd.Normal.experimental_fit([1., 1.], scale=20.)` returns a Normal
+        distribution with `scale=20.` rather than the maximum likelihood
+        parameter `scale=0.`.
+    Returns:
+      maximum_likelihood_instance: instance of `cls` with parameters that
+        maximize the likelihood of `value`.
+    """
+    with tf.name_scope('experimental_fit'):
+      value = tf.convert_to_tensor(value, name='value')
+
+      sample_ndims_ = tf.get_static_value(sample_ndims)
+      # Reshape `value` if needed to have a single leftmost sample dimension.
+      if sample_ndims_ != 1:
+        assertions = []
+        if sample_ndims_ is None and validate_args:
+          assertions += [assert_util.assert_positive(
+              sample_ndims,
+              message='`sample_ndims` must be a positive integer.')]
+        elif sample_ndims_ is not None and sample_ndims_ < 1:
+          raise ValueError(
+              '`sample_ndims` must be a positive integer. (saw: `{}`)'.format(
+                  sample_ndims_))
+        with tf.control_dependencies(assertions):
+          value_shape = ps.convert_to_shape_tensor(ps.shape(value))
+          value = tf.reshape(
+              value, ps.concat([[-1], value_shape[sample_ndims:]], axis=0))
+
+      kwargs = cls._maximum_likelihood_parameters(value)
+
+    kwargs.update(init_kwargs)
+    return cls(**kwargs, validate_args=validate_args)
+
+  @classmethod
+  def _maximum_likelihood_parameters(cls, value):
+    """Returns a dictionary of parameters that maximize likelihood of `value`.
+
+    Following the [`Distribution` contract](
+    https://github.com/tensorflow/probability/blob/main/discussion/tfp_distributions_contract.md),
+    this method should be implemented only when the parameter estimate can be
+    computed efficiently and accurately. Iterative algorithms are permitted if
+    they are guaranteed to converge within a fixed number of steps (for example,
+    Newton iterations on a convex objective).
+
+    Args:
+      value: a `Tensor` valid sample from this distribution family, whose
+        leftmost dimension indexes independent samples.
+    Returns:
+      parameters: a dict with `str` keys and `Tensor` values, such that
+        `cls(**parameters)` gives maximum likelihood to `value` among all
+        instances of `cls`.
+    """
+    raise NotImplementedError(
+        'Fitting maximum likelihood parameters is not implemented for this '
+        'distribution: {}.'.format(cls.__name__))
 
   def __str__(self):
     if self.batch_shape:
