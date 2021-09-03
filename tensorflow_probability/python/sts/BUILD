@@ -227,6 +227,9 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/sts/internal",
         "//tensorflow_probability/python/util",
     ],

@@ -149,6 +149,37 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     lp = self.evaluate(joint.log_prob(x))
     self.assertAllEqual(lp.shape, [5, 2])
 
+  def test_model_with_dynamic_batch_ndims(self):
+    if tf.executing_eagerly():
+      self.skipTest('Dynamic shape.')
+
+    def coroutine_model():
+      g = yield tfd.LogNormal(0., [1., 2.])
+      df = yield tfd.Exponential([1., 2.])
+      loc = yield tfd.Sample(tfd.Normal(0, g), 20)
+      yield tfd.StudentT(tf.expand_dims(df, -1), loc, 1)
+
+    joint = tfd.JointDistributionCoroutineAutoBatched(
+        coroutine_model,
+        batch_ndims=tf1.placeholder_with_default(1, shape=[]),
+        validate_args=True)
+
+    batch_shape_tensor = self.evaluate(joint.batch_shape_tensor())
+    self.assertAllEqual(batch_shape_tensor, [2])
+    event_shape_tensor = self.evaluate(joint.event_shape_tensor())
+    self.assertAllEqual(event_shape_tensor[0], [])
+    self.assertAllEqual(event_shape_tensor[1], [])
+    self.assertAllEqual(event_shape_tensor[2], [20])
+    self.assertAllEqual(event_shape_tensor[3], [20])
+
+    self.assertAllEqual(joint.batch_shape, tf.TensorShape(None))
+    self.assertAllEqual(joint._model_flatten(joint.event_shape),
+                        [tf.TensorShape(None)] * 4)
+
+    x = joint.sample([5], seed=test_util.test_seed(sampler_type='stateless'))
+    lp = self.evaluate(joint.log_prob(x))
+    self.assertAllEqual(lp.shape, [5, 2])
+
   @parameterized.named_parameters(
       {'testcase_name': 'coroutine',
        'base_jd_class': tfd.JointDistributionCoroutine,
