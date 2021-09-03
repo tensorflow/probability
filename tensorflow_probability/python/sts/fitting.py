@@ -17,7 +17,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import collections
+import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -25,16 +25,18 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import mcmc
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python import vi
-from tensorflow_probability.python.bijectors import softplus as softplus_lib
-from tensorflow_probability.python.distributions import independent as independent_lib
-from tensorflow_probability.python.distributions import joint_distribution_named as joint_distribution_named_lib
-from tensorflow_probability.python.distributions import normal as normal_lib
-from tensorflow_probability.python.distributions import transformed_distribution as transformed_distribution_lib
+from tensorflow_probability.python.experimental import vi as experimental_vi
+from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
+
+@deprecation.deprecated('2022-03-01',
+                        'Please use `tf.random.stateless_uniform` or similar.')
 def sample_uniform_initial_state(parameter,
                                  return_constrained=True,
                                  init_sample_shape=(),
@@ -78,35 +80,6 @@ def sample_uniform_initial_state(parameter,
     return parameter.bijector.forward(uniform_initializer)
   else:
     return uniform_initializer
-
-
-def _build_posterior_for_one_parameter(param, batch_shape, seed):
-  """Built a transformed-normal variational dist over a parameter's support."""
-
-  # Build a trainable Normal distribution.
-  initial_loc = sample_uniform_initial_state(
-      param, init_sample_shape=batch_shape,
-      return_constrained=False, seed=seed)
-  loc = tf.Variable(initial_value=initial_loc,
-                    name=param.name + '_loc')
-  scale = tfp_util.TransformedVariable(
-      tf.fill(tf.shape(initial_loc),
-              value=tf.constant(0.02, initial_loc.dtype),
-              name=param.name + '_scale'),
-      softplus_lib.Softplus())
-  posterior_dist = normal_lib.Normal(loc=loc, scale=scale)
-
-  # Ensure the `event_shape` of the variational distribution matches the
-  # parameter.
-  if (param.prior.event_shape.ndims is None
-      or param.prior.event_shape.ndims > 0):
-    posterior_dist = independent_lib.Independent(
-        posterior_dist, reinterpreted_batch_ndims=param.prior.event_shape.ndims)
-
-  # Transform to constrained parameter space.
-  posterior_dist = transformed_distribution_lib.TransformedDistribution(
-      posterior_dist, param.bijector, name='{}_posterior'.format(param.name))
-  return posterior_dist
 
 
 def build_factored_surrogate_posterior(
@@ -196,14 +169,19 @@ def build_factored_surrogate_posterior(
 
   """
   with tf.name_scope(name or 'build_factored_surrogate_posterior'):
-    seed = tfp_util.SeedStream(
-        seed, salt='StructuralTimeSeries_build_factored_surrogate_posterior')
-    variational_posterior = collections.OrderedDict()
-    for param in model.parameters:
-      variational_posterior[param.name] = _build_posterior_for_one_parameter(
-          param, batch_shape=batch_shape, seed=seed())
-    return joint_distribution_named_lib.JointDistributionNamed(
-        variational_posterior)
+    prior = model._joint_prior_distribution()  # pylint: disable=protected-access
+    batch_shape = distribution_util.expand_to_vector(
+        ps.convert_to_shape_tensor(batch_shape, dtype=np.int32))
+    return experimental_vi.build_factored_surrogate_posterior(
+        event_shape=prior.event_shape_tensor(),
+        bijector=prior.experimental_default_event_space_bijector(),
+        batch_shape=ps.concat(
+            [
+                batch_shape,
+                prior.batch_shape_tensor()
+            ], axis=0),
+        dtype=prior.dtype,
+        seed=seed)
 
 
 def fit_with_hmc(model,
@@ -424,9 +402,10 @@ def fit_with_hmc(model,
 
         # Set step sizes using the unconstrained variational distribution.
         if initial_step_size is None:
-          q_dists_by_name, _ = variational_posterior.sample_distributions()
+          q_dists_by_name, _ = (
+              variational_posterior.distribution.sample_distributions())
           initial_step_size = [
-              q_dists_by_name[p.name].distribution.stddev()
+              q_dists_by_name[p.name].stddev()
               for p in model.parameters]
 
     # Run HMC to sample from the posterior on parameters.

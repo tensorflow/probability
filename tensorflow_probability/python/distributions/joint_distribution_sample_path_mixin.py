@@ -78,9 +78,12 @@ class JointDistributionSamplePathMixin(object):
     return self._batch_ndims
 
   def _batch_shape_parts(self):
-    return [batch_shape[:self.batch_ndims]
-            for batch_shape in self._get_static_distribution_attributes().
-            batch_shape]
+    static_batch_ndims = tf.get_static_value(self.batch_ndims)
+    static_batch_shapes = self._get_static_distribution_attributes().batch_shape
+    if static_batch_ndims is None:
+      return [tf.TensorShape(None)] * len(static_batch_shapes)
+    return [batch_shape[:static_batch_ndims]
+            for batch_shape in static_batch_shapes]
 
   def _batch_shape(self):
     # Caching will not leak graph Tensors since this is a static attribute.
@@ -97,11 +100,21 @@ class JointDistributionSamplePathMixin(object):
         prefer_static.broadcast_shape, self._batch_shape_tensor_parts()))
 
   def _event_shape(self):
+    """Static shape of a single sample from a single batch."""
     if not hasattr(self, '_cached_event_shape'):
-      self._cached_event_shape = list([
-          tf.nest.map_structure(  # Recurse over joint component distributions.
-              d.batch_shape[self.batch_ndims:].concatenate,
-              d.event_shape) for d in self._get_single_sample_distributions()])
+      part_attrs = self._get_static_distribution_attributes()
+      static_batch_ndims = tf.get_static_value(self.batch_ndims)
+      if static_batch_ndims is None:
+        flat_joint_event_shape = [tf.TensorShape(None)] * len(part_attrs.dtype)
+      else:
+        flat_joint_event_shape = [
+            # Recurse over joint component dists.
+            tf.nest.map_structure(  # pylint: disable=g-complex-comprehension
+                part_batch_shape[static_batch_ndims:].concatenate,
+                part_event_shape)
+            for part_event_shape, part_batch_shape in zip(
+                part_attrs.event_shape, part_attrs.batch_shape)]
+      self._cached_event_shape = flat_joint_event_shape
     return self._model_unflatten(self._cached_event_shape)
 
   def _event_shape_tensor(self):

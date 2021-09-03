@@ -18,13 +18,20 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+import types
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.experimental import util as tfe_util
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.sts.internal import util as sts_util
+
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 tfl = tf.linalg
 
@@ -237,6 +244,166 @@ class StructuralTimeSeries(object):
         initial_step=initial_step,
         **linear_gaussian_ssm_kwargs)
 
+  def _joint_prior_distribution(self):
+    """Constructs the model's parameter prior distribution."""
+
+    # Patch prior distributions to default to their STS-associated bijectors,
+    # which may enforce scaling and/or additional parameter constraints.
+    return joint_distribution_auto_batched.JointDistributionNamedAutoBatched(
+        collections.OrderedDict(
+            (p.name, _with_default_bijector(p.prior, p.bijector))
+            for p in self.parameters),
+        use_vectorized_map=False,
+        batch_ndims=ps.rank_from_shape(self.batch_shape_tensor,
+                                       self.batch_shape))
+
+  def joint_distribution(self,
+                         observed_time_series=None,
+                         num_timesteps=None,
+                         trajectories_shape=None,
+                         initial_step=0,
+                         mask=None,
+                         experimental_parallelize=False):
+    """Constructs the joint distribution over parameters and observed values.
+
+    Args:
+      observed_time_series: Optional observed time series to model, as a
+        `Tensor` or `tfp.sts.MaskedTimeSeries` instance having shape
+        `concat([batch_shape, trajectories_shape, num_timesteps, 1])`. If
+        an observed time series is provided, the `num_timesteps`,
+        `trajectories_shape`, and `mask` arguments are ignored, and
+        an unnormalized (pinned) distribution over parameter values is returned.
+        Default value: `None`.
+      num_timesteps: scalar `int` `Tensor` number of timesteps to model. This
+        must be specified either directly or by passing an
+        `observed_time_series`.
+        Default value: `0`.
+      trajectories_shape: `int` `Tensor` shape of sampled trajectories
+        for each set of parameter values. If not specified (either directly
+        or by passing an `observed_time_series`), defaults to a
+        one-to-one correspondence between trajectories and parameter settings
+        (implicitly `trajectories_shape=()`).
+        Default value: `None`.
+      initial_step: Optional scalar `int` `Tensor` specifying the starting
+        timestep.
+        Default value: `0`.
+      mask: Optional `bool` `Tensor` having shape
+        `concat([batch_shape, trajectories_shape, num_timesteps])`, in which
+        `True` entries indicate that the series value at the corresponding step
+        is missing and should be ignored. This argument should be passed only
+        if `observed_time_series` is not specified or does not already contain
+        a missingness mask; it is an error to pass both this
+        argument and an `observed_time_series` value containing a missingness
+        mask.
+        Default value: `None`.
+      experimental_parallelize: If `True`, use parallel message passing
+        algorithms from `tfp.experimental.parallel_filter` to perform time
+        series operations in `O(log num_timesteps)` sequential steps. The
+        overall FLOP and memory cost may be larger than for the sequential
+        implementations by a constant factor.
+        Default value: `False`.
+    Returns:
+      joint_distribution: joint distribution of model parameters and
+        observed trajectories. If no `observed_time_series` was specified, this
+        is an instance of `tfd.JointDistributionNamedAutoBatched` with a
+        random variable for each model parameter (with names and order matching
+        `self.parameters`), plus a final random variable `observed_time_series`
+        representing a trajectory(ies) conditioned on the parameters. If
+        `observed_time_series` was specified, the return value is given by
+        `joint_distribution.experimental_pin(
+        observed_time_series=observed_time_series)` where `joint_distribution`
+        is as just described, so it defines an unnormalized posterior
+        distribution over the parameters.
+
+    #### Example:
+
+    The joint distribution can generate prior samples of parameters and
+    trajectories:
+
+    ```python
+    from matplotlib import pylab as plt
+    import tensorflow_probability as tfp
+
+    # Sample and plot 100 trajectories from the prior.
+    model = tfp.sts.LocalLinearTrendModel()
+    prior_samples = model.joint_distribution().sample([100])
+    plt.plot(
+      tf.linalg.matrix_transpose(prior_samples['observed_time_series'][..., 0]))
+    ```
+
+    It also integrates with TFP inference APIs, providing a more flexible
+    alternative to the STS-specific fitting utilities.
+
+    ```python
+    jd = model.joint_distribution(observed_time_series)
+
+    # Variational inference.
+    surrogate_posterior = (
+      tfp.experimental.vi.build_factored_surrogate_posterior(
+        event_shape=jd.event_shape,
+        bijector=jd.experimental_default_event_space_bijector()))
+    losses = tfp.vi.fit_surrogate_posterior(
+      target_log_prob_fn=jd.unnormalized_log_prob,
+      surrogate_posterior=surrogate_posterior,
+      optimizer=tf.optimizers.Adam(0.1),
+      num_steps=200)
+    parameter_samples = surrogate_posterior.sample(50)
+
+    # No U-Turn Sampler.
+    samples, kernel_results = tfp.experimental.mcmc.windowed_adaptive_nuts(
+      n_draws=500, joint_dist=dist)
+    ```
+
+    """
+
+    def state_space_model_likelihood(**param_vals):
+      ssm = self.make_state_space_model(
+          param_vals=param_vals,
+          num_timesteps=num_timesteps,
+          initial_step=initial_step,
+          mask=mask,
+          experimental_parallelize=experimental_parallelize)
+      # Looping LGSSM methods are really expensive in eager mode; wrap them
+      # to keep this from slowing things down in interactive use.
+      ssm = tfe_util.JitPublicMethods(ssm, trace_only=True)
+      if distribution_util.shape_may_be_nontrivial(trajectories_shape):
+        return sample.Sample(ssm, sample_shape=trajectories_shape)
+      return ssm
+
+    batch_ndims = ps.rank_from_shape(self.batch_shape_tensor, self.batch_shape)
+    if observed_time_series is not None:
+      [
+          observed_time_series,
+          is_missing
+      ] = sts_util.canonicalize_observed_time_series_with_mask(
+          observed_time_series)
+      if is_missing is not None:
+        if mask is not None:
+          raise ValueError('Passed non-None value for `mask`, but the observed '
+                           'time series already contains an `is_missing` mask.')
+        mask = is_missing
+      num_timesteps = ps.shape(observed_time_series)[-2]
+      trajectories_shape = ps.shape(observed_time_series)[batch_ndims:-2]
+
+    joint_distribution = (
+        joint_distribution_auto_batched.JointDistributionNamedAutoBatched(
+            model=collections.OrderedDict(
+                # Prior.
+                list(self._joint_prior_distribution().model.items()) +
+                # Likelihood.
+                [('observed_time_series', state_space_model_likelihood)]),
+            use_vectorized_map=False,
+            batch_ndims=batch_ndims))
+
+    if observed_time_series is not None:
+      return joint_distribution.experimental_pin(
+          observed_time_series=observed_time_series)
+
+    return joint_distribution
+
+  @deprecation.deprecated(
+      '2022-03-01',
+      'Please use `StructuralTimeSeries.joint_distribution(...).sample()`')
   def prior_sample(self,
                    num_timesteps,
                    initial_step=0,
@@ -261,7 +428,7 @@ class StructuralTimeSeries(object):
         Default value: `[]` (i.e., draw a single sample and don't expand the
           shape).
       seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
-
+        Default value: `None`.
     Returns:
       trajectories: `float` `Tensor` of shape
         `trajectories_sample_shape + params_sample_shape + [num_timesteps, 1]`
@@ -270,21 +437,20 @@ class StructuralTimeSeries(object):
         corresponding to `self.parameters`, each of shape
         `params_sample_shape + prior.batch_shape + prior.event_shape`.
     """
+    parameters_seed, trajectories_seed = samplers.split_seed(seed, n=2)
+    param_samples = self._joint_prior_distribution().sample(
+        params_sample_shape, seed=parameters_seed)
+    model = self.make_state_space_model(
+        num_timesteps=num_timesteps,
+        initial_step=initial_step,
+        param_vals=param_samples)
+    return (model.sample(trajectories_sample_shape, seed=trajectories_seed),
+            param_samples.values())
 
-    seed = tfp_util.SeedStream(
-        seed, salt='StructuralTimeSeries_prior_sample')
-
-    with tf.name_scope('prior_sample'):
-      param_samples = [
-          p.prior.sample(params_sample_shape, seed=seed(), name=p.name)
-          for p in self.parameters
-      ]
-      model = self.make_state_space_model(
-          num_timesteps=num_timesteps,
-          initial_step=initial_step,
-          param_vals=param_samples)
-      return model.sample(trajectories_sample_shape, seed=seed()), param_samples
-
+  @deprecation.deprecated(
+      '2022-03-01',
+      'Please use `StructuralTimeSeries.joint_distribution('
+      'observed_time_series).log_prob`')
   def joint_log_prob(self, observed_time_series):
     """Build the joint density `log p(params) + log p(y|params)` as a callable.
 
@@ -308,7 +474,6 @@ class StructuralTimeSeries(object):
        single model, which is typically the desired behavior for parameter
        inference.
     """
-
     with tf.name_scope('joint_log_prob'):
       [
           observed_time_series,
@@ -316,8 +481,8 @@ class StructuralTimeSeries(object):
       ] = sts_util.canonicalize_observed_time_series_with_mask(
           observed_time_series)
 
-      num_timesteps = distribution_util.prefer_static_value(
-          tf.shape(observed_time_series))[-2]
+      num_timesteps = ps.shape(observed_time_series)[-2]
+      parameter_prior = self._joint_prior_distribution()
 
       def log_joint_fn(*param_vals, **param_kwargs):
         """Generated log-density function."""
@@ -329,11 +494,7 @@ class StructuralTimeSeries(object):
                   param_vals, param_kwargs))
           param_vals = [param_kwargs[p.name] for p in self.parameters]
 
-        # Sum the log_prob values from parameter priors.
-        param_lp = sum([
-            param.prior.log_prob(param_val)
-            for (param, param_val) in zip(self.parameters, param_vals)
-        ])
+        param_lp = parameter_prior.log_prob(*param_vals)
 
         # Build a linear Gaussian state space model and evaluate the marginal
         # log_prob on observations.
@@ -372,3 +533,11 @@ def _assert_dict_contents_are_equal(
     if not _strict_equals(a_val, b_val):
       raise ValueError(message +
                        ' `{}`: {} vs {}.'.format(k, a_val, b_val))
+
+
+def _with_default_bijector(distribution, bijector):
+  dist = distribution.copy()
+  # TODO(b/198690871): Add a proper mechanism to override default bijectors.
+  dist._default_event_space_bijector = types.MethodType(  # pylint: disable=protected-access
+      lambda self: bijector, dist)
+  return dist

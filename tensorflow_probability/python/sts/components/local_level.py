@@ -204,7 +204,7 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
            seed, n=3, salt='LocalLevelStateSpaceModel_joint_sample_n')
 
       if self.batch_shape.is_fully_defined():
-        batch_shape = self.batch_shape.as_list()
+        batch_shape = self.batch_shape
       else:
         batch_shape = self.batch_shape_tensor()
       sample_and_batch_shape = tf.cast(

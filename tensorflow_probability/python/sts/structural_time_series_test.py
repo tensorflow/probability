@@ -297,6 +297,37 @@ class _StsTestHarness(object):
           2,
       ] + param.prior.batch_shape.as_list() + param.prior.event_shape.as_list())
 
+  def test_joint_distribution_log_prob(self):
+    model = self._build_sts()
+    jd = model.joint_distribution(trajectories_shape=[2], num_timesteps=11)
+    self.assertLen(jd.dtype, len(model.parameters) + 1)
+
+    # Time series sampled from the JD should have the expected shape.
+    samples = self.evaluate(
+        jd.sample(seed=test_util.test_seed(sampler_type='stateless')))
+    observed_time_series = samples['observed_time_series']
+    self.assertAllEqual(tf.shape(observed_time_series),
+                        tf.concat([model.batch_shape_tensor(), [2, 11, 1]],
+                                  axis=0))
+
+    # The JD's `log_prob` val should match the previous `joint_log_prob` method.
+    sampled_params = list(samples.values())[:-1]
+    lp0 = model.joint_log_prob(observed_time_series)(*sampled_params)
+    lp1 = jd.log_prob(samples)
+    self.assertAllClose(lp0, lp1)
+
+    # Passing `observed_time_series` should return the pinned distribution.
+    jd_pinned = model.joint_distribution(
+        observed_time_series=observed_time_series)
+    lp2 = jd_pinned.unnormalized_log_prob(*sampled_params)
+    self.assertAllClose(lp0, lp2)
+
+    # The JD should expose the STS bijectors as its default bijectors.
+    jd_bijectors = jd._model_unflatten(
+        jd.experimental_default_event_space_bijector().bijectors)
+    for param in model.parameters:
+      self.assertEqual(param.bijector, jd_bijectors[param.name])
+
   def test_default_priors_follow_batch_shapes(self):
     seed = test_util.test_seed_stream()
     num_timesteps = 3
