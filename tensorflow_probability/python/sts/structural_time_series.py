@@ -445,7 +445,7 @@ class StructuralTimeSeries(object):
         initial_step=initial_step,
         param_vals=param_samples)
     return (model.sample(trajectories_sample_shape, seed=trajectories_seed),
-            param_samples.values())
+            list(param_samples.values()))
 
   @deprecation.deprecated(
       '2022-03-01',
