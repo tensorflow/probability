@@ -119,15 +119,25 @@ def _choose_base_case(is_accepted,
     """Wraps `tf.where`."""
     if proposed is current:
       return proposed
-    # Preserve the name from `current` so names can propagate from
-    # `bootstrap_results`.
-    name = getattr(current, 'name', None)
-    if name is not None:
-      name = name.rpartition('/')[2].rsplit(':', 1)[0]
-    # Since this is an internal utility it is ok to assume
-    # tf.shape(proposed) == tf.shape(current).
-    return tf.where(bu.left_justified_expand_dims_like(is_accepted, proposed),
-                    proposed, current, name=name)
+
+    # Handle CompositeTensor types at the leafmost `addr`.
+    flat_p = tf.nest.flatten(proposed, expand_composites=True)
+    flat_c = tf.nest.flatten(current, expand_composites=True)
+
+    res = []
+    for p, c in zip(flat_p, flat_c):
+      # Preserve the name from `current` so names can propagate from
+      # `bootstrap_results`.
+      name = getattr(c, 'name', None)
+      if name is not None:
+        name = name.rpartition('/')[2].rsplit(':', 1)[0]
+      # Since this is an internal utility it is ok to assume
+      # tf.shape(proposed) == tf.shape(current).
+      res.append(
+          tf.where(bu.left_justified_expand_dims_like(is_accepted, p), p, c,
+                   name=name))
+    return tf.nest.pack_sequence_as(current, res, expand_composites=True)
+
   with tf.name_scope(name or 'choose'):
     if not is_list_like(proposed):
       return _where(proposed, current)

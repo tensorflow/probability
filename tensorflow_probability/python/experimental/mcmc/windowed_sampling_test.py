@@ -618,7 +618,7 @@ class PrecompiledTest(test_util.TestCase):
                                   ('nuts_jit_sig', 'nuts'))
   def test_base_kernel(self, kind):
     self.skip_if_no_xla()
-    self.skipTest('b/195070752')
+    self.skipTest('b/195070752')  # Test is broken by cl/393807414.
 
     if JAX_MODE:
       input_signature = None

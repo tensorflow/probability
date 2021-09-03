@@ -271,15 +271,12 @@ class DiagonalMassMatrixAdaptation(kernel_base.TransitionKernel):
         new_variance_parts = update_running_variance()
         new_inner_results = update_momentum()
       else:
-        new_variance_parts = mcmc_util.choose_from(
-            tf.cast(
-                tf.less_equal(step,
-                              previous_kernel_results.num_estimation_steps),
-                dtype=tf.int32),
-            [variance_parts, update_running_variance()])
-        new_inner_results = tf.cond(
+        new_variance_parts = mcmc_util.choose(
+            step <= previous_kernel_results.num_estimation_steps,
+            update_running_variance(), variance_parts)
+        new_inner_results = mcmc_util.choose(
             tf.equal(step, previous_kernel_results.num_estimation_steps),
-            update_momentum, lambda: new_inner_results)
+            update_momentum(), new_inner_results)
       new_kernel_results = previous_kernel_results._replace(
           inner_results=new_inner_results,
           running_variance=new_variance_parts,

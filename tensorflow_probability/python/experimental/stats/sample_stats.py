@@ -265,16 +265,16 @@ class RunningCovariance(ACClass):
 
 def _default_covariance_event_ndims(event_ndims, shape):
   """Try to default `event_ndims` to 'full covariance' for the given `shape`."""
-  shape = tf.TensorShape(shape)
+  shape_rank = tf.get_static_value(ps.rank_from_shape(shape))
   if event_ndims is None:
-    if shape.rank is None:
+    if shape_rank is None:
       raise ValueError('Cannot default to computing all covariances for '
                        'samples of statically unknown rank.')
     else:
-      event_ndims = shape.rank
-  if shape.rank is not None and event_ndims > shape.rank:
+      event_ndims = shape_rank
+  if shape_rank is not None and event_ndims > shape_rank:
     raise ValueError('Cannot calculate cross-products in {} dimensions for '
-                     'samples of rank {}'.format(event_ndims, len(shape)))
+                     'samples of rank {}'.format(event_ndims, shape_rank))
   if event_ndims > 13:
     # This 13 is because we use an einsum to construct the needed outer product
     # in `_batch_outer_product`.  Each event dimension requires two distinct
