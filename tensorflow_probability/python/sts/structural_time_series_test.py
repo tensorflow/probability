@@ -292,7 +292,10 @@ class _StsTestHarness(object):
         seed=test_util.test_seed())
 
     self.assertAllEqual(ys.shape, [3, 2, 5, 1])
-    for sampled, param in zip(param_samples, model.parameters):
+    self.assertEqual(len(param_samples), len(model.parameters))
+    for i in range(len(param_samples)):
+      sampled = param_samples[i]
+      param = model.parameters[i]
       self.assertAllEqual(sampled.shape, [
           2,
       ] + param.prior.batch_shape.as_list() + param.prior.event_shape.as_list())
