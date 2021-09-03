@@ -34,6 +34,7 @@ from tensorflow_probability.python.experimental.mcmc import initialization
 from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
 from tensorflow_probability.python.experimental.mcmc import preconditioned_nuts as pnuts
 from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
+from tensorflow_probability.python.experimental.mcmc import sharded
 from tensorflow_probability.python.experimental.stats import sample_stats
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -46,6 +47,7 @@ from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc import sample
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -200,7 +202,7 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
   Args:
     model: `tfd.JointDistribution`
       The model to sample from.
-    n_chains: int
+    n_chains: list of ints
       Number of chains (independent examples) to run.
     init_position: Optional
       Structure of tensors at which to initialize sampling. Should have the
@@ -217,6 +219,7 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     bijector: `tfb.Bijector` instance, which unconstrains and flattens.
     step_broadcast_fn: Callable to broadcast step size over latent structure.
     batch_shape: Batch shape of the model.
+    shard_axis_names: Shard axis names for the model
   """
   pinned_model = model.experimental_pin(**pins) if pins else model
   bijector, step_bijector = _get_flat_unconstraining_bijector(pinned_model)
@@ -226,7 +229,7 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     init_position = initialization.retry_init(
         raw_init_dist.sample,
         target_fn=pinned_model.unnormalized_log_prob,
-        sample_shape=[n_chains],
+        sample_shape=n_chains,
         seed=seed)
 
   initial_transformed_position = tf.nest.map_structure(
@@ -237,7 +240,7 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     batch_shape = functools.reduce(tf.broadcast_static_shape,
                                    tf.nest.flatten(batch_shape))
 
-  lp_static_shape = tensorshape_util.concatenate([n_chains], batch_shape)
+  lp_static_shape = tensorshape_util.concatenate(n_chains, batch_shape)
 
   if not tensorshape_util.is_fully_defined(batch_shape):
     batch_shape = pinned_model.batch_shape_tensor()
@@ -265,11 +268,21 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     else:
       return step_size
 
+  shard_axis_names = pinned_model.experimental_shard_axis_names
+  if any(tf.nest.flatten(shard_axis_names)):
+    shard_axis_names = nest.flatten_up_to(
+        initial_transformed_position, pinned_model._model_flatten(  # pylint: disable=protected-access
+            shard_axis_names))
+  else:
+    # No active shard axis names
+    shard_axis_names = None
+
   return (target_log_prob_fn,
           initial_transformed_position,
           bijector,
           step_broadcast,
-          ps.convert_to_shape_tensor(batch_shape, name='batch_shape'))
+          ps.convert_to_shape_tensor(batch_shape, name='batch_shape'),
+          shard_axis_names)
 
 
 def _make_base_kernel(*, kind, proposal_kernel_kwargs):
@@ -388,6 +401,10 @@ class WindowedAdaptation(kernel_base.TransitionKernel):
     )
 
   @property
+  def parameters(self):
+    return self._parameters
+
+  @property
   def inner_kernel(self):
     return self._parameters['inner_kernel']
 
@@ -491,28 +508,47 @@ class WindowedAdaptation(kernel_base.TransitionKernel):
   def is_calibrated(self):
     return self.inner_kernel.is_calibrated
 
+  def experimental_with_shard_axes(self, shard_axis_names):
+    return self.copy(
+        inner_kernel=self.inner_kernel.experimental_with_shard_axes(
+            shard_axis_names))
+
+  @property
+  def experimental_shard_axis_names(self):
+    return self.inner_kernel.experimental_shard_axis_names
+
 
 def make_windowed_adapt_kernel(*, kind, proposal_kernel_kwargs,
-                               dual_averaging_kwargs, initial_running_variance):
-  return WindowedAdaptation(
+                               dual_averaging_kwargs, initial_running_variance,
+                               chain_axis_names, shard_axis_names):
+  """Constructs a windowed adaptation kernel."""
+  kernel = WindowedAdaptation(
       make_slow_adapt_kernel(
           kind=kind,
           proposal_kernel_kwargs=proposal_kernel_kwargs,
           dual_averaging_kwargs=dual_averaging_kwargs,
           initial_running_variance=initial_running_variance),
       num_adaptation_steps=dual_averaging_kwargs['num_adaptation_steps'])
+  if chain_axis_names:
+    kernel = sharded.Sharded(kernel, chain_axis_names)
+  if shard_axis_names:
+    kernel = kernel.experimental_with_shard_axes(shard_axis_names)
+  return kernel
 
 
 def _do_sampling(*, kind, proposal_kernel_kwargs, dual_averaging_kwargs,
                  num_draws, num_burnin_steps, initial_position,
                  initial_running_variance, trace_fn, bijector,
-                 return_final_kernel_results, seed):
+                 return_final_kernel_results, seed,
+                 chain_axis_names, shard_axis_names):
   """Sample from base HMC kernel."""
   kernel = make_windowed_adapt_kernel(
       kind=kind,
       proposal_kernel_kwargs=proposal_kernel_kwargs,
       dual_averaging_kwargs=dual_averaging_kwargs,
-      initial_running_variance=initial_running_variance)
+      initial_running_variance=initial_running_variance,
+      chain_axis_names=chain_axis_names,
+      shard_axis_names=shard_axis_names)
   return sample.sample_chain(
       num_draws,
       initial_position,
@@ -554,13 +590,15 @@ def _get_step_size(initial_transformed_position, log_prob_fn):
       for state_part in initial_transformed_position])**-0.25
 
 
-def _init_momentum(initial_transformed_position, *, batch_shape):
+def _init_momentum(initial_transformed_position, *, batch_shape,
+                   shard_axis_names):
   """Initialize momentum so trace_fn can be concatenated."""
   variance_parts = [ps.ones_like(p) for p in initial_transformed_position]
   return preconditioning_utils.make_momentum_distribution(
       state_parts=initial_transformed_position,
       batch_shape=batch_shape,
-      running_variance_parts=variance_parts)
+      running_variance_parts=variance_parts,
+      shard_axis_names=shard_axis_names)
 
 
 def windowed_adaptive_nuts(n_draws,
@@ -578,6 +616,7 @@ def windowed_adaptive_nuts(n_draws,
                            trace_fn=_default_nuts_trace_fn,
                            return_final_kernel_results=False,
                            discard_tuning=True,
+                           chain_axis_names=None,
                            seed=None,
                            **pins):
   """Adapt and sample from a joint distribution using NUTS, conditioned on pins.
@@ -591,7 +630,7 @@ def windowed_adaptive_nuts(n_draws,
       Number of draws after adaptation.
     joint_dist: `tfd.JointDistribution`
       A joint distribution to sample from.
-    n_chains: int
+    n_chains: int or list of ints
       Number of independent chains to run MCMC with.
     num_adaptation_steps: int
       Number of draws used to adapt step size and mass matrix.
@@ -643,6 +682,9 @@ def windowed_adaptive_nuts(n_draws,
       `trace_fn`.
     discard_tuning: bool
       Whether to return tuning traces and draws.
+    chain_axis_names: A `str` or list of `str`s indicating the named axes
+      by which multiple chains are sharded. See `tfp.experimental.mcmc.Sharded`
+      for more context.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     **pins:
       These are used to condition the provided joint distribution, and are
@@ -678,6 +720,7 @@ def windowed_adaptive_nuts(n_draws,
       trace_fn=trace_fn,
       return_final_kernel_results=return_final_kernel_results,
       discard_tuning=discard_tuning,
+      chain_axis_names=chain_axis_names,
       seed=seed,
       **pins)
 
@@ -694,6 +737,7 @@ def windowed_adaptive_hmc(n_draws,
                           trace_fn=_default_hmc_trace_fn,
                           return_final_kernel_results=False,
                           discard_tuning=True,
+                          chain_axis_names=None,
                           seed=None,
                           **pins):
   """Adapt and sample from a joint distribution, conditioned on pins.
@@ -709,7 +753,7 @@ def windowed_adaptive_hmc(n_draws,
       A joint distribution to sample from.
     num_leapfrog_steps: int
       Number of leapfrog steps to use for the Hamiltonian Monte Carlo step.
-    n_chains: int
+    n_chains: int or list of ints
       Number of independent chains to run MCMC with.
     num_adaptation_steps: int
       Number of draws used to adapt step size and mass matrix.
@@ -749,6 +793,9 @@ def windowed_adaptive_hmc(n_draws,
       `trace_fn`.
     discard_tuning: bool
       Whether to return tuning traces and draws.
+    chain_axis_names: A `str` or list of `str`s indicating the named axes
+      by which multiple chains are sharded. See `tfp.experimental.mcmc.Sharded`
+      for more context.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     **pins:
       These are used to condition the provided joint distribution, and are
@@ -783,6 +830,7 @@ def windowed_adaptive_hmc(n_draws,
       return_final_kernel_results=return_final_kernel_results,
       discard_tuning=discard_tuning,
       seed=seed,
+      chain_axis_names=chain_axis_names,
       **pins)
 
 
@@ -799,6 +847,7 @@ def _windowed_adaptive_impl(n_draws,
                             return_final_kernel_results,
                             discard_tuning,
                             seed,
+                            chain_axis_names,
                             **pins):
   """Runs windowed sampling using either HMC or NUTS as internal sampler."""
   if trace_fn is None:
@@ -806,6 +855,9 @@ def _windowed_adaptive_impl(n_draws,
     no_trace = True
   else:
     no_trace = False
+
+  if isinstance(n_chains, int):
+    n_chains = [n_chains]
 
   if (tf.executing_eagerly() or
       not control_flow_util.GraphOrParentsInXlaContext(
@@ -824,10 +876,13 @@ def _windowed_adaptive_impl(n_draws,
   dual_averaging_kwargs['num_adaptation_steps'] = num_adaptation_steps
   dual_averaging_kwargs.setdefault('reduce_fn',
                                    generic_math.reduce_log_harmonic_mean_exp)
+  # By default, reduce over named axes for step size adaptation
+  dual_averaging_kwargs.setdefault('experimental_reduce_chain_axis_names',
+                                   chain_axis_names)
   setup_seed, sample_seed = samplers.split_seed(
       samplers.sanitize_seed(seed), n=2)
   (target_log_prob_fn, initial_transformed_position, bijector,
-   step_broadcast, batch_shape) = _setup_mcmc(
+   step_broadcast, batch_shape, shard_axis_names) = _setup_mcmc(
        joint_dist,
        n_chains=n_chains,
        init_position=current_state,
@@ -850,7 +905,8 @@ def _windowed_adaptive_impl(n_draws,
       'step_size': init_step_size,
       'momentum_distribution': _init_momentum(
           initial_transformed_position,
-          batch_shape=ps.concat([[n_chains], batch_shape], axis=0))})
+          batch_shape=ps.concat([n_chains, batch_shape], axis=0),
+          shard_axis_names=shard_axis_names)})
 
   initial_running_variance = [
       sample_stats.RunningVariance.from_stats(
@@ -870,6 +926,8 @@ def _windowed_adaptive_impl(n_draws,
       bijector=bijector,
       trace_fn=trace_fn,
       return_final_kernel_results=return_final_kernel_results,
+      chain_axis_names=chain_axis_names,
+      shard_axis_names=shard_axis_names,
       seed=sample_seed)
 
   if return_final_kernel_results:

@@ -22,7 +22,9 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental import distribute
 from tensorflow_probability.python.experimental.mcmc import windowed_sampling
+from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
@@ -264,9 +266,9 @@ class WindowedSamplingTest(test_util.TestCase):
         [tfd.HalfNormal(1., name=f'dist_{idx}') for idx in range(4)])
 
     explicit_init = [tf.ones(20) for _ in range(3)]
-    _, init, bijector, _, _ = windowed_sampling._setup_mcmc(
+    _, init, bijector, _, _, _ = windowed_sampling._setup_mcmc(
         model=sample_dist,
-        n_chains=20,
+        n_chains=[20],
         init_position=explicit_init,
         seed=test_util.test_seed(),
         dist_3=1.)
@@ -311,9 +313,9 @@ class WindowedSamplingTest(test_util.TestCase):
 
     # Twenty chains with three parameters gives a 1 / 2^60 chance of
     # initializing with a finite log probability by chance.
-    _, init, _, _, _ = windowed_sampling._setup_mcmc(
+    _, init, _, _, _, _ = windowed_sampling._setup_mcmc(
         model=tough_dist,
-        n_chains=20,
+        n_chains=[20],
         seed=test_util.test_seed(),
         dist_3=1.)
 
@@ -327,8 +329,8 @@ class WindowedSamplingTest(test_util.TestCase):
     pinned = model.experimental_pin(y=4.2)
 
     # No explicit pins are passed, since the model is already pinned.
-    _, init, _, _, _ = windowed_sampling._setup_mcmc(
-        model=pinned, n_chains=20,
+    _, init, _, _, _, _ = windowed_sampling._setup_mcmc(
+        model=pinned, n_chains=[20],
         seed=test_util.test_seed())
     self.assertLen(init, 1)
 
@@ -398,9 +400,9 @@ class WindowedSamplingTest(test_util.TestCase):
             tf.constant(0., dtype=tf.float64),
             tf.constant(1., dtype=tf.float64))
     ])
-    (target_log_prob_fn, initial_transformed_position, _, _, _
+    (target_log_prob_fn, initial_transformed_position, _, _, _, _
      ) = windowed_sampling._setup_mcmc(
-         dist, n_chains=5, init_position=None, seed=test_util.test_seed())
+         dist, n_chains=[5], init_position=None, seed=test_util.test_seed())
     init_step_size = windowed_sampling._get_step_size(
         initial_transformed_position, target_log_prob_fn)
     self.assertDTypeEqual(init_step_size, np.float64)
@@ -455,6 +457,28 @@ class WindowedSamplingTest(test_util.TestCase):
     bij, _ = windowed_sampling._get_flat_unconstraining_bijector(dist)
     draw = dist.sample(seed=test_util.test_seed())
     self.assertAllCloseNested(bij.inverse(bij(draw)), draw)
+
+  @parameterized.named_parameters(*(
+      (f'{kind}_{n_chains}', kind, n_chains)  # pylint: disable=g-complex-comprehension
+      for kind in ('hmc', 'nuts') for n_chains in ([], 3, [2, 1], [2, 2, 2])))
+  def test_batches_of_chains(self, kind, n_chains):
+
+    def model_fn():
+      x = yield tfd.MultivariateNormalDiag(
+          tf.zeros(3), tf.ones(3), name='x')
+      yield tfd.Multinomial(
+          logits=tfb.Pad([(0, 1)])(x), total_count=10, name='y')
+
+    model = tfd.JointDistributionCoroutineAutoBatched(model_fn, batch_ndims=1)
+    samp = model.sample(seed=test_util.test_seed())
+    states, trace = self.evaluate(tfp.experimental.mcmc.windowed_adaptive_hmc(
+        5, model.experimental_pin(y=samp.y), n_chains=n_chains,
+        num_leapfrog_steps=3, num_adaptation_steps=100,
+        seed=test_util.test_seed()))
+    if isinstance(n_chains, int):
+      n_chains = [n_chains]
+    self.assertEqual((5, *n_chains, 3), states.x.shape)
+    self.assertEqual((5,), trace['step_size'].shape)
 
 
 @test_util.test_graph_and_eager_modes
@@ -649,11 +673,131 @@ class PrecompiledTest(test_util.TestCase):
           trace_fn=None,
           return_final_kernel_results=False,
           discard_tuning=True,
+          chain_axis_names=None,
           seed=seed,
           successes=successes)
 
     self.evaluate(do(self.trials + 0., self.true_values['successes'],
                      test_util.test_seed(sampler_type='stateless')))
+
+if JAX_MODE:
+  # TF runs into the `merge_call` error here (b/181800108).
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='Sharding not available for NumPy backend.')
+  class DistributedTest(distribute_test_lib.DistributedTest):
+
+    def setUp(self):
+      super().setUp()
+      arms = 2
+      days = 3
+
+      seed = test_util.test_seed()
+      trial_seed, value_seed = tfp.random.split_seed(seed)
+      self.trials = tfd.Poisson(100.).sample([arms, days], seed=trial_seed)
+      dist = get_joint_distribution(self.trials)
+      self.true_values = dist.sample(seed=value_seed)
+
+    def nuts_kwargs(self):
+      return {'max_tree_depth': 2}
+
+    def hmc_kwargs(self):
+      return {'num_leapfrog_steps': 3, 'store_parameters_in_results': True}
+
+    def test_can_extract_shard_axis_names_from_model(self):
+      joint_dist = distribute.JointDistributionNamed(dict(
+          x=tfd.Normal(0., 1.),
+          y=lambda x: distribute.Sharded(tfd.Normal(x, 1.), self.axis_name),
+          z=lambda y: distribute.Sharded(tfd.Normal(y, 1.), self.axis_name)
+      ))
+
+      def do():
+        _, _, _, _, _, shard_axis_names = windowed_sampling._setup_mcmc(
+            model=joint_dist,
+            n_chains=[20],
+            seed=test_util.test_seed(), z=1.)
+        # _setup_mcmc will flatten the distribution
+        self.assertListEqual(shard_axis_names, [[], ['i']])
+      self.strategy_run(do, args=(), in_axes=None)
+
+    @parameterized.named_parameters(('hmc_jit_sig', 'hmc'),
+                                    ('nuts_jit_sig', 'nuts'))
+    def test_data_sharding(self, kind):
+      self.skip_if_no_xla()
+
+      joint_dist = distribute.JointDistributionNamed(dict(
+          x=tfd.Normal(0., 1.),
+          y=lambda x: distribute.Sharded(tfd.Normal(x, 1.), self.axis_name),
+          z=lambda y: distribute.Sharded(tfd.Normal(y, 1.), self.axis_name)
+      ))
+
+      def do(seed, z):
+        if kind == 'hmc':
+          proposal_kernel_kwargs = self.hmc_kwargs()
+        else:
+          proposal_kernel_kwargs = self.nuts_kwargs()
+
+        return windowed_sampling._windowed_adaptive_impl(
+            n_draws=10,
+            joint_dist=joint_dist,
+            kind=kind,
+            n_chains=2,
+            proposal_kernel_kwargs=proposal_kernel_kwargs,
+            num_adaptation_steps=21,
+            current_state=None,
+            dual_averaging_kwargs={'target_accept_prob': 0.76},
+            trace_fn=None,
+            return_final_kernel_results=False,
+            discard_tuning=True,
+            seed=seed,
+            chain_axis_names=None,
+            z=z)
+
+      self.evaluate(self.strategy_run(
+          do,
+          in_axes=(None, 0),
+          args=(samplers.zeros_seed(), self.shard_values(
+              tf.ones(distribute_test_lib.NUM_DEVICES)))))
+
+    @parameterized.named_parameters(('hmc_jit_sig', 'hmc'),
+                                    ('nuts_jit_sig', 'nuts'))
+    def test_chain_sharding(self, kind):
+      self.skip_if_no_xla()
+
+      joint_dist = tfd.JointDistributionNamed(dict(
+          x=tfd.Normal(0., 1.),
+          y=lambda x: tfd.Sample(tfd.Normal(x, 1.), 4),
+          z=lambda y: tfd.Independent(tfd.Normal(y, 1.), 1)
+      ))
+
+      def do(seed, z):
+        if kind == 'hmc':
+          proposal_kernel_kwargs = self.hmc_kwargs()
+        else:
+          proposal_kernel_kwargs = self.nuts_kwargs()
+
+        return windowed_sampling._windowed_adaptive_impl(
+            n_draws=10,
+            joint_dist=joint_dist,
+            kind=kind,
+            n_chains=2,
+            proposal_kernel_kwargs=proposal_kernel_kwargs,
+            num_adaptation_steps=21,
+            current_state=None,
+            dual_averaging_kwargs={'target_accept_prob': 0.76},
+            trace_fn=None,
+            return_final_kernel_results=False,
+            discard_tuning=True,
+            seed=seed,
+            chain_axis_names=self.axis_name,
+            z=z)
+
+      self.evaluate(self.strategy_run(
+          do,
+          in_axes=None,
+          args=(samplers.zeros_seed(),
+                tf.ones(distribute_test_lib.NUM_DEVICES))))
 
 
 if __name__ == '__main__':

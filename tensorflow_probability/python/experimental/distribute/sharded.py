@@ -167,10 +167,12 @@ class Sharded(distribution_lib.Distribution):
     return self.distribution._parameter_control_dependencies(is_init=is_init)  # pylint: disable=protected-access
 
   def _default_event_space_bijector(self, *args, **kwargs):
+    bij = self.distribution.experimental_default_event_space_bijector(
+        *args, **kwargs)
+    if bij is None:
+      return None
     return sharded_bij.Sharded(
-        self.distribution.experimental_default_event_space_bijector(
-            *args, **kwargs),
-        shard_axis_name=self.experimental_shard_axis_names)
+        bij, shard_axis_name=self.experimental_shard_axis_names)
 
 
 @log_prob_ratio.RegisterLogProbRatio(Sharded)
