@@ -617,6 +617,11 @@ class JointDistributionPinned(object):
     except StopIteration:
       pass
 
+  @property
+  def experimental_shard_axis_names(self):
+    return self._prune(self.distribution.experimental_shard_axis_names,
+                       retain='unpinned')
+
 
 def _to_pins(dist, *args, **kwargs):
   """Converts *args and **kwargs to a dict of pins.

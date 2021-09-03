@@ -78,8 +78,9 @@ class Sharded(kernel.TransitionKernel):
 
   @property
   def experimental_shard_axis_names(self):
-    return self.kernel.experimental_shard_axis_names
+    return self.inner_kernel.experimental_shard_axis_names
 
   def experimental_with_shard_axes(self, shard_axis_names):
     return self.copy(
-        kernel=kernel.experimental_with_shard_axes(shard_axis_names))
+        inner_kernel=self.inner_kernel.experimental_with_shard_axes(
+            shard_axis_names))

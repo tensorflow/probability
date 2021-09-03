@@ -22,6 +22,8 @@ from __future__ import print_function
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
+from tensorflow_probability.python.experimental import distribute
+from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -156,6 +158,35 @@ class InitializationTest(test_util.TestCase):
         (10, 3),
         tfp.experimental.mcmc.init_near_unconstrained_zero(p).sample(
             seed=test_util.test_seed()).x.shape)
+
+
+@test_util.disable_test_for_backend(
+    disable_numpy=True,
+    reason='Sharding not available for NumPy backend.')
+class DistributedTest(distribute_test_lib.DistributedTest):
+
+  def test_can_initialize_from_sharded_distribution(self):
+
+    def model():
+      x = yield tfd.Normal(0., 1.)
+      yield distribute.Sharded(tfd.Normal(x, 1.), self.axis_name)
+
+    jd = distribute.JointDistributionCoroutine(model)
+
+    def run(seed):
+      init_jd = tfp.experimental.mcmc.init_near_unconstrained_zero(jd)
+      return init_jd.sample(seed=seed)
+
+    x, y = self.evaluate(
+        self.per_replica_to_tensor(
+            self.strategy_run(run, args=(test_util.test_seed(),),
+                              in_axes=None)))
+    for i in range(distribute_test_lib.NUM_DEVICES):
+      for j in range(distribute_test_lib.NUM_DEVICES):
+        if i == j:
+          continue
+        self.assertAllClose(x[i], x[j])
+        self.assertNotAllClose(y[i], y[j])
 
 
 if __name__ == '__main__':

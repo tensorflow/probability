@@ -18,6 +18,7 @@ from __future__ import division
 from __future__ import print_function
 
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionCoroutine
+from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionDistributedMixin
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionNamed
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionSequential
 from tensorflow_probability.python.experimental.distribute.sharded import Sharded

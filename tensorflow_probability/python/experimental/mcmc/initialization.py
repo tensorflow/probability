@@ -23,9 +23,12 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.experimental import distribute
 from tensorflow_probability.python.internal import batched_rejection_sampler as brs
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import tensorshape_util
+
+from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'init_near_unconstrained_zero',
@@ -35,7 +38,7 @@ __all__ = [
 def init_near_unconstrained_zero(
     model=None, constraining_bijector=None, event_shapes=None,
     event_shape_tensors=None, batch_shapes=None, batch_shape_tensors=None,
-    dtypes=None):
+    dtypes=None, shard_axis_names=None):
   """Returns an initialization Distribution for starting a Markov chain.
 
   This initialization scheme follows Stan: we sample every latent
@@ -83,6 +86,9 @@ def init_near_unconstrained_zero(
       the desired samples.  Must be an acceptable input to
       `constraining_bijector.inverse_dtype`.  If supplied together
       with `model`, acts as an override.
+    shard_axis_names: A structure of `str`s indicating the named axes by which
+      the distribution event is sharded. See
+      `tfp.experimental.distribute.Sharded` for more context.
 
   Returns:
     init_dist: A `Distribution` representing the initialization
@@ -126,6 +132,8 @@ def init_near_unconstrained_zero(
     if batch_shape_tensors is None:
       batch_shape_tensors = nest_util.broadcast_structure(
           dtypes, model.batch_shape_tensor())
+    if shard_axis_names is None:
+      shard_axis_names = model.experimental_shard_axis_names
 
   else:
     if constraining_bijector is None or event_shapes is None or dtypes is None:
@@ -157,13 +165,15 @@ def init_near_unconstrained_zero(
 
   # Actually initialize
   def one_term(event_shape, event_shape_tensor, batch_shape, batch_shape_tensor,
-               dtype):
+               dtype, shard_axes=None):
     if not tensorshape_util.is_fully_defined(event_shape):
       event_shape = event_shape_tensor
     result = tfd.Sample(
         tfd.Uniform(low=tf.constant(-2., dtype=dtype),
                     high=tf.constant(2., dtype=dtype)),
         sample_shape=event_shape)
+    if shard_axes:
+      result = distribute.Sharded(result, shard_axes)
     if not tensorshape_util.is_fully_defined(batch_shape):
       batch_shape = batch_shape_tensor
       needs_bcast = True
@@ -180,11 +190,18 @@ def init_near_unconstrained_zero(
   else:
     inv_shape_tensors = tf.nest.map_structure(lambda _: None, inv_shapes)
   inv_dtypes = constraining_bijector.inverse_dtype(dtypes)
-  terms = tf.nest.map_structure(
-      one_term, inv_shapes, inv_shape_tensors, batch_shapes,
-      batch_shape_tensors, inv_dtypes)
-  unconstrained = tfb.pack_sequence_as(inv_shapes)(
-      tfd.JointDistributionSequential(tf.nest.flatten(terms)))
+  if shard_axis_names is None:
+    shard_axis_names = tf.nest.map_structure(lambda _: None, batch_shapes)
+  terms = nest.map_structure_up_to(inv_shapes, one_term, inv_shapes,
+                                   inv_shape_tensors, batch_shapes,
+                                   batch_shape_tensors,
+                                   inv_dtypes, shard_axis_names)
+  if shard_axis_names and any(shard_axes for shard_axes in nest.flatten_up_to(
+      batch_shapes, shard_axis_names)):
+    dist = distribute.JointDistributionSequential(tf.nest.flatten(terms))
+  else:
+    dist = tfd.JointDistributionSequential(tf.nest.flatten(terms))
+  unconstrained = tfb.pack_sequence_as(inv_shapes)(dist)
   return tfd.TransformedDistribution(
       unconstrained, bijector=constraining_bijector)
 

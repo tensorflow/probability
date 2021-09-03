@@ -102,6 +102,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/experimental/distribute",
     ],
 )
 
@@ -113,6 +114,8 @@ multi_substrate_py_test(
         ":initialization",
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/distribute",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -997,6 +1000,7 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
         ":preconditioned_nuts",
         ":preconditioning_utils",
+        ":sharded",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/bijectors:invert",
@@ -1004,6 +1008,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:reshape",
         "//tensorflow_probability/python/bijectors:restructure",
         "//tensorflow_probability/python/experimental/stats:sample_stats",
+        "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
@@ -1031,6 +1036,8 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/distribute",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
