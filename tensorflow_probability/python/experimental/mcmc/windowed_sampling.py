@@ -423,7 +423,8 @@ class WindowedAdaptation(kernel_base.TransitionKernel):
           num_estimation_steps=slow_window_size)
 
     def slow_window_update():
-      curr_slow_window_size = previous_step - first_window_size + slow_window_size
+      curr_slow_window_size = (
+          previous_step - first_window_size + slow_window_size)
       # Reset mass matrix adaptation.
       dmma_results = self.inner_kernel._bootstrap_from_inner_results(  # pylint: disable=protected-access
           current_state, previous_inner_results.inner_results)
@@ -852,9 +853,9 @@ def _windowed_adaptive_impl(n_draws,
           batch_shape=ps.concat([[n_chains], batch_shape], axis=0))})
 
   initial_running_variance = [
-      sample_stats.RunningVariance.from_shape(
-          shape=state_part.shape, dtype=state_part.dtype)
-      for state_part in initial_transformed_position
+      sample_stats.RunningVariance.from_stats(
+          num_samples=0., mean=tf.zeros_like(part), variance=tf.ones_like(part))
+      for part in initial_transformed_position
   ]
   # TODO(phandu): Consider splitting out warmup and post warmup phases
   # to avoid executing adaptation code during the post warmup phase.
