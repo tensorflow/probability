@@ -37,6 +37,8 @@ from __future__ import division
 # [internal] enable type annotations
 from __future__ import print_function
 
+import numpy as np
+
 from tensorflow_probability.python.internal.backend.numpy import ops as common_shapes
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -347,8 +349,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       x = linalg.adjoint(x)
 
     # Always add a batch dimension to enable broadcasting to work.
-    batch_shape = array_ops.concat(
-        [array_ops.ones_like(self.batch_shape_tensor()), [1, 1]], 0)
+    batch_shape = self._compute_ones_matrix_shape()
     x = x + array_ops.zeros(batch_shape, dtype=x.dtype)
 
     # x has shape [B, R, C], where B represent some number of batch dimensions,
@@ -463,8 +464,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       rhs = linalg.adjoint(rhs)
 
     # Always add a batch dimension to enable broadcasting to work.
-    batch_shape = array_ops.concat(
-        [array_ops.ones_like(self.batch_shape_tensor()), [1, 1]], 0)
+    batch_shape = self._compute_ones_matrix_shape()
     rhs = rhs + array_ops.zeros(batch_shape, dtype=rhs.dtype)
 
     # rhs has shape [B, R, C], where B represent some number of batch
@@ -612,6 +612,13 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
   @property
   def _composite_tensor_fields(self):
     return ("operators",)
+
+  def _compute_ones_matrix_shape(self):
+    if self.batch_shape.is_fully_defined():
+      batch_shape = self.batch_shape.concatenate([1, 1])
+      return np.ones_like(batch_shape, dtype=np.int32)
+    return array_ops.concat(
+        [array_ops.ones_like(self.batch_shape_tensor()), [1, 1]], 0)
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg
