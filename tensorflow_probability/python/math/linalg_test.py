@@ -234,7 +234,6 @@ class _CholeskyUpdate(test_util.TestCase):
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
 
 
-
 @test_util.test_all_tf_execution_regimes
 class CholeskyUpdate32Static(_CholeskyUpdate):
   dtype = np.float32
