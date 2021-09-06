@@ -144,7 +144,8 @@ class PushApartTest(test_util.TestCase):
 class _CholeskyUpdate(test_util.TestCase):
   def testCholeskyUpdateXLA(self):
     self.skip_if_no_xla()
-    cholesky_update_fun = tf.function(tfp.math.cholesky_update, jit_compile=True)
+    cholesky_update_fun = tf.function(tfp.math.cholesky_update,
+                                      jit_compile=True)
     self._testCholeskyUpdate(cholesky_update_fun)
 
   def testCholeskyUpdate(self):
