@@ -150,7 +150,7 @@ def cholesky_update(chol, update_vector, multiplier=1., name=None):
             ps.shape(chol)[:-2],
             ps.shape(update_vector)[:-1]), ps.shape(multiplier))
     chol = tf.broadcast_to(
-        chol, ps.concat([batch_shape, tf.shape(chol)[-2:]], axis=0))
+        chol, ps.concat([batch_shape, ps.shape(chol)[-2:]], axis=0))
     update_vector = tf.broadcast_to(
         update_vector,
         ps.concat([batch_shape, ps.shape(update_vector)[-1:]], axis=0))
@@ -196,7 +196,7 @@ def cholesky_update(chol, update_vector, multiplier=1., name=None):
 
     new_diag, new_chol, _, _ = tf.scan(
         fn=compute_new_column,
-        elems=(tf.range(0, tf.shape(chol)[0]), chol_diag, chol),
+        elems=(tf.range(0, ps.shape(chol)[0]), chol_diag, chol),
         initializer=(
             tf.zeros_like(multiplier),
             tf.zeros_like(chol[0, ...]),
