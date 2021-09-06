@@ -142,8 +142,16 @@ class PushApartTest(test_util.TestCase):
 
 
 class _CholeskyUpdate(test_util.TestCase):
+  def testCholeskyUpdateXLA(self):
+    self.skip_if_no_xla()
+    cholesky_update_fun = tf.function(tfp.math.cholesky_update, jit_compile=True)
+    self._testCholeskyUpdate(cholesky_update_fun)
 
   def testCholeskyUpdate(self):
+    self.skip_if_no_xla()
+    self._testCholeskyUpdate(tfp.math.cholesky_update)
+
+  def _testCholeskyUpdate(self, cholesky_update_fun):
     rng = test_util.test_np_rng()
     xs = rng.random_sample(7).astype(self.dtype)[:, tf.newaxis]
     xs = tf1.placeholder_with_default(
@@ -158,7 +166,7 @@ class _CholeskyUpdate(test_util.TestCase):
 
     new_chol_expected = tf.linalg.cholesky(
         mat + tf.linalg.matmul(u, u, transpose_b=True))
-    new_chol = tfp.math.cholesky_update(chol, tf.squeeze(u, axis=-1))
+    new_chol = cholesky_update_fun(chol, tf.squeeze(u, axis=-1))
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
 
   def testCholeskyUpdateBatches(self):
@@ -224,6 +232,7 @@ class _CholeskyUpdate(test_util.TestCase):
 
     new_chol = tfp.math.cholesky_update(chol, u, multiplier=multiplier)
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+
 
 
 @test_util.test_all_tf_execution_regimes
