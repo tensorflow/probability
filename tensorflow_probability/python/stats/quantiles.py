@@ -170,9 +170,8 @@ def find_bins(x,
   """Bin values into discrete intervals.
 
   Given `edges = [c0, ..., cK]`, defining intervals
-  `I0 = [c0, c1)`, `I1 = [c1, c2)`, ..., `I_{K-1} = [c_{K-1}, cK]`,
-  This function returns `bins`, such that:
-  `edges[bins[i]] <= x[i] < edges[bins[i] + 1]`.
+  `I_0 = [c0, c1)`, `I_1 = [c1, c2)`, ..., `I_{K-1} = [c_{K-1}, cK]`,
+  This function returns `bins`, such that `x[i]` lies within `I_{bins[i]}`.
 
   Args:
     x:  Numeric `N-D` `Tensor` with `N > 0`.
@@ -208,7 +207,7 @@ def find_bins(x,
   x = [0., 5., 6., 10., 20.]
   edges = [0., 5., 10.]
   tfp.stats.find_bins(x, edges)
-  ==> [0., 0., 1., 1., np.nan]
+  ==> [0., 1., 1., 1., np.nan]
   ```
 
   Cut `x` into its deciles
