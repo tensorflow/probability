@@ -108,6 +108,9 @@ class ShardTest(test_lib.DistributedTest):
           continue
         self.assertNotEqual(sample[i], sample[j])
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True,
+      reason='Throws NotImplementedError in JAX backend b/199209907')
   def test_kahan_custom_grad(self):
 
     def model_fn():
