@@ -200,8 +200,7 @@ install_python_packages() {
 # Ensure newer than 18.x pip version, which is necessary after tf-nightly
 # switched to manylinux2010.
 python -m pip install $PIP_FLAGS --upgrade 'pip>=19.2'
-# TODO(b/199158964): Remove pin when setuptools works with use_2to3 again.
-python -m pip install --upgrade setuptools\<58.0;
+python -m pip install --upgrade setuptools
 
 check_for_common_package_conflicts
 install_python_packages
