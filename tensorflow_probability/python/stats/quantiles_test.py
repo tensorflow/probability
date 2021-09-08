@@ -129,6 +129,15 @@ class FindBinsTest(test_util.TestCase):
     bins_ = self.evaluate(bins)
     self.assertAllEqual([np.nan, 0, 0, 1, 1, np.nan], bins_)
 
+  def test_1d_array_example(self):
+    x = [0., 5., 6., 10., 20.]
+    edges = [0., 5., 10.]
+    bins = tfp.stats.find_bins(x, edges)
+    self.assertDTypeEqual(bins, np.float32)
+    self.assertAllEqual((5,), bins.shape)
+    bins_ = self.evaluate(bins)
+    self.assertAllEqual([0., 1., 1., 1., np.nan], bins_)
+
   def test_x_is_2d_array_dtype_int32(self):
     x = [[0., 8., 60.],
          [10., 20., 3.]]
