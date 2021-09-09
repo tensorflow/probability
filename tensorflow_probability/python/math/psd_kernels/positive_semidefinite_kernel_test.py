@@ -61,22 +61,21 @@ class TestKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
   """
 
   def __init__(self, multiplier=None, feature_ndims=1):
+    parameters = dict(locals())
     self._multiplier = (None if multiplier is None else
                         tf.convert_to_tensor(multiplier))
     dtype = None if multiplier is None else self._multiplier.dtype
     super(TestKernel, self).__init__(feature_ndims=feature_ndims,
-                                     dtype=dtype)
+                                     dtype=dtype,
+                                     parameters=parameters)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict(multiplier=tfp.util.ParameterProperties())
 
   @property
   def multiplier(self):
     return self._multiplier
-
-  def _batch_shape(self):
-    return [] if self.multiplier is None else self._multiplier.shape
-
-  def _batch_shape_tensor(self):
-    return (tf.TensorShape([]) if self.multiplier is None else
-            tf.shape(self._multiplier))
 
   def _apply(self, x1, x2, example_ndims=0):
     x1 = tf.convert_to_tensor(x1)
@@ -204,6 +203,17 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
     tensor_params = tf1.placeholder_with_default(params, shape=None)
     k = TestKernel(tensor_params)
     self.assertAllEqual(shape, self.evaluate(k.batch_shape_tensor()))
+
+  @parameterized.named_parameters(
+      ('Shape [] kernel', 2., [4]),
+      ('Shape [1] kernel', [2.], [3, 1]),
+      ('Shape [2] kernel', [1., 2.], [2]),
+      ('Shape [2, 1] kernel', [[1.], [2.]], [2, 3]))
+  def testBroadcastParametersWithBatchShape(self, params, broadcast_shape):
+    k = TestKernel(params)._broadcast_parameters_with_batch_shape(
+        broadcast_shape)
+    self.assertAllEqual(broadcast_shape, k.batch_shape)
+    self.assertAllEqual(broadcast_shape, self.evaluate(k.batch_shape_tensor()))
 
   def testApplyOutputWithStaticShapes(self):
     k = TestKernel(PARAMS_0)  # batch_shape = []

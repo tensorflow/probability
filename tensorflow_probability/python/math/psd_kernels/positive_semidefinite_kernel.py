@@ -324,6 +324,27 @@ class PositiveSemidefiniteKernel(tf.Module):
     """Python `bool` indicating possibly expensive checks are enabled."""
     return self._validate_args
 
+  def copy(self, **override_parameters_kwargs):
+    """Creates a copy of the kernel.
+
+    Note: the copy may continue to depend on the original initialization
+    arguments.
+
+    Args:
+      **override_parameters_kwargs: String/value dictionary of initialization
+        arguments to override with new values.
+    Returns:
+      copied_kernel: A new instance of `type(self)` initialized from the union
+        of self.parameters and override_parameters_kwargs, i.e.,
+        `dict(self.parameters, **override_parameters_kwargs)`.
+    """
+    parameters = dict(self.parameters, **override_parameters_kwargs)
+    copied_kernel = type(self)(**parameters)
+    # pylint: disable=protected-access
+    copied_kernel._parameters = self._no_dependency(parameters)
+    # pylint: enable=protected-access
+    return copied_kernel
+
   def _batch_shape_tensor(self, **parameter_kwargs):
     """Infers batch shape from parameters.
 
@@ -423,6 +444,22 @@ class PositiveSemidefiniteKernel(tf.Module):
     if not hasattr(self, '__cached_batch_shape'):
       self.__cached_batch_shape = self._no_dependency(self._batch_shape())
     return self.__cached_batch_shape
+
+  def _broadcast_parameters_with_batch_shape(self, batch_shape):
+    """Broadcasts each parameter's batch shape with the given `batch_shape`.
+
+    This can be understood as a pseudo-inverse operation to batch slicing.
+
+    Args:
+      batch_shape: Integer `Tensor` batch shape.
+    Returns:
+      broadcast_kernel: copy of this kernel in which each parameter's
+        batch shape is determined by broadcasting its current batch shape with
+        the given `batch_shape`.
+    """
+    return self.copy(
+        **batch_shape_lib.broadcast_parameters_with_batch_shape(
+            self, batch_shape))
 
   @contextlib.contextmanager
   def _name_and_control_scope(self, name=None):
