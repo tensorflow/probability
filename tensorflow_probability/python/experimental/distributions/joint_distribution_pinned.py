@@ -160,17 +160,18 @@ class JointDistributionPinned(object):
   the underlying distribution). Log-density evaluates the joint probability of
   the given event and the pinned values.
 
-  This object represents an unnormalized probability density, and as such is
-  not a `tfp.distributions.Distribution`, and lacks `sample` and `log_prob`
-  methods. In their place, it provides:
-
-  * `unnormalized_log_prob`, `unnormalized_log_prob_parts`
-  * `sample_unpinned`, `sample_and_log_weight`
-
   Mathematically speaking, the object represents a joint probability density,
   `p(x, y)` where the `x` are pinned and the `y` are unpinned. Accordingly, it
   is also proportional to `p(y | x)`, up to a (generally) intractable
   normalizing constant `p(x)`, i.e. `p(x, y) = p(y | x) p(x)`.
+
+  The measure on the unpinned values `y` that this object represents
+  is no longer a probability measure, in that the integral of
+  `log_prob` over the space of `y` is `p(x)`, which in general is not
+  1.  As such, this is not a `tfp.distributions.Distribution`, and
+  lacks a `sample` method. In its place, it provides:
+
+  * `sample_unpinned`, `sample_and_log_weight`
 
   A common use-case with probabilistic inference is writing out a generative
   model to explain some observed data:
@@ -195,7 +196,7 @@ class JointDistributionPinned(object):
 
   ```python
   partial = tfde.JointDistributionPinned(jd, obs=data)
-  target_log_prob_fn = partial.unnormalized_log_prob
+  target_log_prob_fn = partial.log_prob
   ```
 
   Or, even more concisely `partial = jd.experimental_pin(obs=data)`.
@@ -215,7 +216,7 @@ class JointDistributionPinned(object):
   When these transformations may be dependent on ancestral parts of a joint
   distribution, and some of those parameters may be pinned, it is helpful to
   have a utility class to bridge the gap and provide the multi-part bijective
-  transform. This is the "raison d'etre" of this class.
+  transform. This is the "raison d'être" of this class.
 
   The model below is somewhat contrived, but demonstrates the use-case.
 
@@ -255,7 +256,7 @@ class JointDistributionPinned(object):
   @tf.function(autograph=False)
   def one_step():
     with tf.GradientTape() as tape:
-      lp = pinned.unnormalized_log_prob(bij.forward(vars))
+      lp = pinned.log_prob(bij.forward(vars))
     gradients = tape.gradient(lp, vars)
     opt.apply_gradients(zip(gradients.values(), vars.values()))
 
@@ -266,7 +267,7 @@ class JointDistributionPinned(object):
   initial_state = bij.forward(uniform_init)
 
   kernel = tfp.mcmc.HamiltonianMonteCarlo(
-      target_log_prob_fn=pinned.unnormalized_log_prob,
+      target_log_prob_fn=pinned.log_prob,
       step_size=.5, num_leapfrog_steps=4)
   # **This line is currently aspirational**, to demonstrate the use-case.
   kernel = tfp.mcmc.TransformedTransitionKernel(kernel, bij)
@@ -506,8 +507,18 @@ class JointDistributionPinned(object):
   def sample_unpinned(self, sample_shape=(), seed=None):
     """Draws unnormalized samples using ancestral sampling.
 
-    Conceptually, this is comparable to calling `underlying.sample(value=pins)`,
-    then stripping away the pinned parts.
+    This produces the same distribution on outputs as calling
+    `underlying.sample(value=pins)`, then stripping away the pinned
+    parts.
+
+    In the probability literature, this operation corresponds to
+    sampling from the do-calculus expression
+    `underlying(Unpinned|do(Pinned = pins))`, where the assumed causal
+    structure of `underlying` is given by its data dependence graph.
+
+    Note that this is not the same measure as is represented by the
+    `log_prob` method of this class, which is why this method is not
+    called `sample`.
 
     Args:
       sample_shape: Shape prefix to use when sampling.
@@ -523,19 +534,25 @@ class JointDistributionPinned(object):
   def sample_and_log_weight(self, sample_shape=(), seed=None):
     """Draws unnormalized samples and their log-weights with ancestral sampling.
 
-    Since this object represents an unnormalized density, we are unable to
-    directly sample the distribution. However, we can evaluate the relative
-    density of different samples. This function returns the relative log-weight
-    alongside the sample. This log-weight is the log-probability of the pinned
-    parts at the sampled location (it differs from `unnormalized_log_prob` by
-    the log-probability of the unpinned parts).
+    This method provides the ancestral importance sampler for the
+    non-probability measure on the unpinned space represented by this
+    object.  To wit, we draw a sample with the same distribution as
+    `sample_unpinned`, and return it together with a weight given by
+    the log-probability of the pinned parts.
+
+    Denoting the unpinned space by `Y`, the samples by `y`, their
+    corresponding log-weights by `w`, and the measure defined by this
+    object by `m`, the spec for this method is that, for any
+    real-valued function `f : Y -> R`,
+
+      int_Y f(y) dm = E [f(y) * exp(w)].
 
     Args:
       sample_shape: Shape prefix to use when sampling.
       seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
 
     Returns:
-      samples: unpinned parts drawn from the pinned distribution.
+      samples: unpinned parts ancestrally sampled from the pinned distribution.
       log_weights: log-weight of the sample. (Log-probability of the pinned
         parts at the sampled location.)
     """
@@ -562,14 +579,18 @@ class JointDistributionPinned(object):
 
   @docstring_util.expand_docstring(
       calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(
-          method='unnormalized_log_prob', method_abbr='lp'))
-  def unnormalized_log_prob(self, *args, **kwargs):  # pylint: disable=g-doc-args
-    """Computes the unnormalized log-probability.
+          method='log_prob', method_abbr='lp'))
+  def log_prob(self, *args, **kwargs):  # pylint: disable=g-doc-args
+    """Computes the log-density of this measure at the given point.
+
+    The measure on the space of unpinned values that is represented by
+    this object is not a probability measure, so the values of
+    `log_prob` will in general not integrate to 1.
 
     ${calling_convention_description}
 
     Returns:
-      unnormalized_log_prob: The joint log-probability of `*xs` or `**kwargs`
+      log_prob: The joint log-probability of `*xs` or `**kwargs`
         with the pinned parts. It is unnormalized with respect to `*xs` or
         `**kwargs`.
     """
@@ -578,9 +599,63 @@ class JointDistributionPinned(object):
 
   @docstring_util.expand_docstring(
       calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(
+          method='unnormalized_log_prob', method_abbr='lp'))
+  def unnormalized_log_prob(self, *args, **kwargs):  # pylint: disable=g-doc-args
+    """Computes the log-density of this measure at the given point.
+
+    The measure on the space of unpinned values that is represented by
+    this object is not a probability measure, so the values of
+    `unnormalized_log_prob` will in general not integrate to 1.
+
+    This method currently computes the same values as `log_prob`, but
+    may be modified in the future to omit normalization constants.
+
+    ${calling_convention_description}
+
+    Returns:
+      log_prob: The joint log-probability of `*xs` or `**kwargs`
+        with the pinned parts. It is unnormalized with respect to `*xs` or
+        `**kwargs`.
+    """
+    xs = _to_pins(self, *args, **kwargs)
+    return self.distribution.unnormalized_log_prob(self._add_pins(**xs))
+
+  @docstring_util.expand_docstring(
+      calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(
+          method='log_prob_parts', method_abbr='lp_parts'))
+  def log_prob_parts(self, *args, **kwargs):  # pylint: disable=g-doc-args
+    """Computes the log-probability of each part.
+
+    The measure on the space of unpinned values that is represented by
+    this object is not a probability measure, so the values produced
+    by `log_prob_parts` will in general not integrate to 1.
+
+    ${calling_convention_description}
+
+    Returns:
+      pinned: partial log-prob of each pinned part
+      unpinned: partial log-prob of each unpinned part
+    """
+    xs = _to_pins(self, *args, **kwargs)
+    parts = self.distribution.unnormalized_log_prob_parts(self._add_pins(**xs))
+    return UnnormalizedLogProbParts(
+        pinned=self._prune(parts, retain='pinned'),
+        unpinned=self._prune(parts, retain='unpinned'))
+
+  @docstring_util.expand_docstring(
+      calling_convention_description=CALLING_CONVENTION_DESCRIPTION.format(
           method='unnormalized_log_prob_parts', method_abbr='lp_parts'))
   def unnormalized_log_prob_parts(self, *args, **kwargs):  # pylint: disable=g-doc-args
-    """Computes the unnormalized log-probability of each part.
+    """Computes the log-probability of each part.
+
+    The measure on the space of unpinned values that is represented by
+    this object is not a probability measure, so the values produced
+    by `unnormalized_log_prob_parts` will in general not integrate to
+    1.
+
+    This method currently computes the same values as
+    `log_prob_parts`, but may be modified in the future to omit
+    normalization constants.
 
     ${calling_convention_description}
 
