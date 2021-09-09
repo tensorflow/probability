@@ -38,7 +38,6 @@ py_library(
     srcs = ["matcher.py"],
     srcs_version = "PY3",
     deps = [
-        # dataclasses dep,
     ],
 )
 
@@ -58,7 +57,6 @@ py_library(
     deps = [
         ":matcher",
         ":rules",
-        # dataclasses dep,
         # jax dep,
         # numpy dep,
         "//oryx/core:trace_util",

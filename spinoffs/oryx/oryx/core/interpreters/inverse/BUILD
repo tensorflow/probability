@@ -38,7 +38,6 @@ py_library(
     srcs = ["slice.py"],
     srcs_version = "PY3",
     deps = [
-        # dataclasses dep,
         # jax dep,
         "//oryx/core:pytree",
     ],
