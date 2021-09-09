@@ -40,7 +40,6 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":harvest",
-        # dataclasses dep,
         # jax dep,
         # numpy dep,
         "//oryx/core:trace_util",
@@ -54,7 +53,6 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":harvest",
-        # dataclasses dep,
         # jax dep,
         "//oryx/core:pytree",
     ],
@@ -66,7 +64,6 @@ py_library(
     srcs = ["harvest.py"],
     srcs_version = "PY3",
     deps = [
-        # dataclasses dep,
         # jax dep,
         "//oryx/core:primitive",
         "//oryx/core:trace_util",
