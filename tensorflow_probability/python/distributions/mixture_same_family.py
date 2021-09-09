@@ -553,12 +553,15 @@ class MixtureSameFamily(distribution.Distribution):
     # autodiff would be incorrect, so we raise an error if it is requested.
     transform_2d = _prevent_2nd_derivative(transform_2d)
 
+    # Avoid short-circuiting from `tf.stop_gradient`, which might otherwise hide
+    # the 2nd derivative prevention.
+    soft_stop_gradient = tf.custom_gradient(lambda v: (v, lambda dv: None))
     # Compute [- stop_gradient(jacobian)^-1 * transform] by solving a linear
     # system. The Jacobian is lower triangular because the distributional
     # transform for i-th event dimension does not depend on the next
     # dimensions.
     surrogate_x_2d = -tf.linalg.triangular_solve(
-        tf.stop_gradient(jacobian), transform_2d[..., tf.newaxis],
+        soft_stop_gradient(jacobian), transform_2d[..., tf.newaxis],
         lower=True)  # [S*prod(B), prod(E), 1]
     surrogate_x = tf.reshape(surrogate_x_2d, ps.shape(x))
 
