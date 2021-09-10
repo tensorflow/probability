@@ -35,6 +35,7 @@ from tensorflow_probability.python.experimental import auto_batching
 from tensorflow_probability.python.experimental import bijectors
 from tensorflow_probability.python.experimental import distribute
 from tensorflow_probability.python.experimental import distributions
+from tensorflow_probability.python.experimental import joint_distribution_layers
 from tensorflow_probability.python.experimental import linalg
 from tensorflow_probability.python.experimental import marginalize
 from tensorflow_probability.python.experimental import math
@@ -62,6 +63,7 @@ _allowed_symbols = [
     'bijectors',
     'distribute',
     'distributions',
+    'joint_distribution_layers',
     'linalg',
     'marginalize',
     'math',
