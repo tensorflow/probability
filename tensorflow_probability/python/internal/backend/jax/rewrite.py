@@ -45,7 +45,7 @@ def main(argv):
   contents = contents.replace('scipy.special', 'jax.scipy.special')
   if FLAGS.rewrite_numpy_import:
     contents = contents.replace('\nimport numpy as np',
-                                '\nimport numpy as onp\nimport jax.numpy as np')
+                                '\nimport numpy as onp; import jax.numpy as np')
   else:
     contents = contents.replace('\nimport numpy as np',
                                 '\nimport numpy as np; onp = np')

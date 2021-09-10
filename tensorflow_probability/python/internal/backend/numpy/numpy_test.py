@@ -617,6 +617,54 @@ def argsort_params(draw):
 
 
 @hps.composite
+def conv2d_params(draw):
+  # NCHW is GPU-only
+  # data_format = draw(hps.sampled_from(['NHWC', 'NCHW']))
+  data_format = draw(hps.just('NHWC'))
+
+  input_shape = draw(shapes(4, 4, min_side=5, max_side=10))
+  if data_format.startswith('NC'):
+    channels = input_shape[1]
+  else:
+    channels = input_shape[3]
+  filter_shape = draw(shapes(3, 3, min_side=1, max_side=4))
+  filter_shape = filter_shape[:2] + (channels, filter_shape[-1])
+
+  input_ = draw(
+      single_arrays(
+          batch_shape=(),
+          shape=hps.just(input_shape),
+      ))
+  filters = draw(single_arrays(
+      batch_shape=(),
+      shape=hps.just(filter_shape),
+  ))
+  small = hps.integers(0, 5)
+  small_pos = hps.integers(1, 5)
+  strides = draw(hps.one_of(small_pos, hps.tuples(small_pos, small_pos)))
+  if isinstance(strides, tuple) and len(strides) == 2 and draw(hps.booleans()):
+    if data_format.startswith('NC'):
+      strides = (1, 1) + strides
+    else:
+      strides = (1,) + strides + (1,)
+
+  zeros = (0, 0)
+  explicit_padding = (
+      draw(hps.tuples(small, small)),
+      draw(hps.tuples(small, small)),
+  )
+  if data_format.startswith('NC'):
+    explicit_padding = (zeros, zeros) + explicit_padding
+  else:
+    explicit_padding = (zeros,) + explicit_padding + (zeros,)
+  padding = draw(
+      hps.one_of(
+          hps.just(explicit_padding), hps.sampled_from(['SAME', 'VALID'])))
+
+  return (input_, filters, strides, padding, data_format)
+
+
+@hps.composite
 def sparse_xent_params(draw):
   num_classes = draw(hps.integers(1, 6))
   batch_shape = draw(shapes(min_dims=1))
@@ -1223,6 +1271,7 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
     TestCase('math.xlog1py',
              [n_same_shape(n=2, elements=[floats(), positive_floats()])]),
+    TestCase('nn.conv2d', [conv2d_params()], disabled=NUMPY_MODE),
     TestCase(
         'nn.sparse_softmax_cross_entropy_with_logits', [sparse_xent_params()],
         rtol=1e-4,
@@ -1276,9 +1325,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
         xla_disabled=True),
     TestCase('histogram_fixed_width_bins',
              [histogram_fixed_width_bins_params()]),
-    TestCase(
-        'argsort', [argsort_params()],
-        xla_const_args=(1, 2, 3)),  # axis, direction, stable-sort
+    TestCase('argsort', [argsort_params()],
+             xla_const_args=(1, 2, 3)),  # axis, direction, stable-sort
 ]
 
 

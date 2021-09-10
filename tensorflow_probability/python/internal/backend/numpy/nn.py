@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 # Dependency imports
 import numpy as np
 
@@ -35,6 +37,7 @@ from tensorflow_probability.python.internal.backend.numpy.ops import stop_gradie
 
 
 __all__ = [
+    'conv2d',
     'l2_normalize',
     'log_softmax',
     'moments',
@@ -46,6 +49,106 @@ __all__ = [
     'sparse_softmax_cross_entropy_with_logits',
     'top_k',
 ]
+
+
+JAX_MODE = False
+
+
+if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
+
+
+# Borrowed from TensorFlow.
+def _get_sequence(value, n, channel_index, name):
+  """Formats a value input for gen_nn_ops."""
+  # Performance is fast-pathed for common cases:
+  # `None`, `list`, `tuple` and `int`.
+  if value is None:
+    return [1] * (n + 2)
+
+  # Always convert `value` to a `list`.
+  if isinstance(value, list):
+    pass
+  elif isinstance(value, tuple):
+    value = list(value)
+  elif isinstance(value, int):
+    value = [value]
+  elif not isinstance(value, collections.abc.Sized):
+    value = [value]
+  else:
+    value = list(value)  # Try casting to a list.
+
+  len_value = len(value)
+
+  # Fully specified, including batch and channel dims.
+  if len_value == n + 2:
+    return value
+
+  # Apply value to spatial dims only.
+  if len_value == 1:
+    value = value * n  # Broadcast to spatial dimensions.
+  elif len_value != n:
+    raise ValueError('{} should be of length 1, {} or {} but was {}'.format(
+        name, n, n + 2, len_value))
+
+  # Add batch and channel dims (always 1).
+  if channel_index == 1:
+    return [1, 1] + value
+  else:
+    return [1] + value + [1]
+
+
+def _conv2d(
+    input,  # pylint: disable=redefined-builtin
+    filters,
+    strides,
+    padding,
+    data_format='NHWC',
+    dilations=None,
+    name=None):
+  """tf.nn.conv2d implementation."""
+  del name
+  if not JAX_MODE:
+    raise NotImplementedError('tf.nn.conv2d not implemented in NumPy.')
+
+  if dilations is not None:
+    raise ValueError('Dilations not yet supported')
+
+  channel_index = 1 if data_format.startswith('NC') else 3
+
+  window_strides = _get_sequence(strides, 2, channel_index, 'strides')
+  if window_strides[0] != 1:
+    raise ValueError(
+        f'Stride != 1 not supported for batch dimension. `strides`: {strides} '
+        f'`data_format`: {data_format}')
+  if window_strides[channel_index] != 1:
+    raise ValueError(
+        'Stride != 1 not supported for channel dimension. `strides`: '
+        f'{strides} '
+        f'`data_format`: {data_format}')
+  window_strides = [
+      e for i, e in enumerate(window_strides) if i not in [0, channel_index]
+  ]
+
+  if isinstance(padding, (list, tuple)):
+    if padding[0] != (0, 0):
+      raise ValueError(
+          f'Padding not supported for batch dimension. `padding`: {padding} '
+          f'`data_format`: {data_format}')
+    if padding[channel_index] != (0, 0):
+      raise ValueError(
+          'Padding not supported for channel dimension. `padding`: '
+          f'{padding} '
+          f'`data_format`: {data_format}')
+    padding = [s for i, s in enumerate(padding) if i not in [0, channel_index]]
+
+  return jax.lax.conv_general_dilated(
+      lhs=input,
+      rhs=filters,
+      window_strides=window_strides,
+      padding=padding,
+      dimension_numbers=(data_format, 'HWIO', data_format),
+  )
 
 
 def _sigmoid_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-argument
@@ -95,6 +198,11 @@ def _softmax_cross_entropy_with_logits(  # pylint: disable=invalid-name,unused-a
 
 
 # --- Begin Public Functions --------------------------------------------------
+
+conv2d = utils.copy_docstring(
+    'tf.nn.conv2d',
+    _conv2d)
+
 
 l2_normalize = utils.copy_docstring(
     'tf.nn.l2_normalize',
