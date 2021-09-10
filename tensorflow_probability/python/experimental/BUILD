@@ -53,6 +53,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/bijectors",
         "//tensorflow_probability/python/experimental/distribute",
         "//tensorflow_probability/python/experimental/distributions",
+        "//tensorflow_probability/python/experimental/joint_distribution_layers",
         "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
         "//tensorflow_probability/python/experimental/math",
