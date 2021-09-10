@@ -389,11 +389,10 @@ def block(f: Program, names: Sequence[str]) -> Program:
   """Returns a program that removes the provided names from transformations."""
 
   def program(key, *args, **kwargs):
-    return harvest.harvest(
+    return harvest.plant(
         f,
         tag=RANDOM_VARIABLE,
-        blocklist=names,
-        mode=harvest.HarvestMode.PLANT_ONLY)({}, key, *args, **kwargs)[0]
+        blocklist=names)({}, key, *args, **kwargs)
 
   return program
 
@@ -440,9 +439,8 @@ def intervene(f: Program, **observations: Dict[str, Any]) -> Program:
   """
 
   def wrapped(*args, **kwargs):
-    return harvest.harvest(
-        f, tag=RANDOM_VARIABLE, mode='plant_only')(observations, *args,
-                                                   **kwargs)[0]
+    return harvest.plant(
+        f, tag=RANDOM_VARIABLE)(observations, *args, **kwargs)
 
   return wrapped
 

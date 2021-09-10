@@ -48,15 +48,6 @@ class SummaryTest(test_util.TestCase):
     with self.assertRaisesRegex(ValueError, 'has already been reaped: x'):
       summary.get_summaries(f)(2.)
 
-  def test_can_append_to_growing_list_with_summary(self):
-    def f(x):
-      summary.summary(x + 1., name='x', mode='append')
-      summary.summary(x + 2., name='x', mode='append')
-      return x
-    _, summaries = summary.get_summaries(f)(2.)
-    self.assertSetEqual(set(summaries.keys()), {'x'})
-    np.testing.assert_allclose(summaries['x'], np.array([3., 4.]))
-
   def test_can_pull_summaries_out_of_scan_in_append_mode(self):
     def f(x):
       def body(x, _):
