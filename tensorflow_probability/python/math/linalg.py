@@ -54,7 +54,7 @@ def cholesky_concat(chol, cols, name=None):
   This operation is conceptually identical to:
   ```python
   def cholesky_concat_slow(chol, cols):  # cols shaped (n + m) x m = z x m
-    mat = tf.matmul(chol, chol, adjoint_b=True)  # batch of n x n
+    mat = tf.matmul(chol, chol, adjoint_b=True)  # shape of n x n
     # Concat columns.
     mat = tf.concat([mat, cols[..., :tf.shape(mat)[-2], :]], axis=-1)  # n x z
     # Concat rows.
@@ -150,7 +150,7 @@ def cholesky_update(chol, update_vector, multiplier=1., name=None):
             ps.shape(chol)[:-2],
             ps.shape(update_vector)[:-1]), ps.shape(multiplier))
     chol = tf.broadcast_to(
-        chol, ps.concat([batch_shape, tf.shape(chol)[-2:]], axis=0))
+        chol, ps.concat([batch_shape, ps.shape(chol)[-2:]], axis=0))
     update_vector = tf.broadcast_to(
         update_vector,
         ps.concat([batch_shape, ps.shape(update_vector)[-1:]], axis=0))
@@ -170,7 +170,7 @@ def cholesky_update(chol, update_vector, multiplier=1., name=None):
       """Computes the next column of the updated cholesky."""
       _, _, omega, b = accumulated_quantities
       index, diagonal_member, col = state
-      omega_at_index = tf.gather(omega, index, axis=-1)
+      omega_at_index = omega[..., index]
 
       # Line 4
       new_diagonal_member = tf.math.sqrt(
@@ -196,7 +196,7 @@ def cholesky_update(chol, update_vector, multiplier=1., name=None):
 
     new_diag, new_chol, _, _ = tf.scan(
         fn=compute_new_column,
-        elems=(tf.range(0, tf.shape(chol)[0]), chol_diag, chol),
+        elems=(tf.range(0, ps.shape(chol)[0]), chol_diag, chol),
         initializer=(
             tf.zeros_like(multiplier),
             tf.zeros_like(chol[0, ...]),
