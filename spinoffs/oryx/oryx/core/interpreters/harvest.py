@@ -119,11 +119,24 @@ plant(f, tag='intermediate')({'y': 0.}, 5.)  # ==> 1.
 reap(f, tag='intermediate')(1.)  # ==> {'y': 2.}
 reap(f, tag='intermediate')(5.)  # ==> {'y': 6.}
 ```
-"""
-import enum
-from typing import Any, Callable, Dict, Iterable, List, FrozenSet, Tuple, Union
 
+#### Sharp edges
+
+* `harvest` has undefined semantics under autodifferentiation. If a function
+  you're taking the gradient of has a `sow`, it might produce unintuitive
+  results when harvested. To better control gradient semantics, you can use
+  `jax.custom_jvp` or `jax.custom_vjp`. The current implementation sows primals
+  and tangents in the JVP but ignore cotangents in the VJP. These particular
+  semantics are subject to change.
+* Planting values into a `pmap` is partially working. Harvest tries to plant all
+  the values, assuming they have a leading map dimension.
+"""
+import collections
 import dataclasses
+import functools
+
+from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tuple, Union
+
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
@@ -131,17 +144,13 @@ from jax import lax
 from jax import linear_util as lu
 from jax import tree_util
 from jax import util as jax_util
-# pylint: disable=g-import-not-at-top
-try:
-  from jax._src.lax import control_flow as lax_control_flow
-except ImportError:
-  from jax.lax import lax_control_flow  # type: ignore
+from jax._src.lax import control_flow as lcf
 from jax.interpreters import ad
 from jax.interpreters import batching
-from jax.interpreters import masking
+from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 from jax.lib.xla_bridge import xla_client as xc
-import jax.numpy as np
+import jax.numpy as jnp
 
 from oryx.core import primitive as prim
 from oryx.core import trace_util
@@ -149,341 +158,33 @@ from oryx.core import trace_util
 __all__ = [
     'HarvestTrace',
     'HarvestTracer',
-    'sow',
+    'call_and_reap',
     'harvest',
-    'reap',
-    'plant',
     'nest',
+    'plant',
+    'reap',
+    'sow',
 ]
 
-safe_map = jax_util.safe_map
-safe_zip = jax_util.safe_zip
-
-
-class HarvestMode(enum.Enum):
-  REAP_PLANT = 'reap_plant'
-  PLANT_ONLY = 'plant_only'
-
-
-@dataclasses.dataclass(frozen=True)
-class HarvestSettings:
-  """Contains the settings for a HarvestTrace."""
-  tag: str
-  blocklist: FrozenSet[str]
-  allowlist: Union[FrozenSet[str], None]
-  mode: HarvestMode
-  exclusive: bool
-
-
-@dataclasses.dataclass
-class HarvestContext:
-  """Contains the settings and storage for the current trace in the stack."""
-  settings: HarvestSettings
-  reaps: Dict[str, Any]
-  plants: Dict[str, Any]
-
-  def __post_init__(self):
-    self._already_planted = set()
-
-  def handle_sow(self, values, *, name, tag, mode, tree):
-    """Determines if a value should be planted or reaped and calls the appropriate handler."""
-    if tag != self.settings.tag:
-      if self.settings.exclusive:
-        return values
-      return sow_p.bind(*values, name=name, tag=tag, mode=mode, tree=tree)
-    if (self.settings.allowlist is not None and
-        name not in self.settings.allowlist):
-      return values
-    if name in self.settings.blocklist:
-      return values
-    if name in self.plants:
-      return self.handle_plant(values, name=name, mode=mode, tree=tree)
-    elif self.settings.mode is not HarvestMode.PLANT_ONLY:
-      return self.handle_reap(values, name=name, mode=mode, tree=tree)
-    return sow_p.bind(*values, name=name, tag=tag, mode=mode, tree=tree)
-
-  def handle_reap(self, values, *, name, mode, tree):
-    """Stores values in the context."""
-    unflat_values = tree_util.tree_unflatten(tree, values)
-    if mode == 'strict' and name in self.reaps:
-      raise ValueError(f'Variable has already been reaped: {name}')
-    if mode == 'append':
-      if name not in self.reaps:
-        self.reaps[name] = HarvestList([])
-      self.reaps[name].append(unflat_values)
-    elif mode == 'clobber' or mode == 'strict':
-      self.reaps[name] = unflat_values
-    else:
-      raise ValueError(f'Invalid sow mode: {mode}')
-    return values
-
-  def handle_plant(self, values, *, name, mode, tree, **_):
-    """Pulls values from the context."""
-    del values
-    if mode == 'strict' and name in self._already_planted:
-      raise ValueError(f'Variable has already been planted: {name}')
-    self._already_planted.add(name)
-    values = self.plants[name]
-    if mode == 'append':
-      if not isinstance(values, HarvestList):
-        values = self.plants[name] = HarvestList(values)
-      values = values.pop()
-    flat_values, tree2 = tree_util.tree_flatten(values)
-    if tree != tree2:
-      raise ValueError('Must plant with same tree structure as value: '
-                       f'Plant: {tree} vs Value: {tree2}.')
-    return flat_values
-
-
-harvest_custom_rules = {}
-
-
-class HarvestList:
-  """Class used to store sows with mode = 'append'."""
-
-  def __init__(self, data, size=0, idx=0):
-    self.data = data
-    self.size = size
-    self.idx = idx
-
-  def pop(self):
-    out = self.data[self.idx]
-    self.idx += 1
-    return out
-
-  def append(self, tracers):
-    self.data.append(tracers)
-    self.size += 1
-
-  def as_array(self):
-    return tree_util.tree_multimap(lambda *args: np.array(list(args)),
-                                   *self.data)
-
-  def flatten(self):
-    return (self.data,), (self.size, self.idx)
-
-  @classmethod
-  def unflatten(cls, data, xs):
-    size, idx = data
-    return HarvestList(xs[0], size=size, idx=idx)
-
-
-tree_util.register_pytree_node(HarvestList, HarvestList.flatten,
-                               HarvestList.unflatten)
-
-
-class HarvestTrace(jax_core.Trace):
-  """A HarvestTrace manages HarvestTracer objects.
-
-  Since HarvestTracers are just wrappers around known values, HarvestTrace
-  just passes these values through primitives, except in the case of
-  `sow` and `nest`, which are specially handled by the active HarvestContext.
-
-  Default primitive logic lives in `process_primitive`, with special logic for
-  `sow` in `handle_sow`.
-  """
-
-  def pure(self, val):
-    return HarvestTracer(self, val)
-
-  def sublift(self, tracer):
-    return self.pure(tracer.val)
-
-  def lift(self, val):
-    return self.pure(val)
-
-  def instantiate_const(self, val):
-    if isinstance(val, HarvestTracer):
-      return val
-    return self.pure(val)
-
-  def process_primitive(self, primitive, tracers, params):
-    tracers = safe_map(self.instantiate_const, tracers)
-    if primitive in harvest_custom_rules:
-      return harvest_custom_rules[primitive](self, *tracers, **params)
-    return self.default_process_primitive(primitive, tracers, params)
-
-  def default_process_primitive(self, primitive, tracers, params):
-    """Handles primitives without custom harvest rules."""
-    if primitive is sow_p:
-      return self.handle_sow(*tracers, **params)
-    vals = [t.val for t in tracers]
-    outvals = primitive.bind(*vals, **params)
-    if not primitive.multiple_results:
-      outvals = [outvals]
-    out_tracers = safe_map(self.pure, outvals)
-    if primitive.multiple_results:
-      return out_tracers
-    return out_tracers[0]
-
-  def handle_sow(self, *tracers, name, tag, mode, tree):
-    vals = [t.val for t in tracers]
-    context = trace_util.get_dynamic_context(self)
-    return safe_map(
-        self.pure,
-        context.handle_sow(vals, name=name, tag=tag, mode=mode, tree=tree))
-
-  def process_call(self, call_primitive, f, tracers, params):
-    return self.process_higher_order_primitive(call_primitive, f, tracers,
-                                               params, False)
-
-  def process_map(self, call_primitive, f, tracers, params):
-    return self.process_higher_order_primitive(call_primitive, f, tracers,
-                                               params, True)
-
-  def process_higher_order_primitive(self, primitive, f, tracers, params,
-                                     is_map):
-    name = params.pop('name', f.__name__)
-    tracers = safe_map(self.instantiate_const, tracers)
-    vals = [t.val for t in tracers]
-    context = trace_util.get_dynamic_context(self)
-    active_tag = context.settings.tag
-    plants = context.plants
-    if primitive is nest_p:
-      plants = plants.get(params['scope'], {})
-    if is_map:
-      # TODO(sharadmv): figure out if invars are mapped or unmapped
-      params = params.copy()
-      out_axes_thunk = params['out_axes_thunk']
-      @jax_util.as_hashable_function(closure=('harvest', out_axes_thunk))
-      def new_out_axes_thunk():
-        out_axes = out_axes_thunk()
-        assert all(out_axis == 0 for out_axis in out_axes)
-        return (0,) * out_tree().num_leaves
-      new_params = dict(
-          params,
-          in_axes=(0,) * len(tree_util.tree_leaves(plants)) + params['in_axes'],
-          out_axes_thunk=new_out_axes_thunk)
-    else:
-      new_params = dict(params)
-    all_args, all_tree = tree_util.tree_flatten((plants, vals))
-    num_plants = len(all_args) - len(vals)
-    if 'donated_invars' in params:
-      new_params['donated_invars'] = ((False,) * num_plants
-                                      + params['donated_invars'])
-    f, out_tree = harvest_eval(f, self, context.settings, all_tree)
-    out_flat = primitive.bind(
-        f, *all_args, **new_params, name=jax_util.wrap_name(name, 'harvest'))
-    out, reaps = tree_util.tree_unflatten(out_tree(), out_flat)
-    out_tracers = safe_map(self.pure, out)
-    reap_tracers = tree_util.tree_map(self.pure, reaps)
-    if primitive is nest_p and reap_tracers:
-      flat_tracers, tree = tree_util.tree_flatten(reap_tracers)
-      self.handle_sow(
-          *flat_tracers,
-          name=params['scope'],
-          tag=active_tag,
-          mode='strict',
-          tree=tree)
-    else:
-      for name, reap_tracer in reap_tracers.items():
-        flat_tracers, tree = tree_util.tree_flatten(reap_tracer)
-        self.handle_sow(
-            *flat_tracers, name=name, tag=active_tag, mode='strict', tree=tree)
-    return out_tracers
-
-  def post_process_call(self, call_primitive, out_tracers, params):
-    vals = tuple(t.val for t in out_tracers)
-    master = self.main
-
-    def todo(x):
-      trace = HarvestTrace(master, jax_core.cur_sublevel())
-      return safe_map(jax_util.partial(HarvestTracer, trace), x)
-
-    return vals, todo
-
-  post_process_map = post_process_call
-
-  def process_custom_jvp_call(self, primitive, fun, jvp, tracers):
-    # This implementation just drops the custom derivative rule.
-    # TODO(mattjj,sharadmv): don't drop the custom derivative rule
-    del primitive, jvp  # Unused.
-    return fun.call_wrapped(*tracers)
-
-  def process_custom_vjp_call(self, primitive, fun, fwd, bwd, tracers,
-                              out_trees):
-    # This implementation just drops the custom derivative rule.
-    # TODO(mattjj,sharadmv): don't drop the custom derivative rule
-    del primitive, fwd, bwd, out_trees  # Unused.
-    return fun.call_wrapped(*tracers)
-
-
-class HarvestTracer(jax_core.Tracer):
-  """A HarvestTracer just encapsulates a single value."""
-
-  def __init__(self, trace: HarvestTrace, val):
-    self._trace = trace
-    self.val = val
-
-  @property
-  def aval(self):
-    return abstract_arrays.raise_to_shaped(jax_core.get_aval(self.val))
-
-  def full_lower(self):
-    return self
-
-
-@lu.transformation
-def harvest_function(master: jax_core.MainTrace, settings: HarvestSettings,
-                     in_tree, args: Iterable[Any]):
-  """A JAX linear_util transformation that runs a HarvestTrace."""
-  trace = HarvestTrace(master, jax_core.cur_sublevel())
-  plants, args = tree_util.tree_unflatten(in_tree, args)
-  in_tracers = safe_map(trace.pure, args)
-  context = HarvestContext(settings, {}, plants)
-  with trace_util.new_dynamic_context(master, context):
-    ans = yield in_tracers, {}
-    out_tracers = safe_map(trace.full_raise, ans)
-    reaps = tree_util.tree_map(trace.full_raise, context.reaps)
-    del master
-  reaped_tracers = {}
-  for key, reaped_tracer in reaps.items():
-    if isinstance(reaped_tracer, HarvestList):
-      reaped_tracers[key] = reaped_tracer.as_array()
-    else:
-      reaped_tracers[key] = reaped_tracer
-  yield ([t.val for t in out_tracers],
-         tree_util.tree_map(lambda t: t.val, reaped_tracers))
-
-
-def harvest_eval(f: lu.WrappedFun, trace: HarvestTrace,
-                 settings: HarvestSettings,
-                 all_tree) -> Tuple[lu.WrappedFun, Callable[[], Any]]:
-  f = harvest_function(f, trace.main, settings, all_tree)
-  return harvest_wrapper(f, trace)
-
-
-@lu.transformation_with_aux
-def harvest_wrapper(trace: HarvestTrace, *args):
-  del trace
-  out, reaps = yield (args,), {}
-  out_flat, out_tree = tree_util.tree_flatten((out, reaps))
-  yield out_flat, out_tree
-
+Value = Any
 
 sow_p = jax_core.Primitive('sow')
 sow_p.multiple_results = True
 
 
+@sow_p.def_impl
 def _sow_impl(*args, **_):
   return args
 
 
-sow_p.def_impl(_sow_impl)
-
-
+@sow_p.def_abstract_eval
 def _sow_abstract_eval(*avals, **_):
   return avals
 
 
-sow_p.def_abstract_eval(_sow_abstract_eval)
-
-
+@functools.partial(ad.deflinear, sow_p)
 def _sow_transpose(cts_in, *_, **__):
   return cts_in
-
-
-ad.deflinear(sow_p, _sow_transpose)
 
 
 def _sow_batch_rule(batched_args, batch_dims, **params):
@@ -493,6 +194,33 @@ def _sow_batch_rule(batched_args, batch_dims, **params):
 
 batching.primitive_batchers[sow_p] = _sow_batch_rule
 xla.translations[sow_p] = lambda c, *args, **params: xc.ops.Tuple(c, args)
+
+
+def sow(value, *, tag: str, name: str, mode: str = 'strict', key=None):
+  """Marks a value with a name and a tag.
+
+  Args:
+    value: A JAX value to be tagged and named.
+    tag: a string representing the tag of the sown value.
+    name: a string representing the name to sow the value with.
+    mode: The mode by which to sow the value. There are three options: 1.
+      `'strict'` - if another value is sown with the same name and tag in the
+      same context, harvest will throw an error. 2. `'clobber'` - if another is
+      value is sown with the same name and tag, it will replace this value 3.
+      `'append'` - sown values of the same name and tag are appended to a
+      growing list. Append mode assumes some ordering on the values being sown
+      defined by data-dependence.
+    key: an optional JAX value that will be tied into the sown value.
+
+  Returns:
+    The original `value` that was passed in.
+  """
+  if key is not None:
+    value = prim.tie_in(key, value)
+  flat_args, in_tree = tree_util.tree_flatten(value)
+  out_flat = sow_p.bind(*flat_args, name=name, tag=tag, mode=mode, tree=in_tree)
+  return tree_util.tree_unflatten(in_tree, out_flat)
+
 
 nest_p = jax_core.CallPrimitive('nest')
 
@@ -524,145 +252,7 @@ def _nest_transpose_rule(*args, **kwargs):
 ad.primitive_transposes[nest_p] = _nest_transpose_rule
 
 
-def sow(value, *, tag, name, mode='strict', key=None):
-  """Marks a value with a name and a tag.
-
-  Args:
-    value: A JAX value to be tagged and named.
-    tag (str): a string representing the tag of the sown value.
-    name (str): a string representing the name to sow the value with.
-    mode (str): The mode by which to sow the value. There are three options: 1.
-      strict - if another value is sown with the same name and tag in the same
-      context, harvest will throw an error. 2. clobber - if another is value is
-      sown with the same name and tag, it will replace this value 3. append -
-      sown values of the same name and tag are appended to a growing list.
-      Append mode assumes some ordering on the values being sown defined by
-      data-dependence.
-    key: an optional JAX value that will be tied into the sown value.
-
-  Returns:
-    The original `value` that was passed in.
-  """
-  if key is not None:
-    value = prim.tie_in(key, value)
-  flat_args, in_tree = tree_util.tree_flatten(value)
-  out_flat = sow_p.bind(*flat_args, name=name, tag=tag, mode=mode, tree=in_tree)
-  return tree_util.tree_unflatten(in_tree, out_flat)
-
-
-def harvest(f,
-            *,
-            tag: str,
-            allowlist: Union[Iterable[str], None] = None,
-            blocklist: Iterable[str] = frozenset(),
-            mode: str = 'reap_plant',
-            exclusive: bool = False):
-  """Transforms a function into a "functionalized" version.
-
-  Sown values are namespaced using string "tags", where a value is sown (using
-  `sow`) with a tag, and `harvest` will ignore any sown values that don't match
-  its input tag. Harvest will take a function `f :: X -> Y` that has sown values
-  and converts it into a function `g :: Plants -> X -> (Y, Reaps)`.
-
-  The additional input to the function, called `plants`, are values that are
-  injected into the function. `plants` is a dictionary mapping string names
-  to values, and while `f` is being run, if a key in `plants` matches the
-  name of a sown value, the value in `plants` is used instead of the sown value.
-
-  The additional output of the function, called `reaps`, are values that are
-  collected from the function. `reaps` is a dictionary mapping string names
-  to values, and while `f` is being run, if the name of a sown value is not
-  in `plants`, it is added to the `reaps` dictionary and returned along
-  with the original output of the function. A value can only be reaped if it
-  is not also planted.
-
-  Args:
-    f: a function to be transformed.
-    tag: `str`, the harvest tag that will be reaped/planted.
-    allowlist: an iterable of strings of names that will be planted/reaped where
-      other names will be ignored.
-    blocklist: an iterable of strings of names that will be ignored while
-      planting/reaping.
-    mode: `str`, either `'reap_plant'` (the default) or `'plant_only'`. In
-      `'plant_only'` mode, `harvest` will keep `sow`s in the function that were
-      not `plant`-ed.
-    exclusive: `bool`, when `True` removes all other tags from the harvested
-      function.
-  Returns:
-    A function that takes in an additional initial input (a dictionary mapping
-    names to values to be injected) and an additional final output (a
-    dictionary mapping names to values that were collected).
-  """
-  blocklist = frozenset(blocklist)
-  if allowlist is not None:
-    allowlist = frozenset(allowlist)
-  settings = HarvestSettings(tag, blocklist, allowlist, HarvestMode(mode),
-                             exclusive)
-
-  def wrapped(plants, *args, **kwargs):
-    fun = lu.wrap_init(f, kwargs)
-    flat_args, in_tree = tree_util.tree_flatten(args)
-    flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
-    all_args, all_tree = tree_util.tree_flatten((plants, flat_args))
-    with jax_core.new_main(HarvestTrace) as master:
-      flat_fun = harvest_function(flat_fun, master, settings, all_tree)
-      out_flat, reaped = flat_fun.call_wrapped(all_args)
-      del master
-    out = tree_util.tree_unflatten(out_tree(), out_flat)
-    return out, reaped
-
-  return wrapped
-
-
-def reap(f, *, tag, **harvest_kwargs):
-  """Collects tagged values from a function.
-
-  Transforms a function to return the original output and intermediate collected
-  values. In implementation, returns partial(harvest(f), {}). See `harvest`
-  for more details.
-
-  Args:
-    f: a function to be transformed
-    tag: `str`, the harvest tag that will be reaped.
-    **harvest_kwargs: additional keyword arguments that will be passed to
-      `harvest`.
-
-  Returns:
-    A function that returns tagged values (a dictionary mapping
-    names to values that were collected).
-  """
-
-  def wrapped(*args, **kwargs):
-    return harvest(f, tag=tag, **harvest_kwargs)({}, *args, **kwargs)[1]
-
-  return wrapped
-
-
-def plant(f, *, tag, **harvest_kwargs):
-  """Injects tagged values into a function.
-
-  Transforms a function to one where tagged values can injected. In
-  implementation, returns a function that takes plants as an additional
-  initial argument.
-
-  Args:
-    f: a function to be transformed
-    tag: `str`, the harvest tag that will be planted.
-    **harvest_kwargs: additional keyword arguments that will be passed to
-      `harvest`.
-
-  Returns:
-    A function that takes in an additional initial input (a dictionary mapping
-    names to values to be injected).
-  """
-
-  def wrapped(plants, *args, **kwargs):
-    return harvest(f, tag=tag, **harvest_kwargs)(plants, *args, **kwargs)[0]
-
-  return wrapped
-
-
-def nest(f, *, scope):
+def nest(f, *, scope: str):
   """Wraps a function to create a new scope for harvested values.
 
   Harvested values live in one dynamic name scope (for a particular tag),
@@ -683,7 +273,7 @@ def nest(f, *, scope):
 
   Args:
     f: a function to be transformed
-    scope (str): a string that will act as the parent scope of all values tagged
+    scope: a string that will act as the parent scope of all values tagged
       in `f`.
 
   Returns:
@@ -695,115 +285,856 @@ def nest(f, *, scope):
     fun = lu.wrap_init(f, kwargs)
     flat_args, in_tree = tree_util.tree_flatten(args)
     flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
-    out_flat = nest_p.bind(flat_fun, *flat_args, scope=scope, mode='strict',
-                           name=getattr(f, '__name__', '<no name>'))
+    out_flat = nest_p.bind(
+        flat_fun,
+        *flat_args,
+        scope=scope,
+        name=getattr(f, '__name__', '<no name>'))
     return tree_util.tree_unflatten(out_tree(), out_flat)
 
   return wrapped
 
 
-def _find_sows(typed_jaxpr: jax_core.ClosedJaxpr,
-               tag: str) -> List[Dict[str, Any]]:
-  sows = []
-  for eqn in typed_jaxpr.jaxpr.eqns:
-    # TODO(sharadmv): handle nested Jaxprs
-    if eqn.primitive is sow_p:
-      sow_tag = eqn.params['tag']
-      if sow_tag == tag:
-        sows.append(eqn.params)
-  return sows
+class HarvestTrace(jax_core.Trace):
+  """An evaluating trace that dispatches to a dynamic context."""
+
+  def pure(self, val: Value) -> 'HarvestTracer':
+    return HarvestTracer(self, val)
+
+  def sublift(self, tracer: 'HarvestTracer') -> 'HarvestTracer':
+    return self.pure(tracer.val)
+
+  def lift(self, val: Value) -> 'HarvestTracer':
+    return self.pure(val)
+
+  def process_primitive(
+      self, primitive: jax_core.Primitive, tracers: List['HarvestTracer'],
+      params: Dict[str, Any]) -> Union['HarvestTracer', List['HarvestTracer']]:
+    context = trace_util.get_dynamic_context(self)
+    custom_rule = context.get_custom_rule(primitive)
+    if custom_rule:
+      return custom_rule(self, *tracers, **params)
+    return self.default_process_primitive(primitive, tracers, params)
+
+  def default_process_primitive(
+      self, primitive: jax_core.Primitive, tracers: List['HarvestTracer'],
+      params: Dict[str, Any]) -> Union['HarvestTracer', List['HarvestTracer']]:
+    context = trace_util.get_dynamic_context(self)
+    vals = [t.val for t in tracers]
+    if primitive is sow_p:
+      outvals = context.process_sow(*vals, **params)
+      return jax_util.safe_map(self.pure, outvals)
+    outvals = primitive.bind(*vals, **params)
+    if not primitive.multiple_results:
+      outvals = [outvals]
+    out_tracers = jax_util.safe_map(self.pure, outvals)
+    if primitive.multiple_results:
+      return out_tracers
+    return out_tracers[0]
+
+  def process_call(self, call_primitive: jax_core.Primitive, f: Any,
+                   tracers: List['HarvestTracer'], params: Dict[str, Any]):
+    context = trace_util.get_dynamic_context(self)
+    if call_primitive is nest_p:
+      return context.process_nest(self, f, *tracers, **params)
+    return context.process_higher_order_primitive(self, call_primitive, f,
+                                                  tracers, params, False)
+
+  def post_process_call(self, call_primitive, out_tracers, params):
+    vals = tuple(t.val for t in out_tracers)
+    master = self.main
+
+    def todo(x):
+      trace = HarvestTrace(master, jax_core.cur_sublevel())
+      return jax_util.safe_map(jax_util.partial(HarvestTracer, trace), x)
+
+    return vals, todo
+
+  def process_map(self, call_primitive: jax_core.Primitive, f: Any,
+                  tracers: List['HarvestTracer'], params: Dict[str, Any]):
+    context = trace_util.get_dynamic_context(self)
+    return context.process_higher_order_primitive(self, call_primitive, f,
+                                                  tracers, params, True)
+
+  post_process_map = post_process_call
+
+  def process_custom_jvp_call(self, primitive, fun, jvp, tracers):
+    # This implementation just drops the custom derivative rule.
+    # TODO(mattjj,sharadmv): don't drop the custom derivative rule
+    del primitive, jvp  # Unused.
+    return fun.call_wrapped(*tracers)
+
+  def process_custom_vjp_call(self, primitive, fun, fwd, bwd, tracers,
+                              out_trees):
+    # This implementation just drops the custom derivative rule.
+    # TODO(mattjj,sharadmv): don't drop the custom derivative rule
+    del primitive, fwd, bwd, out_trees  # Unused.
+    return fun.call_wrapped(*tracers)
 
 
-def _scan_harvest_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
-                       num_consts, num_carry, linear, unroll):
-  """Collects and injects values into/from the scan body."""
+class HarvestTracer(jax_core.Tracer):
+  """A `HarvestTracer` just encapsulates a single value."""
+
+  def __init__(self, trace: 'HarvestTrace', val: Value):
+    self._trace = trace
+    self.val = val
+
+  @property
+  def aval(self):
+    return abstract_arrays.raise_to_shaped(jax_core.get_aval(self.val))
+
+  def full_lower(self):
+    return self
+
+
+@dataclasses.dataclass(frozen=True)
+class HarvestSettings:
+  """Contains the settings for a HarvestTrace."""
+  tag: str
+  blocklist: FrozenSet[str]
+  allowlist: Union[FrozenSet[str], None]
+  exclusive: bool
+
+
+@dataclasses.dataclass
+class HarvestContext:
+  """A context that handles `sow`s and `nest`s in a `HarvestTrace`."""
+  settings: HarvestSettings
+
+  def process_sow(self, *values, name, tag, mode, tree):
+    """Handles a `sow` primitive in a `HarvestTrace`."""
+    if mode not in {'strict', 'append', 'clobber'}:
+      raise ValueError(f'Invalid mode: {mode}')
+    if tag != self.settings.tag:
+      if self.settings.exclusive:
+        return values
+      return sow_p.bind(*values, name=name, tag=tag, tree=tree, mode=mode)
+    if (self.settings.allowlist is not None and
+        name not in self.settings.allowlist):
+      return values
+    if name in self.settings.blocklist:
+      return values
+    return self.handle_sow(*values, name=name, tag=tag, tree=tree, mode=mode)
+
+  def get_custom_rule(self, primitive):
+    raise NotImplementedError
+
+  def handle_sow(self, *values, name, tag, mode, tree):
+    raise NotImplementedError
+
+  def process_nest(self, trace, f, *tracers, scope, name):
+    raise NotImplementedError
+
+  def process_higher_order_primitive(self, trace: HarvestTrace,
+                                     call_primitive: jax_core.Primitive, f: Any,
+                                     tracers: List['HarvestTracer'],
+                                     params: Dict[str, Any], is_map: bool):
+    raise NotImplementedError
+
+
+reap_custom_rules = {}
+
+
+@dataclasses.dataclass
+class Reap:
+  value: Any
+  metadata: Dict[str, Any]
+
+
+@dataclasses.dataclass
+class ReapContext(HarvestContext):
+  """Contains the settings and storage for the current trace in the stack."""
+  settings: HarvestSettings
+  reaps: Dict[str, Reap]
+
+  def get_custom_rule(self, primitive):
+    return reap_custom_rules.get(primitive)
+
+  def handle_sow(self, *values, name, tag, tree, mode):
+    """Stores a sow in the reaps dictionary."""
+    del tag
+    if name in self.reaps:
+      raise ValueError(f'Variable has already been reaped: {name}')
+    avals = tree_util.tree_unflatten(
+        tree,
+        [abstract_arrays.raise_to_shaped(jax_core.get_aval(v)) for v in values])
+    self.reaps[name] = Reap(
+        tree_util.tree_unflatten(tree, values), dict(mode=mode, aval=avals))
+    return values
+
+  def reap_higher_order_primitive(self, trace, call_primitive, f, tracers,
+                                  params, is_map):
+    """Wraps the inner function with a reap trace."""
+    name = jax_util.wrap_name(params.pop('name', f.__name__), 'reap')
+    vals = [t.val for t in tracers]
+    f, aux = reap_eval(f, trace, self.settings)
+
+    if is_map:
+      out_axes_thunk = params['out_axes_thunk']
+
+      @jax_util.as_hashable_function(closure=('harvest', out_axes_thunk))
+      def new_out_axes_thunk():
+        out_axes = out_axes_thunk()
+        assert all(out_axis == 0 for out_axis in out_axes)
+        return (0,) * aux().num_leaves
+
+      params = dict(params, out_axes_thunk=new_out_axes_thunk)
+    out_flat = call_primitive.bind(f, *vals, name=name, **params)
+    out_tree = aux()
+    out_vals, reaps = tree_util.tree_unflatten(out_tree, out_flat)
+    out_tracers = jax_util.safe_map(trace.pure, out_vals)
+    reap_tracers = tree_util.tree_map(trace.pure, reaps)
+    return out_tracers, reap_tracers
+
+  def process_nest(self, trace, f, *tracers, scope, name, **params):
+    out_tracers, reap_tracers = self.reap_higher_order_primitive(
+        trace, nest_p, f, tracers, dict(params, name=name, scope=scope), False)
+    tag = self.settings.tag
+    if reap_tracers:
+      flat_reap_tracers, reap_tree = tree_util.tree_flatten(reap_tracers)
+      trace.process_primitive(
+          sow_p, flat_reap_tracers,
+          dict(name=scope, tag=tag, tree=reap_tree, mode='strict'))
+    return out_tracers
+
+  def process_higher_order_primitive(self, trace, call_primitive, f, tracers,
+                                     params, is_map):
+    out_tracers, reap_tracers = self.reap_higher_order_primitive(
+        trace, call_primitive, f, tracers, params, is_map)
+    tag = self.settings.tag
+    for k, v in reap_tracers.items():
+      flat_reap_tracers, reap_tree = tree_util.tree_flatten(v)
+      trace.process_primitive(
+          sow_p, flat_reap_tracers,
+          dict(name=k, tag=tag, tree=reap_tree, mode='strict'))
+    return out_tracers
+
+
+@lu.transformation
+def reap_function(main: jax_core.MainTrace, settings: HarvestSettings,
+                  return_metadata: bool, args: Iterable[Any]):
+  """A function transformation that returns reap values."""
+  trace = HarvestTrace(main, jax_core.cur_sublevel())
+  in_tracers = jax_util.safe_map(trace.pure, args)
+  context = ReapContext(settings, {})
+  with trace_util.new_dynamic_context(main, context):
+    ans = yield in_tracers, {}
+    out_tracers = jax_util.safe_map(trace.full_raise, ans)
+    reap_tracers = tree_util.tree_map(lambda x: trace.full_raise(x.value),
+                                      context.reaps)
+    reap_metadata = tree_util.tree_map(lambda x: x.metadata, context.reaps)
+    del main
+  out_values, reap_values = tree_util.tree_map(lambda x: x.val,
+                                               (out_tracers, reap_tracers))
+  if return_metadata:
+    out = (out_values, reap_values, reap_metadata)
+  else:
+    out = (out_values, reap_values)
+  yield out
+
+
+def reap_eval(
+    f: lu.WrappedFun, trace: HarvestTrace,
+    settings: HarvestSettings) -> Tuple[lu.WrappedFun, Callable[[], Any]]:
+  f = reap_function(f, trace.main, settings, False)
+  return reap_wrapper(f, trace)
+
+
+@lu.transformation_with_aux
+def reap_wrapper(trace: HarvestTrace, *args):
+  del trace
+  out, reaps = yield (args,), {}
+  out_flat, out_tree = tree_util.tree_flatten((out, reaps))
+  yield out_flat, out_tree
+
+
+def call_and_reap(f,
+                  *,
+                  tag: str,
+                  allowlist: Optional[Iterable[str]] = None,
+                  blocklist: Iterable[str] = frozenset(),
+                  exclusive: bool = False):
+  """Transforms a function into one that additionally returns its sown values.
+
+  Args:
+    f: a function to be transformed.
+    tag: a string tag; only sown values with `tag` will be reaped.
+    allowlist: an optional sequence of string names, which if provided will
+      enforce that only sows with names in the allowlist will be reaped.
+    blocklist: an optional sequence of string names, which if provided will
+      enforce that only no sows with names in the blocklist will be reaped.
+    exclusive: determines whether or not to execute in "exclusive" mode
+      where other tags are removed during execution.
+
+  Returns:
+    A new function that executes the original and returns its sown values as
+    an additional return value.
+  """
+  blocklist = frozenset(blocklist)
+  if allowlist is not None:
+    allowlist = frozenset(allowlist)
+  settings = HarvestSettings(tag, blocklist, allowlist, exclusive)
+
+  def wrapped(*args, **kwargs):
+    fun = lu.wrap_init(f, kwargs)
+    flat_args, in_tree = tree_util.tree_flatten(args)
+    flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
+    with jax_core.new_main(HarvestTrace) as main:
+      flat_fun = reap_function(flat_fun, main, settings, False)
+      out_flat, reaps = flat_fun.call_wrapped(flat_args)
+      del main
+    return tree_util.tree_unflatten(out_tree(), out_flat), reaps
+
+  return wrapped
+
+
+def reap(f,
+         *,
+         tag: str,
+         allowlist: Optional[Iterable[str]] = None,
+         blocklist: Iterable[str] = frozenset(),
+         exclusive: bool = False):
+  """Transforms a function into one that returns its sown values.
+
+  Args:
+    f: a function to be transformed.
+    tag: a string tag; only sown values with `tag` will be reaped.
+    allowlist: an optional sequence of string names, which if provided will
+      enforce that only sows with names in the allowlist will be reaped.
+    blocklist: an optional sequence of string names, which if provided will
+      enforce that only no sows with names in the blocklist will be reaped.
+    exclusive: determines whether or not to execute in "exclusive" mode
+      where other tags are removed during execution.
+
+  Returns:
+    A new function that executes the original and returns its sown values.
+  """
+
+  def wrapped(*args, **kwargs):
+    return call_and_reap(
+        f,
+        tag=tag,
+        allowlist=allowlist,
+        blocklist=blocklist,
+        exclusive=exclusive)(*args, **kwargs)[1]
+
+  return wrapped
+
+
+@lu.transformation_with_aux
+def _reap_metadata_wrapper(*args):
+  out, reaps, metadata = yield (args,), {}
+  yield (out, reaps), metadata
+
+
+def _get_harvest_metadata(closed_jaxpr, settings, *args):
+  """Probes a jaxpr for metadata like its sown values."""
+  fun = lu.wrap_init(jax_core.jaxpr_as_fun(closed_jaxpr))
+  with jax_core.new_main(HarvestTrace) as main:
+    settings = HarvestSettings(settings.tag, settings.blocklist,
+                               settings.allowlist, True)
+    fun = reap_function(fun, main, settings, True)
+    fun, aux = _reap_metadata_wrapper(fun)
+    flat_args, in_tree = tree_util.tree_flatten(args)
+    flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
+    in_avals = jax_util.safe_map(
+        lambda a: abstract_arrays.raise_to_shaped(jax_core.get_aval(a)),
+        flat_args)
+    pe.trace_to_jaxpr_final(flat_fun, in_avals)
+    metadata = aux()
+    out_tree()
+  return metadata
+
+
+def _reap_scan_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
+                    num_consts, num_carry, linear, unroll):
+  """Reaps the body of a scan to pull out `clobber` and `append` sows."""
+
+  const_tracers, carry_tracers, xs_tracers = jax_util.split_list(
+      tracers, [num_consts, num_carry])
+  _, carry_avals, xs_avals = tree_util.tree_map(
+      lambda x: x.aval, (const_tracers, carry_tracers, xs_tracers))
+  const_vals, carry_vals, xs_vals = tree_util.tree_map(
+      lambda x: x.val, (const_tracers, carry_tracers, xs_tracers))
   context = trace_util.get_dynamic_context(trace)
   settings = context.settings
-  values = [t.val for t in tracers]
-  consts, init, xs = jax_util.split_list(values, [num_consts, num_carry])
+  x_tracers = [t[0] for t in xs_tracers]
+  x_avals = [t.aval for t in x_tracers]
+  x_vals = [t.val for t in x_tracers]
+  metadata = _get_harvest_metadata(jaxpr, settings,
+                                   *(const_vals + carry_vals + x_vals))
 
-  active_sows = _find_sows(jaxpr, settings.tag)
-  active_modes = [params['mode'] for params in active_sows]
-  if any(mode == 'strict' for mode in active_modes):
-    raise ValueError('Cannot use strict mode in a scan.')
-  active_names = [params['name'] for params in active_sows]
-  sow_modes = {name: mode for name, mode in zip(active_names, active_modes)}
-  carry_plants = {
-      name: context.plants[name]
-      for name in active_names
-      if name in context.plants and sow_modes[name] == 'clobber'
-  }
-  xs_plants = {
-      name: context.plants[name]
-      for name in active_names
-      if name in context.plants and sow_modes[name] == 'append'
-  }
+  reap_modes = collections.defaultdict(set)
+  reap_carry_avals = {}
+  for name, meta in metadata.items():
+    mode = meta['mode']
+    aval = meta['aval']
+    if mode == 'strict':
+      raise ValueError(f'Cannot use strict mode for \'{name}\' inside `scan`.')
+    reap_modes[mode].add(name)
+    if mode == 'clobber':
+      reap_carry_avals[name] = aval
+  body_fun = jax_core.jaxpr_as_fun(jaxpr)
 
-  def jaxpr_fun(carry, x):
-    body_out = jax_core.eval_jaxpr(jaxpr.jaxpr, jaxpr.literals,
-                                   *(consts + carry + x))
-    carry, y = jax_util.split_list(body_out, [num_carry])
-    return carry, y
+  reap_carry_flat_avals, _ = tree_util.tree_flatten(reap_carry_avals)
 
-  harvest_body = harvest(
-      jaxpr_fun,
+  reap_carry_in_tree = tree_util.tree_structure(
+      ((carry_avals, reap_carry_avals), xs_avals))
+
+  def new_body(carry, x):
+    carry, _ = carry
+    all_values = const_vals + tree_util.tree_leaves((carry, x))
+    out, reaps = call_and_reap(
+        body_fun,
+        tag=settings.tag,
+        allowlist=settings.allowlist,
+        blocklist=settings.blocklist,
+        exclusive=settings.exclusive)(*all_values)
+    carry_out, y = jax_util.split_list(out, [num_carry])
+    carry_reaps = {
+        name: val
+        for name, val in reaps.items()
+        if name in reap_modes['clobber']
+    }
+    xs_reaps = {
+        name: val for name, val in reaps.items() if name in reap_modes['append']
+    }
+    return (carry_out, carry_reaps), (y, xs_reaps)
+
+  new_body_jaxpr, consts, out_tree = lcf._initial_style_jaxpr(  # pylint: disable=protected-access
+      new_body, reap_carry_in_tree,
+      tuple(carry_avals + reap_carry_flat_avals + x_avals))
+  dummy_reap_carry_vals = tree_util.tree_map(
+      lambda x: jnp.zeros(x.shape, x.dtype), reap_carry_flat_avals)
+  out = lax.scan_p.bind(
+      *(consts + carry_vals + dummy_reap_carry_vals + xs_vals),
+      reverse=reverse,
+      length=length,
+      jaxpr=new_body_jaxpr,
+      num_consts=len(consts),
+      num_carry=len(carry_vals + dummy_reap_carry_vals),
+      linear=(linear[:len(consts)] + (False,) * len(dummy_reap_carry_vals) +
+              linear[len(consts):]),
+      unroll=unroll)
+  (carry_out,
+   carry_reaps), (ys, ys_reaps) = tree_util.tree_unflatten(out_tree, out)
+  (carry_out, carry_reaps), (ys, ys_reaps) = tree_util.tree_map(
+      trace.pure, ((carry_out, carry_reaps), (ys, ys_reaps)))
+  for k, v in {**carry_reaps, **ys_reaps}.items():
+    sow(v, tag=settings.tag, mode=metadata[k]['mode'], name=k)
+  return carry_out + ys
+
+
+reap_custom_rules[lcf.scan_p] = _reap_scan_rule
+
+
+def _reap_while_rule(trace: HarvestTrace, *tracers, cond_jaxpr, body_jaxpr,
+                     cond_nconsts, body_nconsts):
+  """Reaps the body of a while loop to get the reaps of the final iteration."""
+  cond_const_tracers, body_const_tracers, init_tracers = jax_util.split_list(
+      tracers, [cond_nconsts, body_nconsts])
+  _, init_avals = tree_util.tree_map(lambda x: x.aval,
+                                     (body_const_tracers, init_tracers))
+  cond_const_vals, body_const_vals, init_vals = tree_util.tree_map(
+      lambda x: x.val, (cond_const_tracers, body_const_tracers, init_tracers))
+  context = trace_util.get_dynamic_context(trace)
+  settings = context.settings
+  body_metadata = _get_harvest_metadata(body_jaxpr, settings,
+                                        *(body_const_tracers + init_tracers))
+  for k, meta in body_metadata.items():
+    mode = meta['mode']
+    if mode != 'clobber':
+      raise ValueError(
+          f'Must use clobber mode for \'{k}\' inside of a `while_loop`.')
+  reap_avals = {k: v['aval'] for k, v in body_metadata.items()}
+
+  cond_fun = jax_core.jaxpr_as_fun(cond_jaxpr)
+  body_fun = jax_core.jaxpr_as_fun(body_jaxpr)
+  reap_settings = dict(
       tag=settings.tag,
       allowlist=settings.allowlist,
       blocklist=settings.blocklist,
-      mode=settings.mode)
+      exclusive=settings.exclusive)
 
-  def body(carry, x):
-    x_plants, x_vals = x
-    (carry, y), reaps = harvest_body({
-        **carry_plants,
-        **x_plants
-    }, carry, x_vals)
-    return carry, (y, reaps)
+  def new_cond(carry, _):
+    return cond_fun(*(cond_const_vals + carry))
 
-  xs_flat = tree_util.tree_leaves((xs_plants, xs))
-  x_avals = []
-  for x in xs_flat:
-    x_aval = jax_core.get_aval(x)
-    if x_aval is jax_core.abstract_unit:
-      x_avals.append(x_aval)
-    else:
-      x_shape, x_dtype = masking.padded_shape_as_value(x.shape[1:]), x.dtype
-      x_avals.append(abstract_arrays.ShapedArray(x_shape, x_dtype))
-  x_avals = tuple(x_avals)
-  init_avals = tuple(
-      abstract_arrays.raise_to_shaped(jax_core.get_aval(a)) for a in init)
-  in_flat, in_tree = tree_util.tree_flatten((init, (xs_plants, xs)))
-  body_jaxpr, new_consts, out_tree = (
-      lax_control_flow._initial_style_jaxpr(  # pylint: disable=protected-access
-          body, in_tree, init_avals + x_avals))
-  new_values = list(new_consts) + in_flat
-  num_xs_plants = len(new_values) - len(init) - len(xs) - len(new_consts)
-  remaining_linear = linear[num_consts:]
-  new_linear = ((False,) * len(new_consts) + remaining_linear[:len(init)] +
-                (False,) * num_xs_plants + remaining_linear[len(init):])
-  assert len(new_linear) == len(new_values)
+  def new_body(carry, _):
+    carry, reaps = call_and_reap(body_fun,
+                                 **reap_settings)(*(body_const_vals + carry))
+    return (carry, reaps)
 
-  outs = lax.scan_p.bind(
-      *new_values,
-      length=length,
+  new_in_avals, new_in_tree = tree_util.tree_flatten((init_avals, reap_avals))
+  new_cond_jaxpr, cond_consts, _ = lcf._initial_style_jaxpr(  # pylint: disable=protected-access
+      new_cond, new_in_tree, tuple(new_in_avals))
+  new_body_jaxpr, body_consts, out_tree = lcf._initial_style_jaxpr(  # pylint: disable=protected-access
+      new_body, new_in_tree, tuple(new_in_avals))
+  dummy_reap_vals = tree_util.tree_map(lambda x: jnp.zeros(x.shape, x.dtype),
+                                       reap_avals)
+  new_in_vals = tree_util.tree_leaves((init_vals, dummy_reap_vals))
+  out = lax.while_p.bind(
+      *(cond_consts + body_consts + new_in_vals),
+      cond_nconsts=len(cond_consts),
+      body_nconsts=len(body_consts),
+      cond_jaxpr=new_cond_jaxpr,
+      body_jaxpr=new_body_jaxpr)
+  out = jax_util.safe_map(trace.pure, out)
+  out, reaps = tree_util.tree_unflatten(out_tree, out)
+  for k, v in reaps.items():
+    sow(v, name=k, tag=settings.tag, mode=body_metadata[k]['mode'])
+  return out
+
+
+reap_custom_rules[lcf.while_p] = _reap_while_rule
+
+
+def _check_branch_metadata(branch_metadatas):
+  """Checks that a set of harvest metadata are consistent with each other."""
+  first_branch_meta = branch_metadatas[0]
+  for branch_metadata in branch_metadatas[1:]:
+    if len(branch_metadata) != len(first_branch_meta):
+      raise ValueError('Mismatching number of `sow`s between branches.')
+    for name, meta in branch_metadata.items():
+      if name not in first_branch_meta:
+        raise ValueError(f'Missing sow in branch: \'{name}\'.')
+      first_meta_aval = first_branch_meta[name]['aval']
+      if meta['aval'].shape != first_meta_aval.shape:
+        raise ValueError(f'Mismatched shape between branches: \'{name}\'.')
+      if meta['aval'].dtype != first_meta_aval.dtype:
+        raise ValueError(f'Mismatched dtype between branches: \'{name}\'.')
+
+
+def _reap_cond_rule(trace, *tracers, branches, linear):
+  """Reaps each path of the `cond`."""
+  index_tracer, ops_tracers = tracers[0], tracers[1:]
+  index_val, ops_vals = tree_util.tree_map(lambda x: x.val,
+                                           (index_tracer, ops_tracers))
+  _, ops_avals = tree_util.tree_map(lambda x: x.aval,
+                                    (index_tracer, ops_tracers))
+  context = trace_util.get_dynamic_context(trace)
+  settings = context.settings
+  reap_settings = dict(
+      tag=settings.tag,
+      allowlist=settings.allowlist,
+      blocklist=settings.blocklist,
+      exclusive=settings.exclusive)
+  branch_metadatas = tuple(
+      _get_harvest_metadata(branch, settings, *ops_tracers)
+      for branch in branches)
+  _check_branch_metadata(branch_metadatas)
+  branch_funs = tuple(map(jax_core.jaxpr_as_fun, branches))
+  reaped_branches = tuple(
+      call_and_reap(f, **reap_settings) for f in branch_funs)
+  in_tree = tree_util.tree_structure(ops_avals)
+  new_branch_jaxprs, consts, out_trees = (
+      lcf._initial_style_jaxprs_with_common_consts(  # pylint: disable=protected-access
+          reaped_branches, in_tree, ops_avals, lax.cond_p.name))
+  out = lax.cond_p.bind(
+      index_val,
+      *(tuple(consts) + ops_vals),
+      branches=tuple(new_branch_jaxprs),
+      linear=(False,) * len(tuple(consts) + linear))
+  out = jax_util.safe_map(trace.pure, out)
+  out, reaps = tree_util.tree_unflatten(out_trees[0], out)
+  for k, v in reaps.items():
+    sow(v, name=k, tag=settings.tag, mode='strict')
+  return out
+
+
+reap_custom_rules[lcf.cond_p] = _reap_cond_rule
+
+plant_custom_rules = {}
+
+
+@dataclasses.dataclass
+class PlantContext(HarvestContext):
+  """Contains the settings and storage for the current trace in the stack."""
+  settings: HarvestSettings
+  plants: Dict[str, Any]
+
+  def __post_init__(self):
+    self._already_planted = set()
+
+  def get_custom_rule(self, primitive):
+    return plant_custom_rules.get(primitive)
+
+  def handle_sow(self, *values, name, tag, tree, mode):
+    """Returns the value stored in the plants dictionary."""
+    if name in self._already_planted:
+      raise ValueError(f'Variable has already been planted: {name}')
+    if name in self.plants:
+      self._already_planted.add(name)
+      return tree_util.tree_leaves(self.plants[name])
+    return sow_p.bind(*values, name=name, tag=tag, mode=mode, tree=tree)
+
+  def process_nest(self, trace, f, *tracers, scope, name, **params):
+    return self.process_higher_order_primitive(
+        trace, nest_p, f, tracers, dict(params, name=name, scope=scope), False)
+
+  def process_higher_order_primitive(self, trace, call_primitive, f, tracers,
+                                     params, is_map):
+    del is_map
+    name = jax_util.wrap_name(params.pop('name', f.__name__), 'reap')
+    context = trace_util.get_dynamic_context(trace)
+    vals = [t.val for t in tracers]
+    plants = context.plants
+    if 'in_axes' in params:
+      # TODO(b/199459308): figure out if invars are mapped or unmapped
+      params = dict(
+          params,
+          in_axes=(0,) * len(tree_util.tree_leaves(plants)) + params['in_axes'])
+    if 'donated_invars' in params:
+      params = dict(params)
+      params['donated_invars'] = (
+          (False,) * len(tree_util.tree_leaves(plants)) +
+          params['donated_invars'])
+    elif call_primitive is nest_p:
+      plants = plants.get(params['scope'], {})
+    all_vals, all_tree = tree_util.tree_flatten((plants, vals))
+    f = plant_eval(f, trace, self.settings, all_tree)
+    out_vals = call_primitive.bind(f, *all_vals, name=name, **params)
+    return jax_util.safe_map(trace.pure, out_vals)
+
+
+@lu.transformation
+def plant_function(main: jax_core.MainTrace, settings: HarvestSettings,
+                   in_tree: Any, args: Iterable[Any]):
+  """A function transformation that injects values in place of sows."""
+  trace = HarvestTrace(main, jax_core.cur_sublevel())
+  plants, args = tree_util.tree_unflatten(in_tree, args)
+  args = jax_util.safe_map(trace.pure, args)
+  context = PlantContext(settings, plants)
+  with trace_util.new_dynamic_context(main, context):
+    ans = yield args, {}
+    out_tracers = jax_util.safe_map(trace.full_raise, ans)
+    del main
+  yield [t.val for t in out_tracers]
+
+
+def plant_eval(f: lu.WrappedFun, trace: HarvestTrace, settings: HarvestSettings,
+               all_tree: Any) -> Tuple[lu.WrappedFun, Callable[[], Any]]:
+  f = plant_function(f, trace.main, settings, all_tree)
+  return plant_wrapper(f)
+
+
+@lu.transformation
+def plant_wrapper(*args):
+  out = yield (args,), {}
+  yield out
+
+
+def plant(f,
+          *,
+          tag: str,
+          allowlist: Optional[Iterable[str]] = None,
+          blocklist: Iterable[str] = frozenset(),
+          exclusive: bool = False):
+  """Transforms a function into one that injects values in place of sown ones.
+
+  Args:
+    f: a function to be transformed.
+    tag: a string tag; only sown values with `tag` will be planted.
+    allowlist: an optional sequence of string names, which if provided will
+      enforce that only sows with names in the allowlist will be planted.
+    blocklist: an optional sequence of string names, which if provided will
+      enforce that only no sows with names in the blocklist will be planted.
+    exclusive: determines whether or not to execute in "exclusive" mode
+      where other tags are removed during execution.
+
+  Returns:
+    A new function that takes in a dictionary of planted values in addition to
+    the original function's inputs, and injects the planted values in place of
+    sown values.
+  """
+
+  blocklist = frozenset(blocklist)
+  if allowlist is not None:
+    allowlist = frozenset(allowlist)
+  settings = HarvestSettings(tag, blocklist, allowlist, exclusive)
+
+  def wrapped(plants, *args, **kwargs):
+    fun = lu.wrap_init(f, kwargs)
+    flat_args, in_tree = tree_util.tree_flatten(args)
+    flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
+    all_args, all_tree = tree_util.tree_flatten((plants, flat_args))
+    with jax_core.new_main(HarvestTrace) as main:
+      flat_fun = plant_function(flat_fun, main, settings, all_tree)
+      out_flat = flat_fun.call_wrapped(all_args)
+      del main
+    return tree_util.tree_unflatten(out_tree(), out_flat)
+
+  return wrapped
+
+
+def _plant_scan_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
+                     num_consts, num_carry, linear, unroll):
+  """Injects values into a scan according to their sow mode."""
+
+  const_tracers, carry_tracers, xs_tracers = jax_util.split_list(
+      tracers, [num_consts, num_carry])
+  carry_avals, xs_avals = tree_util.tree_map(lambda x: x.aval,
+                                             (carry_tracers, xs_tracers))
+  const_vals, carry_vals, xs_vals = tree_util.tree_map(
+      lambda x: x.val, (const_tracers, carry_tracers, xs_tracers))
+  context = trace_util.get_dynamic_context(trace)
+  settings = context.settings
+  x_tracers = [t[0] for t in xs_tracers]
+  x_avals = [t.aval for t in x_tracers]
+  metadata = _get_harvest_metadata(jaxpr, settings,
+                                   *(const_tracers + carry_tracers + x_tracers))
+
+  plants = context.plants
+  plant_modes = collections.defaultdict(set)
+  plant_xs_avals = {}
+  for name, meta in metadata.items():
+    mode = meta['mode']
+    aval = meta['aval']
+    if mode == 'strict':
+      raise ValueError(f'Cannot use strict mode for \'{name}\' inside `scan`.')
+    plant_modes[mode].add(name)
+    if mode == 'append' and name in plants:
+      plant_xs_avals[name] = aval
+  body_fun = jax_core.jaxpr_as_fun(jaxpr)
+  clobber_plants = {
+      name: value
+      for name, value in plants.items()
+      if name in plant_modes['clobber']
+  }
+  append_plants = {
+      name: value
+      for name, value in plants.items()
+      if name in plant_modes['append']
+  }
+
+  plant_xs_flat_avals, _ = tree_util.tree_flatten(plant_xs_avals)
+
+  plant_xs_in_tree = tree_util.tree_structure(
+      (carry_avals, (xs_avals, plant_xs_avals)))
+
+  def new_body(carry, x):
+    x, plants = x
+    all_plants = {**plants, **clobber_plants}
+    all_values = const_vals + tree_util.tree_leaves((carry, x))
+    out = plant(
+        body_fun,
+        tag=settings.tag,
+        allowlist=settings.allowlist,
+        blocklist=settings.blocklist,
+        exclusive=settings.exclusive)(all_plants, *all_values)
+    carry_out, y = jax_util.split_list(out, [num_carry])
+    return carry_out, y
+
+  new_body_jaxpr, consts, _ = lcf._initial_style_jaxpr(  # pylint: disable=protected-access
+      new_body, plant_xs_in_tree,
+      tuple(carry_avals + x_avals + plant_xs_flat_avals))
+  plant_vals = tree_util.tree_leaves(append_plants)
+  out = lcf.scan_p.bind(
+      *(consts + carry_vals + xs_vals + plant_vals),
       reverse=reverse,
-      jaxpr=body_jaxpr,
-      num_consts=len(new_consts),
+      length=length,
+      jaxpr=new_body_jaxpr,
+      num_consts=len(consts),
       num_carry=num_carry,
-      linear=new_linear,
+      linear=linear + (False,) * len(plant_vals),
       unroll=unroll)
-  outs = safe_map(trace.pure, outs)
-  carry, (ys, reaps) = tree_util.tree_unflatten(out_tree, outs)
-  out_reaps = {}
-  for k, val in reaps.items():
-    mode = sow_modes.get(k, 'strict')
-    if mode == 'append':
-      val = tree_util.tree_map(np.concatenate, val)
-    elif mode == 'clobber':
-      val = tree_util.tree_map(lambda x: x[-1], val)
-    out_reaps[k] = sow(val, tag=settings.tag, name=k, mode='strict')
-  (carry, ys) = prim.tie_in(out_reaps, (carry, ys))
-  return carry + ys
+  return out
 
 
-harvest_custom_rules[lax.scan_p] = _scan_harvest_rule
+plant_custom_rules[lcf.scan_p] = _plant_scan_rule
+
+
+def _plant_while_rule(trace: HarvestTrace, *tracers, cond_jaxpr, body_jaxpr,
+                      cond_nconsts, body_nconsts):
+  """Injects values into a while loop, overriding values for all iterations."""
+  cond_const_tracers, body_const_tracers, init_tracers = jax_util.split_list(
+      tracers, [cond_nconsts, body_nconsts])
+  init_avals = tree_util.tree_map(lambda x: x.aval, init_tracers)
+  cond_const_vals, body_const_vals, init_vals = tree_util.tree_map(
+      lambda x: x.val, (cond_const_tracers, body_const_tracers, init_tracers))
+  context = trace_util.get_dynamic_context(trace)
+  settings = context.settings
+  body_metadata = _get_harvest_metadata(body_jaxpr, settings,
+                                        *(body_const_tracers + init_tracers))
+  for k, meta in body_metadata.items():
+    mode = meta['mode']
+    if mode != 'clobber':
+      raise ValueError(
+          f'Must use clobber mode for \'{k}\' inside of a `while_loop`.')
+
+  body_fun = jax_core.jaxpr_as_fun(body_jaxpr)
+  plant_settings = dict(
+      tag=settings.tag,
+      allowlist=settings.allowlist,
+      blocklist=settings.blocklist,
+      exclusive=settings.exclusive)
+  plants = context.plants
+
+  def new_body(*carry):
+    carry = plant(body_fun, **plant_settings)(plants,
+                                              *(tuple(body_const_vals) + carry))
+    return carry
+
+  in_tree = tree_util.tree_structure(init_avals)
+  new_body_jaxpr, new_body_consts, _ = lcf._initial_style_jaxpr(  # pylint: disable=protected-access
+      new_body, in_tree, tuple(init_avals))
+  out = lcf.while_p.bind(
+      *(cond_const_vals + new_body_consts + init_vals),
+      cond_nconsts=len(cond_const_vals),
+      body_nconsts=len(new_body_consts),
+      cond_jaxpr=cond_jaxpr,
+      body_jaxpr=new_body_jaxpr)
+  return jax_util.safe_map(trace.pure, out)
+
+
+plant_custom_rules[lcf.while_p] = _plant_while_rule
+
+
+def _plant_cond_rule(trace, *tracers, branches, linear):
+  """Injects the same values into both branches of a conditional."""
+  index_tracer, ops_tracers = tracers[0], tracers[1:]
+  index_val, ops_vals = tree_util.tree_map(lambda x: x.val,
+                                           (index_tracer, ops_tracers))
+  ops_avals = tree_util.tree_map(lambda x: x.aval, ops_tracers)
+  context = trace_util.get_dynamic_context(trace)
+  settings = context.settings
+  plant_settings = dict(
+      tag=settings.tag,
+      allowlist=settings.allowlist,
+      blocklist=settings.blocklist,
+      exclusive=settings.exclusive)
+  branch_metadatas = tuple(
+      _get_harvest_metadata(branch, settings, *ops_tracers)
+      for branch in branches)
+  _check_branch_metadata(branch_metadatas)
+  plants = context.plants
+  branch_funs = tuple(map(jax_core.jaxpr_as_fun, branches))
+  planted_branches = tuple(
+      functools.partial(plant(f, **plant_settings), plants)
+      for f in branch_funs)
+  in_tree = tree_util.tree_structure(ops_avals)
+  new_branch_jaxprs, consts, _ = (
+      lcf._initial_style_jaxprs_with_common_consts(  # pylint: disable=protected-access
+          planted_branches,
+          in_tree,
+          ops_avals,
+          lax.cond_p.name))
+  out = lax.cond_p.bind(
+      index_val,
+      *(tuple(consts) + ops_vals),
+      branches=tuple(new_branch_jaxprs),
+      linear=(False,) * len(tuple(consts) + linear))
+  return jax_util.safe_map(trace.pure, out)
+
+
+plant_custom_rules[lcf.cond_p] = _plant_cond_rule
+
+
+def harvest(f,
+            *,
+            tag: str,
+            allowlist: Optional[Iterable[str]] = None,
+            blocklist: Iterable[str] = frozenset(),
+            exclusive: bool = False):
+  kwargs = dict(
+      tag=tag, allowlist=allowlist, blocklist=blocklist, exclusive=exclusive)
+  return call_and_reap(plant(f, **kwargs), **kwargs)

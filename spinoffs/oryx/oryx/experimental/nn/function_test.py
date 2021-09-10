@@ -371,7 +371,10 @@ class FunctionTest(test_util.TestCase):
     def template(x, init_key=None):
       layer = state.init(ScalarMul(2 * jnp.ones(1)), name='scalar_mul')(
           init_key, x)
-      return layer(layer(x))
+      x, layer = layer.call_and_update(x)
+      x, layer = layer.call_and_update(x)
+      state.assign(layer, name='scalar_mul')
+      return x
     net = state.init(template)(self._seed, jnp.ones(5))
     np.testing.assert_array_equal(net(jnp.ones(5)), 4 * jnp.ones(5))
 
@@ -379,7 +382,10 @@ class FunctionTest(test_util.TestCase):
     def template(x, init_key=None):
       layer = state.init(ScalarMul(2 * jnp.ones(1)), name='scalar_mul')(
           init_key, x)
-      return layer(layer(x)).sum()
+      x, layer = layer.call_and_update(x)
+      x, layer = layer.call_and_update(x)
+      state.assign(layer, name='scalar_mul')
+      return x[0]
     net = state.init(template)(self._seed, jnp.ones(()))
 
     def loss(net, x):
