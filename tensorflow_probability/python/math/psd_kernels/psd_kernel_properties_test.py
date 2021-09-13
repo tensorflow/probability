@@ -143,8 +143,9 @@ class KernelPropertiesTest(test_util.TestCase):
         example_ndims=1,
         feature_dim=2,
         feature_ndims=1)))
-    with tfp_hps.no_tf_rank_errors():
-      diag = kernel.apply(xs, xs, example_ndims=1)
+    with tfp_hps.no_cholesky_decomposition_errors():
+      with tfp_hps.no_tf_rank_errors():
+        diag = kernel.apply(xs, xs, example_ndims=1)
 
     # Test flatten/unflatten.
     flat = tf.nest.flatten(kernel, expand_composites=True)
