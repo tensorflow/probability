@@ -459,7 +459,7 @@ class Sum(StructuralTimeSeries):
                               observation_noise_scale_prior,
                               tfb.Chain([
                                   tfb.Scale(scale=observed_stddev),
-                                  tfb.Softplus()]))]
+                                  tfb.Softplus(low=dtype_util.eps(dtype))]))]
       for component in components:
         for parameter in component.parameters:
           parameters.append(Parameter(

@@ -24,6 +24,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
@@ -446,22 +447,22 @@ class SparseLinearRegression(StructuralTimeSeries):
                         prior=tfd.InverseGamma(
                             0.5 * ones_like_weights_batch,
                             0.5 * ones_like_weights_batch),
-                        bijector=tfb.Softplus()),
+                        bijector=tfb.Softplus(low=dtype_util.eps(dtype))),
               Parameter('global_scale_noncentered',
                         prior=tfd.HalfNormal(
                             scale=ones_like_weights_batch),
-                        bijector=tfb.Softplus()),
+                        bijector=tfb.Softplus(low=dtype_util.eps(dtype))),
               Parameter('local_scale_variances',
                         prior=tfd.Independent(tfd.InverseGamma(
                             0.5 * ones_like_weights,
                             0.5 * ones_like_weights),
                                               reinterpreted_batch_ndims=1),
-                        bijector=tfb.Softplus()),
+                        bijector=tfb.Softplus(low=dtype_util.eps(dtype))),
               Parameter('local_scales_noncentered',
                         prior=tfd.Independent(tfd.HalfNormal(
                             scale=ones_like_weights),
                                               reinterpreted_batch_ndims=1),
-                        bijector=tfb.Softplus()),
+                        bijector=tfb.Softplus(low=dtype_util.eps(dtype))),
               Parameter('weights_noncentered',
                         prior=tfd.Independent(tfd.Normal(
                             loc=tf.zeros_like(ones_like_weights),

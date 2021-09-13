@@ -302,7 +302,7 @@ class DynamicLinearRegression(StructuralTimeSeries):
           parameters=[
               Parameter('drift_scale', drift_scale_prior,
                         tfb.Chain([tfb.Scale(scale=observed_stddev),
-                                   tfb.Softplus()]))
+                                   tfb.Softplus(low=dtype_util.eps(dtype))]))
           ],
           latent_size=num_features,
           init_parameters=init_parameters,

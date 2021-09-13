@@ -421,6 +421,8 @@ class SmoothSeasonal(StructuralTimeSeries):
         initial_state_prior = tfd.MultivariateNormalDiag(
             scale_diag=initial_state_scale * ones)
 
+      dtype = dtype_util.common_dtype([drift_scale_prior, initial_state_prior])
+
       self._initial_state_prior = initial_state_prior
       self._period = period
       self._frequency_multipliers = frequency_multipliers
@@ -430,7 +432,7 @@ class SmoothSeasonal(StructuralTimeSeries):
         parameters.append(Parameter(
             'drift_scale', drift_scale_prior,
             tfb.Chain([tfb.Scale(scale=observed_stddev),
-                       tfb.Softplus()])))
+                       tfb.Softplus(low=dtype_util.eps(dtype))])))
       self._allow_drift = allow_drift
 
       super(SmoothSeasonal, self).__init__(

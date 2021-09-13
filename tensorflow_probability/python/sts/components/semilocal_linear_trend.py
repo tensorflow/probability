@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import distribution_util as dist_util
+from tensorflow_probability.python.internal import dtype_util
 
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
@@ -397,6 +398,12 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
       if initial_slope_prior is None:
         initial_slope_prior = tfd.Normal(loc=0., scale=observed_stddev)
 
+      dtype = dtype_util.common_dtype([level_scale_prior,
+                                       slope_scale_prior,
+                                       autoregressive_coef_prior,
+                                       initial_level_prior,
+                                       initial_slope_prior])
+
       self._initial_state_prior = tfd.MultivariateNormalDiag(
           loc=tf.stack(
               [initial_level_prior.mean(),
@@ -418,7 +425,8 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
         autoregressive_coef_bijector = tfb.Identity()  # unconstrained
 
       stddev_preconditioner = tfb.Scale(scale=observed_stddev)
-      scaled_softplus = tfb.Chain([stddev_preconditioner, tfb.Softplus()])
+      scaled_softplus = tfb.Chain([stddev_preconditioner,
+                                   tfb.Softplus(low=dtype_util.eps(dtype))])
       super(SemiLocalLinearTrend, self).__init__(
           parameters=[
               Parameter('level_scale', level_scale_prior, scaled_softplus),

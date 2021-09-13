@@ -26,6 +26,7 @@ from tensorflow_probability.python import distributions as tfd
 
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import docstring_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
@@ -829,7 +830,7 @@ class Seasonal(StructuralTimeSeries):
             loc=observed_initial,
             scale=tf.abs(observed_initial) + observed_stddev)
 
-      dtype = tf.debugging.assert_same_float_dtype(
+      dtype = dtype_util.common_dtype(
           [drift_scale_prior, initial_effect_prior])
 
       if isinstance(initial_effect_prior, tfd.Normal):
@@ -868,7 +869,7 @@ class Seasonal(StructuralTimeSeries):
         parameters.append(Parameter(
             'drift_scale', drift_scale_prior,
             tfb.Chain([tfb.Scale(scale=observed_stddev),
-                       tfb.Softplus()])))
+                       tfb.Softplus(low=dtype_util.eps(dtype))])))
       self._allow_drift = allow_drift
 
       super(Seasonal, self).__init__(

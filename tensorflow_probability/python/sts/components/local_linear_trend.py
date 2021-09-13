@@ -24,6 +24,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions import linear_gaussian_ssm
 from tensorflow_probability.python.internal import distribution_util as dist_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
@@ -377,7 +378,7 @@ class LocalLinearTrend(StructuralTimeSeries):
         initial_slope_prior = tfd.Normal(
             loc=0., scale=observed_stddev, name='initial_slope_prior')
 
-      tf.debugging.assert_same_float_dtype([
+      dtype = dtype_util.common_dtype([
           level_scale_prior, slope_scale_prior, initial_level_prior,
           initial_slope_prior
       ])
@@ -393,7 +394,7 @@ class LocalLinearTrend(StructuralTimeSeries):
           ], axis=-1))
 
       scaled_softplus = tfb.Chain([tfb.Scale(scale=observed_stddev),
-                                   tfb.Softplus()])
+                                   tfb.Softplus(low=dtype_util.eps(dtype))])
       super(LocalLinearTrend, self).__init__(
           parameters=[
               Parameter('level_scale', level_scale_prior, scaled_softplus),

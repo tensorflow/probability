@@ -284,15 +284,17 @@ class LocalLevel(StructuralTimeSeries):
     init_parameters = dict(locals())
     with tf.name_scope(name or 'LocalLevel') as name:
 
-      dtype = dtype_util.common_dtype([level_scale_prior, initial_level_prior])
-
       if observed_time_series is not None:
         _, observed_stddev, observed_initial = (
             sts_util.empirical_statistics(observed_time_series))
       else:
-        observed_stddev, observed_initial = (tf.convert_to_tensor(
-            value=1., dtype=dtype), tf.convert_to_tensor(
-                value=0., dtype=dtype))
+        observed_stddev, observed_initial = 1., 0.
+
+      dtype = dtype_util.common_dtype([level_scale_prior,
+                                       initial_level_prior,
+                                       observed_stddev,
+                                       observed_initial],
+                                      dtype_hint=tf.float32)
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
@@ -303,7 +305,7 @@ class LocalLevel(StructuralTimeSeries):
             name='level_scale_prior')
       if initial_level_prior is None:
         self._initial_state_prior = tfd.MultivariateNormalDiag(
-            loc=observed_initial[..., tf.newaxis],
+            loc=tf.convert_to_tensor(observed_initial)[..., tf.newaxis],
             scale_diag=(
                 tf.abs(observed_initial) + observed_stddev)[..., tf.newaxis],
             name='initial_level_prior')
@@ -316,7 +318,7 @@ class LocalLevel(StructuralTimeSeries):
           parameters=[
               Parameter('level_scale', level_scale_prior,
                         tfb.Chain([tfb.Scale(scale=observed_stddev),
-                                   tfb.Softplus()])),
+                                   tfb.Softplus(low=dtype_util.eps(dtype))])),
           ],
           latent_size=1,
           init_parameters=init_parameters,
