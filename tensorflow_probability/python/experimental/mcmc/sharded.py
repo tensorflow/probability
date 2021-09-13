@@ -65,6 +65,10 @@ class Sharded(kernel.TransitionKernel):
         current_state, previous_kernel_results, seed=seed)
 
   @property
+  def parameters(self):
+    return self._parameters
+
+  @property
   def inner_kernel(self):
     return self._parameters['inner_kernel']
 

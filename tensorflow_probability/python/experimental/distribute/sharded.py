@@ -146,6 +146,9 @@ class Sharded(distribution_lib.Distribution):
         seed, self.experimental_shard_axis_names)
     return self.distribution.sample(sample_shape=n, seed=seed, **kwargs)
 
+  def _variance(self):
+    return self.distribution.variance()
+
   _log_prob = _implement_sharded_lp_fn('log_prob')
   _unnormalized_log_prob = _implement_sharded_lp_fn('unnormalized_log_prob')
 
