@@ -658,7 +658,7 @@ def _reap_scan_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
       lambda x: x.val, (const_tracers, carry_tracers, xs_tracers))
   context = trace_util.get_dynamic_context(trace)
   settings = context.settings
-  x_tracers = [t[0] for t in xs_tracers]
+  x_tracers = [t[0] if hasattr(t, '_getitem') else t for t in xs_tracers]
   x_avals = [t.aval for t in x_tracers]
   x_vals = [t.val for t in x_tracers]
   metadata = _get_harvest_metadata(jaxpr, settings,
@@ -978,7 +978,7 @@ def _plant_scan_rule(trace: HarvestTrace, *tracers, length, reverse, jaxpr,
       lambda x: x.val, (const_tracers, carry_tracers, xs_tracers))
   context = trace_util.get_dynamic_context(trace)
   settings = context.settings
-  x_tracers = [t[0] for t in xs_tracers]
+  x_tracers = [t[0] if hasattr(t, '_getitem') else t for t in xs_tracers]
   x_avals = [t.aval for t in x_tracers]
   metadata = _get_harvest_metadata(jaxpr, settings,
                                    *(const_tracers + carry_tracers + x_tracers))
