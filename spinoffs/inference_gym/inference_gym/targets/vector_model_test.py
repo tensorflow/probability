@@ -156,6 +156,33 @@ class TestBadSampleTransformationModel(targets.Model):
     return self._model.log_prob(value)
 
 
+class TestScalarModel(targets.Model):
+
+  def __init__(self):
+    self._model = tfd.Normal(0., 1.)
+
+    super(TestScalarModel, self).__init__(
+        default_event_space_bijector=tfb.Identity(),
+        event_shape=self._model.event_shape,
+        dtype=self._model.dtype,
+        name='test_scalar_model',
+        pretty_name='TestScalarModel',
+        sample_transformations=dict(
+            first_moment=targets.Model.SampleTransformation(
+                fn=lambda x: x,
+                pretty_name='First moment',
+            ),
+            second_moment=targets.Model.SampleTransformation(
+                fn=lambda x: x**2,
+                pretty_name='Second moment',
+            ),
+        ),
+    )
+
+  def _unnormalized_log_prob(self, value):
+    return self._model.log_prob(value)
+
+
 @test_util.multi_backend_test(globals(), 'targets.vector_model_test')
 @test_util.test_all_tf_execution_regimes
 class VectorModelTest(test_util.InferenceGymTestCase, parameterized.TestCase):
@@ -163,8 +190,10 @@ class VectorModelTest(test_util.InferenceGymTestCase, parameterized.TestCase):
   @parameterized.named_parameters(
       ('Structured', TestStructuredModel, 3 + 9, []),
       ('Unstructured', TestUnstructuredModel, 9, []),
+      ('Scalar', TestScalarModel, 1, []),
       ('BatchedStructured', TestStructuredModel, 3 + 9, [2]),
       ('BatchedUnstructured', TestUnstructuredModel, 9, [2]),
+      ('BatchedScalar', TestScalarModel, 1, [2]),
   )
   def testBasic(self, model_class, vec_event_size, batch_shape):
     base_model = model_class()

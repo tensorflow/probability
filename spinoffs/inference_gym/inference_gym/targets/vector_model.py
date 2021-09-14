@@ -119,7 +119,8 @@ class VectorModel(model_lib.Model):
     first_element = tf.nest.flatten(x)[0]
     first_shape = nest.flatten_up_to(self.model.dtype,
                                      self.model.event_shape)[0]
-    batch_shape = first_element.shape[:-len(first_shape)]
+    batch_shape = first_element.shape[:len(first_element.shape) -
+                                      len(first_shape)]
     return _flatten_and_concat(x, batch_shape, self.dtype)
 
   def vector_event_to_structured(self, x):
