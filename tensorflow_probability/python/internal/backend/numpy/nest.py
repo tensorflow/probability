@@ -189,7 +189,11 @@ def flatten(structure, expand_composites=False):
   return dm_tree.flatten(structure)
 
 
-flatten_up_to = dm_tree.flatten_up_to
+def flatten_up_to(*args, **kwargs):
+  # Internal `tree` does not accept check_types here; see b/198436438.
+  # Apparently the open-source version of same still does.
+#   kwargs.pop('check_types', None)  # DisableOnExport
+  return dm_tree.flatten_up_to(*args, **kwargs)
 
 
 def flatten_with_joined_string_paths(structure, separator='/'):
