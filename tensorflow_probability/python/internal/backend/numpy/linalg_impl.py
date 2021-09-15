@@ -469,6 +469,8 @@ matrix_transpose = utils.copy_docstring(
     'tf.linalg.matrix_transpose',
     _matrix_transpose)
 
+transpose = matrix_transpose
+
 solve = utils.copy_docstring('tf.linalg.solve', _solve)
 
 svd = utils.copy_docstring(
