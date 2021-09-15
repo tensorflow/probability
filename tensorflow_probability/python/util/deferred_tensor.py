@@ -351,8 +351,9 @@ class DeferredTensor(six.with_metaclass(
                                       else _numpy_text(value))
     else:
       value_str = ''
-    return '<{}: dtype={}, shape={}, fn={}{}>'.format(
+    return '<{}: name={}, dtype={}, shape={}, fn={}{}>'.format(
         type(self).__name__,
+        self.name,
         dtype_util.name(self.dtype) if self.dtype else '?',
         str(
             tensorshape_util.as_list(self.shape)
@@ -530,7 +531,7 @@ class TransformedVariable(DeferredTensor):
         pretransformed_input=pretransformed_input,
         transform_fn=bijector,
         shape=shape,
-        name=bijector.name)
+        name=name or bijector.name)
     self._bijector = bijector
 
   @property

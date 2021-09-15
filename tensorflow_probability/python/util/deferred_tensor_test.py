@@ -75,19 +75,19 @@ class DeferredTensorTest(test_util.TestCase):
     # For speed, we don't bother testing the optimization part of the example.
 
   def test_properties(self):
-    x = tfp.util.DeferredTensor(tf.Variable(0.), tf.math.exp)
+    x = tfp.util.DeferredTensor(tf.Variable(0.), tf.math.exp, name='bar')
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertEqual((), x.shape)
     self.assertEqual(tf.float32, x.dtype)
     if tf.executing_eagerly():
       self.assertEqual(
           repr(x),
-          '<DeferredTensor: dtype=float32, shape=[], fn=exp, numpy=1.0>')
+          '<DeferredTensor: name=bar, dtype=float32, shape=[], fn=exp, '
+          'numpy=1.0>')
     else:
-      self.assertStartsWith(x.name, 'exp')
       self.assertEqual(
           repr(x),
-          '<DeferredTensor: dtype=float32, shape=[], fn=exp>')
+          '<DeferredTensor: name=bar, dtype=float32, shape=[], fn=exp>')
 
   @test_util.jax_disable_variable_test
   @test_util.numpy_disable_variable_test
@@ -138,20 +138,21 @@ class DeferredTensorTest(test_util.TestCase):
 
   def test_from_bijector_with_inverted_assignment(self):
     x = tfp.util.DeferredTensor(tf.Variable([[1.], [2.], [3.]]),
-                                tfb.Pad(validate_args=True))
+                                tfb.Pad(validate_args=True),
+                                name='foo')
     self.assertEqual(tf.float32, x.dtype)
     self.assertAllEqual([3, 1], x.pretransformed_input.shape)
     self.assertAllEqual([3, 2], x.shape)
     if tf.executing_eagerly():
       self.assertEqual(
           repr(x),
-          '<DeferredTensor: dtype=float32, shape=[3, 2], fn="pad", '
+          '<DeferredTensor: name=foo, dtype=float32, shape=[3, 2], fn="pad", '
           'numpy=\narray([[1., 0.],\n       [2., 0.],\n       [3., 0.]], '
           'dtype=float32)>')
     else:
       self.assertEqual(
           repr(x),
-          '<DeferredTensor: dtype=float32, shape=[3, 2], fn="pad">')
+          '<DeferredTensor: name=foo, dtype=float32, shape=[3, 2], fn="pad">')
 
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertAllEqual([[1., 0.], [2., 0.], [3., 0.]],
@@ -273,19 +274,20 @@ class TransformedVariableTest(test_util.TestCase):
                           atol=0., rtol=1e-5)
 
   def test_properties(self):
-    x = tfp.util.TransformedVariable(1., tfb.Exp())
+    x = tfp.util.TransformedVariable(1., tfb.Exp(), name='foo')
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertEqual((), x.shape)
     self.assertEqual(tf.float32, x.dtype)
     if tf.executing_eagerly():
       self.assertEqual(
           repr(x),
-          '<TransformedVariable: dtype=float32, shape=[], fn="exp", numpy=1.0>')
+          '<TransformedVariable: name=foo, dtype=float32, shape=[], fn="exp", '
+          'numpy=1.0>')
     else:
-      self.assertStartsWith(x.name, 'exp')
       self.assertEqual(
           repr(x),
-          '<TransformedVariable: dtype=float32, shape=[], fn="exp">')
+          '<TransformedVariable: name=foo_1, dtype=float32, shape=[], '
+          'fn="exp">')
 
   def test_shape_changing_bijector(self):
     num_tril_nonzero = lambda num_rows: num_rows * (num_rows + 1) // 2
