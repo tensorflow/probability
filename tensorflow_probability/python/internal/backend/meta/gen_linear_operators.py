@@ -158,7 +158,7 @@ def gen_module(module_name):
   code = code.replace(
       'tensorflow.python.util import',
       'tensorflow_probability.python.internal.backend.numpy import')
-  code = code.replace('tensor_util.constant_value(', '(')
+  code = code.replace('tensor_util.constant_value(', 'ops.get_static_value(')
   code = code.replace('tensor_util.is_tensor(', 'ops.is_tensor(')
   code = code.replace('tensor_util.is_tf_type(', 'ops.is_tensor(')
   code = code.replace(
