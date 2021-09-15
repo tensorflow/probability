@@ -28,6 +28,7 @@ sys.path.append(version_path)
 from version import __version__  # pylint: disable=g-import-not-at-top
 
 REQUIRED_PACKAGES = [
+    'absl-py',
     'six >= 1.10.0',
     'numpy >= 1.13.3',
     'decorator',
