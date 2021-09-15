@@ -26,6 +26,23 @@ provide rewrite rules that take JAX expressions and rewrite them as a sum of
 Because JAX does not have an einsum primitive, some rules are dedicated to
 converting existing linear function primitives in JAX (like dot products,
 transposes, etc.) into into `Einsum`s.
+
+## Rewrites
+
+Here we broadly explain the canonicalization rules.
+
+* `Einsum` rewrite rules
+
+Linear functions can be expressed as an `Einsum`. An `Einsum` rewrite pass takes
+several JAX primitives (`transpose`, `broadcast`, `dot_general`, etc.) and
+converts them into `Einsum`s. It also combines nested `Einsum`s into a single
+`Einsum`.
+
+* `AddN` rewrite rules
+
+With the eventual goal of rewriting a density into "sum of einsums", we want
+to turn nested additions into a single flat addition operation. The `AddN`
+rewrite pass turns nested additions into a single `AddN`.
 """
 import itertools as it
 
@@ -33,6 +50,7 @@ from typing import Any, Callable
 
 from jax import lax
 
+from oryx.experimental.autoconj import addn
 from oryx.experimental.autoconj import einsum
 from oryx.experimental.matching import jax_rewrite as jr
 from oryx.experimental.matching import matcher
@@ -43,7 +61,7 @@ __all__ = [
     'canonicalize',
 ]
 
-
+AddN = addn.AddN
 Einsum = einsum.Einsum
 Var = matcher.Var
 Segment = matcher.Segment
@@ -136,12 +154,44 @@ def compose_einsums(parent_formula, left_args, child_formula, child_args,
                                 right_args)
 
 
-CANONICALIZATION_RULES = (
+REWRITE_TO_EINSUM_RULES = (
     transpose_as_einsum,
     dot_as_einsum,
     squeeze_as_einsum,
     reduce_sum_as_einsum,
     compose_einsums,
+)
+
+
+def _add(x, y):
+  return Primitive(lax.add_p, (x, y), Params())
+
+
+_add_to_addn_pattern = _add(Var('x'), Var('y'))
+
+
+@register_rule(_add_to_addn_pattern)
+def add_to_addn(x, y):
+  return AddN((x, y))
+
+
+_addn_of_addn_pattern = AddN(
+    (Segment('args1'), AddN(Var('child_args')), Segment('args2')))
+
+
+@register_rule(_addn_of_addn_pattern)
+def addn_of_addn_to_addn(args1, child_args, args2):
+  return AddN((*args1, *child_args, *args2))
+
+
+REWRITE_TO_ADDN_RULES = (
+    add_to_addn,
+    addn_of_addn_to_addn,
+)
+
+CANONICALIZATION_RULES = (
+    *REWRITE_TO_EINSUM_RULES,
+    *REWRITE_TO_ADDN_RULES,
 )
 
 canonicalize = rules.term_rewriter(*CANONICALIZATION_RULES)

@@ -20,6 +20,7 @@ from jax import random
 import jax.numpy as jnp
 import numpy as np
 
+from oryx.experimental.autoconj import addn
 from oryx.experimental.autoconj import canonicalize
 from oryx.experimental.autoconj import einsum
 from oryx.experimental.matching import jax_rewrite as jr
@@ -222,9 +223,64 @@ class CanonicalizeTest(test_util.TestCase):
         a.name: random.normal(key, a.shape, dtype=a.dtype)
         for key, a in zip(keys, [w, x, y, z])
     }
-    np.testing.assert_allclose(final_op.evaluate(env), einsum_op.evaluate(env),
-                               rtol=1e-5, atol=1e-5)
+    np.testing.assert_allclose(
+        final_op.evaluate(env),
+        einsum_op.evaluate(env),
+        rtol=1e-5,
+        atol=1e-5,
+    )
 
+  def test_can_rewrite_add_to_addn(self):
+    x = JaxVar('x', (3, 4), jnp.float32)
+    y = JaxVar('y', (3, 4), jnp.float32)
+    add_op = Primitive(lax.add_p, (x, y), Params())
+    addn_op = canonicalize.add_to_addn(add_op)
+    self.assertIsInstance(addn_op, addn.AddN)
+
+    x_val = jnp.arange(12).reshape((3, 4))
+    y_val = jnp.arange(12, 24).reshape((3, 4))
+    np.testing.assert_allclose(
+        add_op.evaluate(dict(x=x_val, y=y_val)),
+        addn_op.evaluate(dict(x=x_val, y=y_val)),
+    )
+
+  def test_can_rewrite_nested_addn_to_addn(self):
+    x = JaxVar('x', (3, 4), jnp.float32)
+    y = JaxVar('y', (3, 4), jnp.float32)
+    z = JaxVar('y', (3, 4), jnp.float32)
+    child_addn_op = addn.AddN((y, z))
+    parent_addn_op = addn.AddN((x, child_addn_op))
+    addn_op = canonicalize.addn_of_addn_to_addn(parent_addn_op)
+    self.assertIsInstance(addn_op, addn.AddN)
+    self.assertLen(addn_op.operands, 3)
+    self.assertTupleEqual(addn_op.operands, (x, y, z))
+
+    x_val = jnp.arange(12).reshape((3, 4))
+    y_val = jnp.arange(12, 24).reshape((3, 4))
+    z_val = jnp.arange(24, 36).reshape((3, 4))
+    np.testing.assert_allclose(
+        parent_addn_op.evaluate(dict(x=x_val, y=y_val, z=z_val)),
+        addn_op.evaluate(dict(x=x_val, y=y_val, z=z_val)),
+    )
+
+  def test_can_rewrite_nested_adds_into_single_addn(self):
+    x = JaxVar('x', (3, 4), jnp.float32)
+    y = JaxVar('y', (3, 4), jnp.float32)
+    z = JaxVar('y', (3, 4), jnp.float32)
+    child_add_op = Primitive(lax.add_p, (y, z), Params())
+    parent_add_op = Primitive(lax.add_p, (x, child_add_op), Params())
+    addn_op = canonicalize.canonicalize(parent_add_op)
+    self.assertIsInstance(addn_op, addn.AddN)
+    self.assertLen(addn_op.operands, 3)
+    self.assertTupleEqual(addn_op.operands, (x, y, z))
+
+    x_val = jnp.arange(12).reshape((3, 4))
+    y_val = jnp.arange(12, 24).reshape((3, 4))
+    z_val = jnp.arange(24, 36).reshape((3, 4))
+    np.testing.assert_allclose(
+        parent_add_op.evaluate(dict(x=x_val, y=y_val, z=z_val)),
+        addn_op.evaluate(dict(x=x_val, y=y_val, z=z_val)),
+    )
 
 if __name__ == '__main__':
   absltest.main()

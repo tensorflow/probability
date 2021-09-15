@@ -37,11 +37,24 @@ py_library(
     srcs = ["canonicalize.py"],
     srcs_version = "PY3",
     deps = [
+        ":addn",
         ":einsum",
         # jax dep,
         "//oryx/experimental/matching:jax_rewrite",
         "//oryx/experimental/matching:matcher",
         "//oryx/experimental/matching:rules",
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "addn",
+    srcs = ["addn.py"],
+    srcs_version = "PY3",
+    deps = [
+        # jax dep,
+        "//oryx/experimental/matching:jax_rewrite",
+        "//oryx/experimental/matching:matcher",
     ],
 )
 
@@ -70,12 +83,31 @@ py_test(
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        ":addn",
         ":canonicalize",
         ":einsum",
         # absl/testing:absltest dep,
         # jax dep,
         # numpy dep,
         "//oryx/experimental/matching:jax_rewrite",
+        "//oryx/internal:test_util",
+    ],
+)
+
+# py_strict
+py_test(
+    name = "addn_test",
+    srcs = ["addn_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        ":addn",
+        # absl/testing:absltest dep,
+        # jax dep,
+        # numpy dep,
+        "//oryx/experimental/matching:jax_rewrite",
+        "//oryx/experimental/matching:matcher",
+        "//oryx/experimental/matching:rules",
         "//oryx/internal:test_util",
     ],
 )
