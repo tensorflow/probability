@@ -456,7 +456,7 @@ def _get_static_value_jax(tensor, partial=False):
     return None
   if isinstance(tensor, Module):
     return None
-  if isinstance(tensor, np.ndarray):
+  if isinstance(tensor, (onp.ndarray, np.ndarray)):
     return onp.array(tensor)
   return tensor
 
