@@ -1828,7 +1828,7 @@ class NumpyTest(test_util.TestCase):
       @hp.given(strategy)
       def check_consistency(tf_fn, np_fn, args):
         # If `args` is a single item, put it in a tuple
-        if isinstance(args, np.ndarray) or tf.is_tensor(args):
+        if isinstance(args, (onp.ndarray, np.ndarray)) or tf.is_tensor(args):
           args = (args,)
         kwargs = {}
         if isinstance(args, Kwargs):
