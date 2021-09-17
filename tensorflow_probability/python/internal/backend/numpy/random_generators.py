@@ -161,10 +161,10 @@ def _poisson(shape, lam, dtype=np.float32, seed=None,
 
 
 if JAX_MODE:
+  from functools import partial  # pylint: disable=g-import-not-at-top
   from jax import jit  # pylint: disable=g-import-not-at-top
   from jax import lax  # pylint: disable=g-import-not-at-top
   from jax import random  # pylint: disable=g-import-not-at-top
-  from jax.util import partial  # pylint: disable=g-import-not-at-top
 
   # Jitting the implementation because
   # sampling is very slow outside of JIT
