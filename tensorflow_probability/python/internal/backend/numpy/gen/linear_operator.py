@@ -1332,7 +1332,7 @@ def _extract_attrs(op, keys):
           f" 3. an entry in `op.parameters` with key '{k}'.")
     if k in op._composite_tensor_prefer_static_fields and kwargs[k] is not None:  # pylint: disable=protected-access
       if ops.is_tensor(kwargs[k]):
-        static_val = (kwargs[k])
+        static_val = ops.get_static_value(kwargs[k])
         if static_val is not None:
           kwargs[k] = static_val
     if isinstance(kwargs[k], (np.ndarray, np.generic)):

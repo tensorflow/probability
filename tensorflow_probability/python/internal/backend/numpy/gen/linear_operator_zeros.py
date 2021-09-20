@@ -236,14 +236,14 @@ class LinearOperatorZeros(linear_operator.LinearOperator):
 
       self._num_rows = linear_operator_util.shape_tensor(
           num_rows, name="num_rows")
-      self._num_rows_static = (self._num_rows)
+      self._num_rows_static = ops.get_static_value(self._num_rows)
 
       if num_columns is None:
         num_columns = num_rows
 
       self._num_columns = linear_operator_util.shape_tensor(
           num_columns, name="num_columns")
-      self._num_columns_static = (self._num_columns)
+      self._num_columns_static = ops.get_static_value(self._num_columns)
 
       self._check_domain_range_possibly_add_asserts()
 
@@ -261,7 +261,7 @@ class LinearOperatorZeros(linear_operator.LinearOperator):
       else:
         self._batch_shape_arg = linear_operator_util.shape_tensor(
             batch_shape, name="batch_shape_arg")
-        self._batch_shape_static = (
+        self._batch_shape_static = ops.get_static_value(
             self._batch_shape_arg)
         self._check_batch_shape_possibly_add_asserts()
 

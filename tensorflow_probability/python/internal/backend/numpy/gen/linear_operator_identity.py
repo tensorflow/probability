@@ -311,7 +311,7 @@ class LinearOperatorIdentity(BaseLinearOperatorIdentity):
 
       self._num_rows = linear_operator_util.shape_tensor(
           num_rows, name="num_rows")
-      self._num_rows_static = (self._num_rows)
+      self._num_rows_static = ops.get_static_value(self._num_rows)
       self._check_num_rows_possibly_add_asserts()
 
       if batch_shape is None:
@@ -319,7 +319,7 @@ class LinearOperatorIdentity(BaseLinearOperatorIdentity):
       else:
         self._batch_shape_arg = linear_operator_util.shape_tensor(
             batch_shape, name="batch_shape_arg")
-        self._batch_shape_static = (
+        self._batch_shape_static = ops.get_static_value(
             self._batch_shape_arg)
         self._check_batch_shape_possibly_add_asserts()
 
@@ -676,7 +676,7 @@ class LinearOperatorScaledIdentity(BaseLinearOperatorIdentity):
 
       self._num_rows = linear_operator_util.shape_tensor(
           num_rows, name="num_rows")
-      self._num_rows_static = (self._num_rows)
+      self._num_rows_static = ops.get_static_value(self._num_rows)
       self._check_num_rows_possibly_add_asserts()
       self._num_rows_cast_to_dtype = _ops.cast(self._num_rows, self.dtype)
       self._num_rows_cast_to_real_dtype = _ops.cast(self._num_rows,
