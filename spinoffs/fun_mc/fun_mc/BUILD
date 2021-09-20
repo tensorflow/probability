@@ -128,6 +128,7 @@ py_test(
 py_library(
     name = "prefab",
     srcs = ["prefab.py"],
+    srcs_version = "PY3",
     deps = [
         ":backend",
         ":fun_mc_lib",
@@ -153,6 +154,7 @@ py_test(
 py_library(
     name = "util_tfp",
     srcs = ["util_tfp.py"],
+    srcs_version = "PY3",
     deps = [
         ":backend",
         ":fun_mc_lib",

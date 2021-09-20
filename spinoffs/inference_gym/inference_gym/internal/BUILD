@@ -43,6 +43,7 @@ py_library(
 py_library(
     name = "array_to_source",
     srcs = ["array_to_source.py"],
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -91,6 +92,7 @@ py_test(
 py_library(
     name = "ground_truth_encoding",
     srcs = ["ground_truth_encoding.py"],
+    srcs_version = "PY3",
     deps = [
         ":array_to_source",
     ],
