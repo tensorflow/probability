@@ -192,14 +192,12 @@ class LinearOperatorFullMatrix(linear_operator.LinearOperator):
 
     dtype = matrix.dtype
     if dtype not in allowed_dtypes:
-      raise TypeError(
-          "Argument matrix must have dtype in %s.  Found: %s"
-          % (allowed_dtypes, dtype))
+      raise TypeError(f"Argument `matrix` must have dtype in {allowed_dtypes}. "
+                      f"Received: {dtype}.")
 
     if tensor_shape.TensorShape(matrix.shape).ndims is not None and tensor_shape.TensorShape(matrix.shape).ndims < 2:
-      raise ValueError(
-          "Argument matrix must have at least 2 dimensions.  Found: %s"
-          % matrix)
+      raise ValueError(f"Argument `matrix` must have at least 2 dimensions. "
+                       f"Received: {matrix}.")
 
   def _shape(self):
     return tensor_shape.TensorShape(self._matrix.shape)
