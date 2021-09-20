@@ -191,7 +191,7 @@ def get_broadcast_shape(*tensors):
 
 def shape_may_be_nontrivial(shape):
   """Returns `True` if it's possible that `shape` describes a non-scalar."""
-  static_size = tf.get_static_value(tf.size(shape))
+  static_size = tf.get_static_value(ps.size(shape))
   return (static_size is None) or static_size >= 1
 
 

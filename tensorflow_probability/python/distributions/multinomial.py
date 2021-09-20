@@ -386,7 +386,7 @@ def _sample_multinomial_as_iterated_binomial(
     # `split_seed`.  We can't take advantage of the Python-list code path anyway
     # because the index at which we will take the seed is a Tensor.
     seeds = samplers.split_seed(
-        seed, n=tf.convert_to_tensor(num_classes),
+        seed, n=ps.convert_to_shape_tensor(num_classes),
         salt='multinomial_draw_sample')
 
     def fn(i, num_trials, consumed_prob, accum):

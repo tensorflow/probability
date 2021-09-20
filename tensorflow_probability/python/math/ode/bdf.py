@@ -510,7 +510,7 @@ class BDF(base.Solver):
       else:
         solution_times = tf.cast(solution_times, p.real_dtype)
         final_time = tf.reduce_max(solution_times)
-        num_solution_times = tf.size(solution_times)
+        num_solution_times = ps.size(solution_times)
         solution_time_array = tf.TensorArray(
             solution_times.dtype, size=num_solution_times,
             element_shape=[]).unstack(solution_times)
@@ -741,7 +741,7 @@ class BDF(base.Solver):
     # Convert everything to operate on a single, concatenated vector form.
     initial_state_vec = util.get_state_vec(initial_state)
     ode_fn_vec = util.get_ode_fn_vec(ode_fn, state_shape)
-    num_odes = tf.size(initial_state_vec)
+    num_odes = ps.size(initial_state_vec)
 
     return util.Bunch(
         initial_state=initial_state,

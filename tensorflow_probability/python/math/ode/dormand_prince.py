@@ -24,6 +24,7 @@ import functools
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.math.ode import base
 from tensorflow_probability.python.math.ode import runge_kutta_util as rk_util
 from tensorflow_probability.python.math.ode import util
@@ -213,7 +214,7 @@ class DormandPrince(base.Solver):
       else:
         solution_times = tf.cast(solution_times, p.real_dtype)
         util.error_if_not_vector(solution_times, 'solution_times')
-        num_solution_times = tf.size(solution_times)
+        num_solution_times = ps.size(solution_times)
         times_array = tf.TensorArray(
             p.real_dtype,
             size=num_solution_times,

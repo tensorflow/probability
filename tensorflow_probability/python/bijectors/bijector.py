@@ -1003,9 +1003,11 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
           self.forward_min_event_ndims, tf.int32)
       input_shape = nest_util.convert_to_nested_tensor(
           input_shape, dtype_hint=input_shape_dtype,
-          name='input_event_shape', allow_packing=True)
+          name='input_event_shape', allow_packing=True,
+          as_shape_tensor=True)
       # Wrap inputs in identity to make sure control_scope is respected.
-      input_shape = nest.map_structure(tf.identity, input_shape)
+      if not JAX_MODE:
+        input_shape = nest.map_structure(tf.identity, input_shape)
 
       # Refer to static-dtype to get structure; we don't care about ntype here.
       output_shape_dtype = nest_util.broadcast_structure(
@@ -1013,7 +1015,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
       return nest_util.convert_to_nested_tensor(
           self._forward_event_shape_tensor(input_shape),
           dtype_hint=output_shape_dtype,
-          name='output_event_shape', allow_packing=True)
+          name='output_event_shape', allow_packing=True,
+          as_shape_tensor=True)
 
   def _forward_event_shape(self, input_shape):
     """Subclass implementation for `forward_event_shape` public function."""
@@ -1066,16 +1069,19 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
           output_shape, name='output_event_shape',
           dtype_hint=nest_util.broadcast_structure(
               self.inverse_min_event_ndims, tf.int32),
-          allow_packing=True)
+          allow_packing=True,
+          as_shape_tensor=True)
       # Wrap inputs in identity to make sure control_scope is respected.
-      output_shape = nest.map_structure(tf.identity, output_shape)
+      if not JAX_MODE:
+        output_shape = nest.map_structure(tf.identity, output_shape)
 
       return nest_util.convert_to_nested_tensor(
           self._inverse_event_shape_tensor(output_shape),
           name='input_event_shape',
           dtype_hint=nest_util.broadcast_structure(
               self.forward_min_event_ndims, tf.int32),
-          allow_packing=True)
+          allow_packing=True,
+          as_shape_tensor=True)
 
   def _inverse_event_shape(self, output_shape):
     """Subclass implementation for `inverse_event_shape` public function."""

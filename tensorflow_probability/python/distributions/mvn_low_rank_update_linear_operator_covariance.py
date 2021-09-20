@@ -222,9 +222,9 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovariance(
       # well-tested function.
       batch_shape, event_shape = distribution_util.shapes_from_loc_and_scale(
           loc, cov_operator)
-      self._batch_shape_tensor_value = tf.convert_to_tensor(
+      self._batch_shape_tensor_value = ps.convert_to_shape_tensor(
           batch_shape, name='batch_shape')
-      self._event_shape_tensor_value = tf.convert_to_tensor(
+      self._event_shape_tensor_value = ps.convert_to_shape_tensor(
           event_shape, name='event_shape')
 
       # Get static shapes (for self.*shape methods).

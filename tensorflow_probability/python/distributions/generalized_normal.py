@@ -167,7 +167,7 @@ class GeneralizedNormal(distribution.AutoCompositeTensorDistribution):
     return tf.TensorShape([])
 
   def _sample_n(self, n, seed=None, name=None):
-    n = tf.convert_to_tensor(n, name='num', dtype=tf.int32)
+    n = ps.convert_to_shape_tensor(n, name='num', dtype=tf.int32)
     loc = tf.convert_to_tensor(self.loc)
     scale = tf.convert_to_tensor(self.scale)
     power = tf.convert_to_tensor(self.power)

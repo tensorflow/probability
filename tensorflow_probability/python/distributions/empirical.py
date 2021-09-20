@@ -310,7 +310,7 @@ class Empirical(distribution.AutoCompositeTensorDistribution):
     cdf = tf.reduce_sum(
         tf.cast(
             tf.reduce_all(
-                samples <= event, axis=tf.range(-self._event_ndims, 0)),
+                samples <= event, axis=ps.range(-self._event_ndims, 0)),
             dtype=tf.int32),
         axis=-1) / num_samples
     if dtype_util.is_floating(self.dtype):
@@ -326,7 +326,7 @@ class Empirical(distribution.AutoCompositeTensorDistribution):
     prob = tf.reduce_sum(
         tf.cast(
             tf.reduce_all(
-                tf.equal(samples, event), axis=tf.range(-self._event_ndims, 0)),
+                tf.equal(samples, event), axis=ps.range(-self._event_ndims, 0)),
             dtype=tf.int32),
         axis=-1) / num_samples
     if dtype_util.is_floating(self.dtype):

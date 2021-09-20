@@ -1015,7 +1015,7 @@ def has_not_u_turn(state_diff,
   """If the trajectory does not exhibit a U-turn pattern."""
   shard_axis_names = (shard_axis_names or ([None] * len(state_diff)))
   def reduce_sum(x, v, shard_axes):
-    out = tf.reduce_sum(x, axis=tf.range(log_prob_rank, ps.rank(v)))
+    out = tf.reduce_sum(x, axis=ps.range(log_prob_rank, ps.rank(v)))
     if shard_axes is not None:
       out = distribute_lib.psum(out, shard_axes)
     return out
