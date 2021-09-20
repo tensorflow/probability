@@ -346,7 +346,7 @@ class HarvestTrace(jax_core.Trace):
 
     def todo(x):
       trace = HarvestTrace(master, jax_core.cur_sublevel())
-      return jax_util.safe_map(jax_util.partial(HarvestTracer, trace), x)
+      return jax_util.safe_map(functools.partial(HarvestTracer, trace), x)
 
     return vals, todo
 

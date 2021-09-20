@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Core logic for the inverse transformation."""
+import functools
 from typing import Iterable
 
 import jax
@@ -236,7 +237,7 @@ class InverseDict(object):
 
   def __getitem__(self, prim):
     if prim not in self.rules:
-      self[prim] = jax_util.partial(default_rule, prim)
+      self[prim] = functools.partial(default_rule, prim)
     return self.rules[prim]
 
   def __setitem__(self, prim, val):
@@ -296,7 +297,7 @@ ildj_registry = InverseDict()
 
 
 def hop_inverse_rule(prim):
-  ildj_registry[prim] = jax_util.partial(propagate.call_rule, prim)
+  ildj_registry[prim] = functools.partial(propagate.call_rule, prim)
 primitive.register_hop_transformation_rule('inverse', hop_inverse_rule)
 
 
@@ -364,4 +365,4 @@ def map_ildj(prim, incells, outcells, **params):
   new_outcells = [add_slice(v, old_v)
                   for old_v, v in safe_zip(outcells, new_outcells)]
   return new_incells, new_outcells, state
-ildj_registry[pxla.xla_pmap_p] = jax_util.partial(map_ildj, pxla.xla_pmap_p)
+ildj_registry[pxla.xla_pmap_p] = functools.partial(map_ildj, pxla.xla_pmap_p)

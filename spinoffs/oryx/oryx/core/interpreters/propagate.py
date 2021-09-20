@@ -35,7 +35,7 @@ import dataclasses
 from jax import core as jax_core
 from jax import linear_util as lu
 from jax import tree_util
-from jax import util as jax_util
+from jax import util as functools
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 
@@ -338,9 +338,11 @@ def call_rule(prim, incells, outcells, **params):
 
 
 default_call_rules = {}
-default_call_rules[xla.xla_call_p] = jax_util.partial(call_rule, xla.xla_call_p)
-default_call_rules[jax_core.call_p] = jax_util.partial(call_rule,
-                                                       jax_core.call_p)
-default_call_rules[pe.remat_call_p] = jax_util.partial(call_rule,
-                                                       pe.remat_call_p)
-default_call_rules[harvest.nest_p] = jax_util.partial(call_rule, harvest.nest_p)
+default_call_rules[xla.xla_call_p] = functools.partial(call_rule,
+                                                       xla.xla_call_p)
+default_call_rules[jax_core.call_p] = functools.partial(call_rule,
+                                                        jax_core.call_p)
+default_call_rules[pe.remat_call_p] = functools.partial(call_rule,
+                                                        pe.remat_call_p)
+default_call_rules[harvest.nest_p] = functools.partial(call_rule,
+                                                       harvest.nest_p)
