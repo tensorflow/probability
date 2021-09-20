@@ -112,7 +112,8 @@ print(sorted(releases)[-1])
 "
 
 find_good_tf_nightly_version_str() {
-  curl -s https://pypi.org/pypi/tf-nightly/json \
+  VERSION=$1
+  curl -s "https://pypi.org/pypi/${VERSION}/json" \
     | python -c "$PYTHON_PARSE_PACKAGE_JSON" \
         --bad_dates 20210519 20210619
 }
