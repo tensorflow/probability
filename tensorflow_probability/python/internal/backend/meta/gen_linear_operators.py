@@ -196,6 +196,8 @@ def gen_module(module_name):
   code = code.replace('math_ops.range', 'array_ops.range')
   code = code.replace('ops.convert_to_tensor_v2_with_dispatch(',
                       'ops.convert_to_tensor(')
+  code = code.replace('ops.convert_to_tensor(dim_value)',
+                      'np.array(dim_value, np.int32)')
 
   code = code.replace('self.dtype.real_dtype', 'dtypes.real_dtype(self.dtype)')
   code = code.replace('dtype.real_dtype', 'dtypes.real_dtype(dtype)')
