@@ -23,6 +23,8 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import prefer_static as ps
+
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -289,7 +291,7 @@ def call_fn(fn, args):
 
 
 def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
-                             allow_packing=False,
+                             allow_packing=False, as_shape_tensor=False,
                              name=None):
   """Converts the given `value` to a (structure of) `Tensor`.
 
@@ -309,6 +311,9 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
     allow_packing: Python `bool`, default `False`. If `True`, allow
       `convert_to_nested_tensor` to stack nested lists of Tensors along the
       leading dimension. Otherwise, raise.
+    as_shape_tensor: Optional boolean when if `True` uses
+      `prefer_static.convert_to_shape_tensor` instead of `tf.convert_to_tensor`
+      for JAX compatibility.
     name: Optional name to use if a new `Tensor` is created. If inputs are
       structured, elements are named accoring to '{name}/{path}.{to}.{elem}'.
 
@@ -336,7 +341,10 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
       raise NotImplementedError(('Cannot convert a structure of tensors to a '
                                  'single tensor. Saw {} at path {}.'
                                 ).format(value, path))
-    return tf.convert_to_tensor(value, dtype, dtype_hint, name=name)
+    if as_shape_tensor:
+      return ps.convert_to_shape_tensor(value, dtype, dtype_hint, name=name)
+    else:
+      return tf.convert_to_tensor(value, dtype, dtype_hint, name=name)
 
   ### The following branches only affect naming.
   # For unstructured calls, just use the provided name.
