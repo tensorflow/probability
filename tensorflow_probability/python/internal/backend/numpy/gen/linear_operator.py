@@ -486,7 +486,7 @@ class LinearOperator(module.Module, composite_tensor.CompositeTensor):
     # more efficient manner, e.g. without excessive Tensor conversions.
     dim_value = tensor_shape.dimension_value(self.domain_dimension)
     if dim_value is not None:
-      return ops.convert_to_tensor(dim_value)
+      return np.array(dim_value, np.int32)
     else:
       shape = self.shape_tensor() if shape is None else shape
       return shape[-1]
@@ -530,7 +530,7 @@ class LinearOperator(module.Module, composite_tensor.CompositeTensor):
     # more efficient manner, e.g. without excessive Tensor conversions.
     dim_value = tensor_shape.dimension_value(self.range_dimension)
     if dim_value is not None:
-      return ops.convert_to_tensor(dim_value)
+      return np.array(dim_value, np.int32)
     else:
       shape = self.shape_tensor() if shape is None else shape
       return shape[-2]
