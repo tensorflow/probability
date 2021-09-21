@@ -669,44 +669,6 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
     self.assertAllClose(reverse_kl_sequential_, 0.6534264, rtol=0.07, atol=0.)
     self.assertAllClose(reverse_kl_named_, 0.6534264, rtol=0.07, atol=0.)
 
-  def test_importance_weighted_objective(self):
-    seed = test_util.test_seed(sampler_type='stateless')
-
-    # Use a normalized target, so the true normalizing constant (lowest possible
-    # loss) is zero.
-    target = tfd.Normal(loc=0., scale=1.)
-    proposal = tfd.StudentT(2, loc=3., scale=2.)
-
-    elbo_loss = tfp.vi.monte_carlo_variational_loss(
-        target_log_prob_fn=target.log_prob,
-        surrogate_posterior=proposal,
-        discrepancy_fn=tfp.vi.kl_reverse,
-        sample_size=int(3e4),
-        importance_sample_size=1,
-        seed=seed)
-    self.assertAllGreater(elbo_loss, 0.)
-
-    # Check that importance sampling reduces the loss towards zero.
-    iwae_10_loss = tfp.vi.monte_carlo_variational_loss(
-        target_log_prob_fn=target.log_prob,
-        surrogate_posterior=proposal,
-        discrepancy_fn=tfp.vi.kl_reverse,
-        sample_size=int(3e4),
-        importance_sample_size=10,
-        seed=seed)
-    self.assertAllGreater(elbo_loss, iwae_10_loss)
-    self.assertAllGreater(iwae_10_loss, 0)
-
-    iwae_100_loss = tfp.vi.monte_carlo_variational_loss(
-        target_log_prob_fn=target.log_prob,
-        surrogate_posterior=proposal,
-        discrepancy_fn=tfp.vi.kl_reverse,
-        sample_size=int(3e4),
-        importance_sample_size=100,
-        seed=seed)
-    self.assertAllGreater(iwae_10_loss, iwae_100_loss)
-    self.assertAllClose(iwae_100_loss, 0, atol=0.1)
-
   def test_score_trick(self):
     d = 5  # Dimension
     sample_size = int(4.5e5)
