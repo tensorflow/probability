@@ -18,8 +18,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 import numpy as np
 
@@ -28,6 +26,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import monte_carlo
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
 from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
 
@@ -790,6 +789,7 @@ def symmetrized_csiszar_function(logu, csiszar_function, name=None):
 def monte_carlo_variational_loss(target_log_prob_fn,
                                  surrogate_posterior,
                                  sample_size=1,
+                                 importance_sample_size=1,
                                  discrepancy_fn=kl_reverse,
                                  use_reparameterization=None,
                                  seed=None,
@@ -803,15 +803,21 @@ def monte_carlo_variational_loss(target_log_prob_fn,
   data, minimizing the loss with respect to the parameters of
   `surrogate_posterior` performs approximate posterior inference.
 
-  This function defines divergences of the form
-  `E_q[discrepancy_fn(log p(z) - log q(z))]`, sometimes known as f-divergences
-  [1, 2]. In the special case `discrepancy_fn(logu) == -logu` (the default
-  `tfp.vi.kl_reverse`), this is the reverse Kullback-Liebler divergence
-  `KL[q||p]`, whose negation applied to an unnormalized `p` is the widely-used
-  evidence lower bound (ELBO) [3]. Other cases of interest available under
-  `tfp.vi` include the forward `KL[p||q]` (given by `tfp.vi.kl_forward(logu)
-  == exp(logu) * logu`), total variation distance, Amari
-  alpha-divergences, and [more](https://en.wikipedia.org/wiki/F-divergence).
+  This function defines losses of the form
+  `E_q[discrepancy_fn(log(u))]`, where `u = p(z) / q(z)` in the (default) case
+  where `importance_sample_size == 1`, and
+  `u = mean([p(z[k]) / q(z[k]) for k in range(importance_sample_size)]))` more
+  generally. These losses are sometimes known as f-divergences [1, 2].
+
+  The default behavior (`discrepancy_fn == tfp.vi.kl_reverse`, where
+  `tfp.vi.kl_reverse = lambda logu: -logu`, and
+  `importance_sample_size == 1`) computes an unbiased estimate of the standard
+  evidence lower bound (ELBO) [3]. The bound may be tightened by setting
+  `importance_sample_size > 1` [4], and the variance of the estimate reduced by
+  setting `sample_size > 1`. Other discrepancies of interest
+  available under `tfp.vi` include the forward `KL[p||q]`, total variation
+  distance, Amari alpha-divergences, and [more](
+  https://en.wikipedia.org/wiki/F-divergence).
 
   Args:
     target_log_prob_fn: Python callable that takes a set of `Tensor` arguments
@@ -834,6 +840,13 @@ def monte_carlo_variational_loss(target_log_prob_fn,
     sample_size: Integer scalar number of Monte Carlo samples used to
       approximate the variational divergence. Larger values may stabilize
       the optimization, but at higher cost per step in time and memory.
+      Default value: `1`.
+    importance_sample_size: Python `int` number of terms used to define an
+      importance-weighted divergence. If `importance_sample_size > 1`, then the
+      `surrogate_posterior` is optimized to function as an importance-sampling
+      proposal distribution. In this case it often makes sense to use
+      importance sampling to approximate posterior expectations (see
+      `tfp.vi.fit_surrogate_posterior` for an example).
       Default value: `1`.
     discrepancy_fn: Python `callable` representing a Csiszar `f` function in
       in log-space. That is, `discrepancy_fn(log(u)) = f(u)`, where `f` is
@@ -923,11 +936,17 @@ def monte_carlo_variational_loss(target_log_prob_fn,
   #### References:
 
   [1]: https://en.wikipedia.org/wiki/F-divergence
+
   [2]: Ali, Syed Mumtaz, and Samuel D. Silvey. "A general class of coefficients
        of divergence of one distribution from another." Journal of the Royal
        Statistical Society: Series B (Methodological) 28.1 (1966): 131-142.
-  [3]: Bishop, Christopher M. Pattern Recognition and Machine Learning.
+
+  [3]: Christopher M. Bishop. Pattern Recognition and Machine Learning.
        Springer, 2006.
+
+  [4]  Yuri Burda, Roger Grosse, and Ruslan Salakhutdinov. Importance Weighted
+       Autoencoders. In _International Conference on Learning
+       Representations_, 2016. https://arxiv.org/abs/1509.00519
 
   """
   with tf.name_scope(name or 'monte_carlo_variational_loss'):
@@ -950,28 +969,61 @@ def monte_carlo_variational_loss(target_log_prob_fn,
       raise TypeError('`target_log_prob_fn` must be a Python `callable`'
                       'function.')
 
-    def divergence_fn(q_samples, q_lp=None):
-      target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
-      if q_lp is None:
-        q_lp = surrogate_posterior.log_prob(q_samples)
-      return discrepancy_fn(target_log_prob - q_lp)
-
     if use_reparameterization:
       # Attempt to avoid bijector inverses by computing the surrogate log prob
       # during the forward sampling pass.
       q_samples, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
-          sample_size, seed=seed)
-      divergence_fn = functools.partial(divergence_fn, q_lp=q_lp)
+          [sample_size, importance_sample_size], seed=seed)
     else:
       # Score fn objective requires explicit gradients of `log_prob`.
-      q_samples = surrogate_posterior.sample(sample_size, seed=seed)
+      q_samples = surrogate_posterior.sample(
+          [sample_size, importance_sample_size], seed=seed)
+      q_lp = None
 
-    return monte_carlo.expectation(
-        f=divergence_fn,
+    loss_with_importance_sample_dim = monte_carlo.expectation(
+        f=_make_importance_weighted_divergence_fn(
+            target_log_prob_fn,
+            surrogate_posterior=surrogate_posterior,
+            discrepancy_fn=discrepancy_fn,
+            precomputed_surrogate_log_prob=q_lp,
+            importance_sample_axis=1),
         samples=q_samples,
         # Log-prob is only used if use_reparameterization=False.
         log_prob=surrogate_posterior.log_prob,
         use_reparameterization=use_reparameterization)
+    return tf.squeeze(loss_with_importance_sample_dim, axis=0)
+
+
+def _make_importance_weighted_divergence_fn(
+    target_log_prob_fn,
+    surrogate_posterior,
+    discrepancy_fn,
+    precomputed_surrogate_log_prob=None,
+    importance_sample_axis=1):
+  """Defines a function to compute an importance-weighted divergence."""
+
+  def divergence_fn(q_samples):
+    q_lp = precomputed_surrogate_log_prob
+    if q_lp is None:
+      q_lp = surrogate_posterior.log_prob(q_samples)
+    importance_sample_size = ps.shape(q_lp)[importance_sample_axis]
+
+    target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
+    log_weights = target_log_prob - q_lp
+    if tf.get_static_value(importance_sample_size) == 1:
+      # Bypass importance weighting.
+      return discrepancy_fn(log_weights)
+
+    log_sum_weights = tf.reduce_logsumexp(log_weights,
+                                          axis=importance_sample_axis,
+                                          # Match the result shape we would have
+                                          # gotten without importance sampling.
+                                          keepdims=True)
+    log_avg_weights = log_sum_weights - tf.math.log(
+        tf.cast(importance_sample_size, dtype=log_weights.dtype))
+    return discrepancy_fn(log_avg_weights)
+
+  return divergence_fn
 
 
 def csiszar_vimco(f,
@@ -981,18 +1033,18 @@ def csiszar_vimco(f,
                   num_batch_draws=1,
                   seed=None,
                   name=None):
-  """Use VIMCO to lower the variance of gradient[csiszar_function(Avg(logu))].
+  """Use VIMCO to lower the variance of gradient[csiszar_function(log(Avg(u))].
 
   This function generalizes VIMCO [(Mnih and Rezende, 2016)][1] to Csiszar
   f-Divergences.
 
   Note: if `q.reparameterization_type = tfd.FULLY_REPARAMETERIZED`,
-  consider using `monte_carlo_csiszar_f_divergence`.
+  consider using `monte_carlo_variational_loss`.
 
   The VIMCO loss is:
 
   ```none
-  vimco = f(Avg{logu[i] : i=0,...,m-1})
+  vimco = f(log(Avg{u[i] : i=0,...,m-1}))
   where,
     logu[i] = log( p(x, h[i]) / q(h[i] | x) )
     h[i] iid~ q(H | x)

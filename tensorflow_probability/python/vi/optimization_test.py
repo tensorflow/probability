@@ -84,6 +84,39 @@ class OptimizationTests(test_util.TestCase):
     self.assertAllClose(final_q_loc_, z_posterior_mean, atol=0.2)
     self.assertAllClose(final_q_scale_, z_posterior_stddev, atol=0.1)
 
+  def test_importance_sampling_example(self):
+
+    def log_prob(z, x):
+      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+    conditioned_log_prob = lambda z: log_prob(z, x=5.)
+
+    q_z = tfp.experimental.util.make_trainable(tfd.Normal)
+    # Fit `q` with an importance-weighted variational loss.
+    loss_curve = tfp.vi.fit_surrogate_posterior(
+        conditioned_log_prob,
+        surrogate_posterior=q_z,
+        importance_sample_size=10,
+        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        num_steps=100,
+        seed=test_util.test_seed())
+    self.evaluate(tf1.global_variables_initializer())
+    self.evaluate(loss_curve)
+
+    # Estimate posterior statistics with importance sampling.
+    zs, q_log_prob = self.evaluate(q_z.experimental_sample_and_log_prob(
+        1000, seed=test_util.test_seed()))
+    self_normalized_log_weights = tf.nn.log_softmax(
+        conditioned_log_prob(zs) - q_log_prob)
+    posterior_mean = tf.reduce_sum(
+        tf.exp(self_normalized_log_weights) * zs,
+        axis=0)
+    self.assertAllClose(posterior_mean, 2.5, atol=1e-1)
+
+    posterior_variance = tf.reduce_sum(
+        tf.exp(self_normalized_log_weights) * (zs - posterior_mean)**2,
+        axis=0)
+    self.assertAllClose(posterior_variance, 0.5, atol=1e-1)
+
   def test_fit_posterior_with_joint_q(self):
 
     # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])

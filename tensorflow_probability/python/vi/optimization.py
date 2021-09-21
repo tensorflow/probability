@@ -24,24 +24,32 @@ import functools
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.vi import csiszar_divergence
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 _trace_loss = lambda traceable_quantities: traceable_quantities.loss
 
-# Silent fallback to score-function gradients leads to difficult-to-debug
-# failures, so we force reparameterization gradients by default.
-_reparameterized_elbo = functools.partial(
-    csiszar_divergence.monte_carlo_variational_loss,
-    discrepancy_fn=csiszar_divergence.kl_reverse,
-    use_reparameterization=True)
 
-
+@deprecation.deprecated_args(
+    '2022-03-01',
+    'Custom loss functions are no longer supported in '
+    '`fit_surrogate_posterior`. Instead, use the `discrepancy_fn` argument to '
+    'specify a custom divergence, or pass a custom loss directly to '
+    '`tfp.math.minimize` as '
+    '`loss_fn=functools.partial(variational_loss_fn, '
+    'target_log_prob_fn=target_log_prob_fn, '
+    'surrogate_posterior=surrogate_posterior, '
+    'sample_size=sample_size)`.',
+    'variational_loss_fn')
 def fit_surrogate_posterior(target_log_prob_fn,
                             surrogate_posterior,
                             optimizer,
                             num_steps,
                             convergence_criterion=None,
                             trace_fn=_trace_loss,
-                            variational_loss_fn=_reparameterized_elbo,
+                            variational_loss_fn=None,
+                            discrepancy_fn=csiszar_divergence.kl_reverse,
                             sample_size=1,
+                            importance_sample_size=1,
                             trainable_variables=None,
                             jit_compile=None,
                             seed=None,
@@ -106,19 +114,33 @@ def fit_surrogate_posterior(target_log_prob_fn,
       as well as any other quantities captured in the closure of `trace_fn`,
       for example, statistics of a variational distribution.
       Default value: `lambda traceable_quantities: traceable_quantities.loss`.
-    variational_loss_fn: Python `callable` with signature
+    variational_loss_fn: Optional Python `callable` with signature
       `loss = variational_loss_fn(target_log_prob_fn, surrogate_posterior,
        sample_size, seed)` defining a variational loss function. The default is
        a Monte Carlo approximation to the standard evidence lower bound (ELBO),
        equivalent to minimizing the 'reverse' `KL[q||p]` divergence between the
        surrogate `q` and true posterior `p`. [1]
-       Default value: `functools.partial(
+       Default value: `None` (equivalent to functools.partial(
          tfp.vi.monte_carlo_variational_loss,
          discrepancy_fn=tfp.vi.kl_reverse,
+         importance_sample_size=importance_sample_size,
          use_reparameterization=True)`.
+    discrepancy_fn: Python `callable` representing a Csiszar `f` function in
+      in log-space. See the docs for `tfp.vi.monte_carlo_variational_loss` for
+      examples. This argument is ignored if a `variational_loss_fn` is
+      explicitly specified.
+      Default value: `tfp.vi.kl_reverse`.
     sample_size: Python `int` number of Monte Carlo samples to use
       in estimating the variational divergence. Larger values may stabilize
       the optimization, but at higher cost per step in time and memory.
+      Default value: `1`.
+    importance_sample_size: Python `int` number of terms used to define an
+      importance-weighted divergence. If `importance_sample_size > 1`, then the
+      `surrogate_posterior` is optimized to function as an importance-sampling
+      proposal distribution. In this case, posterior expectations should be
+      approximated by importance sampling, as demonstrated in the example below.
+      This argument is ignored if a `variational_loss_fn` is explicitly
+      specified.
       Default value: `1`.
     trainable_variables: Optional list of `tf.Variable` instances to optimize
       with respect to. If `None`, defaults to the set of all variables accessed
@@ -161,13 +183,10 @@ def fit_surrogate_posterior(target_log_prob_fn,
   to bother doing the math: we can use variational inference instead!
 
   ```python
-  q_z = tfd.Normal(loc=tf.Variable(0., name='q_z_loc'),
-                   scale=tfp.util.TransformedVariable(1., tfb.Softplus(),
-                                                      name='q_z_scale'),
-                   name='q_z')
+  q_z = tfp.experimental.util.make_trainable(tfd.Normal, name='q_z')
   losses = tfp.vi.fit_surrogate_posterior(
       conditioned_log_prob,
-      surrogate_posterior=q,
+      surrogate_posterior=q_z,
       optimizer=tf.optimizers.Adam(learning_rate=0.1),
       num_steps=100)
   print(q_z.mean(), q_z.stddev())  # => approximately [2.5, 1/sqrt(2)]
@@ -185,22 +204,81 @@ def fit_surrogate_posterior(target_log_prob_fn,
   mechanisms available in joint distribution classes (demonstrated below).
 
   **Custom loss function**. Suppose we prefer to fit the same model using
-    the forward KL divergence `KL[p||q]`. We can pass a custom loss function:
+    the forward KL divergence `KL[p||q]`. We can pass a custom discrepancy
+    function:
 
   ```python
-    import functools
-    forward_kl_loss = functools.partial(
-      tfp.vi.monte_carlo_variational_loss, discrepancy_fn=tfp.vi.kl_forward)
     losses = tfp.vi.fit_surrogate_posterior(
         conditioned_log_prob,
-        surrogate_posterior=q,
+        surrogate_posterior=q_z,
         optimizer=tf.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
-        variational_loss_fn=forward_kl_loss)
+        discrepancy_fn=tfp.vi.kl_forward)
   ```
 
   Note that in practice this may have substantially higher-variance gradients
   than the reverse KL.
+
+  **Importance weighting**. A surrogate posterior may be corrected by
+  interpreting it as a proposal for an [importance sampler](
+  https://en.wikipedia.org/wiki/Importance_sampling). That is, one can use
+  weighted samples from the surrogate to estimate expectations under the true
+  posterior:
+
+  ```python
+  zs, q_log_prob = surrogate_posterior.experimental_sample_and_log_prob(
+    num_samples)
+
+  # Naive expectation under the surrogate posterior.
+  expected_x = tf.reduce_mean(f(zs), axis=0)
+
+  # Importance-weighted estimate of the expectation under the true posterior.
+  self_normalized_log_weights = tf.nn.log_softmax(
+    target_log_prob_fn(zs) - q_log_prob)
+  expected_x = tf.reduce_sum(
+    tf.exp(self_normalized_log_weights) * f(zs),
+    axis=0)
+  ```
+
+  Any distribution may be used as a proposal, but it is often natural to
+  consider surrogates that were themselves fit by optimizing an
+  importance-weighted variational objective [2], which directly optimizes the
+  surrogate's effectiveness as an proposal distribution. This may be specified
+  by passing `importance_sample_size > 1`. The importance-weighted objective
+  may favor different characteristics than the original objective.
+  For example, effective proposals are generally overdispersed, whereas a
+  surrogate optimizing reverse KL would otherwise tend to be underdispersed.
+
+  Although importance sampling is guaranteed to tighten the variational bound,
+  some research has found that this does not necessarily improve the quality
+  of deep generative models, because it also introduces gradient noise that can
+  lead to a weaker training signal [3]. As always, evaluation is important to
+  choose the approach that works best for a particular task.
+
+  When using an importance-weighted loss to fit a surrogate, it is also
+  recommended to apply importance sampling when computing expectations
+  under that surrogate.
+
+  ```python
+  # Fit `q` with an importance-weighted variational loss.
+  losses = tfp.vi.fit_surrogate_posterior(
+        conditioned_log_prob,
+        surrogate_posterior=q_z,
+        importance_sample_size=10,
+        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        num_steps=200)
+
+  # Estimate posterior statistics with importance sampling.
+  zs, q_log_prob = q_z.experimental_sample_and_log_prob(1000)
+  self_normalized_log_weights = tf.nn.log_softmax(
+    conditioned_log_prob(zs) - q_log_prob)
+  posterior_mean = tf.reduce_sum(
+    tf.exp(self_normalized_log_weights) * zs,
+    axis=0)
+  posterior_variance = tf.reduce_sum(
+    tf.exp(self_normalized_log_weights) * (zs - posterior_mean)**2,
+    axis=0)
+  ```
 
   **Inhomogeneous Poisson Process**. For a more interesting example, let's
   consider a model with multiple latent variables as well as trainable
@@ -287,9 +365,29 @@ def fit_surrogate_posterior(target_log_prob_fn,
 
   #### References
 
-  [1]: Bishop, Christopher M. Pattern Recognition and Machine Learning.
+  [1]: Christopher M. Bishop. Pattern Recognition and Machine Learning.
        Springer, 2006.
+
+  [2]  Yuri Burda, Roger Grosse, and Ruslan Salakhutdinov. Importance Weighted
+       Autoencoders. In _International Conference on Learning
+       Representations_, 2016. https://arxiv.org/abs/1509.00519
+
+  [3]  Tom Rainforth, Adam R. Kosiorek, Tuan Anh Le, Chris J. Maddison,
+       Maximilian Igl, Frank Wood, and Yee Whye Teh. Tighter Variational Bounds
+       are Not Necessarily Better. In _International Conference on Machine
+       Learning (ICML)_, 2018. https://arxiv.org/abs/1802.04537
+
   """
+
+  if variational_loss_fn is None:
+    variational_loss_fn = functools.partial(
+        csiszar_divergence.monte_carlo_variational_loss,
+        discrepancy_fn=discrepancy_fn,
+        importance_sample_size=importance_sample_size,
+        # Silent fallback to score-function gradients leads to
+        # difficult-to-debug failures, so force reparameterization gradients by
+        # default.
+        use_reparameterization=True)
 
   def complete_variational_loss_fn(seed=None):
     return variational_loss_fn(
