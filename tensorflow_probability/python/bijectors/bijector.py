@@ -36,6 +36,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import generic as math_generic
 from tensorflow_probability.python.math import gradient
+
 # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import deprecation
 from tensorflow.python.util import nest
@@ -589,10 +590,16 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
     if not name:
       name = type(self).__name__
       name = name_util.camel_to_lower_snake(name)
-    name = name_util.get_name_scope_name(name)
+
+    constructor_name_scope = name_util.get_name_scope_name(name)
+    # Extract the (locally unique) name from the scope.
+    name = (constructor_name_scope.split('/')[-2]
+            if '/' in constructor_name_scope
+            else name)
     name = name_util.strip_invalid_chars(name)
     super(Bijector, self).__init__(name=name)
     self._name = name
+    self._constructor_name_scope = constructor_name_scope
     # TODO(b/176242804): Infer `parameters` if not specified by the child class.
 
     if parameters is None:
@@ -1792,7 +1799,9 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
   @contextlib.contextmanager
   def _name_and_control_scope(self, name=None):
     """Helper function to standardize op scope."""
-    with tf.name_scope(self.name):
+    with name_util.instance_scope(
+        instance_name=self.name,
+        constructor_name_scope=self._constructor_name_scope):
       with tf.name_scope(name) as name_scope:
         deps = []
         if self._defer_all_assertions:

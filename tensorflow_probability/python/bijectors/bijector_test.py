@@ -213,6 +213,38 @@ class BaseBijectorTest(test_util.TestCase):
         base_params.pop('validate_args'), copy_params.pop('validate_args'))
     self.assertEqual(base_params, copy_params)
 
+  def testNameScopeRefersToInitialScope(self):
+    if tf.executing_eagerly():
+      self.skipTest('Eager mode.')
+
+    outer_bijector = tfb.Exp(name='Exponential')
+    self.assertStartsWith(outer_bijector.name, 'Exponential')
+
+    with tf.name_scope('inside'):
+      inner_bijector = tfb.Exp(name='Exponential')
+      self.assertStartsWith(inner_bijector.name, 'Exponential')
+
+      self.assertStartsWith(inner_bijector.forward(0., name='x').name,
+                            'inside/Exponential/x')
+      self.assertStartsWith(outer_bijector.forward(0., name='x').name,
+                            'inside/Exponential_CONSTRUCTED_AT_top_level/x')
+
+      meta_bijector = tfb.Chain([inner_bijector], name='meta_bijector')
+      # Check for spurious `_CONSTRUCTED_AT_`.
+      self.assertStartsWith(
+          meta_bijector.forward(0., name='x').name,
+          'inside/meta_bijector/x/Exponential/forward')
+
+    # Outside the scope.
+    self.assertStartsWith(inner_bijector.forward(0., name='x').name,
+                          'Exponential_CONSTRUCTED_AT_inside/x')
+    self.assertStartsWith(outer_bijector.forward(0., name='x').name,
+                          'Exponential/x')
+    # Check that init scope is annotated only for the toplevel bijector.
+    self.assertStartsWith(
+        meta_bijector.forward(0., name='x').name,
+        'meta_bijector_CONSTRUCTED_AT_inside/x/Exponential/forward')
+
 
 @test_util.test_graph_and_eager_modes
 class BijectorStringReprTest(test_util.TestCase):

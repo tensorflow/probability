@@ -609,9 +609,15 @@ class Distribution(_BaseDistribution):
     if not name:
       name = type(self).__name__
       name = name_util.camel_to_lower_snake(name)
-    name = name_util.get_name_scope_name(name)
+
+    constructor_name_scope = name_util.get_name_scope_name(name)
+    # Extract the (locally unique) name from the scope.
+    name = (constructor_name_scope.split('/')[-2]
+            if '/' in constructor_name_scope
+            else name)
     name = name_util.strip_invalid_chars(name)
     super(Distribution, self).__init__(name=name)
+    self._constructor_name_scope = constructor_name_scope
     self._name = name
 
     graph_parents = [] if graph_parents is None else graph_parents
@@ -1938,7 +1944,9 @@ class Distribution(_BaseDistribution):
     """Helper function to standardize op scope."""
     # Note: we recieve `kwargs` and not `**kwargs` to ensure no collisions on
     # other args we choose to take in this function.
-    with tf.name_scope(self.name):
+    with name_util.instance_scope(
+        instance_name=self.name,
+        constructor_name_scope=self._constructor_name_scope):
       with tf.name_scope(name) as name_scope:
         deps = []
         if self._defer_all_assertions:

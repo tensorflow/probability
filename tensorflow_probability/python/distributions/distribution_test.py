@@ -473,6 +473,47 @@ class DistributionTest(test_util.TestCase):
     y = dist._set_sample_static_shape(x, sample_shape)
     self.assertIsNone(tensorshape_util.rank(y.shape))
 
+  def testNameScopeRefersToInitialScope(self):
+    if tf.executing_eagerly():
+      self.skipTest('Eager mode.')
+
+    seed = test_util.test_seed()
+
+    outer_dist = tfd.Normal(loc=0., scale=1., name='dist', validate_args=True)
+    self.assertStartsWith(outer_dist.name, 'dist')
+
+    with tf.name_scope('inside'):
+      inner_dist = tfd.Normal(loc=0., scale=1., name='dist', validate_args=True)
+      self.assertStartsWith(inner_dist.name, 'dist')
+      self.assertStartsWith(inner_dist.sample(seed=seed, name='x').name,
+                            'inside/dist/x')
+      self.assertStartsWith(outer_dist.sample(seed=seed, name='x').name,
+                            'inside/dist_CONSTRUCTED_AT_top_level/x')
+      # Check that we reuse the same scope across multiple calls.
+      self.assertStartsWith(outer_dist.sample(seed=seed, name='x').name,
+                            'inside/dist_CONSTRUCTED_AT_top_level/x')
+
+      meta_dist = tfd.Independent(inner_dist,
+                                  reinterpreted_batch_ndims=0,
+                                  name='meta_dist')
+      # Patch to return tensors directly from the inner distribution, so we can
+      # read their names.
+      meta_dist._call_sample_n = meta_dist._sample_n
+      # Check for spurious `_CONSTRUCTED_AT_`.
+      self.assertStartsWith(
+          meta_dist.sample(seed=seed, name='x').name,
+          'inside/meta_dist/x/dist/sample')
+
+    # Outside the scope.
+    self.assertStartsWith(inner_dist.sample(seed=seed, name='x').name,
+                          'dist_CONSTRUCTED_AT_inside/x')
+    self.assertStartsWith(outer_dist.sample(seed=seed, name='x').name,
+                          'dist/x')
+    # Check that init scope is annotated only for the toplevel distribution.
+    self.assertStartsWith(
+        meta_dist.sample(seed=seed, name='x').name,
+        'meta_dist_CONSTRUCTED_AT_inside/x/dist/sample')
+
   def testNameScopeWorksCorrectly(self):
     x = tfd.Normal(loc=0., scale=1., name='x')
     x_duplicate = tfd.Normal(loc=0., scale=1., name='x')
@@ -493,12 +534,12 @@ class DistributionTest(test_util.TestCase):
     # Tensors also do not have names in eager mode, so exit early.
     if tf.executing_eagerly():
       return
-    self.assertStartsWith(x_sample.name, 'x_2/custom_sample')
-    self.assertStartsWith(x_log_prob.name, 'x_4/custom_log_prob')
+    self.assertStartsWith(x_sample.name, 'x/custom_sample')
+    self.assertStartsWith(x_log_prob.name, 'x/custom_log_prob')
 
     self.assertStartsWith(x_duplicate.name, 'x_1')
-    self.assertStartsWith(x_duplicate_sample.name, 'x_1_1/custom_sample')
-    self.assertStartsWith(x_sample_duplicate.name, 'x_3/custom_sample')
+    self.assertStartsWith(x_duplicate_sample.name, 'x_1/custom_sample')
+    self.assertStartsWith(x_sample_duplicate.name, 'x/custom_sample_1')
 
   def testUnimplemtnedProbAndLogProbExceptions(self):
     class TerribleDistribution(tfd.Distribution):
