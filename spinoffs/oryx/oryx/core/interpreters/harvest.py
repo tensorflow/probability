@@ -27,11 +27,12 @@ tagged values.
 `harvest` is a very general purpose transformation purely focused on converting
 functions that have special side-effects (defined using `sow`) and
 "functionalizing" them. Specifically, a function
-`f :: X -> Y` has a set of defined intermediates, or `Sows`. This set
+`f :: (x: X) -> Y` has a set of defined intermediates, or `Sows`. This set
 can be divided into intermediates you are "collecting" and intermediates you are
 "injecting", or `Reaps` and `Plants` respectively. Functionalizing
-`f` now gives you `harvest(f) :: (Plants, X) -> Y -> Reaps`. Generally, most
-users will not need to use `harvest` directly, but will use wrappers around it.
+`f` now gives you `harvest(f) :: (plants: Plants, x: X) -> Tuple[Y, Reaps]`.
+Generally, most users will not need to use `harvest` directly, but will use
+wrappers around it.
 
 ## `sow`
 
