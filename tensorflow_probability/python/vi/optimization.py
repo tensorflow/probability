@@ -42,6 +42,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
                             trace_fn=_trace_loss,
                             variational_loss_fn=_reparameterized_elbo,
                             sample_size=1,
+                            importance_sample_size=1,
                             trainable_variables=None,
                             jit_compile=None,
                             seed=None,
@@ -120,6 +121,12 @@ def fit_surrogate_posterior(target_log_prob_fn,
       in estimating the variational divergence. Larger values may stabilize
       the optimization, but at higher cost per step in time and memory.
       Default value: `1`.
+    importance_sample_size: Python `int` number of terms used to define an
+      importance-weighted divergence. If `importance_sample_size > 1`, then the
+      `surrogate_posterior` is optimized to function as an importance-sampling
+      proposal distribution. In this case, posterior expectations should be
+      approximated by importance sampling, as demonstrated in the example below.
+      Default value: `1`.
     trainable_variables: Optional list of `tf.Variable` instances to optimize
       with respect to. If `None`, defaults to the set of all variables accessed
       during the computation of the variational bound, i.e., those defining
@@ -161,13 +168,10 @@ def fit_surrogate_posterior(target_log_prob_fn,
   to bother doing the math: we can use variational inference instead!
 
   ```python
-  q_z = tfd.Normal(loc=tf.Variable(0., name='q_z_loc'),
-                   scale=tfp.util.TransformedVariable(1., tfb.Softplus(),
-                                                      name='q_z_scale'),
-                   name='q_z')
+  q_z = tfp.experimental.util.make_trainable(tfd.Normal, name='q_z')
   losses = tfp.vi.fit_surrogate_posterior(
       conditioned_log_prob,
-      surrogate_posterior=q,
+      surrogate_posterior=q_z,
       optimizer=tf.optimizers.Adam(learning_rate=0.1),
       num_steps=100)
   print(q_z.mean(), q_z.stddev())  # => approximately [2.5, 1/sqrt(2)]
@@ -193,7 +197,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
       tfp.vi.monte_carlo_variational_loss, discrepancy_fn=tfp.vi.kl_forward)
     losses = tfp.vi.fit_surrogate_posterior(
         conditioned_log_prob,
-        surrogate_posterior=q,
+        surrogate_posterior=q_z,
         optimizer=tf.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
         variational_loss_fn=forward_kl_loss)
@@ -201,6 +205,67 @@ def fit_surrogate_posterior(target_log_prob_fn,
 
   Note that in practice this may have substantially higher-variance gradients
   than the reverse KL.
+
+  **Importance weighting**. A surrogate posterior may be corrected by
+  interpreting it as a proposal for an [importance sampler](
+  https://en.wikipedia.org/wiki/Importance_sampling). That is, one can use
+  weighted samples from the surrogate to estimate expectations under the true
+  posterior:
+
+  ```python
+  zs, q_log_prob = surrogate_posterior.experimental_sample_and_log_prob(
+    num_samples)
+
+  # Naive expectation under the surrogate posterior.
+  expected_x = tf.reduce_mean(f(zs), axis=0)
+
+  # Importance-weighted estimate of the expectation under the true posterior.
+  self_normalized_log_weights = tf.nn.log_softmax(
+    target_log_prob_fn(zs) - q_log_prob)
+  expected_x = tf.reduce_sum(
+    tf.exp(self_normalized_log_weights) * f(zs),
+    axis=0)
+  ```
+
+  Any distribution may be used as a proposal, but it is often natural to
+  consider surrogates that were themselves fit by optimizing an
+  importance-weighted variational objective [2], which directly optimizes the
+  surrogate's effectiveness as an proposal distribution. This may be specified
+  by passing `importance_sample_size > 1`. The importance-weighted objective
+  may favor different characteristics than the original objective.
+  For example, effective proposals are generally overdispersed, whereas a
+  surrogate optimizing reverse KL would otherwise tend to be underdispersed.
+
+  Although importance sampling is guaranteed to tighten the variational bound,
+  some research has found that this does not necessarily improve the quality
+  of deep generative models, because it also introduces gradient noise that can
+  lead to a weaker training signal [3]. As always, evaluation is important to
+  choose the approach that works best for a particular task.
+
+  When using an importance-weighted loss to fit a surrogate, it is also
+  recommended to apply importance sampling when computing expectations
+  under that surrogate.
+
+  ```python
+  # Fit `q` with an importance-weighted variational loss.
+  losses = tfp.vi.fit_surrogate_posterior(
+        conditioned_log_prob,
+        surrogate_posterior=q_z,
+        importance_sample_size=10,
+        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        num_steps=200)
+
+  # Estimate posterior statistics with importance sampling.
+  zs, q_log_prob = q_z.experimental_sample_and_log_prob(1000)
+  self_normalized_log_weights = tf.nn.log_softmax(
+    conditioned_log_prob(zs) - q_log_prob)
+  posterior_mean = tf.reduce_sum(
+    tf.exp(self_normalized_log_weights) * zs,
+    axis=0)
+  posterior_variance = tf.reduce_sum(
+    tf.exp(self_normalized_log_weights) * (zs - posterior_mean)**2,
+    axis=0)
+  ```
 
   **Inhomogeneous Poisson Process**. For a more interesting example, let's
   consider a model with multiple latent variables as well as trainable
@@ -287,8 +352,18 @@ def fit_surrogate_posterior(target_log_prob_fn,
 
   #### References
 
-  [1]: Bishop, Christopher M. Pattern Recognition and Machine Learning.
+  [1]: Christopher M. Bishop. Pattern Recognition and Machine Learning.
        Springer, 2006.
+
+  [2]  Yuri Burda, Roger Grosse, and Ruslan Salakhutdinov. Importance Weighted
+       Autoencoders. In _International Conference on Learning
+       Representations_, 2016. https://arxiv.org/abs/1509.00519
+
+  [3]  Tom Rainforth, Adam R. Kosiorek, Tuan Anh Le, Chris J. Maddison,
+       Maximilian Igl, Frank Wood, and Yee Whye Teh. Tighter Variational Bounds
+       are Not Necessarily Better. In _International Conference on Machine
+       Learning (ICML)_, 2018. https://arxiv.org/abs/1802.04537
+
   """
 
   def complete_variational_loss_fn(seed=None):
@@ -296,6 +371,7 @@ def fit_surrogate_posterior(target_log_prob_fn,
         target_log_prob_fn,
         surrogate_posterior,
         sample_size=sample_size,
+        importance_sample_size=importance_sample_size,
         seed=seed)
 
   return tfp_math.minimize(complete_variational_loss_fn,
