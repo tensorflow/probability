@@ -68,6 +68,8 @@ VMAP_LOGPROB_BLOCKLIST = (
 PMAP_SAMPLE_BLOCKLIST = (
     'Bates',
     'BatchReshape',  # http://b/163171224
+    'MixtureSameFamily',  # Too slow: http://b/170871051
+    'NegativeBinomial',  # Too slow: http://b/170871051
 )
 PMAP_LOGPROB_BLOCKLIST = (
     'BatchReshape',  # http://b/161984806
@@ -80,23 +82,30 @@ JVP_SAMPLE_BLOCKLIST = ()
 JVP_LOGPROB_SAMPLE_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
+    'NegativeBinomial',  # Too slow: http://b/170871051
 )
 JVP_LOGPROB_PARAM_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
+    'NegativeBinomial',  # Too slow: http://b/170871051
 )
 
-VJP_SAMPLE_BLOCKLIST = ()
+VJP_SAMPLE_BLOCKLIST = (
+    'NegativeBinomial',  # Too slow: http://b/170871051
+)
 VJP_LOGPROB_SAMPLE_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
+    'NegativeBinomial',  # Too slow: http://b/170871051
 )
 VJP_LOGPROB_PARAM_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
+    'NegativeBinomial',  # Too slow: http://b/170871051
 )
 
 PYTREE_BLOCKLIST = (
     'Bates',
     'MixtureSameFamily',  # Too slow: http://b/170871051
+    'NegativeBinomial',  # Too slow: http://b/170871051
     'Poisson',  # Too slow: http://b/170871051
     'Sample',  # Too slow: http://b/170871051
     'SinhArcsinh',  # b/183670203
