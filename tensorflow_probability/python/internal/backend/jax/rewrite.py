@@ -41,6 +41,10 @@ def main(argv):
   contents = contents.replace(
       'import tensorflow_probability.substrates.numpy as tfp',
       'import tensorflow_probability.substrates.jax as tfp')
+  # To fix lazy imports in `LinearOperator`.
+  contents = contents.replace(
+      'tensorflow_probability.substrates.numpy',
+      'tensorflow_probability.substrates.jax')
   contents = contents.replace('scipy.linalg', 'jax.scipy.linalg')
   contents = contents.replace('scipy.special', 'jax.scipy.special')
   if FLAGS.rewrite_numpy_import:
