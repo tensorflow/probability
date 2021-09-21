@@ -27,6 +27,7 @@ licenses(["notice"])
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
+#         "//tensorflow_probability/google:friends",  # DisableOnExport
     ],
 )
 
