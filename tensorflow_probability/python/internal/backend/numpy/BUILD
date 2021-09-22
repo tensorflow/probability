@@ -26,6 +26,7 @@ package(
 py_library(
     name = "numpy",
     srcs = ["__init__.py"],
+    srcs_version = "PY3",
     deps = [
         ":__internal__",
         ":bitwise",
@@ -69,6 +70,7 @@ py_library(
 py_library(
     name = "__internal__",
     srcs = ["__internal__.py"],
+    srcs_version = "PY3",
     deps = [
         ":composite_tensor",
     ],
@@ -77,6 +79,7 @@ py_library(
 py_library(
     name = "bitwise",
     srcs = ["bitwise.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -86,6 +89,7 @@ py_library(
 py_library(
     name = "compat",
     srcs = ["compat.py"],
+    srcs_version = "PY3",
     deps = [
         ":v1",
         ":v2",
@@ -95,16 +99,19 @@ py_library(
 py_library(
     name = "composite_tensor",
     srcs = ["composite_tensor.py"],
+    srcs_version = "PY3",
 )
 
 py_library(
     name = "config",
     srcs = ["config.py"],
+    srcs_version = "PY3",
 )
 
 py_library(
     name = "control_flow",
     srcs = ["control_flow.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":dtype",
@@ -116,12 +123,14 @@ py_library(
 py_library(
     name = "data_structures",
     srcs = ["data_structures.py"],
+    srcs_version = "PY3",
     deps = [],
 )
 
 py_library(
     name = "debugging",
     srcs = ["debugging.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":v1",
@@ -133,12 +142,14 @@ py_library(
 py_library(
     name = "deprecation",
     srcs = ["deprecation.py"],
+    srcs_version = "PY3",
     deps = [],
 )
 
 py_library(
     name = "dtype",
     srcs = ["dtype.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -148,6 +159,7 @@ py_library(
 py_library(
     name = "errors",
     srcs = ["errors.py"],
+    srcs_version = "PY3",
     deps = [
     ],
 )
@@ -155,6 +167,7 @@ py_library(
 py_library(
     name = "functional_ops",
     srcs = ["functional_ops.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -164,6 +177,7 @@ py_library(
 py_library(
     name = "initializers",
     srcs = ["initializers.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -173,6 +187,7 @@ py_library(
 py_library(
     name = "numpy_keras",
     srcs = ["numpy_keras.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":keras_layers",
@@ -183,6 +198,7 @@ py_library(
 py_library(
     name = "keras_layers",
     srcs = ["keras_layers.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -195,6 +211,7 @@ py_library(
         "linalg.py",
         "linalg_impl.py",
     ],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":static_rewrites",
@@ -206,6 +223,7 @@ py_library(
 py_library(
     name = "misc",
     srcs = ["misc.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -215,6 +233,7 @@ py_library(
 py_library(
     name = "nest",
     srcs = ["nest.py"],
+    srcs_version = "PY3",
     deps = [
         # tree dep,
     ],
@@ -223,11 +242,13 @@ py_library(
 py_library(
     name = "nested_structure_coder",
     srcs = ["nested_structure_coder.py"],
+    srcs_version = "PY3",
 )
 
 py_library(
     name = "nn",
     srcs = ["nn.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":numpy_array",
@@ -240,6 +261,7 @@ py_library(
 py_library(
     name = "numpy_array",
     srcs = ["numpy_array.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":ops",
@@ -250,6 +272,7 @@ py_library(
 py_library(
     name = "numpy_logging",
     srcs = ["numpy_logging.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -259,6 +282,7 @@ py_library(
 py_library(
     name = "numpy_math",
     srcs = ["numpy_math.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -269,6 +293,7 @@ py_library(
 py_library(
     name = "numpy_signal",
     srcs = ["numpy_signal.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -278,6 +303,7 @@ py_library(
 py_library(
     name = "ops",
     srcs = ["ops.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -289,6 +315,7 @@ py_library(
 py_library(
     name = "private",
     srcs = ["private.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -298,6 +325,7 @@ py_library(
 py_library(
     name = "tensor_array_ops",
     srcs = ["tensor_array_ops.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -321,6 +349,7 @@ py_test(
 py_library(
     name = "random_generators",
     srcs = ["random_generators.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":numpy_array",
@@ -333,6 +362,7 @@ py_library(
 py_library(
     name = "raw_ops",
     srcs = ["raw_ops.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":numpy_array",
@@ -345,11 +375,13 @@ py_library(
 py_library(
     name = "resource_variable_ops",
     srcs = ["resource_variable_ops.py"],
+    srcs_version = "PY3",
 )
 
 py_library(
     name = "sets_lib",
     srcs = ["sets_lib.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -359,6 +391,7 @@ py_library(
 py_library(
     name = "sparse_lib",
     srcs = ["sparse_lib.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
     ],
@@ -376,6 +409,7 @@ py_library(
     name = "tensor_shape_gen",
     testonly = 1,
     srcs = ["tensor_shape_gen.py"],
+    srcs_version = "PY3",
     deps = [
         # absl/logging dep,
         # six dep,
@@ -385,6 +419,7 @@ py_library(
 py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
+    srcs_version = "PY3",
     deps = [
         # absl/logging dep,
         # absl/testing:absltest dep,
@@ -395,22 +430,26 @@ py_library(
 py_library(
     name = "tf_inspect",
     srcs = ["tf_inspect.py"],
+    srcs_version = "PY3",
     deps = [],
 )
 
 py_library(
     name = "tensor_spec",
     srcs = ["tensor_spec.py"],
+    srcs_version = "PY3",
 )
 
 py_library(
     name = "type_spec",
     srcs = ["type_spec.py"],
+    srcs_version = "PY3",
 )
 
 py_library(
     name = "variables",
     srcs = ["variables.py"],
+    srcs_version = "PY3",
     deps = [
         ":ops",
     ],
@@ -501,6 +540,7 @@ test_suite(
 py_library(
     name = "v1",
     srcs = ["v1.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":initializers",
@@ -513,6 +553,7 @@ py_library(
 py_library(
     name = "v2",
     srcs = ["v2.py"],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         ":nest",
@@ -524,6 +565,7 @@ py_library(
 py_library(
     name = "_utils",
     srcs = ["_utils.py"],
+    srcs_version = "PY3",
     deps = [
         ":nest",
         # wrapt dep,
@@ -596,6 +638,7 @@ py_library(
     name = "linear_operator_gen",
     testonly = 1,
     srcs = [":{}_gen.py".format(filename) for filename in LINOP_FILES],
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,
@@ -629,6 +672,7 @@ py_test(
 py_library(
     name = "static_rewrites",
     srcs = glob(["gen/*.py"]),
+    srcs_version = "PY3",
     deps = [
         ":_utils",
         # numpy dep,

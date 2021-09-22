@@ -449,6 +449,7 @@ multi_substrate_py_library(
 py_library(
     name = "glow",
     srcs = ["glow.py"],
+    srcs_version = "PY3",
     deps = [
         ":bijector",
         ":blockwise",

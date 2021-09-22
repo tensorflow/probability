@@ -479,6 +479,7 @@ multi_substrate_py_test(
 py_library(
     name = "reparameterization",
     srcs = ["reparameterization.py"],
+    srcs_version = "PY3",
 )
 
 multi_substrate_py_library(

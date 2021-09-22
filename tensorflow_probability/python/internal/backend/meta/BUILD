@@ -38,6 +38,7 @@ py_binary(
     name = "gen_tensor_shape",
     srcs = ["gen_tensor_shape.py"],
     python_version = "PY3",
+    srcs_version = "PY3",
     deps = [
         # absl:app dep,
         # tensorflow dep,

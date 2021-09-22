@@ -349,6 +349,7 @@ py_library(
     name = "hypothesis_testlib",
     testonly = True,
     srcs = ["hypothesis_testlib.py"],
+    srcs_version = "PY3",
     deps = [
         # hypothesis dep,
         # numpy dep,
