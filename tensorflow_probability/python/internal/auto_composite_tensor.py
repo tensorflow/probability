@@ -163,7 +163,7 @@ def _extract_type_spec_recursively(value):
   return value
 
 
-class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
+class _AutoCompositeTensorTypeSpec(type_spec.BatchableTypeSpec):
   """A tf.TypeSpec for `AutoCompositeTensor` objects."""
 
   __slots__ = ('_param_specs', '_non_tensor_params', '_omit_kwargs',
@@ -331,6 +331,17 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
     return self._TypeSpec__is_compatible(
         self._comparable, spec_or_value._comparable)  # pylint: disable=protected-access
 
+  def _copy(self, **overrides):
+    kwargs = {
+        'param_specs': self._param_specs,
+        'non_tensor_params': self._non_tensor_params,
+        'omit_kwargs': self._omit_kwargs,
+        'prefer_static_value': self._prefer_static_value,
+        'non_identifying_kwargs': self._non_identifying_kwargs,
+        'callable_params': self._callable_params}
+    kwargs.update(overrides)
+    return type(self)(**kwargs)
+
   def _with_tensor_ranks_only(self):
     """Returns a TypeSpec compatible with `self`, with tensor shapes relaxed.
 
@@ -347,13 +358,8 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
         return tf.TensorShape([None] * value.rank)
       else:
         return value
-
-    return type(self)(
-        tf.nest.map_structure(relax, self._param_specs),
-        self._non_tensor_params,
-        self._omit_kwargs,
-        self._prefer_static_value,
-        self._callable_params)
+    return self._copy(
+        param_specs=tf.nest.map_structure(relax, self._param_specs))
 
   def __get_cmp_key(self):
     return (type(self), self._TypeSpec__make_cmp_key(self._comparable))
@@ -378,6 +384,27 @@ class _AutoCompositeTensorTypeSpec(tf.TypeSpec):
 
   def __hash__(self):
     return hash(self.__get_cmp_key())
+
+  def _batch(self, batch_size):
+    """Returns a TypeSpec representing a batch of objects with this TypeSpec."""
+    # This method recursively adds a batch dimension to all parameter Tensors.
+    # Note that this may result in parameter shapes that do not broadcast. You
+    # may wish to first call
+    # `dist = dist._broadcast_parameters_with_batch_shape(tf.ones_like(
+    # `dist.batch_shape_tensor()))` to ensure that the parameters of a
+    # Distribution or analogous object will continue to broadcast after
+    # batching.
+    return self._copy(
+        param_specs=tf.nest.map_structure(
+            lambda spec: spec._batch(batch_size),  # pylint: disable=protected-access
+            self._param_specs))
+
+  def _unbatch(self):
+    """Returns a TypeSpec representing a single element of this TypeSpec."""
+    return self._copy(
+        param_specs=tf.nest.map_structure(
+            lambda spec: spec._unbatch(),  # pylint: disable=protected-access
+            self._param_specs))
 
 
 class AutoCompositeTensor(composite_tensor.CompositeTensor):

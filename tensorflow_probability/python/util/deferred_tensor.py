@@ -817,6 +817,8 @@ class _DeferredTensorSpec(_DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
     """Returns a TypeSpec representing a batch of DeferredTensors."""
     transform_or_spec = self._specs.get(
         'transform_or_spec', self.transform_or_spec)
+    if hasattr(transform_or_spec, '_batch'):
+      transform_or_spec = transform_or_spec._batch(batch_size)
     return _DeferredTensorSpec(
         self._get_batched_input_spec(batch_size),
         transform_or_spec=transform_or_spec,
@@ -830,6 +832,8 @@ class _DeferredTensorSpec(_DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
     """Returns a TypeSpec representing a single DeferredTensor."""
     transform_or_spec = self._specs.get(
         'transform_or_spec', self.transform_or_spec)
+    if hasattr(transform_or_spec, '_unbatch'):
+      transform_or_spec = transform_or_spec._unbatch()
     return _DeferredTensorSpec(
         self._get_unbatched_input_spec(),
         transform_or_spec=transform_or_spec,
@@ -901,6 +905,8 @@ class _TransformedVariableSpec(
     """Returns a TypeSpec representing a batch of TransformedVariable."""
     transform_or_spec = self._specs.get(
         'transform_or_spec', self.transform_or_spec)
+    if hasattr(transform_or_spec, '_batch'):
+      transform_or_spec = transform_or_spec._batch(batch_size)
     return _TransformedVariableSpec(
         self._get_batched_input_spec(batch_size),
         transform_or_spec=transform_or_spec,
@@ -911,6 +917,8 @@ class _TransformedVariableSpec(
     """Returns a TypeSpec representing a single TransformedVariable."""
     transform_or_spec = self._specs.get(
         'transform_or_spec', self.transform_or_spec)
+    if hasattr(transform_or_spec, '_unbatch'):
+      transform_or_spec = transform_or_spec._unbatch()
     return _TransformedVariableSpec(
         self._get_unbatched_input_spec(),
         transform_or_spec=transform_or_spec,

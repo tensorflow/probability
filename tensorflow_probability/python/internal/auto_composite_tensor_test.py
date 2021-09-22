@@ -434,6 +434,16 @@ class AutoCompositeTensorTest(test_util.TestCase):
                    else 'ScaleThreeNormal_1')
     self.assertEqual(unflat.name, unflat_name)
 
+  def test_can_return_distribution_from_vectorized_map(self):
+
+    def fn(x):
+      dist = AutoNormal(loc=x, scale=[3., 5.])
+      return dist._broadcast_parameters_with_batch_shape(
+          tf.ones_like(dist.batch_shape_tensor()))
+
+    batch_dist = tf.vectorized_map(fn, tf.convert_to_tensor([1., 2., 3.]))
+    self.assertAllEqual(batch_dist.batch_shape, [3, 2])
+
 
 class _TestTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):
 
