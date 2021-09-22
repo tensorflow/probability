@@ -973,25 +973,24 @@ def monte_carlo_variational_loss(target_log_prob_fn,
       # Attempt to avoid bijector inverses by computing the surrogate log prob
       # during the forward sampling pass.
       q_samples, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
-          [sample_size, importance_sample_size], seed=seed)
+          [sample_size * importance_sample_size], seed=seed)
     else:
       # Score fn objective requires explicit gradients of `log_prob`.
       q_samples = surrogate_posterior.sample(
-          [sample_size, importance_sample_size], seed=seed)
+          [sample_size * importance_sample_size], seed=seed)
       q_lp = None
 
-    loss_with_importance_sample_dim = monte_carlo.expectation(
+    return monte_carlo.expectation(
         f=_make_importance_weighted_divergence_fn(
             target_log_prob_fn,
             surrogate_posterior=surrogate_posterior,
             discrepancy_fn=discrepancy_fn,
             precomputed_surrogate_log_prob=q_lp,
-            importance_sample_axis=1),
+            importance_sample_size=importance_sample_size),
         samples=q_samples,
         # Log-prob is only used if use_reparameterization=False.
         log_prob=surrogate_posterior.log_prob,
         use_reparameterization=use_reparameterization)
-    return tf.squeeze(loss_with_importance_sample_dim, axis=0)
 
 
 def _make_importance_weighted_divergence_fn(
@@ -999,14 +998,13 @@ def _make_importance_weighted_divergence_fn(
     surrogate_posterior,
     discrepancy_fn,
     precomputed_surrogate_log_prob=None,
-    importance_sample_axis=1):
+    importance_sample_size=1):
   """Defines a function to compute an importance-weighted divergence."""
 
   def divergence_fn(q_samples):
     q_lp = precomputed_surrogate_log_prob
     if q_lp is None:
       q_lp = surrogate_posterior.log_prob(q_samples)
-    importance_sample_size = ps.shape(q_lp)[importance_sample_axis]
 
     target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
     log_weights = target_log_prob - q_lp
@@ -1014,11 +1012,12 @@ def _make_importance_weighted_divergence_fn(
       # Bypass importance weighting.
       return discrepancy_fn(log_weights)
 
-    log_sum_weights = tf.reduce_logsumexp(log_weights,
-                                          axis=importance_sample_axis,
-                                          # Match the result shape we would have
-                                          # gotten without importance sampling.
-                                          keepdims=True)
+    # Explicitly break out `importance_sample_size` as a separate axis.
+    log_weights = tf.reshape(
+        log_weights,
+        ps.concat([[-1, importance_sample_size],
+                   ps.shape(log_weights)[1:]], axis=0))
+    log_sum_weights = tf.reduce_logsumexp(log_weights, axis=1)
     log_avg_weights = log_sum_weights - tf.math.log(
         tf.cast(importance_sample_size, dtype=log_weights.dtype))
     return discrepancy_fn(log_avg_weights)
