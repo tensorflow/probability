@@ -377,7 +377,7 @@ broadcast_to = utils.copy_docstring(
 
 
 def _cast(x, dtype):
-  x = np.asarray(x)
+  x = convert_to_tensor(x)
   if (np.issubdtype(x.dtype, np.complexfloating) and
       not np.issubdtype(dtype, np.complexfloating)):
     x = np.real(x)
