@@ -267,6 +267,10 @@ class ShapeTest(test_util.TestCase):
     self.evaluate(v.initializer)
     self.assertEqual(1, self.evaluate(ps.rank_from_shape(v)))
 
+  def test_convert_dimension_to_tensor(self):
+    v = ps.constant(tf1.Dimension(1))
+    self.assertEqual(1, v)
+
   def test_rank_from_shape(self):
     shape = [2, 4, 3]
     expected_rank = len(shape)

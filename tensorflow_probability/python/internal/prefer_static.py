@@ -43,11 +43,20 @@ from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensor
 
 JAX_MODE = False
 
+
 # Enable converting TF TensorShape and Dimension into np.array. This allows TF
 # code to pass TensorShapes into prefer_static functions. We can also re-use the
-# nptf methods.
+# TensorShape conversion logic from nptf, but Dimension needs to be here to make
+# sure we use TF's dimension_value.
+def _convert_dimension_to_tensor(value, dtype=None):
+  dtype = dtype or np.int32
+  if dtype not in (np.int32, np.int64):
+    raise nptf.ops.TypeConversionError(value, dtype)
+  return nptf.convert_to_tensor(tf.compat.dimension_value(value), dtype=dtype)
+
+
 nptf.register_tensor_conversion_function(
-    tf1.Dimension, nptf.ops._convert_dimension_to_tensor)  # pylint: disable=protected-access
+    tf1.Dimension, _convert_dimension_to_tensor)
 nptf.register_tensor_conversion_function(
     tf.TensorShape, nptf.ops._convert_tensorshape_to_tensor)  # pylint: disable=protected-access
 
