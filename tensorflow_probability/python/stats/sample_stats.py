@@ -183,7 +183,7 @@ def auto_correlation(x,
     if max_lags is None:
       max_lags = x_len - 1
     else:
-      max_lags = tf.convert_to_tensor(max_lags, name='max_lags')
+      max_lags = ps.convert_to_shape_tensor(max_lags, name='max_lags')
       max_lags_ = tf.get_static_value(max_lags)
       if max_lags_ is None or not know_static_shape:
         know_static_shape = False
@@ -285,7 +285,7 @@ def cholesky_covariance(x, sample_axis=0, keepdims=False, name=None):
       lower triangular matrices (the Cholesky factors).
   """
   with tf.name_scope(name or 'cholesky_covariance'):
-    sample_axis = tf.convert_to_tensor(sample_axis, dtype=tf.int32)
+    sample_axis = ps.convert_to_shape_tensor(sample_axis, dtype=tf.int32)
     cov = covariance(
         x, sample_axis=sample_axis, event_axis=-1, keepdims=keepdims)
     return tf.linalg.cholesky(cov)
@@ -971,10 +971,10 @@ def log_average_probs(logits, sample_axis=0, event_axis=None, keepdims=False,
   with tf.name_scope(name or 'average_sigmoid'):
     logits = tf.convert_to_tensor(logits, dtype_hint=tf.float32, name='logits')
     if sample_axis is not None:
-      sample_axis = tf.convert_to_tensor(
+      sample_axis = ps.convert_to_shape_tensor(
           sample_axis, dtype_hint=tf.int32, name='sample_axis')
     if event_axis is not None:
-      event_axis = tf.convert_to_tensor(
+      event_axis = ps.convert_to_shape_tensor(
           event_axis, dtype_hint=tf.int32, name='event_axis')
     if event_axis is None:
       # log(sigmoid(x)) = log(1 / (1 + exp(-x))) = -log1p(exp(-x)) = -sp(-x)
