@@ -461,7 +461,7 @@ def potential_scale_reduction(chains_states,
   # array) is not efficiently computable.  Therefore, we try constant_value then
   # check for None.
   icn_const_ = tf.get_static_value(
-      tf.convert_to_tensor(independent_chain_ndims))
+      ps.convert_to_shape_tensor(independent_chain_ndims))
   if icn_const_ is not None:
     independent_chain_ndims = icn_const_
     if icn_const_ < 1:
@@ -539,15 +539,15 @@ def _potential_scale_reduction_single_state(state, independent_chain_ndims,
       state = tf.transpose(
           a=state,
           perm=ps.concat(
-              [[1, 0], tf.range(2, tf.rank(state))], axis=0))
+              [[1, 0], ps.range(2, ps.rank(state))], axis=0))
 
       # We're treating the new dim as indexing 2 chains, so increment.
       independent_chain_ndims += 1
 
-    sample_axis = tf.range(0, sample_ndims)
-    chain_axis = tf.range(sample_ndims,
+    sample_axis = ps.range(0, sample_ndims)
+    chain_axis = ps.range(sample_ndims,
                           sample_ndims + independent_chain_ndims)
-    sample_and_chain_axis = tf.range(
+    sample_and_chain_axis = ps.range(
         0, sample_ndims + independent_chain_ndims)
 
     n = _axis_size(state, sample_axis)

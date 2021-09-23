@@ -1238,7 +1238,7 @@ def pad(x, axis, front=False, back=False, value=0, count=1, name=None):
         tensorshape_util.rank(x.shape)
         if tensorshape_util.rank(x.shape) is not None else tf.rank(
             x, name='ndims'))
-    axis = tf.convert_to_tensor(axis, name='axis')
+    axis = ps.convert_to_shape_tensor(axis, name='axis')
     axis_ = tf.get_static_value(axis)
     if axis_ is not None:
       axis = axis_
