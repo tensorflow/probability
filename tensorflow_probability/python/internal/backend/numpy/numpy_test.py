@@ -122,8 +122,15 @@ class TestCase(dict):
 def floats(min_value=-1e16,
            max_value=1e16,
            allow_nan=ALLOW_NAN,
-           allow_infinity=ALLOW_INFINITY):
-  return hps.floats(min_value, max_value, allow_nan, allow_infinity)
+           allow_infinity=ALLOW_INFINITY,
+           dtype=np.float32):
+  if min_value is not None: min_value = onp.array(min_value, dtype=dtype).item()
+  if max_value is not None: max_value = onp.array(max_value, dtype=dtype).item()
+  return hps.floats(min_value=min_value,
+                    max_value=max_value,
+                    allow_nan=allow_nan,
+                    allow_infinity=allow_infinity,
+                    width=np.dtype(dtype).itemsize * 8)
 
 
 def integers(min_value=-2**30, max_value=2**30):
@@ -133,9 +140,17 @@ def integers(min_value=-2**30, max_value=2**30):
 def complex_numbers(min_magnitude=0.,
                     max_magnitude=1e16,
                     allow_nan=ALLOW_NAN,
-                    allow_infinity=ALLOW_INFINITY):
-  return hps.complex_numbers(
-      min_magnitude, max_magnitude, allow_nan, allow_infinity)
+                    allow_infinity=ALLOW_INFINITY,
+                    dtype=np.complex64):
+  # TODO(jburnim): In the np.complex64 case, directly build np.complex64 values
+  # with Hypothesis instead of building np.complex128 and casting.
+  return hps.builds(
+      dtype,
+      hps.complex_numbers(
+          min_magnitude=min_magnitude,
+          max_magnitude=max_magnitude,
+          allow_nan=allow_nan,
+          allow_infinity=allow_infinity))
 
 
 @hps.composite
@@ -156,11 +171,12 @@ def shapes(min_dims=0, max_dims=4, min_side=1, max_side=5):
   return strategy
 
 
-def fft_shapes(fft_dim):
+def fft_shapes(fft_dim, max_fft_size=32):
+  sizes = [s for s in [2, 4, 8, 16, 32] if s <= max_fft_size]
   return hps.tuples(
       shapes(max_dims=2),  # batch portion
       hps.lists(min_size=fft_dim, max_size=fft_dim,
-                elements=hps.sampled_from([2, 4, 8, 16, 32]))).map(
+                elements=hps.sampled_from(sizes))).map(
                     lambda t: t[0] + tuple(t[1]))
 
 
@@ -173,13 +189,14 @@ def n_same_shape(draw, n, shape=shapes(), dtype=None, elements=None,
   if elements is None:
     if dtype in (np.float32, np.float64):
       if allow_nan:
-        elements = floats(min_value=None, max_value=None, allow_nan=allow_nan)
+        elements = floats(min_value=None, max_value=None,
+                          allow_nan=allow_nan, dtype=dtype)
       else:
-        elements = floats()
+        elements = floats(dtype=dtype)
     elif dtype in (np.int32, np.int64):
       elements = integers()
     elif dtype in (np.complex64, np.complex128):
-      elements = complex_numbers()
+      elements = complex_numbers(dtype=dtype)
     elif dtype == np.bool_:
       elements = hps.booleans()
     else:
@@ -256,8 +273,9 @@ def one_hot_params(draw):
 def array_and_diagonal(draw):
   side = draw(hps.integers(1, 10))
   shape = draw(shapes(min_dims=2, min_side=side, max_side=side))
-  array = draw(hnp.arrays(np.float64, shape, elements=floats()))
-  diag = draw(hnp.arrays(np.float64, shape[:-1], elements=floats()))
+  array = draw(hnp.arrays(np.float64, shape, elements=floats(dtype=np.float64)))
+  diag = draw(hnp.arrays(np.float64, shape[:-1],
+                         elements=floats(dtype=np.float64)))
   return array, diag
 
 
@@ -266,7 +284,7 @@ def matmul_compatible_pairs(draw,
                             dtype=np.float64,
                             x_strategy=None,
                             elements=None):
-  elements = elements or floats()
+  elements = elements or floats(dtype=dtype)
   x_strategy = x_strategy or single_arrays(
       shape=shapes(min_dims=2, max_dims=5), dtype=dtype, elements=elements)
   x = draw(x_strategy)
@@ -343,11 +361,11 @@ def normal_params(draw):
   dtype = draw(hps.sampled_from([np.float32, np.float64]))
   mean = (
       draw(single_arrays(shape=hps.just(arg_shapes[1]), dtype=dtype,
-                         elements=floats()))
+                         elements=floats(dtype=dtype)))
       if include_arg[0] else 0)
   stddev = (
       draw(single_arrays(shape=hps.just(arg_shapes[2]), dtype=dtype,
-                         elements=positive_floats()))
+                         elements=positive_floats(dtype=dtype)))
       if include_arg[1] else 1)
   return (arg_shapes[0], mean, stddev, dtype)
 
@@ -359,11 +377,13 @@ def uniform_params(draw):
       tfp_hps.broadcasting_shapes(shape, 3).map(tensorshapes_to_tuples))
   include_arg = draw(hps.lists(hps.booleans(), min_size=2, max_size=2))
   dtype = draw(hps.sampled_from([np.int32, np.int64, np.float32, np.float64]))
-  elements = floats(), positive_floats()
   if dtype == np.int32 or dtype == np.int64:
     # TF RandomUniformInt only supports scalar min/max.
     arg_shapes = (arg_shapes[0], (), ())
     elements = integers(), integers(min_value=1)
+  else:
+    elements = floats(dtype=dtype), positive_floats(dtype=dtype)
+
   minval = (
       draw(single_arrays(shape=hps.just(arg_shapes[1]), dtype=dtype,
                          elements=elements[0]))
@@ -384,6 +404,7 @@ def gamma_params():
             d['dtype'])  # dtype
   return hps.fixed_dictionaries(
       dict(shape=shapes(),
+           # TODO(jburnim): Support generating float64 params.
            params=n_same_shape(n=2, elements=positive_floats()),
            include_beta=hps.booleans(),
            dtype=hps.sampled_from([np.float32, np.float64]))
@@ -582,7 +603,7 @@ def histogram_fixed_width_bins_params(draw):
       dtype=np.float32,
       shape=shapes(min_dims=1, min_side=2),
       unique=True,
-      elements=hps.floats(min_value=-1e5, max_value=1e5)
+      elements=hps.floats(min_value=-1e5, max_value=1e5, width=32)
   ))
   vmin, vmax = np.min(values), np.max(values)
   value_min = draw(hps.one_of(
@@ -783,7 +804,7 @@ NUMPY_TEST_CASES = [
     TestCase(
         'signal.fft3d', [
             single_arrays(
-                shape=fft_shapes(fft_dim=3),
+                shape=fft_shapes(fft_dim=3, max_fft_size=16),
                 dtype=np.complex64,
                 elements=complex_numbers(max_magnitude=1e3))
         ],
@@ -838,7 +859,7 @@ NUMPY_TEST_CASES = [
     TestCase(
         'signal.ifft3d', [
             single_arrays(
-                shape=fft_shapes(fft_dim=3),
+                shape=fft_shapes(fft_dim=3, max_fft_size=16),
                 dtype=np.complex64,
                 elements=complex_numbers(max_magnitude=1e3))
         ],
@@ -865,7 +886,7 @@ NUMPY_TEST_CASES = [
     TestCase(
         'signal.irfft3d', [
             single_arrays(
-                shape=fft_shapes(fft_dim=3),
+                shape=fft_shapes(fft_dim=3, max_fft_size=16),
                 dtype=np.complex64,
                 elements=complex_numbers(max_magnitude=1e3))
         ],
