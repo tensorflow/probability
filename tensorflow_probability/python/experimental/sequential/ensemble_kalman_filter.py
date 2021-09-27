@@ -37,13 +37,13 @@ def _covariance(x, y=None):
   """Sample covariance, assuming samples are the leftmost axis."""
   x = tf.convert_to_tensor(x, name='x')
   # Covariance *only* uses the centered versions of x (and y).
-  x -= tf.reduce_mean(x, axis=0)
+  x = x - tf.reduce_mean(x, axis=0)
 
   if y is None:
     y = x
   else:
     y = tf.convert_to_tensor(y, name='y', dtype=x.dtype)
-    y -= tf.reduce_mean(y, axis=0)
+    y = y - tf.reduce_mean(y, axis=0)
 
   return tf.reduce_mean(tf.linalg.matmul(
       x[..., tf.newaxis],

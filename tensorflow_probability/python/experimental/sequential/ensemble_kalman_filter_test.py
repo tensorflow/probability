@@ -63,7 +63,10 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
         step=0, particles=particles, extra={'unchanged': 1})
 
     predicted_state = tfs.ensemble_kalman_filter_predict(
-        state, transition_fn=transition_fn, inflate_fn=None)
+        state,
+        transition_fn=transition_fn,
+        inflate_fn=None,
+        seed=test_util.test_seed())
 
     # Check that extra is correctly propagated.
     self.assertIn('unchanged', predicted_state.extra)

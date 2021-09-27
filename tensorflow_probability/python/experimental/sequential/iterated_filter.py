@@ -30,8 +30,10 @@ from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.experimental.mcmc import infer_trajectories
 
 from tensorflow_probability.python.internal import distribution_util as dist_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
+from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 
 from tensorflow_probability.python.util import SeedStream
 
@@ -40,6 +42,9 @@ __all__ = [
     'geometric_cooling_schedule',
     'IteratedFilter'
 ]
+
+JAX_MODE = False  # Overwritten by rewrite script.
+NUMPY_MODE = False
 
 
 # Utility to avoid breakage when passed-in structures are mutated externally.
@@ -121,9 +126,8 @@ class DeterministicEmpirical(distribution.Distribution):
             lambda _: batch_ndims, values_with_sample_dim)
       self._batch_ndims = batch_ndims
 
-      self._max_num_samples = prefer_static.reduce_min(
-          [prefer_static.size0(x)
-           for x in tf.nest.flatten(values_with_sample_dim)])
+      self._max_num_samples = ps.reduce_min(
+          [ps.size0(x) for x in tf.nest.flatten(values_with_sample_dim)])
 
       super(DeterministicEmpirical, self).__init__(
           dtype=tf.nest.map_structure(
@@ -148,7 +152,7 @@ class DeterministicEmpirical(distribution.Distribution):
 
   def _event_shape(self):
     return tf.nest.map_structure(
-        lambda x, nd: x.shape[1 + nd:],
+        lambda x, nd: tf.TensorShape(x.shape[1 + nd:]),
         self.values_with_sample_dim,
         self.batch_ndims)
 
@@ -160,7 +164,7 @@ class DeterministicEmpirical(distribution.Distribution):
 
   def _batch_shape(self):
     return tf.nest.map_structure(
-        lambda x, nd: x.shape[1 : 1 + nd],
+        lambda x, nd: tf.TensorShape(x.shape[1 : 1 + nd]),
         self.values_with_sample_dim,
         self.batch_ndims)
 
@@ -175,7 +179,7 @@ class DeterministicEmpirical(distribution.Distribution):
     with tf.name_scope(name or 'sample'):
       # Grab the required number of values from the provided tensors.
       sample_shape = dist_util.expand_to_vector(sample_shape)
-      n = tf.cast(tf.reduce_prod(sample_shape), dtype=tf.int32)
+      n = ps.cast(ps.reduce_prod(sample_shape), dtype=tf.int32)
 
       # Check that we're not trying to draw too many samples.
       assertions = []
@@ -202,8 +206,8 @@ class DeterministicEmpirical(distribution.Distribution):
       # Reshape the values to the appropriate sample shape.
       return tf.nest.map_structure(
           lambda x: tf.reshape(x,  # pylint: disable=g-long-lambda
-                               tf.concat([tf.cast(sample_shape, tf.int32),
-                                          tf.cast(tf.shape(x)[1:], tf.int32)],
+                               ps.concat([ps.cast(sample_shape, tf.int32),
+                                          ps.cast(ps.shape(x)[1:], tf.int32)],
                                          axis=0)),
           sampled)
 
@@ -211,7 +215,7 @@ class DeterministicEmpirical(distribution.Distribution):
     flat_values = tf.nest.flatten(self.values_with_sample_dim)
     return tf.cast(
         tf.reduce_all([
-            tf.equal(a, b[:prefer_static.size0(a)])
+            tf.equal(a, b[:ps.size0(a)])
             for (a, b) in zip(tf.nest.flatten(x), flat_values)]),
         dtype=flat_values[0].dtype)
 
@@ -227,7 +231,7 @@ def _maybe_build_joint_distribution(structure_of_distributions):
       _maybe_build_joint_distribution,
       structure_of_distributions)
   if (hasattr(outer_structure, '_asdict') or
-      isinstance(outer_structure, collections.Mapping)):
+      isinstance(outer_structure, collections.abc.Mapping)):
     return joint_distribution_named.JointDistributionNamed(outer_structure)
   else:
     return joint_distribution_sequential.JointDistributionSequential(
@@ -259,7 +263,7 @@ def augment_transition_fn_with_parameters(parameter_prior,
     perturbed_unconstrained_parameter_dists = tf.nest.map_structure(
         lambda x, p, s: independent.Independent(  # pylint: disable=g-long-lambda
             normal.Normal(loc=x, scale=p),
-            reinterpreted_batch_ndims=prefer_static.rank_from_shape(s)),
+            reinterpreted_batch_ndims=ps.rank_from_shape(s)),
         unconstrained_params,
         perturbation_scale,
         parameter_prior.event_shape_tensor())
@@ -562,23 +566,35 @@ class IteratedFilter(object):
       # TODO(davmre): remove the need for dummy shape dependencies,
       # and this check, by using `JointDistributionNamedAutoBatched` with
       # auto-vectorization enabled in `joint_prior_on_parameters_and_state`.
+
       num_particles_canary = 13
-      prior_static_sample_shapes = tf.function(
-          lambda: self._joint_initial_state_prior.sample(num_particles_canary),
-          autograph=False).get_concrete_function().output_shapes
-      if not all([s[:1].is_compatible_with([num_particles_canary])
-                  for s in tf.nest.flatten(prior_static_sample_shapes)]):
-        raise ValueError('The specified prior does not generate consistent '
-                         'shapes when sampled. Please verify that all parts of '
-                         '`initial_state_prior_fn` have batch shape matching '
-                         'that of the parameters. This may require creating '
-                         '"dummy" dependencies on parameters; for example: '
-                         '`tf.broadcast_to(value, tf.shape(parameter))`. (in a '
-                         'test sample with {} particles, we expected all) '
-                         'values to have shape compatible with [{}, ...]; '
-                         'saw shapes {})'.format(num_particles_canary,
-                                                 num_particles_canary,
-                                                 prior_static_sample_shapes))
+      canary_seed = samplers.sanitize_seed([0, 1])
+      def _get_shape_1(x):
+        if hasattr(x, 'state'):
+          x = x.state
+        return tf.TensorShape(x.shape[1:2])
+      prior_static_sample_shapes = tf.nest.map_structure(
+          # Sample shape [0, num_particles_canary] particles (size will be zero)
+          # then trim off the leading 0 and (possibly) any event shape.
+          # We expect shape [num_particles_canary] to remain.
+          _get_shape_1,
+          self._joint_initial_state_prior.sample([0, num_particles_canary],
+                                                 seed=canary_seed))
+      if not all([
+          tensorshape_util.is_compatible_with(s[:1], [num_particles_canary])
+          for s in tf.nest.flatten(prior_static_sample_shapes)
+      ]):
+        raise ValueError(
+            'The specified prior does not generate consistent '
+            'shapes when sampled. Please verify that all parts of '
+            '`initial_state_prior_fn` have batch shape matching '
+            'that of the parameters. This may require creating '
+            '"dummy" dependencies on parameters; for example: '
+            '`tf.broadcast_to(value, tf.shape(parameter))`. (in a '
+            f'test sample with {num_particles_canary} particles, we expected '
+            'all) values to have shape compatible with '
+            f'[{num_particles_canary}, ...]; '
+            f'saw shapes {prior_static_sample_shapes})')
 
       # Augment the transition and observation fns to cover both
       # parameters and states.
@@ -615,7 +631,7 @@ class IteratedFilter(object):
             parameter_constraining_bijector)
 
       self._batch_ndims = tf.nest.map_structure(
-          prefer_static.rank_from_shape,
+          ps.rank_from_shape,
           parameter_prior.batch_shape_tensor())
       self._name = name
 
@@ -808,7 +824,7 @@ class IteratedFilter(object):
             **kwargs)
       estimated_unconstrained_parameters = tf.scan(
           fn=loop_body,
-          elems=cooling_schedule(tf.range(1, num_iterations)),
+          elems=cooling_schedule(ps.range(1, num_iterations)),
           initializer=initial_unconstrained_parameters)
 
       return self.parameter_constraining_bijector.forward(

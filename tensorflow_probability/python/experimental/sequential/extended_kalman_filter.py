@@ -30,14 +30,21 @@ __all__ = [
 ]
 
 
-def _initialize_accumulated_quantities(observations, num_timesteps):
-  """Initialize arrays passed through the filter loop."""
-  initial_arrays = [tf.nest.map_structure(
-      lambda x: tf.TensorArray(dtype=x.dtype, size=num_timesteps),
-      observations) for _ in range(7)]
-  initial_arrays.append(tf.nest.map_structure(
-      lambda _: tf.TensorArray(dtype=tf.int32, size=num_timesteps),
-      observations))
+def _initialize_accumulated_quantities(
+    initial_kalman_filter_state,
+    observations,
+    num_timesteps,
+):
+  """Initialize quantities to accumulate, specifying dtype/shape."""
+  initial_arrays = []
+  for x in initial_kalman_filter_state:
+    # pylint: disable=cell-var-from-loop
+    initial_arrays.append(
+        tf.nest.map_structure(
+            lambda _: tf.TensorArray(  # pylint: disable=g-long-lambda
+                dtype=x.dtype, element_shape=x.shape, size=num_timesteps),
+            observations))
+    # pylint: enable=cell-var-from-loop
   return linear_gaussian_ssm.KalmanFilterState(*initial_arrays)
 
 
@@ -192,20 +199,22 @@ def extended_kalman_filter(
     observation_dist = observation_fn(initial_state)
 
     # Initialize the state estimate.
+    def _make_initial_kalman_filter_state():
+      return linear_gaussian_ssm.KalmanFilterState(
+          predicted_mean=initial_state,
+          predicted_cov=initial_covariance,
+          filtered_mean=initial_state,
+          filtered_cov=initial_covariance,
+          observation_mean=observation_dist.mean(),
+          observation_cov=observation_dist.covariance(),
+          log_marginal_likelihood=dummy_zeros,
+          timestep=tf.zeros(observations_shape[1:-1], dtype=tf.int32) - 1,
+      )
     initial_estimate = tf.nest.map_structure(
-        lambda _: linear_gaussian_ssm.KalmanFilterState(  # pylint: disable=g-long-lambda
-            predicted_mean=initial_state,
-            predicted_cov=initial_covariance,
-            filtered_mean=initial_state,
-            filtered_cov=initial_covariance,
-            observation_mean=observation_dist.mean(),
-            observation_cov=observation_dist.covariance(),
-            log_marginal_likelihood=dummy_zeros,
-            timestep=tf.zeros(observations_shape[1:-1], dtype=tf.int32) - 1),
-        observations)
+        lambda _: _make_initial_kalman_filter_state(), observations)
 
     initial_accumulated_quantities = _initialize_accumulated_quantities(
-        observations, num_timesteps)
+        _make_initial_kalman_filter_state(), observations, num_timesteps)
 
     run_ekf_step = functools.partial(
         extended_kalman_filter_one_step,

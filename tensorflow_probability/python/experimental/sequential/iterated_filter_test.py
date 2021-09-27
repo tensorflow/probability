@@ -18,6 +18,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -27,6 +28,8 @@ tfd = tfp.distributions
 @test_util.test_graph_and_eager_modes  # `eager_no_tf_function` is too slow.
 class IteratedFilterTest(test_util.TestCase):
 
+  @test_util.numpy_disable_test_missing_functionality(
+      'batch dims > 0 not supported by (numpy) _gather_nd')
   def test_batch_estimation(self):
 
     # Batch of models, each a normal random walk with unknown scale param.
@@ -46,7 +49,10 @@ class IteratedFilterTest(test_util.TestCase):
     true_scales = self.evaluate(
         parameter_prior.sample(seed=test_util.test_seed()))
     trajectories = tf.math.cumsum(
-        tf.random.normal([num_timesteps] + batch_shape) * true_scales, axis=0)
+        tf.random.normal(
+            [num_timesteps] + batch_shape, seed=test_util.test_seed()) *
+        true_scales,
+        axis=0)
     observations = self.evaluate(
         parameterized_observation_fn(0, trajectories).sample(
             seed=test_util.test_seed()))
@@ -72,7 +78,7 @@ class IteratedFilterTest(test_util.TestCase):
     # Note that this inference isn't super precise with the current tuning.
     # Varying the seed, the max absolute error across the batch is typically
     # in the range 0.2 - 0.4.
-    self.assertAllClose(np.mean(final_scales, axis=0), true_scales, atol=0.8)
+    self.assertAllClose(np.mean(final_scales, axis=0), true_scales, atol=1.0)
 
   def test_epidemiological_model_docstring_example(self):
     # Toy SIR model
@@ -86,7 +92,7 @@ class IteratedFilterTest(test_util.TestCase):
     initial_state_prior_fn = lambda parameters: tfd.JointDistributionNamed({  # pylint: disable=g-long-lambda
         'new_infections': tfd.Poisson(parameters['infection_rate']),
         'new_recoveries': tfd.Deterministic(
-            tf.broadcast_to(0., tf.shape(parameters['recovery_rate']))),
+            tf.broadcast_to(0., ps.shape(parameters['recovery_rate']))),
         'susceptible': (lambda new_infections:  # pylint: disable=g-long-lambda
                         tfd.Deterministic(population_size - new_infections)),
         'infected': (lambda new_infections:  # pylint: disable=unnecessary-lambda, g-long-lambda
