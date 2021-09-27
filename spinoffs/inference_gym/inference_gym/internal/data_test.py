@@ -82,13 +82,22 @@ class DataTest(test_util.InferenceGymTestCase):
     self.assertEqual((30,), dataset['observed_values'].shape)
 
   @test_util.uses_tfds
-  def testRadon(self):
-    dataset = data.radon(train_fraction=0.75)
+  def testRadonMinnesota(self):
+    dataset = data.radon_minnesota(train_fraction=0.75)
     for k, v in dataset.items():
       if k.startswith('train_'):
-        self.assertEqual((689,), v.shape)
+        self.assertEqual((689,), tf.convert_to_tensor(v).shape)
       if k.startswith('test_'):
-        self.assertEqual((230,), v.shape)
+        self.assertEqual((230,), tf.convert_to_tensor(v).shape)
+
+  @test_util.uses_tfds
+  def testRadonIndiana(self):
+    dataset = data.radon_indiana(train_fraction=0.75)
+    for k, v in dataset.items():
+      if k.startswith('train_'):
+        self.assertEqual((1388,), tf.convert_to_tensor(v).shape)
+      if k.startswith('test_'):
+        self.assertEqual((463,), tf.convert_to_tensor(v).shape)
 
   def testSyntheticItemResponseTheory(self):
     num_train_points = int(0.75 * 30012)

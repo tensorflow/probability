@@ -43,6 +43,8 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.probit_regression import GermanCreditNumericProbitRegression
   from inference_gym.targets.probit_regression import ProbitRegression
   from inference_gym.targets.radon_contextual_effects import RadonContextualEffects
+  from inference_gym.targets.radon_contextual_effects import RadonContextualEffectsHalfNormalIndiana
+  from inference_gym.targets.radon_contextual_effects import RadonContextualEffectsIndiana
   from inference_gym.targets.radon_contextual_effects import RadonContextualEffectsHalfNormalMinnesota
   from inference_gym.targets.radon_contextual_effects import RadonContextualEffectsMinnesota
   from inference_gym.targets.sparse_logistic_regression import GermanCreditNumericSparseLogisticRegression
@@ -82,6 +84,8 @@ __all__ = [
     'PlasmaSpectroscopy',
     'ProbitRegression',
     'RadonContextualEffects',
+    'RadonContextualEffectsHalfNormalIndiana',
+    'RadonContextualEffectsIndiana',
     'RadonContextualEffectsHalfNormalMinnesota',
     'RadonContextualEffectsMinnesota',
     'SparseLogisticRegression',

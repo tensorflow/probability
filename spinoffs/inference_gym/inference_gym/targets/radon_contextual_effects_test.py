@@ -42,7 +42,7 @@ def _test_dataset(train_size, test_size=None, num_counties=3):
                             if test_size else None),
       test_log_radon=(np.random.rand(test_size).astype(np.float32)
                       if test_size else None),
-      )
+  )
 
 
 class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
@@ -125,6 +125,29 @@ class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
             test_nll=[],
             per_example_test_nll=[test_size]))
 
+  def testInvalidPriorScaleRaises(self):
+    with self.assertRaisesRegex(ValueError, 'not a valid value'):
+      radon_contextual_effects.RadonContextualEffects(
+          prior_scale='invalid_input', **_test_dataset(train_size=20))
+
+
+@test_util.multi_backend_test(globals(),
+                              'targets.radon_contextual_effects_test')
+class RadonContextualEffectsTest(_RadonContextualEffectsTest):
+  prior_scale = 'uniform'
+
+
+@test_util.multi_backend_test(globals(),
+                              'targets.radon_contextual_effects_test')
+class RadonContextualEffectsHalfNormalTest(_RadonContextualEffectsTest):
+  prior_scale = 'halfnormal'
+
+
+del _RadonContextualEffectsTest
+
+
+class _RadonContextualEffectsWithDataTest(test_util.InferenceGymTestCase):
+
   @test_util.uses_tfds
   def testRadon(self):
     """Checks that you get finite values given unconstrained samples.
@@ -132,7 +155,6 @@ class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
     We check `unnormalized_log_prob` as well as the values of the sample
     transformations.
     """
-    num_counties = 85
     model = self.build_model(dtype=tf.float32)
     self.validate_log_prob_and_transforms(
         model,
@@ -140,7 +162,7 @@ class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
             identity={
                 'county_effect_mean': [],
                 'county_effect_scale': [],
-                'county_effect': [num_counties],
+                'county_effect': [self.num_counties],
                 'weight': [3],
                 'log_radon_scale': []
             },
@@ -163,33 +185,46 @@ class _RadonContextualEffectsTest(test_util.InferenceGymTestCase):
         num_steps=4000,
         num_leapfrog_steps=15,
         step_size=0.03,
-        dtype=tf.float64,
+        dtype=self.dtype,
         standard_deviation_fudge_atol=1e-4)
-    self.assertSameElements(tf.nest.flatten(model.dtype), [tf.float64])
+    self.assertSameElements(tf.nest.flatten(model.dtype), [self.dtype])
 
 
 @test_util.multi_backend_test(globals(),
                               'targets.radon_contextual_effects_test')
-class RadonContextualEffectsTest(_RadonContextualEffectsTest):
-  prior_scale = 'uniform'
+class RadonContextualEffectsMinnesotaTest(_RadonContextualEffectsWithDataTest):
+  num_counties = 85
+  dtype = tf.float64
   build_model = radon_contextual_effects.RadonContextualEffectsMinnesota
 
-  def testInvalidPriorScaleRaises(self):
-    with self.assertRaisesRegex(ValueError, 'not a valid value'):
-      radon_contextual_effects.RadonContextualEffects(
-          prior_scale='invalid_input',
-          **_test_dataset(train_size=20))
-
 
 @test_util.multi_backend_test(globals(),
                               'targets.radon_contextual_effects_test')
-class RadonContextualEffectsHalfNormalTest(_RadonContextualEffectsTest):
-  prior_scale = 'halfnormal'
+class RadonContextualEffectsMinnesotaHalfNormalTest(
+    _RadonContextualEffectsWithDataTest):
+  num_counties = 85
+  dtype = tf.float64
   build_model = radon_contextual_effects.RadonContextualEffectsHalfNormalMinnesota
 
 
-del _RadonContextualEffectsTest
+@test_util.multi_backend_test(globals(),
+                              'targets.radon_contextual_effects_test')
+class RadonContextualEffectsIndianaTest(_RadonContextualEffectsWithDataTest):
+  num_counties = 91
+  dtype = tf.float32
+  build_model = radon_contextual_effects.RadonContextualEffectsIndiana
 
+
+@test_util.multi_backend_test(globals(),
+                              'targets.radon_contextual_effects_test')
+class RadonContextualEffectsIndianaHalfNormalTest(
+    _RadonContextualEffectsWithDataTest):
+  num_counties = 91
+  dtype = tf.float32
+  build_model = radon_contextual_effects.RadonContextualEffectsHalfNormalIndiana
+
+
+del _RadonContextualEffectsWithDataTest
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

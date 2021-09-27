@@ -37,6 +37,8 @@ __all__ = [
     'german_credit_numeric_logistic_regression',
     'german_credit_numeric_probit_regression',
     'german_credit_numeric_sparse_logistic_regression',
+    'radon_contextual_effects_indiana',
+    'radon_contextual_effects_indiana_halfnormal',
     'radon_contextual_effects_minnesota',
     'radon_contextual_effects_minnesota_halfnormal',
     'stochastic_volatility_log_sp500',
@@ -133,13 +135,39 @@ def german_credit_numeric_sparse_logistic_regression():
   return sparse_logistic_regression.sparse_logistic_regression(**dataset)
 
 
+def radon_contextual_effects_indiana():
+  """Hierarchical radon model with contextual effects, with data from Indiana.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.radon_indiana()
+  for key in list(dataset.keys()):
+    if key.startswith('test_'):
+      del dataset[key]
+  return radon_contextual_effects.radon_contextual_effects(**dataset)
+
+
+def radon_contextual_effects_indiana_halfnormal():
+  """Hierarchical radon model with contextual effects, with data from Indiana.
+
+  Returns:
+    target: StanModel.
+  """
+  dataset = data.radon_indiana()
+  for key in list(dataset.keys()):
+    if key.startswith('test_'):
+      del dataset[key]
+  return radon_contextual_effects_halfnormal.radon_contextual_effects(**dataset)
+
+
 def radon_contextual_effects_minnesota():
   """Hierarchical radon model with contextual effects, with data from Minnesota.
 
   Returns:
     target: StanModel.
   """
-  dataset = data.radon(state='MN')
+  dataset = data.radon_minnesota()
   for key in list(dataset.keys()):
     if key.startswith('test_'):
       del dataset[key]
@@ -152,7 +180,7 @@ def radon_contextual_effects_minnesota_halfnormal():
   Returns:
     target: StanModel.
   """
-  dataset = data.radon(state='MN')
+  dataset = data.radon_minnesota()
   for key in list(dataset.keys()):
     if key.startswith('test_'):
       del dataset[key]

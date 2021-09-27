@@ -30,6 +30,8 @@ __all__ = [
     'convection_lorenz_bridge',
     'german_credit_numeric',
     'radon',
+    'radon_indiana',
+    'radon_minnesota',
     'sp500_returns',
     'sp500_log_returns',
     'synthetic_item_response_theory',
@@ -230,9 +232,10 @@ def german_credit_numeric(
 
 
 def radon(
-    state='MN',
-    num_examples=919,
-    num_counties=85,
+    state,
+    num_examples,
+    num_counties,
+    drop_floors_above_1=True,
     train_fraction=1.,
     shuffle=False,
     shuffle_seed=42):
@@ -253,12 +256,15 @@ def radon(
       the filtered dataset, and if there is a mismatch a ValueError is raised.
       (The value is not determined automatically from the dataset because it is
       needed before the dataset is materialized).
-    num_counties: `int`, number of unique counties in the filtered dataset.
-    train_fraction: What fraction of the data to put in the training set. When
+    num_counties: `int`, number of unique counties in the filtered dataset. When
       the dataset is materialized, this value is verified against the size of
       the filtered dataset, and if there is a mismatch a ValueError is raised.
       (The value is not determined automatically from the dataset because it is
       needed before the dataset is materialized).
+    drop_floors_above_1: Whether to drop datapoints with `floor` being greater
+      than 1. In particular, floor equals 9 when it is unknown and the standard
+      model uses the floor as a boolean indicator.
+    train_fraction: What fraction of the data to put in the training set.
     shuffle: `bool`. If `True`, shuffle the data.
     shuffle_seed: `int`, RNG seed to use if shuffling the data.
 
@@ -330,6 +336,13 @@ def radon(
         county_strings = county_strings[states == state]
         uranium = uranium[states == state]
 
+      if drop_floors_above_1:
+        keep = floor <= 1
+        floor = floor[keep]
+        radon_val = radon_val[keep]
+        county_strings = county_strings[keep]
+        uranium = uranium[keep]
+
       radon_val[radon_val <= 0.] = 0.1
       log_radon = np.log(radon_val)
       log_uranium = np.log(uranium)
@@ -363,7 +376,7 @@ def radon(
       # Create a new features for mean of floor across counties.
       xbar = []
       for i in range(num_counties):
-        xbar.append(train_floor[county == i].mean())
+        xbar.append(floor[county == i].mean())
       floor_by_county = np.array(xbar, dtype=log_radon.dtype)
 
       load_dataset.dataset = dict(
@@ -425,6 +438,119 @@ def radon(
           lambda: load_dataset()['test_log_radon'],
           shape=[num_test],
           dtype=np.float64),
+  )
+
+
+def radon_indiana(
+    train_fraction=1.,
+    shuffle=False,
+    shuffle_seed=42,
+):
+  """The Radon dataset for the state of Indiana.
+
+  See `radon` for more details. For this dataset, `num_examples = 1914` and
+  `num_counties = 91`. This dataset had 63 datapoints with floors above 1, which
+  are filtered out.
+
+  Args:
+    train_fraction: What fraction of the data to put in the training set.
+    shuffle: `bool`. If `True`, shuffle the data.
+    shuffle_seed: `int`, RNG seed to use if shuffling the data.
+
+  Returns:
+    dataset: A Dict with the following keys:
+      `num_counties`: `int`, number of unique counties in the filtered dataset.
+      `train_log_uranium`: Floating-point `Tensor` with shape
+        `[num_train]`. Soil uranium measurements.
+      `train_floor`: Integer `Tensor` with shape `[num_train]`. Floor of the
+        house on which the measurement was taken.
+      `train_county`: Integer `Tensor` with values in `range(0, num_counties)`
+        of shape `[num_train]`. County in which the measurement was taken.
+      `train_floor_by_county`: Floating-point `Tensor` with shape
+        `[num_train]`. Average floor on which the measurement was taken for the
+        county in which each house is located (the `Tensor` will have
+        `num_counties` unique values). This represents the contextual effect.
+      `train_log_radon`: Floating-point `Tensor` with shape `[num_train]`.
+        Radon measurement for each house (the dependent variable in the model).
+      `test_log_uranium`: Floating-point `Tensor` with shape `[num_test`. Soil
+        Soil uranium measurements for the test set.
+      `test_floor`: Integer `Tensor` with shape `[num_test]`. Floor of the house
+        house on which the measurement was taken.
+      `test_county`: Integer `Tensor` with values in `range(0, num_counties)` of
+        shape `[num_test]`. County in which the measurement was taken. Can be
+        `None`, in which case test-related sample transformations are not
+        computed.
+      `test_floor_by_county`: Floating-point `Tensor` with shape
+        `[num_test]`. Average floor on which the measurement was taken
+        (calculated from the training set) for the county in which each house is
+        located (the `Tensor` will have `num_counties` unique values). This
+        represents the contextual effect.
+      `test_log_radon`: Floating-point `Tensor` with shape `[num_test]`. Radon
+        measurement for each house (the dependent variable in the model).
+  """
+  return radon(
+      state='IN',
+      num_examples=1851,
+      num_counties=91,
+      shuffle=shuffle,
+      train_fraction=train_fraction,
+      shuffle_seed=shuffle_seed,
+  )
+
+
+def radon_minnesota(
+    train_fraction=1.,
+    shuffle=False,
+    shuffle_seed=42,
+):
+  """The Radon dataset for the state of Minnesota.
+
+  See `radon` for more details. For this dataset, `num_examples = 919` and
+  `num_counties = 85`. This dataset has no datapoints with floor above 1.
+
+  Args:
+    train_fraction: What fraction of the data to put in the training set.
+    shuffle: `bool`. If `True`, shuffle the data.
+    shuffle_seed: `int`, RNG seed to use if shuffling the data.
+
+  Returns:
+    dataset: A Dict with the following keys:
+      `num_counties`: `int`, number of unique counties in the filtered dataset.
+      `train_log_uranium`: Floating-point `Tensor` with shape
+        `[num_train]`. Soil uranium measurements.
+      `train_floor`: Integer `Tensor` with shape `[num_train]`. Floor of the
+        house on which the measurement was taken.
+      `train_county`: Integer `Tensor` with values in `range(0, num_counties)`
+        of shape `[num_train]`. County in which the measurement was taken.
+      `train_floor_by_county`: Floating-point `Tensor` with shape
+        `[num_train]`. Average floor on which the measurement was taken for the
+        county in which each house is located (the `Tensor` will have
+        `num_counties` unique values). This represents the contextual effect.
+      `train_log_radon`: Floating-point `Tensor` with shape `[num_train]`.
+        Radon measurement for each house (the dependent variable in the model).
+      `test_log_uranium`: Floating-point `Tensor` with shape `[num_test`. Soil
+        Soil uranium measurements for the test set.
+      `test_floor`: Integer `Tensor` with shape `[num_test]`. Floor of the house
+        house on which the measurement was taken.
+      `test_county`: Integer `Tensor` with values in `range(0, num_counties)` of
+        shape `[num_test]`. County in which the measurement was taken. Can be
+        `None`, in which case test-related sample transformations are not
+        computed.
+      `test_floor_by_county`: Floating-point `Tensor` with shape
+        `[num_test]`. Average floor on which the measurement was taken
+        (calculated from the training set) for the county in which each house is
+        located (the `Tensor` will have `num_counties` unique values). This
+        represents the contextual effect.
+      `test_log_radon`: Floating-point `Tensor` with shape `[num_test]`. Radon
+        measurement for each house (the dependent variable in the model).
+  """
+  return radon(
+      state='MN',
+      num_examples=919,
+      num_counties=85,
+      shuffle=shuffle,
+      train_fraction=train_fraction,
+      shuffle_seed=shuffle_seed,
   )
 
 

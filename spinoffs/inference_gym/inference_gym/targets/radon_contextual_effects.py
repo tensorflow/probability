@@ -23,6 +23,8 @@ from tensorflow_probability.python.internal import dtype_util
 from inference_gym.internal import data
 from inference_gym.targets import bayesian_model
 from inference_gym.targets import model
+from inference_gym.targets.ground_truth import radon_contextual_effects_indiana
+from inference_gym.targets.ground_truth import radon_contextual_effects_indiana_halfnormal
 from inference_gym.targets.ground_truth import radon_contextual_effects_minnesota
 from inference_gym.targets.ground_truth import radon_contextual_effects_minnesota_halfnormal
 
@@ -31,8 +33,10 @@ tfd = tfp.distributions
 
 __all__ = [
     'RadonContextualEffects',
+    'RadonContextualEffectsIndiana',
+    'RadonContextualEffectsHalfNormalIndiana',
     'RadonContextualEffectsMinnesota',
-    'RadonContextualEffectsHalfNormalMinnesota'
+    'RadonContextualEffectsHalfNormalMinnesota',
 ]
 
 
@@ -333,6 +337,68 @@ class RadonContextualEffects(bayesian_model.BayesianModel):
     return dataset
 
 
+class RadonContextualEffectsIndiana(RadonContextualEffects):
+  """Bayesian hierarchical model to predict radon measurements in houses.
+
+  This model uses the Radon data set that accompanies the example in [1],
+  filtered to include only houses in Indiana. Unlike the classical Minnesotta
+  dataset, this dataset is somewhat larger and produces a posterior that does
+  not require 64 bit precision to sample from.
+
+  #### References
+
+  [1] Gelman, A., & Hill, J. (2007). Data Analysis Using Regression and
+      Multilevel/Hierarchical Models (1st ed.). Cambridge University Press.
+      http://www.stat.columbia.edu/~gelman/arm/examples/radon/
+  """
+
+  GROUND_TRUTH_MODULE = radon_contextual_effects_indiana
+
+  def __init__(self, dtype=tf.float32):
+    dataset = data.radon_indiana()
+    for key in list(dataset.keys()):
+      if key.startswith('test_'):
+        del dataset[key]
+      elif dtype_util.is_floating(dataset[key].dtype):
+        dataset[key] = tf.cast(dataset[key], dtype)
+    super(RadonContextualEffectsIndiana, self).__init__(
+        name='radon_contextual_effects_indiana',
+        pretty_name='Radon Contextual Effects Indiana',
+        **dataset)
+
+
+class RadonContextualEffectsHalfNormalIndiana(RadonContextualEffects):
+  """Bayesian hierarchical model to predict radon measurements in houses.
+
+  This model uses the Radon data set that accompanies the example in [1],
+  filtered to include only houses in Indiana. It uses the form of the model with
+  a `HalfNormal` prior on the scale parameters. Unlike the classical Minnesotta
+  dataset, this dataset is somewhat larger and produces a posterior that does
+  not require 64 bit precision to sample from.
+
+  #### References
+
+  [1] Gelman, A., & Hill, J. (2007). Data Analysis Using Regression and
+      Multilevel/Hierarchical Models (1st ed.). Cambridge University Press.
+      http://www.stat.columbia.edu/~gelman/arm/examples/radon/
+  """
+
+  GROUND_TRUTH_MODULE = radon_contextual_effects_indiana_halfnormal
+
+  def __init__(self, dtype=tf.float32):
+    dataset = data.radon_indiana()
+    for key in list(dataset.keys()):
+      if key.startswith('test_'):
+        del dataset[key]
+      elif dtype_util.is_floating(dataset[key].dtype):
+        dataset[key] = tf.cast(dataset[key], dtype)
+    super(RadonContextualEffectsHalfNormalIndiana, self).__init__(
+        name='radon_contextual_effects_halfnormal_indiana',
+        pretty_name='Radon Contextual Effects HalfNormal Indiana',
+        prior_scale='halfnormal',
+        **dataset)
+
+
 class RadonContextualEffectsMinnesota(RadonContextualEffects):
   """Bayesian hierarchical model to predict radon measurements in houses.
 
@@ -349,7 +415,7 @@ class RadonContextualEffectsMinnesota(RadonContextualEffects):
   GROUND_TRUTH_MODULE = radon_contextual_effects_minnesota
 
   def __init__(self, dtype=tf.float64):
-    dataset = data.radon(state='MN')
+    dataset = data.radon_minnesota()
     for key in list(dataset.keys()):
       if key.startswith('test_'):
         del dataset[key]
@@ -378,7 +444,7 @@ class RadonContextualEffectsHalfNormalMinnesota(RadonContextualEffects):
   GROUND_TRUTH_MODULE = radon_contextual_effects_minnesota_halfnormal
 
   def __init__(self, dtype=tf.float64):
-    dataset = data.radon(state='MN')
+    dataset = data.radon_minnesota()
     for key in list(dataset.keys()):
       if key.startswith('test_'):
         del dataset[key]
