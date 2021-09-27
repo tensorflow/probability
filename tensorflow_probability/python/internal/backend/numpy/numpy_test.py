@@ -119,18 +119,24 @@ class TestCase(dict):
 # mode detail.
 
 
-def floats(min_value=-1e16,
+@hps.composite
+def floats(draw,
+           min_value=-1e16,
            max_value=1e16,
            allow_nan=ALLOW_NAN,
            allow_infinity=ALLOW_INFINITY,
-           dtype=np.float32):
-  if min_value is not None: min_value = onp.array(min_value, dtype=dtype).item()
-  if max_value is not None: max_value = onp.array(max_value, dtype=dtype).item()
-  return hps.floats(min_value=min_value,
-                    max_value=max_value,
-                    allow_nan=allow_nan,
-                    allow_infinity=allow_infinity,
-                    width=np.dtype(dtype).itemsize * 8)
+           dtype=None):
+  if dtype is None:
+    dtype = np.float32 if FLAGS.use_tpu else np.float64
+  if min_value is not None:
+    min_value = onp.array(min_value, dtype=dtype).item()
+  if max_value is not None:
+    max_value = onp.array(max_value, dtype=dtype).item()
+  return draw(hps.floats(min_value=min_value,
+                         max_value=max_value,
+                         allow_nan=allow_nan,
+                         allow_infinity=allow_infinity,
+                         width=np.dtype(dtype).itemsize * 8))
 
 
 def integers(min_value=-2**30, max_value=2**30):
@@ -323,7 +329,7 @@ def batched_probabilities(draw, batch_shape, num_classes):
   probs = draw(single_arrays(
       batch_shape=batch_shape,
       shape=hps.just((num_classes,)),
-      dtype=np.float32, elements=floats()))
+      dtype=np.float32, elements=floats(dtype=np.float32)))
   probs = onp.exp(probs - onp.max(
       probs, axis=-1, keepdims=True))
   return probs / probs.sum(keepdims=True, axis=-1)
@@ -405,7 +411,7 @@ def gamma_params():
   return hps.fixed_dictionaries(
       dict(shape=shapes(),
            # TODO(jburnim): Support generating float64 params.
-           params=n_same_shape(n=2, elements=positive_floats()),
+           params=n_same_shape(n=2, elements=positive_floats(dtype=np.float32)),
            include_beta=hps.booleans(),
            dtype=hps.sampled_from([np.float32, np.float64]))
       ).map(dict_to_params)  # dtype
@@ -643,7 +649,7 @@ def conv2d_params(draw):
   # data_format = draw(hps.sampled_from(['NHWC', 'NCHW']))
   data_format = draw(hps.just('NHWC'))
 
-  input_shape = draw(shapes(4, 4, min_side=5, max_side=10))
+  input_shape = draw(shapes(4, 4, min_side=2, max_side=10))
   if data_format.startswith('NC'):
     channels = input_shape[1]
   else:
@@ -697,7 +703,7 @@ def sparse_xent_params(draw):
   logits = single_arrays(
       batch_shape=batch_shape,
       shape=hps.just((num_classes,)),
-      elements=hps.floats(min_value=-1e5, max_value=1e5))
+      elements=hps.floats(min_value=-1e5, max_value=1e5, width=32))
   return draw(
       hps.fixed_dictionaries(dict(
           labels=labels, logits=logits)).map(Kwargs))
@@ -712,7 +718,7 @@ def xent_params(draw):
   logits = single_arrays(
       batch_shape=batch_shape,
       shape=hps.just((num_classes,)),
-      elements=hps.floats(min_value=-1e5, max_value=1e5))
+      elements=hps.floats(min_value=-1e5, max_value=1e5, width=32))
   return draw(
       hps.fixed_dictionaries(dict(
           labels=labels, logits=logits)).map(Kwargs))
@@ -815,7 +821,8 @@ NUMPY_TEST_CASES = [
             single_arrays(
                 shape=fft_shapes(fft_dim=1),
                 dtype=np.float32,
-                elements=floats(min_value=-1e3, max_value=1e3))
+                elements=floats(min_value=-1e3, max_value=1e3,
+                                dtype=np.float32))
         ],
         atol=1e-4,
         rtol=1e-4,
@@ -825,7 +832,8 @@ NUMPY_TEST_CASES = [
             single_arrays(
                 shape=fft_shapes(fft_dim=2),
                 dtype=np.float32,
-                elements=floats(min_value=-1e3, max_value=1e3))
+                elements=floats(min_value=-1e3, max_value=1e3,
+                                dtype=np.float32))
         ],
         atol=1e-3,
         rtol=1e-3),
@@ -834,7 +842,8 @@ NUMPY_TEST_CASES = [
             single_arrays(
                 shape=fft_shapes(fft_dim=3),
                 dtype=np.float32,
-                elements=floats(min_value=-1e3, max_value=1e3))
+                elements=floats(min_value=-1e3, max_value=1e3,
+                                dtype=np.float32))
         ],
         atol=1e-2,
         rtol=2e-3),
@@ -1226,9 +1235,11 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.lgamma', [single_arrays(elements=positive_floats())]),
     TestCase('math.log', [single_arrays(elements=positive_floats())]),
     TestCase('math.log1p',
-             [single_arrays(elements=positive_floats().map(lambda x: x - 1.))]),
+             [single_arrays(elements=floats(min_value=-1 + 1e-6))],
+             xla_atol=1e-4, xla_rtol=1e-4),
     TestCase('math.log_sigmoid',
-             [single_arrays(elements=floats(min_value=-100.))]),
+             [single_arrays(elements=floats(min_value=-100.))],
+             xla_atol=1e-4, xla_rtol=1e-4),
     TestCase('math.logical_not',
              [single_arrays(dtype=np.bool_, elements=hps.booleans())]),
     TestCase('math.ndtri', [single_arrays(elements=floats(0., 1.))]),
