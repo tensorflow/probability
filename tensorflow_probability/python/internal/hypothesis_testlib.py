@@ -344,7 +344,9 @@ def constrained_tensors(constraint_fn, shape, dtype=np.float32, elements=None):
   #     allow_nan=False, allow_infinity=False)
   if elements is None:
     if dtype_util.is_floating(dtype):
-      elements = hps.floats(-200, 200, allow_nan=False, allow_infinity=False)
+      width = np.dtype(dtype_util.as_numpy_dtype(dtype)).itemsize * 8
+      elements = hps.floats(
+          -200, 200, allow_nan=False, allow_infinity=False, width=width)
     elif dtype_util.is_bool(dtype):
       elements = hps.booleans()
     else:
