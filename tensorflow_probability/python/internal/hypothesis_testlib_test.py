@@ -21,6 +21,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import time
+
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
@@ -46,6 +48,28 @@ class HypothesisTestlibTest(test_util.TestCase):
     result = self.evaluate(result_)
     self.assertTrue(np.all(np.isfinite(result)))
 
+
+class HypothesisTestlibTimeoutTest(test_util.TestCase):
+
+  @classmethod
+  def setUpClass(cls):
+    super().setUpClass()
+    cls._num_test_timeout_runs = 0
+
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings(max_examples=1000, timeout=10)
+  def testTimeout(self, data):
+    # Trivial Hypothesis test.
+    x = data.draw(hps.floats(allow_nan=False, allow_infinity=False))
+    self.assertGreaterEqual(x * x, 0)
+
+    # Sleep for two seconds, so only ~5 test runs fit in the 10s timeout.
+    time.sleep(2)
+
+    # Check that Hypothesis timeout prevented the test from running more than
+    # six times (the expected five times plus a buffer of one).
+    self._num_test_timeout_runs += 1
+    self.assertLessEqual(self._num_test_timeout_runs, 6)
 
 if __name__ == '__main__':
   test_util.main()

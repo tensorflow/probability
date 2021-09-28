@@ -83,7 +83,7 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
   # - Derandomize by default because flaky tests are horrible
   # - Turn off example database because
   #   - It makes tests flaky on our cluster even if derandomized at the current
-  #     internal Hypothesis version (3.65)
+  #     internal Hypothesis version.
   #   - In the future, derandomization will imply ignoring the database setting
   #     anyway
   #   - Having one can't make example runs any faster
@@ -106,14 +106,24 @@ def tfp_hp_settings(default_max_examples=None, **kwargs):
     if repro_seed is not None:
       # This implements the semantics of TFP_HYPOTHESIS_REPRODUCE via
       # the `hp.reproduce_failure` decorator.
-      test_method = hp.reproduce_failure('3.88.3', repro_seed)(test_method)
+      # TODO(jburnim): Catch Hypothesis version mismatches.
+      test_method = hp.reproduce_failure(hp.__version__,
+                                         repro_seed)(test_method)
     elif randomize_hypothesis():
       # Hypothesis defaults to seeding its internal PRNG from the system time,
       # so since we actually want randomization (including across machines) we
       # have to force it.
       entropy = os.urandom(64)
       test_method = hp.seed(int.from_bytes(entropy, 'big'))(test_method)
-    return hp.settings(**kwds)(test_method)
+    if hp.__version_info__ >= (4,):
+      # TODO(jburnim): Comment this.
+      timeout = kwds.pop('timeout')
+      ret = hp.settings(**kwds)(test_method)
+      object.__setattr__(ret._hypothesis_internal_use_settings,
+                         'timeout', timeout)
+    else:
+      ret = hp.settings(**kwds)(test_method)
+    return ret
   return decorator
 
 
@@ -831,3 +841,35 @@ def lower_tril_positive_definite(x):
 
 def lower_tril(x):
   return tf.linalg.band_part(x, -1, 0)
+
+
+def _monkey_patch_hypothesis_timeout():
+  # pylint: disable=g-import-not-at-top
+  import time
+  from hypothesis.internal.conjecture.engine import ConjectureRunner
+  # pylint: enable=g-import-not-at-top
+
+  def _should_generate_more(self):
+    # Inserted/new code for adding timeouts to Hypothesis 4.
+    timeout = None
+    try:
+      timeout = object.__getattribute__(self.settings, 'timeout')
+    except AttributeError:
+      pass
+    if timeout is not None:
+      if not hasattr(self, 'start_time'):
+        self.start_time = time.perf_counter()
+      else:
+        if (time.perf_counter() - self.start_time) > timeout:
+          return False
+
+    return self._original_should_generate_more()
+
+  ConjectureRunner._original_should_generate_more = (
+      ConjectureRunner.should_generate_more)
+  ConjectureRunner.should_generate_more = _should_generate_more
+
+if hp.__version_info__ >= (4,):
+  # Monkey patch the timeout feature back in to Hypothesis.
+  # (This feature was removed in Hypothesis 4.)
+  _monkey_patch_hypothesis_timeout()
