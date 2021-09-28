@@ -347,7 +347,7 @@ def where_params(draw, version=2):
         tfp_hps.broadcasting_shapes(shape, 3).map(tensorshapes_to_tuples))
   elif version == 1:
     max_cond_ndim = min(1, len(shape))
-    cond_dims = draw(hps.sampled_from(np.arange(max_cond_ndim + 1)))
+    cond_dims = draw(hps.sampled_from(onp.arange(max_cond_ndim + 1)))
     cond_shape = shape[:cond_dims]
     x_shape, y_shape = shape, shape
   else:
