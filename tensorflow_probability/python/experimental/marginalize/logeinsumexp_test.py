@@ -88,9 +88,12 @@ def nary_einsum(draw, max_num_tensors):
   # We build a right hand side by selecting a list of these
   # letters using each letter at most once.
   letters = list(set(''.join(lhss)))
-  rhs_letters = draw(hps.lists(hps.sampled_from(letters),
-                               max_size=len(letters),
-                               unique=True))
+  if letters:
+    rhs_letters = draw(hps.lists(hps.sampled_from(letters),
+                                 max_size=len(letters),
+                                 unique=True))
+  else:
+    rhs_letters = []
   rhs = ''.join(rhs_letters)
 
   # Combine pieces on left hand side with right hand side to make
