@@ -35,7 +35,6 @@ import dataclasses
 from jax import core as jax_core
 from jax import linear_util as lu
 from jax import tree_util
-from jax import util as functools
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 
