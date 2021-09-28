@@ -482,6 +482,7 @@ reduce_max = _prefer_static(tf.reduce_max, nptf.reduce_max)
 reduce_min = _prefer_static(tf.reduce_min, nptf.reduce_min)
 reduce_prod = _prefer_static(tf.reduce_prod, nptf.reduce_prod)
 reduce_sum = _prefer_static(tf.reduce_sum, nptf.reduce_sum)
+repeat = _prefer_static(tf.repeat, nptf.repeat)
 reshape = _prefer_static(tf.reshape, nptf.reshape)
 reverse = _prefer_static(tf.reverse, nptf.reverse)
 round = _prefer_static(tf.math.round, nptf.math.round)  # pylint: disable=redefined-builtin
@@ -497,6 +498,7 @@ tensor_scatter_nd_sub = _prefer_static(
     tf.tensor_scatter_nd_sub, nptf.tensor_scatter_nd_sub)
 tensor_scatter_nd_update = _prefer_static(
     tf.tensor_scatter_nd_update, nptf.tensor_scatter_nd_update)
+tile = _prefer_static(tf.tile, nptf.tile)
 top_k = _prefer_static(tf.math.top_k, nptf.math.top_k)
 unique = _prefer_static(tf.unique, nptf.unique)
 unstack = _prefer_static(tf.unstack, nptf.unstack)
