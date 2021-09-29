@@ -113,6 +113,21 @@ class NamedTupleDistribution(tfd.Distribution):
         a=None, b=tf.TensorShape([3, None]), c=tf.TensorShape(None))
 
 
+class DistributionMetaTest(test_util.TestCase):
+
+  def test_private_docstring_is_propagated_to_public_method(self):
+
+    class MyDistribution(tfd.Distribution):
+
+      def _sample_and_log_prob(self, sample_shape):
+        """Custom docstring for MyDistribution.sample_and_log_prob."""
+        pass
+
+    self.assertContainsExactSubsequence(
+        MyDistribution.experimental_sample_and_log_prob.__doc__,
+        'Custom docstring for MyDistribution.sample_and_log_prob.')
+
+
 @test_util.test_all_tf_execution_regimes
 class DistributionStrReprTest(test_util.TestCase):
 

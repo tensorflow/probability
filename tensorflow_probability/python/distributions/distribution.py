@@ -52,27 +52,30 @@ __all__ = [
     'Distribution',
 ]
 
-_DISTRIBUTION_PUBLIC_METHOD_WRAPPERS = [
-    'batch_shape',
-    'batch_shape_tensor',
-    'cdf',
-    'covariance',
-    'cross_entropy',
-    'entropy',
-    'event_shape',
-    'event_shape_tensor',
-    'kl_divergence',
-    'log_cdf',
-    'log_prob',
-    'log_survival_function',
-    'mean',
-    'mode',
-    'prob',
-    'sample',
-    'stddev',
-    'survival_function',
-    'variance',
-]
+_DISTRIBUTION_PUBLIC_METHOD_WRAPPERS = {
+    'batch_shape': '_batch_shape',
+    'batch_shape_tensor': '_batch_shape_tensor',
+    'cdf': '_cdf',
+    'covariance': '_covariance',
+    'cross_entropy': '_cross_entropy',
+    'entropy': '_entropy',
+    'event_shape': '_event_shape',
+    'event_shape_tensor': '_event_shape_tensor',
+    'experimental_default_event_space_bijector': (
+        '_default_event_space_bijector'),
+    'experimental_sample_and_log_prob': '_sample_and_log_prob',
+    'kl_divergence': '_kl_divergence',
+    'log_cdf': '_log_cdf',
+    'log_prob': '_log_prob',
+    'log_survival_function': '_log_survival_function',
+    'mean': '_mean',
+    'mode': '_mode',
+    'prob': '_prob',
+    'sample': '_sample_n',
+    'stddev': '_stddev',
+    'survival_function': '_survival_function',
+    'variance': '_variance',
+}
 
 
 _ALWAYS_COPY_PUBLIC_METHOD_WRAPPERS = ['kl_divergence', 'cross_entropy']
@@ -236,11 +239,10 @@ class _DistributionMeta(abc.ABCMeta):
       raise TypeError('First parent class declared for {} must be '
                       'Distribution, but saw "{}"'.format(
                           classname, base.__name__))
-    for attr in _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS:
+    for attr, special_attr in _DISTRIBUTION_PUBLIC_METHOD_WRAPPERS.items():
       if attr in attrs:
         # The method is being overridden, do not update its docstring.
         continue
-      special_attr = '_{}'.format(attr)
       class_attr_value = attrs.get(attr, None)
       base_attr_value = getattr(base, attr, None)
       if not base_attr_value:
