@@ -97,7 +97,8 @@ def _default_nuts_trace_fn(state, bijector, is_adapting, pkr):
       'tune': is_adapting,
       'target_log_prob': unnest.get_innermost(pkr, 'target_log_prob'),
       'diverging': unnest.get_innermost(pkr, 'has_divergence'),
-      'accept_ratio': tf.minimum(1., tf.exp(energy_diff)),
+      'accept_ratio':
+          tf.minimum(tf.ones_like(energy_diff), tf.exp(energy_diff)),
       'variance_scaling':
           unnest.get_innermost(pkr, 'momentum_distribution').variance(),
       'n_steps': unnest.get_innermost(pkr, 'leapfrogs_taken'),
@@ -142,7 +143,8 @@ def _default_hmc_trace_fn(state, bijector, is_adapting, pkr):
       'diverging': has_divergence,
       'log_acceptance_correction':
           unnest.get_innermost(pkr, 'log_acceptance_correction'),
-      'accept_ratio': tf.minimum(1., tf.exp(energy_diff)),
+      'accept_ratio':
+          tf.minimum(tf.ones_like(energy_diff), tf.exp(energy_diff)),
       'variance_scaling':
           unnest.get_innermost(pkr, 'momentum_distribution').variance(),
       'is_accepted': unnest.get_innermost(pkr, 'is_accepted')}
@@ -909,9 +911,10 @@ def _windowed_adaptive_impl(n_draws,
           shard_axis_names=shard_axis_names)})
 
   initial_running_variance = [
-      sample_stats.RunningVariance.from_stats(
-          num_samples=0., mean=tf.zeros_like(part), variance=tf.ones_like(part))
-      for part in initial_transformed_position
+      sample_stats.RunningVariance.from_stats(  # pylint: disable=g-complex-comprehension
+          num_samples=tf.zeros([], part.dtype),
+          mean=tf.zeros_like(part),
+          variance=tf.ones_like(part)) for part in initial_transformed_position
   ]
   # TODO(phandu): Consider splitting out warmup and post warmup phases
   # to avoid executing adaptation code during the post warmup phase.

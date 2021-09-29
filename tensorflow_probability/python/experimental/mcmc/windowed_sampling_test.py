@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental import distribute
 from tensorflow_probability.python.experimental.mcmc import windowed_sampling
+from tensorflow_probability.python.internal import callable_util
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -480,6 +481,23 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertEqual((5, *n_chains, 3), states.x.shape)
     self.assertEqual((5,), trace['step_size'].shape)
 
+  @parameterized.named_parameters(
+      ('_nuts', tfp.experimental.mcmc.windowed_adaptive_nuts, {}),
+      ('_hmc', tfp.experimental.mcmc.windowed_adaptive_hmc, {
+          'num_leapfrog_steps': 1
+      }),
+  )
+  def test_f64_state(self, method, method_kwargs):
+    states, _ = callable_util.get_output_spec(lambda: method(  # pylint: disable=g-long-lambda
+        5,
+        tfd.Normal(tf.constant(0., tf.float64), 1.),
+        n_chains=2,
+        num_adaptation_steps=100,
+        seed=test_util.test_seed(),
+        **method_kwargs))
+
+    self.assertEqual(tf.float64, states.dtype)
+
 
 @test_util.test_graph_and_eager_modes
 class WindowedSamplingStepSizeTest(test_util.TestCase):
@@ -798,7 +816,6 @@ if JAX_MODE:
           in_axes=None,
           args=(samplers.zeros_seed(),
                 tf.ones(distribute_test_lib.NUM_DEVICES))))
-
 
 if __name__ == '__main__':
   test_util.main()
