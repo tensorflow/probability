@@ -746,7 +746,12 @@ def qr_params(draw):
   if FLAGS.test_mode != 'xla':  # XLA does not support complex QR.
     valid_dtypes.append(np.complex128)
   dtype = draw(hps.sampled_from(valid_dtypes))
-  arr = draw(single_arrays(dtype=dtype, shape=shapes(min_dims=2)))
+  if dtype == np.float64:
+    elements = floats(min_value=-1e6, max_value=1e6, dtype=dtype)
+  else:
+    elements = complex_numbers(min_magnitude=0., max_magnitude=1e6, dtype=dtype)
+  arr = draw(single_arrays(dtype=dtype, shape=shapes(min_dims=2),
+                           elements=elements))
   return arr, full_matrices
 
 
@@ -840,7 +845,7 @@ NUMPY_TEST_CASES = [
     TestCase(
         'signal.rfft3d', [
             single_arrays(
-                shape=fft_shapes(fft_dim=3),
+                shape=fft_shapes(fft_dim=3, max_fft_size=16),
                 dtype=np.float32,
                 elements=floats(min_value=-1e3, max_value=1e3,
                                 dtype=np.float32))
@@ -968,7 +973,6 @@ NUMPY_TEST_CASES = [
             qr_params(),
         ],
         post_processor=_qr_post_process,
-        atol=1e-3,
         xla_const_args=(1,)),  # full_matrices
 
     # ArgSpec(args=['coeffs', 'x', 'name'], varargs=None, keywords=None,
@@ -1852,11 +1856,7 @@ class NumpyTest(test_util.TestCase):
       rtol = rtol if xla_rtol is None else xla_rtol
       atol = atol if xla_atol is None else xla_atol
     for strategy in strategy_list:
-      @hp.settings(deadline=None,
-                   max_examples=10,
-                   database=None,
-                   derandomize=True,
-                   suppress_health_check=(hp.HealthCheck.too_slow,))
+      @tfp_hps.tfp_hp_settings(max_examples=10, derandomize=True)
       @hp.given(strategy)
       def check_consistency(tf_fn, np_fn, args):
         # If `args` is a single item, put it in a tuple
