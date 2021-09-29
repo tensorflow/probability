@@ -883,12 +883,12 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
       write_index = write_instruction.gather([iter_])
       velocity_state_memory = VelocityStateSwap(
           velocity_swap=[
-              tf.tensor_scatter_nd_update(old, [write_index], [new])
+              _safe_tensor_scatter_nd_update(old, [write_index], [new])
               for old, new in zip(velocity_state_memory.velocity_swap,
                                   next_velocity_parts)
           ],
           state_swap=[
-              tf.tensor_scatter_nd_update(old, [write_index], [new])
+              _safe_tensor_scatter_nd_update(old, [write_index], [new])
               for old, new in zip(velocity_state_memory.state_swap,
                                   state_to_write)
           ])
@@ -1116,3 +1116,9 @@ def _prepare_step_size(step_size, dtype, n_state_parts):
     raise ValueError('There should be exactly one `step_size` or it should '
                      'have same length as `current_state`.')
   return step_sizes
+
+
+def _safe_tensor_scatter_nd_update(tensor, indices, updates):
+  if tensor.shape[:-1] == 0:
+    return tensor
+  return tf.tensor_scatter_nd_update(tensor, indices, updates)
