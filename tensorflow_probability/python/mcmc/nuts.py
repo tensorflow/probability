@@ -864,12 +864,12 @@ class NoUTurnSampler(TransitionKernel):
       write_index = write_instruction.gather([iter_])
       momentum_state_memory = MomentumStateSwap(
           momentum_swap=[
-              tf.tensor_scatter_nd_update(old, [write_index], [new])
+              _safe_tensor_scatter_nd_update(old, [write_index], [new])
               for old, new in zip(momentum_state_memory.momentum_swap,
                                   next_momentum_parts)
           ],
           state_swap=[
-              tf.tensor_scatter_nd_update(old, [write_index], [new])
+              _safe_tensor_scatter_nd_update(old, [write_index], [new])
               for old, new in zip(momentum_state_memory.state_swap,
                                   state_to_write)
           ])
@@ -1105,3 +1105,9 @@ def compute_hamiltonian(target_log_prob, momentum_parts,
       for m, axes in zip(momentum_parts, shard_axis_names))
   # TODO(jvdillon): Verify no broadcasting happening.
   return target_log_prob - 0.5 * sum(momentum_sq_parts)
+
+
+def _safe_tensor_scatter_nd_update(tensor, indices, updates):
+  if tensorshape_util.num_elements(tensor.shape) == 0:
+    return tensor
+  return tf.tensor_scatter_nd_update(tensor, indices, updates)

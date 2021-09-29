@@ -1119,6 +1119,6 @@ def _prepare_step_size(step_size, dtype, n_state_parts):
 
 
 def _safe_tensor_scatter_nd_update(tensor, indices, updates):
-  if tensor.shape[:-1] == 0:
+  if tensorshape_util.num_elements(tensor.shape) == 0:
     return tensor
   return tf.tensor_scatter_nd_update(tensor, indices, updates)

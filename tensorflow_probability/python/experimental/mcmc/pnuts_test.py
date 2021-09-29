@@ -596,6 +596,15 @@ class NutsTest(test_util.TestCase):
                                       seed=test_util.test_seed())
     self.assertAlmostEqual(1., self.evaluate(fkr.step_size))
 
+  def test_zero_sized_event(self):
+    tlp_fn = lambda x, y: x[:, 0] + tf.pad(y, [[0, 0], [0, 1]])[:, 0]
+    kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
+        tlp_fn, step_size=0.1)
+    xy = [tf.ones([1, 1]), tf.ones([1, 0])]
+    results = kernel.bootstrap_results(xy)
+    self.evaluate(kernel.one_step(xy, results, seed=test_util.test_seed())[0])
+
+
 # Allowed type of preconditioning schemes to use.
 # See code for details.
 PRECONDITION_SCHEMES = frozenset([
