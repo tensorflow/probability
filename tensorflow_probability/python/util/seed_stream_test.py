@@ -37,7 +37,7 @@ def _ensure_tuple(value):
   Returns:
     `tuple` of one or two scalars.
   """
-  return tuple(np.reshape(value, [-1]))
+  return tuple(np.reshape(np.asarray(value), [-1]))
 
 
 @test_util.test_all_tf_execution_regimes

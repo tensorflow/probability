@@ -22,6 +22,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal import leapfrog_integrator as leapfrog_impl
 
@@ -51,7 +52,7 @@ class LeapfrogIntegratorTest(test_util.TestCase):
         axis=event_dims)
 
   def _integrator_conserves_energy(self, x, independent_chain_ndims, seed):
-    event_dims = tf.range(independent_chain_ndims, tf.rank(x))
+    event_dims = ps.range(independent_chain_ndims, tf.rank(x))
 
     target_fn = lambda x: self._log_gamma_log_prob(x, event_dims)
 
