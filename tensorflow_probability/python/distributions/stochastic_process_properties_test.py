@@ -442,12 +442,12 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
     with kernel_hps.no_pd_errors():
       with tf.GradientTape() as tape:
         sample = process.sample()
-    if process.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
-      grads = tape.gradient(sample, process.variables)
-      for grad, var in zip(grads, process.variables):
-        self.assertIsNotNone(
-            grad,
-            'Grad of sample was `None` for var: {}.'.format(var))
+      if process.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
+        grads = tape.gradient(sample, process.variables)
+        for grad, var in zip(grads, process.variables):
+          self.assertIsNotNone(
+              grad,
+              'Grad of sample was `None` for var: {}.'.format(var))
 
   @parameterized.named_parameters(
       {'testcase_name': '_' + sname, 'process_name': sname}
@@ -466,13 +466,13 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
     # `GaussianProcessRegressionModel`.
     with kernel_hps.no_pd_errors():
       sample = process.sample()
-    with tf.GradientTape() as tape:
-      lp = process.log_prob(sample)
-    grads = tape.gradient(lp, process.variables)
-    for grad, var in zip(grads, process.variables):
-      self.assertIsNotNone(
-          grad,
-          'Grad of log_prob was `None` for var: {}.'.format(var))
+      with tf.GradientTape() as tape:
+        lp = process.log_prob(sample)
+      grads = tape.gradient(lp, process.variables)
+      for grad, var in zip(grads, process.variables):
+        self.assertIsNotNone(
+            grad,
+            'Grad of log_prob was `None` for var: {}.'.format(var))
 
   @parameterized.named_parameters(
       {'testcase_name': '_' + sname, 'process_name': sname}
@@ -493,13 +493,13 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
     # `GaussianProcessRegressionModel`.
     with kernel_hps.no_pd_errors():
       sample = process.sample()
-    try:
-      with tfp_hps.assert_no_excessive_var_usage(
-          'method `log_prob` of `{}`'.format(process),
-          max_permissible=MAX_CONVERSIONS_BY_CLASS.get(process_name, 1)):
-        process.log_prob(sample)
-    except NotImplementedError:
-      pass
+      try:
+        with tfp_hps.assert_no_excessive_var_usage(
+            'method `log_prob` of `{}`'.format(process),
+            max_permissible=MAX_CONVERSIONS_BY_CLASS.get(process_name, 1)):
+          process.log_prob(sample)
+      except NotImplementedError:
+        pass
 
 
 def greater_than_twenty(x):

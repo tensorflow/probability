@@ -254,8 +254,11 @@ def no_pd_errors():
   # definite errors, avoid them in the first place.
   try:
     yield
-  except tf.errors.InvalidArgumentError as e:
-    if re.search(r'Cholesky decomposition was not successful', str(e)):
+  except tf.errors.OpError as e:
+    # NOTE: When tf.linalg.choleksy fails, it returns a matrix with nans on and
+    # below the diagonal.  When we use the Cholesky decomposition in a solve,
+    # TF will raise an error that the matrix of nans is not invertible.
+    if re.search(r'Input matrix is not invertible', str(e)):
       hp.assume(False)
     else:
       raise
