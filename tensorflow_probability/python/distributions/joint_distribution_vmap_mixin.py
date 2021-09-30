@@ -76,8 +76,10 @@ class JointDistributionVmapMixin(object):
   be unsupported.
 
   A limitation relative to standard `JointDistribution`s is that the
-  `sample_distributions()` method does not currently support (nontrivial) sample
-  shapes.
+  `sample_distributions()` method requires all component distributions to be
+  registered as `CompositeTensor`s (see
+  `tfp.experimental.auto_composite_tensor`) when called with nontrivial sample
+  shape.
   """
 
   def __init__(self, *args, **kwargs):

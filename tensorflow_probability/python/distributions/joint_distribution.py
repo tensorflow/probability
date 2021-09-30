@@ -427,17 +427,21 @@ class JointDistribution(distribution_lib.Distribution):
       value = self._resolve_value(value=value,
                                   allow_partially_specified=True,
                                   **kwargs)
-      might_have_batch_dims = (
-          distribution_util.shape_may_be_nontrivial(sample_shape)
-          or value is not None)
-      if self.use_vectorized_map and might_have_batch_dims:
-        raise NotImplementedError('`sample_distributions` with nontrivial '
-                                  'sample shape is not yet supported '
-                                  'for autovectorized JointDistributions.')
-
-      ds, xs = self._call_flat_sample_distributions(
-          sample_shape, seed=seed, value=value)
-      if not might_have_batch_dims:
+      try:
+        ds, xs = self._call_flat_sample_distributions(
+            sample_shape, seed=seed, value=value)
+      except TypeError as e:
+        if 'Failed to convert elements' in str(e):
+          raise TypeError(
+              'Some component distribution(s) cannot be returned from '
+              'the vectorized model because they are not `CompositeTensor`s. '
+              'You may avoid this error by ensuring that all components are '
+              '`CompositeTensor`s, using, e.g., '
+              '`tfp.experimental.auto_composite_tensor`, or by constructing '
+              'the joint distribution with `use_vectorized_map=False`.') from e
+        raise
+      if (value is None and
+          not distribution_util.shape_may_be_nontrivial(sample_shape)):
         # This is a single sample with no pinned values; this call will cache
         # the distributions if they are not already cached.
         self._get_single_sample_distributions(candidate_dists=ds)

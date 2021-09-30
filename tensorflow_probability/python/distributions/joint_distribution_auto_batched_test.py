@@ -425,6 +425,37 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
       self.assertLen(inverted_values, 1)
       self.assertAllClose(lp1, lp2)
 
+  @test_util.jax_disable_test_missing_functionality('b/157594634')
+  def test_sample_distributions(self):
+    def coroutine_model():
+      g = yield tfd.Normal(0., 1., name='g')
+      df = yield tfd.Exponential(1., name='df')
+      loc = yield tfd.Normal(tf.zeros([20]), g, name='loc')
+      yield tfd.StudentT(df, loc, 1, name='x')
+    joint = tfd.JointDistributionCoroutineAutoBatched(coroutine_model)
+
+    ds, xs = joint.sample_distributions([4, 3], seed=test_util.test_seed())
+    for d, x in zip(ds, xs):
+      self.assertGreaterEqual(len(d.batch_shape), 2)
+      lp = d.log_prob(x)
+      self.assertAllEqual(lp.shape[:2], [4, 3])
+
+  @test_util.jax_disable_test_missing_functionality('b/201586404')
+  def test_sample_distributions_not_composite_tensor_raises_error(self):
+    def coroutine_model():
+      yield tfd.TransformedDistribution(tfd.Normal(0., 1.),
+                                        tfb.Exp(),
+                                        name='td')
+    joint = tfd.JointDistributionCoroutineAutoBatched(coroutine_model)
+
+    # Sampling with trivial sample shape avoids the vmap codepath.
+    ds, _ = joint.sample_distributions([], seed=test_util.test_seed())
+    self.assertIsInstance(ds[0], tfd.TransformedDistribution)
+
+    with self.assertRaisesRegex(
+        TypeError, r'Some component distribution\(s\) cannot be returned'):
+      joint.sample_distributions([4, 3], seed=test_util.test_seed())
+
   def test_sample_with_batch_value(self):
     @tfd.JointDistributionCoroutineAutoBatched
     def dist():
@@ -612,11 +643,8 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
         'weights_noncentered',
         'weights',
     ])(*([None]*4))
-    # TODO(b/139710644): Enable `use_vectorized_map` here once
-    # `sample_distributions` is supported.
     joint = tfd.JointDistributionCoroutineAutoBatched(
-        dist, sample_dtype=sample_dtype, validate_args=True,
-        use_vectorized_map=False)
+        dist, sample_dtype=sample_dtype, validate_args=True)
     self.assertAllEqual(sorted(sample_dtype._fields),
                         sorted(joint.sample(
                             seed=test_util.test_seed())._fields))

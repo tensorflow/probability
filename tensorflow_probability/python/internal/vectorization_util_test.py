@@ -218,6 +218,20 @@ class VectorizationTest(test_util.TestCase):
     self.assertAllEqual(r, np.array(
         [[3., 6.], [4., 8.], [5., 10.]], dtype=np.float32))
 
+  def test_rectifies_distribution_batch_shapes(self):
+    def fn(scale):
+      d = tfd.Normal(loc=0, scale=[scale])
+      x = d.sample()
+      return d, x, d.log_prob(x)
+
+    polymorphic_fn = vectorization_util.make_rank_polymorphic(
+        fn, core_ndims=(0))
+    batch_scale = tf.constant([[4., 2., 5.], [1., 2., 1.]], dtype=tf.float32)
+    d, x, lp = polymorphic_fn(batch_scale)
+    self.assertAllEqual(d.batch_shape.as_list(), x.shape.as_list())
+    lp2 = d.log_prob(x)
+    self.assertAllClose(*self.evaluate((lp, lp2)))
+
 
 if __name__ == '__main__':
   test_util.main()

@@ -134,11 +134,24 @@ def _lock_in_non_vectorized_args(fn, arg_structure, flat_core_ndims, flat_args):
           arg_structure, [vectorized_args_by_index[i]
                           if i in vectorized_arg_index_set
                           else v for (i, v) in enumerate(flat_args)])
-      return fn(*new_args_with_original_structure)
+      return tf.nest.map_structure(
+          # If `fn` returns any Distribution instances, ensure that their
+          # parameter batch shapes are padded to align after vectorization.
+          _maybe_rectify_parameter_shapes,
+          fn(*new_args_with_original_structure))
 
   return (vectorized_arg_core_ndims,
           vectorized_args,
           fn_of_vectorized_args)
+
+
+def _maybe_rectify_parameter_shapes(d):
+  if (hasattr(d, '_broadcast_parameters_with_batch_shape') and
+      hasattr(d, 'batch_shape_tensor')):
+    # d is Distribution-like (or PSDKernel, etc.).
+    d = d._broadcast_parameters_with_batch_shape(  # pylint: disable=protected-access
+        ps.ones_like(d.batch_shape_tensor()))
+  return d
 
 
 # TODO(b/145252136): merge `make_rank_polymorphic` into core TensorFlow.
