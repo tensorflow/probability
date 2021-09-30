@@ -1216,11 +1216,10 @@ class Distribution(_BaseDistribution):
         sample_shape, 'sample_shape')
     samples = self._sample_n(
         n, seed=seed() if callable(seed) else seed, **kwargs)
-    batch_event_shape = ps.shape(samples)[1:]
-    final_shape = ps.concat([sample_shape, batch_event_shape], 0)
-    samples = tf.reshape(samples, final_shape)
-    samples = self._set_sample_static_shape(samples, sample_shape)
-    return samples
+    samples = tf.nest.map_structure(
+        lambda x: tf.reshape(x, ps.concat([sample_shape, ps.shape(x)[1:]], 0)),
+        samples)
+    return self._set_sample_static_shape(samples, sample_shape)
 
   def sample(self, sample_shape=(), seed=None, name='sample', **kwargs):
     """Generate samples of the specified shape.

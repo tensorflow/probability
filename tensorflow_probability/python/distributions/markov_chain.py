@@ -339,13 +339,6 @@ class MarkovChain(distribution.Distribution):
         sample_shape, seed=seed, compute_log_prob=False)
     return samples
 
-  # We need to bypass base Distribution reshaping logic, so we
-  # tactically implement the `_call_sample_n` redirector.
-  def _call_sample_n(self, sample_shape, seed, **kwargs):
-    return self._sample_n(sample_shape,
-                          seed=seed() if callable(seed) else seed,
-                          **kwargs)
-
   def _sample_and_log_prob(self, sample_shape, seed=None):
     return self._sample_and_log_prob_helper(
         sample_shape, seed=seed, compute_log_prob=True)
