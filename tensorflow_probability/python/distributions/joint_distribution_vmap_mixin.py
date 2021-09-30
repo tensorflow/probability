@@ -20,6 +20,7 @@ from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import vectorization_util
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -96,14 +97,17 @@ class JointDistributionVmapMixin(object):
   @property
   def _single_sample_ndims(self):
     """Computes the rank of values produced by executing the base model."""
-    result = []
-    for d in self._get_single_sample_distributions():
-      batch_ndims = ps.rank_from_shape(d.batch_shape_tensor, d.batch_shape)
-      result.append(tf.nest.map_structure(
-          lambda a, b, nd=batch_ndims: nd + ps.rank_from_shape(a, b),
-          d.event_shape_tensor(),
-          d.event_shape))
-    return result
+    # Attempt to get static ranks without running the model.
+    attrs = self._get_static_distribution_attributes()
+    batch_ndims, event_ndims = tf.nest.map_structure(
+        tensorshape_util.rank, [attrs.batch_shape, attrs.event_shape])
+    if any(nd is None for nd in tf.nest.flatten([batch_ndims, event_ndims])):
+      batch_ndims, event_ndims = tf.nest.map_structure(
+          ps.rank_from_shape,
+          [list(self._map_attr_over_dists('batch_shape_tensor')),
+           list(self._map_attr_over_dists('event_shape_tensor'))])
+    return [tf.nest.map_structure(lambda x, b=b: b + x, e)
+            for (b, e) in zip(batch_ndims, event_ndims)]
 
   def _call_execute_model(self,
                           sample_shape,
