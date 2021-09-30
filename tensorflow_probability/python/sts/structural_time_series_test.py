@@ -23,6 +23,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import Autoregressive
@@ -301,7 +302,11 @@ class _StsTestHarness(object):
       ] + param.prior.batch_shape.as_list() + param.prior.event_shape.as_list())
 
   def test_joint_distribution_log_prob(self):
-    model = self._build_sts()
+    model = self._build_sts(
+        # Dummy series to build the model with float64 priors. Working in
+        # float64 minimizes numeric inconsistencies between log-prob
+        # implementations.
+        observed_time_series=np.float64([1., 0.]))
     jd = model.joint_distribution(trajectories_shape=[2], num_timesteps=11)
     self.assertLen(jd.dtype, len(model.parameters) + 1)
 
@@ -497,17 +502,19 @@ class LinearRegressionTest(test_util.TestCase, _StsTestHarness):
     # LinearRegression components don't currently take an `observed_time_series`
     # argument, so they can't infer a prior batch shape. This means we have to
     # manually set the batch shape expected by the tests.
+    dtype = np.float32
     if observed_time_series is not None:
       observed_time_series_tensor, _ = (
           sts_util.canonicalize_observed_time_series_with_mask(
               observed_time_series))
       batch_shape = tf.shape(observed_time_series_tensor)[:-2]
-      prior = tfd.Sample(tfd.Laplace(tf.zeros(batch_shape), 1.),
+      dtype = dtype_util.as_numpy_dtype(observed_time_series_tensor.dtype)
+      prior = tfd.Sample(tfd.Laplace(tf.zeros(batch_shape, dtype=dtype), 1.),
                          sample_shape=[num_features])
 
     regression = LinearRegression(
         design_matrix=np.random.randn(
-            max_timesteps, num_features).astype(np.float32),
+            max_timesteps, num_features).astype(dtype),
         weights_prior=prior)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)
@@ -524,15 +531,17 @@ class SparseLinearRegressionTest(test_util.TestCase, _StsTestHarness):
     # argument, so they can't infer a prior batch shape. This means we have to
     # manually set the batch shape expected by the tests.
     batch_shape = None
+    dtype = np.float32
     if observed_time_series is not None:
       observed_time_series_tensor, _ = (
           sts_util.canonicalize_observed_time_series_with_mask(
               observed_time_series))
       batch_shape = tf.shape(observed_time_series_tensor)[:-2]
+      dtype = dtype_util.as_numpy_dtype(observed_time_series_tensor.dtype)
 
     regression = SparseLinearRegression(
         design_matrix=np.random.randn(
-            max_timesteps, num_features).astype(np.float32),
+            max_timesteps, num_features).astype(dtype),
         weights_batch_shape=batch_shape)
     return Sum(components=[regression],
                observed_time_series=observed_time_series)
@@ -545,9 +554,16 @@ class DynamicLinearRegressionTest(test_util.TestCase, _StsTestHarness):
     max_timesteps = 100
     num_features = 3
 
+    dtype = np.float32
+    if observed_time_series is not None:
+      observed_time_series_tensor, _ = (
+          sts_util.canonicalize_observed_time_series_with_mask(
+              observed_time_series))
+      dtype = dtype_util.as_numpy_dtype(observed_time_series_tensor.dtype)
+
     return DynamicLinearRegression(
         design_matrix=np.random.randn(
-            max_timesteps, num_features).astype(np.float32),
+            max_timesteps, num_features).astype(dtype),
         observed_time_series=observed_time_series)
 
 
