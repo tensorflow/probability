@@ -96,8 +96,8 @@ def _interp_regular_1d_grid_impl(x,
       x_ref_min = x_ref_min[..., tf.newaxis]
       x_ref_max = x_ref_max[..., tf.newaxis]
 
-    axis = tf.convert_to_tensor(axis, name='axis', dtype=tf.int32)
-    axis = ps.non_negative_axis(axis, tf.rank(y_ref))
+    axis = ps.convert_to_shape_tensor(axis, name='axis', dtype=tf.int32)
+    axis = ps.non_negative_axis(axis, ps.rank(y_ref))
     _assert_ndims_statically(axis, expect_ndims=0)
 
     ny = tf.cast(tf.shape(y_ref)[axis], dtype)
@@ -625,8 +625,8 @@ def batch_interp_regular_nd_grid(x,
         x_ref_max.shape[-1:], x_ref_min.shape[-1:])
 
     # Convert axis and check it statically.
-    axis = tf.convert_to_tensor(axis, dtype=tf.int32, name='axis')
-    axis = ps.non_negative_axis(axis, tf.rank(y_ref))
+    axis = ps.convert_to_shape_tensor(axis, dtype=tf.int32, name='axis')
+    axis = ps.non_negative_axis(axis, ps.rank(y_ref))
     tensorshape_util.assert_has_rank(axis.shape, 0)
     axis_ = tf.get_static_value(axis)
     y_ref_rank_ = tf.get_static_value(tf.rank(y_ref))
@@ -792,7 +792,7 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
     # Compute opposite_volume (volume of cube opposite the ref point):
     # Recall t.shape = s.shape = [D, nd] + [1, ..., 1]
     # Gather from t and s along the 'nd' axis, which is rank(x) - 1.
-    ov_axis = tf.rank(x) - 1
+    ov_axis = ps.cast(ps.rank(x) - 1, tf.int32)
     opposite_volume = (
         tf.reduce_prod(
             tf.gather(
