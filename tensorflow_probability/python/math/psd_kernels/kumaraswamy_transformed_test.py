@@ -61,7 +61,7 @@ class _KumaraswamyTransformedTest(test_util.TestCase):
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, inner_length_scale, feature_ndims)
+        amplitude, inner_length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
     # This is the identity transform.
@@ -101,7 +101,7 @@ class _KumaraswamyTransformedTest(test_util.TestCase):
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, inner_length_scale, feature_ndims)
+        amplitude, inner_length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
     # Batch shape [3, 1, 2].

@@ -48,7 +48,12 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
   """
 
   def __init__(
-      self, kernel, scale_diag, validate_args=False, name='FeatureScaled'):
+      self,
+      kernel,
+      scale_diag=None,
+      inverse_scale_diag=None,
+      validate_args=False,
+      name='FeatureScaled'):
     """Construct an FeatureScaled kernel instance.
 
     Args:
@@ -61,25 +66,37 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
         of `kernel`. This is a "diagonal" in the sense that if all the feature
         dimensions were flattened, `scale_diag` acts as the inverse of a
         diagonal matrix.
+      inverse_scale_diag: Non-negative floating point `Tensor` that is treated
+        as `1 / scale_diag`. Only one of `scale_diag` or `inverse_scale_diag`
+        should be provided.
+        Default value: None
       validate_args: If `True`, parameters are checked for validity despite
         possibly degrading runtime performance
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
+    if (scale_diag is None) == (inverse_scale_diag is None):
+      raise ValueError(
+          'Must specify exactly one of `scale_diag` and `inverse_scale_diag`.')
     with tf.name_scope(name):
       self._scale_diag = tensor_util.convert_nonref_to_tensor(
           scale_diag, name='scale_diag')
+      self._inverse_scale_diag = tensor_util.convert_nonref_to_tensor(
+          inverse_scale_diag, name='inverse_scale_diag')
 
       def rescale_input(x, feature_ndims, example_ndims):
         """Computes `x / scale_diag`."""
-        scale_diag = tf.convert_to_tensor(self.scale_diag)
-        scale_diag = util.pad_shape_with_ones(
-            scale_diag,
+        inverse_scale_diag = self.inverse_scale_diag
+        if inverse_scale_diag is None:
+          inverse_scale_diag = tf.math.reciprocal(self.scale_diag)
+        inverse_scale_diag = tf.convert_to_tensor(inverse_scale_diag)
+        inverse_scale_diag = util.pad_shape_with_ones(
+            inverse_scale_diag,
             example_ndims,
             # Start before the first feature dimension. We assume scale_diag has
             # at least as many dimensions as feature_ndims.
             start=-(feature_ndims + 1))
-        return x / scale_diag
+        return x * inverse_scale_diag
 
       super(FeatureScaled, self).__init__(
           kernel,
@@ -92,6 +109,10 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
   def scale_diag(self):
     return self._scale_diag
 
+  @property
+  def inverse_scale_diag(self):
+    return self._inverse_scale_diag
+
   @classmethod
   def _parameter_properties(cls, dtype):
     from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
@@ -100,15 +121,23 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
         scale_diag=parameter_properties.ParameterProperties(
             event_ndims=lambda self: self.kernel.feature_ndims,
             default_constraining_bijector_fn=(
-                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        inverse_scale_diag=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims,
+            default_constraining_bijector_fn=softplus.Softplus))
 
   def _parameter_control_dependencies(self, is_init):
     if not self.validate_args:
       return []
     assertions = []
-    scale_diag = self.scale_diag
-    if scale_diag is not None and is_init != tensor_util.is_ref(scale_diag):
+    if (self._inverse_scale_diag is not None and
+        is_init != tensor_util.is_ref(self._inverse_scale_diag)):
+      assertions.append(assert_util.assert_non_negative(
+          self._inverse_scale_diag,
+          message='`inverse_scale_diag` must be non-negative.'))
+    if (self._scale_diag is not None and
+        is_init != tensor_util.is_ref(self._scale_diag)):
       assertions.append(assert_util.assert_positive(
-          scale_diag,
-          message='scale_diag must be positive.'))
+          self._scale_diag,
+          message='`scale_diag` must be positive.'))
     return assertions

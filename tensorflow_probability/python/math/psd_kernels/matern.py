@@ -40,22 +40,29 @@ __all__ = [
 class _AmplitudeLengthScaleMixin(object):
   """Shared logic for amplitude/length_scale parameterized kernels."""
 
-  def _init_params(self, amplitude, length_scale):
+  def _init_params(self, amplitude, length_scale, inverse_length_scale):
     """Shared init logic for `amplitude` and `length_scale` params.
 
     Args:
       amplitude: `Tensor` (or convertible) or `None` to convert, validate.
       length_scale: `Tensor` (or convertible) or `None` to convert, validate.
+      inverse_length_scale: `Tensor` (or convertible) or `None` to convert,
+        validate.
 
     Returns:
       dtype: The common `DType` of the parameters.
     """
+    if (length_scale is not None) and (inverse_length_scale is not None):
+      raise ValueError('Must specify at most one of `length_scale` and '
+                       '`inverse_length_scale`.')
     dtype = util.maybe_get_common_dtype(
         [amplitude, length_scale])
     self._amplitude = tensor_util.convert_nonref_to_tensor(
         amplitude, name='amplitude', dtype=dtype)
     self._length_scale = tensor_util.convert_nonref_to_tensor(
         length_scale, name='length_scale', dtype=dtype)
+    self._inverse_length_scale = tensor_util.convert_nonref_to_tensor(
+        inverse_length_scale, name='inverse_length_scale', dtype=dtype)
     return dtype
 
   @property
@@ -68,6 +75,18 @@ class _AmplitudeLengthScaleMixin(object):
     """Length scale parameter."""
     return self._length_scale
 
+  @property
+  def inverse_length_scale(self):
+    """Inverse length scale parameter."""
+    return self._inverse_length_scale
+
+  def _inverse_length_scale_parameter(self):
+    if self.inverse_length_scale is None:
+      if self.length_scale is not None:
+        return tf.math.reciprocal(self.length_scale)
+      return None
+    return tf.convert_to_tensor(self.inverse_length_scale)
+
   @classmethod
   def _parameter_properties(cls, dtype):
     from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
@@ -77,19 +96,25 @@ class _AmplitudeLengthScaleMixin(object):
                 lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
         length_scale=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
-                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        inverse_length_scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=softplus.Softplus))
 
   def _parameter_control_dependencies(self, is_init):
     """Control dependencies for parameters."""
     if not self.validate_args:
       return []
     assertions = []
+    if (self._inverse_length_scale is not None and
+        is_init != tensor_util.is_ref(self._inverse_length_scale)):
+      assertions.append(assert_util.assert_non_negative(
+          self._inverse_length_scale,
+          message='`inverse_scale_diag` must be non-negative.'))
     for arg_name, arg in dict(amplitude=self.amplitude,
-                              length_scale=self.length_scale).items():
+                              length_scale=self._length_scale).items():
       if arg is not None and is_init != tensor_util.is_ref(arg):
         assertions.append(assert_util.assert_positive(
-            arg,
-            message='{} must be positive.'.format(arg_name)))
+            arg, message=f'{arg_name} must be positive.'))
     return assertions
 
   def _apply(self, x1, x2, example_ndims=0):
@@ -143,12 +168,14 @@ class GeneralizedMatern(_AmplitudeLengthScaleMixin,
                df,
                amplitude=None,
                length_scale=None,
+               inverse_length_scale=None,
                feature_ndims=1,
                validate_args=False,
                name='GeneralizedMatern'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      super(GeneralizedMatern, self)._init_params(amplitude, length_scale)
+      super(GeneralizedMatern, self)._init_params(
+          amplitude, length_scale, inverse_length_scale)
       dtype = util.maybe_get_common_dtype([self._amplitude, df])
       self._df = tensor_util.convert_nonref_to_tensor(
           df, name='df', dtype=dtype)
@@ -176,17 +203,19 @@ class GeneralizedMatern(_AmplitudeLengthScaleMixin,
                 lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
         length_scale=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
-                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        inverse_length_scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=softplus.Softplus))
 
   def _apply_with_distance(
       self, x1, x2, pairwise_square_distance, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
     norm = util.sqrt_with_finite_grads(pairwise_square_distance)
-    if self.length_scale is not None:
-      length_scale = tf.convert_to_tensor(self.length_scale)
-      length_scale = util.pad_shape_with_ones(
-          length_scale, ndims=example_ndims)
-      norm /= length_scale
+    inverse_length_scale = self._inverse_length_scale_parameter()
+    if inverse_length_scale is not None:
+      inverse_length_scale = util.pad_shape_with_ones(
+          inverse_length_scale, ndims=example_ndims)
+      norm = norm * inverse_length_scale
     df = tf.convert_to_tensor(self.df)
     df = tf.stop_gradient(df)
     df = util.pad_shape_with_ones(df, ndims=example_ndims)
@@ -218,14 +247,19 @@ class GeneralizedMatern(_AmplitudeLengthScaleMixin,
     if not self.validate_args:
       return []
     assertions = []
+    if (self._inverse_length_scale is not None and
+        is_init != tensor_util.is_ref(self._inverse_length_scale)):
+      assertions.append(assert_util.assert_non_negative(
+          self._inverse_length_scale,
+          message='`inverse_scale_diag` must be non-negative.'))
     for arg_name, arg in dict(
         df=self.df,
         amplitude=self.amplitude,
-        length_scale=self.length_scale).items():
+        length_scale=self._length_scale).items():
       if arg is not None and is_init != tensor_util.is_ref(arg):
         assertions.append(assert_util.assert_positive(
             arg,
-            message='{} must be positive.'.format(arg_name)))
+            message=f'{arg_name} must be positive.'))
     return assertions
 
 
@@ -251,6 +285,7 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
   def __init__(self,
                amplitude=None,
                length_scale=None,
+               inverse_length_scale=None,
                feature_ndims=1,
                validate_args=False,
                name='MaternOneHalf'):
@@ -266,6 +301,10 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
         length against which `||x - y||` can be compared for scale. Must be
         broadcastable with `amplitude` and inputs to `apply` and `matrix`
         methods. A value of `None` is treated like 1.
+      inverse_length_scale: Non-negative floating point `Tensor` that is
+        treated as `1 / length_scale`. Only one of `length_scale` or
+        `inverse_length_scale` should be provided.
+        Default value: None
       feature_ndims: Python `int` number of rightmost dims to include in the
         squared difference norm in the exponential.
       validate_args: If `True`, parameters are checked for validity despite
@@ -274,7 +313,8 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
-      dtype = super(MaternOneHalf, self)._init_params(amplitude, length_scale)
+      dtype = super(MaternOneHalf, self)._init_params(
+          amplitude, length_scale, inverse_length_scale)
       super(MaternOneHalf, self).__init__(
           feature_ndims,
           dtype=dtype,
@@ -286,11 +326,11 @@ class MaternOneHalf(_AmplitudeLengthScaleMixin,
       self, x1, x2, pairwise_square_distance, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
     norm = util.sqrt_with_finite_grads(pairwise_square_distance)
-    if self.length_scale is not None:
-      length_scale = tf.convert_to_tensor(self.length_scale)
-      length_scale = util.pad_shape_with_ones(
-          length_scale, ndims=example_ndims)
-      norm /= length_scale
+    inverse_length_scale = self._inverse_length_scale_parameter()
+    if inverse_length_scale is not None:
+      inverse_length_scale = util.pad_shape_with_ones(
+          inverse_length_scale, ndims=example_ndims)
+      norm = norm * inverse_length_scale
     log_result = -norm
 
     if self.amplitude is not None:
@@ -319,6 +359,7 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
   def __init__(self,
                amplitude=None,
                length_scale=None,
+               inverse_length_scale=None,
                feature_ndims=1,
                validate_args=False,
                name='MaternThreeHalves'):
@@ -332,8 +373,12 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
       length_scale: Positive floating point `Tensor` that controls how sharp or
         wide the kernel shape is. This provides a characteristic "unit" of
         length against which `||x - y||` can be compared for scale. Must be
-        broadcastable with `amplitude` and inputs to `apply` and `matrix`
+        broadcastable with `amplitude`, and inputs to `apply` and `matrix`
         methods. A value of `None` is treated like 1.
+      inverse_length_scale: Non-negative floating point `Tensor` that is
+        treated as `1 / length_scale`. Only one of `length_scale` or
+        `inverse_length_scale` should be provided.
+        Default value: None
       feature_ndims: Python `int` number of rightmost dims to include in the
         squared difference norm in the exponential.
       validate_args: If `True`, parameters are checked for validity despite
@@ -343,7 +388,7 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = super(MaternThreeHalves, self)._init_params(
-          amplitude, length_scale)
+          amplitude, length_scale, inverse_length_scale)
       super(MaternThreeHalves, self).__init__(
           feature_ndims,
           dtype=dtype,
@@ -355,11 +400,11 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
       self, x1, x2, pairwise_square_distance, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
     norm = util.sqrt_with_finite_grads(pairwise_square_distance)
-    if self.length_scale is not None:
-      length_scale = tf.convert_to_tensor(self.length_scale)
-      length_scale = util.pad_shape_with_ones(
-          length_scale, ndims=example_ndims)
-      norm = norm / length_scale
+    inverse_length_scale = self._inverse_length_scale_parameter()
+    if inverse_length_scale is not None:
+      inverse_length_scale = util.pad_shape_with_ones(
+          inverse_length_scale, ndims=example_ndims)
+      norm = norm * inverse_length_scale
     series_term = np.sqrt(3) * norm
     log_result = tf.math.log1p(series_term) - series_term
 
@@ -388,6 +433,7 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
   def __init__(self,
                amplitude=None,
                length_scale=None,
+               inverse_length_scale=None,
                feature_ndims=1,
                validate_args=False,
                name='MaternFiveHalves'):
@@ -403,6 +449,10 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
         length against which `||x - y||` can be compared for scale. Must be
         broadcastable with `amplitude`, and inputs to `apply` and `matrix`
         methods. A value of `None` is treated like 1.
+      inverse_length_scale: Non-negative floating point `Tensor` that is
+        treated as `1 / length_scale`. Only one of `length_scale` or
+        `inverse_length_scale` should be provided.
+        Default value: None
       feature_ndims: Python `int` number of rightmost dims to include in the
         squared difference norm in the exponential.
       validate_args: If `True`, parameters are checked for validity despite
@@ -412,7 +462,7 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = super(MaternFiveHalves, self)._init_params(
-          amplitude, length_scale)
+          amplitude, length_scale, inverse_length_scale)
       super(MaternFiveHalves, self).__init__(
           feature_ndims,
           dtype=dtype,
@@ -424,11 +474,11 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
       self, x1, x2, pairwise_square_distance, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
     norm = util.sqrt_with_finite_grads(pairwise_square_distance)
-    if self.length_scale is not None:
-      length_scale = tf.convert_to_tensor(self.length_scale)
-      length_scale = util.pad_shape_with_ones(
-          length_scale, ndims=example_ndims)
-      norm = norm / length_scale
+    inverse_length_scale = self._inverse_length_scale_parameter()
+    if inverse_length_scale is not None:
+      inverse_length_scale = util.pad_shape_with_ones(
+          inverse_length_scale, ndims=example_ndims)
+      norm = norm * inverse_length_scale
     series_term = np.sqrt(5) * norm
     log_result = tf.math.log1p(series_term + series_term**2 / 3.) - series_term
 

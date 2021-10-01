@@ -99,7 +99,10 @@ class _MaternTestCase(test_util.TestCase):
     length_scale = np.array(.2, dtype=dtype)
 
     np.random.seed(42)
-    k = self._kernel_type(amplitude, length_scale, feature_ndims)
+    k = self._kernel_type(
+        amplitude=amplitude,
+        length_scale=length_scale,
+        feature_ndims=feature_ndims)
     shape = [dims] * feature_ndims
     for _ in range(5):
       x = np.random.uniform(-1, 1, size=shape).astype(dtype)
@@ -107,6 +110,51 @@ class _MaternTestCase(test_util.TestCase):
       self.assertAllClose(
           self._numpy_kernel(amplitude, length_scale, x, y),
           self.evaluate(k.apply(x, y)))
+
+  @parameterized.parameters({
+      'feature_ndims': 1,
+      'dtype': np.float32,
+      'dims': 3
+  }, {
+      'feature_ndims': 1,
+      'dtype': np.float32,
+      'dims': 4
+  }, {
+      'feature_ndims': 2,
+      'dtype': np.float32,
+      'dims': 2
+  }, {
+      'feature_ndims': 2,
+      'dtype': np.float64,
+      'dims': 3
+  }, {
+      'feature_ndims': 3,
+      'dtype': np.float64,
+      'dims': 2
+  }, {
+      'feature_ndims': 3,
+      'dtype': np.float64,
+      'dims': 3
+  })
+  def testValuesAreCorrectInverseLengthScale(self, feature_ndims, dtype, dims):
+    amplitude = np.array(5., dtype=dtype)
+    inverse_length_scale = np.linspace(1., 20., 20, dtype=dtype)
+
+    np.random.seed(42)
+    k = self._kernel_type(
+        amplitude=amplitude,
+        inverse_length_scale=inverse_length_scale,
+        feature_ndims=feature_ndims)
+    k_ls = self._kernel_type(
+        amplitude=amplitude,
+        length_scale=1. / inverse_length_scale,
+        feature_ndims=feature_ndims)
+    shape = [dims] * feature_ndims
+    x = np.random.uniform(-1, 1, size=shape).astype(dtype)
+    y = np.random.uniform(-1, 1, size=shape).astype(dtype)
+    self.assertAllClose(
+        self.evaluate(k.apply(x, y)),
+        self.evaluate(k_ls.apply(x, y)))
 
   def testShapesAreCorrect(self):
     k = self._kernel_type(amplitude=1., length_scale=1.)
@@ -155,6 +203,7 @@ class GeneralizedMaternTest(_MaternTestCase):
       amplitude=None,
       length_scale=None,
       feature_ndims=1,
+      inverse_length_scale=None,
       validate_args=None,
       df=None):
     # Make sure tests work for scalar DF. Non-scalar DF is handled below.
@@ -164,6 +213,7 @@ class GeneralizedMaternTest(_MaternTestCase):
         df=df,
         amplitude=amplitude,
         length_scale=length_scale,
+        inverse_length_scale=inverse_length_scale,
         feature_ndims=feature_ndims,
         validate_args=validate_args)
 

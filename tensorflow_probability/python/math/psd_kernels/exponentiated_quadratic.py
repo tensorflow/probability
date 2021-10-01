@@ -47,6 +47,7 @@ class ExponentiatedQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
   def __init__(self,
                amplitude=None,
                length_scale=None,
+               inverse_length_scale=None,
                feature_ndims=1,
                validate_args=False,
                name='ExponentiatedQuadratic'):
@@ -62,7 +63,12 @@ class ExponentiatedQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
         kernel shape is. This provides a characteristic "unit" of length against
         which `||x - y||` can be compared for scale. Must be broadcastable with
         `amplitude` and inputs to `apply` and `matrix` methods. A value of
-        `None` is treated like 1.
+        `None` is treated like 1. Only one of `length_scale` or
+        `inverse_length_scale` should be provided.
+        Default value: None
+      inverse_length_scale: Non-negative floating point `Tensor` that is
+        treated as `1 / length_scale`. Only one of `length_scale` or
+        `inverse_length_scale` should be provided.
         Default value: None
       feature_ndims: Python `int` number of rightmost dims to include in the
         squared difference norm in the exponential.
@@ -71,13 +77,18 @@ class ExponentiatedQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
       name: Python `str` name prefixed to Ops created by this class.
     """
     parameters = dict(locals())
+    if (length_scale is not None) and (inverse_length_scale is not None):
+      raise ValueError('Must specify at most one of `length_scale` and '
+                       '`inverse_length_scale`.')
     with tf.name_scope(name):
       dtype = util.maybe_get_common_dtype(
-          [amplitude, length_scale])
+          [amplitude, length_scale, inverse_length_scale])
       self._amplitude = tensor_util.convert_nonref_to_tensor(
           amplitude, name='amplitude', dtype=dtype)
       self._length_scale = tensor_util.convert_nonref_to_tensor(
           length_scale, name='length_scale', dtype=dtype)
+      self._inverse_length_scale = tensor_util.convert_nonref_to_tensor(
+          inverse_length_scale, name='inverse_length_scale', dtype=dtype)
       super(ExponentiatedQuadratic, self).__init__(
           feature_ndims,
           dtype=dtype,
@@ -95,6 +106,18 @@ class ExponentiatedQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
     """Length scale parameter."""
     return self._length_scale
 
+  @property
+  def inverse_length_scale(self):
+    """Inverse length scale parameter."""
+    return self._inverse_length_scale
+
+  def _inverse_length_scale_parameter(self):
+    if self.inverse_length_scale is None:
+      if self.length_scale is not None:
+        return tf.math.reciprocal(self.length_scale)
+      return None
+    return tf.convert_to_tensor(self.inverse_length_scale)
+
   @classmethod
   def _parameter_properties(cls, dtype):
     from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
@@ -104,16 +127,18 @@ class ExponentiatedQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
                 lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
         length_scale=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
-                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        inverse_length_scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=softplus.Softplus))
 
   def _apply_with_distance(
       self, x1, x2, pairwise_square_distance, example_ndims=0):
     exponent = -0.5 * pairwise_square_distance
-    if self.length_scale is not None:
-      length_scale = tf.convert_to_tensor(self.length_scale)
-      length_scale = util.pad_shape_with_ones(
-          length_scale, example_ndims)
-      exponent = exponent / length_scale**2
+    inverse_length_scale = self._inverse_length_scale_parameter()
+    if inverse_length_scale is not None:
+      inverse_length_scale = util.pad_shape_with_ones(
+          inverse_length_scale, example_ndims)
+      exponent = exponent * tf.math.square(inverse_length_scale)
 
     if self.amplitude is not None:
       amplitude = tf.convert_to_tensor(self.amplitude)
@@ -145,10 +170,14 @@ class ExponentiatedQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
     if not self.validate_args:
       return []
     assertions = []
+    if (self._inverse_length_scale is not None and
+        is_init != tensor_util.is_ref(self._inverse_length_scale)):
+      assertions.append(assert_util.assert_non_negative(
+          self._inverse_length_scale,
+          message='`inverse_length_scale` must be non-negative.'))
     for arg_name, arg in dict(amplitude=self.amplitude,
-                              length_scale=self.length_scale).items():
+                              length_scale=self._length_scale).items():
       if arg is not None and is_init != tensor_util.is_ref(arg):
         assertions.append(assert_util.assert_positive(
-            arg,
-            message='{} must be positive.'.format(arg_name)))
+            arg, message=f'{arg_name} must be positive.'))
     return assertions

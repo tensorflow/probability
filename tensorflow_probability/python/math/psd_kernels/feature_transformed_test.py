@@ -56,7 +56,7 @@ class _FeatureTransformedTest(test_util.TestCase):
     amplitude = self.dtype(5.)
     length_scale = self.dtype(0.2)
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, length_scale, feature_ndims)
+        amplitude, length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
     identity_transformed_kernel = tfp.math.psd_kernels.FeatureTransformed(
         kernel,
@@ -79,7 +79,7 @@ class _FeatureTransformedTest(test_util.TestCase):
     amplitude = self.dtype(5.)
     length_scale = self.dtype(0.2)
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, length_scale, feature_ndims)
+        amplitude, length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
     bij = tfp.bijectors.Scale(scale=self.dtype(2.))
@@ -109,7 +109,7 @@ class _FeatureTransformedTest(test_util.TestCase):
     amplitude = self.dtype(5.)
     length_scale = self.dtype(0.2)
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, length_scale, feature_ndims)
+        amplitude, length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
     scale_diag = np.random.uniform(-1, 1, size=(dims,)).astype(self.dtype)
@@ -148,7 +148,7 @@ class _FeatureTransformedTest(test_util.TestCase):
     length_scale = np.random.uniform(
         low=1., high=10., size=[1, 2]).astype(self.dtype)
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, length_scale, feature_ndims)
+        amplitude, length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
     # Batch shape [3, 1, 2].

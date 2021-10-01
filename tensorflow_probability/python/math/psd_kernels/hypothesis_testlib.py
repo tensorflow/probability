@@ -115,7 +115,10 @@ INSTANTIABLE_BASE_KERNELS = _instantiable_base_kernels()
 del _instantiable_base_kernels
 
 
-MUTEX_PARAMS = tuple()
+MUTEX_PARAMS = (
+    set(['length_scale', 'inverse_length_scale']),
+    set(['scale_diag', 'inverse_scale_diag']),
+)
 
 # pylint is unable to handle @hps.composite (e.g. complains "No value for
 # argument 'batch_shape' in function call"), so disable this lint for the file.
@@ -851,6 +854,7 @@ CONSTRAINTS = {
     'slope_variance': constrain_to_range(0.1, 0.5),
     'exponent': constrain_to_range(1, 1.5),
     'length_scale': constrain_to_range(1., 6.),
+    'inverse_length_scale': constrain_to_range(0., 2.),
     'period': constrain_to_range(1., 6.),
     'scale_mixture_rate': constrain_to_range(1., 6.),
     # Ensure shift isn't too large such that all inputs are mapped

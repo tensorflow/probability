@@ -74,7 +74,9 @@ class _FeatureScaledTest(test_util.TestCase):
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude, inner_length_scale, feature_ndims)
+        amplitude,
+        length_scale=inner_length_scale,
+        feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
     # Batch shape [3, 1, 2].
@@ -109,6 +111,45 @@ class _FeatureScaledTest(test_util.TestCase):
             feature_ndims=feature_ndims
         ),
         self.evaluate(ard_kernel.matrix(z, z)))
+
+  @parameterized.parameters(
+      {'feature_ndims': 1, 'dims': 3},
+      {'feature_ndims': 1, 'dims': 4},
+      {'feature_ndims': 2, 'dims': 2},
+      {'feature_ndims': 2, 'dims': 3},
+      {'feature_ndims': 3, 'dims': 2},
+      {'feature_ndims': 3, 'dims': 3})
+  def testKernelParametersInverseLengthScale(self, feature_ndims, dims):
+    # Batch shape [10, 2]
+    amplitude = np.random.uniform(
+        low=1., high=10., size=[10, 2]).astype(self.dtype)
+
+    inner_length_scale = self.dtype(1.)
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+        amplitude,
+        length_scale=inner_length_scale,
+        feature_ndims=feature_ndims)
+    input_shape = [dims] * feature_ndims
+
+    # Batch shape [3, 1, 2].
+    inverse_length_scale = np.random.uniform(
+        2, 5, size=([3, 1, 2] + input_shape)).astype(self.dtype)
+
+    ard_kernel = tfp.math.psd_kernels.FeatureScaled(
+        kernel,
+        scale_diag=None,
+        inverse_scale_diag=inverse_length_scale)
+
+    ard_kernel_ls = tfp.math.psd_kernels.FeatureScaled(
+        kernel,
+        scale_diag=1. / inverse_length_scale)
+
+    x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
+    y = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
+
+    self.assertAllClose(
+        self.evaluate(ard_kernel.apply(x, y)),
+        self.evaluate(ard_kernel_ls.apply(x, y)))
 
 
 class FeatureScaledFloat32Test(_FeatureScaledTest):

@@ -290,6 +290,7 @@ class ConstantTest(test_util.TestCase):
     y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
     self.assertAllClose(np.full((5, 4), val), self.evaluate(k.matrix(x, y)))
 
+  @test_util.numpy_disable_gradient_test
   def testGradsAreNotNone(self):
     val = 0.1
     k = tfp.math.psd_kernels.Constant(constant=val)

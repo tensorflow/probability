@@ -52,8 +52,10 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
     length_scale = .2
 
     np.random.seed(42)
-    k = tfp.math.psd_kernels.ExponentiatedQuadratic(amplitude, length_scale,
-                                                    feature_ndims)
+    k = tfp.math.psd_kernels.ExponentiatedQuadratic(
+        amplitude,
+        length_scale=length_scale,
+        feature_ndims=feature_ndims)
     shape = [dims] * feature_ndims
     for _ in range(5):
       x = np.random.uniform(-1, 1, size=shape).astype(np.float32)
@@ -110,6 +112,33 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
         None, None, validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
 
+  @parameterized.parameters(
+      {'feature_ndims': 1, 'dims': 3},
+      {'feature_ndims': 1, 'dims': 4},
+      {'feature_ndims': 2, 'dims': 2},
+      {'feature_ndims': 2, 'dims': 3},
+      {'feature_ndims': 3, 'dims': 2},
+      {'feature_ndims': 3, 'dims': 3})
+  def testInverseLengthScaleValuesAreCorrect(self, feature_ndims, dims):
+    amplitude = 5.
+    inverse_length_scale = np.array([2., 3., 1., 0.5], dtype=np.float32)
+
+    np.random.seed(42)
+    k = tfp.math.psd_kernels.ExponentiatedQuadratic(
+        amplitude,
+        inverse_length_scale=inverse_length_scale,
+        feature_ndims=feature_ndims)
+    k_with_ls = tfp.math.psd_kernels.ExponentiatedQuadratic(
+        amplitude,
+        length_scale=1. / inverse_length_scale,
+        feature_ndims=feature_ndims)
+    shape = [dims] * feature_ndims
+    x = np.random.uniform(-1, 1, size=shape).astype(np.float32)
+    y = np.random.uniform(-1, 1, size=shape).astype(np.float32)
+    self.assertAllClose(
+        self.evaluate(k.apply(x, y)),
+        self.evaluate(k_with_ls.apply(x, y)))
+
   @test_util.jax_disable_variable_test
   def testValidateVariableArgs(self):
     amplitude = tf.Variable(1.)
@@ -126,6 +155,13 @@ class ExponentiatedQuadraticTest(test_util.TestCase):
       with tf.control_dependencies([amplitude.assign(2.),
                                     length_scale.assign(-1.)]):
         self.evaluate(k.apply([3.], [3.]))
+
+  def testAtMostOneLengthScale(self):
+    with self.assertRaisesRegex(ValueError, 'Must specify at most one of'):
+      tfp.math.psd_kernels.ExponentiatedQuadratic(
+          amplitude=1.,
+          length_scale=1.,
+          inverse_length_scale=2.)
 
 
 if __name__ == '__main__':
