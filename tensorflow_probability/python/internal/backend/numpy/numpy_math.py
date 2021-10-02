@@ -228,7 +228,7 @@ def _confusion_matrix(
   if not JAX_MODE:
     np.add.at(cmatrix, [labels, predictions], weights)
     return cmatrix
-  return jax.ops.index_add(cmatrix, (labels, predictions), weights)
+  return cmatrix.at[(labels, predictions)].add(weights)
 
 
 def _cumop(op, x, axis=0, exclusive=False, reverse=False, name=None,
@@ -414,7 +414,7 @@ def _unsorted_segment_sum(data, segment_ids, num_segments, name=None):
   if not JAX_MODE:
     raise NotImplementedError
   sums = np.zeros(num_segments)
-  return jax.ops.index_add(sums, jax.ops.index[segment_ids], data)
+  return sums.at[segment_ids].add(data)
 
 
 # --- Begin Public Functions --------------------------------------------------

@@ -121,8 +121,7 @@ def _tensor_scatter_nd_add(tensor, indices, updates, name=None):  # pylint: disa
   updates = _convert_to_tensor(updates)
   indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
   if JAX_MODE:
-    import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
-    return jaxops.index_add(tensor, indices, updates)
+    return tensor.at[indices].add(updates)
   tensor[indices] += updates
   return tensor
 
@@ -135,8 +134,7 @@ def _tensor_scatter_nd_sub(tensor, indices, updates, name=None):  # pylint: disa
   updates = _convert_to_tensor(updates)
   indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
   if JAX_MODE:
-    import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
-    return jaxops.index_add(tensor, indices, np.negative(updates))
+    return tensor.at[indices].add(np.negative(updates))
   tensor[indices] -= updates
   return tensor
 
@@ -149,8 +147,7 @@ def _tensor_scatter_nd_update(tensor, indices, updates, name=None):  # pylint: d
   updates = _convert_to_tensor(updates)
   indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
   if JAX_MODE:
-    import jax.ops as jaxops  # pylint: disable=g-import-not-at-top
-    return jaxops.index_update(tensor, indices, updates)
+    return tensor.at[indices].set(updates)
   tensor[indices] = updates
   return tensor
 

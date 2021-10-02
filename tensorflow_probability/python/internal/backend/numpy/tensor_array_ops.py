@@ -125,7 +125,7 @@ class TensorArray(object):
     elif JAX_MODE:
       import jax  # pylint: disable=g-import-not-at-top
       try:
-        new_data = jax.ops.index_update(self._data, index, value)
+        new_data = self._data.at[index].set(value)
       except:
         raise ValueError('Error writing to {}'.format(repr(self)))
     else:

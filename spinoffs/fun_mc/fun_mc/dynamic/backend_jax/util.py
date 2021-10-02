@@ -209,8 +209,7 @@ def trace(state, fn, num_steps, unroll, **_):
     def wrapper(i, state_untraced_traced):
       state, _, trace_arrays = state_untraced_traced
       state, untraced, traced = fn(state)
-      trace_arrays = map_tree(lambda a, e: jax.ops.index_update(a, i, e),
-                              trace_arrays, traced)
+      trace_arrays = map_tree(lambda a, e: a.at[i].set(e), trace_arrays, traced)
       return (state, untraced, trace_arrays)
     state, untraced, traced = lax.fori_loop(
         jnp.asarray(0, num_steps.dtype),
