@@ -289,6 +289,26 @@ class ControlFlowTest(test_util.TestCase):
     self.assertListEqual(['x'], list(variables.keys()))
     np.testing.assert_allclose(variables['x'], true_out)
 
+  def test_harvest_append_mode_in_nested_scan_and_cond_should_accumulate(self):
+
+    def body(carry, x):
+      def _t(x):
+        return variable(x + carry, name='x', mode='append')
+      def _f(x):
+        return variable(x, name='x', mode='append')
+      x = lax.cond(True, _t, _f, x)
+      return x, x
+
+    def f(init):
+      return lax.scan(jax.jit(body), init, jnp.arange(5.))
+
+    (carry, out), variables = harvest_variables(f)({}, 1.)
+    true_out = jnp.array([1., 2., 4., 7., 11.])
+    np.testing.assert_allclose(carry, 11.)
+    np.testing.assert_allclose(out, true_out)
+    self.assertListEqual(['x'], list(variables.keys()))
+    np.testing.assert_allclose(variables['x'], true_out)
+
   def test_harvest_clobber_mode_in_scan_should_return_final_value(self):
 
     def body(carry, x):

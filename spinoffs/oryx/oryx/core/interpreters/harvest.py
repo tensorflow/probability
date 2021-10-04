@@ -477,18 +477,19 @@ class ReapContext(HarvestContext):
       def new_out_axes_thunk():
         out_axes = out_axes_thunk()
         assert all(out_axis == 0 for out_axis in out_axes)
-        return (0,) * aux().num_leaves
+        out_tree, _ = aux()
+        return (0,) * out_tree.num_leaves
 
       params = dict(params, out_axes_thunk=new_out_axes_thunk)
     out_flat = call_primitive.bind(f, *vals, name=name, **params)
-    out_tree = aux()
+    out_tree, metadata = aux()
     out_vals, reaps = tree_util.tree_unflatten(out_tree, out_flat)
     out_tracers = jax_util.safe_map(trace.pure, out_vals)
     reap_tracers = tree_util.tree_map(trace.pure, reaps)
-    return out_tracers, reap_tracers
+    return out_tracers, reap_tracers, metadata
 
   def process_nest(self, trace, f, *tracers, scope, name, **params):
-    out_tracers, reap_tracers = self.reap_higher_order_primitive(
+    out_tracers, reap_tracers, _ = self.reap_higher_order_primitive(
         trace, nest_p, f, tracers, dict(params, name=name, scope=scope), False)
     tag = self.settings.tag
     if reap_tracers:
@@ -500,14 +501,14 @@ class ReapContext(HarvestContext):
 
   def process_higher_order_primitive(self, trace, call_primitive, f, tracers,
                                      params, is_map):
-    out_tracers, reap_tracers = self.reap_higher_order_primitive(
+    out_tracers, reap_tracers, metadata = self.reap_higher_order_primitive(
         trace, call_primitive, f, tracers, params, is_map)
     tag = self.settings.tag
     for k, v in reap_tracers.items():
       flat_reap_tracers, reap_tree = tree_util.tree_flatten(v)
       trace.process_primitive(
           sow_p, flat_reap_tracers,
-          dict(name=k, tag=tag, tree=reap_tree, mode='strict'))
+          dict(name=k, tag=tag, tree=reap_tree, mode=metadata[k]['mode']))
     return out_tracers
 
 
@@ -537,16 +538,16 @@ def reap_function(main: jax_core.MainTrace, settings: HarvestSettings,
 def reap_eval(
     f: lu.WrappedFun, trace: HarvestTrace,
     settings: HarvestSettings) -> Tuple[lu.WrappedFun, Callable[[], Any]]:
-  f = reap_function(f, trace.main, settings, False)
+  f = reap_function(f, trace.main, settings, True)
   return reap_wrapper(f, trace)
 
 
 @lu.transformation_with_aux
 def reap_wrapper(trace: HarvestTrace, *args):
   del trace
-  out, reaps = yield (args,), {}
+  out, reaps, metadata = yield (args,), {}
   out_flat, out_tree = tree_util.tree_flatten((out, reaps))
-  yield out_flat, out_tree
+  yield out_flat, (out_tree, metadata)
 
 
 def call_and_reap(f,
@@ -838,7 +839,7 @@ def _reap_cond_rule(trace, *tracers, branches, linear):
   out = jax_util.safe_map(trace.pure, out)
   out, reaps = tree_util.tree_unflatten(out_trees[0], out)
   for k, v in reaps.items():
-    sow(v, name=k, tag=settings.tag, mode='strict')
+    sow(v, name=k, tag=settings.tag, mode=branch_metadatas[0][k]['mode'])
   return out
 
 
