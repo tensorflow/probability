@@ -665,7 +665,7 @@ def batch_interp_regular_nd_grid(x,
     y_ref = _broadcast_with(
         y_ref,
         _batch_shape_of_zeros_with_rightmost_singletons(
-            n_singletons=tf.rank(y_ref) - axis))
+            n_singletons=ps.rank(y_ref) - axis))
 
     return _batch_interp_with_gather_nd(
         x=x,
