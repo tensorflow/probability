@@ -69,15 +69,15 @@ class PowerSpherical(distribution.AutoCompositeTensorDistribution):
   The probability density function (pdf) is,
 
   ```none
-  pdf(x; mu, kappa) = C(kappa) (1 + mu^T x) ** k
+  pdf(x; mu, kappa) = C(kappa) (1 + mu^T x) ** kappa
   where,
   C(kappa) = 2**(a + b) pi**b Gamma(a) / Gamma(a + b)
-  a = (n - 1) / 2. + k
+  a = (n - 1) / 2. + kappa
   b = (n - 1) / 2.
   ```
 
   where:
-  * `mean_direction = mu`; a unit vector in `R^k`,
+  * `mean_direction = mu`; a unit vector in `R^n`,
   * `concentration = kappa`; scalar real >= 0, concentration of samples around
     `mean_direction`, where 0 pertains to the uniform distribution on the
     hypersphere, and \inf indicates a delta function at `mean_direction`.
