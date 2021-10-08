@@ -15,9 +15,12 @@
 # ============================================================================
 """Tests for inference_gym.targets.sparse_logistic_regression."""
 
+import functools
+
 from absl.testing import parameterized
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from inference_gym.internal import test_util
 from inference_gym.targets import sparse_logistic_regression
 
@@ -33,10 +36,8 @@ def _test_dataset(num_features, num_test_points=None):
   )
 
 
-@test_util.multi_backend_test(globals(),
-                              'targets.sparse_logistic_regression_test')
-class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
-                                   parameterized.TestCase):
+class _SparseLogisticRegressionTest(test_util.InferenceGymTestCase):
+  positive_constraint_fn = None
 
   @parameterized.named_parameters(
       ('NoTest', None),
@@ -53,6 +54,7 @@ class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
     """
     num_features = 5
     model = sparse_logistic_regression.SparseLogisticRegression(
+        positive_constraint_fn=self.positive_constraint_fn,
         **_test_dataset(num_features, num_test_points))
     self.validate_log_prob_and_transforms(
         model,
@@ -75,7 +77,11 @@ class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
     num_features = 5
     kwargs = _test_dataset(num_features, num_test_points)
     self.validate_deferred_materialization(
-        sparse_logistic_regression.SparseLogisticRegression, **kwargs)
+        functools.partial(
+            sparse_logistic_regression.SparseLogisticRegression,
+            positive_constraint_fn=self.positive_constraint_fn),
+        **kwargs,
+    )
 
   def testPartiallySpecifiedTestSet(self):
     """Check that partially specified test set raises an error."""
@@ -84,7 +90,8 @@ class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
     dataset = _test_dataset(num_features, num_test_points)
     del dataset['test_features']
     with self.assertRaisesRegex(ValueError, 'both specified'):
-      sparse_logistic_regression.SparseLogisticRegression(**dataset)
+      sparse_logistic_regression.SparseLogisticRegression(
+          positive_constraint_fn=self.positive_constraint_fn, **dataset)
 
   @test_util.uses_tfds
   def testGermanCredit(self):
@@ -95,7 +102,7 @@ class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
     """
     model = (
         sparse_logistic_regression.GermanCreditNumericSparseLogisticRegression(
-        ))
+            positive_constraint_fn=self.positive_constraint_fn,))
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -115,7 +122,7 @@ class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
     """Checks approximate samples from the model against the ground truth."""
     model = (
         sparse_logistic_regression.GermanCreditNumericSparseLogisticRegression(
-        ))
+            positive_constraint_fn=self.positive_constraint_fn,))
 
     self.validate_ground_truth_using_hmc(
         model,
@@ -126,5 +133,19 @@ class SparseLogisticRegressionTest(test_util.InferenceGymTestCase,
     )
 
 
+@test_util.multi_backend_test(globals(),
+                              'targets.sparse_logistic_regression_test')
+class SparseLogisticRegressionExpTest(_SparseLogisticRegressionTest):
+  positive_constraint_fn = 'exp'
+
+
+@test_util.multi_backend_test(globals(),
+                              'targets.sparse_logistic_regression_test')
+class SparseLogisticRegressionSoftplusTest(_SparseLogisticRegressionTest):
+  positive_constraint_fn = 'softplus'
+
+
+del _SparseLogisticRegressionTest
+
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

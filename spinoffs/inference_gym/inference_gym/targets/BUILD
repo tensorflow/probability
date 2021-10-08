@@ -490,6 +490,7 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )

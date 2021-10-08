@@ -60,6 +60,7 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
                train_labels,
                test_features=None,
                test_labels=None,
+               positive_constraint_fn='exp',
                name='sparse_logistic_regression',
                pretty_name='Sparse Logistic Regression'):
     """Construct the sparse logistic regression model.
@@ -75,6 +76,8 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
       test_labels: Integer `Tensor` with shape `[num_test_points]`. Testing
         labels. Can be `None`, in which case test-related sample transformations
         are not computed.
+      positive_constraint_fn: Python `str`. Which squashing function to use to
+        enforce positivity of scales. Can be either `exp` or `softplus`.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
 
@@ -141,15 +144,24 @@ class SparseLogisticRegression(bayesian_model.BayesianModel):
         sample_transformations['per_example_test_nll'] = (
             model.Model.SampleTransformation(
                 fn=lambda params: test_log_likelihood_fn(  # pylint: disable=g-long-lambda
-                    reduce_sum=False, **params),
+                    reduce_sum=False,
+                    **params),
                 pretty_name='Per-example Test NLL',
             ))
+
+    if positive_constraint_fn == 'exp':
+      scale_bijector = tfb.Exp()
+    elif positive_constraint_fn == 'softplus':
+      scale_bijector = tfb.Softplus()
+    else:
+      raise ValueError(
+          f'Unknown positive_constraint_fn={positive_constraint_fn}')
 
     super(SparseLogisticRegression, self).__init__(
         default_event_space_bijector=dict(
             unscaled_weights=tfb.Identity(),
-            local_scales=tfb.Exp(),
-            global_scale=tfb.Exp(),
+            local_scales=scale_bijector,
+            global_scale=scale_bijector,
         ),
         event_shape=self._prior_dist.event_shape,
         dtype=self._prior_dist.dtype,
@@ -177,11 +189,12 @@ class GermanCreditNumericSparseLogisticRegression(SparseLogisticRegression):
 
   GROUND_TRUTH_MODULE = german_credit_numeric_sparse_logistic_regression
 
-  def __init__(self):
+  def __init__(self, positive_constraint_fn='exp'):
     dataset = data.german_credit_numeric()
     del dataset['test_features']
     del dataset['test_labels']
     super(GermanCreditNumericSparseLogisticRegression, self).__init__(
         name='german_credit_numeric_sparse_logistic_regression',
         pretty_name='German Credit Numeric Sparse Logistic Regression',
+        positive_constraint_fn=positive_constraint_fn,
         **dataset)
