@@ -137,7 +137,7 @@ class GenCovTest(real_tf.test.TestCase):
     self.assertAllClose(true_cov, _gen_cov(x, 1))
 
 
-class FunMCTest(real_tf.test.TestCase, parameterized.TestCase):
+class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
 
   _is_on_jax = BACKEND == 'backend_jax'
 
@@ -1707,6 +1707,50 @@ class FunMCTest(real_tf.test.TestCase, parameterized.TestCase):
         atol=0.05)
     self.assertAllClose(pmh_is_accepted, pmh_accepted_state)
 
+  @parameterized.named_parameters(
+      ('ScalarLarge', -1., lambda x: x**2, True, -1.),
+      ('ScalarSmall', -0.1, lambda x: x**2, True, -0.2),
+      ('Vector', np.array([-3, -4.]), lambda x: tf.reduce_sum(x**2), True,
+       np.array([-3. / 5., -4. / 5.])),
+      ('List', [
+          -3,
+          -4.,
+      ], lambda x: x[0]**2 + x[1]**2, True, [
+          -3. / 5.,
+          -4. / 5.,
+      ]),
+      ('Dict', {
+          'a': -3,
+          'b': -4.,
+      }, lambda x: x['a']**2 + x['b']**2, True, {
+          'a': -3. / 5.,
+          'b': -4. / 5.,
+      }),
+      ('NaNToZero', [
+          -3,
+          np.float32('nan'),
+      ], lambda x: x[0]**2 + x[1]**2, True, [
+          -1.,
+          0.,
+      ]),
+      ('NaNKept', [-3, np.float32('nan')], lambda x: x[0]**2 + x[1]**2, False,
+       [np.float32('nan'), np.float32('nan')]),
+  )
+  def testClipGradients(self, x, fn, zero_out_nan, expected_grad):
+    x = util.map_tree(self._constant, x)
+    max_global_norm = self._constant(1.)
+    expected_grad = util.map_tree(self._constant, expected_grad)
+
+    def eval_fn(x):
+      x = fun_mc.clip_grads(
+          x, max_global_norm=max_global_norm, zero_out_nan=zero_out_nan)
+      return fn(x), ()
+
+    value, _, (grad,) = fun_mc.call_potential_fn_with_grads(eval_fn, (x,))
+
+    self.assertAllCloseNested(value, fn(x))
+    self.assertAllCloseNested(expected_grad, grad)
+
 
 @test_util.multi_backend_test(globals(), 'fun_mc_test')
 class FunMCTest32(FunMCTest):
@@ -1727,4 +1771,4 @@ class FunMCTest64(FunMCTest):
 del FunMCTest
 
 if __name__ == '__main__':
-  real_tf.test.main()
+  tfp_test_util.main()

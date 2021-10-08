@@ -60,6 +60,7 @@ __all__ = [
     'call_transport_map',
     'call_transport_map_with_ldj',
     'choose',
+    'clip_grads',
     'gaussian_proposal',
     'gaussian_momentum_sample',
     'gradient_descent_init',
@@ -1082,8 +1083,7 @@ def metropolis_hastings_step(
             seed=seed))
   is_accepted = log_uniform < log_accept_ratio
 
-  next_state = choose(
-      is_accepted, proposed_state, current_state)
+  next_state = choose(is_accepted, proposed_state, current_state)
   return next_state, MetropolisHastingsExtra(
       is_accepted=is_accepted, log_uniform=log_uniform)
 
@@ -1422,11 +1422,14 @@ def hamiltonian_monte_carlo_step(
   if kinetic_energy_fn is None:
     kinetic_energy_fn = make_gaussian_kinetic_energy_fn(
         len(target_log_prob.shape) if target_log_prob.shape is not None else tf  # pytype: disable=attribute-error
-        .rank(target_log_prob), named_axis=named_axis)
+        .rank(target_log_prob),
+        named_axis=named_axis)
 
   if momentum_sample_fn is None:
     momentum_sample_fn = lambda seed: gaussian_momentum_sample(  # pylint: disable=g-long-lambda
-        state=state, seed=seed, named_axis=named_axis)
+        state=state,
+        seed=seed,
+        named_axis=named_axis)
 
   if integrator_fn is None:
     integrator_fn = lambda state: hamiltonian_integrator(  # pylint: disable=g-long-lambda
@@ -1688,9 +1691,7 @@ def choose(condition, x, y):
     return tf.where(_expand_condition_like(x), x, y)
 
   condition = tf.convert_to_tensor(condition)
-  return util.map_tree(
-      lambda a, r: _choose_base_case(condition, a, r), x,
-      y)
+  return util.map_tree(lambda a, r: _choose_base_case(condition, a, r), x, y)
 
 
 class AdamState(NamedTuple):
@@ -1936,8 +1937,7 @@ def maximal_reflection_coupling_proposal(
   mu1 = util.map_tree(lambda x: x[:num_chains], state)
   mu2 = util.map_tree(lambda x: x[num_chains:], state)
   event_dims = util.map_tree(
-      lambda x: tuple(range(1 + chain_ndims, len(x.shape))),
-      mu1)
+      lambda x: tuple(range(1 + chain_ndims, len(x.shape))), mu1)
   z = util.map_tree(lambda s, x1, x2: (x1 - x2) / s, scale, mu1, mu2)
   z_norm = tf.sqrt(
       _struct_sum(
@@ -1962,22 +1962,13 @@ def maximal_reflection_coupling_proposal(
   x = util.map_tree_up_to(mu1, _sample_part, mu1, x_seeds, named_axis)
 
   e_dot_x = _struct_sum(
-      util.map_tree_up_to(
-          x,
-          lambda x, e, ed, na: _sum(x * e, ed, na),
-          x,
-          e,
-          event_dims,
-          named_axis))
+      util.map_tree_up_to(x, lambda x, e, ed, na: _sum(x * e, ed, na), x, e,
+                          event_dims, named_axis))
 
   log_couple_ratio = _struct_sum(
       util.map_tree_up_to(
-          x,
-          lambda x, z, ed, na: -_sum(x * z + tf.square(z) / 2, ed, na),
-          x,
-          z,
-          event_dims,
-          named_axis))
+          x, lambda x, z, ed, na: -_sum(x * z + tf.square(z) / 2, ed, na), x, z,
+          event_dims, named_axis))
 
   p_couple = tf.exp(tf.minimum(0., log_couple_ratio))
   coupling_proposed = util.random_uniform(
@@ -2877,3 +2868,52 @@ def simple_dual_averages_step(
   )
 
   return sda_state, sda_extra
+
+
+def _global_norm(x: 'FloatNest') -> 'FloatTensor':
+  return tf.sqrt(sum(tf.reduce_sum(tf.square(v)) for v in util.flatten_tree(x)))
+
+
+def clip_grads(x: 'FloatNest',
+               max_global_norm: 'FloatTensor',
+               eps: 'FloatTensor' = 1e-9,
+               zero_out_nan: 'bool' = True) -> 'FloatNest':
+  """Clip gradients flowing through x.
+
+  By default, non-finite gradients are zeroed out.
+
+  Args:
+    x: (Possibly nested) floating point `Tensor`.
+    max_global_norm: Floating point `Tensor`. Maximum global norm of gradients
+      flowing through `x`.
+    eps: Floating point `Tensor`. Epsilon used when normalizing the gradient
+      norm.
+    zero_out_nan: Boolean. If `True` non-finite gradients are zeroed out.
+
+  Returns:
+    x: Same value as the input.
+  """
+
+  @tf.custom_gradient
+  def grad_wrapper(*x):
+
+    def grad_fn(*g):
+      g = util.flatten_tree(g)
+      if zero_out_nan:
+        g = [tf.where(tf.math.is_finite(v), v, tf.zeros_like(v)) for v in g]
+      norm = _global_norm(g) + eps
+
+      def clip_part(v):
+        return tf.where(norm < max_global_norm, v, v * max_global_norm / norm)
+
+      res = tuple(clip_part(v) for v in g)
+      if len(res) == 1:
+        res = res[0]
+      return res
+
+    if len(x) == 1:
+      x = x[0]
+    return x, grad_fn
+
+  return util.unflatten_tree(
+      x, util.flatten_tree(grad_wrapper(*util.flatten_tree(x))))
