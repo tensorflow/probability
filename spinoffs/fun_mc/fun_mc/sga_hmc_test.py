@@ -266,6 +266,50 @@ class SGAHMCTest(tfp_test_util.TestCase):
       self.assertAllClose(value, sharded_value[0, 0])
       self.assertAllClose(grad, sharded_grad[0, 0])
 
+  def testSGAHMC(self):
+
+    @tfd.JointDistributionCoroutine
+    def model():
+      x = yield Root(tfd.Normal(self._constant(0.), 1.))
+      yield tfd.Sample(tfd.Normal(x, 1.), 2)
+
+    def target_log_prob_fn(x):
+      return model.log_prob(x), ()
+
+    @tf.function
+    def kernel(sga_hmc_state, step, seed):
+      adapt = step < num_adapt_steps
+      seed, hmc_seed = util.split_seed(seed, 2)
+
+      sga_hmc_state, sga_hmc_extra = sga_hmc.stochastic_gradient_ascent_hmc_step(
+          sga_hmc_state,
+          scalar_step_size=0.1,
+          target_log_prob_fn=target_log_prob_fn,
+          criterion_fn=sga_hmc.chees_criterion,
+          adapt=adapt,
+          seed=hmc_seed,
+      )
+
+      return (sga_hmc_state, step + 1, seed
+             ), sga_hmc_extra.trajectory_length_params.mean_trajectory_length()
+
+    init_trajectory_length = self._constant(0.1)
+    num_adapt_steps = 10
+    _, trajectory_length = fun_mc.trace(
+        (sga_hmc.stochastic_gradient_ascent_hmc_init(
+            util.map_tree_up_to(
+                model.dtype, lambda dtype, shape: tf.zeros(  # pylint: disable=g-long-lambda
+                    (16,) + tuple(shape), dtype), model.dtype,
+                model.event_shape),
+            target_log_prob_fn,
+            init_trajectory_length=init_trajectory_length), 0,
+         self._make_seed(_test_seed())), kernel, num_adapt_steps + 2)
+
+    # We expect it to increase as part of adaptation.
+    self.assertAllGreater(trajectory_length[-1], init_trajectory_length)
+    # After adaptation is done, the trajectory length should remain constant.
+    self.assertAllClose(trajectory_length[-1], trajectory_length[-2])
+
 
 @test_util.multi_backend_test(globals(), 'sga_hmc_test')
 class SGAHMCTest32(SGAHMCTest):
