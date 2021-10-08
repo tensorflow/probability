@@ -24,6 +24,7 @@ from inference_gym.internal.datasets import sp500_closing_prices as sp500_closin
 from inference_gym.internal.datasets import synthetic_item_response_theory as synthetic_item_response_theory_lib
 from inference_gym.internal.datasets import synthetic_log_gaussian_cox_process as synthetic_log_gaussian_cox_process_lib
 from inference_gym.internal.datasets import synthetic_plasma_spectroscopy as synthetic_plasma_spectroscopy_lib
+from inference_gym.internal.datasets import synthetic_plasma_spectroscopy_with_bump as synthetic_plasma_spectroscopy_with_bump_lib
 
 __all__ = [
     'brownian_motion_missing_middle_observations',
@@ -32,11 +33,12 @@ __all__ = [
     'radon',
     'radon_indiana',
     'radon_minnesota',
-    'sp500_returns',
     'sp500_log_returns',
+    'sp500_returns',
     'synthetic_item_response_theory',
     'synthetic_log_gaussian_cox_process',
     'synthetic_plasma_spectroscopy',
+    'synthetic_plasma_spectroscopy_with_bump',
 ]
 
 
@@ -731,4 +733,26 @@ def synthetic_plasma_spectroscopy():
       measurements=synthetic_plasma_spectroscopy_lib.MEASUREMENTS,
       wavelengths=synthetic_plasma_spectroscopy_lib.WAVELENGTHS,
       center_wavelength=synthetic_plasma_spectroscopy_lib.CENTER_WAVELENGTH,
+  )
+
+
+def synthetic_plasma_spectroscopy_with_bump():
+  """Synthetic dataset sampled from the PlasmaSpectroscopy model.
+
+  This one uses a bump function to create a more realistic plasma blob.
+
+  Returns:
+    dataset: A Dict with the following keys:
+      measurements: Float `Tensor` with shape [num_wavelengths, num_sensors].
+        The spectrometer measurements.
+      wavelengths: Float `Tensor` with shape [num_wavelengths]. Wavelengths
+        measured by the spectrometers.
+      center_wavelength: Float `Tensor` scalar. The center wavelength of the
+        target emission line.
+  """
+  return dict(
+      measurements=synthetic_plasma_spectroscopy_with_bump_lib.MEASUREMENTS,
+      wavelengths=synthetic_plasma_spectroscopy_with_bump_lib.WAVELENGTHS,
+      center_wavelength=(
+          synthetic_plasma_spectroscopy_with_bump_lib.CENTER_WAVELENGTH),
   )

@@ -28,6 +28,7 @@ tfd = tfp.distributions
 __all__ = [
     'PlasmaSpectroscopy',
     'SyntheticPlasmaSpectroscopy',
+    'SyntheticPlasmaSpectroscopyWithBump',
 ]
 
 Root = tfd.JointDistributionCoroutine.Root
@@ -377,12 +378,34 @@ class PlasmaSpectroscopy(bayesian_model.BayesianModel):
 class SyntheticPlasmaSpectroscopy(PlasmaSpectroscopy):
   """Synthetic plasma spectroscopy model.
 
-  This uses is a synthetic dataset sampled from the model prior.
+  This uses is a synthetic dataset sampled from the model prior. This
+  parameterization produces discontinuous log-probabilities, which makes it
+  challenging for typical gradient-based inference methods.
   """
 
   def __init__(self):
     dataset = data.synthetic_plasma_spectroscopy()
-    super(SyntheticPlasmaSpectroscopy, self).__init__(
+    super().__init__(
         name='synthetic_plasma_spectroscopy',
         pretty_name='Synthetic Plasma Spectroscopy',
+        **dataset)
+
+
+class SyntheticPlasmaSpectroscopyWithBump(PlasmaSpectroscopy):
+  """Synthetic plasma spectroscopy model.
+
+  This uses is a synthetic dataset sampled from the model prior. It also uses
+  the bump function to smooth out the gradients. It is also smaller than
+  the `SyntheticPlasmaSpectroscopy` model.
+
+  This model posterior is multi-modal, in part induced by the small number of
+  sensors used.
+  """
+
+  def __init__(self):
+    dataset = data.synthetic_plasma_spectroscopy_with_bump()
+    super().__init__(
+        name='synthetic_plasma_spectroscopy_with_bump',
+        pretty_name='Synthetic Plasma Spectroscopy With Bump',
+        use_bump_function=True,
         **dataset)

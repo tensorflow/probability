@@ -96,6 +96,23 @@ class PlasmaSpectroscopyTest(test_util.InferenceGymTestCase):
                 shift=[],
             )))
 
+  def testSyntheticPlasmaSpectroscopyWithBump(self):
+    """Checks that you get finite values given unconstrained samples.
+
+    We check `unnormalized_log_prob` as well as the values of the sample
+    transformations.
+    """
+    model = plasma_spectroscopy.SyntheticPlasmaSpectroscopyWithBump()
+    self.validate_log_prob_and_transforms(
+        model,
+        sample_transformation_shapes=dict(
+            identity=model.dtype._replace(
+                amplitude=[16],
+                temperature=[16],
+                velocity=[16],
+                shift=[],
+            )))
+
 
 if __name__ == '__main__':
   tf.test.main()

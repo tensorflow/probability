@@ -60,8 +60,8 @@ with open('/tmp/synthetic_item_response_theory.py', 'w') as f:
   f.write("\n\n".join(sources))
 ```
 
-Note that the final `_sample_dataset` is not reproducible, hence the output is
-checked in.
+Note that the final `_sample_dataset` is not reproducible reproducible across
+software versions, hence the output is checked in.
 
 """
 

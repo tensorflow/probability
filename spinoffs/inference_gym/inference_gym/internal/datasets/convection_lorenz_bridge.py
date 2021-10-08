@@ -48,8 +48,8 @@ observed_values = observed_values.numpy()
 observed_values[10:20] = np.nan
 ```
 
-Note that the final `observed_values` is not reproducible, hence the output is
-checked in.
+Note that the final `observed_values` is not reproducible across software
+versions, hence the output is checked in.
 
 """
 

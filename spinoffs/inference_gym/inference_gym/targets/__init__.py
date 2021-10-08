@@ -40,6 +40,7 @@ with util.silence_nonrewritten_import_errors():
   from inference_gym.targets.non_identifiable_quartic import NonIdentifiableQuarticMeasurementModel
   from inference_gym.targets.plasma_spectroscopy import PlasmaSpectroscopy
   from inference_gym.targets.plasma_spectroscopy import SyntheticPlasmaSpectroscopy
+  from inference_gym.targets.plasma_spectroscopy import SyntheticPlasmaSpectroscopyWithBump
   from inference_gym.targets.probit_regression import GermanCreditNumericProbitRegression
   from inference_gym.targets.probit_regression import ProbitRegression
   from inference_gym.targets.radon_contextual_effects import RadonContextualEffects
@@ -95,6 +96,7 @@ __all__ = [
     'SyntheticItemResponseTheory',
     'SyntheticLogGaussianCoxProcess',
     'SyntheticPlasmaSpectroscopy',
+    'SyntheticPlasmaSpectroscopyWithBump',
     'VectorizedStochasticVolatility',
     'VectorizedStochasticVolatilityLogSP500',
     'VectorizedStochasticVolatilityLogSP500Small',

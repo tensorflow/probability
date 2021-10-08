@@ -48,8 +48,8 @@ observed_loc = likelihood.sample(1)
 
 ```
 
-Note that the final `observed_loc` is not reproducible, hence the output is
-checked in.
+Note that the final `observed_loc` is not reproducible across software versions,
+hence the output is checked in.
 
 """
 

@@ -38,6 +38,7 @@ py_library(
         ":synthetic_item_response_theory",
         ":synthetic_log_gaussian_cox_process",
         ":synthetic_plasma_spectroscopy",
+        ":synthetic_plasma_spectroscopy_with_bump",
     ],
 )
 
@@ -95,6 +96,16 @@ py_library(
 py_library(
     name = "synthetic_plasma_spectroscopy",
     srcs = ["synthetic_plasma_spectroscopy.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+    ],
+)
+
+# pytype_strict
+py_library(
+    name = "synthetic_plasma_spectroscopy_with_bump",
+    srcs = ["synthetic_plasma_spectroscopy_with_bump.py"],
     srcs_version = "PY3",
     deps = [
         # numpy dep,
