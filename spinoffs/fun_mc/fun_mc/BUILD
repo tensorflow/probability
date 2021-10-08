@@ -126,12 +126,38 @@ py_test(
 
 # pytype
 py_library(
+    name = "sga_hmc",
+    srcs = ["sga_hmc.py"],
+    deps = [
+        ":backend",
+        ":fun_mc_lib",
+    ],
+)
+
+py_test(
+    name = "sga_hmc_test",
+    srcs = ["sga_hmc_test.py"],
+    python_version = "PY3",
+    shard_count = 2,
+    deps = [
+        ":fun_mc",
+        ":test_util",
+        # jax dep,
+        # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+# pytype
+py_library(
     name = "prefab",
     srcs = ["prefab.py"],
     srcs_version = "PY3",
     deps = [
         ":backend",
         ":fun_mc_lib",
+        ":sga_hmc",
     ],
 )
 
