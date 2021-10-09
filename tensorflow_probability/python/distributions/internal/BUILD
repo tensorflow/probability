@@ -113,36 +113,3 @@ py_test(
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
-
-multi_substrate_py_library(
-    name = "slicing",
-    srcs = ["slicing.py"],
-    deps = [
-        ":init",
-        # six dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "slicing_test",
-    size = "small",
-    srcs = ["slicing_test.py"],
-    deps = [
-        ":slicing",
-        # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
-        "//tensorflow_probability/python/internal:test_util",
-        # tensorflow/compiler/jit dep,
-    ],
-)
-
-exports_files(
-    [
-        "slicing.py",
-        "slicing_test.py",
-    ],
-    visibility = ["//tensorflow_probability:__subpackages__"],
-)

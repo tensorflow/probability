@@ -503,8 +503,8 @@ class DistributionSlicingTest(test_util.TestCase):
   def _test_slicing(self, data, dist_name, dist):
     strm = test_util.test_seed_stream()
     batch_shape = dist.batch_shape
-    slices = data.draw(dhps.valid_slices(batch_shape))
-    slice_str = 'dist[{}]'.format(', '.join(dhps.stringify_slices(
+    slices = data.draw(tfp_hps.valid_slices(batch_shape))
+    slice_str = 'dist[{}]'.format(', '.join(tfp_hps.stringify_slices(
         slices)))
     # Make sure the slice string appears in Hypothesis' attempted example log
     hp.note('Using slice ' + slice_str)

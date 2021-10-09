@@ -31,7 +31,6 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import kullback_leibler
-from tensorflow_probability.python.distributions.internal import slicing
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import batch_shape_lib
@@ -40,6 +39,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensorshape_util
 # Symbol import needed to avoid BUILD-dependency cycle
 from tensorflow_probability.python.math.generic import log1mexp

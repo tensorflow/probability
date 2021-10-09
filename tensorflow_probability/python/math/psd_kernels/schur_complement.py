@@ -439,6 +439,10 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
             default_constraining_bijector_fn=(
                 lambda: softplus.Softplus(low=dtype_util.eps(dtype)))))
 
+  def __getitem__(self, slices):
+    raise NotImplementedError(
+        'Slices of `SchurComplement` are not implemented.')
+
   def _divisor_matrix(self, fixed_inputs=None):
     fixed_inputs = tf.convert_to_tensor(
         self._fixed_inputs if fixed_inputs is None else fixed_inputs)

@@ -774,6 +774,104 @@ def no_tf_rank_errors():
     else:
       raise
 
+# Slicing
+
+
+@hps.composite
+def valid_slices(draw, batch_shape):
+  """Samples a legal (possibly empty) slice for shape batch_shape."""
+  # We build up a list of slices in several stages:
+  # 1. Choose 0 to batch_rank slices to come before an Ellipsis (...).
+  # 2. Decide whether or not to add an Ellipsis; if using, updating the indexing
+  #    used (e.g. batch_shape[i]) to identify safe bounds.
+  # 3. Choose 0 to [remaining_dims] slices to come last.
+  # 4. Decide where to insert between 0 and 3 newaxis slices.
+  batch_shape = tf.TensorShape(batch_shape).as_list()
+  slices = []
+  batch_rank = len(batch_shape)
+  arbitrary_slices = hps.tuples(
+      hps.one_of(hps.just(None), hps.integers(min_value=-100, max_value=100)),
+      hps.one_of(hps.just(None), hps.integers(min_value=-100, max_value=100)),
+      hps.one_of(
+          hps.just(None),
+          hps.integers(min_value=-100, max_value=100).filter(lambda x: x != 0))
+  ).map(lambda tup: slice(*tup))
+
+  # 1. Choose 0 to batch_rank slices to come before an Ellipsis (...).
+  nslc_before_ellipsis = draw(hps.integers(min_value=0, max_value=batch_rank))
+  for i in range(nslc_before_ellipsis):
+    slc = draw(
+        hps.one_of(
+            hps.integers(min_value=0, max_value=batch_shape[i] - 1),
+            arbitrary_slices))
+    slices.append(slc)
+  # 2. Decide whether or not to add an Ellipsis; if using, updating the indexing
+  #    used (e.g. batch_shape[i]) to identify safe bounds.
+  has_ellipsis = draw(hps.booleans().map(lambda x: (Ellipsis, x)))[1]
+  nslc_after_ellipsis = draw(
+      hps.integers(min_value=0, max_value=batch_rank - nslc_before_ellipsis))
+  if has_ellipsis:
+    slices.append(Ellipsis)
+    remain_start, remain_end = (batch_rank - nslc_after_ellipsis, batch_rank)
+  else:
+    remain_start = nslc_before_ellipsis
+    remain_end = nslc_before_ellipsis + nslc_after_ellipsis
+  # 3. Choose 0 to [remaining_dims] slices to come last.
+  for i in range(remain_start, remain_end):
+    slc = draw(
+        hps.one_of(
+            hps.integers(min_value=0, max_value=batch_shape[i] - 1),
+            arbitrary_slices))
+    slices.append(slc)
+  # 4. Decide where to insert between 0 and 3 newaxis slices.
+  newaxis_positions = draw(
+      hps.lists(hps.integers(min_value=0, max_value=len(slices)), max_size=3))
+  for i in sorted(newaxis_positions, reverse=True):
+    slices.insert(i, tf.newaxis)
+  slices = tuple(slices)
+  # Since `d[0]` ==> `d.__getitem__(0)` instead of `d.__getitem__((0,))`;
+  # and similarly `d[:3]` ==> `d.__getitem__(slice(None, 3))` instead of
+  # `d.__getitem__((slice(None, 3),))`; it is useful to test such scenarios.
+  if len(slices) == 1 and draw(hps.booleans()):
+    # Sometimes only a single item non-tuple.
+    return slices[0]
+  return slices
+
+
+def stringify_slices(slices):
+  """Returns a list of strings describing the items in `slices`.
+
+  Each returned string (in order) encodes what to do with one dimension of the
+  slicee:
+
+  - That number for a single integer slice;
+  - 'a:b:c' for a start-stop-step slice, omitting any missing components;
+  - 'tf.newaxis' for an axis insertion; or
+  - The ellipsis '...' for an arbitrary-rank gap.
+
+  Args:
+    slices: A single-dimension slice or a Python tuple of single-dimension
+      slices.
+
+  Returns:
+    pretty_slices: A list of Python strings encoding each slice.
+  """
+  pretty_slices = []
+  slices = slices if isinstance(slices, tuple) else (slices,)
+  for slc in slices:
+    if slc == Ellipsis:
+      pretty_slices.append('...')
+    elif isinstance(slc, slice):
+      pretty_slices.append('{}:{}:{}'.format(
+          *['' if s is None else s for s in (slc.start, slc.stop, slc.step)]))
+    elif isinstance(slc, int) or tf.is_tensor(slc):
+      pretty_slices.append(str(slc))
+    elif slc is tf.newaxis:
+      pretty_slices.append('tf.newaxis')
+    else:
+      raise ValueError('Unexpected slice type: {}'.format(type(slc)))
+  return pretty_slices
+
 
 @contextlib.contextmanager
 def no_cholesky_decomposition_errors():

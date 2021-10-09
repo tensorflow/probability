@@ -621,6 +621,30 @@ py_test(
 )
 
 multi_substrate_py_library(
+    name = "slicing",
+    srcs = ["slicing.py"],
+    deps = [
+        ":prefer_static",
+        ":tensorshape_util",
+        # six dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "slicing_test",
+    size = "small",
+    srcs = ["slicing_test.py"],
+    deps = [
+        ":slicing",
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_library(
     name = "structural_tuple",
     srcs = ["structural_tuple.py"],
     srcs_version = "PY3",
@@ -752,6 +776,8 @@ exports_files(
         "hypothesis_testlib.py",
         "prefer_static.py",
         "prefer_static_test.py",
+        "slicing.py",
+        "slicing_test.py",
         "special_math.py",
         "special_math_test.py",
         "tensor_util.py",

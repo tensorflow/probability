@@ -46,22 +46,22 @@ PROVENANCE_ATTR = '_tfp_batch_slice_provenance'
 ALL_SLICE = slice(None)
 
 
-def _slice_single_param(param, param_event_ndims, slices, dist_batch_shape):
-  """Slices a single parameter of a distribution.
+def _slice_single_param(param, param_event_ndims, slices, batch_shape):
+  """Slices one param of an object with batch derived from broadcasting params.
 
   Args:
     param: A `Tensor`, the original parameter to slice.
     param_event_ndims: `int` event parameterization rank for this parameter.
     slices: A `tuple` of normalized slices.
-    dist_batch_shape: The distribution's batch shape `Tensor`.
+    batch_shape: The object's batch shape `Tensor`.
 
   Returns:
     new_param: A `Tensor`, batch-sliced according to slices.
   """
-  # Extend param shape with ones on the left to match dist_batch_shape.
+  # Extend param shape with ones on the left to match batch_shape.
   param_shape = ps.shape(param)
   insert_ones = ps.ones(
-      [ps.size(dist_batch_shape) + param_event_ndims - ps.rank(param)],
+      [ps.size(batch_shape) + param_event_ndims - ps.rank(param)],
       dtype=param_shape.dtype)
   new_param_shape = ps.concat([insert_ones, param_shape], axis=0)
   full_batch_param = tf.reshape(param, new_param_shape)
@@ -85,9 +85,9 @@ def _slice_single_param(param, param_event_ndims, slices, dist_batch_shape):
       batch_dim_idx = -num_remaining_non_newaxis_slices
       param_dim_idx = batch_dim_idx - param_event_ndims
       continue
-    # Find the batch dimension sizes for both parameter and distribution.
+    # Find the batch dimension sizes for both parameter and object.
     param_dim_size = new_param_shape[param_dim_idx]
-    batch_dim_size = dist_batch_shape[batch_dim_idx]
+    batch_dim_size = batch_shape[batch_dim_idx]
     is_broadcast = batch_dim_size > param_dim_size
     # Slices are denoted by start:stop:step.
     if isinstance(slc, slice):
@@ -139,12 +139,12 @@ def _slice_params_to_dict(dist, params_event_ndims, slices):
                     'on {}, falling back to Distribution.dtype {}'.format(
                         param_name, dist, dtype))
     param = tf.convert_to_tensor(param, dtype=dtype)
-    dist_batch_shape = dist.batch_shape
-    if not tensorshape_util.is_fully_defined(dist_batch_shape):
-      dist_batch_shape = dist.batch_shape_tensor()
+    batch_shape = dist.batch_shape
+    if not tensorshape_util.is_fully_defined(batch_shape):
+      batch_shape = dist.batch_shape_tensor()
     override_dict[param_name] = _slice_single_param(param, param_event_ndims,
                                                     slices,
-                                                    dist_batch_shape)
+                                                    batch_shape)
   return override_dict
 
 
@@ -162,14 +162,15 @@ def _apply_single_step(dist, params_event_ndims, slices, params_overrides):
 
 
 def _apply_slice_sequence(dist, params_event_ndims, slice_overrides_seq):
-  """Applies a sequence of slice or copy-with-overrides operations to `dist`."""
+  """Applies a sequence of slice or copy-with-overrides ops to `dist`."""
   for slices, overrides in slice_overrides_seq:
-    dist = _apply_single_step(dist, params_event_ndims, slices, overrides)
+    dist = _apply_single_step(
+        dist, params_event_ndims, slices, overrides)
   return dist
 
 
 def batch_slice(dist, params_event_ndims, params_overrides, slices):
-  """Slices `dist` along its batch dimensions. Helper for tfd.Distribution.
+  """Slices `dist` along its batch dimensions.
 
   Args:
     dist: A `tfd.Distribution` instance.
@@ -186,12 +187,13 @@ def batch_slice(dist, params_event_ndims, params_overrides, slices):
   if not isinstance(slices, collections.Sequence):
     slices = (slices,)
   # We track the history of slice and copy(**param_overrides) in order to trace
-  # back to the original distribution's source variables.
-  orig_dist, slice_overrides_seq = getattr(dist, PROVENANCE_ATTR, (dist, []))
+  # back to the original dist's source variables.
+  orig_dist, slice_overrides_seq = getattr(
+      dist, PROVENANCE_ATTR, (dist, []))
   slice_overrides_seq += [(slices, params_overrides)]
   # Re-doing the full sequence of slice+copy override work here enables
   # gradients all the way back to the original distribution's arguments.
-  dist = _apply_slice_sequence(orig_dist, params_event_ndims,
-                               slice_overrides_seq)
+  dist = _apply_slice_sequence(
+      orig_dist, params_event_ndims, slice_overrides_seq)
   setattr(dist, PROVENANCE_ATTR, (orig_dist, slice_overrides_seq))
   return dist

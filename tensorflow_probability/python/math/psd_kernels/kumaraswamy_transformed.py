@@ -18,6 +18,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
@@ -100,6 +102,23 @@ class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
   @property
   def concentration0(self):
     return self._concentration0
+
+  def __getitem__(self, slices):
+    overrides = {}
+    if self.parameters.get('kernel', None) is not None:
+      overrides['kernel'] = self.kernel[slices]
+
+    conc_slices = (
+        list(slices) if isinstance(slices, collections.Sequence) else [slices])
+    conc_slices += [slice(None)] * self.kernel.feature_ndims
+
+    if self.parameters.get('concentration0', None) is not None:
+      overrides['concentration0'] = self.concentration0[conc_slices]
+
+    if self.parameters.get('concentration1', None) is not None:
+      overrides['concentration1'] = self.concentration1[conc_slices]
+
+    return self.copy(**overrides)
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):

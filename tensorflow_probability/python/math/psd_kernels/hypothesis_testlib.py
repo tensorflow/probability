@@ -30,6 +30,7 @@ import hypothesis.strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import psd_kernels as tfpk
@@ -148,6 +149,17 @@ class ConstrainToUnit(tfpk.FeatureTransformed):
 
   def _batch_shape_tensor(self):
     return self.kernel.batch_shape_tensor()
+
+  def __getitem__(self, slices):
+    overrides = {}
+    if self.parameters.get('kernel', None) is not None:
+      overrides['kernel'] = self.kernel[slices]
+
+    return self.copy(**overrides)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(kernel=parameter_properties.BatchedComponentProperties())
 
 
 @hps.composite

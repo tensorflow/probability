@@ -30,6 +30,7 @@ from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
@@ -226,7 +227,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     if not (isinstance(feature_ndims, int) and feature_ndims > 0):
       raise ValueError(
           '`feature_ndims` must be a Python `integer` greater than zero. ' +
-          'Got: {}'.format(feature_ndims))
+          f'Got: {feature_ndims}')
     self._feature_ndims = feature_ndims
     self._dtype = dtype
     if not name or name[-1] != '/':  # `name` is not a name scope
@@ -248,7 +249,7 @@ class PositiveSemidefiniteKernel(tf.Module):
   @classmethod
   def _parameter_properties(cls, dtype):
     raise NotImplementedError(
-        '_parameter_properties` is not implemented: {}'.format(cls.__name__))
+        '_parameter_properties` is not implemented: {cls.__name__}')
 
   @property
   def parameters(self):
@@ -288,6 +289,51 @@ class PositiveSemidefiniteKernel(tf.Module):
     """
     with tf.name_scope('parameter_properties'):
       return cls._parameter_properties(dtype)
+
+  def _params_event_ndims(self):
+    """Returns a dict mapping constructor argument names to per-event rank.
+
+    The ranks are pulled from `cls.parameter_properties()`; this is a
+    convenience wrapper.
+
+    Returns:
+      params_event_ndims: Per-event parameter ranks, a `str->int dict`.
+    """
+    try:
+      properties = type(self).parameter_properties()
+    except NotImplementedError:
+      raise NotImplementedError(
+          '{type(self)} does not support batch slicing; must implement '
+          '_parameter_properties.')
+    params_event_ndims = {}
+    for (k, param) in properties.items():
+      ndims = param.instance_event_ndims(self)
+      if param.is_tensor and ndims is not None:
+        params_event_ndims[k] = ndims
+    return params_event_ndims
+
+  def __getitem__(self, slices):
+    """Slices the batch axes of this kernel, returning a new instance.
+
+    ```python
+    k = tfpk.ExponentiatedQuadratic(
+      amplitude=tf.ones([3, 5, 7, 9]),
+      length_scale=tf.ones([3, 5, 7, 9]))
+    k.batch_shape  # => [3, 5, 7, 9]
+    k2 = k[:, tf.newaxis, ..., -2:, 1::2]
+    k2.batch_shape  # => [3, 1, 5, 2, 4]
+    ```
+
+    Args:
+      slices: slices from the [] operator
+
+    Returns:
+      dist: A new `PositiveSemidefiniteKernel` instance with sliced parameters.
+    """
+    return slicing.batch_slice(self, self._params_event_ndims(), {}, slices)
+
+  def __iter__(self):
+    raise TypeError(f'{type(self).__name__} object is not iterable')
 
   @property
   def feature_ndims(self):
@@ -375,9 +421,9 @@ class PositiveSemidefiniteKernel(tf.Module):
           self, **parameter_kwargs)
     except NotImplementedError:
       raise NotImplementedError('Cannot compute batch shape of PSDKernel '
-                                '{}: you must implement at least one of '
+                                '{self}: you must implement at least one of '
                                 '`_batch_shape_tensor` or '
-                                '`_parameter_properties`.'.format(self))
+                                '`_parameter_properties`.')
 
   def batch_shape_tensor(self, name='batch_shape_tensor'):
     """Shape of a single sample from a single event index as a 1-D `Tensor`.

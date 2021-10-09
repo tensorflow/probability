@@ -17,9 +17,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
+
 from absl.testing import parameterized
 import hypothesis as hp
 from hypothesis import strategies as hps
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
@@ -36,6 +40,16 @@ EXTRA_TENSOR_CONVERSION_KERNELS = {
     # The transformation is applied to each input individually.
     'KumaraswamyTransformed': 1,
 }
+
+INSTANTIABLE_BUT_NOT_SLICABLE = [
+    'FeatureTransformed',  # Requires slicing in to the `transformation_fn`.
+    'SchurComplement',  # Not implemented.
+]
+
+
+KERNELS_OK_TO_SLICE = (set(list(kernel_hps.INSTANTIABLE_BASE_KERNELS.keys()) +
+                           list(kernel_hps.SPECIAL_KERNELS)) -
+                       set(INSTANTIABLE_BUT_NOT_SLICABLE))
 
 
 def assert_no_none_grad(kernel, method, wrt_vars, grads):
@@ -160,6 +174,83 @@ class KernelPropertiesTest(test_util.TestCase):
       self.assertAllClose(diag, diag_fn(kernel))
       self.assertAllClose(diag, diag_fn(unflat))
 
+
+@test_util.test_all_tf_execution_regimes
+class PSDKernelSlicingTest(test_util.TestCase):
+
+  def _test_slicing(
+      self,
+      data,
+      kernel_name,
+      kernel,
+      feature_dim,
+      feature_ndims):
+    example_ndims = data.draw(hps.integers(min_value=0, max_value=2))
+    batch_shape = kernel.batch_shape
+    slices = data.draw(tfp_hps.valid_slices(batch_shape))
+    slice_str = 'kernel[{}]'.format(', '.join(tfp_hps.stringify_slices(
+        slices)))
+    # Make sure the slice string appears in Hypothesis' attempted example log
+    hp.note('Using slice ' + slice_str)
+    if not slices:  # Nothing further to check.
+      return
+    sliced_zeros = np.zeros(batch_shape)[slices]
+    sliced_kernel = kernel[slices]
+    hp.note('Using sliced kernel {}.'.format(sliced_kernel))
+    hp.note('Using sliced zeros {}.'.format(sliced_zeros.shape))
+
+    # Check that slicing modifies batch shape as expected.
+    self.assertAllEqual(sliced_zeros.shape, sliced_kernel.batch_shape)
+
+    xs = tf.identity(data.draw(kernel_hps.kernel_input(
+        batch_shape=[],
+        example_ndims=example_ndims,
+        feature_dim=feature_dim,
+        feature_ndims=feature_ndims)))
+
+    # Check that apply of sliced kernels executes.
+    with tfp_hps.no_tf_rank_errors():
+      results = self.evaluate(kernel.apply(xs, xs, example_ndims=example_ndims))
+      hp.note('Using results shape {}.'.format(results.shape))
+      sliced_results = self.evaluate(
+          sliced_kernel.apply(xs, xs, example_ndims=example_ndims))
+
+    # Come up with the slices for apply (which must also include example dims).
+    apply_slices = (
+        tuple(slices) if isinstance(slices, collections.Sequence) else
+        (slices,))
+    apply_slices += tuple([slice(None)] * example_ndims)
+
+    # Check that sampling a sliced kernel produces the same shape as
+    # slicing the samples from the original.
+    self.assertAllClose(results[apply_slices], sliced_results)
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'kernel_name': dname}
+      for dname in sorted(KERNELS_OK_TO_SLICE))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testKernels(self, kernel_name, data):
+    event_dim = data.draw(hps.integers(min_value=2, max_value=3))
+    feature_ndims = data.draw(hps.integers(min_value=1, max_value=2))
+    feature_dim = data.draw(hps.integers(min_value=2, max_value=4))
+
+    kernel, _ = data.draw(
+        kernel_hps.kernels(
+            kernel_name=kernel_name,
+            event_dim=event_dim,
+            feature_dim=feature_dim,
+            feature_ndims=feature_ndims,
+            enable_vars=False))
+
+    # Check that all kernels still register as non-iterable despite
+    # defining __getitem__.  (Because __getitem__ magically makes an object
+    # iterable for some reason.)
+    with self.assertRaisesRegex(TypeError, 'not iterable'):
+      iter(kernel)
+
+    # Test slicing
+    self._test_slicing(data, kernel_name, kernel, feature_dim, feature_ndims)
 
 if __name__ == '__main__':
   test_util.main()

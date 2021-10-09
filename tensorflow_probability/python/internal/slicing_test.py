@@ -24,7 +24,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.distributions.internal import slicing
+from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -47,7 +47,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([1, 1, event_dim]),
         param_event_ndims=1,
         slices=make_slices[44:-52:-3, -94::],
-        dist_batch_shape=tf.constant([2, 7], dtype=tf.int32))
+        batch_shape=tf.constant([2, 7], dtype=tf.int32))
     self.assertAllEqual((1, 1, event_dim), self.evaluate(sliced).shape)
 
   def test_single_param_slice_stop_leadingdim(self):
@@ -55,7 +55,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([7, 6, 5, 4, 3]),
         param_event_ndims=2,
         slices=make_slices[:2],
-        dist_batch_shape=tf.constant([7, 6, 5], dtype=tf.int32))
+        batch_shape=tf.constant([7, 6, 5], dtype=tf.int32))
     self.assertAllEqual((2, 6, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_stop_trailingdim(self):
@@ -63,7 +63,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([7, 6, 5, 4, 3]),
         param_event_ndims=2,
         slices=make_slices[..., :2],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 6, 2, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_stop_broadcastdim(self):
@@ -71,7 +71,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([7, 1, 5, 4, 3]),
         param_event_ndims=2,
         slices=make_slices[:, :2],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 1, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_newaxis_leading(self):
@@ -79,7 +79,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([7, 6, 5, 4, 3]),
         param_event_ndims=2,
         slices=make_slices[:, tf.newaxis],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 1, 6, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_newaxis_trailing(self):
@@ -87,7 +87,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([7, 6, 5, 4, 3]),
         param_event_ndims=2,
         slices=make_slices[..., tf.newaxis, :],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 6, 1, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_start(self):
@@ -95,7 +95,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([7, 6, 5, 4, 3]),
         param_event_ndims=2,
         slices=make_slices[:, 2:],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 4, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_start_broadcastdim(self):
@@ -103,7 +103,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([7, 1, 5, 4, 3]),
         param_event_ndims=2,
         slices=make_slices[:, 2:],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 1, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_int(self):
@@ -111,7 +111,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([7, 6, 5, 4, 3]),
         param_event_ndims=2,
         slices=make_slices[:, 2],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_int_broadcastdim(self):
@@ -119,7 +119,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([7, 1, 5, 4, 3]),
         param_event_ndims=2,
         slices=make_slices[:, 2],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_tensor(self):
@@ -131,7 +131,7 @@ class SlicingTest(test_util.TestCase):
         param,
         param_event_ndims=2,
         slices=make_slices[:, idx],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_tensor_broadcastdim(self):
@@ -143,7 +143,7 @@ class SlicingTest(test_util.TestCase):
         param,
         param_event_ndims=2,
         slices=make_slices[:, idx],
-        dist_batch_shape=tf.constant([7, 6, 5]))
+        batch_shape=tf.constant([7, 6, 5]))
     self.assertAllEqual((7, 5, 4, 3), self.evaluate(sliced).shape)
 
   def test_single_param_slice_broadcast_batch(self):
@@ -153,7 +153,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([4, 3, 1]),  # batch = [4, 3], event = [1]
         param_event_ndims=1,
         slices=make_slices[..., tf.newaxis, 2:, tf.newaxis],
-        dist_batch_shape=tf.constant([7, 4, 3]))
+        batch_shape=tf.constant([7, 4, 3]))
     self.assertAllEqual(
         list(tf.zeros([1, 4, 3])[..., tf.newaxis, 2:, tf.newaxis].shape) + [1],
         self.evaluate(sliced).shape)
@@ -165,7 +165,7 @@ class SlicingTest(test_util.TestCase):
         tf.zeros([4, 3, 1]),  # batch = [4, 3], event = [1]
         param_event_ndims=1,
         slices=make_slices[tf.newaxis, ..., tf.newaxis, 2:, tf.newaxis],
-        dist_batch_shape=tf.constant([7, 4, 3]))
+        batch_shape=tf.constant([7, 4, 3]))
     expected = tensorshape_util.as_list((
         tf.zeros([1, 4, 3])[tf.newaxis, ..., tf.newaxis, 2:, tf.newaxis]
         ).shape) + [1]
@@ -177,7 +177,7 @@ class SlicingTest(test_util.TestCase):
           tf.zeros([7, 6, 5, 4, 3]),
           param_event_ndims=2,
           slices=make_slices[:, ..., 2, ...],
-          dist_batch_shape=tf.constant([7, 6, 5]))
+          batch_shape=tf.constant([7, 6, 5]))
 
   def test_single_param_too_many_slices(self):
     with self.assertRaises(
@@ -186,7 +186,7 @@ class SlicingTest(test_util.TestCase):
           tf.zeros([7, 6, 5, 4, 3]),
           param_event_ndims=2,
           slices=make_slices[:, :3, ..., -2:, :],
-          dist_batch_shape=tf.constant([7, 6, 5]))
+          batch_shape=tf.constant([7, 6, 5]))
 
   def test_jitted_slices(self):
     self.skip_if_no_xla()
