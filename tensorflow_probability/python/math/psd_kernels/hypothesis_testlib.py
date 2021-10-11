@@ -270,7 +270,7 @@ def no_pd_errors():
   try:
     yield
   except tf.errors.OpError as e:
-    # NOTE: When tf.linalg.choleksy fails, it returns a matrix with nans on and
+    # NOTE: When tf.linalg.cholesky fails, it returns a matrix with nans on and
     # below the diagonal.  When we use the Cholesky decomposition in a solve,
     # TF will raise an error that the matrix of nans is not invertible.
     if re.search(r'Input matrix is not invertible', str(e)):
