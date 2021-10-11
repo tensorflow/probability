@@ -27,6 +27,7 @@ from tensorflow_probability.python.optimizer.bfgs_utils import converged_any
 from tensorflow_probability.python.optimizer.differential_evolution import minimize as differential_evolution_minimize
 from tensorflow_probability.python.optimizer.differential_evolution import one_step as differential_evolution_one_step
 from tensorflow_probability.python.optimizer.lbfgs import minimize as lbfgs_minimize
+from tensorflow_probability.python.optimizer.lbfgsb import minimize as lbfgsb_minimize
 from tensorflow_probability.python.optimizer.nelder_mead import minimize as nelder_mead_minimize
 from tensorflow_probability.python.optimizer.nelder_mead import nelder_mead_one_step
 from tensorflow_probability.python.optimizer.proximal_hessian_sparse import minimize as proximal_hessian_sparse_minimize
@@ -42,6 +43,7 @@ _allowed_symbols = [
     'differential_evolution_minimize',
     'differential_evolution_one_step',
     'lbfgs_minimize',
+    'lbfgsb_minimize',
     'nelder_mead_minimize',
     'nelder_mead_one_step',
     'proximal_hessian_sparse_minimize',
