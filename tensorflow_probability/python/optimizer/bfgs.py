@@ -81,7 +81,8 @@ def minimize(value_and_gradients_function,
              stopping_condition=None,
              validate_args=True,
              max_line_search_iterations=50,
-             name=None):
+             name=None,
+             line_search_kwargs={}):
   """Applies the BFGS algorithm to minimize a differentiable function.
 
   Performs unconstrained minimization of a differentiable function using the
@@ -277,10 +278,9 @@ def minimize(value_and_gradients_function,
           state, inverse_hessian_estimate=actual_inv_hessian)
 
       next_state = bfgs_utils.line_search_step(
-          current_state,
-          value_and_gradients_function, actual_search_direction,
+          current_state, value_and_gradients_function, actual_search_direction,
           tolerance, f_relative_tolerance, x_tolerance, stopping_condition,
-          max_line_search_iterations)
+          max_line_search_iterations, **line_search_kwargs)
 
       # Update the inverse Hessian if needed and continue.
       return [_update_inv_hessian(current_state, next_state)]
