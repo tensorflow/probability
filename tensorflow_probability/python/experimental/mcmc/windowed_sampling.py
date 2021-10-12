@@ -52,7 +52,9 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 __all__ = [
     'windowed_adaptive_hmc',
-    'windowed_adaptive_nuts'
+    'windowed_adaptive_nuts',
+    'default_nuts_trace_fn',
+    'default_hmc_trace_fn',
 ]
 
 # Cause all warnings to always be triggered.
@@ -62,7 +64,7 @@ warnings.filterwarnings(
     append=True)  # Don't override user-set filters.
 
 
-def _default_nuts_trace_fn(state, bijector, is_adapting, pkr):
+def default_nuts_trace_fn(state, bijector, is_adapting, pkr):
   """Trace function for `windowed_adaptive_nuts` providing standard diagnostics.
 
   Specifically, these match up with a number of diagnostics used by ArviZ [1],
@@ -105,7 +107,7 @@ def _default_nuts_trace_fn(state, bijector, is_adapting, pkr):
       'is_accepted': unnest.get_innermost(pkr, 'is_accepted')}
 
 
-def _default_hmc_trace_fn(state, bijector, is_adapting, pkr):
+def default_hmc_trace_fn(state, bijector, is_adapting, pkr):
   """Trace function for `windowed_adaptive_hmc` providing standard diagnostics.
 
   Specifically, these match up with a number of diagnostics used by ArviZ [1],
@@ -615,7 +617,7 @@ def windowed_adaptive_nuts(n_draws,
                            max_energy_diff=500.,
                            unrolled_leapfrog_steps=1,
                            parallel_iterations=10,
-                           trace_fn=_default_nuts_trace_fn,
+                           trace_fn=default_nuts_trace_fn,
                            return_final_kernel_results=False,
                            discard_tuning=True,
                            chain_axis_names=None,
@@ -736,7 +738,7 @@ def windowed_adaptive_hmc(n_draws,
                           current_state=None,
                           init_step_size=None,
                           dual_averaging_kwargs=None,
-                          trace_fn=_default_hmc_trace_fn,
+                          trace_fn=default_hmc_trace_fn,
                           return_final_kernel_results=False,
                           discard_tuning=True,
                           chain_axis_names=None,
