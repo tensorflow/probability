@@ -248,6 +248,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:cholesky_outer_product",
         "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/distributions:cholesky_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensorshape_util",

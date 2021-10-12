@@ -28,6 +28,7 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.internal import test_util
 
 tfpk = tfp.math.psd_kernels
@@ -251,6 +252,22 @@ class SchurComplementTest(test_util.TestCase):
 
     self.assertAllClose(
         self.evaluate(schur_with_divisor.matrix(x, y)),
+        self.evaluate(schur.matrix(x, y)))
+
+  def testSchurComplementCholeskyFn(self):
+    base_kernel = tfpk.ExponentiatedQuadratic([1., 2.])
+    fixed_inputs = tf.ones([0, 2], np.float32)
+    cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(jitter=1e-5)
+    schur = tfpk.SchurComplement(
+        base_kernel, fixed_inputs, cholesky_fn=cholesky_fn)
+    schur_actual = tfpk.SchurComplement(base_kernel, fixed_inputs)
+    self.assertEqual(cholesky_fn, schur.cholesky_fn)
+
+    x = np.ones([4, 3], np.float32)
+    y = np.ones([5, 3], np.float32)
+
+    self.assertAllClose(
+        self.evaluate(schur_actual.matrix(x, y)),
         self.evaluate(schur.matrix(x, y)))
 
   @test_util.disable_test_for_backend(

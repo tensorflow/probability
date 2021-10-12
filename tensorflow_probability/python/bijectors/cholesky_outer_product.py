@@ -70,21 +70,34 @@ class CholeskyOuterProduct(bijector.AutoCompositeTensorBijector):
 
   """
 
-  def __init__(self, validate_args=False, name='cholesky_outer_product'):
+  def __init__(
+      self,
+      cholesky_fn=tf.linalg.cholesky,
+      validate_args=False,
+      name='cholesky_outer_product'):
     """Instantiates the `CholeskyOuterProduct` bijector.
 
     Args:
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.
+        Default value: `tf.linalg.cholesky`,
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       name: Python `str` name given to ops managed by this object.
     """
     parameters = dict(locals())
+    self._cholesky_fn = cholesky_fn
+
     with tf.name_scope(name) as name:
       super(CholeskyOuterProduct, self).__init__(
           forward_min_event_ndims=2,
           validate_args=validate_args,
           parameters=parameters,
           name=name)
+
+  @property
+  def cholesky_fn(self):
+    return self._cholesky_fn
 
   @classmethod
   def _parameter_properties(cls, dtype):
@@ -97,7 +110,7 @@ class CholeskyOuterProduct(bijector.AutoCompositeTensorBijector):
       return tf.matmul(x, x, adjoint_b=True)
 
   def _inverse(self, y):
-    return tf.linalg.cholesky(y)
+    return self._cholesky_fn(y)
 
   def _forward_log_det_jacobian(self, x):
     # Let Y be a symmetric, positive definite matrix and write:

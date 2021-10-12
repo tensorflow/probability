@@ -23,8 +23,8 @@ import functools
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -392,6 +392,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
                observation_noise_variance=0.,
                predictive_noise_variance=None,
                mean_fn=None,
+               cholesky_fn=None,
                jitter=1e-6,
                validate_args=False,
                allow_nan_stats=False,
@@ -451,8 +452,13 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
         Takes a `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a
         `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
         Default value: `None` implies the constant zero function.
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.  Default value: `None`,
+        in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
+        parameter.
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
+        This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
@@ -513,6 +519,9 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
 
+      if cholesky_fn is None:
+        cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(jitter)
+
       self._name = name
       self._observation_index_points = observation_index_points
       self._observations = observations
@@ -526,8 +535,8 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
           _conditional_kernel = tfpk.SchurComplement(
               base_kernel=kernel,
               fixed_inputs=observation_index_points,
-              diag_shift=tfp_util.DeferredTensor(
-                  observation_noise_variance, lambda x: jitter + x))
+              cholesky_fn=cholesky_fn,
+              diag_shift=observation_noise_variance)
         # Special logic for mean_fn only; SchurComplement already handles the
         # case of empty observations (ie, falls back to base_kernel).
         if _is_empty_observation_data(
@@ -583,6 +592,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       observation_noise_variance=0.,
       predictive_noise_variance=None,
       mean_fn=None,
+      cholesky_fn=None,
       jitter=1e-6,
       validate_args=False,
       allow_nan_stats=False,
@@ -661,6 +671,10 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
         Takes a `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a
         `Tensor` whose shape is broadcastable with `[b1, ..., bB]`.
         Default value: `None` implies the constant zero function.
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.  Default value: `None`,
+        in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
+        parameter.
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
@@ -710,16 +724,19 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       observation_cholesky = tf.linalg.set_diag(
           observation_cholesky,
           tf.linalg.diag_part(observation_cholesky) +
-          jitter +
           observation_noise_variance[..., tf.newaxis])
-      observation_cholesky = tf.linalg.cholesky(observation_cholesky)
+      if cholesky_fn is None:
+        cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(jitter)
+
+      observation_cholesky = cholesky_fn(observation_cholesky)
       observation_cholesky_operator = tf.linalg.LinearOperatorLowerTriangular(
           observation_cholesky)
 
       conditional_kernel = tfpk.SchurComplement.with_precomputed_divisor(
           base_kernel=kernel,
           fixed_inputs=observation_index_points,
-          diag_shift=observation_noise_variance + jitter)
+          cholesky_fn=cholesky_fn,
+          diag_shift=observation_noise_variance)
 
       if mean_fn is None:
         mean_fn = lambda x: tf.zeros([1], dtype=dtype)
@@ -742,6 +759,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
           index_points=index_points,
           observation_noise_variance=observation_noise_variance,
           predictive_noise_variance=predictive_noise_variance,
+          cholesky_fn=cholesky_fn,
           jitter=jitter,
           _conditional_kernel=conditional_kernel,
           _conditional_mean_fn=conditional_mean_fn,

@@ -55,6 +55,7 @@ multi_substrate_py_library(
         ":chi",
         ":chi2",
         ":cholesky_lkj",
+        ":cholesky_util",
         ":continuous_bernoulli",
         ":deterministic",
         ":dirichlet",
@@ -720,6 +721,7 @@ multi_substrate_py_library(
     name = "gaussian_process",
     srcs = ["gaussian_process.py"],
     deps = [
+        ":cholesky_util",
         ":distribution",
         ":kullback_leibler",
         ":mvn_linear_operator",
@@ -739,8 +741,10 @@ multi_substrate_py_library(
     name = "gaussian_process_regression_model",
     srcs = ["gaussian_process_regression_model.py"],
     deps = [
+        ":cholesky_util",
         ":gaussian_process",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math/psd_kernels",
@@ -2075,6 +2079,7 @@ multi_substrate_py_library(
     name = "student_t_process",
     srcs = ["student_t_process.py"],
     deps = [
+        ":cholesky_util",
         ":distribution",
         ":multivariate_student_t",
         ":student_t",
@@ -4270,5 +4275,25 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "cholesky_util",
+    srcs = ["cholesky_util.py"],
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "cholesky_util_test",
+    srcs = ["cholesky_util_test.py"],
+    deps = [
+        ":cholesky_util",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )

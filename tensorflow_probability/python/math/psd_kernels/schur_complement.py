@@ -183,6 +183,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
                base_kernel,
                fixed_inputs,
                diag_shift=None,
+               cholesky_fn=None,
                validate_args=False,
                name='SchurComplement',
                _precomputed_divisor_matrix_cholesky=None):
@@ -211,6 +212,10 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         `base_kernel.batch_shape`.
       diag_shift: A floating point scalar to be added to the diagonal of the
         divisor_matrix before computing its Cholesky.
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.  Default value: `None`,
+        in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
+        parameter.
       validate_args: If `True`, parameters are checked for validity despite
         possibly degrading runtime performance.
         Default value: `False`
@@ -243,6 +248,13 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       if self._precomputed_divisor_matrix_cholesky is not None:
         self._precomputed_divisor_matrix_cholesky = tf.convert_to_tensor(
             self._precomputed_divisor_matrix_cholesky, dtype)
+      if cholesky_fn is None:
+        from tensorflow_probability.python.distributions import cholesky_util  # pylint:disable=g-import-not-at-top
+        cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn()
+      self._cholesky_fn = cholesky_fn
+      self._cholesky_bijector = invert.Invert(
+          cholesky_outer_product.CholeskyOuterProduct(cholesky_fn=cholesky_fn))
+
       super(SchurComplement, self).__init__(
           base_kernel.feature_ndims,
           dtype=dtype,
@@ -254,6 +266,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       base_kernel,
       fixed_inputs,
       diag_shift=None,
+      cholesky_fn=None,
       validate_args=False,
       name='PrecomputedSchurComplement'):
     """Returns a `SchurComplement` with a precomputed divisor matrix.
@@ -291,6 +304,10 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         `base_kernel.batch_shape`.
       diag_shift: A floating point scalar to be added to the diagonal of the
         divisor_matrix before computing its Cholesky.
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.  Default value: `None`,
+        in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
+        parameter.
       validate_args: If `True`, parameters are checked for validity despite
         possibly degrading runtime performance.
         Default value: `False`
@@ -303,9 +320,13 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     if diag_shift is not None:
       diag_shift = tf.convert_to_tensor(diag_shift, dtype)
 
+    if cholesky_fn is None:
+      from tensorflow_probability.python.distributions import cholesky_util  # pylint:disable=g-import-not-at-top
+      cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn()
+
     # TODO(b/196219597): Add a check to ensure that we have a `base_kernel`
     # that is explicitly concretized.
-    divisor_matrix_cholesky = tf.linalg.cholesky(
+    divisor_matrix_cholesky = cholesky_fn(
         _compute_divisor_matrix(
             base_kernel,
             diag_shift=diag_shift,
@@ -315,6 +336,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         base_kernel=base_kernel,
         fixed_inputs=fixed_inputs,
         diag_shift=diag_shift,
+        cholesky_fn=cholesky_fn,
         validate_args=validate_args,
         _precomputed_divisor_matrix_cholesky=divisor_matrix_cholesky,
         name=name)
@@ -423,6 +445,10 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   @property
   def diag_shift(self):
     return self._diag_shift
+
+  @property
+  def cholesky_fn(self):
+    return self._cholesky_fn
 
   @property
   def cholesky_bijector(self):

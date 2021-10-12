@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import multivariate_student_t
 from tensorflow_probability.python.distributions import student_t
@@ -47,7 +48,7 @@ def _add_diagonal_shift(matrix, shift):
       matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
-def make_cholesky_factored_marginal_fn(jitter):
+def make_cholesky_factored_marginal_fn(cholesky_fn):
   """Construct a `marginal_fn` for use with `tfd.StudentTProcess`.
 
   The returned function computes the Cholesky factorization of the input
@@ -55,8 +56,8 @@ def make_cholesky_factored_marginal_fn(jitter):
   `tfd.MultivariateNormalLinearOperator`.
 
   Args:
-    jitter: `float` scalar `Tensor` added to the diagonal of the covariance
-      matrix to ensure positive definiteness of the covariance matrix.
+    cholesky_fn: Callable which takes a single (batch) matrix argument and
+      returns a Cholesky-like lower triangular factor.
 
   Returns:
     marginal_fn: A Python function that takes a location, covariance matrix,
@@ -73,7 +74,7 @@ def make_cholesky_factored_marginal_fn(jitter):
     squared_scale = ((df - 2.) / df)[
         ..., tf.newaxis, tf.newaxis] * covariance
     scale = tf.linalg.LinearOperatorLowerTriangular(
-        tf.linalg.cholesky(_add_diagonal_shift(squared_scale, jitter)),
+        cholesky_fn(squared_scale),
         is_non_singular=True,
         name='StudentTProcessScaleLinearOperator')
     return multivariate_student_t.MultivariateStudentTLinearOperator(
@@ -250,6 +251,7 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
                mean_fn=None,
                observation_noise_variance=0.,
                marginal_fn=None,
+               cholesky_fn=None,
                jitter=1e-6,
                validate_args=False,
                allow_nan_stats=False,
@@ -284,10 +286,15 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
         optional `validate_args`, `allow_nan_stats` and `name` arguments, and
         returns a multivariate normal subclass of `tfd.Distribution`.
         Default value: `None`, in which case a Cholesky-factorizing function is
-        is created using `make_cholesky_factorizing_marginal_fn` and the
+        is created using `make_cholesky_factored_marginal_fn` and the
         `jitter` argument.
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.  Default value: `None`,
+        in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
+        parameter. At most one of `cholesky_fn` and `marginal_fn` should be set.
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
+        This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
@@ -332,8 +339,15 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
       self._observation_noise_variance = observation_noise_variance
       self._mean_fn = mean_fn
       self._jitter = jitter
+      if marginal_fn is not None and cholesky_fn is not None:
+        raise ValueError(
+            'At most one of `marginal_fn` and `cholesky_fn` should be set.')
       if marginal_fn is None:
-        self._marginal_fn = make_cholesky_factored_marginal_fn(jitter)
+        if cholesky_fn is None:
+          self._cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(
+              jitter)
+        self._marginal_fn = make_cholesky_factored_marginal_fn(
+            self._cholesky_fn)
       else:
         self._marginal_fn = marginal_fn
 
@@ -479,6 +493,10 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
   @property
   def marginal_fn(self):
     return self._marginal_fn
+
+  @property
+  def cholesky_fn(self):
+    return self._cholesky_fn
 
   @property
   def jitter(self):

@@ -231,6 +231,37 @@ class _GaussianProcessTest(object):
             index_points=np.ones([10, 1], dtype=np.float32)),
         tfd.MultivariateNormalLinearOperator)
 
+  def testOneOfCholeskyAndMarginalFn(self):
+    with self.assertRaises(ValueError):
+      index_points = np.array([3., 4., 5.])[..., np.newaxis]
+      tfd.GaussianProcess(
+          kernel=psd_kernels.ExponentiatedQuadratic(),
+          index_points=index_points,
+          marginal_fn=lambda x: x,
+          cholesky_fn=lambda x: x,
+          validate_args=True)
+
+  def testCustomCholeskyFn(self):
+    def test_cholesky(x):
+      return tf.linalg.cholesky(tf.linalg.set_diag(
+          x, tf.linalg.diag_part(x) + 3.))
+
+    # Make sure the points are far away so that this is roughly diagonal.
+    index_points = np.array([-100., -50., 50., 100])[..., np.newaxis]
+
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=index_points,
+        cholesky_fn=test_cholesky,
+        validate_args=True)
+
+    # Roughly, the kernel matrix will look like the identity matrix.
+    # When we add 3 to the diagonal, this leads to 2's on the diagonal
+    # for the cholesky factor.
+    self.assertAllClose(
+        2 * np.ones([4], dtype=np.float64),
+        gp.get_marginal_distribution().stddev())
+
   def testCustomMarginalFn(self):
     def test_marginal_fn(
         loc,

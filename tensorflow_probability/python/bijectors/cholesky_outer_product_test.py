@@ -63,6 +63,17 @@ class CholeskyOuterProductBijectorTest(test_util.TestCase):
         atol=0.,
         rtol=1e-7)
 
+  def testCholeskyFn(self):
+    def robust_cholesky(x):
+      return tf.linalg.cholesky(
+          tf.linalg.set_diag(x, tf.linalg.diag_part(x) + 1.))
+    bijector = tfb.CholeskyOuterProduct(cholesky_fn=robust_cholesky)
+    # We'll add one to the diagonal, so we'll expect the inverse to be
+    # the `sqrt(diagonal + 1)`.
+    x = 3 * np.eye(3)
+    self.assertAllClose(
+        2. * np.eye(3), self.evaluate(bijector.inverse(x)))
+
   def testNoBatchStaticJacobian(self):
     x = np.eye(2)
     bijector = tfb.CholeskyOuterProduct()
