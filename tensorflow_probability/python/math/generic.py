@@ -150,7 +150,11 @@ _reduce_kahan_sum = variadic_reduce.make_variadic_reduce(
 
 
 class Kahan(collections.namedtuple('Kahan', ['total', 'correction'])):
-  """Result of Kahan summation, i.e. `sum = total - correction`."""
+  """Result of Kahan summation, i.e., `sum = total - correction`.
+
+  All the high-order bits of `sum` are held in the `total` field,
+  so the correction can be dropped when returning to ordinary floating-point.
+  """
   __slots__ = ()
 
   def __add__(self, x):
@@ -176,13 +180,17 @@ class Kahan(collections.namedtuple('Kahan', ['total', 'correction'])):
 def reduce_kahan_sum(input_tensor, axis=None, keepdims=False, name=None):
   """Reduces the input tensor along the given axis using Kahan summation.
 
-  Returns both the total and the correction term, as a `namedtuple`, so that a
-  more accurate sum may be written as `total - correction`.
+  Returns both the total and the correction term, as a `namedtuple`,
+  representing the sum in higher precision as `total - correction`.
 
   A practical use-case is computing the difference of two large (magnitude) sums
   we expect to be nearly equal. If instead we take their difference as
   `(s0.total - s1.total) - (s0.correction - s1.correction)`, we can retain more
   precision in computing their difference.
+
+  Note that `total` holds all the high-order bits of the sum, so the correction
+  can be safely neglected if further enhanced precision computations are not
+  required.
 
   Note: (TF + JAX) This function does not work properly on XLA:CPU without the
   environment variable: `XLA_FLAGS=--xla_cpu_enable_fast_math=false`, due to
