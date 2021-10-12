@@ -151,7 +151,7 @@ class JointMapBijectorTest(test_util.TestCase):
       return bij.forward(x)
 
     x = [1., 2., 3.]
-    self.assertAllClose(call_forward(unflat, x), bij.forward(x))
+    self.assertAllCloseNested(call_forward(unflat, x), bij.forward(x))
 
     # Type spec can be encoded/decoded.
     struct_coder = tf.__internal__.saved_model.StructureCoder()
@@ -181,7 +181,7 @@ class JointMapBijectorTest(test_util.TestCase):
     scale = NonCompositeScale(scale=tf.constant(3.))
     bij = tfb.JointMap(bijectors=[exp, scale])
     self.assertNotIsInstance(bij, tf.__internal__.CompositeTensor)
-    self.assertAllClose(
+    self.assertAllCloseNested(
         bij.forward([1., 1.]),
         [exp.forward(1.), scale.forward(1.)])
 

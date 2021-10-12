@@ -129,7 +129,7 @@ class ScaleBijectorTest(test_util.TestCase, parameterized.TestCase):
 
     value, grad = tfp.math.value_and_gradient(_func, [2.])
     self.assertAllNotNone([value, grad])
-    self.assertNotAllZero(grad)
+    self.assertAllAssertsNested(self.assertNotAllZero, grad)
 
   def testImmutableScaleAssertion(self):
     with self.assertRaisesOpError('Argument `scale` must be non-zero'):

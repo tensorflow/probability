@@ -898,6 +898,15 @@ def prepare_conv_args(
 
 def prepare_tuple_argument(arg, n, arg_name, validate_args=False):
   """Helper which processes `Tensor`s to tuples in standard form."""
+  # Short-circuiting incoming lists and tuples here avoids both
+  # Tensor packing / unpacking and numpy 1.20.+ pickiness about
+  # np.array(tuple of Tensor).
+  if isinstance(arg, (tuple, list)):
+    if len(arg) == n:
+      return tuple(arg)
+    if len(arg) == 1:
+      return tuple([arg[0]] * n)
+
   arg_size = ps.size(arg)
   arg_size_ = tf.get_static_value(arg_size)
   assertions = []

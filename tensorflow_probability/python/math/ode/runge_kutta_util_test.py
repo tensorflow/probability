@@ -89,13 +89,13 @@ class RungeKuttaUtilTest(test_util.TestCase):
     states = [(tf.eye(2), tf.ones((2, 2))) for _ in range(3)]
     weighted_state_sum = rk_util.weighted_sum(weights, states)
     expected_result = (tf.zeros((2, 2)), tf.zeros((2, 2)))
-    self.assertAllClose(weighted_state_sum, expected_result)
+    self.assertAllCloseNested(weighted_state_sum, expected_result)
 
     weights = [0.5, -0.25, -0.25, 0]
     states = [(tf.eye(2), tf.ones((2, 2))) for _ in range(4)]
     weighted_state_sum = rk_util.weighted_sum(weights, states)
     expected_result = (tf.zeros((2, 2)), tf.zeros((2, 2)))
-    self.assertAllClose(weighted_state_sum, expected_result)
+    self.assertAllCloseNested(weighted_state_sum, expected_result)
 
   def test_weighted_sum_value_errors(self, dtype):
     del dtype  # not used in this test case.

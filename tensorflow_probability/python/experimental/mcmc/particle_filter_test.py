@@ -349,8 +349,10 @@ class _ParticleFilterTest(test_util.TestCase):
     y1_marginal_dist = tfd.Normal(loc=0., scale=np.sqrt(1. + 1.))
     y2_conditional_dist = (
         lambda y1: tfd.Normal(loc=y1 / 2., scale=np.sqrt(5. / 2.)))
-    true_lps = [y1_marginal_dist.log_prob(observation[0]),
-                y2_conditional_dist(observation[0]).log_prob(observation[1])]
+    true_lps = tf.stack(
+        [y1_marginal_dist.log_prob(observation[0]),
+         y2_conditional_dist(observation[0]).log_prob(observation[1])],
+        axis=0)
     # The following line passes at atol = 0.01 if num_particles = 32768.
     self.assertAllClose(true_lps, lps, atol=0.2)
 
@@ -576,7 +578,7 @@ class _ParticleFilterTest(test_util.TestCase):
 
     _, grads = tfp.math.value_and_gradient(marginal_log_likelihood, 1.0, 1.0)
     self.assertAllNotNone(grads)
-    self.assertNotAllZero(grads)
+    self.assertAllAssertsNested(self.assertNotAllZero, grads)
 
 
 # TODO(b/186068104): add tests with dynamic shapes.
