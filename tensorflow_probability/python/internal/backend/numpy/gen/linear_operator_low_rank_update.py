@@ -32,11 +32,6 @@
 # ==============================================================================
 """Perturb a `LinearOperator` with a rank `K` update."""
 
-from __future__ import absolute_import
-from __future__ import division
-# [internal] enable type annotations
-from __future__ import print_function
-
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops

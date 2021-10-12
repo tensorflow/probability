@@ -32,11 +32,6 @@
 # ==============================================================================
 """`LinearOperator` acting like a zero matrix."""
 
-from __future__ import absolute_import
-from __future__ import division
-# [internal] enable type annotations
-from __future__ import print_function
-
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes

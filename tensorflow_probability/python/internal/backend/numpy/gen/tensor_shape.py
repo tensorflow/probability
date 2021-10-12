@@ -42,11 +42,6 @@ def tf_export(*args, **kwargs):
 # limitations under the License.
 # ==============================================================================
 """Helper classes for tensor shape inference."""
-# from __future__ import absolute_import
-# from __future__ import division
-# # [internal] enable type annotations
-# from __future__ import print_function
-
 import functools
 import operator
 import six
@@ -786,9 +781,9 @@ class TensorShape(object):
   If a tensor is produced by an operation of type `"Foo"`, its shape
   may be inferred if there is a registered shape function for
   `"Foo"`. See [Shape
-  functions](https://tensorflow.org/extend/adding_an_op#shape_functions_in_c)
+  functions](https://www.tensorflow.org/guide/create_op#shape_functions_in_c)
   for details of shape functions and how to register them. Alternatively,
-  the shape may be set explicitly using `tf.Tensor.set_shape`.
+  you may set the shape explicitly using `tf.Tensor.set_shape`.
   """
   __slots__ = ["_dims"]
 

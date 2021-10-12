@@ -32,11 +32,6 @@
 # ==============================================================================
 """Registrations for LinearOperator.inverse."""
 
-from __future__ import absolute_import
-from __future__ import division
-# [internal] enable type annotations
-from __future__ import print_function
-
 from tensorflow_probability.python.internal.backend.numpy import numpy_math as math_ops
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_addition
