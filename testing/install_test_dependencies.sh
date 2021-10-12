@@ -46,6 +46,8 @@ set -e  # fail and exit on any command erroring
 # Get the absolute path to the directory containing this script.
 DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 
+source "${DIR}/dependency_install_lib.sh"
+
 virtualenv_is_active() {
   python ${DIR}/virtualenv_is_active.py
 }
@@ -79,44 +81,6 @@ if enable_gpu_flag_is_set; then
 else
   TF_NIGHTLY_PACKAGE=tf-nightly-cpu
 fi
-
-PYTHON_PARSE_PACKAGE_JSON="
-import sys
-import json
-import argparse
-import sysconfig
-
-
-parser = argparse.ArgumentParser(description='Parse pypi json')
-parser.add_argument(
-    '--bad_dates', type=str, nargs='*',
-    help='Bad dates to be avoided. Space-separated')
-args = parser.parse_args()
-
-pypi_version_str = 'cp' + sysconfig.get_config_var('py_version_nodot')
-
-package_data = json.loads(sys.stdin.read())
-releases = []
-for release, release_info in package_data['releases'].items():
-  # Skip bad dates.
-  if any(bad_date in release for bad_date in args.bad_dates):
-    continue
-
-  # Make sure there's a manylinux wheel file for given python_version.
-  if not any(('manylinux' in wheel_info['filename'] and
-              wheel_info['python_version'] in pypi_version_str)
-             for wheel_info in release_info):
-    continue
-  releases.append(release)
-print(sorted(releases)[-1])
-"
-
-find_good_tf_nightly_version_str() {
-  VERSION=$1
-  curl -s "https://pypi.org/pypi/${VERSION}/json" \
-    | python -c "$PYTHON_PARSE_PACKAGE_JSON" \
-        --bad_dates 20210519 20210619
-}
 
 has_tensorflow_packages() {
   python -m pip list | grep -v tensorflow-metadata | grep tensorflow &> /dev/null
@@ -170,31 +134,12 @@ check_for_common_package_conflicts() {
   fi
 }
 
-install_tensorflow() {
-  # NB: tf-nightly pulls in other deps, like numpy, absl, and six, transitively.
-  TF_VERSION_STR=$(find_good_tf_nightly_version_str $TF_NIGHTLY_PACKAGE)
-  python -m pip install $PIP_FLAGS $TF_NIGHTLY_PACKAGE==$TF_VERSION_STR
-}
-
-install_jax() {
-  # For the JAX backend.
-  python -m pip install jax jaxlib
-}
-
 install_python_packages() {
-  install_tensorflow
-  install_jax
-
-  # The following unofficial dependencies are used only by tests.
-  python -m pip install $PIP_FLAGS hypothesis matplotlib mock mpmath scipy pandas
-
-  # Install additional TFP dependencies.
-  python -m pip install $PIP_FLAGS decorator 'cloudpickle>=1.3' dm-tree
-
+  install_tensorflow "${TF_NIGHTLY_PACKAGE}" "${PIP_FLAGS}"
+  install_jax "${PIP_FLAGS}"
+  install_test_only_packages "${PIP_FLAGS}"
   # Print out all versions, as an FYI in the logs.
-  python --version
-  python -m pip --version
-  python -m pip list
+  dump_versions
 }
 
 # Ensure newer than 18.x pip version, which is necessary after tf-nightly
