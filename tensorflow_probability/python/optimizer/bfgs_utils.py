@@ -152,7 +152,7 @@ def _is_negative_inf(x):
 
 def line_search_step(state, value_and_gradients_function, search_direction,
                      grad_tolerance, f_relative_tolerance, x_tolerance,
-                     stopping_condition, max_iterations):
+                     stopping_condition, max_iterations, f_absolute_tolerance):
   """Performs the line search step of the BFGS search procedure.
 
   Uses hager_zhang line search procedure to compute a suitable step size
@@ -163,18 +163,18 @@ def line_search_step(state, value_and_gradients_function, search_direction,
   Args:
     state: A namedtuple instance holding values for the current state of the
       search procedure. The state must include the fields: `position`,
-      `objective_value`, `objective_gradient`, `num_iterations`,
-      `num_objective_evaluations`, `converged` and `failed`.
+        `objective_value`, `objective_gradient`, `num_iterations`,
+        `num_objective_evaluations`, `converged` and `failed`.
     value_and_gradients_function: A Python callable that accepts a point as a
       real `Tensor` of shape `[..., n]` and returns a tuple of two tensors of
       the same dtype: the objective function value, a real `Tensor` of shape
-      `[...]`, and its derivative, another real `Tensor` of shape `[..., n]`.
+        `[...]`, and its derivative, another real `Tensor` of shape `[..., n]`.
     search_direction: A real `Tensor` of shape `[..., n]`. The direction along
       which to perform line search.
     grad_tolerance: Scalar `Tensor` of real dtype. Specifies the gradient
       tolerance for the procedure.
-    f_relative_tolerance: Scalar `Tensor` of real dtype. Specifies the
-      tolerance for the relative change in the objective value.
+    f_relative_tolerance: Scalar `Tensor` of real dtype. Specifies the tolerance
+      for the relative change in the objective value.
     x_tolerance: Scalar `Tensor` of real dtype. Specifies the tolerance for the
       change in the position.
     stopping_condition: A Python function that takes as input two Boolean
@@ -184,6 +184,9 @@ def line_search_step(state, value_and_gradients_function, search_direction,
       algorithm should stop.
     max_iterations: A Python integer that is used as the maximum number of
       iterations of the hager_zhang line search algorithm
+    f_absolute_tolerance: Scalar `Tensor` of real dtype. Specifies the tolerance
+      for the absolute change in the objective value.
+
   Returns:
     A copy of the input state with the following fields updated:
       converged: a Boolean `Tensor` of shape `[...]` indicating whether the
@@ -234,7 +237,8 @@ def line_search_step(state, value_and_gradients_function, search_direction,
         position_delta,
         ls_result.left.f,
         ls_result.left.full_gradient,
-        grad_tolerance, f_relative_tolerance, x_tolerance)
+        grad_tolerance, f_relative_tolerance, x_tolerance,
+        f_absolute_tolerance)  # pyformat: disable
 
   return ps.cond(
       stopping_condition(state.converged, state.failed),
@@ -323,11 +327,13 @@ def _update_position(state,
                      next_gradient,
                      grad_tolerance,
                      f_relative_tolerance,
-                     x_tolerance):
+                     x_tolerance,
+                     f_absolute_tolerance):  # pyformat: disable
   """Updates the state advancing its position by a given position_delta."""
   state = terminate_if_not_finite(state, next_objective, next_gradient)
 
   next_position = state.position + position_delta
+  # pyformat: disable
   converged = ~state.failed & _check_convergence(state.position,
                                                  next_position,
                                                  state.objective_value,
@@ -335,7 +341,9 @@ def _update_position(state,
                                                  next_gradient,
                                                  grad_tolerance,
                                                  f_relative_tolerance,
-                                                 x_tolerance)
+                                                 x_tolerance,
+                                                 f_absolute_tolerance)
+  # pyformat: enable
   return update_fields(
       state,
       converged=state.converged | converged,
@@ -373,13 +381,18 @@ def _check_convergence(current_position,
                        next_gradient,
                        grad_tolerance,
                        f_relative_tolerance,
-                       x_tolerance):
+                       x_tolerance,
+                       f_absolute_tolerance):  # pyformat: disable
   """Checks if the algorithm satisfies the convergence criteria."""
   grad_converged = norm(next_gradient, dims=1) <= grad_tolerance
   x_converged = norm(next_position - current_position, dims=1) <= x_tolerance
-  f_converged = (norm(next_objective - current_objective, dims=0) <=
-                 f_relative_tolerance * current_objective)
-  return grad_converged | x_converged | f_converged
+  f_relative_converged = (
+      norm(next_objective - current_objective, dims=0) <=
+      f_relative_tolerance * current_objective)
+  f_absolute_converged = (
+      norm(next_objective - current_objective, dims=0) <= f_absolute_tolerance)
+  return (grad_converged | x_converged | f_relative_converged
+          | f_absolute_converged)
 
 
 def _broadcast(value, target):

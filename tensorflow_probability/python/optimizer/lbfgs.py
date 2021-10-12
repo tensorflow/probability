@@ -89,6 +89,7 @@ def minimize(value_and_gradients_function,
              parallel_iterations=1,
              stopping_condition=None,
              max_line_search_iterations=50,
+             f_absolute_tolerance=0,
              name=None):
   """Applies the L-BFGS algorithm to minimize a differentiable function.
 
@@ -178,6 +179,9 @@ def minimize(value_and_gradients_function,
       batch member has converged, or when all have failed.
     max_line_search_iterations: Python int. The maximum number of iterations
       for the `hager_zhang` line search algorithm.
+    f_absolute_tolerance: Scalar `Tensor` of real dtype. If the absolute change
+      in the objective value between one iteration and the next is smaller
+      than this value, the algorithm is stopped.
     name: (Optional) Python str. The name prefixed to the ops created by this
       function. If not supplied, the default name 'minimize' is used.
 
@@ -234,6 +238,8 @@ def minimize(value_and_gradients_function,
         tolerance, dtype=dtype, name='grad_tolerance')
     f_relative_tolerance = tf.convert_to_tensor(
         f_relative_tolerance, dtype=dtype, name='f_relative_tolerance')
+    f_absolute_tolerance = tf.convert_to_tensor(
+        f_absolute_tolerance, dtype=dtype, name='f_absolute_tolerance')
     x_tolerance = tf.convert_to_tensor(
         x_tolerance, dtype=dtype, name='x_tolerance')
     max_iterations = tf.convert_to_tensor(max_iterations, name='max_iterations')
@@ -255,10 +261,9 @@ def minimize(value_and_gradients_function,
       # search direction.
 
       next_state = bfgs_utils.line_search_step(
-          current_state,
-          value_and_gradients_function, search_direction,
+          current_state, value_and_gradients_function, search_direction,
           tolerance, f_relative_tolerance, x_tolerance, stopping_condition,
-          max_line_search_iterations)
+          max_line_search_iterations, f_absolute_tolerance)
 
       # If not failed or converged, update the Hessian estimate.
       should_update = ~(next_state.converged | next_state.failed)

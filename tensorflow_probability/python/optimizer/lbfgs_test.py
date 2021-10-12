@@ -62,6 +62,31 @@ class LBfgsTest(test_util.TestCase):
     self.assertLessEqual(_norm(results.objective_gradient), 1e-8)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
+  def test_quadratic_bowl_3d_absolute_tolerance(self):
+    """Can minimize a two dimensional quadratic function."""
+    minimum = np.array([1.0, 1.0, 1.0])
+    scales = np.array([2.0, 3.0, 4.0])
+
+    @_make_val_and_grad_fn
+    def quadratic(x):
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
+
+    start = tf.constant([0.1, 0.8, 0.9])
+    results_with_tolerance = self.evaluate(
+        tfp.optimizer.lbfgs_minimize(
+            quadratic,
+            initial_position=start,
+            max_iterations=50,
+            f_absolute_tolerance=1.))
+    self.assertTrue(results_with_tolerance.converged)
+
+    results_without_tolerance = self.evaluate(
+        tfp.optimizer.lbfgs_minimize(
+            quadratic, initial_position=start, max_iterations=50))
+    self.assertTrue(results_without_tolerance.converged)
+    self.assertLess(results_with_tolerance.num_iterations,
+                    results_without_tolerance.num_iterations)
+
   def test_high_dims_quadratic_bowl_trivial(self):
     """Can minimize a high-dimensional trivial bowl (sphere)."""
     ndims = 100
