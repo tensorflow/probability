@@ -355,6 +355,7 @@ py_library(
     deps = [
         # hypothesis dep,
         # numpy dep,
+        "//tensorflow_probability/python/experimental/distributions:marginal_fns",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )

@@ -280,6 +280,10 @@ class GeneralizedMaternTest(_MaternTestCase):
           self.evaluate(matern_one_half.apply(x, y)),
           self.evaluate(k.apply(x, y)))
 
+      self.assertAllClose(
+          self.evaluate(matern_one_half.apply(x, x)),
+          self.evaluate(k.apply(x, x)))
+
   @parameterized.parameters({
       'feature_ndims': 1,
       'dtype': np.float32,
@@ -318,6 +322,10 @@ class GeneralizedMaternTest(_MaternTestCase):
           self.evaluate(matern_three_halves.apply(x, y)),
           self.evaluate(k.apply(x, y)))
 
+      self.assertAllClose(
+          self.evaluate(matern_three_halves.apply(x, x)),
+          self.evaluate(k.apply(x, x)))
+
   @parameterized.parameters({
       'feature_ndims': 1,
       'dtype': np.float32,
@@ -355,6 +363,10 @@ class GeneralizedMaternTest(_MaternTestCase):
       self.assertAllClose(
           self.evaluate(matern_five_halves.apply(x, y)),
           self.evaluate(k.apply(x, y)))
+
+      self.assertAllClose(
+          self.evaluate(matern_five_halves.apply(x, x)),
+          self.evaluate(k.apply(x, x)))
 
   @test_util.jax_disable_test_missing_functionality(
       'BesselKve does not have gradients with respect to `df` parameter.')

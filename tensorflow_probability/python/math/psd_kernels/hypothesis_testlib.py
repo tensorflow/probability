@@ -29,6 +29,7 @@ from hypothesis.extra import numpy as hpnp
 import hypothesis.strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.experimental.distributions import marginal_fns
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -683,6 +684,7 @@ def schur_complements(
       base_kernel=base_kernel,
       fixed_inputs=schur_complement_params['fixed_inputs'],
       diag_shift=schur_complement_params['diag_shift'],
+      cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
       validate_args=True)
   return result_kernel, kernel_variable_names
 
