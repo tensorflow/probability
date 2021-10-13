@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """TFP for JAX."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 
 # pylint: disable=g-statement-before-imports,g-import-not-at-top,g-bad-import-order
 

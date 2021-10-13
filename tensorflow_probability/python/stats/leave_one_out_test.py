@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests for tensorflow_probability.python.stats.leave_one_out."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
 import numpy as np
 

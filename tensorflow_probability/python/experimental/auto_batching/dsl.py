@@ -20,10 +20,6 @@ This domain-specific language frontend serves two purposes:
   the remaining gap can be bridged by a source-to-source transformation
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 import contextlib
 import inspect

@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Base classes for building neural networks."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import sys
 
 import tensorflow.compat.v2 as tf

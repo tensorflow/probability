@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests for Generalized Pareto distribution."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
 import hypothesis as hp
 import hypothesis.strategies as hps

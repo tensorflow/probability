@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests for the TF implementations of auto-batched VM variables."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
 
 import hypothesis as hp

@@ -14,10 +14,6 @@
 # ============================================================================
 """TensorFlow Probability experimental python utilities."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental.util.composite_tensor import as_composite
 from tensorflow_probability.python.experimental.util.composite_tensor import register_composite
 from tensorflow_probability.python.experimental.util.deferred_module import DeferredModule

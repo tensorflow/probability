@@ -14,10 +14,6 @@
 # ============================================================================
 """Reimplementation of tensorflow.python.util.tf_inspect."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 try:
   from tensorflow.python.util import tf_inspect as inspect  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 except ImportError:

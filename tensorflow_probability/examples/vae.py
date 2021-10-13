@@ -108,10 +108,6 @@ which can be run with
      https://arxiv.org/abs/1509.00519
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import os
 

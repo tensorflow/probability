@@ -15,10 +15,6 @@
 """TensorFlow Probability auto-batching package.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy
 from tensorflow_probability.python.experimental.auto_batching import dsl
 from tensorflow_probability.python.experimental.auto_batching import frontend

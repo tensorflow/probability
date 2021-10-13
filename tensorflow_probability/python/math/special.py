@@ -14,11 +14,6 @@
 # ============================================================================
 """Implements special functions in TensorFlow."""
 
-from __future__ import absolute_import
-from __future__ import division
-# [internal] enable type annotations
-from __future__ import print_function
-
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf

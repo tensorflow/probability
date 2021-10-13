@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests for GeneralizedPareto bijector."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util

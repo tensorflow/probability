@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests for convolution_layers.py."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 # Dependency imports
 import numpy as np

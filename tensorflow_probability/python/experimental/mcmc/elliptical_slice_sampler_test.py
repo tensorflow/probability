@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests for slice_sampler_utils.py and slice_sampler_kernel.py."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp

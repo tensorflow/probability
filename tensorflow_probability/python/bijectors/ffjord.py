@@ -14,11 +14,6 @@
 # ============================================================================
 """FFJORD bijector class."""
 
-from __future__ import absolute_import
-from __future__ import division
-# [internal] enable type annotations
-from __future__ import print_function
-
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math

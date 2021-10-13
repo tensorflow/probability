@@ -18,10 +18,6 @@ Borrows the stack, and conditional execution, from the host Python; manages only
 divergence.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import contextlib
 import functools
 import heapq

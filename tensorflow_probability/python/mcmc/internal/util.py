@@ -14,10 +14,6 @@
 # ============================================================================
 """Internal utility functions for implementing TransitionKernels."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import warnings
 
 # Dependency imports

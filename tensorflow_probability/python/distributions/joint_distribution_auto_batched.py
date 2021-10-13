@@ -14,9 +14,6 @@
 # ============================================================================
 """Joint distributions with inferred batch semantics."""
 
-from __future__ import absolute_import
-from __future__ import division
-
 from tensorflow_probability.python.distributions import joint_distribution_coroutine
 from tensorflow_probability.python.distributions import joint_distribution_named
 from tensorflow_probability.python.distributions import joint_distribution_sample_path_mixin

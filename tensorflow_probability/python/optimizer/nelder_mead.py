@@ -21,10 +21,6 @@ modifies the simplex based on a set of moves (reflection, expansion, shrinkage
 and contraction) using the function values at each of the vertices.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 # Dependency imports

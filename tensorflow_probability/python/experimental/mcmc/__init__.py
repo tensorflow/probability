@@ -14,10 +14,6 @@
 # ============================================================================
 """TensorFlow Probability experimental MCMC package."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental.mcmc.covariance_reducer import CovarianceReducer
 from tensorflow_probability.python.experimental.mcmc.covariance_reducer import VarianceReducer
 from tensorflow_probability.python.experimental.mcmc.diagonal_mass_matrix_adaptation import DiagonalMassMatrixAdaptation

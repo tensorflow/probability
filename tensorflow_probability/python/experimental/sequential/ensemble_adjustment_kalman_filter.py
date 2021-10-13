@@ -15,10 +15,6 @@
 
 """Utilities for Ensemble Adjustment Kalman Filtering."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.sequential import ensemble_kalman_filter  # pylint:disable=line-too-long
 from tensorflow_probability.python.internal import dtype_util

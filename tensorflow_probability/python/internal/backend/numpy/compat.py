@@ -14,10 +14,6 @@
 # ============================================================================
 """Experimental Numpy backend."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.internal.backend.numpy import v1
 from tensorflow_probability.python.internal.backend.numpy import v2
 from tensorflow_probability.python.internal.backend.numpy.gen.tensor_shape import dimension_value

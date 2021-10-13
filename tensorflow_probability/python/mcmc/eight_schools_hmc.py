@@ -14,10 +14,6 @@
 # ============================================================================
 """Shared library for `eight_schools_hmc_{graph,eager}_test.py`."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import time
 # Dependency imports
 import numpy as np

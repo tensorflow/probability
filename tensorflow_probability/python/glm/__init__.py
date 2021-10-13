@@ -14,10 +14,6 @@
 # ============================================================================
 """TensorFlow Probability GLM python package."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.glm.family import Bernoulli
 from tensorflow_probability.python.glm.family import BernoulliNormalCDF
 from tensorflow_probability.python.glm.family import Binomial

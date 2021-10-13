@@ -34,10 +34,6 @@ To run with default arguments:
      https://arxiv.org/pdf/1409.1556.pdf
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import os
 import warnings
 

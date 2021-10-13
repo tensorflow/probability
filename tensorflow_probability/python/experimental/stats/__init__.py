@@ -14,10 +14,6 @@
 # ============================================================================
 """Statistical functions."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCentralMoments
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningCovariance
 from tensorflow_probability.python.experimental.stats.sample_stats import RunningMean

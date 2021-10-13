@@ -14,10 +14,6 @@
 # ============================================================================
 """The determinantal point process (DPP) distribution class."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 

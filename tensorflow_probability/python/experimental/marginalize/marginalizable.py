@@ -16,8 +16,6 @@
 
 # pylint: disable=abstract-method,no-member,g-importing-member
 
-from __future__ import print_function
-
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib

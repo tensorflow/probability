@@ -14,10 +14,6 @@
 # ============================================================================
 """Tools for probabilistic reasoning in TensorFlow."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import sys
 import types

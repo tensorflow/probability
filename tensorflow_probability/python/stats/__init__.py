@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Statistical functions."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # pylint: disable=unused-import,line-too-long,g-importing-member
 
 from tensorflow_probability.python.internal import all_util

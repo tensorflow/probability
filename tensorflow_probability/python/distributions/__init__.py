@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Statistical distributions."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # pylint: disable=unused-import,line-too-long,g-importing-member,g-bad-import-order
 
 # Distributions:

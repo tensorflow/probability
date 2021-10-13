@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests for Hager Zhang line search."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 from absl.testing import parameterized

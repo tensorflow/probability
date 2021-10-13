@@ -13,8 +13,4 @@
 # limitations under the License.
 # ============================================================================
 """Helper and boilerplate code for Statistical Rethinking notebooks."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.examples.statistical_rethinking.rethinking.quap import *

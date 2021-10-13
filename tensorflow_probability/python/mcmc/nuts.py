@@ -33,10 +33,6 @@ a `tf.while_loop`.
      _arXiv preprint arXiv:1701.02434_, 2018. https://arxiv.org/abs/1701.02434
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 import numpy as np
 

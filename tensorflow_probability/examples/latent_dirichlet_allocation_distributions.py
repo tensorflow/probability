@@ -92,10 +92,6 @@ perplexity
      https://arxiv.org/abs/1703.01488
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import os
 

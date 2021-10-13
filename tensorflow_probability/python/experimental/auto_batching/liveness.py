@@ -22,10 +22,6 @@ This module implements a liveness analysis for the IR defined in
 instructions.py.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst

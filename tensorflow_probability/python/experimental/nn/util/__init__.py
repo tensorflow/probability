@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Utilitity functions for building neural networks."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental.nn.util.convolution_util import im2row
 from tensorflow_probability.python.experimental.nn.util.convolution_util import im2row_index
 from tensorflow_probability.python.experimental.nn.util.convolution_util import make_convolution_fn

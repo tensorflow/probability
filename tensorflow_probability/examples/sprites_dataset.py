@@ -26,10 +26,6 @@ Autoencoder paper [(Li and Mandt, 2018)][2].
      In _International Conference on Machine Learning_, 2018.
      https://arxiv.org/abs/1803.02991
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from collections import namedtuple
 import os
 import random

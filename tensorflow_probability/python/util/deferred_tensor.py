@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Class definitions for declaritive (vs imperative) `Tensors` & `Variables`."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import abc
 import functools
 import numpy as np

@@ -29,10 +29,6 @@ to update the codebook for each minibatch.
      Systems_, 2017. https://arxiv.org/abs/1711.00937
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import os
 import time

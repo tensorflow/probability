@@ -14,10 +14,6 @@
 # ============================================================================
 """Prune module attributes (API) down to a specified list (e.g. `__all__`)."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import sys
 
 

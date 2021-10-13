@@ -35,10 +35,6 @@ chain Monte Carlo library.
 # to limitations of the auto-batching system (at the time of writing).  See
 # https://github.com/tensorflow/probability/blob/main/tensorflow_probability/python/internal/auto_batching/README.md.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 import functools
 

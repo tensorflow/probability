@@ -14,10 +14,6 @@
 # ============================================================================
 """Multivariate Normal distribution class initialized with a full covariance."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import stats as tfp_stats
 from tensorflow_probability.python.bijectors import chain as chain_bijector

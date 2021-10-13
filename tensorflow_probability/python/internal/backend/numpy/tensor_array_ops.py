@@ -14,10 +14,6 @@
 # ============================================================================
 """Numpy implementations of `tf.TensorArray`."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import warnings
 
 import numpy as np

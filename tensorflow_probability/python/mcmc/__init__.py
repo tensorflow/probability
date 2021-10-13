@@ -14,10 +14,6 @@
 # ============================================================================
 """TensorFlow Probability MCMC python package."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.mcmc.diagnostic import effective_sample_size
 from tensorflow_probability.python.mcmc.diagnostic import potential_scale_reduction
 from tensorflow_probability.python.mcmc.dual_averaging_step_size_adaptation import DualAveragingStepSizeAdaptation

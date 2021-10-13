@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Loss functions for neural networks."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental.nn.losses.losses import compute_extra_loss
 from tensorflow_probability.python.experimental.nn.losses.losses import kl_divergence_exact
 from tensorflow_probability.python.experimental.nn.losses.losses import kl_divergence_monte_carlo

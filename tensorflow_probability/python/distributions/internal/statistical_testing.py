@@ -121,10 +121,6 @@ The number of samples needed tends to scale as `O(1/discrepancy**2)` and
 as `O(log(1/error_rate))`.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 import itertools
 

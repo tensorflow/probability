@@ -14,10 +14,6 @@
 # ============================================================================
 """Functions for computing moving statistics of a value stream."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf

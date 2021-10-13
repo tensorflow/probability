@@ -14,10 +14,6 @@
 # ============================================================================
 """Bijective transformations."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # pylint: disable=unused-import,wildcard-import,line-too-long,g-importing-member
 
 from tensorflow_probability.python.bijectors.absolute_value import AbsoluteValue

@@ -23,10 +23,6 @@ Bechmarking GPU: To benchmark GPU, the host machine must have access to a GPU
 (either locally or remotely) and TensorFlow must be compiled with GPU support.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 import pprint
 import time

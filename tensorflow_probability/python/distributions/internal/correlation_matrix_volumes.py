@@ -26,10 +26,6 @@ volumes of several sets of correlation matrices.  Which sets, and the
 desired statistical significance, are hard-coded in this source file.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import pprint
 
 # Dependency imports

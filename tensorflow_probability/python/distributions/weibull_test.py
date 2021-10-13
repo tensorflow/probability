@@ -13,9 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Tests for Weibull distribution."""
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
 import numpy as np
 from scipy import stats

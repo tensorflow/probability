@@ -23,10 +23,6 @@ approximations implicitly.
 This module implements the algorithm known as L-BFGS, which, as its name
 suggests, is a limited-memory version of the BFGS algorithm.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 # Dependency imports

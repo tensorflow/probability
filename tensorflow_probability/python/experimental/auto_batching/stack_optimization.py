@@ -14,10 +14,6 @@
 # ============================================================================
 """Optimizing stack usage (pushes and pops)."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 from tensorflow_probability.python.experimental.auto_batching import instructions as inst

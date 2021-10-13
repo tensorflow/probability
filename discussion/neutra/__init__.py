@@ -14,10 +14,6 @@
 # ============================================================================
 """NeuTra."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from discussion.neutra.neutra_kernel import NeuTra
 
 __all__ = ['NeuTra']

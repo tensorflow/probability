@@ -13,10 +13,6 @@
 # limitations under the License.
 """Tests for tensorflow_probability.python.stats.calibration."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import itertools
 from absl import logging
 from absl.testing import parameterized

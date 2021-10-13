@@ -24,10 +24,6 @@ Tests of compatibility with JAX transformations are in
 jax_transformation_test.py.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 from absl.testing import parameterized

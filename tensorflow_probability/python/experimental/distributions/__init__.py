@@ -14,10 +14,6 @@
 # ============================================================================
 """TensorFlow Probability experimental distributions package."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.distributions.log_prob_ratio import log_prob_ratio
 from tensorflow_probability.python.experimental.distributions import marginal_fns
 from tensorflow_probability.python.experimental.distributions.increment_log_prob import IncrementLogProb

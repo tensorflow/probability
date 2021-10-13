@@ -14,11 +14,6 @@
 # ============================================================================
 """Utilities for fitting variational distributions."""
 
-from __future__ import absolute_import
-from __future__ import division
-# [internal] enable type annotations
-from __future__ import print_function
-
 import functools
 
 from tensorflow_probability.python import math as tfp_math

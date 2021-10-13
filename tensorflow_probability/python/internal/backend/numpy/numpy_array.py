@@ -14,10 +14,6 @@
 # ============================================================================
 """Numpy implementations of TensorFlow general top-level functions."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 # Dependency imports
 import numpy as np

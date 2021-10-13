@@ -14,8 +14,6 @@
 # ============================================================================
 """Particle filtering."""
 
-from __future__ import print_function
-
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import sequential_monte_carlo_kernel as smc_kernel

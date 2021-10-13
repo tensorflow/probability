@@ -14,10 +14,6 @@
 # ============================================================================
 """Stub implementation of tensorflow.python.util.deprecation."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import contextlib
 
 # pylint: disable=unused-argument

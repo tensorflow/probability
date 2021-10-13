@@ -14,10 +14,6 @@
 # ============================================================================
 """Multivariate Normal distribution classes."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import mvn_linear_operator

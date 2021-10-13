@@ -97,10 +97,6 @@ minutes on a single V100 GPU, and produces a model with an ELBO of
      https://arxiv.org/abs/1803.02991
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from datetime import datetime
 import functools
 

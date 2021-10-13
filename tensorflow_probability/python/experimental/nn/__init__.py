@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Tools for building neural networks."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental.nn import initializers
 from tensorflow_probability.python.experimental.nn import losses
 from tensorflow_probability.python.experimental.nn import util

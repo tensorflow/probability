@@ -27,10 +27,6 @@ relaxes the TFP non-experimental contract in two regards:
 You are welcome to try any of this out (and tell us how well it works for you!).
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental import auto_batching
 from tensorflow_probability.python.experimental import bijectors
 from tensorflow_probability.python.experimental import distribute

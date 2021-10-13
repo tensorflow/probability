@@ -24,10 +24,6 @@ The architecture is LeNet-5 [1].
      http://yann.lecun.com/exdb/publis/pdf/lecun-01a.pdf
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import os
 import warnings
 

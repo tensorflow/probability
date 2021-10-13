@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Initializer functions for building neural networks."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental.nn.initializers.initializers import glorot_normal
 from tensorflow_probability.python.experimental.nn.initializers.initializers import glorot_uniform
 from tensorflow_probability.python.experimental.nn.initializers.initializers import he_normal

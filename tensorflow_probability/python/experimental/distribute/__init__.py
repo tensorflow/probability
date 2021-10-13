@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Experimental module for doing distributed log prob calculations."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionCoroutine
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionDistributedMixin
 from tensorflow_probability.python.experimental.distribute.joint_distribution import JointDistributionNamed

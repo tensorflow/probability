@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests for dense variational layers."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
 from keras import testing_utils
 import numpy as np

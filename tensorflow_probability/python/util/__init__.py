@@ -14,10 +14,6 @@
 # ============================================================================
 """TensorFlow Probability python utilities."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.internal.parameter_properties import ParameterProperties
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor

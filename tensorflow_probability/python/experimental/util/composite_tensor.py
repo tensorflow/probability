@@ -14,10 +14,6 @@
 # ============================================================================
 """Use `tfp.distributions.Distribution`s as `tf.CompositeTensor`s."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import inspect
 import six
 

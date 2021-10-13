@@ -14,10 +14,6 @@
 # ============================================================================
 """TensorFlow Probability convergence criteria for optimizations."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.optimizer.convergence_criteria.convergence_criterion import ConvergenceCriterion
 from tensorflow_probability.python.optimizer.convergence_criteria.loss_not_decreasing import LossNotDecreasing

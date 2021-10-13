@@ -18,10 +18,6 @@ Until converged, we propagate type information (dtype and shape) from inputs
 toward outputs.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import contextlib
 import functools
 

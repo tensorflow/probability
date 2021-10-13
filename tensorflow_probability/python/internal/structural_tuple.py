@@ -19,10 +19,6 @@ typing rules. Structural tuples with the same field names, in the same order,
 are considered to be of the same type.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import builtins
 import collections
 import keyword

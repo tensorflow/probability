@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Utilities for time series with missing values."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 # Dependency imports

@@ -14,8 +14,6 @@
 # ============================================================================
 """Sequential Monte Carlo."""
 
-from __future__ import print_function
-
 import collections
 
 import tensorflow.compat.v2 as tf

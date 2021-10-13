@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests of the allocation strategy optimization pass."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
 
 from tensorflow_probability.python.experimental.auto_batching import allocation_strategy

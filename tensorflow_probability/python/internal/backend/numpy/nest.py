@@ -24,10 +24,6 @@ nest.pack_sequence_as(..., ...)
 ```
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 from collections import abc as collections_abc
 import types

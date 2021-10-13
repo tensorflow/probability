@@ -14,10 +14,6 @@
 # ============================================================================
 """Contains sharding-aware versions of tfd.JointDistributions."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as distribution_lib
 from tensorflow_probability.python.bijectors import identity as identity_bijector

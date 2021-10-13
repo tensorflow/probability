@@ -14,10 +14,6 @@
 # ============================================================================
 """TensorFlow Probability benchmarking library."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.debugging.benchmarking.benchmark_tf_function import benchmark_tf_function
 from tensorflow_probability.python.debugging.benchmarking.benchmark_tf_function import BenchmarkTfFunctionConfig
 from tensorflow_probability.python.debugging.benchmarking.benchmark_tf_function import default_benchmark_config

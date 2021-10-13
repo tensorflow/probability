@@ -14,10 +14,6 @@
 # ============================================================================
 """Probabilistic Layers."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.layers.conv_variational import Convolution1DFlipout
 from tensorflow_probability.python.layers.conv_variational import Convolution1DReparameterization
 from tensorflow_probability.python.layers.conv_variational import Convolution2DFlipout

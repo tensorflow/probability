@@ -14,10 +14,6 @@
 # ============================================================================
 """Tests for special."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import hypothesis as hp
 from hypothesis import strategies as hps
 import numpy as np

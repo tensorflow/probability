@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Base class for variational layers for building neural networks."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 import tensorflow.compat.v2 as tf

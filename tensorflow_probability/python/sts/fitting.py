@@ -13,10 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Methods for fitting StructuralTimeSeries models to data."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import numpy as np
 
 import tensorflow.compat.v1 as tf1

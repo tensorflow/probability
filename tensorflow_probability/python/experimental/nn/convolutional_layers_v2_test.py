@@ -15,10 +15,6 @@
 """Tests for convolution_layers_v2.py."""
 # TODO(emilyaf): Test Keras compatibility (other layers too).
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import functools
 # Dependency imports
 

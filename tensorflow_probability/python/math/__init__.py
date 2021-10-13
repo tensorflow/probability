@@ -14,10 +14,6 @@
 # ============================================================================
 """TensorFlow Probability math functions."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.math import ode
 from tensorflow_probability.python.math import psd_kernels

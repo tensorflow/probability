@@ -21,10 +21,6 @@ All operations take and ignore name= arguments to allow for useful op names in
 the TensorFlow backend.
 """
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 # Dependency imports

@@ -14,10 +14,6 @@
 # ============================================================================
 """The `JointDistributionNamed` class."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import collections
 
 from tensorflow_probability.python.distributions import joint_distribution_sequential

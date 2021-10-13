@@ -14,10 +14,6 @@
 # ============================================================================
 """Auto-generate TensorShape replacements."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 import importlib
 import inspect
 
@@ -35,15 +31,10 @@ COMMENT_OUT = [
     ('from tensorflow.python.platform '
      'import tf_logging as logging'),
     'from tensorflow.python.util.tf_export import tf_export',
-    'from __future__',
 ]
 
 PREAMBLE = """
 \"\"\"TensorShape, for numpy & jax.\"\"\"
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from absl import logging
 
 class Monitoring(object):

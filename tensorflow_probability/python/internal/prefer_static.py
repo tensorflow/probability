@@ -14,10 +14,6 @@
 # ============================================================================
 """Operations that use static values when possible."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 # Dependency imports
 import decorator
 import numpy as np
