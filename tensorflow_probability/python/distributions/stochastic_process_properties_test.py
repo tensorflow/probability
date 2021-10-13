@@ -26,6 +26,7 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.experimental.distributions import marginal_fns
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -179,7 +180,9 @@ def gaussian_processes(draw,
       enable_vars=enable_vars))
 
   gp = tfd.GaussianProcess(
-      kernel=k, index_points=index_points,
+      kernel=k,
+      index_points=index_points,
+      cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
       observation_noise_variance=params['observation_noise_variance'])
   return gp
 
@@ -247,6 +250,7 @@ def gaussian_process_regression_models(draw,
       index_points=index_points,
       observation_index_points=observation_index_points,
       observations=observations,
+      cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
       observation_noise_variance=params[
           'observation_noise_variance'])
   return gp
@@ -363,9 +367,7 @@ def student_t_processes(draw,
   stp = tfd.StudentTProcess(
       kernel=k,
       index_points=index_points,
-      # The Student-T Process can encounter cholesky decomposition errors,
-      # so use a large jitter to avoid that.
-      jitter=1e-1,
+      cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
       df=params['df'])
   return stp
 
@@ -437,17 +439,14 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
         process_name=process_name, enable_vars=True))
     self.evaluate([var.initializer for var in process.variables])
 
-    # TODO(b/147770193): Avoid non-PSD matrices in
-    # `GaussianProcessRegressionModel`.
-    with kernel_hps.no_pd_errors():
-      with tf.GradientTape() as tape:
-        sample = process.sample()
-      if process.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
-        grads = tape.gradient(sample, process.variables)
-        for grad, var in zip(grads, process.variables):
-          self.assertIsNotNone(
-              grad,
-              'Grad of sample was `None` for var: {}.'.format(var))
+    with tf.GradientTape() as tape:
+      sample = process.sample()
+    if process.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
+      grads = tape.gradient(sample, process.variables)
+      for grad, var in zip(grads, process.variables):
+        self.assertIsNotNone(
+            grad,
+            'Grad of sample was `None` for var: {}.'.format(var))
 
   @parameterized.named_parameters(
       {'testcase_name': '_' + sname, 'process_name': sname}
@@ -462,17 +461,14 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
     self.evaluate([var.initializer for var in process.variables])
 
     # Test that log_prob produces non-None gradients.
-    # TODO(b/147770193): Avoid non-PSD matrices in
-    # `GaussianProcessRegressionModel`.
-    with kernel_hps.no_pd_errors():
-      sample = process.sample()
-      with tf.GradientTape() as tape:
-        lp = process.log_prob(sample)
-      grads = tape.gradient(lp, process.variables)
-      for grad, var in zip(grads, process.variables):
-        self.assertIsNotNone(
-            grad,
-            'Grad of log_prob was `None` for var: {}.'.format(var))
+    sample = process.sample()
+    with tf.GradientTape() as tape:
+      lp = process.log_prob(sample)
+    grads = tape.gradient(lp, process.variables)
+    for grad, var in zip(grads, process.variables):
+      self.assertIsNotNone(
+          grad,
+          'Grad of log_prob was `None` for var: {}.'.format(var))
 
   @parameterized.named_parameters(
       {'testcase_name': '_' + sname, 'process_name': sname}
@@ -489,17 +485,14 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
     self.evaluate([var.initializer for var in process.variables])
 
     hp.note('Testing excessive var usage in {}.log_prob'.format(process_name))
-    # TODO(b/147770193): Avoid non-PSD matrices in
-    # `GaussianProcessRegressionModel`.
-    with kernel_hps.no_pd_errors():
-      sample = process.sample()
-      try:
-        with tfp_hps.assert_no_excessive_var_usage(
-            'method `log_prob` of `{}`'.format(process),
-            max_permissible=MAX_CONVERSIONS_BY_CLASS.get(process_name, 1)):
-          process.log_prob(sample)
-      except NotImplementedError:
-        pass
+    sample = process.sample()
+    try:
+      with tfp_hps.assert_no_excessive_var_usage(
+          'method `log_prob` of `{}`'.format(process),
+          max_permissible=MAX_CONVERSIONS_BY_CLASS.get(process_name, 1)):
+        process.log_prob(sample)
+    except NotImplementedError:
+      pass
 
 
 def greater_than_twenty(x):

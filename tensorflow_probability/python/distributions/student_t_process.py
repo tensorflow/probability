@@ -339,11 +339,12 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
       self._observation_noise_variance = observation_noise_variance
       self._mean_fn = mean_fn
       self._jitter = jitter
+      self._cholesky_fn = cholesky_fn
       if marginal_fn is not None and cholesky_fn is not None:
         raise ValueError(
             'At most one of `marginal_fn` and `cholesky_fn` should be set.')
       if marginal_fn is None:
-        if cholesky_fn is None:
+        if self._cholesky_fn is None:
           self._cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(
               jitter)
         self._marginal_fn = make_cholesky_factored_marginal_fn(
