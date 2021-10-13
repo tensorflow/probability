@@ -27,13 +27,13 @@
 # Simple usage (from the root of the TFP repo, with a virtualenv active):
 #
 # ```bash
-#   $ ./testing/install_python_packages.sh
+#   $ ./testing/install_test_dependencies.sh
 # ```
 #
 # Usage outside of a virtualenv (not recommended):
 #
 # ```bash
-#   $ ./testing/install_python_packages.sh --user
+#   $ ./testing/install_test_dependencies.sh --user
 # ```
 #
 # The --user variant will simply forward the --user flag to pip install

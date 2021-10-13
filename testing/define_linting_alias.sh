@@ -24,7 +24,7 @@
 # # ==> /absolute/path/to/testing/run_tfp_lints.sh
 # ```
 #
-# Optionally, provide a positional arguemnt to this script to create an
+# Optionally, provide a positional argument to this script to create an
 # alternate alias name:
 #
 # ```bash
