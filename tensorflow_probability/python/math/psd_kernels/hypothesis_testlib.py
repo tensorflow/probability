@@ -862,7 +862,7 @@ CONSTRAINTS = {
     'concentration1': constrain_to_range(1., 2.),
     'df': constrain_to_range(2., 5.),
     'slope_variance': constrain_to_range(0.1, 0.5),
-    'exponent': constrain_to_range(1, 1.5),
+    'exponent': lambda x: tf.math.floor(constrain_to_range(1, 4.)(x)),
     'length_scale': constrain_to_range(1., 6.),
     'inverse_length_scale': constrain_to_range(0., 2.),
     'period': constrain_to_range(1., 6.),

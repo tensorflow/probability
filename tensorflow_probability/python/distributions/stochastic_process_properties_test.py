@@ -247,8 +247,7 @@ def gaussian_process_regression_models(draw,
       observation_index_points=observation_index_points,
       observations=observations,
       cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
-      observation_noise_variance=params[
-          'observation_noise_variance'])
+      observation_noise_variance=params['observation_noise_variance'])
   return gp
 
 

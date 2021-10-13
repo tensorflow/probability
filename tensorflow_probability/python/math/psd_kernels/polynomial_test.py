@@ -65,6 +65,23 @@ class PolynomialTest(test_util.TestCase):
           validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
+  def testExponentInteger(self):
+    with self.assertRaisesOpError('`exponent` must be an integer.'):
+      k = tfp.math.psd_kernels.Polynomial(
+          bias_variance=1.,
+          slope_variance=1.,
+          exponent=1.5,
+          validate_args=True)
+      self.evaluate(k.apply([1.], [1.]))
+
+    # No error
+    k = tfp.math.psd_kernels.Polynomial(
+        bias_variance=1.,
+        slope_variance=1.,
+        exponent=3.,
+        validate_args=True)
+    self.evaluate(k.apply([1.], [1.]))
+
   def testShifttNonPositiveIsOk(self):
     # No exception expected
     k = tfp.math.psd_kernels.Polynomial(shift=-1., validate_args=True)

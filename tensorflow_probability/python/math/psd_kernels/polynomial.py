@@ -85,9 +85,10 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
         like 0, which results in having the intercept at the origin.
         Default Value: `None`
       exponent: Positive floating point `Tensor` that controls the exponent
-        (also known as the degree) of the polynomial function. Must be
-        broadcastable with `bias_variance`, `slope_variance`, `shift`, and
-        inputs to `apply` and `matrix` methods. A value of `None` is treated
+        (also known as the degree) of the polynomial function, and must be an
+        integer.
+        Must be broadcastable with `bias_variance`, `slope_variance`, `shift`,
+        and inputs to `apply` and `matrix` methods. A value of `None` is treated
         like 1, which results in a linear kernel.
         Default Value: `None`
       feature_ndims: Python `int` number of rightmost dims to include in kernel
@@ -193,9 +194,14 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
     slope_variance = self.slope_variance
 
     if ok_to_check(self.exponent):
+      exponent = tf.convert_to_tensor(self.exponent)
       assertions.append(
           assert_util.assert_positive(
-              self.exponent, message='`exponent` must be positive.'))
+              exponent, message='`exponent` must be positive.'))
+      from tensorflow_probability.python.internal import distribution_util  # pylint: disable=g-import-not-at-top
+      assertions.append(
+          distribution_util.assert_integer_form(
+              exponent, message='`exponent` must be an integer.'))
     if ok_to_check(self.bias_variance):
       bias_variance = tf.convert_to_tensor(self.bias_variance)
       assertions.append(
