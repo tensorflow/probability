@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for MixtureSameFamily distribution."""
 
-import warnings
-
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v1 as tf1
@@ -23,6 +21,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -164,6 +163,66 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     ]
 
     self.assertAllClose(marginals, expected_marginals)
+
+  def testBatchShapesAreBroadcast(self):
+    logits_seed, loc_seed, seed = samplers.split_seed(
+        test_util.test_seed(sampler_type='stateless'), n=3)
+    logits = self.evaluate(samplers.normal([3, 1, 5], seed=logits_seed))
+    loc = self.evaluate(samplers.normal([1, 4, 5, 2], seed=loc_seed))
+    dist = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(logits=self._build_tensor(logits)),
+        components_distribution=tfd.Independent(
+            tfd.Logistic(loc=self._build_tensor(loc), scale=1.),
+            reinterpreted_batch_ndims=1),
+        validate_args=True)
+    self.assertAllEqual(dist.batch_shape_tensor(), [3, 4])
+    mean, variance = self.evaluate((dist.mean(), dist.variance()))
+    self.assertAllEqual(mean.shape, [3, 4, 2])
+    self.assertAllEqual(variance.shape, [3, 4, 2])
+
+    x, x_lp = self.evaluate(
+        dist.experimental_sample_and_log_prob([2, 1], seed=seed))
+    self.assertAllEqual(x.shape, [2, 1, 3, 4, 2])
+
+    mode = self.evaluate(dist.posterior_mode(x))
+    self.assertAllEqual(mode.shape, [2, 1, 3, 4])
+    marginals_logits = self.evaluate(
+        dist.posterior_marginal(x).logits_parameter())
+    self.assertAllEqual(marginals_logits.shape, [2, 1, 3, 4, 5])
+
+    fully_broadcast_dist = tfd.MixtureSameFamily(
+        mixture_distribution=(dist.mixture_distribution
+                              ._broadcast_parameters_with_batch_shape([3, 4])),
+        components_distribution=(dist.components_distribution
+                                 ._broadcast_parameters_with_batch_shape(
+                                     [3, 4, 5])),
+        validate_args=True)
+    self.assertAllEqual(
+        fully_broadcast_dist.mixture_distribution.batch_shape_tensor(),
+        [3, 4])
+    self.assertAllEqual(
+        fully_broadcast_dist.components_distribution.batch_shape_tensor(),
+        [3, 4, 5])
+
+    x2 = self.evaluate(fully_broadcast_dist.sample([2, 1], seed=seed))
+    self.assertAllEqual(x, x2)
+    self.assertAllEqual(x_lp, fully_broadcast_dist.log_prob(x))
+
+  def testBroadcastBatchDimensionsAreIndependent(self):
+    mixture = tfd.MixtureSameFamily(
+        mixture_distribution=tfd.Categorical(probs=[0.5, 0.5]),
+        components_distribution=tfd.Normal(loc=[[0., 10.], [0., 10.]],
+                                           scale=0.1))
+    samples = self.evaluate(mixture.sample(sample_shape=(1000,),
+                                           seed=test_util.test_seed()))
+    # If mixture components across the batch are independent, we'll sample from
+    # (10, 0) and (0, 10) just as often as (0, 0) and (10, 10), so the mean
+    # absolute difference is about 5. On the other hand, if both batches share
+    # the same mixture component, the mean absolute difference would be close
+    # to zero.
+    self.assertGreater(
+        np.mean(np.abs(samples[..., 0] - samples[..., 1])),
+        4.)
 
   def testPosteriorMode(self):
     gm = tfd.MixtureSameFamily(
@@ -351,9 +410,12 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
   def testExcessiveConcretizationOfParams(self):
     logits = tfp_hps.defer_and_count_usage(
-        self._build_variable(np.zeros((4, 4, 5)), name='logits'))
+        # Dynamic rank would incur extra concretizations because batch
+        # broadcasting can't be short-circuited.
+        self._build_variable(np.zeros((5)), static_rank=True, name='logits'))
     concentration = tfp_hps.defer_and_count_usage(
-        self._build_variable(np.zeros((4, 4, 5, 3)), name='concentration'))
+        self._build_variable(np.zeros((5, 3)), static_rank=True,
+                             name='concentration'))
     dist = tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(logits=logits),
         components_distribution=tfd.Dirichlet(concentration=concentration),
@@ -404,7 +466,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     logits = tfp_hps.defer_and_count_usage(self._build_variable(
         np.zeros(5), name='logits', static_rank=True))
     loc = tfp_hps.defer_and_count_usage(self._build_variable(
-        np.zeros((4, 4, 5)), name='loc', static_rank=True))
+        np.zeros(5), name='loc', static_rank=True))
     scale = tfp_hps.defer_and_count_usage(self._build_variable(
         1., name='scale', static_rank=True))
     dist = tfd.MixtureSameFamily(
@@ -529,25 +591,6 @@ class MixtureSameFamilyTestDynamic32(
       with tf.control_dependencies([loc.assign(np.zeros((4, 7, 2, 3)))]):
         self.evaluate(dist.mean())
 
-  def testMatchingBatchShapeAssertions(self):
-    logits = self._build_variable(np.zeros(5))
-    loc = self._build_variable(np.zeros((4, 5, 2, 3)), static_rank=True)
-    scale = self._build_variable(1.)
-    dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=logits),
-        components_distribution=tfd.Independent(
-            tfd.Logistic(loc=loc, scale=scale), reinterpreted_batch_ndims=2),
-        validate_args=True)
-
-    self.evaluate([v.initializer for v in [logits, loc, scale]])
-    self.evaluate(dist.sample(seed=test_util.test_seed()))
-
-    msg = ('`mixture_distribution.batch_shape`.* is not compatible with '
-           '`components_distribution.batch_shape')
-    with self.assertRaisesRegex(Exception, msg):
-      with tf.control_dependencies([logits.assign(np.zeros((4, 3, 5)))]):
-        self.evaluate(dist.sample(seed=test_util.test_seed()))
-
 
 @test_util.test_all_tf_execution_regimes
 class MixtureSameFamilyTestStatic64(
@@ -555,89 +598,6 @@ class MixtureSameFamilyTestStatic64(
     test_util.TestCase):
   use_static_shape = True
   dtype = np.float64
-
-
-class SamplerBackwardCompatibilityTest(test_util.TestCase):
-
-  @test_util.substrate_disable_stateful_random_test
-  def testStatefulComponentDist(self):
-
-    class StatefulNormal(tfd.Distribution):
-
-      def __init__(self, loc):
-        self._loc = tf.convert_to_tensor(loc)
-        super(StatefulNormal, self).__init__(
-            dtype=tf.float32, reparameterization_type=tfd.FULLY_REPARAMETERIZED,
-            validate_args=False, allow_nan_stats=False)
-
-      def _batch_shape(self):
-        return self._loc.shape
-
-      def _event_shape(self):
-        return []
-
-      def _sample_n(self, n, seed=None):
-        return self._loc + tf.random.normal(
-            tf.concat([[n], tf.shape(self._loc)], axis=0), seed=seed)
-
-    mix = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=[0., 0]),
-        components_distribution=StatefulNormal(loc=[1., 2]))
-    with warnings.catch_warnings(record=True) as triggered:
-      self.evaluate(mix.sample())
-    self.assertTrue(
-        any('Falling back to stateful sampling for `components_distribution`'
-            in str(warning.message) for warning in triggered))
-
-  @test_util.substrate_disable_stateful_random_test
-  def testStatefulMixtureDist(self):
-
-    class StatefulCategorical(tfd.Distribution):
-
-      def __init__(self, logits):
-        self._logits = tf.convert_to_tensor(logits)
-        super(StatefulCategorical, self).__init__(
-            dtype=tf.int32, reparameterization_type=tfd.NOT_REPARAMETERIZED,
-            validate_args=False, allow_nan_stats=False)
-
-      def _event_shape(self):
-        return []
-
-      def _sample_n(self, n, seed=None):
-        return tf.random.categorical([self._logits], n, seed=seed)[0]
-
-    mix = tfd.MixtureSameFamily(
-        mixture_distribution=StatefulCategorical(logits=[0., 0]),
-        components_distribution=tfd.Normal(loc=[1., 2], scale=1))
-    with warnings.catch_warnings(record=True) as triggered:
-      self.evaluate(mix.sample())
-    self.assertTrue(
-        any('Falling back to stateful sampling for `mixture_distribution`'
-            in str(warning.message) for warning in triggered))
-
-  def testGithubIssue1010(self):
-    dtype = np.float64
-    npredict = int(1e2)
-    ncomponent = 5
-    ngrid = int(1e2)
-    pi_sim = np.random.uniform(size=(npredict, ncomponent)).astype(dtype)
-    pi_sim = pi_sim / pi_sim.sum(axis=1, keepdims=True)
-    mean_sim = np.random.uniform(
-        low=5, high=10, size=(npredict, ncomponent)).astype(dtype)
-    sd_sim = np.random.uniform(
-        low=0.1, high=1, size=(npredict, ncomponent)).astype(dtype)
-    mixture_distribution = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(probs=pi_sim),
-        components_distribution=tfd.Normal(
-            loc=mean_sim,
-            scale=sd_sim,
-            validate_args=True,
-            allow_nan_stats=False,
-        )
-    )
-
-    grid = np.linspace(-10, 10, num=ngrid).astype(dtype)
-    self.evaluate(mixture_distribution.prob(grid))
 
 
 if __name__ == '__main__':

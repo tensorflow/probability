@@ -321,6 +321,19 @@ def size0(x, name=None):
     return pad(shape(x)[:1], paddings=[[0, 1]], constant_values=0)[0]
 
 
+def dimension_size(x, idx):
+  """Equivalent to `shape(x)[idx]`, but robust to partially-known shapes."""
+  x_shape = x.shape
+  static_idx = tf.get_static_value(idx)
+  if static_idx is not None:
+    idx = static_idx
+    if tf.compat.dimension_value(x_shape[idx]) is None:
+      x_shape = _shape(x)
+  else:  # `dimension_idx` is not static.
+    x_shape = convert_to_shape_tensor(_shape(x))
+  return x_shape[idx]
+
+
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
   s_ = tf.get_static_value(s)

@@ -19,12 +19,12 @@ import warnings
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
-from tensorflow_probability.python.internal import distribution_util as distribution_utils
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -32,8 +32,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.gradient import value_and_batch_jacobian
-from tensorflow_probability.python.util.seed_stream import SeedStream
-from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
 
 
 # Cause all warnings to always be triggered.
@@ -118,13 +116,13 @@ class MixtureSameFamily(distribution.Distribution):
     """Construct a `MixtureSameFamily` distribution.
 
     Args:
-      mixture_distribution: `tfp.distributions.Categorical`-like instance.
+      mixture_distribution: `tfd.Categorical`-like instance.
         Manages the probability of selecting components. The number of
         categories must match the rightmost batch dimension of the
-        `components_distribution`. Must have either scalar `batch_shape` or
-        `batch_shape` matching `components_distribution.batch_shape[:-1]`.
-      components_distribution: `tfp.distributions.Distribution`-like instance.
-        Right-most batch dimension indexes components.
+        `components_distribution`. Must have `batch_shape` broadcastable
+        with `components_distribution.batch_shape[:-1]`.
+      components_distribution: `tfd.Distribution`-like instance.
+        The right-most batch dimension indexes the mixture components.
       reparameterize: Python `bool`, default `False`. Whether to reparameterize
         samples of the distribution using implicit reparameterization gradients
         [(Figurnov et al., 2018)][1]. The gradients for the mixture logits are
@@ -222,6 +220,27 @@ class MixtureSameFamily(distribution.Distribution):
             parameter_properties.BatchedComponentProperties(
                 event_ndims=1)))
 
+  def _get_distributions_with_broadcast_batch_shape(self):
+    """Broadcasts the mixture and component dists to have full batch shape."""
+    overall_batch_shape = self.batch_shape
+    if (tensorshape_util.is_fully_defined(overall_batch_shape) and
+        self.components_distribution.batch_shape[:-1] == overall_batch_shape and
+        self.mixture_distribution.batch_shape == overall_batch_shape):
+      # No need to broadcast.
+      return self.mixture_distribution, self.components_distribution
+
+    if not tensorshape_util.is_fully_defined(overall_batch_shape):
+      overall_batch_shape = self.batch_shape_tensor()
+    # The mixture distribution is primarily accessed through its parameters
+    # (e.g., logits), so broadcast those directly.
+    mixture_distribution = (
+        self.mixture_distribution._broadcast_parameters_with_batch_shape(
+            overall_batch_shape))
+    components_distribution = batch_broadcast.BatchBroadcast(
+        self.components_distribution,
+        with_shape=ps.concat([overall_batch_shape, [1]], axis=0))
+    return mixture_distribution, components_distribution
+
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing
     # for instances of MSF, not subclasses thereof.
@@ -258,73 +277,27 @@ class MixtureSameFamily(distribution.Distribution):
   def _sample_n(self, n, seed):
     components_seed, mix_seed = samplers.split_seed(seed,
                                                     salt='MixtureSameFamily')
-    try:
-      seed_stream = SeedStream(seed, salt='MixtureSameFamily')
-    except TypeError as e:  # Can happen for Tensor seeds.
-      seed_stream = None
-      seed_stream_err = e
-    try:
-      x = self.components_distribution.sample(  # [n, B, k, E]
-          n, seed=components_seed)
-      if seed_stream is not None:
-        seed_stream()  # Advance even if unused.
-    except TypeError as e:
-      if ('Expected int for argument' not in str(e) and
-          TENSOR_SEED_MSG_PREFIX not in str(e)):
-        raise
-      if seed_stream is None:
-        raise seed_stream_err
-      msg = ('Falling back to stateful sampling for `components_distribution` '
-             '{} of type `{}`. Please update to use `tf.random.stateless_*` '
-             'RNGs. This fallback may be removed after 20-Aug-2020. {}')
-      warnings.warn(msg.format(self.components_distribution.name,
-                               type(self.components_distribution),
-                               str(e)))
-      x = self.components_distribution.sample(  # [n, B, k, E]
-          n, seed=seed_stream())
+    mixture_distribution, components_distribution = (
+        self._get_distributions_with_broadcast_batch_shape())
+    x = components_distribution.sample(  # [n, B, k, E]
+        n, seed=components_seed)
 
-    event_shape = None
-    event_ndims = tensorshape_util.rank(self.event_shape)
-    if event_ndims is None:
-      event_shape = self.components_distribution.event_shape_tensor()
-      event_ndims = ps.rank_from_shape(event_shape)
-    event_ndims_static = tf.get_static_value(event_ndims)
-
-    num_components = None
-    if event_ndims_static is not None:
-      num_components = tf.compat.dimension_value(
-          x.shape[-1 - event_ndims_static])
+    event_ndims = ps.rank_from_shape(self.event_shape_tensor, self.event_shape)
     # We could also check if num_components can be computed statically from
     # self.mixture_distribution's logits or probs.
-    if num_components is None:
-      num_components = tf.shape(x)[-1 - event_ndims]
+    num_components = ps.dimension_size(x, idx=-1 - event_ndims)
 
     # TODO(jvdillon): Consider using tf.gather (by way of index unrolling).
     npdt = dtype_util.as_numpy_dtype(x.dtype)
-    try:
-      mix_sample = self.mixture_distribution.sample(
-          n, seed=mix_seed)  # [n, B] or [n]
-    except TypeError as e:
-      if ('Expected int for argument' not in str(e) and
-          TENSOR_SEED_MSG_PREFIX not in str(e)):
-        raise
-      if seed_stream is None:
-        raise seed_stream_err
-      msg = ('Falling back to stateful sampling for `mixture_distribution` '
-             '{} of type `{}`. Please update to use `tf.random.stateless_*` '
-             'RNGs. This fallback may be removed after 20-Aug-2020. ({})')
-      warnings.warn(msg.format(self.mixture_distribution.name,
-                               type(self.mixture_distribution),
-                               str(e)))
-      mix_sample = self.mixture_distribution.sample(
-          n, seed=seed_stream())  # [n, B] or [n]
+    mix_sample = mixture_distribution.sample(
+        n, seed=mix_seed)  # [n, B]
     mask = tf.one_hot(
-        indices=mix_sample,  # [n, B] or [n]
+        indices=mix_sample,  # [n, B]
         depth=num_components,
         on_value=npdt(1),
-        off_value=npdt(0))    # [n, B, k] or [n, k]
+        off_value=npdt(0))    # [n, B, k]
 
-    # Pad `mask` to [n, B, k, [1]*e] or [n, [1]*b, k, [1]*e] .
+    # Pad `mask` to [n, B, k, [1]*e].
     batch_ndims = ps.rank(x) - event_ndims - 1
     mask_batch_ndims = ps.rank(mask) - 1
     pad_ndims = batch_ndims - mask_batch_ndims
@@ -344,9 +317,8 @@ class MixtureSameFamily(distribution.Distribution):
     ret = tf.reduce_sum(masked, axis=-1 - event_ndims)  # [n, B, E]
 
     if self._reparameterize:
-      if event_shape is None:
-        event_shape = self.components_distribution.event_shape_tensor()
-      ret = self._reparameterize_sample(ret, event_shape=event_shape)
+      ret = self._reparameterize_sample(
+          ret, event_shape=components_distribution.event_shape_tensor())
 
     return ret
 
@@ -375,11 +347,13 @@ class MixtureSameFamily(distribution.Distribution):
         self._per_mixture_component_log_prob(x), axis=-1)  # [S, B]
 
   def _mean(self):
-    probs = self.mixture_distribution.probs_parameter()  # [B, k] or [k]
-    component_means = self.components_distribution.mean()  # [B, k, E]
+    mixture_distribution, components_distribution = (
+        self._get_distributions_with_broadcast_batch_shape())
+    probs = mixture_distribution.probs_parameter()  # [B, k]
+    component_means = components_distribution.mean()  # [B, k, E]
     event_ndims = self._event_ndims()
 
-    # reshape probs to [B, k, [1]*e] or [k, [1]*e]
+    # reshape probs to [B, k, [1]*e]
     probs = tf.reshape(probs, ps.concat([
         ps.shape(probs),
         ps.ones([event_ndims], dtype=tf.int32)
@@ -396,12 +370,14 @@ class MixtureSameFamily(distribution.Distribution):
     return tf.reduce_logsumexp(log_cdf_x + log_mix_prob, axis=-1)  # [S, B]
 
   def _variance(self):
-    probs = self.mixture_distribution.probs_parameter()  # [B, k] or [k]
-    component_means = self.components_distribution.mean()  # [B, k, E]
-    component_vars = self.components_distribution.variance()  # [B, k, E]
+    mixture_distribution, components_distribution = (
+        self._get_distributions_with_broadcast_batch_shape())
+    probs = mixture_distribution.probs_parameter()  # [B, k]
+    component_means = components_distribution.mean()  # [B, k, E]
+    component_vars = components_distribution.variance()  # [B, k, E]
     event_ndims = self._event_ndims()
 
-    # reshape probs to [B, k, [1]*e] or [k, [1]*e]
+    # reshape probs to [B, k, [1]*e]
     probs = tf.reshape(probs, ps.concat([
         ps.shape(probs),
         ps.ones([event_ndims], dtype=tf.int32)
@@ -422,13 +398,14 @@ class MixtureSameFamily(distribution.Distribution):
     if static_event_ndims is not None and static_event_ndims != 1:
       # Covariance is defined only for vector distributions.
       raise NotImplementedError('covariance is not implemented')
-
-    probs = self.mixture_distribution.probs_parameter()  # [B, k] or [k]
-    component_means = self.components_distribution.mean()  # [B, k, E]
-    component_covars = self.components_distribution.covariance()  # [B, k, E, E]
+    mixture_distribution, components_distribution = (
+        self._get_distributions_with_broadcast_batch_shape())
+    probs = mixture_distribution.probs_parameter()  # [B, k]
+    component_means = components_distribution.mean()  # [B, k, E]
+    component_covars = components_distribution.covariance()  # [B, k, E, E]
 
     # Law of total variance: Var(Y) = E[Var(Y|X)] + Var(E[Y|X])
-    probs = probs[..., tf.newaxis, tf.newaxis]  # [B, k, 1, 1] or [k, 1, 1]
+    probs = probs[..., tf.newaxis, tf.newaxis]  # [B, k, 1, 1]
     mean_cond_var = tf.reduce_sum(
         probs * component_covars, axis=-3)  # [B, E, E]
     mean = tf.reduce_sum(
@@ -692,35 +669,6 @@ class MixtureSameFamily(distribution.Distribution):
               kc,
               message=('`mixture_distribution` components does not equal '
                        '`components_distribution.batch_shape[-1]`')),
-      ]
-
-    mdbs = self.mixture_distribution.batch_shape
-    cdbs = tensorshape_util.with_rank_at_least(
-        self.components_distribution.batch_shape, 1)[:-1]
-    if (tensorshape_util.is_fully_defined(mdbs)
-        and tensorshape_util.is_fully_defined(cdbs)):
-      if tensorshape_util.rank(mdbs) != 0 and mdbs != cdbs:
-        raise ValueError(
-            '`mixture_distribution.batch_shape` (`{}`) is not '
-            'compatible with `components_distribution.batch_shape` '
-            '(`{}`)'.format(tensorshape_util.as_list(mdbs),
-                            tensorshape_util.as_list(cdbs)))
-    elif self.validate_args:
-      if not tensorshape_util.is_fully_defined(mdbs):
-        mixture_dist_param = tf.convert_to_tensor(mixture_dist_param)
-        mdbs = tf.shape(mixture_dist_param)[:-1]
-      if not tensorshape_util.is_fully_defined(cdbs):
-        if component_bst is None:
-          component_bst = self.components_distribution.batch_shape_tensor()
-        cdbs = component_bst[:-1]
-      assertions += [
-          assert_util.assert_equal(
-              distribution_utils.pick_vector(
-                  tf.equal(tf.shape(mdbs)[0], 0), cdbs, mdbs),
-              cdbs,
-              message=(
-                  '`mixture_distribution.batch_shape` is not '
-                  'compatible with `components_distribution.batch_shape`'))
       ]
 
     return assertions

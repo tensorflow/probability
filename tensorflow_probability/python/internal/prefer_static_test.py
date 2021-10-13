@@ -267,6 +267,42 @@ class ShapeTest(test_util.TestCase):
     v = ps.constant(tf1.Dimension(1))
     self.assertEqual(1, v)
 
+  def test_dimension_size(self):
+    shape = [3, 2, 1]
+    idx = 1
+    idx_tensor = tf.convert_to_tensor(idx)
+
+    # case: numpy input.
+    self.assertEqual(ps.dimension_size(np.zeros(shape), idx), shape[idx])
+    self.assertEqual(ps.dimension_size(np.zeros(shape), idx_tensor),
+                     shape[idx])
+
+    # case: static-shape Tensor input.
+    self.assertEqual(ps.dimension_size(tf.zeros(shape), idx), shape[idx])
+    self.assertEqual(ps.dimension_size(tf.zeros(shape), idx_tensor),
+                     shape[idx])
+
+    if tf.executing_eagerly():
+      return
+
+    # Case: input is Tensor with fully unknown shape.
+    zeros_pl = tf1.placeholder_with_default(tf.zeros(shape), shape=None)
+    idx_pl = tf1.placeholder_with_default(idx, shape=[])
+    self.assertAllEqual(ps.dimension_size(zeros_pl, idx), shape[idx])
+    self.assertAllEqual(ps.dimension_size(zeros_pl, idx_tensor), shape[idx])
+    self.assertAllEqual(ps.dimension_size(zeros_pl, idx_pl), shape[idx])
+
+    # Case: input is Tensor with partially known shape.
+    # The result should be static if idx is.
+    zeros_partial_pl = tf1.placeholder_with_default(
+        tf.zeros(shape),
+        shape=tf.TensorShape([None, shape[idx], None]))
+    self.assertEqual(ps.dimension_size(zeros_partial_pl, idx), shape[idx])
+    self.assertEqual(ps.dimension_size(zeros_partial_pl, idx_tensor),
+                     shape[idx])
+    self.assertAllEqual(ps.dimension_size(zeros_partial_pl, idx_pl),
+                        shape[idx])
+
   def test_rank_from_shape(self):
     shape = [2, 4, 3]
     expected_rank = len(shape)
