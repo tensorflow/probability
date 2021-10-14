@@ -905,7 +905,7 @@ def prepare_tuple_argument(arg, n, arg_name, validate_args=False):
     if len(arg) == n:
       return tuple(arg)
     if len(arg) == 1:
-      return tuple([arg[0]] * n)
+      return (arg[0],) * n
 
   arg_size = ps.size(arg)
   arg_size_ = tf.get_static_value(arg_size)
