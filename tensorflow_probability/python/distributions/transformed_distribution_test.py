@@ -1178,6 +1178,35 @@ class MultipartBijectorsTest(test_util.TestCase):
         noop_assert_fn,
         self.evaluate(restructured_dist.sample(seed=test_util.test_seed())))
 
+  def test_batch_broadcast_vector_to_parts(self):
+    batch_shape = [4, 2]
+    true_split_sizes = [1, 3, 2]
+
+    base_event_size = sum(true_split_sizes)
+    # Base dist with no batch shape (will require broadcasting).
+    base_dist = tfd.MultivariateNormalDiag(
+        loc=tf.random.normal([base_event_size], seed=test_util.test_seed()),
+        scale_diag=tf.exp(tf.random.normal([base_event_size],
+                                           seed=test_util.test_seed())))
+
+    # Bijector with batch shape in one part.
+    bijector = tfb.Chain([tfb.JointMap([tfb.Identity(),
+                                        tfb.Identity(),
+                                        tfb.Shift(
+                                            tf.ones(batch_shape +
+                                                    [true_split_sizes[-1]]))]),
+                          tfb.Split(true_split_sizes, axis=-1)])
+    split_dist = tfd.TransformedDistribution(base_dist, bijector)
+    self.assertAllEqual(split_dist.batch_shape, batch_shape)
+
+    # Because one branch of the split has batch shape, TD should feed batches
+    # of base samples *into* the split, so the batch shape propagates to all
+    # branches.
+    xs = split_dist.sample(seed=test_util.test_seed())
+    self.assertAllEqualNested(
+        tf.nest.map_structure(lambda x: x.shape, xs),
+        [batch_shape + [d] for d in true_split_sizes])
+
 
 if __name__ == '__main__':
   test_util.main()

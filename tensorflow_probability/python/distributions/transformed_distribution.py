@@ -315,7 +315,8 @@ class TransformedDistribution(distribution_lib.Distribution):
   def _maybe_broadcast_distribution_batch_shape(self):
     """Returns the base distribution broadcast to the TD's full batch shape."""
     distribution_batch_shape = self.distribution.batch_shape
-    if tf.nest.is_nested(distribution_batch_shape) or self._is_joint:
+    if (tf.nest.is_nested(distribution_batch_shape) or
+        tf.nest.is_nested(self.distribution.dtype)):
       # TODO(b/191674464): Support joint distributions in BatchBroadcast.
       return self.distribution
 
