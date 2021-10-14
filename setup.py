@@ -27,15 +27,9 @@ version_path = os.path.join(
 sys.path.append(version_path)
 from version import __version__  # pylint: disable=g-import-not-at-top
 
-REQUIRED_PACKAGES = [
-    'absl-py',
-    'six >= 1.10.0',
-    'numpy >= 1.13.3',
-    'decorator',
-    'cloudpickle >= 1.3',
-    'gast >= 0.3.2',  # For autobatching
-    'dm-tree'  # For NumPy/JAX backends (hence, also for prefer_static)
-]
+# Ditto for required_packages.py
+sys.path.append(os.path.dirname(__file__))
+from required_packages import REQUIRED_PACKAGES  # pylint: disable=g-import-not-at-top, g-bad-import-order
 
 if '--release' in sys.argv:
   release = True

@@ -70,13 +70,17 @@ install_jax() {
   python -m pip install $PIP_FLAGS jax jaxlib
 }
 
+install_common_packages() {
+  # Install additional TFP dependencies (other than TensorFlow or JAX).
+  PIP_FLAGS=${1-}
+  ROOT=$(cd $(dirname $(dirname "${BASH_SOURCE[0]}")) && pwd)
+  python -m pip install $PIP_FLAGS $(python "${ROOT}/required_packages.py")
+}
+
 install_test_only_packages() {
   # The following unofficial dependencies are used only by tests.
   PIP_FLAGS=${1-}
   python -m pip install $PIP_FLAGS hypothesis matplotlib mock mpmath scipy pandas
-
-  # Install additional TFP dependencies.
-  python -m pip install $PIP_FLAGS decorator 'cloudpickle>=1.3' dm-tree
 }
 
 dump_versions() {

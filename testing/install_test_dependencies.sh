@@ -137,6 +137,7 @@ check_for_common_package_conflicts() {
 install_python_packages() {
   install_tensorflow "${TF_NIGHTLY_PACKAGE}" "${PIP_FLAGS}"
   install_jax "${PIP_FLAGS}"
+  install_common_packages "${PIP_FLAGS}"
   install_test_only_packages "${PIP_FLAGS}"
   # Print out all versions, as an FYI in the logs.
   dump_versions
