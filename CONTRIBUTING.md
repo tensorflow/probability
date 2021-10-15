@@ -79,6 +79,10 @@ We strongly recommend running unit tests in an active
 extra bazel flags, so we created a wrapper script, which we suggest using. An
 example invocation (presumed to run from the root of the TFP repo:
 
+```shell
+./testing/run_tfp_test.sh //tensorflow_probability/...
+```
+
 #### Dependencies
 
 To run the unit tests, you'll need several packages installed (again, we
@@ -124,6 +128,13 @@ tfp_test //tensorflow_probability/...
 tfp_test //tensorflow_probability/python/distributions:joint_distribution_coroutine_test
 # Lint a file.
 tfp_lints tensorflow_probability/python/distributions/joint_distribution_coroutine.py
+```
+
+We also have a script that bundles creating a new virtualenv and installing TFP
+dependencies in it.
+
+```shell
+source ./testing/fresh_tfp_virtualenv.sh
 ```
 
 ### Additional considerations
