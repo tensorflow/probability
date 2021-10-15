@@ -223,9 +223,9 @@ class ShardTest(test_lib.DistributedTest):
     true_lp, true_g = true_lp_grad(x)
 
     self.assertAllClose(true_lp, lp)
-    self.assertAllClose(true_g, g)
+    self.assertAllCloseNested(true_g, g)
     self.assertAllClose(true_lp, sharded_lp[0])
-    self.assertAllClose(true_g, sharded_g)
+    self.assertAllCloseNested(true_g, sharded_g)
 
   def test_log_prob_ratio_with_no_axes(self):
     # The motivation here is to enable writing generic code that works inside
@@ -419,7 +419,7 @@ class ShardTest(test_lib.DistributedTest):
     true_lp, true_g = lp_grad(x)
 
     self.assertAllClose(true_lp, sharded_lp[0])
-    self.assertAllClose(true_g, sharded_g)
+    self.assertAllCloseNested(true_g, sharded_g)
 
   def test_none_axis_in_jax_error(self):
     if not JAX_MODE:

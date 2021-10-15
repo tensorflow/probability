@@ -216,7 +216,7 @@ class RunningPotentialScaleReductionTest(test_util.TestCase):
     rhat = self.evaluate(running_rhat.potential_scale_reduction())
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=[state_0, state_1], independent_chain_ndims=1)
-    self.assertAllClose(true_rhat, rhat, rtol=1e-6)
+    self.assertAllCloseNested(true_rhat, rhat, rtol=1e-6)
 
   def test_independent_chain_ndims(self):
     running_rhat = tfp.experimental.stats.RunningPotentialScaleReduction.from_shape(

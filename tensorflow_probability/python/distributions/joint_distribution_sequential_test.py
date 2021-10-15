@@ -635,8 +635,8 @@ class JointDistributionSequentialTest(test_util.TestCase):
       bijectors.append(b)
 
     # Test forward and inverse values.
-    self.assertAllClose(joint_bijector.forward(x), y)
-    self.assertAllClose(joint_bijector.inverse(y), x)
+    self.assertAllCloseNested(joint_bijector.forward(x), y)
+    self.assertAllCloseNested(joint_bijector.inverse(y), x)
 
     # Test forward log det Jacobian via finite differences.
     event_ndims = [0, 1, 0]

@@ -213,7 +213,7 @@ class JointDistributionTest(test_lib.DistributedTest):
         rtol=7e-6)  # relaxed tol for fp32 in JAX
     self.assertAllClose(
         true_lp_diff, dist_lp_diff[0])
-    self.assertAllClose(
+    self.assertAllCloseNested(
         true_lp_diff_grad, dist_lp_diff_grad)
 
   def test_jd_has_correct_sample_path_gradients(self):

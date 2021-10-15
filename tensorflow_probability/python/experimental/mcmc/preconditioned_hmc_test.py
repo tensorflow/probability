@@ -662,7 +662,7 @@ class _PreconditionedHMCTest(test_util.TestCase):
                                          filter_threshold=0,
                                          filter_beyond_positive_pairs=False)
     if not self.use_default_momentum_distribution:
-      self.assertAllClose(
+      self.assertAllCloseNested(
           self.evaluate(ess),
           [tf.constant(100.),
            tf.constant(100.), 100. * tf.ones((2, 3, 4))])
