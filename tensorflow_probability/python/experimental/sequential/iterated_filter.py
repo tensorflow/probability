@@ -35,8 +35,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 
-from tensorflow_probability.python.util import SeedStream
-
 
 __all__ = [
     'geometric_cooling_schedule',
@@ -797,9 +795,9 @@ class IteratedFilter(object):
         of particles representing the parameter estimate after each iteration
         of filtering.
     """
-    seed = SeedStream(seed, 'iterated_filter_estimate_parameters')
     with self._name_scope(name or 'estimate_parameters'):
 
+      step_seed, initial_seed = samplers.split_seed(seed)
       initial_perturbation_scale = tf.convert_to_tensor(
           initial_perturbation_scale, name='initial_perturbation_scale')
 
@@ -808,24 +806,27 @@ class IteratedFilter(object):
           observations=observations,
           num_particles=num_particles,
           perturbation_scale=initial_perturbation_scale,
-          seed=seed,
+          seed=step_seed,
           **kwargs)
 
       # Run the remaining iterations and accumulate the results.
       @tf.function(autograph=False)
-      def loop_body(unconstrained_parameters, cooling_fraction):
-        return self.one_step(
+      def loop_body(unconstrained_parameters_seed, cooling_fraction):
+        unconstrained_parameters, seed = unconstrained_parameters_seed
+        step_seed, seed = samplers.split_seed(seed)
+        return (self.one_step(
             observations=observations,
             num_particles=num_particles,
             perturbation_scale=tf.nest.map_structure(
                 lambda s: cooling_fraction * s, initial_perturbation_scale),
             initial_unconstrained_parameters=unconstrained_parameters,
-            seed=seed,
-            **kwargs)
-      estimated_unconstrained_parameters = tf.scan(
+            seed=step_seed,
+            **kwargs), seed)
+
+      estimated_unconstrained_parameters, _ = tf.scan(
           fn=loop_body,
           elems=cooling_schedule(ps.range(1, num_iterations)),
-          initializer=initial_unconstrained_parameters)
+          initializer=(initial_unconstrained_parameters, initial_seed))
 
       return self.parameter_constraining_bijector.forward(
           estimated_unconstrained_parameters)

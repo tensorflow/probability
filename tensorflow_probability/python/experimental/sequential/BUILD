@@ -144,6 +144,7 @@ multi_substrate_py_test(
     name = "iterated_filter_test",
     size = "medium",
     srcs = ["iterated_filter_test.py"],
+    jax_size = "large",
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
