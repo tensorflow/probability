@@ -151,8 +151,7 @@ class JointDistributionVmapMixin(object):
                 seed=seed,
                 value=v,
                 sample_and_trace_fn=sample_and_trace_fn)),
-        core_ndims=[value_core_ndims, None],
-        validate_args=self.validate_args)
+        core_ndims=[value_core_ndims, None])
     # Redefine the polymorphic fn to hack around `make_rank_polymorphic`
     # not currently supporting keyword args. This is needed because the
     # `iid_sample` wrapper below expects to pass through a `seed` kwarg.

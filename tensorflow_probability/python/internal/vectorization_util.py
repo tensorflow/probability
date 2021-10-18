@@ -151,7 +151,7 @@ def _maybe_rectify_parameter_shapes(d):
 
 
 # TODO(b/145252136): merge `make_rank_polymorphic` into core TensorFlow.
-def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
+def make_rank_polymorphic(fn, core_ndims, name=None):
   """Lift a function to one that vectorizes across arbitrary-rank inputs.
 
   Args:
@@ -165,8 +165,6 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
       call to `fn`; `None` values denote arguments that should not be vectorized
       (e.g., non-`Tensor` arguments). May alternately be a single scalar
       Tensor `int` applicable to all `args`.
-    validate_args: whether to add runtime checks.
-      Default value: `False`.
     name: Python `str` name prefixed to ops created by `vectorized_fn`.
   Returns:
     vectorized_fn: a new function, equivalent to `fn`, but which automatically
@@ -248,8 +246,6 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
   def vectorized_fn(*args):
     """Vectorized version of `fn` that accepts arguments of any rank."""
     with tf.name_scope(name or 'make_rank_polymorphic'):
-      assertions = []
-
       # If we got a single value for core_ndims, tile it across all args.
       core_ndims_structure = (
           core_ndims
@@ -276,45 +272,27 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
       # `vectorized_map` requires all inputs to have a single, common batch
       # dimension `[n]`. So we broadcast all input parts to a common
       # batch shape, then flatten it down to a single dimension.
-
-      # First, compute how many 'extra' (batch) ndims each part has. This must
-      # be nonnegative.
       vectorized_arg_shapes = [ps.shape(arg) for arg in vectorized_args]
-      batch_ndims = [
-          ps.rank_from_shape(arg_shape) - nd
-          for (arg_shape, nd) in zip(
-              vectorized_arg_shapes, vectorized_arg_core_ndims)]
-      static_ndims = [tf.get_static_value(nd) for nd in batch_ndims]
-      if any([nd and nd < 0 for nd in static_ndims]):
-        raise ValueError('Cannot broadcast a Tensor having lower rank than the '
-                         'specified `core_ndims`! (saw input ranks {}, '
-                         '`core_ndims` {}).'.format(
-                             tf.nest.map_structure(
-                                 ps.rank_from_shape,
-                                 vectorized_arg_shapes),
-                             vectorized_arg_core_ndims))
-      if validate_args:
-        for nd, part, core_nd in zip(
-            batch_ndims, vectorized_args, vectorized_arg_core_ndims):
-          assertions.append(tf.debugging.assert_non_negative(
-              nd, message='Cannot broadcast a Tensor having lower rank than '
-              'the specified `core_ndims`! (saw {} vs minimum rank {}).'.format(
-                  part, core_nd)))
 
-      # Next, split each part's shape into batch and core shapes, and
-      # broadcast the batch shapes.
-      with tf.control_dependencies(assertions):
-        empty_shape = np.zeros([0], dtype=np.int32)
-        batch_shapes, core_shapes = empty_shape, empty_shape
-        if vectorized_arg_shapes:
-          batch_shapes, core_shapes = zip(*[
-              (arg_shape[:nd], arg_shape[nd:])
-              for (arg_shape, nd) in zip(vectorized_arg_shapes, batch_ndims)])
-        broadcast_batch_shape = (
-            functools.reduce(ps.broadcast_shape, batch_shapes, []))
+      vectorized_arg_actual_core_ndims = []
+      batch_shapes, core_shapes = [], []
+      for (arg_shape, core_nd) in zip(vectorized_arg_shapes,
+                                      vectorized_arg_core_ndims):
+        arg_nd = ps.rank_from_shape(arg_shape)
+        # Shrink 'core' ndims of rank-deficient args. This guarantees that
+        # `batch_ndims` is always nonnegative.
+        actual_core_nd = ps.minimum(arg_nd, core_nd)
+        vectorized_arg_actual_core_ndims.append(actual_core_nd)
+
+        batch_ndims = arg_nd - actual_core_nd
+        batch_shapes.append(arg_shape[:batch_ndims])
+        core_shapes.append(arg_shape[batch_ndims:])
 
       # Flatten all of the batch dimensions into one.
+      broadcast_batch_shape = (
+          functools.reduce(ps.broadcast_shape, batch_shapes, []))
       n = ps.cast(ps.reduce_prod(broadcast_batch_shape), tf.int32)
+
       static_n = tf.get_static_value(n)
       if static_n == 1:
         # We can bypass `vectorized_map` if the batch shape is `[]`, `[1]`,
@@ -324,7 +302,8 @@ def make_rank_polymorphic(fn, core_ndims, validate_args=False, name=None):
             tf.nest.map_structure(
                 lambda x, nd: tf.reshape(x, ps.shape(x)[ps.rank(x) - nd:]),
                 vectorized_args,
-                vectorized_arg_core_ndims))
+                vectorized_arg_actual_core_ndims,
+                check_types=False))
       else:
         # Pad all input parts to the common shape, then flatten
         # into the single leading dimension `[n]`.

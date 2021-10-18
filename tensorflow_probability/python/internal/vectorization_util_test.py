@@ -136,26 +136,19 @@ class VectorizationTest(test_util.TestCase):
           np.array([[1., 2.], [-4., 3.]]).astype(np.float32)]
     self.assertAllEqual(self.evaluate(vectorized_sum(*xs)), sum(xs))
 
-  def test_raises_error_on_insufficient_rank_input(self):
-    def matvec(a, b):
-      # Throws an error if either arg has extra dimensions.
-      return tf.linalg.matvec(tf.reshape(a, tf.shape(a)[-2:]),
-                              tf.reshape(b, tf.shape(b)[-1:]))
+  def test_passes_insufficient_rank_input_through_to_function(self):
+
+    vectorized_vector_sum = vectorization_util.make_rank_polymorphic(
+        lambda a, b: a + b, core_ndims=(1, 1))
+    c = vectorized_vector_sum(tf.convert_to_tensor(3.),
+                              tf.convert_to_tensor([1., 2., 3.]))
+    self.assertAllClose(c, [4., 5., 6.])
+
     vectorized_matvec = vectorization_util.make_rank_polymorphic(
-        matvec, core_ndims=(2, 1), validate_args=True)
-
-    # Static check.
+        tf.linalg.matvec, core_ndims=(2, 1))
     with self.assertRaisesRegexp(
-        ValueError, 'Cannot broadcast a Tensor having lower rank'):
+        ValueError, 'Shape must be rank 2 but is rank 1'):
       vectorized_matvec(tf.zeros([5]), tf.zeros([2, 1, 5]))
-
-    # Runtime check.
-    if not tf.executing_eagerly():
-      with self.assertRaisesOpError(
-          'Condition x >= 0 did not hold element-wise'):
-        self.evaluate(vectorized_matvec(
-            self.maybe_static(tf.zeros([5]), is_static=False),
-            self.maybe_static(tf.zeros([2, 1, 5]), is_static=False)))
 
   def test_can_escape_vectorization_with_none_ndims(self):
 

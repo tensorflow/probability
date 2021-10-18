@@ -431,6 +431,23 @@ class JointDistributionPinnedTest(test_util.TestCase):
                 tf.identity,  # Bypass bijector cache.
                 bij.inverse(ys))))
 
+  @test_util.numpy_disable_test_missing_functionality('vectorized map')
+  def test_pin_broadcast_value_autobatched(self):
+
+    def model():
+      c0 = yield tfd.Gamma(1., rate=1., name='c0')  # []
+      c1 = yield tfd.Gamma(1., rate=1, name='c1')  # []
+      probs = yield tfd.Sample(tfd.Beta(c1, c0), 14, name='probs')  # [14]
+      yield tfd.Binomial(total_count=30, probs=probs, name='obs')  # [14]
+
+    pinned = tfd.JointDistributionCoroutineAutoBatched(model).experimental_pin(
+        obs=15. * tf.ones([14]))
+    pinned_with_broadcast_value = tfd.JointDistributionCoroutineAutoBatched(
+        model).experimental_pin(obs=15.)  # Scalar value for vector-valued RV.
+    xs = self.evaluate(pinned.sample_unpinned([5], seed=test_util.test_seed()))
+    self.assertAllClose(pinned.log_prob(xs),
+                        pinned_with_broadcast_value.log_prob(xs))
+
   def test_str(self):
     @tfd.JointDistributionCoroutine
     def model():
