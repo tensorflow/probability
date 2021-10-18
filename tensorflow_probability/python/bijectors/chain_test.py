@@ -403,6 +403,11 @@ class ChainBijectorTest(test_util.TestCase):
     ignore_bij = tfb.Chain([exp, smc], validate_event_size=False)
     self.evaluate(ignore_bij.forward_log_det_jacobian([1., 2., 3.], 1))
 
+  def testDofValidationDoesNoHarm(self):
+    # Chain with no change in degrees-of-freedom.
+    bij = tfb.Chain([tfb.Exp()], validate_args=True, validate_event_size=True)
+    self.evaluate(bij.forward_log_det_jacobian([1., 2., 3.], 1))
+
   @test_util.disable_test_for_backend(
       disable_numpy=True, disable_jax=True,
       reason="Numpy and JAX have no notion of CompositeTensor/saved_model.")

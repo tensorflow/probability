@@ -456,10 +456,8 @@ class Composition(bijector.Bijector):
       # case it doesn't matter).
       increased_dof = ps.reduce_any(nest.flatten(increased_dof))
       if compute_x_values and self.validate_event_size:
-        assertions = [
-            self._maybe_warn_increased_dof(
-                component_name=bij.name, increased_dof=increased_dof)
-        ]
+        assertions = self._maybe_warn_increased_dof(
+            component_name=bij.name, increased_dof=increased_dof)
         increased_dof |= (_event_size(y, y_event_ndims)
                           > _event_size(x, x_event_ndims))
       else:
@@ -571,8 +569,8 @@ class Composition(bijector.Bijector):
     """Warns or raises when `increased_dof` is True."""
     # Short-circuit when increased_dof is statically False.
     increased_dof_ = tf.get_static_value(increased_dof)
-    if increased_dof_ is False:  # pylint: disable=g-bool-id-comparison
-      return
+    if increased_dof_ is not None and not increased_dof_:
+      return []
 
     error_message = (
         'Nested component "{}" in composition "{}" operates on inputs '
@@ -584,18 +582,20 @@ class Composition(bijector.Bijector):
     if self._validate_args:
       if increased_dof_:
         raise ValueError(error_message)
-      return assert_util.assert_equal(False, increased_dof, error_message)
+      return [assert_util.assert_equal(False, increased_dof, error_message)]
 
     if (not tf.executing_eagerly() and
         control_flow_util.GraphOrParentsInXlaContext(tf1.get_default_graph())):
-      return  # No StringFormat or Print ops in XLA.
+      return []  # No StringFormat or Print ops in XLA.
 
     # Otherwise, we print a warning and continue.
-    return ps.cond(
-        pred=increased_dof,
-        false_fn=tf.no_op,
-        true_fn=lambda: tf.print(  # pylint: disable=g-long-lambda
-            'WARNING: ' + error_message, output_stream=sys.stderr))
+    return [
+        ps.cond(
+            pred=increased_dof,
+            false_fn=tf.no_op,
+            true_fn=lambda: tf.print(  # pylint: disable=g-long-lambda
+                'WARNING: ' + error_message, output_stream=sys.stderr))
+    ]
 
   ###
   ### Trivial traversals
