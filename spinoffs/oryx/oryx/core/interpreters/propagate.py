@@ -164,7 +164,7 @@ class Environment:
     if isinstance(var, jax_core.Literal):
       return cell
     cur_cell = self.read(var)
-    if var is jax_core.dropvar:
+    if isinstance(var, jax_core.DropVar):
       return cur_cell
     self.env[var] = cur_cell.join(cell)
     return self.env[var]
