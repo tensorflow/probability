@@ -39,12 +39,16 @@ __all__ = [
     'exp_pade_4_4',
     'expm1_pade_4_4',
     'log1p_pade_4_4',
-    'log_pade_4_4_newton',
+    'log_pade_4_4',
     'patch_manual_special_functions',
     'reduce_logsumexp',
     'softplus',
 ]
 
+if JAX_MODE:
+  import jax  # pylint: disable=g-import-not-at-top
+
+# This is only used for the TF backend.
 _real_log = tf.math.log
 
 
@@ -120,8 +124,7 @@ def _exp_pade_4_4_fwd(x):  # pylint: disable=missing-function-docstring
   res = _horner(x, coeffs_p) / _horner(x, coeffs_q)
 
   if JAX_MODE:
-    import jax.numpy as jnp  # pylint: disable=g-import-not-at-top
-    res = res * jnp.exp2(n)
+    res = res * jax.numpy.exp2(n)
   else:
     res = res * (2**n)
 
@@ -154,38 +157,75 @@ def exp_pade_4_4(x, name='exp_pade_4_4'):
     return _exp_pade_4_4_impl(x)
 
 
-def _log_pade_4_4_newton_fwd(x):
+def _log_pade_4_4_fwd(x):  # pylint: disable=missing-function-docstring
   x = tf.convert_to_tensor(x, dtype_hint=tf.float32)
+  orig_x = x
+
   dtype = dtype_util.as_numpy_dtype(x.dtype)
-  r = _real_log(x)
-  res = r - 1. + x / exp_pade_4_4(r)
-  res = tf.where(tf.equal(x, 0), -np.float32('inf').astype(dtype), res)
-  res = tf.where(tf.equal(x, 1), tf.zeros_like(res), res)
-  return res, x
+
+  zero = np.zeros([], dtype)
+  log2 = np.log(2).astype(dtype)
+  one = np.ones([], dtype)
+  two = np.array(2, dtype)
+  inf = np.array(float('inf'), dtype)
+  nan = np.array(float('nan'), dtype)
+
+  # Scale x to [0.5, 1), extract exponent.
+  if JAX_MODE:
+    # Despite the bit arithmetic, benchmarks showed this to be slightly faster
+    # than the fallback code below.
+    x, e = jax.numpy.frexp(x)
+  else:
+    # TensorFlow does not expose frexp.
+    e = tf.math.ceil(_real_log(x) / log2)
+    x = x / two**e
+
+  # We'll be using a Pade approximant for log1p(x), so move x closer to zero.
+  x_is_small = x < log2
+  es = e - one
+  xs = two * x - one
+  el = e
+  xl = x - one
+
+  e = tf.where(x_is_small, es, el)
+  x = tf.where(x_is_small, xs, xl)
+
+  coeffs_p = np.array([5 / 84, 13 / 21, 3 / 2, 1, 0], dtype)
+  coeffs_q = np.array([1 / 70, 2 / 7, 9 / 7, 2, 1], dtype)
+
+  res = _horner(x, coeffs_p) / _horner(x, coeffs_q)
+  res = res + e * log2
+
+  # Special points.
+  res = tf.where(tf.equal(orig_x, one), tf.zeros_like(res), res)
+  res = tf.where(tf.less(orig_x, zero), nan, res)
+  res = tf.where(tf.equal(orig_x, zero), -inf, res)
+  res = tf.where(tf.equal(orig_x, inf), inf, res)
+  return res, orig_x
 
 
-def _log_pade_4_4_newton_bwd(x, dy):
+def _log_pade_4_4_bwd(x, dy):
   return dy / x
 
 
-def _log_pade_4_4_newton_jvp(x, dx):
-  return (_log_pade_4_4_newton_fwd(x[0])[0],
-          _log_pade_4_4_newton_bwd(x[0], dx[0]))
+def _log_pade_4_4_jvp(x, dx):
+  return (_log_pade_4_4_fwd(x[0])[0],
+          _log_pade_4_4_bwd(x[0], dx[0]))
 
 
 @custom_gradient.custom_gradient(
-    vjp_fwd=_log_pade_4_4_newton_fwd,
-    vjp_bwd=_log_pade_4_4_newton_bwd,
-    jvp_fn=_log_pade_4_4_newton_jvp,
+    vjp_fwd=_log_pade_4_4_fwd,
+    vjp_bwd=_log_pade_4_4_bwd,
+    jvp_fn=_log_pade_4_4_jvp,
 )
-def _log_pade_4_4_newton_impl(x):
-  return _log_pade_4_4_newton_fwd(x)[0]
+def _log_pade_4_4_impl(x):
+  return _log_pade_4_4_fwd(x)[0]
 
 
-def log_pade_4_4_newton(x, name='log_pade_4_4_newton'):
-  """log using the Pade(4,4) approximant + a Newton's method step."""
+def log_pade_4_4(x, name='log_pade_4_4'):
+  """log using the Pade(4,4) approximant."""
   with tf.name_scope(name):
-    return _log_pade_4_4_newton_impl(x)
+    return _log_pade_4_4_impl(x)
 
 
 def _expm1_pade_4_4_fwd(x):  # pylint: disable=missing-function-docstring
@@ -236,9 +276,9 @@ def _log1p_pade_4_4_fwd(x):
   dtype = dtype_util.as_numpy_dtype(x.dtype)
   coeffs_p = np.array([5 / 84, 13 / 21, 3 / 2, 1, 0], dtype)
   coeffs_q = np.array([1 / 70, 2 / 7, 9 / 7, 2, 1], dtype)
-  for_large_x = log_pade_4_4_newton(1 + x)
+  for_large_x = log_pade_4_4(1 + x)
   for_small_x = _horner(x, coeffs_p) / _horner(x, coeffs_q)
-  x_is_small = x < 0.7
+  x_is_small = tf.abs(x) < 0.7
   return tf.where(x_is_small, for_small_x, for_large_x), x
 
 
@@ -288,8 +328,6 @@ def patch_manual_special_functions():
     Nothing.
   """
   if JAX_MODE:
-    import jax  # pylint: disable=g-import-not-at-top
-
     old_expm1 = jax.numpy.expm1
     old_log1p = jax.numpy.log1p
     old_exp = jax.numpy.exp
@@ -309,7 +347,7 @@ def patch_manual_special_functions():
       jax.numpy.expm1 = expm1_pade_4_4
       jax.numpy.log1p = log1p_pade_4_4
       jax.numpy.exp = exp_pade_4_4
-      jax.numpy.log = log_pade_4_4_newton
+      jax.numpy.log = log_pade_4_4
       jax.scipy.special.logsumexp = reduce_logsumexp
       jax.nn.softplus = softplus
     else:
@@ -317,7 +355,7 @@ def patch_manual_special_functions():
       tf.math.log1p = log1p_pade_4_4
       tf.math.exp = exp_pade_4_4
       tf.exp = exp_pade_4_4
-      tf.math.log = log_pade_4_4_newton
+      tf.math.log = log_pade_4_4
       tf.math.reduce_logsumexp = reduce_logsumexp
       tf.reduce_logsumexp = reduce_logsumexp
       tf.math.softplus = softplus

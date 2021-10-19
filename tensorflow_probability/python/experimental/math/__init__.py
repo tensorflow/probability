@@ -17,7 +17,7 @@
 from tensorflow_probability.python.experimental.math.manual_special_functions import exp_pade_4_4
 from tensorflow_probability.python.experimental.math.manual_special_functions import expm1_pade_4_4
 from tensorflow_probability.python.experimental.math.manual_special_functions import log1p_pade_4_4
-from tensorflow_probability.python.experimental.math.manual_special_functions import log_pade_4_4_newton
+from tensorflow_probability.python.experimental.math.manual_special_functions import log_pade_4_4
 from tensorflow_probability.python.experimental.math.manual_special_functions import patch_manual_special_functions
 from tensorflow_probability.python.experimental.math.manual_special_functions import reduce_logsumexp
 from tensorflow_probability.python.experimental.math.manual_special_functions import softplus
@@ -26,7 +26,7 @@ __all__ = [
     'exp_pade_4_4',
     'expm1_pade_4_4',
     'log1p_pade_4_4',
-    'log_pade_4_4_newton',
+    'log_pade_4_4',
     'patch_manual_special_functions',
     'reduce_logsumexp',
     'softplus',

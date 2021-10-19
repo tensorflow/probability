@@ -76,10 +76,10 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
           new_fn=tfp.experimental.math.exp_pade_4_4,
       ),
       dict(
-          testcase_name='_log_pade_4_4_newton',
+          testcase_name='_log_pade_4_4',
           x=np.linspace(0., 5., 50),
           old_fn=tf.math.log,
-          new_fn=tfp.experimental.math.log_pade_4_4_newton,
+          new_fn=tfp.experimental.math.log_pade_4_4,
       ),
       dict(
           testcase_name='_expm1_pade_4_4',
@@ -210,20 +210,20 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
           grad_rtol=1e-6,
       ),
       dict(
-          testcase_name='_log_pade_4_4_newton_far',
+          testcase_name='_log_pade_4_4_far',
           x=10**np.concatenate(
               [-np.linspace(3., 21., 50),
                np.linspace(3., 21., 50)]),
-          fn=tfp.experimental.math.log_pade_4_4_newton,
+          fn=tfp.experimental.math.log_pade_4_4,
           true_fwd_fn=np.log,
           true_bwd_fn=lambda x, dy: dy / x,
           value_rtol=1e-6,
           grad_rtol=1e-6,
       ),
       dict(
-          testcase_name='_log_pade_4_4_newton_near',
+          testcase_name='_log_pade_4_4_near',
           x=10**np.linspace(-3., 3., 50),
-          fn=tfp.experimental.math.log_pade_4_4_newton,
+          fn=tfp.experimental.math.log_pade_4_4,
           true_fwd_fn=np.log,
           true_bwd_fn=lambda x, dy: dy / x,
           value_rtol=1e-5,
@@ -284,13 +284,32 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
     self.assertAllClose(y_gt, y, rtol=value_rtol)
     self.assertAllClose(grads_gt, grads, rtol=grad_rtol)
 
-  @mock.patch.object(manual_special_functions, 'softplus')
-  @mock.patch.object(manual_special_functions, 'reduce_logsumexp')
-  @mock.patch.object(manual_special_functions, 'log1p_pade_4_4')
-  @mock.patch.object(manual_special_functions, 'expm1_pade_4_4')
-  @mock.patch.object(manual_special_functions, 'log_pade_4_4_newton')
-  @mock.patch.object(manual_special_functions, 'exp_pade_4_4')
+  @mock.patch.object(
+      manual_special_functions,
+      'softplus',
+      wraps=manual_special_functions.softplus)
+  @mock.patch.object(
+      manual_special_functions,
+      'reduce_logsumexp',
+      wraps=manual_special_functions.reduce_logsumexp)
+  @mock.patch.object(
+      manual_special_functions,
+      'log1p_pade_4_4',
+      wraps=manual_special_functions.log1p_pade_4_4)
+  @mock.patch.object(
+      manual_special_functions,
+      'expm1_pade_4_4',
+      wraps=manual_special_functions.expm1_pade_4_4)
+  @mock.patch.object(
+      manual_special_functions,
+      'log_pade_4_4',
+      wraps=manual_special_functions.log_pade_4_4)
+  @mock.patch.object(
+      manual_special_functions,
+      'exp_pade_4_4',
+      wraps=manual_special_functions.exp_pade_4_4)
   def test_patching(self, exp, log, expm1, log1p, logsumexp, softplus):
+
     exp_calls = 0
     expm1_calls = 0
     log_calls = 0
@@ -334,12 +353,30 @@ class ManualSpecialFunctionsTest(test_util.TestCase):
       softplus_calls += 1
       self.assertEqual(softplus_calls, softplus.call_count)
 
-  @mock.patch.object(manual_special_functions, 'softplus')
-  @mock.patch.object(manual_special_functions, 'reduce_logsumexp')
-  @mock.patch.object(manual_special_functions, 'log1p_pade_4_4')
-  @mock.patch.object(manual_special_functions, 'expm1_pade_4_4')
-  @mock.patch.object(manual_special_functions, 'log_pade_4_4_newton')
-  @mock.patch.object(manual_special_functions, 'exp_pade_4_4')
+  @mock.patch.object(
+      manual_special_functions,
+      'softplus',
+      wraps=manual_special_functions.softplus)
+  @mock.patch.object(
+      manual_special_functions,
+      'reduce_logsumexp',
+      wraps=manual_special_functions.reduce_logsumexp)
+  @mock.patch.object(
+      manual_special_functions,
+      'log1p_pade_4_4',
+      wraps=manual_special_functions.log1p_pade_4_4)
+  @mock.patch.object(
+      manual_special_functions,
+      'expm1_pade_4_4',
+      wraps=manual_special_functions.expm1_pade_4_4)
+  @mock.patch.object(
+      manual_special_functions,
+      'log_pade_4_4',
+      wraps=manual_special_functions.log_pade_4_4)
+  @mock.patch.object(
+      manual_special_functions,
+      'exp_pade_4_4',
+      wraps=manual_special_functions.exp_pade_4_4)
   def test_patching_jax(self, exp, log, expm1, log1p, logsumexp, softplus):
     if not JAX_MODE or NUMPY_MODE:
       self.skipTest('This test is JAX-only')
