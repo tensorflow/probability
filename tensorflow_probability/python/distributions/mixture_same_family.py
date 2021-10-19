@@ -14,7 +14,6 @@
 # ============================================================================
 """The same-family Mixture distribution class."""
 
-import collections
 import warnings
 
 import tensorflow.compat.v2 as tf
@@ -240,33 +239,6 @@ class MixtureSameFamily(distribution.Distribution):
         self.components_distribution,
         with_shape=ps.concat([overall_batch_shape, [1]], axis=0))
     return mixture_distribution, components_distribution
-
-  def __getitem__(self, slices):
-    # Because slicing is parameterization-dependent, we only implement slicing
-    # for instances of MSF, not subclasses thereof.
-    if type(self) is not MixtureSameFamily:  # pylint: disable=unidiomatic-typecheck
-      return super(MixtureSameFamily, self).__getitem__(slices)
-
-    slices = (
-        list(slices) if isinstance(slices, collections.Sequence) else [slices])
-    mixture_rank = tensorshape_util.rank(self.mixture_distribution.batch_shape)
-    if mixture_rank is None:
-      raise NotImplementedError('Cannot slice MixtureSameFamily with unknown '
-                                'mixture_distribution rank')
-    elif mixture_rank > 0:
-      sliced_mixture_dist = self.mixture_distribution.__getitem__(slices)
-    else:  # must be scalar
-      sliced_mixture_dist = self.mixture_distribution
-
-    # The components distribution has the component axis as the last batch dim,
-    # and this must be preserved.
-    if Ellipsis not in slices:
-      slices.append(Ellipsis)
-    slices.append(slice(None))
-    sliced_components_dist = self.components_distribution.__getitem__(slices)
-    return self.copy(
-        mixture_distribution=sliced_mixture_dist,
-        components_distribution=sliced_components_dist)
 
   def _event_shape_tensor(self):
     return self.components_distribution.event_shape_tensor()

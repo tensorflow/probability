@@ -182,16 +182,6 @@ class Sample(distribution_lib.Distribution):
   def experimental_is_sharded(self):
     return self.distribution.experimental_is_sharded
 
-  def __getitem__(self, slices):
-    # Because slicing is parameterization-dependent, we only implement slicing
-    # for instances of MSF, not subclasses thereof.
-    if type(self).__init__ is not Sample.__init__:
-      return super(Sample, self).__getitem__(slices)
-
-    # Since this distribution only modifies the event shape, we can simply pass
-    # through slicing to the underlying.
-    return self.copy(distribution=self.distribution.__getitem__(slices))
-
   def _event_shape_tensor(self):
     return ps.concat([
         ps.reshape(self.sample_shape, shape=[-1]),

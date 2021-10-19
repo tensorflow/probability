@@ -39,7 +39,6 @@ EXTRA_TENSOR_CONVERSION_KERNELS = {
 
 INSTANTIABLE_BUT_NOT_SLICABLE = [
     'FeatureTransformed',  # Requires slicing in to the `transformation_fn`.
-    'SchurComplement',  # Not implemented.
 ]
 
 

@@ -259,21 +259,6 @@ class TransformedDistribution(distribution_lib.Distribution):
   def experimental_is_sharded(self):
     raise NotImplementedError  # TODO(b/175084455): Handle bijector sharding.
 
-  def __getitem__(self, slices):
-    # Because slicing is parameterization-dependent, we only implement slicing
-    # for instances of TD, not subclasses thereof.
-    if type(self) is not TransformedDistribution:  # pylint: disable=unidiomatic-typecheck
-      return super(TransformedDistribution, self).__getitem__(slices)
-
-    if tensorshape_util.rank(self.distribution.batch_shape) is None:
-      raise NotImplementedError(
-          'Slicing TransformedDistribution with underlying distribution of '
-          'unknown rank is not yet implemented.')
-    overrides = {}
-    if self.parameters.get('distribution', None) is not None:
-      overrides['distribution'] = self.distribution[slices]
-    return self.copy(**overrides)
-
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(

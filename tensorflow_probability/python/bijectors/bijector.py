@@ -29,6 +29,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math import generic as math_generic
 from tensorflow_probability.python.math import gradient
@@ -1124,6 +1125,19 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
           'Only one of `x_event_ndims` and `y_event_ndims` may be specified.')
     return x_event_ndims
 
+  def __getitem__(self, slices):
+    try:
+      return slicing.batch_slice(
+          self, slices, bijector_x_event_ndims=self.forward_min_event_ndims)
+    except ValueError as e:
+      if (tf.nest.is_nested(self.forward_min_event_ndims)
+          and not self._parts_interact):
+        raise ValueError('Batch slicing failed for the multi-part bijector '
+                         '"{}", likely because its `forward_min_event_ndims` '
+                         '({}) does not imply a consistent batch shape.'.format(
+                             self.name, self.forward_min_event_ndims)) from e
+      raise e
+
   def _broadcast_parameters_with_batch_shape(self, batch_shape, x_event_ndims):
     """Broadcasts each parameter's batch shape with the given `batch_shape`.
 
@@ -1274,9 +1288,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
       # Try to get the static batch shape.
       batch_shape = self.experimental_batch_shape(x_event_ndims=x_event_ndims)
       if not tensorshape_util.is_fully_defined(batch_shape):
-        batch_shape = ps.convert_to_shape_tensor(
-            self._batch_shape_tensor(x_event_ndims))
-      return batch_shape
+        batch_shape = self._batch_shape_tensor(x_event_ndims)
+      return ps.convert_to_shape_tensor(batch_shape)
 
   @classmethod
   def _parameter_properties(cls, dtype):

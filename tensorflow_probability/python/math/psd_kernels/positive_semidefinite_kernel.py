@@ -326,7 +326,7 @@ class PositiveSemidefiniteKernel(tf.Module):
     Returns:
       dist: A new `PositiveSemidefiniteKernel` instance with sliced parameters.
     """
-    return slicing.batch_slice(self, self._params_event_ndims(), {}, slices)
+    return slicing.batch_slice(self, {}, slices)
 
   def __iter__(self):
     raise TypeError(f'{type(self).__name__} object is not iterable')

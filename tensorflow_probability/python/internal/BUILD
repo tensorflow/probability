@@ -638,6 +638,7 @@ multi_substrate_py_test(
     deps = [
         ":slicing",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors",
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,

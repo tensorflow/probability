@@ -58,9 +58,6 @@ STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST = (
 INSTANTIABLE_BUT_NOT_SLICABLE = (
     'BatchBroadcast',
     'BatchReshape',
-    'Masked',
-    'Mixture',
-    'QuantizedDistribution',
 )
 
 
@@ -509,7 +506,6 @@ class DistributionSlicingTest(test_util.TestCase):
     sliced_zeros = np.zeros(batch_shape)[slices]
     sliced_dist = dist[slices]
     hp.note('Using sliced distribution {}.'.format(sliced_dist))
-
     # Check that slicing modifies batch shape as expected.
     self.assertAllEqual(sliced_zeros.shape, sliced_dist.batch_shape)
 

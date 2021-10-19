@@ -57,13 +57,6 @@ class PointwiseExponential(psd_kernel.AutoCompositeTensorPsdKernel):
   def _parameter_properties(cls, dtype):
     return dict(kernel=parameter_properties.BatchedComponentProperties())
 
-  def __getitem__(self, slices):
-    overrides = {}
-    if self.parameters.get('kernel', None) is not None:
-      overrides['kernel'] = self.kernel[slices]
-
-    return self.copy(**overrides)
-
   def _apply(self, x1, x2, example_ndims):
     kernel_output = self._kernel.apply(x1, x2, example_ndims)
     exponential_output = tf.exp(kernel_output)

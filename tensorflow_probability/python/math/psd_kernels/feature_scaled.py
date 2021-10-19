@@ -14,8 +14,6 @@
 # ============================================================================
 """Feature scaled kernel."""
 
-import collections
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
@@ -110,21 +108,6 @@ class FeatureScaled(feature_transformed.FeatureTransformed):
   @property
   def inverse_scale_diag(self):
     return self._inverse_scale_diag
-
-  def __getitem__(self, slices):
-    overrides = {}
-    if self.parameters.get('kernel', None) is not None:
-      overrides['kernel'] = self.kernel[slices]
-
-    diag_slices = (list(slices) if isinstance(
-        slices, collections.Sequence) else [slices])
-    diag_slices += [slice(None)] * self.kernel.feature_ndims
-
-    if self.parameters.get('scale_diag', None) is not None:
-      overrides['scale_diag'] = self.scale_diag[diag_slices]
-    if self.parameters.get('inverse_scale_diag', None) is not None:
-      overrides['inverse_scale_diag'] = self.inverse_scale_diag[diag_slices]
-    return self.copy(**overrides)
 
   @classmethod
   def _parameter_properties(cls, dtype):

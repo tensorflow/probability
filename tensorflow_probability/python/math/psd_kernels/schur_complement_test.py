@@ -25,7 +25,9 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import cholesky_util
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+
 
 tfpk = tfp.math.psd_kernels
 
@@ -295,6 +297,33 @@ class SchurComplementTest(test_util.TestCase):
     self.assertAllClose(actual, matrix(schur_with_divisor))
     self.assertAllClose(actual, matrix(unflat))
 
+  def testBatchSlicePreservesPrecomputedDivisor(self):
+    batch_shape = [4, 3]
+    base_kernel = tfpk.ExponentiatedQuadratic(
+        amplitude=self.evaluate(
+            tf.exp(samplers.normal(batch_shape, seed=test_util.test_seed()))))
+    fixed_inputs = self.evaluate(samplers.normal(batch_shape + [1, 2],
+                                                 seed=test_util.test_seed()))
+    schur = tfpk.SchurComplement(base_kernel, fixed_inputs)
+    schur_with_divisor = tfpk.SchurComplement.with_precomputed_divisor(
+        base_kernel, fixed_inputs)
+    self.assertAllEqual(schur.batch_shape, batch_shape)
+    self.assertAllEqual(schur_with_divisor.batch_shape, batch_shape)
+
+    schur_sliced = schur[tf.newaxis, 0, ..., -2:]
+    schur_with_divisor_sliced = schur_with_divisor[tf.newaxis, 0, ..., -2:]
+    batch_shape_sliced = tf.ones(batch_shape)[tf.newaxis, 0, ..., -2:].shape
+    self.assertAllEqual(schur_sliced.batch_shape, batch_shape_sliced)
+    self.assertAllEqual(schur_with_divisor_sliced.batch_shape,
+                        batch_shape_sliced)
+    self.assertAllEqual(
+        (schur_with_divisor_sliced
+         ._precomputed_divisor_matrix_cholesky.shape[:-2]),
+        batch_shape_sliced)
+
+    x = np.ones([1, 2], np.float32)
+    y = np.ones([3, 2], np.float32)
+    self.assertAllClose(schur_with_divisor.matrix(x, y), schur.matrix(x, y))
 
 if __name__ == '__main__':
   test_util.main()

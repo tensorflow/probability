@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for distribution slicing helper."""
+"""Tests for slicing helper."""
 
 import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensorshape_util
@@ -184,6 +185,37 @@ class SlicingTest(test_util.TestCase):
           slices=make_slices[:, :3, ..., -2:, :],
           batch_shape=tf.constant([7, 6, 5]))
 
+  def test_slice_single_param_distribution(self):
+    sliced = slicing._slice_single_param(
+        tfd.Normal(loc=tf.zeros([4, 3, 1]),  # batch = [4, 3], event = [2]
+                   scale=tf.ones([2])),
+        param_event_ndims=1,
+        slices=make_slices[..., tf.newaxis, 2:, tf.newaxis],
+        batch_shape=tf.constant([7, 4, 3]))
+    self.assertAllEqual(
+        list(tf.zeros([1, 4, 3])[..., tf.newaxis, 2:, tf.newaxis].shape),
+        sliced.batch_shape_tensor()[:-1])
+
+  def test_slice_single_param_atomic(self):
+    sliced = slicing._slice_single_param(
+        tfb.Identity(),
+        param_event_ndims=0,
+        slices=make_slices[..., tf.newaxis, 2:, tf.newaxis],
+        batch_shape=tf.constant([7, 4, 3]))
+    self.assertAllEqual([], sliced.experimental_batch_shape_tensor())
+
+  def test_slice_single_param_bijector_composition(self):
+    sliced = slicing._slice_single_param(
+        tfb.JointMap({'a': tfb.Chain([
+            tfb.Invert(tfb.Scale(tf.ones([4, 3, 1])))
+        ])}),
+        param_event_ndims={'a': 1},
+        slices=make_slices[..., tf.newaxis, 2:, tf.newaxis],
+        batch_shape=tf.constant([7, 4, 3]))
+    self.assertAllEqual(
+        list(tf.zeros([1, 4, 3])[..., tf.newaxis, 2:, tf.newaxis].shape),
+        sliced.experimental_batch_shape_tensor(x_event_ndims={'a': 1}))
+
   def test_jitted_slices(self):
     self.skip_if_no_xla()
     shp = [7, 6, 5, 4]
@@ -192,9 +224,40 @@ class SlicingTest(test_util.TestCase):
     def f(ix):
       return slicing._slice_params_to_dict(
           tfd.MultivariateNormalDiag(t, tf.ones([shp[-1]])),
-          dict(loc=1, scale_diag=1),
           slices=make_slices[..., ix, :])
     self.assertAllEqual(t[:, 3], f(tf.constant(3))['loc'])
+
+  def test_slice_transformed_distribution_with_chain(self):
+    dist = tfd.TransformedDistribution(
+        distribution=tfd.MultivariateNormalDiag(
+            loc=tf.zeros([4]), scale_diag=tf.ones([1, 4])),
+        bijector=tfb.Chain([tfb.JointMap([tfb.Identity(),
+                                          tfb.Shift(tf.ones([4, 3, 2]))]),
+                            tfb.Split(2),
+                            tfb.ScaleMatvecDiag(tf.ones([5, 1, 3, 4])),
+                            tfb.Exp()]))
+    self.assertAllEqual(dist.batch_shape_tensor(), [5, 4, 3])
+    self.assertAllEqualNested(
+        tf.nest.map_structure(lambda x: x.shape,
+                              dist.sample(seed=test_util.test_seed())),
+        [[5, 4, 3, 2], [5, 4, 3, 2]])
+
+    sliced = dist[tf.newaxis, ..., 0, :, :-1]
+    self.assertAllEqual(sliced.batch_shape_tensor(), [1, 4, 2])
+    self.assertAllEqualNested(
+        tf.nest.map_structure(lambda x: x.shape,
+                              sliced.sample(seed=test_util.test_seed())),
+        [[1, 4, 2, 2], [1, 4, 2, 2]])
+
+  def test_slice_nested_mixture(self):
+    dist = tfd.MixtureSameFamily(
+        tfd.Categorical(logits=tf.zeros([2])),
+        tfd.MixtureSameFamily(
+            tfd.Categorical(logits=tf.zeros([2])),
+            tfd.Bernoulli(logits=tf.zeros([1, 2, 2]))))
+    self.assertAllEqual(dist[0, ...].batch_shape_tensor(), [])
+    self.assertAllEqual(dist[0, ..., tf.newaxis].batch_shape_tensor(), [1])
+    self.assertAllEqual(dist[..., tf.newaxis].batch_shape_tensor(), [1, 1])
 
 
 if __name__ == '__main__':

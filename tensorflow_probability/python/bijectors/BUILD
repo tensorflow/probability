@@ -129,6 +129,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:name_util",
         "//tensorflow_probability/python/internal:nest_util",
+        "//tensorflow_probability/python/internal:slicing",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/math:gradient",

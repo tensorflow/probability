@@ -879,7 +879,7 @@ class Distribution(_BaseDistribution):
     Returns:
       dist: A new `tfd.Distribution` instance with sliced parameters.
     """
-    return slicing.batch_slice(self, self._params_event_ndims(), {}, slices)
+    return slicing.batch_slice(self, {}, slices)
 
   def __iter__(self):
     raise TypeError('{!r} object is not iterable'.format(type(self).__name__))
@@ -941,9 +941,8 @@ class Distribution(_BaseDistribution):
     try:
       # We want track provenance from origin variables, so we use batch_slice
       # if this distribution supports slicing. See the comment on
-      # PROVENANCE_ATTR in slicing.py
-      return slicing.batch_slice(self, self._params_event_ndims(),
-                                 override_parameters_kwargs, Ellipsis)
+      # PROVENANCE_ATTR in batch_slicing.py
+      return slicing.batch_slice(self, override_parameters_kwargs, Ellipsis)
     except NotImplementedError:
       pass
     parameters = dict(self.parameters, **override_parameters_kwargs)

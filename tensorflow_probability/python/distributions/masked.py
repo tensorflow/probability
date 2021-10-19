@@ -220,11 +220,6 @@ class Masked(distribution_lib.Distribution):
           parameters=parameters,
           name=name)
 
-  def __getitem__(self, slices):
-    # TODO(b/181859872): This could be implemented with some effort, possibly by
-    #     reusing parts of internal/slicing.py
-    raise NotImplementedError
-
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(

@@ -29,6 +29,11 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'inferred_batch_shape',
     'inferred_batch_shape_tensor',
+    'get_batch_shape_tensor_part',
+    'get_batch_shape_part',
+    'broadcast_parameter_with_batch_shape',
+    'broadcast_parameters_with_batch_shape',
+    'map_fn_over_parameters_with_event_ndims'
 ]
 
 
@@ -62,7 +67,7 @@ def inferred_batch_shape(batch_object, bijector_x_event_ndims=None):
   """
   batch_shapes = map_fn_over_parameters_with_event_ndims(
       batch_object,
-      _get_batch_shape_part,
+      get_batch_shape_part,
       require_static=True,
       bijector_x_event_ndims=bijector_x_event_ndims)
   return functools.reduce(tf.broadcast_static_shape,
@@ -104,14 +109,14 @@ def inferred_batch_shape_tensor(batch_object,
   """
   batch_shapes = map_fn_over_parameters_with_event_ndims(
       batch_object,
-      _get_batch_shape_tensor_part,
+      get_batch_shape_tensor_part,
       bijector_x_event_ndims=bijector_x_event_ndims,
       require_static=False,
       **parameter_kwargs)
   return functools.reduce(ps.broadcast_shape, tf.nest.flatten(batch_shapes), [])
 
 
-def _get_batch_shape_tensor_part(x, event_ndims):
+def get_batch_shape_tensor_part(x, event_ndims):
   """Extracts an object's runtime (Tensor) shape for batch shape inference."""
   if hasattr(x, 'experimental_batch_shape_tensor'):  # `x` is a bijector
     try:
@@ -134,7 +139,7 @@ def _get_batch_shape_tensor_part(x, event_ndims):
   return _truncate_shape_tensor(base_shape, event_ndims)
 
 
-def _get_batch_shape_part(x, event_ndims):
+def get_batch_shape_part(x, event_ndims):
   """Extracts an object's shape for batch shape inference."""
   if hasattr(x, 'experimental_batch_shape'):  # `x` is a bijector
     if event_ndims is None:
@@ -167,31 +172,32 @@ def _get_batch_shape_part(x, event_ndims):
   return _truncate_shape(base_shape, event_ndims)
 
 
-def _truncate_shape_tensor(shape, ndims_to_truncate):
+def _truncate_shape_tensor(shape, rightmost_ndims_to_truncate):
   shape = ps.convert_to_shape_tensor(shape, dtype_hint=np.int32)
-  ndims_to_truncate = ps.convert_to_shape_tensor(
-      ndims_to_truncate, dtype_hint=np.int32)
+  rightmost_ndims_to_truncate = ps.convert_to_shape_tensor(
+      rightmost_ndims_to_truncate, dtype_hint=np.int32)
   base_rank = ps.rank_from_shape(shape)
   return shape[:(
       base_rank -
       # Don't try to slice away more ndims than the parameter
       # actually has, if that's fewer than `event_ndims` (i.e.,
       # if it relies on broadcasting).
-      ps.minimum(ndims_to_truncate, base_rank))]
+      ps.minimum(rightmost_ndims_to_truncate, base_rank))]
 
 
-def _truncate_shape(shape, ndims_to_truncate):
-  if tensorshape_util.rank(shape) is None or ndims_to_truncate is None:
+def _truncate_shape(shape, rightmost_ndims_to_truncate):
+  if (tensorshape_util.rank(shape) is None or
+      rightmost_ndims_to_truncate is None):
     return tf.TensorShape(None)
-  if tf.is_tensor(ndims_to_truncate):
-    event_ndims = tf.get_static_value(ndims_to_truncate)
+  if tf.is_tensor(rightmost_ndims_to_truncate):
+    event_ndims = tf.get_static_value(rightmost_ndims_to_truncate)
     if event_ndims is None:
       return tf.TensorShape(None)
   return shape[:(len(shape) -
                  # Don't try to slice away more ndims than the parameter
                  # actually has, if that's fewer than `event_ndims` (i.e.,
                  # if it relies on broadcasting).
-                 min(ndims_to_truncate, len(shape)))]
+                 min(rightmost_ndims_to_truncate, len(shape)))]
 
 
 def batch_shape_parts(batch_object,
@@ -200,7 +206,7 @@ def batch_shape_parts(batch_object,
   """Returns a dict mapping parameter names to their inferred batch shapes."""
   return map_fn_over_parameters_with_event_ndims(
       batch_object,
-      _get_batch_shape_tensor_part,
+      get_batch_shape_tensor_part,
       bijector_x_event_ndims=bijector_x_event_ndims,
       **parameter_kwargs)
 
@@ -244,13 +250,13 @@ def broadcast_parameters_with_batch_shape(batch_object,
   return map_fn_over_parameters_with_event_ndims(
       batch_object,
       functools.partial(
-          _broadcast_parameter_with_batch_shape, batch_shape=batch_shape),
+          broadcast_parameter_with_batch_shape, batch_shape=batch_shape),
       bijector_x_event_ndims=bijector_x_event_ndims)
 
 
-def _broadcast_parameter_with_batch_shape(param,
-                                          param_event_ndims,
-                                          batch_shape):
+def broadcast_parameter_with_batch_shape(param,
+                                         param_event_ndims,
+                                         batch_shape):
   """Broadcasts `param` with the given batch shape, recursively."""
   if hasattr(param, 'forward_min_event_ndims'):
     # Bijector-valued params are responsible for handling any structure in

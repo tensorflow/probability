@@ -192,6 +192,9 @@ class Independent(distribution_lib.Distribution):
         ps.maximum(0, ps.size(distribution_batch_shape_tensor) - 1),
         np.int32)
 
+  # TODO(davmre): Delete this override.
+  # The default slicing machinery should work here after we remove support for
+  # the deprecated init arg `reinterpreted_batch_ndims=None`.
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing
     # for instances of Independent, not subclasses thereof.

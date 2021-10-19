@@ -486,11 +486,11 @@ class BernoulliSlicingTest(test_util.TestCase):
     check(make_slicer[:-3, tf.newaxis], make_slicer[..., 0, :2],
           make_slicer[::2])
     if tf.executing_eagerly(): return
-    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 'Index out of range.*input has only 4 dims'):
+    with self.assertRaisesRegex((ValueError, tf.errors.InvalidArgumentError),
+                                'Index out of range.*input has only 4 dims'):
       check(make_slicer[19, tf.newaxis, 2, ..., :, 0, 4])
-    with self.assertRaisesRegexp((ValueError, tf.errors.InvalidArgumentError),
-                                 'slice index.*out of bounds'):
+    with self.assertRaisesRegex((IndexError, ValueError),
+                                'index.*out of bounds'):
       check(make_slicer[..., 2, :])  # ...,1,5 -> 2 is oob.
 
   @test_util.jax_disable_test_missing_functionality('Gradient tape not '
