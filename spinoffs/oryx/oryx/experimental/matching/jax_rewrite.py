@@ -462,7 +462,7 @@ class Primitive(JaxExpression):
   def shape_dtype(self):
     if self._shape_dtype is not None:
       return self._shape_dtype
-    fun = functools.partial(self.primitive.bind, **self.params)
+    fun = functools.partial(self.primitive.bind, **self.params)  # type: ignore  # bind-properties
     self._shape_dtype = jax.eval_shape(fun, *self.operands)
     return self._shape_dtype
 
