@@ -27,7 +27,7 @@ from jax.interpreters import ad
 from jax.interpreters import batching
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
-from jax.lib.xla_bridge import xla_client as xc
+from jax.lib import xla_client as xc
 
 from oryx.core import trace_util
 

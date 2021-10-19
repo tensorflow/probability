@@ -150,7 +150,7 @@ from jax.interpreters import ad
 from jax.interpreters import batching
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
-from jax.lib.xla_bridge import xla_client as xc
+from jax.lib import xla_client as xc
 import jax.numpy as jnp
 
 from oryx.core import primitive as prim
