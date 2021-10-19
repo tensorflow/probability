@@ -14,8 +14,6 @@
 # ============================================================================
 """The VariationalGaussianProcess distribution class."""
 
-import functools
-
 import numpy as np
 import tensorflow.compat.v2 as tf
 
@@ -159,6 +157,20 @@ class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
           name=name,
           parameters=parameters)
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        base_kernel=parameter_properties.BatchedComponentProperties(),
+        inducing_index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.base_kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        variational_scale=(
+            parameter_properties.ParameterProperties(
+                event_ndims=2,
+                shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+                default_constraining_bijector_fn=(
+                    fill_scale_tril_bijector.FillScaleTriL))))
+
   @property
   def base_kernel(self):
     return self._base_kernel
@@ -173,26 +185,6 @@ class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
 
   def chol_kzz(self):
     return tf.convert_to_tensor(self._chol_kzz)
-
-  def _batch_shape(self):
-    return functools.reduce(
-        tf.broadcast_static_shape,
-        [
-            self.base_kernel.batch_shape,
-            self.inducing_index_points.shape[
-                :-(self.base_kernel.feature_ndims + 1)],
-            self.variational_scale.shape[:-2],
-        ])
-
-  def _batch_shape_tensor(self):
-    return functools.reduce(
-        tf.broadcast_dynamic_shape,
-        [
-            self.base_kernel.batch_shape_tensor(),
-            tf.shape(self.inducing_index_points)[
-                :-(self.base_kernel.feature_ndims + 1)],
-            tf.shape(self.variational_scale)[:-2],
-        ])
 
   def _apply(self, x1, x2, example_ndims=1):
     # We follow nearly-identical patterns here to the SchurComplement kernel.
