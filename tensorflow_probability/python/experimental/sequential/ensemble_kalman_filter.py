@@ -24,6 +24,7 @@ __all__ = [
     'EnsembleKalmanFilterState',
     'ensemble_kalman_filter_predict',
     'ensemble_kalman_filter_update',
+    'ensemble_kalman_filter_log_marginal_likelihood',
     'inflate_by_scaled_identity_fn',
 ]
 
@@ -225,3 +226,60 @@ def ensemble_kalman_filter_update(
 
     return EnsembleKalmanFilterState(
         step=state.step + 1, particles=new_particles, extra=extra)
+
+
+def ensemble_kalman_filter_log_marginal_likelihood(
+    state,
+    observation,
+    observation_fn,
+    seed=None,
+    name=None):
+  """Ensemble Kalman Filter Log Marginal Likelihood.
+
+  The [Ensemble Kalman Filter](
+  https://en.wikipedia.org/wiki/Ensemble_Kalman_filter) is a Monte Carlo
+  version of the traditional Kalman Filter.
+
+  This method estimates (logarithm of) the marginal likelihood of the
+  observation at step `k`, `Y_k`, given previous observations from steps
+  `1` to `k-1`, `Y_{1:k}`. In other words, `Log[p(Y_k | Y_{1:k})]`.
+  This function's approximation to `p(Y_k | Y_{1:k})` is correct under a
+  Linear Gaussian state space model assumption, as ensemble size --> infinity.
+
+  Args:
+    state: Instance of `EnsembleKalmanFilterState` at step `k`,
+      conditioned on previous observations `Y_{1:k}`. Typically this is the
+      output of `ensemble_kalman_filter_predict`.
+    observation: `Tensor` representing the observation at step `k`.
+    observation_fn: callable returning an instance of
+      `tfd.MultivariateNormalLinearOperator` along with an extra information
+      to be returned in the `EnsembleKalmanFilterState`.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+    name: Python `str` name for ops created by this method.
+      Default value: `None`
+      (i.e., `'ensemble_kalman_filter_log_marginal_likelihood'`).
+
+  Returns:
+    log_marginal_likelihood: `Tensor` with same dtype as `state`.
+  """
+
+  with tf.name_scope(name or 'ensemble_kalman_filter_log_marginal_likelihood'):
+    observation_particles_dist, unused_extra = observation_fn(
+        state.step, state.particles, state.extra)
+
+    common_dtype = dtype_util.common_dtype(
+        [observation_particles_dist, observation], dtype_hint=tf.float32)
+
+    observation = tf.convert_to_tensor(observation, dtype=common_dtype)
+
+    if not isinstance(observation_particles_dist,
+                      distributions.MultivariateNormalLinearOperator):
+      raise ValueError('Expected `observation_fn` to return an instance of '
+                       '`MultivariateNormalLinearOperator`')
+
+    observation_particles = observation_particles_dist.sample(seed=seed)
+    observation_dist = distributions.MultivariateNormalTriL(
+        loc=tf.reduce_mean(observation_particles, axis=0),
+        scale_tril=tf.linalg.cholesky(_covariance(observation_particles)))
+
+    return observation_dist.log_prob(observation)

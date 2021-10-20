@@ -16,6 +16,7 @@
 
 
 # Dependency imports
+import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
@@ -64,6 +65,20 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
         inflate_fn=None,
         seed=test_util.test_seed())
 
+    observation = tf.convert_to_tensor([0.], dtype=particles.dtype)
+    log_ml = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+        predicted_state,
+        observation=observation,
+        observation_fn=observation_fn,
+        seed=test_util.test_seed())
+    self.assertAllEqual(observation.shape[:-1], log_ml.shape)
+    log_ml_krazy_obs = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+        predicted_state,
+        observation=observation + 10.,
+        observation_fn=observation_fn,
+        seed=test_util.test_seed())
+    self.assertAllLess(log_ml_krazy_obs, log_ml)
+
     # Check that extra is correctly propagated.
     self.assertIn('unchanged', predicted_state.extra)
     self.assertEqual(1, predicted_state.extra['unchanged'])
@@ -74,7 +89,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
     updated_state = tfs.ensemble_kalman_filter_update(
         predicted_state,
         # The observation is the constant 0.
-        observation=[0.],
+        observation=observation,
         seed=test_util.test_seed(),
         observation_fn=observation_fn)
 
@@ -190,11 +205,12 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
     seed_stream = test_util.test_seed_stream()
 
     # Initialize the ensemble.
+    particles_shape = (300, 3, 2)
     particles = {
         'x': self.evaluate(tf.random.normal(
-            shape=[300, 3, 2], seed=seed_stream(), dtype=tf.float64)),
+            shape=particles_shape, seed=seed_stream(), dtype=tf.float64)),
         'xdot': self.evaluate(tf.random.normal(
-            shape=[300, 3, 2], seed=seed_stream(), dtype=tf.float64))
+            shape=particles_shape, seed=seed_stream(), dtype=tf.float64))
     }
 
     state = tfs.EnsembleKalmanFilterState(
@@ -202,6 +218,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
             'observation_count': 0, 'transition_count': 0})
 
     for i in range(10):
+      # Predict.
       state = tfs.ensemble_kalman_filter_predict(
           state,
           transition_fn=transition_fn,
@@ -210,16 +227,35 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
       self.assertIn('transition_count', state.extra)
       self.assertEqual(i + 1, state.extra['transition_count'])
 
+      # Marginal likelihood.
+      observation = tf.convert_to_tensor([1. * i, 2. * i], dtype=tf.float64)
+      log_ml = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+          state,
+          observation=observation,
+          observation_fn=observation_fn,
+          seed=test_util.test_seed())
+      self.assertAllEqual(particles_shape[1:-1], log_ml.shape)
+      self.assertIn('observation_count', state.extra)
+      self.assertEqual(3 * i + 1, state.extra['observation_count'])
+
+      log_ml_krazy_obs = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+          state,
+          observation=observation + 10.,
+          observation_fn=observation_fn,
+          seed=test_util.test_seed())
+      np.testing.assert_array_less(
+          self.evaluate(log_ml_krazy_obs), self.evaluate(log_ml))
+      self.assertEqual(3 * i + 2, state.extra['observation_count'])
+
+      # Update.
       state = tfs.ensemble_kalman_filter_update(
           state,
-          observation=[1. * i, 2. * i],
+          observation=observation,
           observation_fn=observation_fn,
           seed=seed_stream())
       print(self.evaluate(
           tf.reduce_mean(state.particles['x'], axis=0)))
-
-      self.assertIn('observation_count', state.extra)
-      self.assertEqual(i + 1, state.extra['observation_count'])
+      self.assertEqual(3 * i + 3, state.extra['observation_count'])
 
     self.assertAllClose([[9., 18.]] * 3, self.evaluate(
         tf.reduce_mean(state.particles['x'], axis=0)), rtol=0.05)

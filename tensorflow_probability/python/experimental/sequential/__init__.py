@@ -15,6 +15,7 @@
 """TensorFlow Probability experimental sequential estimation package."""
 
 from tensorflow_probability.python.experimental.sequential.ensemble_adjustment_kalman_filter import ensemble_adjustment_kalman_filter_update
+from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import ensemble_kalman_filter_log_marginal_likelihood
 from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import ensemble_kalman_filter_predict
 from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import ensemble_kalman_filter_update
 from tensorflow_probability.python.experimental.sequential.ensemble_kalman_filter import EnsembleKalmanFilterState
@@ -31,6 +32,7 @@ _allowed_symbols = [
     'EnsembleKalmanFilterState',
     'ensemble_kalman_filter_predict',
     'ensemble_kalman_filter_update',
+    'ensemble_kalman_filter_log_marginal_likelihood',
     'ensemble_adjustment_kalman_filter_update',
     'geometric_cooling_schedule',
     'inflate_by_scaled_identity_fn',
