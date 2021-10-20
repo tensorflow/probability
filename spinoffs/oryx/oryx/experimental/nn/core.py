@@ -18,7 +18,7 @@ import abc
 import collections
 import jax
 from jax import random
-from jax.experimental import stax
+from jax.example_libraries import stax
 import jax.numpy as np
 
 from oryx.core import primitive

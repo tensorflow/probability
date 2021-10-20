@@ -21,7 +21,7 @@ import types
 import jax
 from jax import lax
 from jax import tree_util
-from jax.experimental import stax
+from jax.example_libraries import stax
 import jax.numpy as jnp
 import numpy as np
 

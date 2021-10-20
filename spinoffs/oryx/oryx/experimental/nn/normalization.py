@@ -17,7 +17,7 @@
 import collections
 from jax import lax
 from jax import random
-from jax.experimental import stax
+from jax.example_libraries import stax
 import jax.numpy as np
 
 from oryx.core import kwargs_util
