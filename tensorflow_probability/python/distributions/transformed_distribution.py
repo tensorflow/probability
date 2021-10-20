@@ -20,6 +20,7 @@ from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
@@ -510,6 +511,51 @@ class TransformedDistribution(distribution_lib.Distribution):
     return tf.nest.map_structure(
         tf.abs,
         tf.nest.map_structure(tf.subtract, y_stddev_plus_shift, shift))
+
+  def _covariance(self, **kwargs):
+    if not self.bijector.is_constant_jacobian:
+      raise NotImplementedError(
+          '`covariance` is not implemented for non-affine `bijectors`.')
+    if not self.bijector._is_injective:  # pylint: disable=protected-access
+      raise NotImplementedError(
+          '`covariance` is not implemented when `bijector` is not injective.')
+    if (tf.nest.is_nested(self.bijector.forward_min_event_ndims) or
+        self.bijector.forward_event_ndims(1) != 1):
+      raise NotImplementedError(
+          '`covariance` is only implemented when `bijector` takes vector '
+          'inputs and produces vector outputs.')
+
+    # An affine bijector is of the form `forward(x) = scale @ x + shift`,
+    # where the covariance is invariant to the shift, so we extract the
+    # shift and subtract it.
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+    cov = self.distribution.covariance(**distribution_kwargs)
+    zero_vector = tf.zeros_like(cov[..., 0])
+    shift = self.bijector.forward(zero_vector, **bijector_kwargs)
+
+    if shift is zero_vector:  # Short-circuit if bijector is tfb.Identity.
+      return cov
+
+    # Broadcast `cov` to full batch rank so we can treat its rows as an
+    # additional batch dim. Note that we can't just call `forward(cov)` directly
+    # because the user presumably lined up the bijector batch dimensions to work
+    # when transforming vectors, not matrices.
+    cov = tf.broadcast_to(
+        cov, ps.broadcast_shape(ps.shape(cov),
+                                ps.concat([ps.ones_like(ps.shape(shift)),
+                                           [1]], axis=0)))
+    ndims = ps.rank(cov)
+    cov_rows = dist_util.move_dimension(  # No-op if cov has no batch dims.
+        cov, source_idx=-2, dest_idx=0)
+    tmp = self.bijector.forward(  # scale @ transpose(cov).
+        cov_rows, **bijector_kwargs) - shift
+    # Swap leftmost batch dim (rows) with event dim (columns).
+    tmp_transpose = tf.transpose(  # cov @ transpose(scale).
+        tmp, perm=ps.concat([[ndims - 1], ps.range(1, ndims - 1), [0]], axis=0))
+    result_rows = self.bijector.forward(  # scale @ cov @ transpose(scale).
+        tmp_transpose, **bijector_kwargs) - shift
+    return dist_util.move_dimension(  # No-op if result has no batch dims.
+        result_rows, source_idx=0, dest_idx=-2)
 
   def _entropy(self, **kwargs):
     if not self.bijector.is_constant_jacobian:

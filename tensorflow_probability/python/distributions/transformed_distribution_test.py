@@ -434,6 +434,71 @@ class TransformedDistributionTest(test_util.TestCase):
         NotImplementedError, 'is a multivariate transformation'):
       scaled_normal.stddev()
 
+  def testCovariance(self):
+    base_scale_tril = np.array([[1., 0.], [-3., 0.2]], dtype=np.float32)
+    base_cov = tf.matmul(base_scale_tril, base_scale_tril, adjoint_b=True)
+
+    shift = np.array([[-1., 0.], [-1., -2.], [4., 5.]], dtype=np.float32)
+    scale = np.array([[1., -2.], [2., -3.], [0.1, -2.]], dtype=np.float32)
+    scale_matvec = np.array([[0.5, 0.], [-2., 0.7]], dtype=np.float32)
+    normal = tfd.TransformedDistribution(
+        distribution=tfd.MultivariateNormalTriL(
+            loc=[0., 0.], scale_tril=base_scale_tril, validate_args=True),
+        bijector=tfb.Chain([tfb.ScaleMatvecTriL(scale_matvec),
+                            tfb.Shift(shift=shift),
+                            tfb.Scale(scale=scale)],
+                           validate_args=True),
+        validate_args=True)
+
+    overall_scale = tf.matmul(scale_matvec, tf.linalg.diag(scale))
+    expected_cov = tf.matmul(overall_scale,
+                             tf.matmul(base_cov, overall_scale, adjoint_b=True))
+    self.assertAllClose(normal.covariance(), expected_cov)
+
+  def testCovarianceIdentityShortCircuit(self):
+    cov_canary = tf.eye(2)
+
+    class MyMVN(tfd.MultivariateNormalDiag):
+
+      def __init__(self):
+        super().__init__(loc=[0., 0.], scale_diag=[1., 1.])
+
+      def _covariance(self):
+        return cov_canary
+
+    identity_transformed = tfd.TransformedDistribution(distribution=MyMVN(),
+                                                       bijector=tfb.Identity())
+    self.assertIs(identity_transformed.covariance(), cov_canary)
+
+  def testCovarianceNotImplemented(self):
+    mvn = tfd.MultivariateNormalDiag(loc=[0., 0.], scale_diag=[1., 2.])
+
+    # Non-affine bijector.
+    with self.assertRaisesRegex(
+        NotImplementedError, '`covariance` is not implemented'):
+      tfd.TransformedDistribution(
+          distribution=mvn, bijector=tfb.Exp()).covariance()
+
+    # Non-injective bijector.
+    with self.assertRaisesRegex(
+        NotImplementedError, '`covariance` is not implemented'):
+      tfd.TransformedDistribution(
+          distribution=mvn, bijector=tfb.AbsoluteValue()).covariance()
+
+    # Non-vector event shape.
+    with self.assertRaisesRegex(
+        NotImplementedError, '`covariance` is only implemented'):
+      tfd.TransformedDistribution(
+          distribution=mvn,
+          bijector=tfb.Reshape(event_shape_out=[2, 1],
+                               event_shape_in=[2])).covariance()
+
+    # Multipart bijector.
+    with self.assertRaisesRegex(
+        NotImplementedError, '`covariance` is only implemented'):
+      tfd.TransformedDistribution(
+          distribution=mvn, bijector=tfb.Split(2)).covariance()
+
   def testEntropy(self):
     shift = np.array([[-1, 0, 1], [-1, -2, -3]], dtype=np.float32)
     diag = np.array([[1, 2, 3], [2, 3, 2]], dtype=np.float32)
