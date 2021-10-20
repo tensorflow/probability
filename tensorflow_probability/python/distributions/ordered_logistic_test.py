@@ -36,7 +36,7 @@ class OrderedLogisticTest(test_util.TestCase):
 
   def setUp(self):
     self._ordered = tfb.Ascending()
-    self._rng = np.random.RandomState(test_util.test_seed())
+    self._rng = test_util.test_np_rng()
     super(OrderedLogisticTest, self).setUp()
 
   @parameterized.parameters(

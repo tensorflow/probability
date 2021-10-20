@@ -33,9 +33,8 @@ class MutualInformationTest(tfp_test_util.TestCase):
   def setUp(self):
     super(MutualInformationTest, self).setUp()
     self.seed = tfp_test_util.test_seed()
-    np.random.seed(self.seed)
 
-    self.scores = np.random.normal(
+    self.scores = tfp_test_util.test_np_rng().normal(
         loc=1.0,
         scale=2.0,
         size=[13, 17])

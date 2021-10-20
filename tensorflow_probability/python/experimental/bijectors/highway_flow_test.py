@@ -171,14 +171,11 @@ class HighwayFlowTests(test_util.TestCase):
                          maxval=1.,
                          seed=test_util.test_seed(sampler_type='stateless'))
 
+    seed = test_util.test_seed(sampler_type='stateless')
     bijector1 = tfp.experimental.bijectors.build_trainable_highway_flow(
-        width,
-        activation_fn=tf.nn.softplus,
-        seed=test_util.test_seed(sampler_type='stateless'))
+        width, activation_fn=tf.nn.softplus, seed=seed)
     bijector2 = tfp.experimental.bijectors.build_trainable_highway_flow(
-        width,
-        activation_fn=tf.nn.softplus,
-        seed=test_util.test_seed(sampler_type='stateless'))
+        width, activation_fn=tf.nn.softplus, seed=seed)
     self.evaluate([v.initializer for v in bijector1.trainable_variables])
     self.evaluate([v.initializer for v in bijector2.trainable_variables])
     self.assertAllClose(bijector1.forward(x), bijector2.forward(x))

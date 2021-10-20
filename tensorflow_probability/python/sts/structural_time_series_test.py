@@ -100,9 +100,9 @@ class _StructuralTimeSeriesTests(object):
     s3 = s1 + s2
     self.assertLen(s3.components, 2)
 
-    observation_noise_scale_prior_sample = (
-        lambda s: s.parameters[0].prior.sample(  # pylint: disable=g-long-lambda
-            seed=test_util.test_seed(sampler_type='stateless')))
+    seed = test_util.test_seed(sampler_type='stateless')
+    def observation_noise_scale_prior_sample(s):
+      return s.parameters[0].prior.sample(seed=seed)
     self.assertAllEqual(observation_noise_scale_prior_sample(s3),
                         observation_noise_scale_prior_sample(s1))
     self.assertAllEqual(observation_noise_scale_prior_sample(s3),

@@ -32,6 +32,7 @@ tfd = tfp.distributions
 class BatchedRejectionSamplerTest(test_util.TestCase):
 
   def testBatchedLasVegasAlgorithm(self):
+    seed = test_util.test_seed(sampler_type='stateless')
     def uniform_less_than_point_five(seed):
       values = samplers.uniform([6], seed=seed)
       negative_values = -values
@@ -42,7 +43,7 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
     ((negative_values, values), _, _) = self.evaluate(
         brs.batched_las_vegas_algorithm(
             uniform_less_than_point_five,
-            seed=test_util.test_seed()))
+            seed=seed))
 
     self.assertAllLess(values, 0.5)
     self.assertAllClose(-values, negative_values)
@@ -51,7 +52,7 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
     ((negative_values_2, values_2), _, _) = self.evaluate(
         brs.batched_las_vegas_algorithm(
             uniform_less_than_point_five,
-            seed=test_util.test_seed()))
+            seed=seed))
     self.assertAllEqual(negative_values, negative_values_2)
     self.assertAllEqual(values, values_2)
 
@@ -105,8 +106,10 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
           is_static)
       return uniform_samples, tf.ones_like(uniform_samples) * upper_bounds
 
+    seed = test_util.test_seed(sampler_type='stateless')
+
     all_samples, _ = self.evaluate(brs.batched_rejection_sampler(
-        proposal_fn, target_fn, seed=test_util.test_seed(), dtype=dtype))
+        proposal_fn, target_fn, seed=seed, dtype=dtype))
 
     for i in range(beta.shape[0]):
       samples = all_samples[:, i]
@@ -115,7 +118,7 @@ class BatchedRejectionSamplerTest(test_util.TestCase):
 
     # Check for reproducibility.
     all_samples_2, _ = self.evaluate(brs.batched_rejection_sampler(
-        proposal_fn, target_fn, seed=test_util.test_seed(), dtype=dtype))
+        proposal_fn, target_fn, seed=seed, dtype=dtype))
     self.assertAllEqual(all_samples, all_samples_2)
 
 if __name__ == '__main__':

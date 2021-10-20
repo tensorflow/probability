@@ -80,22 +80,20 @@ class _TrainableASVISurrogate(object):
 
   def test_initialization_is_deterministic_following_seed(self):
     prior_dist = self.make_prior_dist()
+    seed = test_util.test_seed(sampler_type='stateless')
+    init_seed, sample_seed = tfp.random.split_seed(seed)
 
     surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
-        prior=prior_dist,
-        seed=test_util.test_seed(sampler_type='stateless'))
+        prior=prior_dist, seed=init_seed)
     self.evaluate(
         [v.initializer for v in surrogate_posterior.trainable_variables])
-    posterior_sample = surrogate_posterior.sample(
-        seed=test_util.test_seed(sampler_type='stateless'))
+    posterior_sample = surrogate_posterior.sample(seed=sample_seed)
 
     surrogate_posterior2 = tfp.experimental.vi.build_asvi_surrogate_posterior(
-        prior=prior_dist,
-        seed=test_util.test_seed(sampler_type='stateless'))
+        prior=prior_dist, seed=init_seed)
     self.evaluate(
         [v.initializer for v in surrogate_posterior2.trainable_variables])
-    posterior_sample2 = surrogate_posterior2.sample(
-        seed=test_util.test_seed(sampler_type='stateless'))
+    posterior_sample2 = surrogate_posterior2.sample(seed=sample_seed)
 
     self.assertAllEqualNested(posterior_sample, posterior_sample2)
 

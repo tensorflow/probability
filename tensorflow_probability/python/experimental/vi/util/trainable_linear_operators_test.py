@@ -148,21 +148,16 @@ class TrainableLinearOperators(test_util.TestCase):
     tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
 
   def test_deterministic_initialization_from_seed(self):
+    seed = test_util.test_seed(sampler_type='stateless')
     op = tfp.experimental.vi.util.build_trainable_linear_operator_block(
         operators=(tf.linalg.LinearOperatorDiag,
                    tf.linalg.LinearOperatorLowerTriangular),
-        block_dims=(2, 3),
-        batch_shape=[3],
-        dtype=tf.float32,
-        seed=test_util.test_seed(sampler_type='stateless'))
+        block_dims=(2, 3), batch_shape=[3], dtype=tf.float32, seed=seed)
     self.evaluate([v.initializer for v in op.trainable_variables])
     op2 = tfp.experimental.vi.util.build_trainable_linear_operator_block(
         operators=(tf.linalg.LinearOperatorDiag,
                    tf.linalg.LinearOperatorLowerTriangular),
-        block_dims=(2, 3),
-        batch_shape=[3],
-        dtype=tf.float32,
-        seed=test_util.test_seed(sampler_type='stateless'))
+        block_dims=(2, 3), batch_shape=[3], dtype=tf.float32, seed=seed)
     self.evaluate([v.initializer for v in op2.trainable_variables])
     self.assertAllEqual(op.to_dense(), op2.to_dense())
 

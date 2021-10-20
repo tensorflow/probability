@@ -362,17 +362,18 @@ class JointDistributionCoroutineTest(test_util.TestCase):
 
     joint = tfd.JointDistributionCoroutine(coroutine_model, validate_args=True)
 
+    seed = test_util.test_seed(sampler_type='stateless')
     for sample_shape in ([], [5]):
       inverted_values.clear()
       x1, lp1 = self.evaluate(
           joint.experimental_sample_and_log_prob(
               sample_shape,
-              seed=test_util.test_seed(sampler_type='seedless'),
+              seed=seed,
               df=2.7 * tf.ones(sample_shape)  # Check that kwargs are supported.
               ))
       x2 = self.evaluate(
           joint.sample(sample_shape,
-                       seed=test_util.test_seed(sampler_type='seedless'),
+                       seed=seed,
                        df=2.7 * tf.ones(sample_shape)))
       self.assertAllCloseNested(x1, x2)
 

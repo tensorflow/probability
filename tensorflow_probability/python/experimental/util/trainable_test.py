@@ -130,16 +130,13 @@ class TestTrainableDistributionsAndBijectors(test_util.TestCase):
       self.assertAllLess(v, 1.)
 
   def test_initialization_is_deterministic_with_seed(self):
+    seed = test_util.test_seed(sampler_type='stateless')
     distribution1 = tfp.experimental.util.make_trainable(
-        tfd.Normal,
-        seed=test_util.test_seed(sampler_type='stateless'),
-        validate_args=True)
+        tfd.Normal, seed=seed, validate_args=True)
     self.evaluate([v.initializer for v in distribution1.trainable_variables])
 
     distribution2 = tfp.experimental.util.make_trainable(
-        tfd.Normal,
-        seed=test_util.test_seed(sampler_type='stateless'),
-        validate_args=True)
+        tfd.Normal, seed=seed, validate_args=True)
     self.evaluate([v.initializer for v in distribution2.trainable_variables])
 
     self.assertAllEqual(distribution1.mean(), distribution2.mean())

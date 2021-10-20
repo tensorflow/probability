@@ -148,10 +148,15 @@ class PixelCnnTest(test_util.TestCase):
     self.assertAllInRange(samples, self.low, self.high)
     self.assertLessEqual(np.unique(samples).size, self.high+1)
 
+    seed = test_util.test_seed()
+    if tf.executing_eagerly():
+      tf.random.set_seed(seed)
     sample_rng_1 = dist.sample(
-        self.batch_shape, conditional_input=h, seed=test_util.test_seed())
+        self.batch_shape, conditional_input=h, seed=seed)
+    if tf.executing_eagerly():
+      tf.random.set_seed(seed)
     sample_rng_2 = dist.sample(
-        self.batch_shape, conditional_input=h, seed=test_util.test_seed())
+        self.batch_shape, conditional_input=h, seed=seed)
     self.assertAllEqual(
         self.evaluate(sample_rng_1), self.evaluate(sample_rng_2))
 

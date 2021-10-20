@@ -37,8 +37,7 @@ class OptimizationTests(test_util.TestCase):
 
     num_samples = 10000
     mu, sigma = 3., 5.
-    np.random.seed(seed)
-    x = np.random.randn(num_samples) * sigma + mu
+    x = test_util.test_np_rng().randn(num_samples) * sigma + mu
 
     # Test that the tape automatically picks up any trainable variables in
     # the model, even though it's just a function with no explicit

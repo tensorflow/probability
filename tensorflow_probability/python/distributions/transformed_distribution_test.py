@@ -283,13 +283,14 @@ class TransformedDistributionTest(test_util.TestCase):
         sample, s=sigma, scale=np.exp(mu))
     self.assertAllClose(expected_log_pdf, log_pdf, rtol=1e-4, atol=0.)
 
+    seed = test_util.test_seed(sampler_type='stateless')
     sample, log_pdf = self.evaluate(
-        log_normal.experimental_sample_and_log_prob(seed=test_util.test_seed()))
+        log_normal.experimental_sample_and_log_prob(seed=seed))
     expected_log_pdf = stats.lognorm.logpdf(
         sample, s=sigma, scale=np.exp(mu))
     self.assertAllClose(expected_log_pdf, log_pdf, rtol=1e-4, atol=0.)
 
-    sample2 = self.evaluate(log_normal.sample(seed=test_util.test_seed()))
+    sample2 = self.evaluate(log_normal.sample(seed=seed))
     self.assertAllClose(sample, sample2, rtol=1e-4)
 
   def testCachedSamplesInvert(self):
