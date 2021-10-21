@@ -197,10 +197,7 @@ py_library(
     name = "regularization",
     srcs = ["regularization.py"],
     srcs_version = "PY3",
-    deps = [
-        # enum dep,
-        # numpy dep,
-    ],
+    deps = [# numpy dep],
 )
 
 py_test(
