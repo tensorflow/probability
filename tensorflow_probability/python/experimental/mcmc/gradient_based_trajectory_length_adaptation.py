@@ -114,9 +114,20 @@ def hmc_like_num_leapfrog_steps_setter_fn(kernel_results,
 
 def hmc_like_proposed_velocity_getter_fn(kernel_results):
   """Getter for `proposed_velocity` so it can be inspected."""
-  # TODO(b/169898033): This only works with the standard kinetic energy term.
-  proposed_velocity = unnest.get_innermost(kernel_results, 'final_momentum')
+  final_momentum = unnest.get_innermost(kernel_results, 'final_momentum')
   proposed_state = unnest.get_innermost(kernel_results, 'proposed_state')
+
+  momentum_distribution = unnest.get_innermost(
+      kernel_results, 'momentum_distribution', default=None)
+  if momentum_distribution is None:
+    proposed_velocity = final_momentum
+  else:
+    momentum_log_prob = getattr(momentum_distribution,
+                                '_log_prob_unnormalized',
+                                momentum_distribution.log_prob)
+    kinetic_energy_fn = lambda *args: -momentum_log_prob(*args)
+    _, proposed_velocity = mcmc_util.maybe_call_fn_and_grads(
+        kinetic_energy_fn, final_momentum)
   # proposed_velocity has the wrong structure when state is a scalar.
   return tf.nest.pack_sequence_as(proposed_state,
                                   tf.nest.flatten(proposed_velocity))

@@ -262,6 +262,68 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         np.abs(init_kernel_results.max_trajectory_length -
                final_kernel_results.max_trajectory_length), 0.0005)
 
+  def testPreconditionedHMC(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Too slow for TF Eager.')
+
+    target = tfd.Independent(
+        tfd.Normal(0., tf.constant([1., 10.], self.dtype)), 1)
+
+    num_burnin_steps = 1000
+    num_adaptation_steps = int(num_burnin_steps * 0.8)
+    num_results = 500
+    num_chains = 16
+    step_size = 0.1
+
+    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+        target_log_prob_fn=target.log_prob,
+        step_size=step_size,
+        num_leapfrog_steps=1,
+        momentum_distribution=tfd.Independent(
+            tfd.Normal(0., tf.constant([1., 1. / 10.], self.dtype)), 1),
+    )
+    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+        kernel,
+        num_adaptation_steps=num_adaptation_steps,
+        validate_args=True)
+    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+        kernel, num_adaptation_steps=num_adaptation_steps)
+
+    def trace_fn(_, pkr):
+      return (
+          pkr.inner_results.inner_results.accepted_results
+          .step_size,
+          pkr.inner_results.max_trajectory_length,
+          pkr.inner_results.inner_results.log_accept_ratio,
+      )
+
+    # The chain will be stepped for num_results + num_burnin_steps, adapting for
+    # the first num_adaptation_steps.
+    chain, [step_size, max_trajectory_length, log_accept_ratio] = (
+        tfp.mcmc.sample_chain(
+            num_results=num_results,
+            num_burnin_steps=num_burnin_steps,
+            current_state=tf.zeros([num_chains, 2], dtype=self.dtype),
+            kernel=kernel,
+            trace_fn=trace_fn,
+            seed=test_util.test_seed(sampler_type='stateless')))
+
+    p_accept = tf.math.exp(
+        tfp.math.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
+    mean_step_size = tf.reduce_mean(step_size)
+    mean_max_trajectory_length = tf.reduce_mean(max_trajectory_length)
+
+    self.assertAllClose(0.75, p_accept, atol=0.1)
+    self.assertAllClose(1.2, mean_step_size, atol=0.2)
+    self.assertAllClose(1.5, mean_max_trajectory_length, rtol=0.25)
+    self.assertAllClose(
+        target.mean(), tf.reduce_mean(chain, axis=[0, 1]),
+        atol=0.3)
+    self.assertAllClose(
+        target.variance(),
+        tf.math.reduce_variance(chain, axis=[0, 1]),
+        rtol=0.1)
+
   def testNumAdaptationSteps(self):
 
     def target_log_prob_fn(x):
