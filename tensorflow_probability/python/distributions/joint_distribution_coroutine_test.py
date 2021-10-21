@@ -60,8 +60,11 @@ def nested_lists_with_names_model_fn():
           tfd.StudentT(3., -2., 5.),
           tfd.Exponential(4.)])], name='abc'))
   a, (b, c) = abc
-  yield tfd.JointDistributionSequential([tfd.Normal(a * b, c),
-                                         tfd.Normal(a + b, c)], name='de')
+  yield tfd.JointDistributionSequential(
+      [tfd.Independent(tfd.Normal(a * b, c),
+                       reinterpreted_batch_ndims=1),
+       tfd.Independent(tfd.Normal(a + b, c),
+                       reinterpreted_batch_ndims=1)], name='de')
 
 
 def singleton_normal_model_fn():

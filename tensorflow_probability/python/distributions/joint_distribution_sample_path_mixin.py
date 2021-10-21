@@ -145,11 +145,14 @@ class JointDistributionSamplePathMixin(object):
     return assertions
 
   def _reduce_log_probs_over_dists(self, lps):
+    """Sum computed log probs across joint distribution parts."""
     if self._experimental_use_kahan_sum:
-      return sum(jd_lib.maybe_check_wont_broadcast(
-          self._reduce_measure_over_dists(
-              lps, reduce_fn=tfp_math.reduce_kahan_sum),
-          self.validate_args)).total
+      reduced_lps = self._reduce_measure_over_dists(
+          lps, reduce_fn=tfp_math.reduce_kahan_sum)
+      broadcasting_checks = jd_lib.maybe_check_wont_broadcast(
+          [v.total for v in reduced_lps], self.validate_args)
+      with tf.control_dependencies(broadcasting_checks):
+        return sum(reduced_lps).total
     else:
       return sum(jd_lib.maybe_check_wont_broadcast(
           self._reduce_measure_over_dists(lps, reduce_fn=tf.reduce_sum),

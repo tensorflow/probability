@@ -918,6 +918,18 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     # Without Kahan, example max-abs-diff: ~0.06
     self.assertAllClose(lp64, lp, rtol=0., atol=.01)
 
+  def test_kahan_broadcasting_check(self):
+    def model():
+      _ = yield tfd.Normal(0., 1.)  # Batch shape ()
+      _ = yield tfd.Normal([0., 1., 2.], 1.)  # Batch shape [3]
+    dist = tfd.JointDistributionCoroutineAutoBatched(
+        model, validate_args=True, experimental_use_kahan_sum=True,
+        batch_ndims=1)
+    sample = self.evaluate(dist.sample(seed=test_util.test_seed(
+        sampler_type='stateless')))
+    with self.assertRaises(ValueError):
+      self.evaluate(dist.log_prob(sample))
+
 
 if __name__ == '__main__':
   # TODO(b/173158845): XLA:CPU reassociates away the Kahan correction term.

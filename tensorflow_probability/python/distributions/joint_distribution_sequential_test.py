@@ -54,8 +54,12 @@ def nested_lists_model_fn():
               tfd.StudentT(3., -2., 5.),
               tfd.Exponential(4.)])], name='abc'),
       lambda abc: tfd.JointDistributionSequential([  # pylint: disable=g-long-lambda
-          tfd.Normal(abc[0] * abc[1][0], abc[1][1]),
-          tfd.Normal(abc[0] + abc[1][0], abc[1][1])], name='de')
+          tfd.Independent(
+              tfd.Normal(abc[0] * abc[1][0], abc[1][1]),
+              reinterpreted_batch_ndims=1),
+          tfd.Independent(
+              tfd.Normal(abc[0] + abc[1][0], abc[1][1]),
+              reinterpreted_batch_ndims=1)], name='de')
   ]
 
 

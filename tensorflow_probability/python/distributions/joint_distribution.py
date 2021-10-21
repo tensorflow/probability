@@ -1087,8 +1087,13 @@ def maybe_check_wont_broadcast(flat_xs, validate_args):
     return flat_xs
   msg = 'Broadcasting probably indicates an error in model specification.'
   s = tuple(ps.shape(x) for x in flat_xs)
+  def same_shape(a, b):
+    # Can't just use np.all(a == b) because numpy's == may broadcast!
+    # For instance, [3] == [3, 3] is [True, True], but that's not what
+    # we want here.
+    return len(a) == len(b) and np.all(a == b)
   if all(ps.is_numpy(s_) for s_ in s):
-    if not all(np.all(a == b) for a, b in zip(s[1:], s[:-1])):
+    if not all(same_shape(a, b) for a, b in zip(s[1:], s[:-1])):
       raise ValueError(msg)
     return flat_xs
   assertions = [assert_util.assert_equal(a, b, message=msg)
