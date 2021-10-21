@@ -311,7 +311,8 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
-          [df, index_points, observation_noise_variance, jitter], tf.float32)
+          [df, kernel, index_points, observation_noise_variance, jitter],
+          tf.float32)
       df = tensor_util.convert_nonref_to_tensor(df, dtype=dtype, name='df')
       observation_noise_variance = tensor_util.convert_nonref_to_tensor(
           observation_noise_variance,
@@ -608,3 +609,65 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
               self.df, dtype_util.as_numpy_dtype(self.df.dtype)(2.),
               message='`df` must be greater than 2.'))
     return assertions
+
+  def posterior_predictive(
+      self, observations, predictive_index_points=None, **kwargs):
+    """Return the posterior predictive distribution associated with this distribution.
+
+    Returns the posterior predictive distribution `p(Y' | X, Y, X')` where:
+      * `X'` is `predictive_index_points`
+      * `X` is `self.index_points`.
+      * `Y` is `observations`.
+
+    This is equivalent to using the
+    `StudentTProcessRegressionModel.precompute_regression_model` method.
+
+    WARNING: This method assumes `index_points` is the only varying parameter
+    (i.e. is a `Variable` / changes after initialization) and hence is not
+    tape-safe.
+
+    Args:
+      observations: `float` `Tensor` representing collection, or batch of
+        collections, of observations corresponding to
+        `self.index_points`. Shape has the form `[b1, ..., bB, e]`, which
+        must be broadcastable with the batch and example shapes of
+        `self.index_points`. The batch shape `[b1, ..., bB]` must be
+        broadcastable with the shapes of all other batched parameters
+      predictive_index_points: `float` `Tensor` representing finite collection,
+        or batch of collections, of points in the index set over which the GP
+        is defined.
+        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
+        number of feature dimensions and must equal `kernel.feature_ndims` and
+        `e` is the number (size) of predictive index points in each batch.
+        The batch shape must be broadcastable with this distributions
+        `batch_shape`.
+        Default value: `None`.
+      **kwargs: Any other keyword arguments to pass / override.
+
+    Returns:
+      stprm: An instance of `Distribution` that represents the posterior
+        predictive.
+    """
+    from tensorflow_probability.python.distributions import student_t_process_regression_model as stprm  # pylint:disable=g-import-not-at-top
+    if self.index_points is None:
+      raise ValueError(
+          'Expected that `self.index_points` is not `None`. Using '
+          '`self.index_points=None` is equivalent to using a `StudentTProcess` '
+          'prior, which this class encapsulates.')
+    argument_dict = {
+        'df': self.df,
+        'kernel': self.kernel,
+        'observation_index_points': self.index_points,
+        'observations': observations,
+        'index_points': predictive_index_points,
+        'observation_noise_variance': self.observation_noise_variance,
+        'cholesky_fn': self.cholesky_fn,
+        'mean_fn': self.mean_fn,
+        'validate_args': self.validate_args,
+        'allow_nan_stats': self.allow_nan_stats
+    }
+    argument_dict.update(**kwargs)
+
+    return stprm.StudentTProcessRegressionModel.precompute_regression_model(
+        **argument_dict)
+

@@ -121,6 +121,7 @@ from tensorflow_probability.python.distributions.spherical_uniform import Spheri
 from tensorflow_probability.python.distributions.stopping_ratio_logistic import StoppingRatioLogistic
 from tensorflow_probability.python.distributions.student_t import StudentT
 from tensorflow_probability.python.distributions.student_t_process import StudentTProcess
+from tensorflow_probability.python.distributions.student_t_process_regression_model import StudentTProcessRegressionModel
 from tensorflow_probability.python.distributions.transformed_distribution import TransformedDistribution
 from tensorflow_probability.python.distributions.triangular import Triangular
 from tensorflow_probability.python.distributions.truncated_cauchy import TruncatedCauchy
@@ -274,6 +275,7 @@ __all__ = [
     'StoppingRatioLogistic',
     'StudentT',
     'StudentTProcess',
+    'StudentTProcessRegressionModel',
     'TransformedDistribution',
     'Triangular',
     'TruncatedCauchy',

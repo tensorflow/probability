@@ -59,6 +59,10 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         np.random.uniform(-1., 1., (7, 1, 7, 2)).astype(np.float64))
     observations = np.random.uniform(-1., 1., (11, 7)).astype(np.float64)
 
+    def cholesky_fn(x):
+      return tf.linalg.cholesky(
+          tf.linalg.set_diag(x, tf.linalg.diag_part(x) + 1.))
+
     if not self.is_static:
       amplitude = tf1.placeholder_with_default(amplitude, shape=None)
       length_scale = tf1.placeholder_with_default(length_scale, shape=None)
@@ -77,6 +81,7 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         observation_index_points,
         observations,
         observation_noise_variance,
+        cholesky_fn=cholesky_fn,
         jitter=jitter,
         validate_args=True)
 
@@ -85,6 +90,8 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     sample_shape = [9, 3]
 
     samples = gprm.sample(sample_shape, seed=test_util.test_seed())
+
+    self.assertIs(cholesky_fn, gprm.cholesky_fn)
 
     if self.is_static or tf.executing_eagerly():
       self.assertAllEqual(gprm.batch_shape_tensor(), batch_shape)
@@ -388,6 +395,19 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         index_points=index_points_2,
         observation_index_points=observation_index_points_2,
         observations=observations_2)
+
+    precomputed_gprm1 = (
+        tfd.GaussianProcessRegressionModel.precompute_regression_model(
+            kernel=kernel_1,
+            index_points=index_points_1,
+            observation_index_points=observation_index_points_1,
+            observations=observations_1,
+            mean_fn=mean_fn,
+            jitter=1e-5,
+            validate_args=True))
+    precomputed_gprm2 = precomputed_gprm1.copy(index_points=index_points_2)
+    self.assertIs(precomputed_gprm1.mean_fn, precomputed_gprm2.mean_fn)
+    self.assertIs(precomputed_gprm1.kernel, precomputed_gprm2.kernel)
 
     event_shape_1 = [5]
     event_shape_2 = [10]

@@ -145,6 +145,7 @@ multi_substrate_py_library(
         ":stopping_ratio_logistic",
         ":student_t",
         ":student_t_process",
+        ":student_t_process_regression_model",
         ":transformed_distribution",
         ":triangular",
         ":truncated_cauchy",
@@ -2097,6 +2098,26 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "student_t_process_regression_model",
+    srcs = ["student_t_process_regression_model.py"],
+    deps = [
+        ":cholesky_util",
+        ":distribution",
+        ":student_t",
+        ":student_t_process",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "triangular",
     srcs = ["triangular.py"],
     deps = [
@@ -3876,6 +3897,22 @@ multi_substrate_py_test(
     jax_size = "medium",
     deps = [
         ":distributions",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "student_t_process_regression_model_test",
+    srcs = ["student_t_process_regression_model_test.py"],
+    jax_size = "medium",
+    shard_count = 2,
+    deps = [
+        ":distributions",
+        # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensorshape_util",
