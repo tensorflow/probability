@@ -35,6 +35,7 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 
 __all__ = [
     'chees_criterion',
+    'chees_rate_criterion',
     'GradientBasedTrajectoryLengthAdaptation',
     'GradientBasedTrajectoryLengthAdaptationResults',
 ]
@@ -153,6 +154,7 @@ def hmc_like_log_accept_prob_getter_fn(kernel_results):
 def chees_criterion(previous_state,
                     proposed_state,
                     accept_prob,
+                    trajectory_length,
                     validate_args=False,
                     experimental_shard_axis_names=None,
                     experimental_reduce_chain_axis_names=None):
@@ -186,6 +188,8 @@ def chees_criterion(previous_state,
     proposed_state: (Possibly nested) floating point `Tensor`. The proposed
       state of the HMC chain.
     accept_prob: Floating `Tensor`. Probability of acceping the proposed state.
+    trajectory_length: Floating `Tensor`. Mean trajectory length (not used
+      in this criterion).
     validate_args: Whether to perform non-static argument validation.
     experimental_shard_axis_names: A structure of string names indicating how
       members of the state are sharded.
@@ -206,6 +210,7 @@ def chees_criterion(previous_state,
        preparation.
 
   """
+  del trajectory_length
   batch_ndims = ps.rank(accept_prob)
   batch_axes = ps.range(batch_ndims, dtype=tf.int32)
   reduce_chain_axis_names = distribute_lib.canonicalize_named_axis(
@@ -280,6 +285,50 @@ def chees_criterion(previous_state,
   return chees
 
 
+def chees_rate_criterion(previous_state,
+                         proposed_state,
+                         accept_prob,
+                         trajectory_length,
+                         validate_args=False,
+                         experimental_shard_axis_names=None,
+                         experimental_reduce_chain_axis_names=None):
+  """ChEES rate criterion.
+
+  This is just like `chees_criterion`, but normalized by the trajectory
+  length:
+  ```none
+  ChEES rate = 1/4 E[(||x' - E[x]||**2 - ||x - E[x]||**2)**2 /
+    trajectory_length**power]
+  ```
+
+  Args:
+    previous_state: (Possibly nested) floating point `Tensor`. The previous
+      state of the HMC chain.
+    proposed_state: (Possibly nested) floating point `Tensor`. The proposed
+      state of the HMC chain.
+    accept_prob: Floating `Tensor`. Probability of acceping the proposed state.
+    trajectory_length: Floating `Tensor`. Trajectory length.
+    validate_args: Whether to perform non-static argument validation.
+    experimental_shard_axis_names: A structure of string names indicating how
+      members of the state are sharded.
+    experimental_reduce_chain_axis_names: A string or list of string names
+      indicating which named chain axes to reduce over when computing the
+      criterion.
+
+  Returns:
+    chees_rate: The value of the ChEES rate criterion.
+  """
+  return chees_criterion(
+      previous_state=previous_state,
+      proposed_state=proposed_state,
+      accept_prob=accept_prob,
+      trajectory_length=trajectory_length,
+      validate_args=validate_args,
+      experimental_shard_axis_names=experimental_shard_axis_names,
+      experimental_reduce_chain_axis_names=experimental_reduce_chain_axis_names,
+  ) / trajectory_length
+
+
 class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
   """Use gradient ascent to adapt inner kernel's trajectory length.
 
@@ -287,9 +336,9 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
   parameter of Hamiltonian Monte Carlo. It does so by following the gradient of
   a criterion with respect to the trajectory length. The criterion is computed
   via `criterion_fn` with signature `(previous_state, proposed_state,
-  accept_prob) -> criterion`, where both the returned values retain the batch
-  dimensions implied by the first three inputs. See `chees_criterion` for an
-  example.
+  accept_prob, trajectory_length) -> criterion`, where both the returned
+  values retain the batch dimensions implied by the first three inputs. See
+  `chees_criterion` for an example.
 
   To avoid resonances, this kernel jitters the integration time between 0 and
   the learned trajectory length by default.
@@ -507,7 +556,8 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
   def num_adaptation_steps(self):
     return self._parameters['num_adaptation_steps']
 
-  def criterion_fn(self, previous_state, proposed_state, accept_prob):
+  def criterion_fn(self, previous_state, proposed_state, accept_prob,
+                   trajectory_length):
     kwargs = {}
     if self.experimental_reduce_chain_axis_names is not None:
       kwargs['experimental_reduce_chain_axis_names'] = (
@@ -516,7 +566,8 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
       kwargs['experimental_shard_axis_names'] = (
           self.experimental_shard_axis_names)
     return self._parameters['criterion_fn'](previous_state, proposed_state,
-                                            accept_prob, **kwargs)
+                                            accept_prob, trajectory_length,
+                                            **kwargs)
 
   @property
   def max_leapfrog_steps(self):
@@ -733,9 +784,15 @@ def _update_trajectory_grad(previous_kernel_results, previous_state,
         proposed_state, adjust_state, proposed_state, proposed_velocity,
         experimental_shard_axis_names=experimental_shard_axis_names)
     return criterion_fn(
-        previous_state,
-        adjusted_state,
-        accept_prob)
+        previous_state=previous_state,
+        proposed_state=adjusted_state,
+        accept_prob=accept_prob,
+        # We add the step size here because we effectively do `floor(traj +
+        # step_size) / step_size` when computing the number of leapfrog steps.
+        trajectory_length=(
+            trajectory_jitter * previous_kernel_results.max_trajectory_length +
+            step_size + dt),
+    )
 
   criterion, trajectory_grad = gradient.value_and_gradient(
       leapfrog_action, tf.zeros_like(accept_prob))

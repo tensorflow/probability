@@ -20,6 +20,7 @@ from tensorflow_probability.python.experimental.mcmc.diagonal_mass_matrix_adapta
 from tensorflow_probability.python.experimental.mcmc.elliptical_slice_sampler import EllipticalSliceSampler
 from tensorflow_probability.python.experimental.mcmc.expectations_reducer import ExpectationsReducer
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import chees_criterion
+from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import chees_rate_criterion
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptation
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptationResults
 from tensorflow_probability.python.experimental.mcmc.initialization import init_near_unconstrained_zero
@@ -98,6 +99,7 @@ __all__ = [
     'augment_with_observation_history',
     'augment_with_state_history',
     'chees_criterion',
+    'chees_rate_criterion',
     'default_make_hmc_kernel_fn',
     'ess_below_threshold',
     'gen_make_hmc_kernel_fn',
