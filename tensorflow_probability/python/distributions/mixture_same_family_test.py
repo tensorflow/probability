@@ -206,7 +206,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
     x2 = self.evaluate(fully_broadcast_dist.sample([2, 1], seed=seed))
     self.assertAllEqual(x, x2)
-    self.assertAllEqual(x_lp, fully_broadcast_dist.log_prob(x))
+    self.assertAllClose(x_lp, fully_broadcast_dist.log_prob(x))
 
   def testBroadcastBatchDimensionsAreIndependent(self):
     mixture = tfd.MixtureSameFamily(
