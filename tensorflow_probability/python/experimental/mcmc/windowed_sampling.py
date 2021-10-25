@@ -177,9 +177,10 @@ def _get_flat_unconstraining_bijector(jd_model):
 
   # this reshaping is required as as split can produce a tensor of shape [1]
   # when the distribution event shape is []
-  unsplit = joint_map.JointMap(bijectors=[
-      reshape.Reshape(event_shape_out=x, event_shape_in=[-1])
-      for x in unconstrained_shapes])
+  unsplit = joint_map.JointMap(
+      tf.nest.map_structure(
+          lambda x: reshape.Reshape(event_shape_out=x, event_shape_in=[-1]),
+          unconstrained_shapes))
 
   bij = invert.Invert(chain.Chain([event_space_bij, flat_bijector, unsplit]))
   step_size_bij = invert.Invert(flat_bijector)
@@ -240,8 +241,6 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
     batch_shape = functools.reduce(tf.broadcast_static_shape,
                                    tf.nest.flatten(batch_shape))
 
-  lp_static_shape = tensorshape_util.concatenate(n_chains, batch_shape)
-
   if not tensorshape_util.is_fully_defined(batch_shape):
     batch_shape = pinned_model.batch_shape_tensor()
     if tf.nest.is_nested(batch_shape):
@@ -254,7 +253,6 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
   @tf.function(autograph=False)
   def target_log_prob_fn(*args):
     lp = pinned_model.unnormalized_log_prob(bijector.inverse(args))
-    tensorshape_util.set_shape(lp, lp_static_shape)
     ldj = bijector.inverse_log_det_jacobian(
         args, event_ndims=[1 for _ in initial_transformed_position])
     return lp + ldj

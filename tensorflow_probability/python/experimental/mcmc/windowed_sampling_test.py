@@ -477,6 +477,45 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertEqual((5, *n_chains, 3), states.x.shape)
     self.assertEqual((5,), trace['step_size'].shape)
 
+  def test_dynamic_batch_shape(self):
+    """Test correct handling of `TensorShape(None)`."""
+    if JAX_MODE:
+      self.skipTest('b/203858802')
+
+    n_features = 5
+    n_timepoints = 100
+    features = tfd.Normal(0., 1.).sample([100, n_features],
+                                         test_util.test_seed())
+    ar_sigma = 1.
+    rho = .25
+
+    @tfd.JointDistributionCoroutine
+    def jd_model():
+      beta = yield Root(tfd.Sample(tfd.Normal(0., 1.), n_features))
+      yhat = tf.einsum('ij,...j->...i', features, beta)
+
+      def ar_fun(y):
+        loc = tf.concat([tf.zeros_like(y[..., :1]), y[..., :-1]], axis=-1)
+        return tfd.Independent(
+            tfd.Normal(loc=loc * rho, scale=ar_sigma),
+            reinterpreted_batch_ndims=1)
+      # Autoregressive distribution defined as below introduce a batch shape:
+      # TensorShape(None)
+      yield tfd.Autoregressive(
+          distribution_fn=ar_fun,
+          sample0=tf.zeros_like(yhat),
+          num_steps=yhat.shape[-1],
+          name='y')
+
+    states, _ = self.evaluate(
+        tfp.experimental.mcmc.windowed_adaptive_nuts(
+            2,
+            jd_model,
+            num_adaptation_steps=25,
+            n_chains=3,
+            seed=test_util.test_seed()))
+    self.assertEqual((2, 3, n_timepoints), states.y.shape)
+
   @parameterized.named_parameters(
       ('_nuts', tfp.experimental.mcmc.windowed_adaptive_nuts, {}),
       ('_hmc', tfp.experimental.mcmc.windowed_adaptive_hmc, {
