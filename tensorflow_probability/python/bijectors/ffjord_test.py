@@ -20,8 +20,10 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
-
 from tensorflow_probability.python.internal import test_util as tfp_test_util
+from tensorflow_probability.python.math import gradient as tfp_gradient
+
+from tensorflow.python import tf2  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
 
@@ -54,6 +56,46 @@ class FFJORDBijectorTest(tfp_test_util.TestCase):
         expected_log_det_jacobian,
         self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1))
     )
+
+  def testBijectorConditionKwargs(self, dtype):
+    if not tf2.enabled():
+      self.skipTest('b/152464477')
+
+    tf_dtype = tf.as_dtype(dtype)
+    def conditional_ode_fn(t, z, c):
+      del t  # unused.
+      return tf.ones_like(z) * c ** 2
+    trace_augmentation_fn = tfb.ffjord.trace_jacobian_exact
+    bijector = tfb.FFJORD(trace_augmentation_fn=trace_augmentation_fn,
+                          state_time_derivative_fn=conditional_ode_fn,
+                          dtype=tf_dtype)
+    x = tf.zeros((2, 5), dtype=tf_dtype)
+    y = tf.ones((2, 5), dtype=tf_dtype) * 4
+    c = tf.ones((2, 5), dtype=tf_dtype) * 2
+    expected_log_det_jacobian = np.zeros(2, dtype=dtype)
+    expected_dy_dc = np.ones((2, 5), dtype=dtype) * 4
+
+    def grad_fn(c):
+      y = bijector.forward(x, c=c)
+      return y
+
+    dy_dc = self.evaluate(
+        tfp_gradient.value_and_gradient(grad_fn, c)[1])
+
+    self.assertStartsWith(bijector.name, 'ffjord')
+    self.assertAllClose(self.evaluate(y),
+                        self.evaluate(bijector.forward(x, c=c)), atol=1e-5)
+    self.assertAllClose(self.evaluate(x),
+                        self.evaluate(bijector.inverse(y, c=c)), atol=1e-5)
+    self.assertAllClose(
+        expected_log_det_jacobian,
+        self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=1, c=c))
+    )
+    self.assertAllClose(
+        expected_log_det_jacobian,
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1, c=c))
+    )
+    self.assertAllClose(expected_dy_dc, dy_dc)
 
   def testJacobianScaling(self, dtype):
     tf_dtype = tf.as_dtype(dtype)

@@ -75,13 +75,13 @@ def trace_jacobian_hutchinson(
       prefer_static.concat([[num_samples], state_shape], axis=0),
       dtype=dtype, seed=seed)
 
-  def augmented_ode_fn(time, state_log_det_jac):
+  def augmented_ode_fn(time, state_log_det_jac, **kwargs):
     """Computes both time derivative and trace of the jacobian."""
     state, _ = state_log_det_jac
     with tf.GradientTape(persistent=True,
                          watch_accessed_variables=False) as tape:
       tape.watch(state)
-      state_time_derivative = ode_fn(time, state)
+      state_time_derivative = ode_fn(time, state, **kwargs)
 
     def estimate_trace(random_sample):
       """Computes stochastic trace estimate based on a single random_sample."""
@@ -118,10 +118,10 @@ def trace_jacobian_exact(ode_fn, state_shape, dtype):
   """
   del state_shape, dtype  # Not used by trace_jacobian_exact
 
-  def augmented_ode_fn(time, state_log_det_jac):
+  def augmented_ode_fn(time, state_log_det_jac, **kwargs):
     """Computes both time derivative and trace of the jacobian."""
     state, _ = state_log_det_jac
-    ode_fn_with_time = lambda x: ode_fn(time, x)
+    ode_fn_with_time = lambda x: ode_fn(time, x, **kwargs)
     batch_shape = [prefer_static.size0(state)]
     state_time_derivative, diag_jac = tfp_math.diag_jacobian(
         xs=state, fn=ode_fn_with_time, sample_shape=batch_shape)
@@ -167,7 +167,10 @@ class FFJORD(bijector.Bijector):
 
   Differential equation integration is performed by a call to `ode_solve_fn`.
   Custom `ode_solve_fn` must accept the following arguments:
-  * ode_fn(time, state): Differential equation to be solved.
+  * ode_fn(time, state, **condition_kwargs): Differential equation to be solved.
+    Custom `ode_solve_fn`s may optionally support conditional inputs by
+    accepting a `constants` dict arg and computing gradients wrt the provided
+    values in **condition_kwargs.
   * initial_time: Scalar float or floating Tensor representing the initial time.
   * initial_state: Floating Tensor representing the initial state.
   * solution_times: 1D floating Tensor of solution times.
@@ -312,8 +315,9 @@ class FFJORD(bijector.Bijector):
       self._trace_augmentation_fn = trace_augmentation_fn
       self._state_time_derivative_fn = state_time_derivative_fn
 
-      def inverse_state_time_derivative(time, state):
-        return -state_time_derivative_fn(self._final_time - time, state)
+      def inverse_state_time_derivative(time, state, **kwargs):
+        return -state_time_derivative_fn(self._final_time - time, state,
+                                         **kwargs)
 
       self._inv_state_time_derivative_fn = inverse_state_time_derivative
       super(FFJORD, self).__init__(
@@ -327,12 +331,13 @@ class FFJORD(bijector.Bijector):
   def _parameter_properties(cls, dtype):
     return dict()
 
-  def _solve_ode(self, ode_fn, state):
+  def _solve_ode(self, ode_fn, state, **kwargs):
     """Solves the initial value problem defined by `ode_fn`.
 
     Args:
       ode_fn: `Callable(time, state)` that represents state time derivative.
       state: A `Tensor` representing initial state.
+      **kwargs: Additional arguments to pass to ode_solve_fn.
 
     Returns:
       final_state: `Tensor` of the same shape and dtype as `state` representing
@@ -342,47 +347,56 @@ class FFJORD(bijector.Bijector):
         ode_fn=ode_fn,
         initial_time=self._initial_time,
         initial_state=state,
-        solution_times=[self._final_time])
+        solution_times=[self._final_time],
+        **kwargs)
     final_state = tf.nest.map_structure(
         lambda x: x[-1], integration_result.states)
     return final_state
 
-  def _augmented_forward(self, x):
+  def _augmented_forward(self, x, **condition_kwargs):
     """Computes forward and forward_log_det_jacobian transformations."""
     augmented_ode_fn = self._trace_augmentation_fn(
         self._state_time_derivative_fn, x.shape, x.dtype)
     augmented_x = (x, tf.zeros(shape=x.shape, dtype=x.dtype))
-    y, fldj = self._solve_ode(augmented_ode_fn, augmented_x)
+    if condition_kwargs:
+      y, fldj = self._solve_ode(augmented_ode_fn, augmented_x,
+                                constants=condition_kwargs)
+    else:
+      y, fldj = self._solve_ode(augmented_ode_fn, augmented_x)
     return y, {'ildj': -fldj, 'fldj': fldj}
 
-  def _augmented_inverse(self, y):
+  def _augmented_inverse(self, y, **condition_kwargs):
     """Computes inverse and inverse_log_det_jacobian transformations."""
     augmented_inv_ode_fn = self._trace_augmentation_fn(
         self._inv_state_time_derivative_fn, y.shape, y.dtype)
     augmented_y = (y, tf.zeros(shape=y.shape, dtype=y.dtype))
-    x, ildj = self._solve_ode(augmented_inv_ode_fn, augmented_y)
+    if condition_kwargs:
+      x, ildj = self._solve_ode(augmented_inv_ode_fn, augmented_y,
+                                constants=condition_kwargs)
+    else:
+      x, ildj = self._solve_ode(augmented_inv_ode_fn, augmented_y)
     return x, {'ildj': ildj, 'fldj': -ildj}
 
-  def _forward(self, x):
-    y, _ = self._augmented_forward(x)
+  def _forward(self, x, **condition_kwargs):
+    y, _ = self._augmented_forward(x, **condition_kwargs)
     return y
 
-  def _inverse(self, y):
-    x, _ = self._augmented_inverse(y)
+  def _inverse(self, y, **condition_kwargs):
+    x, _ = self._augmented_inverse(y, **condition_kwargs)
     return x
 
-  def _forward_log_det_jacobian(self, x):
+  def _forward_log_det_jacobian(self, x, **condition_kwargs):
     cached = self._cache.forward_attributes(x)
     # If LDJ isn't in the cache, call forward once.
     if 'fldj' not in cached:
-      _, attrs = self._augmented_forward(x)
+      _, attrs = self._augmented_forward(x, **condition_kwargs)
       cached.update(attrs)
     return cached['fldj']
 
-  def _inverse_log_det_jacobian(self, y):
+  def _inverse_log_det_jacobian(self, y, **condition_kwargs):
     cached = self._cache.inverse_attributes(y)
     # If LDJ isn't in the cache, call inverse once.
     if 'ildj' not in cached:
-      _, attrs = self._augmented_inverse(y)
+      _, attrs = self._augmented_inverse(y, **condition_kwargs)
       cached.update(attrs)
     return cached['ildj']
