@@ -15,6 +15,7 @@
 """Positive-semidefinite kernels package."""
 
 from tensorflow_probability.python.internal import all_util
+from tensorflow_probability.python.math.psd_kernels.changepoint import ChangePoint
 from tensorflow_probability.python.math.psd_kernels.exp_sin_squared import ExpSinSquared
 from tensorflow_probability.python.math.psd_kernels.exponentiated_quadratic import ExponentiatedQuadratic
 from tensorflow_probability.python.math.psd_kernels.feature_scaled import FeatureScaled
@@ -36,6 +37,7 @@ from tensorflow_probability.python.math.psd_kernels.schur_complement import Schu
 
 _allowed_symbols = [
     'AutoCompositeTensorPsdKernel',
+    'ChangePoint',
     'Constant',
     'ExponentiatedQuadratic',
     'ExpSinSquared',

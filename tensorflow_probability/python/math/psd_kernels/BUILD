@@ -33,6 +33,7 @@ multi_substrate_py_library(
     name = "psd_kernels",
     srcs = ["__init__.py"],
     deps = [
+        ":changepoint",
         ":exp_sin_squared",
         ":exponentiated_quadratic",
         ":feature_scaled",
@@ -77,6 +78,32 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "changepoint",
+    srcs = ["changepoint.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "changepoint_test",
+    size = "small",
+    srcs = ["changepoint_test.py"],
+    jax_size = "medium",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

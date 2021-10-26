@@ -34,6 +34,7 @@ from tensorflow_probability.python.math import psd_kernels as tfpk
 
 
 SPECIAL_KERNELS = [
+    'ChangePoint',
     'FeatureScaled',
     'KumaraswamyTransformed',
     'PointwiseExponential',
@@ -305,6 +306,87 @@ def depths():
   # TODO(b/139841600): Increase the depth after we can generate kernel inputs
   # that are not too close to each other.
   return hps.integers(min_value=0, max_value=1)
+
+
+@hps.composite
+def changepoints(
+    draw,
+    batch_shape=None,
+    event_dim=None,
+    feature_dim=None,
+    feature_ndims=None,
+    enable_vars=None,
+    depth=None):
+  """Strategy for drawing `Changepoint` kernels.
+
+  The underlying kernel is drawn from the `kernels` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      Kernel.  Hypothesis will pick a batch shape if omitted.
+    event_dim: Optional Python int giving the size of each of the
+      kernel's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    feature_dim: Optional Python int giving the size of each feature dimension.
+      If omitted, Hypothesis will choose one.
+    feature_ndims: Optional Python int stating the number of feature dimensions
+      inputs will have. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all Tensors, never Variables or DeferredTensor.
+    depth: Python `int` giving maximum nesting depth of compound kernel.
+
+  Returns:
+    kernels: A strategy for drawing `Changepoint` kernels with the specified
+      `batch_shape` (or an arbitrary one if omitted).
+  """
+  if depth is None:
+    depth = draw(depths())
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes())
+  if event_dim is None:
+    event_dim = draw(hps.integers(min_value=2, max_value=6))
+  if feature_dim is None:
+    feature_dim = draw(hps.integers(min_value=2, max_value=6))
+  if feature_ndims is None:
+    feature_ndims = draw(hps.integers(min_value=2, max_value=6))
+
+  num_kernels = draw(hps.integers(min_value=2, max_value=4))
+
+  inner_kernels = []
+  kernel_variable_names = []
+  for _ in range(num_kernels):
+    base_kernel, variable_names = draw(kernels(
+        batch_shape=batch_shape,
+        event_dim=event_dim,
+        feature_dim=feature_dim,
+        feature_ndims=feature_ndims,
+        enable_vars=False,
+        depth=depth-1))
+    inner_kernels.append(base_kernel)
+    kernel_variable_names += variable_names
+
+  constraints = dict(
+      locs=lambda x: tf.cumsum(tf.math.abs(x) + 1e-3, axis=-1),
+      slopes=tfp_hps.softplus_plus_eps())
+
+  params = draw(tfp_hps.broadcasting_params(
+      batch_shape,
+      event_dim=num_kernels - 1,
+      params_event_ndims=dict(locs=1, slopes=1),
+      constraint_fn_for=constraints.get))
+  params = {k: tf.cast(params[k], tf.float64) for k in params}
+
+  if enable_vars and draw(hps.booleans()):
+    kernel_variable_names.append('locs')
+    kernel_variable_names.append('slopes')
+    params['locs'] = tf.Variable(params['locs'], name='locs')
+    params['slopes'] = tf.Variable(params['slopes'], name='slopes')
+  result_kernel = tfpk.ChangePoint(
+      kernels=inner_kernels, validate_args=True, **params)
+  return result_kernel, kernel_variable_names
 
 
 @hps.composite
@@ -801,7 +883,15 @@ def kernels(
             feature_ndims=feature_ndims,
             enable_vars=enable_vars))
 
-  if kernel_name == 'FeatureScaled':
+  if kernel_name == 'ChangePoint':
+    return draw(changepoints(
+        batch_shape=batch_shape,
+        event_dim=event_dim,
+        feature_dim=feature_dim,
+        feature_ndims=feature_ndims,
+        enable_vars=enable_vars,
+        depth=depth))
+  elif kernel_name == 'FeatureScaled':
     return draw(feature_scaleds(
         batch_shape=batch_shape,
         event_dim=event_dim,
