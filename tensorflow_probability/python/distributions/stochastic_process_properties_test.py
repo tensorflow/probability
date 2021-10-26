@@ -33,7 +33,8 @@ from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as
 PARAM_EVENT_NDIMS_BY_PROCESS_NAME = {
     'GaussianProcess': dict(observation_noise_variance=0),
     'GaussianProcessRegressionModel': dict(observation_noise_variance=0),
-    'StudentTProcess': dict(df=0),
+    'StudentTProcess': dict(df=0, observation_noise_variance=0),
+    'StudentTProcessRegressionModel': dict(df=0, observation_noise_variance=0),
     'VariationalGaussianProcess': dict(obseration_noise_variance=0)
 }
 
@@ -43,6 +44,7 @@ MUTEX_PARAMS = set()
 
 MAX_CONVERSIONS_BY_CLASS = dict(
     GaussianProcessRegressionModel=4,
+    StudentTProcessRegressionModel=4,
     VariationalGaussianProcess=9)
 
 
@@ -134,6 +136,14 @@ def stochastic_processes(draw,
         enable_vars=enable_vars))
   elif process_name == 'StudentTProcess':
     return draw(student_t_processes(
+        kernel_name=kernel_name,
+        batch_shape=batch_shape,
+        event_dim=event_dim,
+        feature_dim=feature_dim,
+        feature_ndims=feature_ndims,
+        enable_vars=enable_vars))
+  elif process_name == 'StudentTProcessRegressionModel':
+    return draw(student_t_process_regression_models(
         kernel_name=kernel_name,
         batch_shape=batch_shape,
         event_dim=event_dim,
@@ -363,7 +373,79 @@ def student_t_processes(draw,
       kernel=k,
       index_points=index_points,
       cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
-      df=params['df'])
+      df=params['df'],
+      observation_noise_variance=params['observation_noise_variance'])
+  return stp
+
+
+@hps.composite
+def student_t_process_regression_models(draw,
+                                        kernel_name=None,
+                                        batch_shape=None,
+                                        event_dim=None,
+                                        feature_dim=None,
+                                        feature_ndims=None,
+                                        enable_vars=False):
+  # First draw a kernel.
+  k, _ = draw(kernel_hps.base_kernels(
+      kernel_name=kernel_name,
+      batch_shape=batch_shape,
+      event_dim=event_dim,
+      feature_dim=feature_dim,
+      feature_ndims=feature_ndims,
+      # Disable variables
+      enable_vars=False))
+  compatible_batch_shape = draw(
+      tfp_hps.broadcast_compatible_shape(k.batch_shape))
+  index_points = draw(kernel_hps.kernel_input(
+      batch_shape=compatible_batch_shape,
+      example_ndims=1,
+      feature_dim=feature_dim,
+      feature_ndims=feature_ndims,
+      enable_vars=enable_vars,
+      name='index_points'))
+  hp.note('Index points:\n{}'.format(repr(index_points)))
+
+  observation_index_points = draw(
+      kernel_hps.kernel_input(
+          batch_shape=compatible_batch_shape,
+          example_ndims=1,
+          feature_dim=feature_dim,
+          feature_ndims=feature_ndims,
+          enable_vars=enable_vars,
+          name='observation_index_points'))
+  hp.note('Observation index points:\n{}'.format(
+      repr(observation_index_points)))
+
+  observations = draw(kernel_hps.kernel_input(
+      batch_shape=compatible_batch_shape,
+      example_ndims=1,
+      # This is the example dimension suggested observation_index_points.
+      example_dim=int(observation_index_points.shape[-(feature_ndims + 1)]),
+      # No feature dimensions.
+      feature_dim=0,
+      feature_ndims=0,
+      enable_vars=enable_vars,
+      name='observations'))
+  hp.note('Observations:\n{}'.format(repr(observations)))
+
+  params = draw(broadcasting_params(
+      'StudentTProcessRegressionModel',
+      compatible_batch_shape,
+      event_dim=event_dim,
+      enable_vars=enable_vars))
+  hp.note('Params:\n{}'.format(repr(params)))
+
+  stp = tfd.StudentTProcessRegressionModel(
+      # Ensure that the `df` parameter is not a `Variable` since we pass
+      # in a `DeferredTensor` of the `df` parameter.
+      df=tf.convert_to_tensor(params['df']),
+      kernel=k,
+      index_points=index_points,
+      observation_index_points=observation_index_points,
+      observations=observations,
+      cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
+      observation_noise_variance=params['observation_noise_variance'])
   return stp
 
 
