@@ -227,7 +227,7 @@ class Support(object):
   SCALAR_IN_0_1 = 'SCALAR_IN_0_1'
   VECTOR_UNCONSTRAINED = 'VECTOR_UNCONSTRAINED'
   VECTOR_SIZE_TRIANGULAR = 'VECTOR_SIZE_TRIANGULAR'
-  VECTOR_WITH_L1_NORM_1_SIZE_GT1 = 'VECTOR_WITH_L1_NORM_1_SIZE_GT1'
+  VECTOR_POSITIVE_WITH_L1_NORM_1_SIZE_GT1 = 'VECTOR_POSITIVE_WITH_L1_NORM_1_SIZE_GT1'
   VECTOR_STRICTLY_INCREASING = 'VECTOR_STRICTLY_INCREASING'
   MATRIX_UNCONSTRAINED = 'MATRIX_UNCONSTRAINED'
   MATRIX_LOWER_TRIL = 'MATRIX_LOWER_TRIL'
@@ -275,14 +275,14 @@ def _vector_constrainer(support):
   def l1norm(x):
     x = tf.concat([x, tf.ones_like(x[..., :1]) * 1e-6], axis=-1)
     x = x / tf.linalg.norm(x, ord=1, axis=-1, keepdims=True)
-    return x
+    return tf.math.abs(x)
 
   constrainers = {
       Support.VECTOR_UNCONSTRAINED:
           identity_fn,
       Support.VECTOR_STRICTLY_INCREASING:
           lambda x: tf.cumsum(tf.abs(x) + 1e-3, axis=-1),
-      Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1:
+      Support.VECTOR_POSITIVE_WITH_L1_NORM_1_SIZE_GT1:
           l1norm,
       Support.VECTOR_SIZE_TRIANGULAR:
           identity_fn,
@@ -906,6 +906,27 @@ def finite_ground_truth_only():
 # Utility functions for constraining parameters and/or domain/codomain members.
 
 
+def ensure_high_gt_low(low, high):
+  """Returns a value with shape matching `high` and gt broadcastable `low`."""
+  new_high = tf.maximum(low + tf.abs(low) * .1 + .1, high)
+  reduce_dims = []
+  if (tensorshape_util.rank(new_high.shape) >
+      tensorshape_util.rank(high.shape)):
+    reduced_leading_axes = tf.range(
+        tensorshape_util.rank(new_high.shape) -
+        tensorshape_util.rank(high.shape))
+    new_high = tf.math.reduce_max(
+        new_high, axis=reduced_leading_axes)
+  reduce_dims = [
+      d for d in range(tensorshape_util.rank(high.shape))
+      if high.shape[d] < new_high.shape[d]
+  ]
+  if reduce_dims:
+    new_high = tf.math.reduce_max(
+        new_high, axis=reduce_dims, keepdims=True)
+  return new_high
+
+
 def softplus_plus_eps(eps=1e-6):
   return lambda x: tf.nn.softplus(x) + eps
 
@@ -928,7 +949,7 @@ def orthonormal(x):
 
 def lower_tril_positive_definite(x):
   return tf.linalg.band_part(
-      tf.linalg.set_diag(x, softplus_plus_eps(1e-4)(tf.linalg.diag_part(x))),
+      tf.linalg.set_diag(x, softplus_plus_eps(1e-1)(tf.linalg.diag_part(x))),
       num_lower=-1,
       num_upper=0)
 

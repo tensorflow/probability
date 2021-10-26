@@ -58,6 +58,7 @@ STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST = (
 INSTANTIABLE_BUT_NOT_SLICABLE = (
     'BatchBroadcast',
     'BatchReshape',
+    'Sample'  # TODO(b/204210361)
 )
 
 
@@ -81,6 +82,8 @@ SLICING_LOGPROB_ATOL.update({
 SLICING_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-5)
 SLICING_LOGPROB_RTOL.update({
     'NormalInverseGaussian': 5e-3,  # b/193076242
+    'Sample': 1e-3,
+    'Slicing': 6e-5,
     'Weibull': 3e-5,
 })
 

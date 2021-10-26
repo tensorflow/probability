@@ -131,27 +131,6 @@ def constrain_between_eps_and_one_minus_eps(eps0=1e-6, eps1=1e-6):
   return lambda x: eps0 + (1 - (eps0 + eps1)) * tf.sigmoid(x)
 
 
-def ensure_high_gt_low(low, high):
-  """Returns a value with shape matching `high` and gt broadcastable `low`."""
-  new_high = tf.maximum(low + tf.abs(low) * .1 + .1, high)
-  reduce_dims = []
-  if (tensorshape_util.rank(new_high.shape) >
-      tensorshape_util.rank(high.shape)):
-    reduced_leading_axes = tf.range(
-        tensorshape_util.rank(new_high.shape) -
-        tensorshape_util.rank(high.shape))
-    new_high = tf.math.reduce_max(
-        new_high, axis=reduced_leading_axes)
-  reduce_dims = [
-      d for d in range(tensorshape_util.rank(high.shape))
-      if high.shape[d] < new_high.shape[d]
-  ]
-  if reduce_dims:
-    new_high = tf.math.reduce_max(
-        new_high, axis=reduce_dims, keepdims=True)
-  return new_high
-
-
 def fix_finite_discrete(d):
   size = d.get('probs', d.get('logits', None)).shape[-1]
   return dict(d, outcomes=tf.linspace(-1.0, 1.0, size))
@@ -162,7 +141,8 @@ def fix_lkj(d):
 
 
 def fix_normal_inverse_gaussian(d):
-  tailweight = ensure_high_gt_low(tf.math.abs(d['skewness']), d['tailweight'])
+  tailweight = tfp_hps.ensure_high_gt_low(
+      tf.math.abs(d['skewness']), d['tailweight'])
   # Make sure that |skewness| < tailweight
   return dict(d, tailweight=(tailweight + 1.))
 
@@ -172,16 +152,16 @@ def fix_spherical_uniform(d):
 
 
 def fix_pert(d):
-  peak = ensure_high_gt_low(d['low'], d['peak'])
-  high = ensure_high_gt_low(peak, d['high'])
-  temperature = ensure_high_gt_low(
+  peak = tfp_hps.ensure_high_gt_low(d['low'], d['peak'])
+  high = tfp_hps.ensure_high_gt_low(peak, d['high'])
+  temperature = tfp_hps.ensure_high_gt_low(
       np.zeros(d['temperature'].shape, dtype=np.float32), d['temperature'])
   return dict(d, peak=peak, high=high, temperature=temperature)
 
 
 def fix_triangular(d):
-  peak = ensure_high_gt_low(d['low'], d['peak'])
-  high = ensure_high_gt_low(peak, d['high'])
+  peak = tfp_hps.ensure_high_gt_low(d['low'], d['peak'])
+  high = tfp_hps.ensure_high_gt_low(peak, d['high'])
   return dict(d, peak=peak, high=high)
 
 
@@ -198,7 +178,7 @@ def fix_bates(d):
           tfd.bates.BATES_TOTAL_COUNT_STABILITY_LIMITS[  # pylint: disable=protected-access
               d['total_count'].dtype]),
       1.)
-  high = ensure_high_gt_low(d['low'], d['high'])
+  high = tfp_hps.ensure_high_gt_low(d['low'], d['high'])
   return dict(d, total_count=total_count, high=high)
 
 
@@ -359,11 +339,14 @@ CONSTRAINTS = {
     'Triangular':
         fix_triangular,
     'TruncatedCauchy':
-        lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
+        lambda d: dict(d, high=tfp_hps.ensure_high_gt_low(  # pylint:disable=g-long-lambda
+            d['low'], d['high'])),
     'TruncatedNormal':
-        lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
+        lambda d: dict(d, high=tfp_hps.ensure_high_gt_low(  # pylint:disable=g-long-lambda
+            d['low'], d['high'])),
     'Uniform':
-        lambda d: dict(d, high=ensure_high_gt_low(d['low'], d['high'])),
+        lambda d: dict(d, high=tfp_hps.ensure_high_gt_low(  # pylint:disable=g-long-lambda
+            d['low'], d['high'])),
     'SphericalUniform':
         fix_spherical_uniform,
     'Wishart':
@@ -1144,7 +1127,7 @@ def quantized_distributions(draw,
   if low_quantile is not None:
     low_quantile = tf.convert_to_tensor(low_quantile, dtype=underlying.dtype)
     if high_quantile is not None:
-      high_quantile = ensure_high_gt_low(low_quantile, high_quantile)
+      high_quantile = tfp_hps.ensure_high_gt_low(low_quantile, high_quantile)
 
   hp.note('Drawing QuantizedDistribution with underlying distribution'
           ' {}'.format(underlying))
@@ -1393,7 +1376,8 @@ def mixtures(draw,
   # TODO(b/169441746): Re-enable nesting MixtureSameFamily inside Mixture when
   # the weird edge case gets fixed.
   def nested_eligibility_filter(dist_name):
-    if dist_name in ['MixtureSameFamily']:
+    # TODO(b/204209547): Re-enable Categorical.
+    if dist_name in ['Categorical', 'MixtureSameFamily']:
       return False
     return eligibility_filter(dist_name)
 

@@ -31,58 +31,174 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 SPECIAL_BIJECTORS = [
+    'Composition',
+    'FillScaleTriL',
+    'FillTriangular',
     'Inline',
     'Invert',
+    'TransformDiagonal',
 ]
 
-# INSTANTIABLE_BIJECTORS is a map from str->(BijectorClass,)
-INSTANTIABLE_BIJECTORS = None
+NONINSTANTIABLE_BIJECTORS = [
+    'AbsoluteValue',  # Non-invertible
+    # Base classes.
+    'AutoCompositeTensorBijector',
+    'Bijector',
+    # TODO(b/199173655): Add hypothesis generation for the below bijectors.
+    'BatchNormalization',
+    'Blockwise',
+    'Chain',
+    'CorrelationCholesky',
+    'FFJORD',
+    'Glow',
+    'JointMap',
+    'LambertWTail',
+    'MaskedAutoregressiveFlow',
+    'Pad',
+    'RationalQuadraticSpline',
+    'RealNVP',
+    'Restructure',
+    'ScaleMatvecLinearOperator',
+    'ScaleMatvecLinearOperatorBlock',
+    'Split',
+    # Tests need to be added.
+    # TODO(b/199174510): Remove non-invertible matrix errors.
+    'CholeskyToInvCholesky',
+    # TODO(b/199175367): SoftClip errors from having non-trivial batch shapes
+    # in DeferredTensor.
+    'SoftClip',
+]
+
+TRANSFORM_DIAGONAL_ALLOWLIST = {
+    'DiscreteCosineTransform',
+    'Exp',
+    'Expm1',
+    'GompertzCDF',
+    'GumbelCDF',
+    'GeneralizedExtremeValueCDF',
+    'GeneralizedPareto',
+    'Identity',
+    'Inline',
+    'KumaraswamyCDF',
+    'MoyalCDF',
+    'NormalCDF',
+    'PowerTransform',
+    'Power',
+    'RayleighCDF',
+    'Reciprocal',
+    'Scale',
+    'ScaleMatvecDiag',
+    'ScaleMatvecLU',
+    'ScaleMatvecTriL',
+    'Shift',
+    'ShiftedGompertzCDF',
+    'Sigmoid',
+    'Sinh',
+    'SinhArcsinh',
+    'Softplus',
+    'Softsign',
+    'Square',
+    'Tanh',
+    'WeibullCDF',
+}
 
 
-def instantiable_bijectors():
-  """Identifies bijectors that are trivially instantiable.
+class BijectorInfo(collections.namedtuple(
+    'BijectorInfo', ['cls', 'params_event_ndims'])):
+  """Sufficient information to instantiate a Bijector.
 
-  Here, "trivially" means things like `Exp` for which no parameters need to be
-  generated; i.e., the only arguments to the constructor are `self`, `name`, and
-  `validate_args`.
+  To wit
 
-  This finds the bijectors by traversing the `tfp.bijectors` namespace.  The
-  traversal is cached so it only happens once per Python process.
+  - The Python class `cls` giving the class, and
+  - A Python dict `params_event_ndims` giving the event dimensions for the
+    parameters (so that parameters can be built with predictable batch shapes).
+
+  Specifically, the `params_event_ndims` dict maps string parameter names to
+  Python integers.  Each integer gives how many (trailing) dimensions of that
+  parameter are part of the event.
+  """
+  __slots__ = ()
+
+
+def _instantiable_base_bijectors():
+  """Computes the table of mechanically instantiable base Bijectors.
+
+  A Bijector is mechanically instantiable if
+
+  - The class appears as a symbol binding in `tfp.bijectors`;
+  - The class defines a `_params_event_ndims` method (necessary
+    to generate parameter Tensors with predictable batch shapes); and
+  - The name is not blocklisted in `SPECIAL_BIJECTORS` or
+    `NONINSTANTIABLE_BIJECTORS`.
 
   Returns:
-    instantiable: A Python `dict` mapping the `str` bijector name to a singleton
-      tuple containing the bijector class object.
+    instantiable_base_bijectors: A Python dict mapping bijector name
+      (as a string) to a `BijectorInfo` carrying the information necessary to
+      instantiate it.
   """
-  global INSTANTIABLE_BIJECTORS
-  if INSTANTIABLE_BIJECTORS is not None:
-    return INSTANTIABLE_BIJECTORS
+  result = {}
+  for bijector_name in dir(tfb):
+    bijector_class = getattr(tfb, bijector_name)
+    if (not inspect.isclass(bijector_class) or
+        not issubclass(bijector_class, tfb.Bijector) or
+        bijector_name in SPECIAL_BIJECTORS or
+        bijector_name in NONINSTANTIABLE_BIJECTORS):
+      continue
+    try:
+      params_event_ndims = {
+          k: p.event_ndims
+          for (k, p) in bijector_class.parameter_properties().items()
+          if p.is_tensor and p.event_ndims is not None
+      }
+      has_concrete_event_ndims = all(
+          isinstance(nd, int) for nd in params_event_ndims.values())
+    except NotImplementedError:
+      has_concrete_event_ndims = False
+    if has_concrete_event_ndims:
+      result[bijector_name] = BijectorInfo(bijector_class, params_event_ndims)
+    else:
+      logging.warning(
+          'Unable to test tfb.%s: `parameter_properties()` is not '
+          'implemented or does not define concrete (integer) `event_ndims` '
+          'for all parameters.',
+          bijector_name)
+  return result
+
+
+# INSTANTIABLE_BIJECTORS is a map from str->BijectorInfo
+INSTANTIABLE_BIJECTORS = _instantiable_base_bijectors()
+
+
+TRIVIALLY_INSTANTIABLE_BIJECTORS = None
+
+
+def trivially_instantiable_bijectors():
+  """Identifies bijectors that are instantiable without any arguments."""
+  global TRIVIALLY_INSTANTIABLE_BIJECTORS
+  if TRIVIALLY_INSTANTIABLE_BIJECTORS is not None:
+    return TRIVIALLY_INSTANTIABLE_BIJECTORS
 
   result = {}
   for bijector_name in dir(tfb):
     bijector_class = getattr(tfb, bijector_name)
     if (not inspect.isclass(bijector_class) or
         not issubclass(bijector_class, tfb.Bijector) or
-        bijector_name in SPECIAL_BIJECTORS):
+        bijector_name in SPECIAL_BIJECTORS or
+        bijector_name in NONINSTANTIABLE_BIJECTORS):
       continue
-    # ArgSpec(args, varargs, keywords, defaults)
-    spec = inspect.getargspec(bijector_class.__init__)
-    ctor_args = set(spec.args) | set(
-        [arg for arg in (spec.varargs, spec.keywords) if arg is not None])
-    unsupported_args = set(ctor_args) - set(['name', 'self', 'validate_args'])
-    if unsupported_args:
-      logging.warning('Unable to test tfb.%s: unsupported args %s',
-                      bijector_name, unsupported_args)
-      continue
-    if not bijector_class()._is_injective:  # pylint: disable=protected-access
-      logging.warning('Unable to test non-injective tfb.%s.', bijector_name)
-      continue
-    result[bijector_name] = (bijector_class,)
-  result['Invert'] = (tfb.Invert,)
+
+    if not bijector_class.parameter_properties():
+      if not bijector_class()._is_injective:  # pylint: disable=protected-access
+        continue
+      result[bijector_name] = bijector_class
+
+  result['Invert'] = tfb.Invert
 
   for bijector_name in sorted(result):
-    logging.warning('Supported bijector: tfb.%s', bijector_name)
-  INSTANTIABLE_BIJECTORS = result
-  return INSTANTIABLE_BIJECTORS
+    logging.warning('Trivially supported bijectors: tfb.%s', bijector_name)
+
+  TRIVIALLY_INSTANTIABLE_BIJECTORS = result
+  return TRIVIALLY_INSTANTIABLE_BIJECTORS
 
 
 class BijectorSupport(collections.namedtuple(
@@ -172,7 +288,7 @@ def bijector_supports():
           BijectorSupport(Support.OTHER, Support.OTHER),
       'IteratedSigmoidCentered':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
-                          Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1),
+                          Support.VECTOR_POSITIVE_WITH_L1_NORM_1_SIZE_GT1),
       'KumaraswamyCDF':
           BijectorSupport(Support.SCALAR_IN_0_1, Support.SCALAR_IN_0_1),
       'Log':
@@ -239,7 +355,7 @@ def bijector_supports():
                           Support.SCALAR_UNCONSTRAINED),
       'SoftClip':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
-                          Support.SCALAR_UNCONSTRAINED),
+                          Support.OTHER),
       'Softfloor':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),
@@ -251,7 +367,7 @@ def bijector_supports():
                           Support.SCALAR_IN_NEG1_1),
       'SoftmaxCentered':
           BijectorSupport(Support.VECTOR_UNCONSTRAINED,
-                          Support.VECTOR_WITH_L1_NORM_1_SIZE_GT1),
+                          Support.VECTOR_POSITIVE_WITH_L1_NORM_1_SIZE_GT1),
       'Square':
           BijectorSupport(Support.SCALAR_NON_NEGATIVE,
                           Support.SCALAR_NON_NEGATIVE),
@@ -266,7 +382,7 @@ def bijector_supports():
       'WeibullCDF':
           BijectorSupport(Support.SCALAR_NON_NEGATIVE, Support.SCALAR_IN_0_1),
   }
-  missing_keys = set(instantiable_bijectors().keys()) - set(supports.keys())
+  missing_keys = set(INSTANTIABLE_BIJECTORS.keys()) - set(supports.keys())
   if missing_keys:
     raise ValueError('Missing bijector supports: {}'.format(missing_keys))
   BIJECTOR_SUPPORTS = supports
@@ -296,7 +412,7 @@ def unconstrained_bijectors(draw, max_forward_event_ndims=None,
   if max_forward_event_ndims is None:
     max_forward_event_ndims = float('inf')
 
-  ndims_by_prefix = dict(SCALAR=0, VECTOR=1, MATRIX=2)
+  ndims_by_prefix = dict(SCALAR=0, VECTOR=1, MATRIX=2, OTHER=-1)
 
   def is_acceptable(support):
     """Determines if a `BijectorSupport` object is acceptable."""
@@ -312,17 +428,17 @@ def unconstrained_bijectors(draw, max_forward_event_ndims=None,
     return True
 
   supports = bijector_supports()
-  acceptable_keys = sorted([k for k in instantiable_bijectors().keys()
+  bijectors = trivially_instantiable_bijectors()
+  acceptable_keys = sorted([k for k in bijectors
                             if k == 'Invert' or is_acceptable(supports[k])])
   bijector_name = draw(hps.sampled_from(acceptable_keys))
   if bijector_name == 'Invert':
-    acceptable_keys = [k for k in instantiable_bijectors().keys()
+    acceptable_keys = [k for k in bijectors
                        if is_acceptable(supports[k].invert())]
     underlying = draw(hps.sampled_from(acceptable_keys))
-    underlying = instantiable_bijectors()[underlying][0](
-        validate_args=validate_args)
+    underlying = bijectors[underlying](validate_args=validate_args)
     return tfb.Invert(underlying, validate_args=validate_args)
-  return instantiable_bijectors()[bijector_name][0](validate_args=validate_args)
+  return bijectors[bijector_name](validate_args=validate_args)
 
 
 def distribution_eligilibility_filter_for(bijector):
@@ -444,4 +560,15 @@ def generalized_pareto_constraint(loc, scale, conc):
     return tf.where(conc_ >= 0.,
                     tf.math.softplus(x) + loc_,
                     loc_ - tf.math.sigmoid(x) * scale / conc_)
+  return constrain
+
+
+def softclip_constraint(low, high):
+  """Maps `s` to support based on `low` and `high`."""
+  def constrain(x):
+    low_ = tf.convert_to_tensor(low)
+    high_ = tf.convert_to_tensor(high)
+    # Ensure the values are within (low, high).
+    return (0.5 * (high_ - low_) * tf.math.sigmoid(x) +
+            (high_ - low_) / 4 + low_)
   return constrain

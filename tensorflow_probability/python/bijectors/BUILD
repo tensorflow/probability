@@ -141,7 +141,7 @@ py_test(
     size = "large",
     srcs = ["bijector_properties_test.py"],
     python_version = "PY3",
-    shard_count = 25,
+    shard_count = 35,
     srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [

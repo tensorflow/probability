@@ -23,7 +23,8 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import experimental
-from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.bijectors import hypothesis_testlib as bhps
 from tensorflow_probability.python.bijectors import invert as invert_lib
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -35,83 +36,6 @@ from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
-TF2_FRIENDLY_BIJECTORS = (
-    'Ascending',
-    'BatchNormalization',
-    # 'CategoricalToDiscrete', TODO(b/137956955): Add support
-    # for hypothesis testing
-    'CholeskyOuterProduct',
-    'Cumsum',
-    'DiscreteCosineTransform',
-    'Exp',
-    'Expm1',
-    'FillScaleTriL',
-    'FillTriangular',
-    'FrechetCDF',
-    'GeneralizedExtremeValueCDF',
-    'GeneralizedPareto',
-    'GompertzCDF',
-    'GumbelCDF',
-    'Identity',
-    'Inline',
-    'Invert',
-    'IteratedSigmoidCentered',
-    'KumaraswamyCDF',
-    'Log',
-    'Log1p',
-    'MatrixInverseTriL',
-    'MoyalCDF',
-    'NormalCDF',
-    'Ordered',
-    'Permute',
-    'Power',
-    'PowerTransform',
-    'RationalQuadraticSpline',
-    'RayleighCDF',
-    'Reciprocal',
-    'Reshape',
-    'Scale',
-    'ScaleMatvecDiag',
-    'ScaleMatvecLU',
-    'ScaleMatvecTriL',
-    'Shift',
-    'ShiftedGompertzCDF',
-    'Sigmoid',
-    'Sinh',
-    'SinhArcsinh',
-    'SoftClip',
-    'Softfloor',
-    'Softplus',
-    'Softsign',
-    'Square',
-    'Tanh',
-    'TransformDiagonal',
-    'Transpose',
-    'WeibullCDF',
-)
-
-BIJECTOR_PARAMS_NDIMS = {
-    'FrechetCDF': dict(loc=0, scale=0, concentration=0),
-    'GompertzCDF': dict(concentration=0, rate=0),
-    'GumbelCDF': dict(loc=0, scale=0),
-    'GeneralizedExtremeValueCDF': dict(loc=0, scale=0, concentration=0),
-    'GeneralizedPareto': dict(loc=0, scale=0, concentration=0),
-    'KumaraswamyCDF': dict(concentration1=0, concentration0=0),
-    'MoyalCDF': dict(loc=0, scale=0),
-    'Power': dict(power=0),
-    'RayleighCDF': dict(scale=0),
-    'Scale': dict(scale=0),
-    'ScaleMatvecDiag': dict(scale_diag=1),
-    'ScaleMatvecLU': dict(lower_upper=2, permutation=1),
-    'ScaleMatvecTriL': dict(scale_tril=2),
-    'Shift': dict(shift=0),
-    'ShiftedGompertzCDF': dict(concentration=0, rate=0),
-    'SinhArcsinh': dict(skewness=0, tailweight=0),
-    'Softfloor': dict(temperature=0),
-    'Softplus': dict(hinge_softness=0),
-    'RationalQuadraticSpline': dict(bin_widths=1, bin_heights=1, knot_slopes=1),
-    'WeibullCDF': dict(concentration=0, scale=0),
-}
 
 MUTEX_PARAMS = (
     set(['scale', 'log_scale']),
@@ -129,40 +53,7 @@ NO_LDJ_GRADS_EXPECTED = {
     'GumbelCDF': dict(loc={ILDJ}),
     'MoyalCDF': dict(loc={ILDJ}),
     'Shift': dict(shift={FLDJ, ILDJ}),
-}
-
-TRANSFORM_DIAGONAL_ALLOWLIST = {
-    'BatchNormalization',
-    'DiscreteCosineTransform',
-    'Exp',
-    'Expm1',
-    'GompertzCDF',
-    'GumbelCDF',
-    'GeneralizedExtremeValueCDF',
-    'GeneralizedPareto',
-    'Identity',
-    'Inline',
-    'KumaraswamyCDF',
-    'MoyalCDF',
-    'NormalCDF',
-    'PowerTransform',
-    'Power',
-    'RayleighCDF',
-    'Reciprocal',
-    'Scale',
-    'ScaleMatvecDiag',
-    'ScaleMatvecLU',
-    'ScaleMatvecTriL',
-    'Shift',
-    'ShiftedGompertzCDF',
-    'Sigmoid',
-    'Sinh',
-    'SinhArcsinh',
-    'Softplus',
-    'Softsign',
-    'Square',
-    'Tanh',
-    'WeibullCDF',
+    'Softplus': dict(low={FLDJ}),
 }
 
 AUTOVECTORIZATION_IS_BROKEN = [
@@ -211,28 +102,6 @@ def is_generalized_pareto(bijector):
 # pylint: disable=no-value-for-parameter
 
 
-@hps.composite
-def broadcasting_params(draw,
-                        bijector_name,
-                        batch_shape,
-                        event_dim=None,
-                        enable_vars=False):
-  """Draws a dict of parameters which should yield the given batch shape."""
-  params_event_ndims = BIJECTOR_PARAMS_NDIMS.get(bijector_name, {})
-
-  def _constraint(param):
-    return constraint_for(bijector_name, param)
-
-  return draw(
-      tfp_hps.broadcasting_params(
-          batch_shape,
-          params_event_ndims,
-          event_dim=event_dim,
-          enable_vars=enable_vars,
-          constraint_fn_for=_constraint,
-          mutex_params=MUTEX_PARAMS))
-
-
 # TODO(b/141098791): Eliminate this.
 @experimental.auto_composite_tensor
 class CallableModule(tf.Module, experimental.AutoCompositeTensor):
@@ -259,7 +128,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
     draw: Hypothesis strategy sampler supplied by `@hps.composite`.
     bijector_name: Optional Python `str`.  If given, the produced bijectors
       will all have this type.  If omitted, Hypothesis chooses one from
-      the allowlist `TF2_FRIENDLY_BIJECTORS`.
+      the allowlist `INSTANTIABLE_BIJECTORS`.
     batch_shape: An optional `TensorShape`.  The batch shape of the resulting
       bijector.  Hypothesis will pick one if omitted.
     event_dim: Optional Python int giving the size of each of the underlying
@@ -273,7 +142,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
     allowed_bijectors: Optional list of `str` Bijector names to sample from.
       Bijectors not in this list will not be returned or instantiated as
       part of a meta-bijector (Chain, Invert, etc.). Defaults to
-      `TF2_FRIENDLY_BIJECTORS`.
+      `INSTANTIABLE_BIJECTORS`.
     validate_args: Python `bool`; whether to enable runtime checks.
     return_duplicate: Python `bool`: If `False` return a single bijector. If
       `True` return a tuple of two bijectors of the same type, instantiated with
@@ -284,7 +153,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
       (or an arbitrary one if omitted).
   """
   if allowed_bijectors is None:
-    allowed_bijectors = TF2_FRIENDLY_BIJECTORS
+    allowed_bijectors = bhps.INSTANTIABLE_BIJECTORS
   if bijector_name is None:
     bijector_name = draw(hps.sampled_from(allowed_bijectors))
   if batch_shape is None:
@@ -308,7 +177,7 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
   elif bijector_name == 'TransformDiagonal':
     underlying_name = draw(
         hps.sampled_from(sorted(
-            set(allowed_bijectors) & set(TRANSFORM_DIAGONAL_ALLOWLIST))))
+            set(allowed_bijectors) & set(bhps.TRANSFORM_DIAGONAL_ALLOWLIST))))
     underlying = draw(
         bijectors(
             bijector_name=underlying_name,
@@ -373,9 +242,18 @@ def bijectors(draw, bijector_name=None, batch_shape=None, event_dim=None,
     # (Contrast with `Permute` above.)
     bijector_params = {'perm': draw(hps.permutations(np.arange(event_ndims)))}
   else:
+    params_event_ndims = bhps.INSTANTIABLE_BIJECTORS[
+        bijector_name].params_event_ndims
     bijector_params = draw(
-        broadcasting_params(bijector_name, batch_shape, event_dim=event_dim,
-                            enable_vars=enable_vars))
+        tfp_hps.broadcasting_params(
+            batch_shape,
+            params_event_ndims,
+            event_dim=event_dim,
+            enable_vars=enable_vars,
+            constraint_fn_for=lambda param: constraint_for(bijector_name, param),  # pylint:disable=line-too-long
+            mutex_params=MUTEX_PARAMS))
+    bijector_params = constrain_params(bijector_params, bijector_name)
+
   ctor = getattr(tfb, bijector_name)
   hp.note('Forming {} bijector with params {}.'.format(
       bijector_name, bijector_params))
@@ -400,7 +278,7 @@ def constrain_forward_shape(bijector, shape):
     return constrain_inverse_shape(bijector.bijector, shape=shape)
 
   # TODO(b/146897388): Enable bijectors with parameter-dependent support.
-  support = bijector_hps.bijector_supports()[
+  support = bhps.bijector_supports()[
       type(bijector).__name__].forward
   if support == tfp_hps.Support.VECTOR_SIZE_TRIANGULAR:
     # Need to constrain the shape.
@@ -455,15 +333,15 @@ def domain_tensors(draw, bijector, shape=None):
   if shape is None:
     shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
-  support = bijector_hps.bijector_supports()[bijector_name].forward
+  support = bhps.bijector_supports()[bijector_name].forward
   if isinstance(bijector, tfb.PowerTransform):
-    constraint_fn = bijector_hps.power_transform_constraint(bijector.power)
+    constraint_fn = bhps.power_transform_constraint(bijector.power)
   elif isinstance(bijector, tfb.FrechetCDF):
-    constraint_fn = bijector_hps.frechet_constraint(bijector.loc)
+    constraint_fn = bhps.frechet_constraint(bijector.loc)
   elif isinstance(bijector, tfb.GeneralizedExtremeValueCDF):
-    constraint_fn = bijector_hps.gev_constraint(bijector.loc,
-                                                bijector.scale,
-                                                bijector.concentration)
+    constraint_fn = bhps.gev_constraint(bijector.loc,
+                                        bijector.scale,
+                                        bijector.concentration)
   else:
     constraint_fn = tfp_hps.constrainer(support)
   return draw(tfp_hps.constrained_tensors(constraint_fn, shape))
@@ -494,10 +372,13 @@ def codomain_tensors(draw, bijector, shape=None):
   if shape is None:
     shape = draw(tfp_hps.shapes())
   bijector_name = type(bijector).__name__
-  support = bijector_hps.bijector_supports()[bijector_name].inverse
+  support = bhps.bijector_supports()[bijector_name].inverse
   if is_generalized_pareto(bijector):
-    constraint_fn = bijector_hps.generalized_pareto_constraint(
+    constraint_fn = bhps.generalized_pareto_constraint(
         bijector.loc, bijector.scale, bijector.concentration)
+  elif isinstance(bijector, tfb.SoftClip):
+    constraint_fn = bhps.softclip_constraint(
+        bijector.low, bijector.high)
   else:
     constraint_fn = tfp_hps.constrainer(support)
   return draw(tfp_hps.constrained_tensors(constraint_fn, shape))
@@ -589,7 +470,7 @@ class BijectorPropertiesTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}
-      for bname in TF2_FRIENDLY_BIJECTORS)
+      for bname in set(bhps.INSTANTIABLE_BIJECTORS))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testBijector(self, bijector_name, data):
@@ -711,9 +592,9 @@ class BijectorPropertiesTest(test_util.TestCase):
     self.assertAllEqualNested(ys.dtype, bijector.forward_dtype(xs.dtype))
     self.assertAllEqualNested(xs.dtype, bijector.inverse_dtype(ys.dtype))
 
-  @parameterized.named_parameters({
-      'testcase_name': bname, 'bijector_name': bname
-  } for bname in TF2_FRIENDLY_BIJECTORS)
+  @parameterized.named_parameters(
+      {'testcase_name': bname, 'bijector_name': bname}
+      for bname in set(bhps.INSTANTIABLE_BIJECTORS))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testParameterProperties(self, bijector_name, data):
@@ -737,7 +618,7 @@ class BijectorPropertiesTest(test_util.TestCase):
     bijector, event_dim = self._draw_bijector(
         bijector_name, data,
         validate_args=True,
-        allowed_bijectors=TF2_FRIENDLY_BIJECTORS)
+        allowed_bijectors=bhps.INSTANTIABLE_BIJECTORS)
 
     # Extract the full shape of an output from this bijector.
     xs = self._draw_domain_tensor(bijector, data, event_dim)
@@ -799,8 +680,8 @@ class BijectorPropertiesTest(test_util.TestCase):
     self.evaluate(new_bijector.forward(xs))
 
   @parameterized.named_parameters(
-      {'testcase_name': bname, 'bijector_name': bname}
-      for bname in (set(TF2_FRIENDLY_BIJECTORS) -
+      {'testcase_name': bname, 'bijector_name': bname}  # pylint:disable=g-complex-comprehension
+      for bname in (set(bhps.INSTANTIABLE_BIJECTORS) -
                     set(AUTOVECTORIZATION_IS_BROKEN)))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
@@ -814,7 +695,7 @@ class BijectorPropertiesTest(test_util.TestCase):
         bijector_name, data,
         batch_shape=[],  # Avoid conflict with vmap sample dimension.
         validate_args=False,  # Work around lack of `If` support in vmap.
-        allowed_bijectors=(set(TF2_FRIENDLY_BIJECTORS) -
+        allowed_bijectors=(set(bhps.INSTANTIABLE_BIJECTORS) -
                            set(AUTOVECTORIZATION_IS_BROKEN)))
     atol = AUTOVECTORIZATION_ATOL[bijector_name]
     rtol = AUTOVECTORIZATION_RTOL[bijector_name]
@@ -864,7 +745,7 @@ class BijectorPropertiesTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}
-      for bname in TF2_FRIENDLY_BIJECTORS)
+      for bname in set(bhps.INSTANTIABLE_BIJECTORS))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testHashing(self, bijector_name, data):
@@ -875,7 +756,7 @@ class BijectorPropertiesTest(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': bname, 'bijector_name': bname}
-      for bname in TF2_FRIENDLY_BIJECTORS)
+      for bname in set(bhps.INSTANTIABLE_BIJECTORS))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testEquality(self, bijector_name, data):
@@ -886,8 +767,8 @@ class BijectorPropertiesTest(test_util.TestCase):
     self.assertFalse(bijector_1 != bijector_2)  # pylint: disable=g-generic-assert
 
   @parameterized.named_parameters(
-      {'testcase_name': bname, 'bijector_name': bname}
-      for bname in (set(TF2_FRIENDLY_BIJECTORS) -
+      {'testcase_name': bname, 'bijector_name': bname}  # pylint:disable=g-complex-comprehension
+      for bname in (set(bhps.INSTANTIABLE_BIJECTORS) -
                     set(COMPOSITE_TENSOR_IS_BROKEN)))
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
@@ -897,7 +778,7 @@ class BijectorPropertiesTest(test_util.TestCase):
         bijector_name, data,
         batch_shape=[],
         validate_args=True,
-        allowed_bijectors=(set(TF2_FRIENDLY_BIJECTORS) -
+        allowed_bijectors=(set(bhps.INSTANTIABLE_BIJECTORS) -
                            set(COMPOSITE_TENSOR_IS_BROKEN)))
 
     if type(bijector) is invert_lib._Invert:  # pylint: disable=unidiomatic-typecheck
@@ -955,6 +836,22 @@ def ensure_nonzero(x):
   return tf.where(x < 1e-6, tf.constant(1e-3, x.dtype), x)
 
 
+def fix_sigmoid(d):
+  # Ensure that low < high.
+  return dict(d, high=tfp_hps.ensure_high_gt_low(
+      d['low'], d['high']))
+
+
+def fix_softclip(d):
+  # Ensure that low < high.
+  return dict(d, high=tfp_hps.ensure_high_gt_low(
+      d['low'], d['high']))
+
+
+def fix_rational_quadratic(d):
+  return dict(d, range_min=-1)
+
+
 CONSTRAINTS = {
     'concentration':
         tfp_hps.softplus_plus_eps(),
@@ -975,6 +872,8 @@ CONSTRAINTS = {
         tfp_hps.softplus_plus_eps(),
     'temperature':
         tfp_hps.softplus_plus_eps(eps=0.5),
+    'RationalQuadraticSpline':
+        fix_rational_quadratic,
     'Scale.scale':
         tfp_hps.softplus_plus_eps(),
     'ScaleMatvecDiag.scale_diag':
@@ -985,12 +884,14 @@ CONSTRAINTS = {
     # overflow for the inverse.
     'ShiftedGompertzCDF.concentration':
         lambda x: tf.math.softplus(x) + 1e-1,
+    'Sigmoid': fix_sigmoid,
+    'SoftClip': fix_softclip,
     'bin_widths':
-        bijector_hps.spline_bin_size_constraint,
+        bhps.spline_bin_size_constraint,
     'bin_heights':
-        bijector_hps.spline_bin_size_constraint,
+        bhps.spline_bin_size_constraint,
     'knot_slopes':
-        bijector_hps.spline_slope_constraint,
+        bhps.spline_slope_constraint,
     'lower_upper':
         lambda x: tf.linalg.set_diag(x, ensure_nonzero(tf.linalg.diag_part(x))),
     'permutation':
@@ -1003,6 +904,34 @@ def constraint_for(bijector_name=None, param=None):
     return CONSTRAINTS.get('{}.{}'.format(bijector_name, param),
                            CONSTRAINTS.get(param, tfp_hps.identity_fn))
   return CONSTRAINTS.get(bijector_name, tfp_hps.identity_fn)
+
+
+def constrain_params(params_unconstrained, bijector_name):
+  """Constrains a parameters dictionary to a bijector's parameter space."""
+  # Constrain them to legal values
+  params_constrained = constraint_for(bijector_name)(params_unconstrained)
+
+  # Sometimes the "bijector constraint" fn may replace c2t-tracking
+  # DeferredTensor params with Tensor params (e.g. fix_triangular). In such
+  # cases, we preserve the c2t-tracking DeferredTensors by wrapping them but
+  # ignoring the value.  We similarly reinstate raw tf.Variables, so they
+  # appear in the bijector's `variables` list and can be initialized.
+  for k in params_constrained:
+    if (k in params_unconstrained and
+        isinstance(params_unconstrained[k],
+                   (tfp_util.DeferredTensor, tf.Variable))
+        and params_unconstrained[k] is not params_constrained[k]):
+
+      def constrained_value(v, val=params_constrained[k]):  # pylint: disable=cell-var-from-loop
+        # While the gradient to v will be 0, we only care about the c2t
+        # counts.
+        return v * 0 + val
+
+      params_constrained[k] = tfp_util.DeferredTensor(
+          params_unconstrained[k], constrained_value)
+  hp.note('Forming bijector {} with constrained parameters {}'.format(
+      bijector_name, params_constrained))
+  return params_constrained
 
 
 if __name__ == '__main__':

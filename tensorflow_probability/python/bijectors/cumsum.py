@@ -16,7 +16,7 @@
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 
 __all__ = [
     'Cumsum',
@@ -97,15 +97,15 @@ class Cumsum(bijector.AutoCompositeTensorBijector):
     return tf.cumsum(x, axis=self.axis)
 
   def _inverse(self, y):
-    ndims = prefer_static.rank(y)
-    shifted_y = tf.pad(
-        tf.slice(
-            y, tf.zeros(ndims, dtype=tf.int32),
-            prefer_static.shape(y) -
-            tf.one_hot(ndims + self.axis, ndims, dtype=tf.int32)
+    ndims = ps.rank(y)
+    shifted_y = ps.pad(
+        ps.slice(
+            y, ps.zeros(ndims, dtype=tf.int32),
+            ps.shape(y) -
+            ps.one_hot(ndims + self.axis, ndims, dtype=tf.int32)
         ),  # Remove the last entry of y in the chosen dimension.
-        paddings=tf.one_hot(
-            tf.one_hot(ndims + self.axis, ndims, on_value=0, off_value=-1),
+        paddings=ps.one_hot(
+            ps.one_hot(ndims + self.axis, ndims, on_value=0, off_value=-1),
             2,
             dtype=tf.int32
         )  # Insert zeros at the beginning of the chosen dimension.
