@@ -15,6 +15,7 @@
 """Tests Kendall's Tau metric."""
 
 import random
+import numpy as np
 
 from scipy import stats
 
@@ -74,20 +75,42 @@ class KendallsTauTest(test_util.TestCase):
       self.assertAllClose(expected, res, atol=1e-5)
 
   def test_kendall_tau_assert_all_ties_y_true(self):
-    with self.assertRaises((ValueError, tf.errors.InvalidArgumentError)):
-      self.evaluate(tfp.stats.kendalls_tau([12, 12, 12], [1, 4, 7]))
+    self.assertTrue(
+          self.evaluate(
+              tf.math.is_nan(tfp.stats.kendalls_tau([12, 12, 12], [1, 4, 7]))))
 
   def test_kendall_tau_assert_all_ties_y_pred(self):
-    with self.assertRaises((ValueError, tf.errors.InvalidArgumentError)):
-      self.evaluate(tfp.stats.kendalls_tau([1, 2, 3], [4, 4, 4]))
+    self.assertTrue(
+          self.evaluate(
+              tf.math.is_nan(tfp.stats.kendalls_tau([1, 2, 3], [4, 4, 4]))))
 
   def test_kendall_tau_assert_scalar(self):
-    with self.assertRaises((ValueError, tf.errors.InvalidArgumentError)):
-      tfp.stats.kendalls_tau([1], [4])
+    self.assertTrue(
+        self.evaluate(tf.math.is_nan(tfp.stats.kendalls_tau([1], [4]))))
 
   def test_kendall_tau_assert_unmatched(self):
     with self.assertRaises(ValueError):
       tfp.stats.kendalls_tau([1, 2], [3, 4, 5])
+
+  def test_kendall_tau_edge_case_behavior(self):
+    self.assertTrue(
+        self.evaluate(
+            tf.math.is_nan(
+                tfp.stats.kendalls_tau(
+                    tf.constant([0, 0]), tf.constant([3, 5])))))
+    self.assertTrue(
+        self.evaluate(
+            tf.math.is_nan(
+                tfp.stats.kendalls_tau(
+                    tf.constant([0, 1]), tf.constant([3, 3])))))
+    self.assertTrue(
+        self.evaluate(
+            tf.math.is_nan(
+                tfp.stats.kendalls_tau(tf.constant([0]), tf.constant([3])))))
+    self.assertTrue(
+        self.evaluate(
+            tf.math.is_nan(
+                tfp.stats.kendalls_tau(tf.constant([]), tf.constant([])))))
 
 
 if __name__ == '__main__':
