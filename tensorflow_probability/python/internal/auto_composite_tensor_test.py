@@ -362,9 +362,8 @@ class AutoCompositeTensorTest(test_util.TestCase):
     a = tf.constant([3., 2.])
     ct = ThingWithCallableArg(a, f=f)
 
-    struct_coder = tf.__internal__.saved_model.StructureCoder()
     with self.assertRaisesRegex(ValueError, 'Cannot serialize'):
-      struct_coder.encode_structure(ct._type_spec)  # pylint: disable=protected-access
+      tf.__internal__.saved_model.encode_structure(ct._type_spec)  # pylint: disable=protected-access
 
     @tfp.experimental.auto_composite_tensor(module_name='my.module')
     class F(tfp.experimental.AutoCompositeTensor):
@@ -373,8 +372,8 @@ class AutoCompositeTensorTest(test_util.TestCase):
         return f(*args, **kwargs)
 
     ct_functor = ThingWithCallableArg(a, f=F())
-    enc = struct_coder.encode_structure(ct_functor._type_spec)
-    dec = struct_coder.decode_proto(enc)
+    enc = tf.__internal__.saved_model.encode_structure(ct_functor._type_spec)
+    dec = tf.__internal__.saved_model.decode_proto(enc)
     self.assertEqual(dec, ct_functor._type_spec)
 
   def test_composite_tensor_callable_arg(self):

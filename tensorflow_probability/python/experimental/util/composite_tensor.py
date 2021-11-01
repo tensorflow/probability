@@ -279,9 +279,8 @@ def as_composite(obj):
             mk_err_msg('(Unable to convert dependent entry \'{}\' of object '
                        '\'{}\': {})'.format(k, obj, str(e))))
   result = cls(**kwargs)
-  struct_coder = nested_structure_coder.StructureCoder()
   try:
-    struct_coder.encode_structure(result._type_spec)  # pylint: disable=protected-access
+    nested_structure_coder.encode_structure(result._type_spec)  # pylint: disable=protected-access
   except nested_structure_coder.NotEncodableError as e:
     raise NotImplementedError(
         mk_err_msg('(Unable to serialize: {})'.format(str(e))))
