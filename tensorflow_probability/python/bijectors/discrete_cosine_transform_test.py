@@ -18,6 +18,7 @@
 
 import numpy as np
 from scipy import fftpack
+import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.internal import test_util
@@ -66,6 +67,17 @@ class DiscreteCosineTransformTest(test_util.TestCase):
           eval_func=self.evaluate,
           event_ndims=1,
           rtol=1e-3)
+
+  def testZeroSizedInput(self):
+    bijector = tfb.DiscreteCosineTransform(validate_args=True)
+    z = tf.zeros((3, 5, 0))
+    self.assertAllEqual(bijector.forward(z), z)
+    self.assertAllEqual(bijector.inverse(z), z)
+
+    bijector = tfb.DiscreteCosineTransform(dct_type=3, validate_args=True)
+    z = tf.zeros((2, 0, 7))
+    self.assertAllEqual(bijector.forward(z), z)
+    self.assertAllEqual(bijector.inverse(z), z)
 
 
 if __name__ == '__main__':

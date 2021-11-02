@@ -18,6 +18,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
@@ -76,9 +77,17 @@ class DiscreteCosineTransform(bijector.AutoCompositeTensorBijector):
     return dict()
 
   def _forward(self, x):
+    # TODO(b/204835042): Handle inputs of size 0 when the shape is not
+    # statically known.
+    if any(d == 0 for d in tensorshape_util.as_list(x.shape)):
+      return x
     return tf.signal.dct(x, type=self._dct_type, norm='ortho')
 
   def _inverse(self, y):
+    # TODO(b/204835042): Handle inputs of size 0 when the shape is not
+    # statically known.
+    if any(d == 0 for d in tensorshape_util.as_list(y.shape)):
+      return y
     return tf.signal.idct(y, type=self._dct_type, norm='ortho')
 
   def _inverse_log_det_jacobian(self, y):
