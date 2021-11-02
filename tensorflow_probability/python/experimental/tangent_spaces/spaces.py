@@ -22,6 +22,7 @@ __all__ = [
     'FullSpace',
     'GeneralSpace',
     'TangentSpace',
+    'UnspecifiedTangentSpaceError',
     'ZeroSpace',
 ]
 
@@ -49,17 +50,17 @@ class TangentSpace(object):
   """
 
   def transform_general(self, x, f):
-    """Returns the density correction corresponding to f at x.
+    """Returns the density correction, in log space, corresponding to f at x.
 
     Also returns a new `TangentSpace` representing the tangent to fM at f(x).
 
     Args:
       x: `Tensor` (structure). The point at which to calculate the density.
-      f: `Bijector` or one of its subclasses. The transformation that requires
-        a density correction based on this tangent space.
+      f: `Bijector` or one of its subclasses. The transformation that requires a
+        density correction based on this tangent space.
 
     Returns:
-      density: A `Tensor` representing the density correction of f at x
+      log_density: A `Tensor` representing the log density correction of f at x
       space: A `TangentSpace` representing the tangent to fM at f(x)
 
     Raises:
@@ -79,7 +80,7 @@ class TangentSpace(object):
       f: same as in `transform_general`.
 
     Returns:
-      density: A `Tensor` representing the density correction of f at x
+      log_density: A `Tensor` representing the log density correction of f at x
       space: A `TangentSpace` representing the tangent to fM at f(x)
 
     Raises:
@@ -90,7 +91,7 @@ class TangentSpace(object):
     return self.transform_general(x, f)
 
   def transform_projection(self, x, f):
-    """Same as `transform_general`, with f a projection on some coordinates.
+    """Same as `transform_general`, with f a projection (or its inverse).
 
     Default falls back to `transform_general`, which may be overridden
     in subclasses.
@@ -100,7 +101,7 @@ class TangentSpace(object):
       f: same as in `transform_general`.
 
     Returns:
-      density: A `Tensor` representing the density correction of f at x
+      log_density: A `Tensor` representing the log density correction of f at x
       space: A `TangentSpace` representing the tangent to fM at f(x)
 
     Raises:
@@ -120,7 +121,7 @@ class TangentSpace(object):
       f: same as in `transform_dimension_preserving`.
 
     Returns:
-      density: A `Tensor` representing the density correction of f at x
+      log_density: A `Tensor` representing the log density correction of f at x
       space: A `TangentSpace` representing the tangent to fM at f(x)
 
     Raises:
@@ -147,13 +148,16 @@ class AxisAlignedSpace(TangentSpace):
   this special case we can represent the standard basis of the
   subspace with a mask. The subclass is designed to support axis-aligned
   injections like the `FillTriangular` `Bijector`.
+
+  Any Bijector calling the `transform_projection` method is expected
+  to define an `experimental_update_live_dimensions` method.
   """
 
   def __init__(self, axis_mask):
     """Constructs an AxisAlignedSpace with a set of live dimensions.
 
     Args:
-      axis_mask: `Tensor`. A bit-mask defining the live dimensions of the space.
+      axis_mask: `Tensor`. A bit-mask of the live dimensions of the space.
     """
     self.axis_mask = axis_mask
 
@@ -162,11 +166,17 @@ class AxisAlignedSpace(TangentSpace):
     return as_general_space.transform_general(x, f)
 
   def transform_projection(self, x, f):
-    # TODO(pravnar): Define Bijector.experimental_update_live_dimensions.
+    if not hasattr(f, 'experimental_update_live_dimensions'):
+      msg = ('When calling `transform_projection` the Bijector must implement '
+             'the `experimental_update_live_dimensions` method.')
+      raise NotImplementedError(msg)
     new_live_dimensions = f.experimental_update_live_dimensions(self.axis_mask)
-    # TODO(pravnar): Special-case a bijector (direction) that knows
-    # that the result of the projection will be a full space
-    return 1, AxisAlignedSpace(new_live_dimensions)
+    if all(tf.get_static_value(new_live_dimensions)):
+      # Special-case a bijector (direction) that knows that the result
+      # of the projection will be a full space
+      return 0, FullSpace()
+    else:
+      return 0, AxisAlignedSpace(new_live_dimensions)
 
   def transform_coordinatewise(self, x, f):
     # TODO(pravnar): compute the derivative of f along x along the
@@ -175,7 +185,7 @@ class AxisAlignedSpace(TangentSpace):
 
 
 def jacobian_determinant(x, f):
-  return tf.exp(f.forward_log_det_jacobian(x))
+  return f.forward_log_det_jacobian(x)
 
 
 class FullSpace(TangentSpace):
@@ -200,8 +210,8 @@ class FullSpace(TangentSpace):
 
 
 def volume_coefficient(basis):
-  return tf.sqrt(tf.linalg.det(tf.linalg.matmul(
-      basis, basis, transpose_b=True)))
+  return tf.multiply(
+      tf.linalg.logdet(tf.linalg.matmul(basis, basis, transpose_b=True)), 0.5)
 
 
 class GeneralSpace(TangentSpace):
@@ -221,11 +231,20 @@ class ZeroSpace(TangentSpace):
   """Tangent space of M for discrete distributions.
 
   In this special case the tangent space is 0-dimensional, and the
-  basis is represented by a 0x0 matrix, which gives 1 as the density
+  basis is represented by a 0x0 matrix, which gives 0 as the density
   correction term.
 
   """
 
   def transform_general(self, x, f):
     del x, f
-    return 1, ZeroSpace()
+    return 0, ZeroSpace()
+
+
+class UnspecifiedTangentSpaceError(Exception):
+  """An exception raised when a tangent space has not been specified."""
+
+  def __init__(self):
+    message = ('Please specify one of the tangent spaces defined at '
+               'tensorflow_probability.python.experimental.tangent_spaces.')
+    super().__init__(message)

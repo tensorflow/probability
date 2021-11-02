@@ -1681,6 +1681,40 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
     """
     return self._call_forward_log_det_jacobian(x, event_ndims, name, **kwargs)
 
+  def experimental_compute_density_correction(self,
+                                              x,
+                                              tangent_space,
+                                              backward_compat=False):
+    """Density correction for this transformation wrt the tangent space, at x.
+
+    Subclasses of Bijector may call the most specific applicable
+    method of `TangentSpace`, based on whether the transformation is
+    dimension-preserving, coordinate-wise, a projection, or something
+    more general. The backward-compatible assumption is that the
+    transformation is dimension-preserving (goes from R^n to R^n).
+
+    Args:
+      x: `Tensor` (structure). The point at which to calculate the density.
+      tangent_space: `TangentSpace` or one of its subclasses.  The tangent to
+        the support manifold at `x`.
+      backward_compat: `bool` specifying whether to assume that the Bijector
+        is dimension-preserving.
+
+    Returns:
+      density_correction: `Tensor` representing the density correction---in log
+        space---under the transformation that this Bijector denotes.
+
+    Raises:
+      TypeError if `backward_compat` is False but no method of
+        `TangentSpace` has been called explicitly.
+
+    """
+    if backward_compat:
+      return tangent_space.transform_dimension_preserving(x, self)
+    else:
+      raise TypeError(
+          'Please call the `TangentSpace` method applicable to this Bijector.')
+
   def _forward_dtype(self, input_dtype, **kwargs):
     """Subclass stub for `forward_dtype`."""
     return input_dtype

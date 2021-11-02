@@ -544,6 +544,7 @@ multi_substrate_py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/tangent_spaces",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:batch_shape_lib",
         "//tensorflow_probability/python/internal:distribution_util",

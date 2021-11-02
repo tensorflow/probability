@@ -43,7 +43,6 @@ from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tenso
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
-
 __all__ = [
     'Distribution',
 ]
@@ -1898,6 +1897,50 @@ class Distribution(_BaseDistribution):
     raise NotImplementedError(
         'Fitting maximum likelihood parameters is not implemented for this '
         'distribution: {}.'.format(cls.__name__))
+
+  def experimental_local_measure(self, value, backward_compat=False, **kwargs):
+    """Returns a log probability density together with a `TangentSpace`.
+
+    A `TangentSpace` allows us to calculate the correct push-forward
+    density when we apply a transformation to a `Distribution` on
+    a strict submanifold of R^n (typically via a `Bijector` in the
+    `TransformedDistribution` subclass). The density correction uses
+    the basis of the tangent space.
+
+    Args:
+      value: `float` or `double` `Tensor`.
+      backward_compat: `bool` specifying whether to fall back to returning
+        `FullSpace` as the tangent space, and representing R^n with the standard
+         basis.
+      **kwargs: Named arguments forwarded to subclass implementation.
+
+    Returns:
+      log_prob: a `Tensor` representing the log probability density, of shape
+        `sample_shape(x) + self.batch_shape` with values of type `self.dtype`.
+      tangent_space: a `TangentSpace` object (by default `FullSpace`)
+        representing the tangent space to the manifold at `value`.
+
+    Raises:
+      UnspecifiedTangentSpaceError if `backward_compat` is False and
+        the `_experimental_tangent_space` attribute has not been defined.
+    """
+    log_prob = self.log_prob(value, **kwargs)
+    tangent_space = None
+    if getattr(self, '_experimental_tangent_space'):
+      tangent_space = self._experimental_tangent_space
+    elif backward_compat:
+      # Import here rather than top-level to avoid circular import.
+      # pylint: disable=g-import-not-at-top
+      from tensorflow_probability.python.experimental import tangent_spaces
+      tangent_space = tangent_spaces.FullSpace()
+
+    if not tangent_space:
+      # Import here rather than top-level to avoid circular import.
+      # pylint: disable=g-import-not-at-top
+      from tensorflow_probability.python.experimental import tangent_spaces
+      raise tangent_spaces.UnspecifiedTangentSpaceError
+
+    return log_prob, tangent_space
 
   def __str__(self):
     if self.batch_shape:
