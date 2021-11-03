@@ -241,16 +241,27 @@ class CholeskyLKJ(distribution.AutoCompositeTensorDistribution):
     """
     # The formula is from D. Lewandowski et al [1], p. 1999, from the
     # proof that eqs 16 and 17 are equivalent.
+    # Instead of using a for loop for k from 1 to (dimension - 1), we will
+    # vectorize the computation by performing operations on the vector
+    # `dimension_range = np.arange(1, dimension)`.
     with tf.name_scope(name or 'log_normalization_lkj'):
       if concentration is None:
         concentration = tf.convert_to_tensor(self.concentration)
-      logpi = np.log(np.pi)
-      ans = tf.zeros_like(concentration)
-      for k in range(1, self.dimension):
-        ans = ans + tf.constant(logpi * k / 2., concentration.dtype)
-        effective_concentration = concentration + (self.dimension - 1 - k) / 2.
-        ans = ans + tfp_math.log_gamma_difference(
-            k / 2., effective_concentration)
+      logpi = float(np.log(np.pi))
+      dimension_range = np.arange(
+          1.,
+          self.dimension,
+          dtype=dtype_util.as_numpy_dtype(concentration.dtype))
+      effective_concentration = (
+          concentration[..., tf.newaxis] +
+          (self.dimension - 1 - dimension_range) / 2.)
+      ans = tf.reduce_sum(
+          tfp_math.log_gamma_difference(dimension_range / 2.,
+                                        effective_concentration),
+          axis=-1)
+      # Then we add to `ans` the sum of `logpi / 2 * k` for `k` run from 1 to
+      # `dimension - 1`.
+      ans = ans + logpi * (self.dimension * (self.dimension - 1) / 4.)
       return ans
 
   def _default_event_space_bijector(self):

@@ -1141,7 +1141,7 @@ def _log_gamma_difference_big_y(x, y):
   as `x log(x) - x + o(x)`, and thus subtracting the value of lgamma for two
   close, large arguments incurs catastrophic cancellation.
 
-  The method is to partition lgamma into the Striling approximation and the
+  The method is to partition lgamma into the Stirling approximation and the
   correction `log_gamma_correction`, symbolically cancel the former, and compute
   and subtract the latter.
 
@@ -1218,14 +1218,14 @@ def log_gamma_difference(x, y, name=None):
   as `x log(x) - x + o(x)`, and thus subtracting the value of lgamma for two
   close, large arguments incurs catastrophic cancellation.
 
-  The method is to partition lgamma into the Striling approximation and the
-  correction `log_gamma_correction`, symbolically cancel the former, and compute
-  and subtract the latter.
+  When `y >= 8`, the method is to partition lgamma into the Stirling
+  approximation and the correction `log_gamma_correction`, symbolically cancel
+  the former, and compute and subtract the latter.
 
   Args:
     x: Floating-point Tensor.  `x` should be non-negative, and elementwise no
       more than `y`.
-    y: Floating-point Tensor.  `y` should be elementwise no less than 8.
+    y: Floating-point Tensor.  `y` should be positive.
     name: Optional Python `str` naming the operation.
 
   Returns:
@@ -1325,7 +1325,7 @@ def lbeta(x, y, name=None):
   cancellation between the lgammas.  This method avoids the numeric cancellation
   by explicitly decomposing lgamma into the Stirling approximation and an
   explicit `log_gamma_correction`, and cancelling the large terms from the
-  Striling analytically.
+  Stirling analytically.
 
   The computed gradients are the same as for the naive forward computation,
   because (i) digamma grows much slower than lgamma, so cancellations aren't as

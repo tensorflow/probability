@@ -139,7 +139,7 @@ class _RandomSphericalUniform(object):
   def test_expectations_3d(self):
     self.verify_expectations(3)
 
-  def test_expectations_5d(self):
+  def test_expectations_4d(self):
     self.verify_expectations(4)
 
   def test_expectations_9d(self):

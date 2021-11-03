@@ -42,6 +42,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import linalg
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.random import random_ops
 from tensorflow.python.ops import control_flow_util  # pylint: disable=g-direct-tensorflow-import
@@ -105,12 +106,64 @@ class _ClipByValue(bijector_lib.AutoCompositeTensorBijector):
     return tf.zeros([], dtype=dtype_util.base_dtype(x.dtype))
 
 
-def _replicate(n, tensor):
-  """Replicate the input tensor n times along a new (major) dimension."""
-  # TODO(axch) Does this already exist somewhere?  Should it get contributed?
-  multiples = ps.concat([[n], ps.ones([ps.rank(tensor)], dtype=n.dtype)],
-                        axis=0)
-  return tf.tile(tensor[tf.newaxis], multiples)
+def _tril_spherical_uniform(dimension, batch_shape, dtype, seed):
+  """Returns a `Tensor` of samples of lower triangular matrices.
+
+  Each row of the lower triangular part follows a spherical uniform
+  distribution.
+
+  Args:
+    dimension: Scalar `int` `Tensor`, representing the dimensionality of the
+      output matrices.
+    batch_shape: Vector-shaped, `int` `Tensor` representing batch shape of
+      output. The output will have shape `batch_shape + [dimension, dimension]`.
+    dtype: TF `dtype` representing `dtype` of output.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+
+  Returns:
+    tril_spherical_uniform: `Tensor` with specified `batch_shape` and `dtype`
+      consisting of real values drawn row-wise from a spherical uniform
+      distribution.
+  """
+  # Essentially, we will draw lower triangular samples where each lower
+  # triangular entry follows a normal distribution, then apply `x / norm(x)`
+  # for each row of the samples.
+  # To avoid possible NaNs, we will use spherical_uniform directly for
+  # the first two rows.
+  assert dimension > 0, '`dimension` needs to be positive.'
+  num_seeds = min(dimension, 3)
+  seeds = list(samplers.split_seed(seed, n=num_seeds, salt='sample_lkj'))
+  rows = []
+  paddings_prepend = [[0, 0]] * len(batch_shape)
+  for n in range(1, min(dimension, 2) + 1):
+    rows.append(
+        tf.pad(
+            random_ops.spherical_uniform(
+                shape=batch_shape, dimension=n, dtype=dtype, seed=seeds.pop()),
+            paddings_prepend + [[0, dimension - n]],
+            constant_values=0.))
+  samples = tf.stack(rows, axis=-2)
+  if dimension > 2:
+    normal_shape = ps.concat(
+        [batch_shape, [dimension * (dimension + 1) // 2 - 3]], axis=0)
+    normal_samples = samplers.normal(
+        shape=normal_shape, dtype=dtype, seed=seeds.pop())
+    # We fill the first two rows of the triangular matrix with ones.
+    # Note that fill_triangular fills elements in a clockwise spiral.
+    normal_samples = tf.concat([
+        normal_samples[..., :dimension],
+        tf.ones(ps.concat([batch_shape, [1]], axis=0), dtype=dtype),
+        normal_samples[..., dimension:(2 * dimension - 1)],
+        tf.ones(ps.concat([batch_shape, [2]], axis=0), dtype=dtype),
+        normal_samples[..., (2 * dimension - 1):],
+    ],
+                               axis=-1)
+    normal_samples = linalg.fill_triangular(
+        normal_samples, upper=False)[..., 2:, :]
+    remaining_rows = normal_samples / tf.norm(
+        normal_samples, ord=2, axis=-1, keepdims=True)
+    samples = tf.concat([samples, remaining_rows], axis=-2)
+  return samples
 
 
 def sample_lkj(
@@ -146,9 +199,6 @@ def sample_lkj(
         'Cannot sample negative-dimension correlation matrices.')
   # Notation below: B is the batch shape, i.e., tf.shape(concentration)
 
-  # We need 1 seed for beta corr12, and 2 per loop iter.
-  num_seeds = 1 + 2 * max(0, dimension - 2)
-  seeds = list(samplers.split_seed(seed, n=num_seeds, salt='sample_lkj'))
   with tf.name_scope('sample_lkj' or name):
     concentration = tf.convert_to_tensor(concentration)
     if not dtype_util.is_floating(concentration.dtype):
@@ -156,90 +206,72 @@ def sample_lkj(
           'The concentration argument should have floating type, not '
           '{}'.format(dtype_util.name(concentration.dtype)))
 
-    concentration = _replicate(num_samples, concentration)
-    concentration_shape = ps.shape(concentration)
+    batch_shape = ps.concat([[num_samples], ps.shape(concentration)], axis=0)
+    dtype = concentration.dtype
     if dimension <= 1:
       # For any dimension <= 1, there is only one possible correlation matrix.
-      shape = ps.concat([
-          concentration_shape, [dimension, dimension]], axis=0)
-      return tf.ones(shape=shape, dtype=concentration.dtype)
-    beta_conc = concentration + (dimension - 2.) / 2.
-    beta_dist = beta.Beta(concentration1=beta_conc, concentration0=beta_conc)
+      shape = ps.concat([batch_shape, [dimension, dimension]], axis=0)
+      return tf.ones(shape=shape, dtype=dtype)
+
+    # We need 1 seed for beta and 1 seed for tril_spherical_uniform.
+    beta_seed, tril_spherical_uniform_seed = samplers.split_seed(
+        seed, n=2, salt='sample_lkj')
 
     # Note that the sampler below deviates from [1], by doing the sampling in
     # cholesky space. This does not change the fundamental logic of the
     # sampler, but does speed up the sampling.
+    # In addition, we also vectorize the computation to make the sampler
+    # more feasible to use in problems where `dimension` is large.
 
-    # This is the correlation coefficient between the first two dimensions.
-    # This is also `r` in reference [1].
-    corr12 = 2. * beta_dist.sample(seed=seeds.pop()) - 1.
+    beta_conc = concentration + (dimension - 2.) / 2.
+    dimension_range = np.arange(
+        1., dimension, dtype=dtype_util.as_numpy_dtype(dtype))
+    beta_conc1 = dimension_range / 2.
+    beta_conc0 = beta_conc[..., tf.newaxis] - (dimension_range - 1) / 2.
+    beta_dist = beta.Beta(concentration1=beta_conc1, concentration0=beta_conc0)
+    # norm is y in reference [1].
+    norm = beta_dist.sample(sample_shape=[num_samples], seed=beta_seed)
+    # distance shape: B + [dimension - 1, 1] for broadcast
+    distance = tf.sqrt(norm)[..., tf.newaxis]
 
-    # Below we construct the Cholesky of the initial 2x2 correlation matrix,
-    # which is of the form:
-    # [[1, 0], [r, sqrt(1 - r**2)]], where r is the correlation between the
-    # first two dimensions.
-    # This is the top-left corner of the cholesky of the final sample.
-    first_row = tf.concat([
-        tf.ones_like(corr12)[..., tf.newaxis],
-        tf.zeros_like(corr12)[..., tf.newaxis]], axis=-1)
-    second_row = tf.concat([
-        corr12[..., tf.newaxis],
-        tf.sqrt(1 - corr12**2)[..., tf.newaxis]], axis=-1)
+    # direction is u in reference [1].
+    # direction follows the spherical uniform distribution and will be stored
+    # in a lower triangular matrix, hence it will have shape:
+    # B + [dimension - 1, dimension - 1]
+    direction = _tril_spherical_uniform(dimension - 1, batch_shape, dtype,
+                                        tril_spherical_uniform_seed)
 
-    chol_result = tf.concat([
-        first_row[..., tf.newaxis, :],
-        second_row[..., tf.newaxis, :]], axis=-2)
+    # raw_correlation is w in reference [1].
+    # shape: B + [dimension - 1, dimension - 1]
+    raw_correlation = distance * direction
 
-    for n in range(2, dimension):
-      # Loop invariant: on entry, result has shape B + [n, n]
-      beta_conc = beta_conc - 0.5
-      # norm is y in reference [1].
-      norm = beta.Beta(
-          concentration1=n/2.,
-          concentration0=beta_conc
-      ).sample(seed=seeds.pop())
-      # distance shape: B + [1] for broadcast
-      distance = tf.sqrt(norm)[..., tf.newaxis]
-      # direction is u in reference [1].
-      # direction shape: B + [n]
-      direction = random_ops.spherical_uniform(
-          shape=concentration_shape,
-          dimension=n,
-          dtype=concentration.dtype,
-          seed=seeds.pop())
-      # raw_correlation is w in reference [1].
-      raw_correlation = distance * direction  # shape: B + [n]
+    # This is the rows in the cholesky of the result,
+    # which differs from the construction in reference [1].
+    # In the reference, the new row `z` = chol_result @ raw_correlation^T
+    # = C @ raw_correlation^T (where as short hand we use C = chol_result).
+    # We prove that the below equation is the right row to add to the
+    # cholesky, by showing equality with reference [1].
+    # Let S be the sample constructed so far, and let `z` be as in
+    # reference [1]. Then at this iteration, the new sample S' will be
+    # [[S z^T]
+    #  [z 1]]
+    # In our case we have the cholesky decomposition factor C, so
+    # we want our new row x (same size as z) to satisfy:
+    #  [[S z^T]  [[C 0]    [[C^T  x^T]         [[CC^T  Cx^T]
+    #   [z 1]] =  [x k]]    [0     k]]  =       [xC^t   xx^T + k**2]]
+    # Since C @ raw_correlation^T = z = C @ x^T, and C is invertible,
+    # we have that x = raw_correlation. Also 1 = xx^T + k**2, so k
+    # = sqrt(1 - xx^T) = sqrt(1 - |raw_correlation|**2) = sqrt(1 -
+    # distance**2).
+    paddings_prepend = [[0, 0]] * len(batch_shape)
+    diag = tf.pad(
+        tf.sqrt(1. - norm), paddings_prepend + [[1, 0]], constant_values=1.)
+    chol_result = tf.pad(
+        raw_correlation,
+        paddings_prepend + [[1, 0], [0, 1]],
+        constant_values=0.)
+    chol_result = tf.linalg.set_diag(chol_result, diag)
 
-      # This is the next row in the cholesky of the result,
-      # which differs from the construction in reference [1].
-      # In the reference, the new row `z` = chol_result @ raw_correlation^T
-      # = C @ raw_correlation^T (where as short hand we use C = chol_result).
-      # We prove that the below equation is the right row to add to the
-      # cholesky, by showing equality with reference [1].
-      # Let S be the sample constructed so far, and let `z` be as in
-      # reference [1]. Then at this iteration, the new sample S' will be
-      # [[S z^T]
-      #  [z 1]]
-      # In our case we have the cholesky decomposition factor C, so
-      # we want our new row x (same size as z) to satisfy:
-      #  [[S z^T]  [[C 0]    [[C^T  x^T]         [[CC^T  Cx^T]
-      #   [z 1]] =  [x k]]    [0     k]]  =       [xC^t   xx^T + k**2]]
-      # Since C @ raw_correlation^T = z = C @ x^T, and C is invertible,
-      # we have that x = raw_correlation. Also 1 = xx^T + k**2, so k
-      # = sqrt(1 - xx^T) = sqrt(1 - |raw_correlation|**2) = sqrt(1 -
-      # distance**2).
-      new_row = tf.concat(
-          [raw_correlation, tf.sqrt(1. - norm[..., tf.newaxis])], axis=-1)
-
-      # Finally add this new row, by growing the cholesky of the result.
-      chol_result = tf.concat([
-          chol_result,
-          tf.zeros_like(chol_result[..., 0][..., tf.newaxis])], axis=-1)
-
-      chol_result = tf.concat(
-          [chol_result, new_row[..., tf.newaxis, :]], axis=-2)
-
-    assert not seeds, 'Did not use all seeds: ' + len(seeds)
     if cholesky_space:
       return chol_result
 
@@ -476,17 +508,28 @@ class LKJ(distribution.AutoCompositeTensorDistribution):
     """
     # The formula is from D. Lewandowski et al [1], p. 1999, from the
     # proof that eqs 16 and 17 are equivalent.
+    # Instead of using a for loop for k from 1 to (dimension - 1), we will
+    # vectorize the computation by performing operations on the vector
+    # `dimension_range = np.arange(1, dimension)`.
     with tf.name_scope(name or 'log_normalization_lkj'):
       concentration = (
           tf.convert_to_tensor(self.concentration
                                if concentration is None else concentration))
       logpi = float(np.log(np.pi))
-      ans = tf.zeros_like(concentration)
-      for k in range(1, self.dimension):
-        ans = ans + logpi * (k / 2.)
-        effective_concentration = concentration + (self.dimension - 1 - k) / 2.
-        ans = ans + tfp_math.log_gamma_difference(
-            k / 2., effective_concentration)
+      dimension_range = np.arange(
+          1.,
+          self.dimension,
+          dtype=dtype_util.as_numpy_dtype(concentration.dtype))
+      effective_concentration = (
+          concentration[..., tf.newaxis] +
+          (self.dimension - 1 - dimension_range) / 2.)
+      ans = tf.reduce_sum(
+          tfp_math.log_gamma_difference(dimension_range / 2.,
+                                        effective_concentration),
+          axis=-1)
+      # Then we add to `ans` the sum of `logpi / 2 * k` for `k` run from 1 to
+      # `dimension - 1`.
+      ans = ans + logpi * (self.dimension * (self.dimension - 1) / 4.)
       return ans
 
   def _mean(self):

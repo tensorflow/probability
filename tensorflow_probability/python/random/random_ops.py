@@ -118,12 +118,11 @@ def spherical_uniform(
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
       Default value: `None` (i.e., no seed).
     name: Python `str` name prefixed to Ops created by this function.
-      Default value: `None` (i.e., 'random_rayleigh').
+      Default value: `None` (i.e., 'random_spherical_uniform').
 
   Returns:
     spherical_uniform: `Tensor` with specified `shape` and `dtype` consisting
-      of positive real values drawn from a Rayleigh distribution with specified
-      `scale`.
+      of real values drawn from a spherical uniform distribution.
   """
   with tf.name_scope(name or 'spherical_uniform'):
     seed = samplers.sanitize_seed(seed)
@@ -177,4 +176,3 @@ def spherical_uniform(
             tf.math.equal(dimension, 2),
             twod_samples,
             nd_samples))
-

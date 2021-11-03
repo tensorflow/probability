@@ -1241,6 +1241,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:linalg",
         "//tensorflow_probability/python/math:numeric",
         "//tensorflow_probability/python/math:special",
         "//tensorflow_probability/python/util:seed_stream",
@@ -3232,6 +3233,7 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/distributions/internal:statistical_testing",
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

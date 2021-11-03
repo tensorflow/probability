@@ -23,6 +23,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
 
 
@@ -434,6 +435,46 @@ class LKJTestGraphOnly(test_util.TestCase):
       self.evaluate(
           testee_lkj.log_prob(
               tf1.placeholder_with_default(tf.eye(4), shape=None)))
+
+
+@test_util.test_all_tf_execution_regimes
+@parameterized.named_parameters(('_float32', np.float32),
+                                ('_float64', np.float64))
+class TrilSphericalUniformTest(test_util.TestCase):
+
+  def verify_expectations(self, dimension, dtype):
+    num_samples = int(1e6)
+    # pylint: disable=protected-access
+    x = tfd.lkj._tril_spherical_uniform(
+        dimension=dimension,
+        batch_shape=[num_samples],
+        dtype=dtype,
+        seed=test_util.test_seed())
+    # pylint: enable=protected-access
+    self.assertEqual(dtype, dtype_util.as_numpy_dtype(x.dtype))
+    final_shape = [num_samples, dimension, dimension]
+    self.assertAllEqual(final_shape, x.shape)
+    sample_mean = tf.reduce_mean(x, axis=0)
+    sample_var = tf.reduce_mean(
+        tf.math.squared_difference(x, sample_mean), axis=0)
+    sample_mean, sample_var = self.evaluate([sample_mean, sample_var])
+    self.assertAllClose(
+        np.zeros_like(sample_mean), sample_mean, atol=3e-3, rtol=1e-3)
+    expected_var = np.tril(np.ones([dimension, dimension], dtype=dtype))
+    expected_var = expected_var / np.arange(1, dimension + 1)[..., None]
+    self.assertAllClose(expected_var, sample_var, atol=2e-3, rtol=1e-2)
+
+  def test_expectations_1d(self, dtype):
+    self.verify_expectations(1, dtype)
+
+  def test_expectations_2d(self, dtype):
+    self.verify_expectations(2, dtype)
+
+  def test_expectations_3d(self, dtype):
+    self.verify_expectations(3, dtype)
+
+  def test_expectations_5d(self, dtype):
+    self.verify_expectations(5, dtype)
 
 
 if __name__ == '__main__':
