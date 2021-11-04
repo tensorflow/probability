@@ -310,7 +310,8 @@ class WeightNormTest(test_util.TestCase):
         self.conv_random_input, self.num_conv_filters, transpose=transpose)
 
     self.assertAllClose(true_init_g, self.evaluate(norm_layer.g))
-    self.assertAllClose(true_init_bias, self.evaluate(norm_layer.layer.bias))
+    self.assertAllClose(
+        true_init_bias, self.evaluate(norm_layer.layer.bias), rtol=5e-6)
 
   def testCheckpoint(self):
     model = self._define_model('sequential', self.data_dim, self.num_hidden)
