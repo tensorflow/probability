@@ -216,6 +216,10 @@ class ExponentiallyModifiedGaussian(
       # We don't bother checking the shapes in the dynamic case because
       # all member functions access both arguments anyway.
 
+    if not self.validate_args:
+      assert not assertions  # Should never happen.
+      return []
+
     if is_init != tensor_util.is_ref(self.scale):
       assertions.append(assert_util.assert_positive(
           self.scale, message='Argument `scale` must be positive.'))
