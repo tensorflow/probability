@@ -354,7 +354,7 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
       constrain_ar_coef_stationary: if `True`, perform inference using a
         parameterization that restricts `autoregressive_coef` to the interval
         `(-1, 1)`, or `(0, 1)` if `force_positive_ar_coef` is also `True`,
-        corresponding to stationary processes. This will implicitly truncates
+        corresponding to stationary processes. This will implicitly truncate
         the support of `autoregressive_coef_prior`.
         Default value: `True`.
       constrain_ar_coef_positive: if `True`, perform inference using a
