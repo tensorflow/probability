@@ -854,7 +854,8 @@ def monte_carlo_variational_loss(target_log_prob_fn,
       tfd.FULLY_REPARAMETERIZED`. When `True` uses the standard Monte-Carlo
       average. When `False` uses the score-gradient trick. (See above for
       details.)  When `False`, consider using `csiszar_vimco`.
-    seed: Python `int` seed for `surrogate_posterior.sample`.
+    seed: PRNG seed for `surrogate_posterior.sample`; see
+      `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
 
   Returns:
@@ -1079,7 +1080,7 @@ def csiszar_vimco(f,
       f-Divergence expectation.
     num_batch_draws: Integer scalar number of draws used to approximate the
       f-Divergence expectation.
-    seed: Python `int` seed for `q.sample`.
+    seed: PRNG seed for `q.sample`; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
 
   Returns:

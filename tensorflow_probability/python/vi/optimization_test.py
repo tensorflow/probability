@@ -80,12 +80,14 @@ class OptimizationTests(test_util.TestCase):
     self.assertAllClose(final_q_scale_, z_posterior_stddev, atol=0.1)
 
   def test_importance_sampling_example(self):
+    init_seed, opt_seed, eval_seed = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'), n=3)
 
     def log_prob(z, x):
       return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
     conditioned_log_prob = lambda z: log_prob(z, x=5.)
 
-    q_z = tfp.experimental.util.make_trainable(tfd.Normal)
+    q_z = tfp.experimental.util.make_trainable(tfd.Normal, seed=init_seed)
     # Fit `q` with an importance-weighted variational loss.
     loss_curve = tfp.vi.fit_surrogate_posterior(
         conditioned_log_prob,
@@ -93,13 +95,13 @@ class OptimizationTests(test_util.TestCase):
         importance_sample_size=10,
         optimizer=tf.optimizers.Adam(learning_rate=0.1),
         num_steps=100,
-        seed=test_util.test_seed())
+        seed=opt_seed)
     self.evaluate(tf1.global_variables_initializer())
-    self.evaluate(loss_curve)
+    loss_curve = self.evaluate(loss_curve)
 
     # Estimate posterior statistics with importance sampling.
     zs, q_log_prob = self.evaluate(q_z.experimental_sample_and_log_prob(
-        1000, seed=test_util.test_seed()))
+        1000, seed=eval_seed))
     self_normalized_log_weights = tf.nn.log_softmax(
         conditioned_log_prob(zs) - q_log_prob)
     posterior_mean = tf.reduce_sum(
@@ -111,6 +113,20 @@ class OptimizationTests(test_util.TestCase):
         tf.exp(self_normalized_log_weights) * (zs - posterior_mean)**2,
         axis=0)
     self.assertAllClose(posterior_variance, 0.5, atol=1e-1)
+
+    # Test reproducibility
+    q_z_again = tfp.experimental.util.make_trainable(tfd.Normal, seed=init_seed)
+    # Fit `q` with an importance-weighted variational loss.
+    loss_curve_again = tfp.vi.fit_surrogate_posterior(
+        conditioned_log_prob,
+        surrogate_posterior=q_z_again,
+        importance_sample_size=10,
+        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        num_steps=100,
+        seed=opt_seed)
+    self.evaluate(tf1.global_variables_initializer())
+    loss_curve_again = self.evaluate(loss_curve_again)
+    self.assertAllClose(loss_curve_again, loss_curve)
 
   def test_fit_posterior_with_joint_q(self):
 

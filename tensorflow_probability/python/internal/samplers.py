@@ -84,9 +84,9 @@ def sanitize_seed(seed, salt=None, name=None):
   stateless seed already requires seed uniqueness discipline.
 
   Args:
-    seed: An `int32[2]` Tensor or a Python list of 2 `ints`, which
-      will be treated as stateless seeds; or a Python `int` or `None`,
-      which will be treated as stateful seeds.
+    seed: An `int32[2]` Tensor or a Python list or tuple of 2 `ints`,
+      which will be treated as stateless seeds; or a Python `int` or
+      `None`, which will be treated as stateful seeds.
     salt: An optional Python string.
     name: An optional Python string, name to add to TF ops created by
       this function.

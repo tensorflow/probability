@@ -703,6 +703,25 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
     self.assertAllGreater(iwae_10_loss, iwae_100_loss)
     self.assertAllClose(iwae_100_loss, 0, atol=0.1)
 
+    # Check reproducibility
+    elbo_loss_again = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=target.log_prob,
+        surrogate_posterior=proposal,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(3e4),
+        importance_sample_size=1,
+        seed=seed)
+    self.assertAllClose(elbo_loss_again, elbo_loss)
+
+    iwae_10_loss_again = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn=target.log_prob,
+        surrogate_posterior=proposal,
+        discrepancy_fn=tfp.vi.kl_reverse,
+        sample_size=int(3e4),
+        importance_sample_size=10,
+        seed=seed)
+    self.assertAllClose(iwae_10_loss_again, iwae_10_loss)
+
   def test_score_trick(self):
     d = 5  # Dimension
     sample_size = int(4.5e5)
@@ -959,6 +978,36 @@ class CsiszarVIMCOTest(test_util.TestCase):
     ] = self.evaluate([reverse_kl_sequential, reverse_kl_named])
 
     self.assertAllClose(reverse_kl_sequential_, reverse_kl_named_, atol=0.02)
+
+  def test_vimco_reproducibility(self):
+
+    # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
+    def p_log_prob(z, x):
+      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+
+    # Factored q distribution: equiv to MVNDiag(scale_diag=[1., sqrt(2)])
+    q = tfd.JointDistributionNamed({  # Should pass as **kwargs.
+        'x': tfd.Normal(0., tf.sqrt(2.)),
+        'z': tfd.Normal(0., 1.)
+    })
+
+    seed = test_util.test_seed(sampler_type='stateless')
+
+    reverse_kl = tfp.vi.csiszar_vimco(
+        f=tfp.vi.kl_reverse,
+        p_log_prob=p_log_prob,
+        q=q,
+        num_draws=10,
+        seed=seed)
+
+    reverse_kl_again = tfp.vi.csiszar_vimco(
+        f=tfp.vi.kl_reverse,
+        p_log_prob=p_log_prob,
+        q=q,
+        num_draws=10,
+        seed=seed)
+
+    self.assertAllClose(reverse_kl_again, reverse_kl)
 
 
 if __name__ == '__main__':
