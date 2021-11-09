@@ -29,6 +29,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":gibbs_sampler",
+        ":spike_and_slab",
     ],
 )
 
@@ -76,5 +77,39 @@ py_test(
         "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+py_library(
+    name = "spike_and_slab",
+    srcs = ["spike_and_slab.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
+        "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/experimental/distributions:mvn_precision_factor_linop",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:vectorization_util",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+py_test(
+    name = "spike_and_slab_test",
+    size = "medium",
+    srcs = ["spike_and_slab_test.py"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/sts_gibbs",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
