@@ -282,9 +282,10 @@ class BetaTest(test_util.TestCase):
     sample_values = self.evaluate(samples)
     self.assertEqual(sample_values.shape, (100000, 3, 2, 2))
     self.assertFalse(np.any(sample_values < 0.0))
+    # Pass f64 values to avoid errors in scipy.
     self.assertAllClose(
         sample_values[:, 1, :].mean(axis=0),
-        sp_stats.beta.mean(a, b)[1, :],
+        sp_stats.beta.mean(a.astype(np.float64), b.astype(np.float64))[1, :],
         atol=1e-1)
 
   @parameterized.parameters((np.float32, 5e-3), (np.float64, 1e-4))

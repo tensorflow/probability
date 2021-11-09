@@ -80,8 +80,7 @@ install_common_packages() {
 install_test_only_packages() {
   # The following unofficial dependencies are used only by tests.
   PIP_FLAGS=${1-}
-  # TODO(b/205627112): Unpin scipy version.
-  python -m pip install $PIP_FLAGS hypothesis matplotlib mock mpmath scipy==1.7.1 pandas
+  python -m pip install $PIP_FLAGS hypothesis matplotlib mock mpmath scipy pandas
 }
 
 dump_versions() {

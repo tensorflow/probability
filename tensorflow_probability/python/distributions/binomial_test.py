@@ -282,11 +282,14 @@ class BinomialTest(test_util.TestCase):
           sample_variance,
       ])
       self.assertAllEqual([4], sample_mean.shape)
+      # Pass f64 values to avoid errors in scipy.
       self.assertAllClose(
-          stats.binom.mean(counts, probs), sample_mean_, atol=0., rtol=0.10)
+          stats.binom.mean(counts.astype(np.float64), probs.astype(np.float64)),
+          sample_mean_, atol=0., rtol=0.10)
       self.assertAllEqual([4], sample_variance.shape)
       self.assertAllClose(
-          stats.binom.var(counts, probs), sample_variance_, atol=0., rtol=0.20)
+          stats.binom.var(counts.astype(np.float64), probs.astype(np.float64)),
+          sample_variance_, atol=0., rtol=0.20)
 
   def testSampleExtremeValues(self):
     total_count = tf.constant(17., dtype=tf.float32)
