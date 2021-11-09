@@ -16,15 +16,10 @@
 
 from tensorflow_probability.python.distributions import joint_distribution_coroutine
 from tensorflow_probability.python.distributions import joint_distribution_named
-from tensorflow_probability.python.distributions import joint_distribution_sample_path_mixin
 from tensorflow_probability.python.distributions import joint_distribution_sequential
-from tensorflow_probability.python.distributions import joint_distribution_vmap_mixin
 
 
-# TODO(b/159723894): Reduce complexity by eliminating use of mixins.
 class JointDistributionCoroutineAutoBatched(
-    joint_distribution_sample_path_mixin.JointDistributionSamplePathMixin,
-    joint_distribution_vmap_mixin.JointDistributionVmapMixin,
     joint_distribution_coroutine.JointDistributionCoroutine):
   """Joint distribution parameterized by a distribution-making generator.
 
@@ -291,8 +286,6 @@ class JointDistributionCoroutineAutoBatched(
 
 # TODO(b/159723894): Reduce complexity by eliminating use of mixins.
 class JointDistributionNamedAutoBatched(
-    joint_distribution_sample_path_mixin.JointDistributionSamplePathMixin,
-    joint_distribution_vmap_mixin.JointDistributionVmapMixin,
     joint_distribution_named.JointDistributionNamed):
   """Joint distribution parameterized by named distribution-making functions.
 
@@ -437,10 +430,7 @@ class JointDistributionNamedAutoBatched(
     self._parameters = self._no_dependency(parameters)
 
 
-# TODO(b/159723894): Reduce complexity by eliminating use of mixins.
 class JointDistributionSequentialAutoBatched(
-    joint_distribution_sample_path_mixin.JointDistributionSamplePathMixin,
-    joint_distribution_vmap_mixin.JointDistributionVmapMixin,
     joint_distribution_sequential.JointDistributionSequential):
   """Joint distribution parameterized by distribution-making functions.
 

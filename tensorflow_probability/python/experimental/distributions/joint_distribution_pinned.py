@@ -20,7 +20,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import joint_distribution
-from tensorflow_probability.python.distributions import joint_distribution_vmap_mixin
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import structural_tuple
 from tensorflow_probability.python.internal import tensor_util
@@ -758,7 +757,7 @@ def _to_pins(dist, *args, **kwargs):
 
 
 class _DefaultJointBijectorAutoBatchedWithPins(
-    joint_distribution_vmap_mixin._DefaultJointBijectorAutoBatched):
+    joint_distribution._DefaultJointBijectorAutoBatched):
   """Bijector that auto-batches over both its inputs *and* any pinned values."""
 
   def _vectorize_member_fn(self, member_fn, core_ndims):

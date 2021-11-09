@@ -97,27 +97,33 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
 
   #### Examples
 
+  Consider the following generative model:
+
+  ```
+  e ~ Exponential(rate=[100,120])
+  g ~ Gamma(concentration=e[0], rate=e[1])
+  n ~ Normal(loc=0, scale=2.)
+  m ~ Normal(loc=n, scale=g)
+  for i = 1, ..., 12:
+    x[i] ~ Bernoulli(logits=m)
+  ```
+
+  We can code this as:
+
   ```python
   tfd = tfp.distributions
-
-  # Consider the following generative model:
-  #     e ~ Exponential(rate=[100,120])
-  #     g ~ Gamma(concentration=e[0], rate=e[1])
-  #     n ~ Normal(loc=0, scale=2.)
-  #     m ~ Normal(loc=n, scale=g)
-  #     for i = 1, ..., 12:
-  #       x[i] ~ Bernoulli(logits=m)
-
-  # In TFP, we can write this as:
   joint = tfd.JointDistributionSequential([
-                   tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),  # e
-      lambda    e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),    # g
-                   tfd.Normal(loc=0, scale=2.),                           # n
-      lambda n, g: tfd.Normal(loc=n, scale=g),                            # m
-      lambda    m: tfd.Sample(tfd.Bernoulli(logits=m), 12)                # x
-  ])
-  # (Notice the 1:1 correspondence between "math" and "code".)
+                   tfd.Exponential(rate=[100, 120]),           # e
+      lambda    e: tfd.Gamma(concentration=e[0], rate=e[1]),    # g
+                   tfd.Normal(loc=0, scale=2.),                 # n
+      lambda n, g: tfd.Normal(loc=n, scale=g)                   # m
+      lambda    m: tfd.Sample(tfd.Bernoulli(logits=m), 12)      # x
+  ], batch_ndims=0, use_vectorized_map=True)
+  ```
 
+  Notice the 1:1 correspondence between "math" and "code".
+
+  ```python
   x = joint.sample()
   # ==> A length-5 list of Tensors representing a draw/realization from each
   #     distribution.
@@ -177,22 +183,165 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
   `tfp.distributions`, `JointDistribution.sample` (and subclasses) return a
   structure of  `Tensor`s rather than a `Tensor`.  A structure can be anything
   which is `list`-like, e.g., a `list` or `tuple` of `distribution` makers.
-  Accordingly `joint.batch_shape` returns a `list`-like structure of
-  `TensorShape`s for each of the distributions' batch shapes and
-  `joint.batch_shape_tensor()` returns a `list`-like structure of `Tensor`s for
-  each of the distributions' event shapes. (Same with `event_shape` analogues.)
+  Accordingly `joint.event_shape` returns a `list`-like structure of
+  `TensorShape`s for each of the distributions' event shapes and
+  `joint.event_shape_tensor()` returns a `list`-like structure of `Tensor`s for
+  each of the distributions' event shapes.
+
+
+  #### Vectorized sampling and model evaluation
+
+  When a joint distribution's `sample` method  is called with
+  a `sample_shape` (or the `log_prob` method is called on an input with
+  multiple sample dimensions) the model must be equipped to handle
+  additional batch dimensions. This may be done manually, or automatically
+  by passing `use_vectorized_map=True`. Manual vectorization has historically
+  been the default, but we now recommend that most users enable automatic
+  vectorization unless they are affected by a specific issue; some
+  known issues are listed below.
+
+  When using manually-vectorized joint distributions, each operation in the
+  model must account for the possibility of batch dimensions in Distributions
+  and their samples. By contrast, auto-vectorized models need only describe
+  a *single* sample from the joint distribution; any batch evaluation is
+  automated as required using `tf.vectorized_map` (`vmap` in JAX). In many
+  cases this allows for significant simplications. For example, the following
+  manually-vectorized `tfd.JointDistributionSequential` model:
+
+  ```python
+  model = tfd.JointDistributionSequential([
+      tfd.Normal(0., tf.ones([3])),
+      tfd.Normal(0., 1.),
+      lambda y, x: tfd.Normal(x[..., :2] + y[..., tf.newaxis], 1.)
+    ])
+  ```
+
+  can be written in auto-vectorized form as
+
+  ```python
+  model = tfd.JointDistributionSequential([
+      tfd.Normal(0., tf.ones([3])),
+      tfd.Normal(0., 1.),
+      lambda y, x: tfd.Normal(x[:2] + y, 1.)
+    ],
+    use_vectorized_map=True)
+  ```
+
+  in which we were able to avoid explicitly accounting for batch dimensions
+  when indexing and slicing computed quantities in the third line.
+
+  **Known limitations of automatic vectorization:**
+  - A small fraction of TensorFlow ops are unsupported; models that use an
+    unsupported op will raise an error and must be manually vectorized.
+  - Sampling large batches may be slow under automatic vectorization because
+    TensorFlow's stateless samplers are currently converted using a
+    non-vectorized `while_loop`. This limitation applies only in TensorFlow;
+    vectorized samplers in JAX should be approximately as fast as manually
+    vectorized code.
+  - Calling `sample_distributions` with nontrivial `sample_shape` will raise
+    an error if the model contains any distributions that are not registered as
+    CompositeTensors (TFP's basic distributions are usually fine, but support
+    for wrapper distributions like `tfd.Sample` is a work in progress).
+
+  #### Batch semantics and (log-)densities
+
+  **tl;dr:** pass `batch_ndims=0` unless you have a good reason not to.
+
+  Joint distributions now support 'auto-batching' semantics, in which
+  the distribution's batch shape is derived by broadcasting the leftmost
+  `batch_ndims` dimensions of its components' batch shapes. All remaining
+  dimensions are considered to form a single 'event' of the joint distribution.
+  If `batch_ndims==0`, then the joint distribution has batch shape `[]`, and all
+  component dimensions are treated as event shape. For example, the model
+
+  ```python
+  jd = tfd.JointDistributionSequential([
+      tfd.Normal(0., tf.ones([3])),
+      lambda x: tfd.Normal(x[..., tf.newaxis], tf.ones([3, 2]))
+    ],
+    batch_ndims=0)
+  ```
+
+  creates a joint distribution with batch shape `[]` and event shape
+  `([3], [3, 2])`. The log-density of a sample always has shape
+  `batch_shape`, so this guarantees that
+  `jd.log_prob(jd.sample())` will evaluate to a scalar value. We could
+  alternately construct a joint distribution with batch shape `[3]` and event
+  shape `([], [2])` by setting `batch_ndims=1`, in which case
+  `jd.log_prob(jd.sample())` would evaluate to a value of shape `[3]`.
+
+  Setting `batch_ndims=None` recovers the 'classic' batch semantics (currently
+  still the default for backwards-compatibility reasons), in which the joint
+  distribution's `log_prob` is computed by naively summing log densities from
+  the component distributions. Since these component densities have shapes equal
+  to the batch shapes of the individual components, to avoid broadcasting
+  errors it is usually necessary to construct the components with identical
+  batch shapes. For example, the component distributions in the model above
+  have batch shapes of `[3]` and `[3, 2]` respectively, which would raise an
+  error if summed directly, but can be aligned by wrapping with
+  `tfd.Independent`, as in this model:
+
+  ```python
+  jd = tfd.JointDistributionSequential([
+      tfd.Normal(0., tf.ones([3])),
+      lambda x: tfd.Independent(tfd.Normal(x[..., tf.newaxis], tf.ones([3, 2])),
+                                reinterpreted_batch_ndims=1)
+    ],
+    batch_ndims=None)
+  ```
+
+  Here the components both have batch shape `[3]`, so
+  `jd.log_prob(jd.sample())` returns a value of shape `[3]`, just as in the
+  `batch_ndims=1` case above. In fact, auto-batching semantics are equivalent to
+  implicitly wrapping each component `dist` as `tfd.Independent(dist,
+  reinterpreted_batch_ndim=(dist.batch_shape.ndims - jd.batch_ndims))`; the only
+  vestigial difference is that under auto-batching semantics, the joint
+  distribution has a single batch shape `[3]`, while under the classic semantics
+  the value of `jd.batch_shape` is a *structure* of the component batch shapes
+  `([3], [3])`. Such structured batch shapes will be deprecated in the future,
+  since they are inconsistent with the definition of batch shapes used
+  elsewhere in TFP.
+
+  #### References
+
+  [1] Dan Piponi, Dave Moore, and Joshua V. Dillon. Joint distributions for
+      TensorFlow Probability. _arXiv preprint arXiv:2001.11819__,
+      2020. https://arxiv.org/abs/2001.11819
+
   """
 
-  def __init__(self, model, validate_args=False, name=None):
+  def __init__(self,
+               model,
+               batch_ndims=None,
+               use_vectorized_map=False,
+               validate_args=False,
+               experimental_use_kahan_sum=False,
+               name=None):
     """Construct the `JointDistributionSequential` distribution.
 
     Args:
       model: Python list of either tfd.Distribution instances and/or
         lambda functions which take the `k` previous distributions and returns a
         new tfd.Distribution instance.
+      batch_ndims: `int` `Tensor` number of batch dimensions. The `batch_shape`s
+        of all component distributions must be such that the prefixes of
+        length `batch_ndims` broadcast to a consistent joint batch shape.
+        Default value: `None`.
+      use_vectorized_map: Python `bool`. Whether to use `tf.vectorized_map`
+        to automatically vectorize evaluation of the model. This allows the
+        model specification to focus on drawing a single sample, which is often
+        simpler, but some ops may not be supported.
+        Default value: `False`.
       validate_args: Python `bool`.  Whether to validate input with asserts.
         If `validate_args` is `False`, and the inputs are invalid,
         correct behavior is not guaranteed.
+        Default value: `False`.
+      experimental_use_kahan_sum: Python `bool`. When `True`, we use Kahan
+        summation to aggregate independent underlying log_prob values, which
+        improves against the precision of a naive float32 sum. This can be
+        noticeable in particular for large dimensions in float32. See CPU caveat
+        on `tfp.math.reduce_kahan_sum`. This argument has no effect if
+        `batch_ndims is None`.
         Default value: `False`.
       name: The name for ops managed by the distribution.
         Default value: `None` (i.e., `"JointDistributionSequential"`).
@@ -205,7 +354,14 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       self._model = self._no_dependency(model)
       self._build(model)
 
-      self._single_sample_distributions = {}
+      super(JointDistributionSequential, self).__init__(
+          dtype=None,  # Ignored; we'll override.
+          batch_ndims=batch_ndims,
+          use_vectorized_map=use_vectorized_map,
+          validate_args=validate_args,
+          parameters=parameters,
+          experimental_use_kahan_sum=experimental_use_kahan_sum,
+          name=name)
 
       # If the model consists entirely of prebuilt distributions with no
       # dependencies, cache them directly to avoid a sample call down the road.
@@ -213,13 +369,6 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         self._get_single_sample_distributions(
             candidate_dists=[d() for d in self._dist_fn_wrapped])
 
-      super(JointDistributionSequential, self).__init__(
-          dtype=None,  # Ignored; we'll override.
-          reparameterization_type=None,  # Ignored; we'll override.
-          validate_args=validate_args,
-          allow_nan_stats=False,
-          parameters=parameters,
-          name=name)
       # Check valid structure.
       self._model_unflatten(self._model_flatten(model))
 

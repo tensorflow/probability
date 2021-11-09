@@ -797,6 +797,17 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     self.assertAllEqual(fldj.shape, joint.log_prob(y).shape)
     self.assertAllClose(fldj, -ildj)
 
+    # Passing inputs *without* batch shape should return sane outputs.
+    y = self.evaluate(joint.sample([], seed=test_util.test_seed()))
+    # Strip the sample to represent just a single event.
+    unbatched_y = tf.nest.map_structure(lambda t: t[0, ...], y)
+    self.assertAllEqualNested(tf.nest.map_structure(tf.shape, unbatched_y),
+                              joint.event_shape_tensor())
+    ildj = joint_bijector.inverse_log_det_jacobian(
+        unbatched_y,
+        event_ndims=tf.nest.pack_sequence_as(joint.dtype, [0, 1, 1]))
+    self.assertAllEqual(ildj.shape, joint.log_prob(unbatched_y).shape)
+
   @parameterized.named_parameters(
       {'testcase_name': 'coroutine',
        'jd_class': tfd.JointDistributionCoroutineAutoBatched},

@@ -90,10 +90,8 @@ multi_substrate_py_library(
         ":joint_distribution_auto_batched",
         ":joint_distribution_coroutine",
         ":joint_distribution_named",
-        ":joint_distribution_sample_path_mixin",
         ":joint_distribution_sequential",
         ":joint_distribution_util",
-        ":joint_distribution_vmap_mixin",
         ":kullback_leibler",
         ":kumaraswamy",
         ":lambertw_f",
@@ -1042,6 +1040,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:vectorization_util",
     ],
 )
 
@@ -1051,9 +1050,7 @@ multi_substrate_py_library(
     deps = [
         ":joint_distribution_coroutine",
         ":joint_distribution_named",
-        ":joint_distribution_sample_path_mixin",
         ":joint_distribution_sequential",
-        ":joint_distribution_vmap_mixin",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -1084,18 +1081,6 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
-    name = "joint_distribution_sample_path_mixin",
-    srcs = ["joint_distribution_sample_path_mixin.py"],
-    deps = [
-        ":joint_distribution",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/util:seed_stream",
-    ],
-)
-
-multi_substrate_py_library(
     name = "joint_distribution_sequential",
     srcs = ["joint_distribution_sequential.py"],
     deps = [
@@ -1116,19 +1101,6 @@ multi_substrate_py_library(
         ":joint_distribution_sequential",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "joint_distribution_vmap_mixin",
-    srcs = ["joint_distribution_vmap_mixin.py"],
-    deps = [
-        ":joint_distribution",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:vectorization_util",
-        "//tensorflow_probability/python/util:seed_stream",
     ],
 )
 

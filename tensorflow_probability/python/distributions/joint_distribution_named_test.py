@@ -496,11 +496,9 @@ class JointDistributionNamedTest(test_util.TestCase):
     pgm = dict(logits=tfd.Normal(0., 1.), probs=tfd.Bernoulli(logits=0.5))
     d = tfd.JointDistributionNamed(pgm, validate_args=True)
     d_copy = d.copy()
-    self.assertAllEqual(
-        {'model': pgm,
-         'validate_args': True,
-         'name': 'JointDistributionNamed'},
-        d_copy.parameters)
+    self.assertEqual(d_copy.parameters['model'], pgm)
+    self.assertEqual(d_copy.parameters['validate_args'], True)
+    self.assertEqual(d_copy.parameters['name'], 'JointDistributionNamed')
 
   def test_batch_slicing(self):
     # pylint: disable=bad-whitespace

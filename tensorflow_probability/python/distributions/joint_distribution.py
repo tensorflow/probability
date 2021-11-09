@@ -16,6 +16,7 @@
 
 import abc
 import collections
+import functools
 import itertools
 import warnings
 import numpy as np
@@ -23,6 +24,8 @@ import six
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import ldj_ratio as ldj_ratio_lib
@@ -36,6 +39,8 @@ from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.internal import vectorization_util
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
 
@@ -275,24 +280,65 @@ class JointDistribution(distribution_lib.Distribution):
   - `_model_unflatten`: takes a sequence and returns a structure matching the
     semantics of the `JointDistribution` subclass.
 
-  Subclasses initialize:
-
-  - `_single_sample_distributions`: an empty dictionary, which will hold a
-      mapping from graph id to a prototypical list of component distributions
-      sampled from the model.
   """
 
   class Root(collections.namedtuple('Root', ['distribution'])):
     """Wrapper for coroutine distributions which lack distribution parents."""
     __slots__ = ()
 
-  # TODO(b/166658748): Once the bug is resolved, we should be able to eliminate
-  #   this workaround that disables sanitize_seed for JD*AB.
-  _stateful_to_stateless = True
+  def __init__(self,
+               dtype,
+               validate_args,
+               parameters,
+               name,
+               use_vectorized_map=False,
+               batch_ndims=None,
+               experimental_use_kahan_sum=False):
+
+    if use_vectorized_map and batch_ndims is None:
+      raise ValueError('Autovectorization with `use_vectorized_map=True` '
+                       'is unsupported when `batch_ndims is None`. Please '
+                       'specify an integer number of batch dimensions.')
+
+    self._use_vectorized_map = use_vectorized_map
+    self._batch_ndims = batch_ndims
+    self._experimental_use_kahan_sum = experimental_use_kahan_sum
+    self._single_sample_distributions = {}
+    super(JointDistribution, self).__init__(
+        dtype=dtype,
+        reparameterization_type=None,  # Ignored; we'll override.
+        allow_nan_stats=False,
+        validate_args=validate_args,
+        parameters=parameters,
+        name=name)
 
   @property
   def _require_root(self):
     return True
+
+  @property
+  def _stateful_to_stateless(self):
+    # TODO(b/166658748): Once the bug is resolved, we should be able to
+    #   eliminate this workaround that disables sanitize_seed for autovectorized
+    #   JDs.
+    if self.use_vectorized_map:
+      return JAX_MODE
+    return True
+
+  @property
+  def _single_sample_ndims(self):
+    """Computes the rank of values produced by executing the base model."""
+    # Attempt to get static ranks without running the model.
+    attrs = self._get_static_distribution_attributes()
+    batch_ndims, event_ndims = tf.nest.map_structure(
+        tensorshape_util.rank, [attrs.batch_shape, attrs.event_shape])
+    if any(nd is None for nd in tf.nest.flatten([batch_ndims, event_ndims])):
+      batch_ndims, event_ndims = tf.nest.map_structure(
+          ps.rank_from_shape,
+          [list(self._map_attr_over_dists('batch_shape_tensor')),
+           list(self._map_attr_over_dists('event_shape_tensor'))])
+    return [tf.nest.map_structure(lambda x, b=b: b + x, e)
+            for (b, e) in zip(batch_ndims, event_ndims)]
 
   def _get_single_sample_distributions(self, candidate_dists=None):
     """Returns a list of dists from a single sample of the model."""
@@ -370,23 +416,79 @@ class JointDistribution(distribution_lib.Distribution):
 
   @property
   def use_vectorized_map(self):
-    return False
+    return self._use_vectorized_map
+
+  @property
+  def batch_ndims(self):
+    return self._batch_ndims
+
+  def _batch_shape_parts(self):
+    static_batch_shapes = self._get_static_distribution_attributes().batch_shape
+    if self.batch_ndims is None:
+      return static_batch_shapes
+    static_batch_ndims = tf.get_static_value(self.batch_ndims)
+    if static_batch_ndims is None:
+      return [tf.TensorShape(None)] * len(static_batch_shapes)
+    return [batch_shape[:static_batch_ndims]
+            for batch_shape in static_batch_shapes]
 
   def _batch_shape(self):
-    return self._model_unflatten(
-        self._get_static_distribution_attributes().batch_shape)
+    batch_shape_parts = self._batch_shape_parts()
+    if self.batch_ndims is None:
+      return self._model_unflatten(batch_shape_parts)
+    reduce_fn = ((lambda a, b: a.merge_with(b)) if self.validate_args
+                 else tf.broadcast_static_shape)  # Allows broadcasting.
+    return functools.reduce(reduce_fn, batch_shape_parts)
+
+  def _batch_shape_tensor_parts(self):
+    batch_shapes = self._map_attr_over_dists('batch_shape_tensor')
+    if self.batch_ndims is None:
+      return batch_shapes
+    return [s[:self.batch_ndims] for s in batch_shapes]
 
   def _batch_shape_tensor(self):
-    return self._model_unflatten(
-        self._map_attr_over_dists('batch_shape_tensor'))
+    batch_shape_tensor_parts = self._batch_shape_tensor_parts()
+    if self.batch_ndims is None:
+      return self._model_unflatten(batch_shape_tensor_parts)
+    return tf.convert_to_tensor(functools.reduce(
+        ps.broadcast_shape, batch_shape_tensor_parts))
+
+  def _compute_event_shape(self):
+    part_attrs = self._get_static_distribution_attributes()
+    flat_event_shape = part_attrs.event_shape
+    if self.batch_ndims is not None:
+      static_batch_ndims = tf.get_static_value(self.batch_ndims)
+      if static_batch_ndims is None:
+        flat_event_shape = [tf.TensorShape(None)] * len(part_attrs.dtype)
+      else:
+        flat_event_shape = [
+            # Recurse over joint component dists.
+            tf.nest.map_structure(  # pylint: disable=g-complex-comprehension
+                part_batch_shape[static_batch_ndims:].concatenate,
+                part_event_shape)
+            for part_event_shape, part_batch_shape in zip(
+                part_attrs.event_shape, part_attrs.batch_shape)]
+    return self._model_unflatten(flat_event_shape)
 
   def _event_shape(self):
-    return self._model_unflatten(
-        self._get_static_distribution_attributes().event_shape)
+    if not hasattr(self, '_cached_event_shape'):
+      self._cached_event_shape = self._no_dependency(
+          self._compute_event_shape())
+    return self._cached_event_shape
 
   def _event_shape_tensor(self):
-    return self._model_unflatten(
-        self._map_attr_over_dists('event_shape_tensor'))
+    ds = self._get_single_sample_distributions()
+    component_event_shapes = []
+    for d in ds:
+      batch_shape_treated_as_event = (
+          [] if self.batch_ndims is None
+          else d.batch_shape_tensor()[self.batch_ndims:])
+      component_event_shapes.append(
+          tf.nest.map_structure(
+              lambda e, b=batch_shape_treated_as_event: (  # pylint: disable=g-long-lambda
+                  ps.concat([b, e], axis=0)),
+              d.event_shape_tensor()))
+    return self._model_unflatten(component_event_shapes)
 
   def sample_distributions(self, sample_shape=(), seed=None, value=None,
                            name='sample_distributions', **kwargs):
@@ -469,9 +571,13 @@ class JointDistribution(distribution_lib.Distribution):
         each `distribution_fn` evaluated at each corresponding `value`.
     """
     with self._name_and_control_scope(name):
-      xs = self._map_measure_over_dists('log_prob', value)
+      sum_fn = tf.reduce_sum
+      if self._experimental_use_kahan_sum:
+        sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
       return self._model_unflatten(
-          maybe_check_wont_broadcast(xs, self.validate_args))
+          self._reduce_measure_over_dists(
+              self._map_measure_over_dists('log_prob', value),
+              sum_fn))
 
   def prob_parts(self, value, name='prob_parts'):
     """Probability density/mass function.
@@ -487,9 +593,10 @@ class JointDistribution(distribution_lib.Distribution):
         each `distribution_fn` evaluated at each corresponding `value`.
     """
     with self._name_and_control_scope(name):
-      xs = self._map_measure_over_dists('prob', value)
       return self._model_unflatten(
-          maybe_check_wont_broadcast(xs, self.validate_args))
+          self._reduce_measure_over_dists(
+              self._map_measure_over_dists('prob', value),
+              tf.reduce_prod))
 
   def unnormalized_log_prob_parts(
       self, value, name='unnormalized_log_prob_parts'):
@@ -507,10 +614,14 @@ class JointDistribution(distribution_lib.Distribution):
         the `unnormalized_log_prob` for each `distribution_fn`
         evaluated at each corresponding `value`.
     """
-    with self._name_and_control_scope(name):
-      xs = self._map_measure_over_dists('unnormalized_log_prob', value)
+    with self._name_and_control_scope(name or 'unnormalized_log_prob_parts'):
+      sum_fn = tf.reduce_sum
+      if self._experimental_use_kahan_sum:
+        sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
       return self._model_unflatten(
-          maybe_check_wont_broadcast(xs, self.validate_args))
+          self._reduce_measure_over_dists(
+              self._map_measure_over_dists('unnormalized_log_prob', value),
+              sum_fn))
 
   def unnormalized_prob_parts(self, value, name='unnormalized_prob_parts'):
     """Unnormalized probability density/mass function.
@@ -528,9 +639,10 @@ class JointDistribution(distribution_lib.Distribution):
         each corresponding `value`.
     """
     with self._name_and_control_scope(name):
-      xs = self._map_measure_over_dists('unnormalized_prob', value)
       return self._model_unflatten(
-          maybe_check_wont_broadcast(xs, self.validate_args))
+          self._reduce_measure_over_dists(
+              self._map_measure_over_dists('unnormalized_prob', value),
+              tf.reduce_prod))
 
   def is_scalar_event(self, name='is_scalar_event'):
     """Indicates that `event_shape == []`.
@@ -558,16 +670,18 @@ class JointDistribution(distribution_lib.Distribution):
       is_scalar_batch: `bool` scalar `Tensor` for each distribution in `model`.
     """
     with self._name_and_control_scope(name):
-      return self._model_unflatten(
-          self._map_attr_over_dists('is_scalar_batch'))
+      if self.batch_ndims is None:
+        return self._model_unflatten(
+            self._map_attr_over_dists('is_scalar_batch'))
+      return self._is_scalar_helper(self.batch_shape, self.batch_shape_tensor())
 
   def _log_prob(self, value):
-    xs = self._map_measure_over_dists('log_prob', value)
-    return sum(maybe_check_wont_broadcast(xs, self.validate_args))
+    return self._reduce_log_probs_over_dists(
+        self._map_measure_over_dists('log_prob', value))
 
   def _unnormalized_log_prob(self, value):
-    xs = self._map_measure_over_dists('unnormalized_log_prob', value)
-    return sum(maybe_check_wont_broadcast(xs, self.validate_args))
+    return self._reduce_log_probs_over_dists(
+        self._map_measure_over_dists('unnormalized_log_prob', value))
 
   @distribution_util.AppendDocstring(kwargs_dict={
       'value': ('`Tensor`s structured like `type(model)` used to parameterize '
@@ -618,7 +732,7 @@ class JointDistribution(distribution_lib.Distribution):
                                       **kwargs),
             sample_and_trace_fn=trace_values_and_log_probs))
     return (self._model_unflatten(xs),
-            sum(maybe_check_wont_broadcast(lps, self.validate_args)))
+            self._reduce_log_probs_over_dists(lps))
 
   def _map_measure_over_dists(self, attr, value):
     if any(x is None for x in tf.nest.flatten(value)):
@@ -635,6 +749,41 @@ class JointDistribution(distribution_lib.Distribution):
         sample_and_trace_fn=(
             lambda dist, value, **_: ValueWithTrace(value=value,  # pylint: disable=g-long-lambda
                                                     traced=attr(dist, value))))
+
+  def _reduce_log_probs_over_dists(self, lps):
+    """Sum computed log probs across joint distribution parts."""
+    if self._experimental_use_kahan_sum:
+      reduced_lps = self._reduce_measure_over_dists(
+          lps, reduce_fn=tfp_math.reduce_kahan_sum)
+      broadcasting_checks = maybe_check_wont_broadcast(
+          [v.total for v in reduced_lps], self.validate_args)
+      with tf.control_dependencies(broadcasting_checks):
+        return sum(reduced_lps).total
+    else:
+      return sum(maybe_check_wont_broadcast(
+          self._reduce_measure_over_dists(lps, reduce_fn=tf.reduce_sum),
+          self.validate_args))
+
+  def _reduce_measure_over_dists(self, xs, reduce_fn):
+    if self.batch_ndims is None:
+      return xs
+    num_trailing_batch_dims_treated_as_event = [
+        ps.rank_from_shape(d.batch_shape_tensor()) - self.batch_ndims
+        for d in self._get_single_sample_distributions()]
+
+    with tf.control_dependencies(self._maybe_check_batch_shape()):
+      return [reduce_fn(unreduced_x, axis=_get_reduction_axes(unreduced_x, nd))
+              for (unreduced_x, nd) in zip(
+                  xs, num_trailing_batch_dims_treated_as_event)]
+
+  def _maybe_check_batch_shape(self):
+    assertions = []
+    if self.validate_args:
+      parts = self._batch_shape_tensor_parts()
+      for s in parts[1:]:
+        assertions.append(assert_util.assert_equal(
+            parts[0], s, message='Component batch shapes are inconsistent.'))
+    return assertions
 
   def _map_attr_over_dists(self, attr, dists=None):
     dists = (self._get_single_sample_distributions()
@@ -681,11 +830,59 @@ class JointDistribution(distribution_lib.Distribution):
                           seed=None,
                           value=None,
                           sample_and_trace_fn=trace_distributions_and_values):
-    return self._execute_model(
-        sample_shape,
-        seed=seed,
-        value=value if value is None else self._model_flatten(value),
-        sample_and_trace_fn=sample_and_trace_fn)
+    """Wraps the base `_call_execute_model` with vectorized_map."""
+    flat_value = None if value is None else self._model_flatten(value)
+
+    use_vectorized_map = False
+    if self.use_vectorized_map:
+      # Check for batch/sample dimensions so as to only incur vmap overhead if
+      # it might actually be needed.
+      value_might_have_sample_dims = (
+          flat_value is not None and _might_have_excess_ndims(
+              # Double-flatten in case any components have structured events.
+              flat_value=nest.flatten_up_to(self._single_sample_ndims,
+                                            flat_value,
+                                            check_types=False),
+              flat_core_ndims=tf.nest.flatten(self._single_sample_ndims)))
+      sample_shape_may_be_nontrivial = (
+          distribution_util.shape_may_be_nontrivial(sample_shape))
+      use_vectorized_map = (sample_shape_may_be_nontrivial or
+                            value_might_have_sample_dims)
+
+    if not use_vectorized_map:
+      return self._execute_model(
+          sample_shape=sample_shape, seed=seed, value=flat_value,
+          sample_and_trace_fn=sample_and_trace_fn)
+
+    # Set up for autovectorized sampling. To support the `value` arg, we need to
+    # first understand which dims are from the model itself, then wrap
+    # `_call_execute_model` to batch over all remaining dims.
+    flat_value_core_ndims = None
+    if value is not None:
+      flat_value_core_ndims = tf.nest.map_structure(
+          lambda v, nd: None if v is None else nd,
+          flat_value, self._single_sample_ndims,
+          check_types=False)
+
+    vectorized_execute_model_helper = vectorization_util.make_rank_polymorphic(
+        lambda fv, seed: (  # pylint: disable=g-long-lambda
+            self._execute_model(
+                sample_shape=(),
+                seed=seed,
+                value=fv,
+                sample_and_trace_fn=sample_and_trace_fn)),
+        core_ndims=[flat_value_core_ndims, None])
+    # Redefine the polymorphic fn to hack around `make_rank_polymorphic`
+    # not currently supporting keyword args. This is needed because the
+    # `iid_sample` wrapper below expects to pass through a `seed` kwarg.
+    vectorized_execute_model = (
+        lambda fv, seed: vectorized_execute_model_helper(fv, seed))  # pylint: disable=unnecessary-lambda
+
+    if sample_shape_may_be_nontrivial:
+      vectorized_execute_model = vectorization_util.iid_sample(
+          vectorized_execute_model, sample_shape)
+
+    return vectorized_execute_model(flat_value, seed=seed)
 
   # Override the base method to capture *args and **kwargs, so we can
   # implement more flexible custom calling semantics.
@@ -914,7 +1111,11 @@ class JointDistribution(distribution_lib.Distribution):
 
   def _default_event_space_bijector(self, *args, **kwargs):
     if bool(args) or bool(kwargs):
-      return _DefaultJointBijector(self.experimental_pin(*args, **kwargs))
+      return self.experimental_pin(
+          *args, **kwargs).experimental_default_event_space_bijector()
+
+    if self.use_vectorized_map:
+      return _DefaultJointBijectorAutoBatched(self)
     return _DefaultJointBijector(self)
 
   def experimental_pin(self, *args, **kwargs):  # pylint: disable=g-doc-args
@@ -1077,6 +1278,22 @@ def _resolve_value_from_args(args,
   return value, unmatched_kwargs
 
 
+def _get_reduction_axes(x, nd):
+  """Enumerates the final `nd` axis indices of `x`."""
+  x_rank = ps.rank(x)
+  return ps.range(x_rank - 1, x_rank - nd - 1, -1)
+
+
+def _might_have_excess_ndims(flat_value, flat_core_ndims):
+  for v, nd in zip(flat_value, flat_core_ndims):
+    static_excess_ndims = (
+        0 if v is None else
+        tf.get_static_value(ps.convert_to_shape_tensor(ps.rank(v) - nd)))
+    if static_excess_ndims is None or static_excess_ndims > 0:
+      return True
+  return False
+
+
 def maybe_check_wont_broadcast(flat_xs, validate_args):
   """Verifies that `parts` don't broadcast."""
   flat_xs = tuple(flat_xs)  # So we can receive generators.
@@ -1183,6 +1400,84 @@ class _DefaultJointBijector(composition.Composition):
   def _inverse_log_det_jacobian(self, y, event_ndims, **kwargs):
     return super(_DefaultJointBijector, self)._inverse_log_det_jacobian(
         y, event_ndims, _jd_conditioning=y, **kwargs)
+
+
+class _DefaultJointBijectorAutoBatched(bijector_lib.Bijector):
+  """Automatically vectorized support bijector for autobatched JDs."""
+
+  def __init__(self, jd, **kwargs):
+    parameters = dict(locals())
+    self._jd = jd
+    self._bijector_kwargs = kwargs
+    self._joint_bijector = _DefaultJointBijector(
+        jd=self._jd, **self._bijector_kwargs)
+    super(_DefaultJointBijectorAutoBatched, self).__init__(
+        forward_min_event_ndims=self._joint_bijector.forward_min_event_ndims,
+        inverse_min_event_ndims=self._joint_bijector.inverse_min_event_ndims,
+        validate_args=self._joint_bijector.validate_args,
+        parameters=parameters,
+        name=self._joint_bijector.name)
+    # Any batch dimensions of the JD must be included in the core
+    # 'event' processed by autobatched bijector methods. This is because
+    # `vectorized_map` has no visibility into the internal batch vs event
+    # semantics of the methods being vectorized. More precisely, if we
+    # didn't do this, then:
+    #  1. Calling `self.inverse_log_det_jacobian(y)` with a `y` of shape
+    #     `jd.event_shape` would in general return a result of shape
+    #     `jd.batch_shape` (since each batch member can define a different
+    #     transformation).
+    #  2. By the semantics of `vectorized_map`, calling
+    #     `self.inverse_log_det_jacobian(y)` with an `y` of shape
+    #     `concat([jd.batch_shape, jd.event_shape])` would therefore return
+    #     a result of shape `concat([jd.batch_shape, jd.batch_shape])`, in
+    #     which the batch shape appears *twice*.
+    #  3. This breaks the TFP shape contract and is bad.
+    # We avoid this by specifying that `y` has core ndims matching
+    # `jd.sample().shape.ndims`.
+    jd_batch_ndims = ps.rank_from_shape(jd.batch_shape_tensor(), jd.batch_shape)
+    forward_core_ndims = tf.nest.map_structure(
+        lambda nd: jd_batch_ndims + nd, self.forward_min_event_ndims)
+    inverse_core_ndims = tf.nest.map_structure(
+        lambda nd: jd_batch_ndims + nd, self.inverse_min_event_ndims)
+    # Wrap the non-batched `joint_bijector` to take batched args.
+    # pylint: disable=protected-access
+    self._forward = self._vectorize_member_fn(
+        lambda bij, x: bij._forward(x), core_ndims=[forward_core_ndims])
+    self._inverse = self._vectorize_member_fn(
+        lambda bij, y: bij._inverse(y), core_ndims=[inverse_core_ndims])
+    self._forward_log_det_jacobian = self._vectorize_member_fn(
+        # Need to explicitly broadcast LDJ if `bij` has constant Jacobian.
+        lambda bij, x: tf.broadcast_to(  # pylint: disable=g-long-lambda
+            bij._forward_log_det_jacobian(
+                x, event_ndims=self.forward_min_event_ndims),
+            jd.batch_shape_tensor()),
+        core_ndims=[forward_core_ndims])
+    self._inverse_log_det_jacobian = self._vectorize_member_fn(
+        # Need to explicitly broadcast LDJ if `bij` has constant Jacobian.
+        lambda bij, y: tf.broadcast_to(  # pylint: disable=g-long-lambda
+            bij._inverse_log_det_jacobian(
+                y, event_ndims=self.inverse_min_event_ndims),
+            jd.batch_shape_tensor()),
+        core_ndims=[inverse_core_ndims])
+    for attr in ('_forward_event_shape',
+                 '_forward_event_shape_tensor',
+                 '_inverse_event_shape',
+                 '_inverse_event_shape_tensor',
+                 '_forward_dtype',
+                 '_inverse_dtype',
+                 'forward_event_ndims',
+                 'inverse_event_ndims',):
+      setattr(self, attr, getattr(self._joint_bijector, attr))
+    # pylint: enable=protected-access
+
+  @property
+  def _parts_interact(self):
+    return self._joint_bijector._parts_interact  # pylint: disable=protected-access
+
+  def _vectorize_member_fn(self, member_fn, core_ndims):
+    return vectorization_util.make_rank_polymorphic(
+        lambda x: member_fn(self._joint_bijector, x),
+        core_ndims=core_ndims)
 
 
 @ldj_ratio_lib.RegisterFLDJRatio(_DefaultJointBijector)

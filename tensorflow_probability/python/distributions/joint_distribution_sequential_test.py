@@ -242,11 +242,8 @@ class JointDistributionSequentialTest(test_util.TestCase):
     pgm = [tfd.Normal(0., 1.), tfd.Bernoulli(probs=0.5)]
     d = tfd.JointDistributionSequential(pgm, validate_args=True)
     d_copy = d.copy()
-    self.assertAllEqual(
-        {'model': pgm,
-         'validate_args': True,
-         'name': None},
-        d_copy.parameters)
+    self.assertAllEqual(d_copy.parameters['model'], pgm)
+    self.assertAllEqual(d_copy.parameters['validate_args'], True)
 
   def test_batch_slicing(self):
     d = tfd.JointDistributionSequential(
