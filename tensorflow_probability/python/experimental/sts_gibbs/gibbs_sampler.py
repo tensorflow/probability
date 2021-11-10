@@ -49,9 +49,6 @@ additional code):
   as a function of the sampled latent trajectory. The resampling steps for the
   observation_noise_scale and level_scale parameters would then be replaced with
   a generic loop over all parameters in the model.
-- To support regression with non-Gaussian (e.g., spike-and-slab) priors, one
-  would need to write a custom prior-specific sampler, analogous to the current
-  `resample_weights` function.
 - For specific models it may be possible to implement an efficient prior
   sampling algorithm, analagous to `LocalLevelStateSpaceModel._joint_sample_n`.
   This may be significantly faster than the generic sampler and can speed up
@@ -69,10 +66,13 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import sts
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
+from tensorflow_probability.python.experimental import distributions as tfde
+from tensorflow_probability.python.experimental.sts_gibbs import spike_and_slab
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.sts import components as sts_components
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 # The sampler state stores current values for each model parameter,
@@ -104,12 +104,76 @@ class XLACompilableInverseGamma(tfd.InverseGamma):
         rate=self.scale).sample(n, seed=seed)
 
 
+class DummySpikeAndSlabPrior(tfd.Distribution):
+  """Dummy prior on sparse regression weights."""
+
+  def __init__(self):
+    super().__init__(
+        dtype=tf.float32,
+        reparameterization_type=tfd.FULLY_REPARAMETERIZED,
+        validate_args=False,
+        allow_nan_stats=True,
+        name='dummy_spike_and_slab_prior')
+
+  @property
+  def event_shape(self):
+    # Present as a vector-valued distribution.
+    return tf.TensorShape([1])
+
+  def _parameter_control_dependencies(self, is_init):
+    if not is_init:
+      raise ValueError(
+          'Cannot explicitly operate on a spike-and-slab prior; '
+          'only Gibbs sampling is supported.')
+    return []
+
+  def _default_event_space_bijector(self):
+    return tfb.Identity()
+
+
+class SpikeAndSlabSparseLinearRegression(sts_components.LinearRegression):
+  """Dummy component for sparse regression with a spike-and-slab prior."""
+
+  def __init__(self,
+               design_matrix,
+               weights_prior=None,
+               sparse_weights_nonzero_prob=0.5,
+               name=None):
+    # Extract precision matrix from a multivariate normal prior.
+    weights_prior_precision = None
+    if hasattr(weights_prior, 'precision'):
+      weights_prior_precision = weights_prior.precision()
+    elif weights_prior is not None:
+      inverse_scale = weights_prior.scale.inverse()
+      weights_prior_precision = inverse_scale.matmul(inverse_scale,
+                                                     adjoint=True).to_dense()
+    self._weights_prior_precision = weights_prior_precision
+    self._sparse_weights_nonzero_prob = sparse_weights_nonzero_prob
+    super().__init__(design_matrix=design_matrix,
+                     weights_prior=DummySpikeAndSlabPrior(),
+                     name=name)
+
+
+def _tile_normal_to_mvn_diag(normal_dist, dim):
+  return tfd.MultivariateNormalDiag(
+      loc=normal_dist.loc[..., tf.newaxis],
+      scale_diag=(normal_dist.scale[..., tf.newaxis] *
+                  tf.ones([dim], dtype=normal_dist.scale.dtype)))
+
+
+def _is_multivariate_normal(dist):
+  return (isinstance(dist, tfd.MultivariateNormalLinearOperator) or
+          isinstance(dist,
+                     tfde.MultivariateNormalPrecisionFactorLinearOperator))
+
+
 def build_model_for_gibbs_fitting(observed_time_series,
                                   design_matrix,
                                   weights_prior,
                                   level_variance_prior,
                                   observation_noise_variance_prior,
-                                  slope_variance_prior=None):
+                                  slope_variance_prior=None,
+                                  sparse_weights_nonzero_prob=None):
   """Builds a StructuralTimeSeries model instance that supports Gibbs sampling.
 
   To support Gibbs sampling, a model must have have conjugate priors on all
@@ -117,7 +181,7 @@ def build_model_for_gibbs_fitting(observed_time_series,
   `model.parameters` matches the parameters and ordering specified by the
   the `GibbsSamplerState` namedtuple. Currently, this includes (only) models
   consisting of the sum of a LocalLevel or LocalLinearTrend component with
-  a LinearRegression component.
+  a LinearRegression or SpikeAndSlabSparseLinearRegression component.
 
   Args:
     observed_time_series: optional `float` `Tensor` of shape [..., T, 1]`
@@ -128,9 +192,15 @@ def build_model_for_gibbs_fitting(observed_time_series,
     design_matrix: float `Tensor` of shape `concat([batch_shape,
       [num_timesteps, num_features]])`. This may also optionally be
       an instance of `tf.linalg.LinearOperator`.
-    weights_prior: An instance of `tfd.Normal` representing a scalar prior on
-      each regression weight. May have batch shape broadcastable to the batch
-      shape of `observed_time_series`.
+    weights_prior: Optional distribution instance specifying a normal prior on
+      weights. This may be a multivariate normal instance with event shape
+      `[num_features]`, or a scalar normal distribution with event shape `[]`.
+      In either case, the batch shape must broadcast to the batch shape of
+      `observed_time_series`. If a `sparse_weights_nonzero_prob` is specified,
+      requesting sparse regression, then the `weights_prior` mean is ignored
+      (because nonzero means are not currently implemented by the spike-and-slab
+      sampler). In this case, `weights_prior=None` is also valid, and will use
+      the default prior of the spike-and-slab sampler.
     level_variance_prior: An instance of `tfd.InverseGamma` representing a prior
       on the level variance (`level_scale**2`) of a local level model. May have
       batch shape broadcastable to the batch shape of `observed_time_series`.
@@ -144,11 +214,24 @@ def build_model_for_gibbs_fitting(observed_time_series,
       `observed_time_series`. If specified, a local linear trend model is used
       rather than a local level model.
       Default value: `None`.
+    sparse_weights_nonzero_prob: Optional scalar float `Tensor` prior
+      probability that any given feature has nonzero weight. If specified, this
+      triggers a sparse regression with a spike-and-slab prior, where
+      `sparse_weights_nonzero_prob` is the prior probability of the 'slab'
+      component.
+      Default value: `None`.
   Returns:
     model: A `tfp.sts.StructuralTimeSeries` model instance.
   """
-  if not isinstance(weights_prior, tfd.Normal):
-    raise ValueError('Weights prior must be a univariate normal distribution.')
+  if isinstance(weights_prior, tfd.Normal):
+    # Canonicalize scalar normal priors as diagonal MVNs.
+    if isinstance(design_matrix, tf.linalg.LinearOperator):
+      num_features = design_matrix.shape_tensor()[-1]
+    else:
+      num_features = tf.shape(design_matrix)[-1]
+    weights_prior = _tile_normal_to_mvn_diag(weights_prior, num_features)
+  elif weights_prior is not None and not _is_multivariate_normal(weights_prior):
+    raise ValueError('Weights prior must be a normal distribution or `None`.')
   if not isinstance(level_variance_prior, tfd.InverseGamma):
     raise ValueError(
         'Level variance prior must be an inverse gamma distribution.')
@@ -163,6 +246,7 @@ def build_model_for_gibbs_fitting(observed_time_series,
 
   sqrt = tfb.Invert(tfb.Square())  # Converts variance priors to scale priors.
 
+  # Level or trend component.
   if slope_variance_prior:
     local_variation = sts.LocalLinearTrend(
         observed_time_series=observed_time_series,
@@ -174,9 +258,18 @@ def build_model_for_gibbs_fitting(observed_time_series,
         observed_time_series=observed_time_series,
         level_scale_prior=sqrt(level_variance_prior),
         name='local_level')
-  regression = sts.LinearRegression(design_matrix=design_matrix,
-                                    weights_prior=weights_prior,
-                                    name='regression')
+
+  # Regression component.
+  if sparse_weights_nonzero_prob is not None:
+    regression = SpikeAndSlabSparseLinearRegression(
+        design_matrix=design_matrix,
+        weights_prior=weights_prior,
+        sparse_weights_nonzero_prob=sparse_weights_nonzero_prob,
+        name='sparse_regression')
+  else:
+    regression = sts.LinearRegression(design_matrix=design_matrix,
+                                      weights_prior=weights_prior,
+                                      name='regression')
   model = sts.Sum([local_variation, regression],
                   observed_time_series=observed_time_series,
                   observation_noise_scale_prior=sqrt(
@@ -430,7 +523,7 @@ def one_step_predictive(model,
 
 
 def _resample_weights(design_matrix, target_residuals, observation_noise_scale,
-                      weights_prior_scale, is_missing=None, seed=None):
+                      weights_prior_scale, seed=None):
   """Samples regression weights from their conditional posterior.
 
   This assumes a conjugate normal regression model,
@@ -450,37 +543,24 @@ def _resample_weights(design_matrix, target_residuals, observation_noise_scale,
     target_residuals:  Float `Tensor` of shape `[..., num_observations]`
     observation_noise_scale: Scalar float `Tensor` (with optional batch shape)
       standard deviation of the iid observation noise.
-    weights_prior_scale: Scalar float `Tensor` (with optional batch shape)
-      specifying the standard deviation of the Normal prior on regression
+    weights_prior_scale: Instance of `tf.linalg.LinearOperator` of shape
+      `[num_features, num_features]` (with optional batch shape),
+      specifying the scale of a multivariate Normal prior on regression
       weights.
-    is_missing: Optional `bool` `Tensor` of shape `[..., num_timesteps]`. A
-      `True` value indicates that the observation for that timestep is missing.
     seed: Optional `Python` `int` seed controlling the sampled values.
   Returns:
     weights: Float `Tensor` of shape `[..., num_features]`, sampled from
       the conditional posterior `p(weights | target_residuals,
       observation_noise_scale, weights_prior_scale)`.
   """
-  if is_missing is not None:
-    # Replace design matrix with zeros at unobserved timesteps. This ensures
-    # they will not affect the posterior on weights.
-    design_matrix = tf.where(is_missing[..., tf.newaxis],
-                             tf.zeros_like(design_matrix),
-                             design_matrix)
-  design_shape = prefer_static.shape(design_matrix)
-  num_outputs = design_shape[-2]
-  num_features = design_shape[-1]
-
-  iid_prior_scale = tf.linalg.LinearOperatorScaledIdentity(
-      num_rows=num_features, multiplier=weights_prior_scale)
-  iid_likelihood_scale = tf.linalg.LinearOperatorScaledIdentity(
-      num_rows=num_outputs, multiplier=observation_noise_scale)
   weights_mean, weights_prec = (
       normal_conjugate_posteriors.mvn_conjugate_linear_update(
           linear_transformation=design_matrix,
           observation=target_residuals,
-          prior_scale=iid_prior_scale,
-          likelihood_scale=iid_likelihood_scale))
+          prior_scale=weights_prior_scale,
+          likelihood_scale=tf.linalg.LinearOperatorScaledIdentity(
+              num_rows=prefer_static.shape(design_matrix)[-2],
+              multiplier=observation_noise_scale)))
   sampled_weights = weights_prec.cholesky().solvevec(
       samplers.normal(
           shape=prefer_static.shape(weights_mean),
@@ -621,24 +701,15 @@ def _build_sampler_loop_body(model,
                      'instead saw {}'.format(level_component))
   model_has_slope = isinstance(level_component, sts.LocalLinearTrend)
 
-  # Require that the model has exactly the parameters expected by
-  # `GibbsSamplerState`.
-  if model_has_slope:
-    (observation_noise_param,
-     level_scale_param,
-     slope_scale_param,
-     weights_param) = model.parameters
-  else:
-    (observation_noise_param,
-     level_scale_param,
-     weights_param) = model.parameters
-  # If all non-`slope_scale` parameters are as expected, by process of
-  # elimination `slope_scale` must be correct as well.
-  if (('observation_noise' not in observation_noise_param.name) or
-      ('level_scale' not in level_scale_param.name) or
-      ('weights' not in weights_param.name)):
-    raise ValueError('Model parameters {} do not match the expected sampler '
-                     'state.'.format(model.parameters))
+  regression_component = model.components[1]
+  if not (isinstance(regression_component, sts.LinearRegression) or
+          isinstance(regression_component, SpikeAndSlabSparseLinearRegression)):
+    raise ValueError('Expected the second model component to be an instance of '
+                     '`tfp.sts.LinearRegression` or '
+                     '`SpikeAndSlabSparseLinearRegression`; '
+                     'instead saw {}'.format(regression_component))
+  model_has_spike_slab_regression = isinstance(
+      regression_component, SpikeAndSlabSparseLinearRegression)
 
   if is_missing is not None:  # Ensure series does not contain NaNs.
     observed_time_series = tf.where(is_missing,
@@ -647,12 +718,42 @@ def _build_sampler_loop_body(model,
 
   num_observed_steps = prefer_static.shape(observed_time_series)[-1]
   design_matrix = _get_design_matrix(model).to_dense()[:num_observed_steps]
+  if is_missing is not None:
+    # Replace design matrix with zeros at unobserved timesteps. This ensures
+    # they will not affect the posterior on weights.
+    design_matrix = tf.where(is_missing[..., tf.newaxis],
+                             tf.zeros_like(design_matrix),
+                             design_matrix)
 
   # Untransform scale priors -> variance priors by reaching thru Sqrt bijector.
-  level_scale_variance_prior = level_scale_param.prior.distribution
-  if model_has_slope:
-    slope_scale_variance_prior = slope_scale_param.prior.distribution
+  observation_noise_param = model.parameters[0]
+  if 'observation_noise' not in observation_noise_param.name:
+    raise ValueError('Model parameters {} do not match the expected sampler '
+                     'state.'.format(model.parameters))
   observation_noise_variance_prior = observation_noise_param.prior.distribution
+  if model_has_slope:
+    level_scale_variance_prior, slope_scale_variance_prior = [
+        p.prior.distribution for p in level_component.parameters]
+  else:
+    level_scale_variance_prior = (
+        level_component.parameters[0].prior.distribution)
+
+  if model_has_spike_slab_regression:
+    spike_and_slab_sampler = spike_and_slab.SpikeSlabSampler(
+        design_matrix,
+        weights_prior_precision=regression_component._weights_prior_precision,  # pylint: disable=protected-access
+        nonzero_prior_prob=regression_component._sparse_weights_nonzero_prob,  # pylint: disable=protected-access
+        observation_noise_variance_prior_concentration=(
+            observation_noise_variance_prior.concentration),
+        observation_noise_variance_prior_scale=(
+            observation_noise_variance_prior.scale),
+        observation_noise_variance_upper_bound=(
+            observation_noise_variance_prior.upper_bound
+            if hasattr(observation_noise_variance_prior, 'upper_bound')
+            else None))
+  else:
+    weights_prior_scale = (
+        regression_component.parameters[0].prior.scale)
 
   def sampler_loop_body(previous_sample, _):
     """Runs one sampler iteration, resampling all model variables."""
@@ -674,13 +775,22 @@ def _build_sampler_loop_body(model,
     # the regression weights, because the level can represent arbitrary
     # variation, while the weights are limited to representing variation in the
     # subspace given by the design matrix.
-    weights = _resample_weights(
-        design_matrix=design_matrix,
-        target_residuals=(observed_time_series - previous_sample.level),
-        observation_noise_scale=previous_sample.observation_noise_scale,
-        weights_prior_scale=weights_param.prior.distribution.scale,
-        is_missing=is_missing,
-        seed=weights_seed)
+    if model_has_spike_slab_regression:
+      (observation_noise_variance,
+       weights) = spike_and_slab_sampler.sample_noise_variance_and_weights(
+           initial_nonzeros=tf.not_equal(previous_sample.weights, 0.),
+           targets=observed_time_series - previous_sample.level,
+           seed=weights_seed)
+      observation_noise_scale = tf.sqrt(observation_noise_variance)
+    else:
+      weights = _resample_weights(
+          design_matrix=design_matrix,
+          target_residuals=observed_time_series - previous_sample.level,
+          observation_noise_scale=previous_sample.observation_noise_scale,
+          weights_prior_scale=weights_prior_scale,
+          seed=weights_seed)
+      # Noise scale will be resampled below.
+      observation_noise_scale = previous_sample.observation_noise_scale
 
     regression_residuals = observed_time_series - tf.linalg.matvec(
         design_matrix, weights)
@@ -688,7 +798,7 @@ def _build_sampler_loop_body(model,
         observed_residuals=regression_residuals,
         level_scale=previous_sample.level_scale,
         slope_scale=previous_sample.slope_scale if model_has_slope else None,
-        observation_noise_scale=previous_sample.observation_noise_scale,
+        observation_noise_scale=observation_noise_scale,
         initial_state_prior=level_component.initial_state_prior,
         is_missing=is_missing,
         seed=level_seed)
@@ -711,12 +821,13 @@ def _build_sampler_loop_body(model,
           observed_residuals=slope_residuals,
           is_missing=None,
           seed=slope_scale_seed)
-    # Estimate noise scale from the residuals.
-    observation_noise_scale = _resample_scale(
-        prior=observation_noise_variance_prior,
-        observed_residuals=regression_residuals - level,
-        is_missing=is_missing,
-        seed=observation_noise_scale_seed)
+    if not model_has_spike_slab_regression:
+      # Estimate noise scale from the residuals.
+      observation_noise_scale = _resample_scale(
+          prior=observation_noise_variance_prior,
+          observed_residuals=regression_residuals - level,
+          is_missing=is_missing,
+          seed=observation_noise_scale_seed)
 
     return GibbsSamplerState(
         observation_noise_scale=observation_noise_scale,

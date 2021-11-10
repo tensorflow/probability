@@ -37,6 +37,22 @@ __all__ = [
 ]
 
 
+class InverseGammaWithSampleUpperBound(inverse_gamma.InverseGamma):
+  """Inverse gamma distribution with an upper bound on sampled values."""
+
+  def __init__(self, concentration, scale, upper_bound, **kwargs):
+    self._upper_bound = upper_bound
+    super().__init__(concentration=concentration,
+                     scale=scale,
+                     **kwargs)
+
+  def _sample_n(self, n, seed=None):
+    xs = super()._sample_n(n, seed=seed)
+    if self._upper_bound is not None:
+      xs = tf.minimum(xs, self._upper_bound)
+    return xs
+
+
 class SpikeSlabSamplerState(collections.namedtuple(
     'SpikeSlabSamplerState',
     ['x_transpose_y',
@@ -179,7 +195,8 @@ class SpikeSlabSampler(object):
                nonzero_prior_prob=0.5,
                weights_prior_precision=None,
                observation_noise_variance_prior_concentration=0.005,
-               observation_noise_variance_prior_scale=0.0025):
+               observation_noise_variance_prior_scale=0.0025,
+               observation_noise_variance_upper_bound=None):
     """Initializes priors for the spike and slab sampler.
 
     Args:
@@ -205,6 +222,11 @@ class SpikeSlabSampler(object):
         scale parameter of the inverse gamma prior on the noise
         variance. Corresponds to `ss / 2` in [1].
         Default value: 0.0025.
+      observation_noise_variance_upper_bound: optional scalar float `Tensor`
+        maximum value of sampled observation noise variance. Specifying a bound
+        can help avoid divergence when the sampler is initialized far from the
+        posterior.
+        Default value: `None`.
     """
     with tf.name_scope('spike_slab_sampler'):
       dtype = dtype_util.common_dtype([
@@ -212,7 +234,8 @@ class SpikeSlabSampler(object):
           nonzero_prior_prob,
           weights_prior_precision,
           observation_noise_variance_prior_concentration,
-          observation_noise_variance_prior_scale], dtype_hint=tf.float32)
+          observation_noise_variance_prior_scale,
+          observation_noise_variance_upper_bound], dtype_hint=tf.float32)
       design_matrix = tf.convert_to_tensor(design_matrix, dtype=dtype)
       nonzero_prior_prob = tf.convert_to_tensor(nonzero_prior_prob, dtype=dtype)
       observation_noise_variance_prior_concentration = tf.convert_to_tensor(
@@ -235,7 +258,7 @@ class SpikeSlabSampler(object):
 
       weights_posterior_precision = x_transpose_x + weights_prior_precision
       observation_noise_variance_posterior_concentration = (
-          observation_noise_variance_prior_concentration + num_outputs) / 2
+          observation_noise_variance_prior_concentration + (num_outputs / 2.))
 
       self.num_outputs = num_outputs
       self.num_features = num_features
@@ -250,6 +273,8 @@ class SpikeSlabSampler(object):
           observation_noise_variance_prior_concentration)
       self.observation_noise_variance_prior_scale = (
           observation_noise_variance_prior_scale)
+      self.observation_noise_variance_upper_bound = (
+          observation_noise_variance_upper_bound)
       self.observation_noise_variance_posterior_concentration = (
           observation_noise_variance_posterior_concentration)
 
@@ -330,7 +355,7 @@ class SpikeSlabSampler(object):
           conditional_posterior_precision_chol=conditional_posterior_precision_chol,
           conditional_weights_mean=conditional_weights_mean,
           observation_noise_variance_posterior_scale=(
-              # SS_gamma from eqn (7) of [1].
+              # SS_gamma / 2 from eqn (7) of [1].
               self.observation_noise_variance_prior_scale +  # ss / 2
               (tf.reduce_sum(targets**2, axis=-1) -  # y'y
                tf.reduce_sum(   # beta_gamma' V_gamma^{-1} beta_gamma
@@ -498,10 +523,11 @@ class SpikeSlabSampler(object):
 
     @joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched
     def posterior_jd():
-      observation_noise_variance = yield inverse_gamma.InverseGamma(
+      observation_noise_variance = yield InverseGammaWithSampleUpperBound(
           concentration=(
               self.observation_noise_variance_posterior_concentration),
           scale=sampler_state.observation_noise_variance_posterior_scale,
+          upper_bound=self.observation_noise_variance_upper_bound,
           name='observation_noise_variance')
       yield MultivariateNormalPrecisionFactorLinearOperator(
           loc=sampler_state.conditional_weights_mean,

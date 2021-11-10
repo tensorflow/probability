@@ -127,6 +127,63 @@ class SpikeAndSlabTest(test_util.TestCase):
         nonzero_submatrix(initial_state.conditional_posterior_precision_chol),
         tf.linalg.cholesky(restricted_weights_posterior_prec.to_dense()))
 
+  def test_noise_variance_posterior_matches_expected(self):
+    # Generate a synthetic regression task.
+    num_features = 5
+    num_outputs = 20
+    design_matrix, _, targets = self.evaluate(
+        self._random_regression_task(
+            num_features=num_features, num_outputs=num_outputs, batch_shape=[2],
+            seed=test_util.test_seed()))
+
+    observation_noise_variance_prior_concentration = 0.03
+    observation_noise_variance_prior_scale = 0.015
+    # Posterior on noise variance if all weights are zero.
+    naive_posterior = tfd.InverseGamma(
+        concentration=(observation_noise_variance_prior_concentration +
+                       num_outputs / 2.),
+        scale=(observation_noise_variance_prior_scale + tf.reduce_sum(
+            tf.square(targets), axis=-1) / 2.))
+
+    # Compare to sampler with weights constrained to near-zero.
+    # We can do this by reducing the width of the slab (here),
+    # or by reducing the probability of the slab (below). Both should give
+    # equivalent noise posteriors.
+    tight_slab_sampler = spike_and_slab.SpikeSlabSampler(
+        design_matrix,
+        weights_prior_precision=tf.eye(num_features) * 1e6,
+        observation_noise_variance_prior_concentration=(
+            observation_noise_variance_prior_concentration),
+        observation_noise_variance_prior_scale=(
+            observation_noise_variance_prior_scale))
+    self.assertAllClose(
+        tight_slab_sampler.observation_noise_variance_posterior_concentration,
+        naive_posterior.concentration)
+    self.assertAllClose(
+        tight_slab_sampler._initialize_sampler_state(
+            targets=targets,
+            nonzeros=tf.ones([num_features], dtype=tf.bool)
+            ).observation_noise_variance_posterior_scale,
+        naive_posterior.scale,
+        atol=1e-2)
+
+    downweighted_slab_sampler = spike_and_slab.SpikeSlabSampler(
+        design_matrix,
+        observation_noise_variance_prior_concentration=(
+            observation_noise_variance_prior_concentration),
+        observation_noise_variance_prior_scale=(
+            observation_noise_variance_prior_scale))
+    self.assertAllClose(
+        (downweighted_slab_sampler.
+         observation_noise_variance_posterior_concentration),
+        naive_posterior.concentration)
+    self.assertAllClose(
+        downweighted_slab_sampler._initialize_sampler_state(
+            targets=targets,
+            nonzeros=tf.zeros([num_features], dtype=tf.bool)
+            ).observation_noise_variance_posterior_scale,
+        naive_posterior.scale)
+
   def test_updated_state_matches_initial_computation(self):
     design_matrix, _, targets = self._random_regression_task(
         num_outputs=2, num_features=3, batch_shape=[],
