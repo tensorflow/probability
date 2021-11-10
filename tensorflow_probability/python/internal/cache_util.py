@@ -229,7 +229,7 @@ class BijectorCache(object):
   and both sides are cached before returning a result. The input object
   is cached with a strong reference, while the transformed output is
   held weakly. When there are no more references to the result, both
-  directions of the mapping are cleared simulataneously.
+  directions of the mapping are cleared simultaneously.
 
   The general contracts are:
     1) The inputs used on cache misses will always be retained
