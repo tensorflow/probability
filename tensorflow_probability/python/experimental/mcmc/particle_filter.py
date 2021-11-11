@@ -20,6 +20,7 @@ from tensorflow_probability.python.experimental.mcmc import sequential_monte_car
 from tensorflow_probability.python.experimental.mcmc import weighted_resampling
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import docstring_util
+from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -384,7 +385,7 @@ def particle_filter(observations,
           state, results, seed=one_step_seed)
       return next_seed, next_state, next_results
 
-    final_seed_state_result, traced_results = mcmc_util.trace_scan(
+    final_seed_state_result, traced_results = loop_util.trace_scan(
         loop_fn=seeded_one_step,
         initial_state=(loop_seed,
                        initial_weighted_particles,

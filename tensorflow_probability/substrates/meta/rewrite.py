@@ -101,11 +101,11 @@ INTERNALS = ('assert_util', 'auto_composite_tensor',
              'callable_util', 'custom_gradient', 'distribution_util',
              'distribute_lib', 'distribute_test_lib',
              'dtype_util', 'hypothesis_testlib', 'implementation_selection',
-             'monte_carlo', 'name_util', 'nest_util', 'numerics_testing',
-             'parameter_properties', 'prefer_static', 'samplers', 'slicing',
-             'special_math', 'structural_tuple', 'tensor_util',
-             'tensorshape_util', 'test_combinations', 'test_util', 'unnest',
-             'variadic_reduce', 'vectorization_util')
+             'loop_util', 'monte_carlo', 'name_util', 'nest_util',
+             'numerics_testing', 'parameter_properties', 'prefer_static',
+             'samplers', 'slicing', 'special_math', 'structural_tuple',
+             'tensor_util', 'tensorshape_util', 'test_combinations',
+             'test_util', 'unnest', 'variadic_reduce', 'vectorization_util')
 OPTIMIZERS = ('linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')

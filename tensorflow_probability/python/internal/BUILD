@@ -372,6 +372,29 @@ py_test(
     ],
 )
 
+multi_substrate_py_library(
+    name = "loop_util",
+    srcs = ["loop_util.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "loop_util_test",
+    srcs = ["loop_util_test.py"],
+    deps = [
+        ":auto_composite_tensor",
+        ":loop_util",
+        ":prefer_static",
+        ":tensorshape_util",
+        ":test_util",
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
+    ],
+)
+
 py_library(
     name = "lazy_loader",
     srcs = ["lazy_loader.py"],

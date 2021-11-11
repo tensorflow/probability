@@ -21,6 +21,7 @@ import collections
 import warnings
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -348,14 +349,14 @@ def sample_chain(
           kernel.one_step(*state_and_results, **one_step_kwargs))
 
     def _trace_scan_fn(seed_state_and_results, num_steps):
-      seed, next_state, current_kernel_results = mcmc_util.smart_for_loop(
+      seed, next_state, current_kernel_results = loop_util.smart_for_loop(
           loop_num_iter=num_steps,
           body_fn=_seeded_one_step,
           initial_loop_vars=list(seed_state_and_results),
           parallel_iterations=parallel_iterations)
       return seed, next_state, current_kernel_results
 
-    (_, _, final_kernel_results), (all_states, trace) = mcmc_util.trace_scan(
+    (_, _, final_kernel_results), (all_states, trace) = loop_util.trace_scan(
         loop_fn=_trace_scan_fn,
         initial_state=(seed, current_state, previous_kernel_results),
         elems=tf.one_hot(

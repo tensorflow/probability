@@ -18,9 +18,9 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
+from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 tfd = tfp.distributions
 tfp_dist = tfp.experimental.distribute
@@ -59,7 +59,7 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
       _, pkr = kernel.one_step(draw, pkr, seed=kernel_seed)
       return (pkr, seed)
 
-    (pkr, _), _ = mcmc_util.trace_scan(body,
+    (pkr, _), _ = loop_util.trace_scan(body,
                                        (pkr, samplers.sanitize_seed(self.key)),
                                        draws, lambda _: ())
 
@@ -93,7 +93,7 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
         _, pkr = kernel.one_step(draw, pkr, seed=step_seed)
         return draw, pkr
 
-      (_, pkr), draws = mcmc_util.trace_scan(body,
+      (_, pkr), draws = loop_util.trace_scan(body,
                                              (tf.zeros(dist.event_shape), pkr),
                                              seeds, lambda v: v[0])
 
@@ -131,7 +131,7 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
         _, pkr = kernel.one_step(draw, pkr, seed=step_seed)
         return draw, pkr
 
-      (_, pkr), draws = mcmc_util.trace_scan(body,
+      (_, pkr), draws = loop_util.trace_scan(body,
                                              (tf.zeros(dist.event_shape), pkr),
                                              seeds, lambda v: v[0])
       return draws, pkr

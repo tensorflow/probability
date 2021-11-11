@@ -498,6 +498,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:docstring_util",
+        "//tensorflow_probability/python/internal:loop_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
@@ -650,7 +651,7 @@ py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/mcmc/internal:util",
+        "//tensorflow_probability/python/internal:loop_util",
     ],
 )
 

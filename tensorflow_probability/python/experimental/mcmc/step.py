@@ -18,8 +18,8 @@ import warnings
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import samplers
-from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 
 __all__ = [
@@ -91,7 +91,7 @@ def step_kernel(
       return [passalong_seed] + list(
           kernel.one_step(*state_and_results, **one_step_kwargs))
 
-    _, next_state, final_kernel_results = mcmc_util.smart_for_loop(
+    _, next_state, final_kernel_results = loop_util.smart_for_loop(
         loop_num_iter=num_steps,
         body_fn=_seeded_one_step,
         initial_loop_vars=list((seed, current_state, previous_kernel_results)),
