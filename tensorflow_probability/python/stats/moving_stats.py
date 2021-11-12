@@ -47,10 +47,10 @@ def assign_moving_mean_variance(value, moving_mean, moving_variance=None,
   and also uses the `assign_add` op to allow concurrent lockless updates to the
   supplied variables.
 
-  For additional references see [this John D. Cook blog post][
-  https://www.johndcook.com/blog/standard_deviation/]
-  (whereas we use `1 - decay = 1 / k`) and
-  [Finch (2009; Eq.  143)][2] (whereas we use `1 - decay = alpha`).
+  For additional references see 
+  [John D. Cook's Blog](https://www.johndcook.com/blog/standard_deviation), 
+  whereas we use `1 - decay = 1 / k`, and
+  [Finch (2009; Eq.  143)][2], whereas we use `1 - decay = alpha`.
 
   Since variables that are initialized to a `0` value will be `0` biased,
   providing `zero_debias_count` triggers scaling the `moving_mean` and
