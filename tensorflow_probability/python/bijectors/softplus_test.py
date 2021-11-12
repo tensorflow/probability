@@ -157,6 +157,16 @@ class SoftplusBijectorTest(test_util.TestCase):
       with tf.control_dependencies([hinge_softness.assign(0.)]):
         self.evaluate(b.forward(0.5))
 
+  def testDtype(self):
+    b = tfb.Softplus()
+    self.assertIsNone(b.dtype)
+
+    b = tfb.Softplus(low=1.75)
+    self.assertEqual(tf.float32, b.dtype)
+
+    b = tfb.Softplus(hinge_softness=tf.constant(0.5, dtype=tf.float64))
+    self.assertEqual(tf.float64, b.dtype)
+
   @parameterized.named_parameters(
       ('32bitGraph', np.float32, False),
       ('64bitGraph', np.float64, False),

@@ -114,13 +114,19 @@ class Softplus(bijector.AutoCompositeTensorBijector):
                validate_args=False,
                name='softplus'):
     parameters = dict(locals())
+    dtype = None
+    if hinge_softness is not None or low is not None:
+      dtype = dtype_util.common_dtype([hinge_softness, low],
+                                      dtype_hint=tf.float32)
     with tf.name_scope(name) as name:
       self._hinge_softness = tensor_util.convert_nonref_to_tensor(
-          hinge_softness, name='hinge_softness')
-      self._low = tensor_util.convert_nonref_to_tensor(low, name='low')
+          hinge_softness, dtype=dtype, name='hinge_softness')
+      self._low = tensor_util.convert_nonref_to_tensor(
+          low, dtype=dtype, name='low')
       super(Softplus, self).__init__(
           forward_min_event_ndims=0,
           validate_args=validate_args,
+          dtype=dtype,
           parameters=parameters,
           name=name)
 
