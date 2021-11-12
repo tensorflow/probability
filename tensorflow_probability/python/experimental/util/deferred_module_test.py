@@ -14,8 +14,6 @@
 # ============================================================================
 """Tests for `tfp.util.DeferredModule`."""
 
-from absl.testing import parameterized
-
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import samplers
@@ -26,13 +24,9 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
-def _gamma_from_loc_scale_positional(loc, log_scale):
-  return (loc / tf.exp(log_scale))**2, loc / (tf.exp(log_scale))**2
-
-
-def _gamma_from_loc_scale_named(loc, log_scale):
-  return {'concentration': (loc / tf.exp(log_scale))**2,
-          'rate': loc / (tf.exp(log_scale))**2}
+def _gamma_from_loc_scale(loc, log_scale):
+  return tfd.Gamma(concentration=(loc / tf.exp(log_scale))**2,
+                   rate=loc / (tf.exp(log_scale))**2)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -42,12 +36,12 @@ class DeferredModuleTest(test_util.TestCase):
     log_precision = tf.Variable(0.)
     mean_times_precision = tf.Variable(1.)
 
-    def to_loc_scale(log_precision, mean_times_precision):
+    def normal_from_natural(log_precision, mean_times_precision):
       variance = 1./tf.exp(log_precision)
       mean = mean_times_precision * variance
-      return {'loc': mean, 'scale': tf.sqrt(variance)}
+      return tfd.Normal(loc=mean, scale=tf.sqrt(variance))
     dist = tfp.experimental.util.DeferredModule(
-        tfd.Normal, to_loc_scale, log_precision, mean_times_precision)
+        normal_from_natural, log_precision, mean_times_precision)
     self.assertIn(log_precision, dist.trainable_variables)
     self.assertIn(mean_times_precision, dist.trainable_variables)
 
@@ -65,12 +59,12 @@ class DeferredModuleTest(test_util.TestCase):
     log_precision = tf.Variable(samplers.normal(batch_shape, seed=seed0))
     mean_times_precision = tf.Variable(samplers.normal(batch_shape, seed=seed1))
 
-    def to_loc_scale(log_precision, mean_times_precision):
+    def normal_from_natural(log_precision, mean_times_precision):
       variance = 1./tf.exp(log_precision)
       mean = mean_times_precision * variance
-      return {'loc': mean, 'scale': tf.sqrt(variance)}
+      return tfd.Normal(loc=mean, scale=tf.sqrt(variance))
     dist = tfp.experimental.util.DeferredModule(
-        tfd.Normal, to_loc_scale, log_precision, mean_times_precision)
+        normal_from_natural, log_precision, mean_times_precision)
     self.assertLen(dist.trainable_variables, 2)
 
     sliced = dist[:2]
@@ -88,10 +82,9 @@ class DeferredModuleTest(test_util.TestCase):
     log_rate = tf.Variable(0.)
     log_scale = tf.Variable(-1.0)
     dist = tfp.experimental.util.DeferredModule(
-        tfd.TransformedDistribution,
-        lambda a, b, c: (tfd.Gamma(tf.exp(a),  # pylint: disable=g-long-lambda
-                                   tf.exp(b)),
-                         tfb.Scale(tf.exp(c))),
+        lambda a, b, c: tfd.TransformedDistribution(tfd.Gamma(tf.exp(a),  # pylint: disable=g-long-lambda
+                                                              tf.exp(b)),
+                                                    tfb.Scale(tf.exp(c))),
         log_concentration,
         log_rate,
         log_scale)
@@ -107,7 +100,9 @@ class DeferredModuleTest(test_util.TestCase):
     log_scale = tf.Variable(-1.0)
     self.evaluate(log_scale.initializer)
 
-    bij = tfp.experimental.util.DeferredModule(tfb.Scale, tf.exp, log_scale)
+    bij = tfp.experimental.util.DeferredModule(
+        lambda log_scale: tfb.Scale(tf.exp(log_scale)),
+        log_scale)
     self.assertLen(bij.trainable_variables, 1)
 
     # Calling the deferred bij produces a concretized TransformedDistribution.
@@ -116,8 +111,7 @@ class DeferredModuleTest(test_util.TestCase):
 
     # We can also defer the call itself, if we like.
     deferred_dist = tfp.experimental.util.DeferredModule(
-        bij, tfd.Normal, loc=0., scale=1.)
-    self.assertLen(deferred_dist.trainable_variables, 1)
+        lambda loc, scale: bij(tfd.Normal(loc, scale)), loc=0., scale=1.)
 
     lp = dist.log_prob(17.)
     with tf.GradientTape() as tape:
@@ -126,25 +120,17 @@ class DeferredModuleTest(test_util.TestCase):
     self.assertIsNotNone(g)
     self.assertAllClose(*self.evaluate((lp, lp_deferred)))
 
-  # Check that the args_fn can return either positional or named arguments to
-  # initialize the base class.
-  @parameterized.named_parameters(
-      {'testcase_name': 'positional',
-       'args_fn': _gamma_from_loc_scale_positional},
-      {'testcase_name': 'named',
-       'args_fn': _gamma_from_loc_scale_named})
-  def testCallingConventions(self, args_fn):
+  def testCallingConventions(self):
 
     loc = tf.Variable(3.)
     log_scale = tf.Variable(1.)
     self.evaluate((loc.initializer, log_scale.initializer))
 
-    # Also check that we can *call* the args_fn with positional or named
-    # arguments.
+    # Check that we can call the build_fn with positional or named arguments.
     dist_args = tfp.experimental.util.DeferredModule(
-        tfd.Gamma, args_fn, loc, log_scale)
+        _gamma_from_loc_scale, loc, log_scale)
     dist_kwargs = tfp.experimental.util.DeferredModule(
-        tfd.Gamma, args_fn, loc=loc, log_scale=log_scale)
+        _gamma_from_loc_scale, loc=loc, log_scale=log_scale)
 
     with tf.GradientTape(persistent=True) as tape:
       mean1, log_stddev1 = dist_args.mean(), tf.math.log(dist_args.stddev())

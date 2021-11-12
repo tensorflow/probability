@@ -17,7 +17,6 @@
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.util import special_methods
-from tensorflow_probability.python.internal import nest_util
 
 
 class DeferredModule(tf.Module, special_methods.SpecialMethods):
@@ -63,14 +62,13 @@ class DeferredModule(tf.Module, special_methods.SpecialMethods):
   computation.
 
   ```python
-  def gamma_params_from_mean_and_variance(mean, variance, **kwargs):
+  def gamma_from_mean_and_variance(mean, variance, **kwargs):
     rate = mean / variance
-    return dict(concentration=mean * rate, rate=rate, **kwargs)
+    return tfd.Gamma(concentration=mean * rate, rate=rate, **kwargs)
 
   mean, variance = tf.Variable(3.2), tf.Variable(9.1)
   deferred_dist = tfp.experimental.util.DeferredModule(
-    tfd.Gamma,
-    args_fn=gamma_params_from_mean_and_variance,
+    build_fn=gamma_from_mean_and_variance,
     mean=mean,  # May be passed by position or by name.
     variance=variance)
 
@@ -95,9 +93,11 @@ class DeferredModule(tf.Module, special_methods.SpecialMethods):
   Distribution yields a new, concrete Distribution instance:
 
   ```python
+  def normal_from_log_scale(scaled_loc, log_scale):
+    return tfd.Normal(loc=5 * scaled_loc, scale=tf.exp(log_scale))
+
   dist = tfp.experimental.util.DeferredModule(
-    tfd.Normal,
-    args_fn=lambda scaled_loc, log_scale: (5 * scaled_loc, tf.exp(log_scale)),
+    build_fn=normal_from_log_scale,
     scaled_loc=tf.Variable([1., 2., 3.]),
     log_scale=tf.Variable([1., 1., 1.]))
   dist.batch_shape  # ==> [3]
@@ -109,33 +109,25 @@ class DeferredModule(tf.Module, special_methods.SpecialMethods):
 
   # If needed, we could defer the slice with another layer of wrapping.
   deferred_slice = tfp.experimental.util.DeferredModule(
-    base_class=lambda d: d[:2],
-    args_fn=lambda d: d,
+    build_fn=lambda d: d[:2],
     d=dist)
   len(deferred_slice.trainable_variables)  # ==> 2
   ```
 
   """
 
-  def __init__(self, base_class, args_fn, *args, **kwargs):
+  def __init__(self, build_fn, *args, **kwargs):
     """Defers initialization of an object with transformed arguments.
 
     Args:
-      base_class: Python type or callable such that `base_class(**args_fn(...))`
-        is an instance of `tf.Module`---for example, a TFP Distribution or
-        Bijector.
-      args_fn: Python callable specifying a deferred transformation of the
+      build_fn: Python callable specifying a deferred transformation of the
         provided arguments. This must have signature
-        `base_class_init_args = args_fn(*args, **kwargs)`. The return value
-        `base_class_init_args` may be either a dictionary or an iterable
-        (list/tuple), in which case the class will be initialized as
-        `base_class(**base_class_init_args)` or
-        `base_class(*base_class_init_args)`, respectively.
-      *args: Optional positional arguments to `args_fn`.
-      **kwargs: Optional keyword arguments to `args_fn`.
+        `module = build_fn(*args, **kwargs)`. The return value `module` is an
+        instance of `tf.Module`.
+      *args: Optional positional arguments to `build_fn`.
+      **kwargs: Optional keyword arguments to `build_fn`.
     """
-    self._base_class = base_class
-    self._args_fn = args_fn
+    self._build_fn = build_fn
     self._param_args = args
     self._param_kwargs = kwargs
 
@@ -151,13 +143,10 @@ class DeferredModule(tf.Module, special_methods.SpecialMethods):
     return fn(self._build_module(), *args, **kwargs)
 
   def _build_module(self):
-    return nest_util.call_fn(self._base_class,
-                             self._args_fn(*self._param_args,
-                                           **self._param_kwargs))
+    return self._build_fn(*self._param_args, **self._param_kwargs)
 
   def __getattr__(self, attr, **kwargs):
-    if attr in ('_base_class',
-                '_args_fn',
+    if attr in ('_build_fn',
                 '_param_args',
                 '_param_kwargs',
                 '_module_attrs'):
