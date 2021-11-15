@@ -297,7 +297,8 @@ class SpikeAndSlabTest(test_util.TestCase):
                         tf.reduce_mean(nonzero_weight_samples),
                         atol=0.03)
 
-  def test_deterministic_given_seed(self):
+  @parameterized.named_parameters(('', False), ('_xla', True))
+  def test_deterministic_given_seed(self, use_xla):
     design_matrix, _, targets = self.evaluate(
         self._random_regression_task(
             num_outputs=3, num_features=4, batch_shape=[],
@@ -307,13 +308,16 @@ class SpikeAndSlabTest(test_util.TestCase):
 
     initial_nonzeros = tf.convert_to_tensor([True, False, False, True])
     seed = test_util.test_seed(sampler_type='stateless')
-    variance1, weights1 = self.evaluate(
-        sampler.sample_noise_variance_and_weights(
-            targets, initial_nonzeros, seed=seed))
-    variance2, weights2 = self.evaluate(
-        sampler.sample_noise_variance_and_weights(
-            targets, initial_nonzeros, seed=seed))
+
+    @tf.function(jit_compile=use_xla)
+    def do_sample(seed):
+      return sampler.sample_noise_variance_and_weights(
+          targets, initial_nonzeros, seed=seed)
+    variance1, weights1 = self.evaluate(do_sample(seed))
+    variance2, weights2 = self.evaluate(do_sample(seed))
+    self.assertAllFinite(variance1)
     self.assertAllClose(variance1, variance2)
+    self.assertAllFinite(weights1)
     self.assertAllClose(weights1, weights2)
 
 

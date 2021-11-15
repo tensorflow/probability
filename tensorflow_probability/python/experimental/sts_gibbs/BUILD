@@ -111,5 +111,6 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )

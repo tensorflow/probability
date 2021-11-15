@@ -16,7 +16,6 @@
 
 import collections
 
-import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
@@ -51,6 +50,26 @@ class InverseGammaWithSampleUpperBound(inverse_gamma.InverseGamma):
     if self._upper_bound is not None:
       xs = tf.minimum(xs, self._upper_bound)
     return xs
+
+
+class MVNPrecisionFactorHardZeros(
+    MultivariateNormalPrecisionFactorLinearOperator):
+  """Multivariate normal that forces some sample dimensions to zero.
+
+  This is equivalent to setting `loc[d] = 0.` and `precision_factor[d, d]=`inf`
+  in the zeroed dimensions, but is numerically better behaved.
+  """
+
+  def __init__(self, loc, precision_factor, nonzeros, **kwargs):
+    self._nonzeros = nonzeros
+    super().__init__(loc=loc, precision_factor=precision_factor, **kwargs)
+
+  def _call_sample_n(self, *args, **kwargs):
+    xs = super()._call_sample_n(*args, **kwargs)
+    return tf.where(self._nonzeros, xs, 0.)
+
+  def _log_prob(self, *args, **kwargs):
+    raise NotImplementedError('Log prob is not currently implemented.')
 
 
 class SpikeSlabSamplerState(collections.namedtuple(
@@ -513,14 +532,6 @@ class SpikeSlabSampler(object):
 
   def _get_conditional_posterior(self, sampler_state):
     """Builds the joint posterior for a sparsity pattern (eqn (7) from [1])."""
-    # Impose a hard, infinite-precision constraint on zeroed-out features, in
-    # place of the identity-matrix representation that we used for numerical
-    # convenience during sampling.
-    hard_precision_factor = _select_nonzero_block(
-        sampler_state.conditional_posterior_precision_chol,
-        nonzeros=sampler_state.nonzeros,
-        identity_multiplier=np.inf)
-
     @joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched
     def posterior_jd():
       observation_noise_variance = yield InverseGammaWithSampleUpperBound(
@@ -529,20 +540,21 @@ class SpikeSlabSampler(object):
           scale=sampler_state.observation_noise_variance_posterior_scale,
           upper_bound=self.observation_noise_variance_upper_bound,
           name='observation_noise_variance')
-      yield MultivariateNormalPrecisionFactorLinearOperator(
+      yield MVNPrecisionFactorHardZeros(
           loc=sampler_state.conditional_weights_mean,
           # Note that the posterior precision varies inversely with the
           # noise variance: in worlds with high noise we're also
           # more uncertain about the values of the weights.
           precision_factor=tf.linalg.LinearOperatorLowerTriangular(
-              hard_precision_factor /
+              sampler_state.conditional_posterior_precision_chol /
               observation_noise_variance[..., tf.newaxis, tf.newaxis]),
+          nonzeros=sampler_state.nonzeros,
           name='weights')
 
     return posterior_jd
 
 
-def _select_nonzero_block(matrix, nonzeros, identity_multiplier=1.):
+def _select_nonzero_block(matrix, nonzeros):
   """Replaces the `i`th row & col with the identity if not `nonzeros[i]`.
 
   This function effectively selects the 'slab' rows (corresponding to
@@ -566,7 +578,6 @@ def _select_nonzero_block(matrix, nonzeros, identity_multiplier=1.):
     matrix: (batch of) float Tensor matrix(s) of shape
       `[num_features, num_features]`.
     nonzeros: (batch of) boolean Tensor vectors of shape `[num_features]`.
-    identity_multiplier: optional scalar multiplier for the identity matrix.
   Returns:
     block_matrix: (batch of) float Tensor matrix(s) of the same shape as
       `matrix`, in which `block_matrix[i, j] = matrix[i, j] if
@@ -578,13 +589,10 @@ def _select_nonzero_block(matrix, nonzeros, identity_multiplier=1.):
   masked = tf.where(nonzeros[..., tf.newaxis],
                     tf.where(nonzeros[..., tf.newaxis, :], matrix, 0.),
                     0.)
-  # Restore a value of `identity_multiplier` on the diagonal of the not-selected
-  # rows. This avoids numerical issues by ensuring that the matrix still has
-  # full rank.
+  # Restore a value of 1 on the diagonal of the not-selected rows. This avoids
+  # numerical issues by ensuring that the matrix still has full rank.
   return tf.linalg.set_diag(masked,
-                            tf.where(nonzeros,
-                                     tf.linalg.diag_part(masked),
-                                     identity_multiplier))
+                            tf.where(nonzeros, tf.linalg.diag_part(masked), 1.))
 
 
 def _update_nonzero_block_chol(chol, idx, psd_matrix, new_nonzeros):
