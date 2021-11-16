@@ -904,6 +904,21 @@ class BijectorCachingTest(test_util.TestCase):
     z = instance_cache_bijector.forward(x)
     self.assertIsNot(y, z)
 
+  @parameterized.named_parameters(
+      ('Keras', True),
+      ('NoKeras', False))
+  def testJacobianRespectsCache(self, keras):
+    bijector = InverseOnlyBijector(scale=2.)
+    y = tf.constant(10.)
+    if keras:
+      self.skipTest('TODO(b/206660667)')
+      y = tf.keras.layers.Input(shape=(), dtype=tf.float32, tensor=y)
+    x = bijector.inverse(y)
+    # Forward computation should work here because it should look up
+    # `y` in the cache and call `inverse_log_det_jacobian`.
+    fldj = bijector.forward_log_det_jacobian(x)
+    self.assertAllClose(fldj, np.log(2.))
+
 
 @test_util.test_all_tf_execution_regimes
 class BijectorReduceEventDimsTest(test_util.TestCase):
