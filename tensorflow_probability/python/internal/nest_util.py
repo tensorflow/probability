@@ -296,7 +296,7 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
   Python scalars.
 
   Args:
-    value: An object whose structure matches that of `dtype ` and for which each
+    value: An object whose structure matches that of `dtype` and for which each
       leaf has a registered `Tensor` conversion function.
     dtype: Optional structure of dtypes defining the structure of outputs and
       the `dtype` argument for nested calls to `convert_to_tensor`. If not
