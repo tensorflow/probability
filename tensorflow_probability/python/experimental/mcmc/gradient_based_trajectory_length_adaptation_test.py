@@ -30,6 +30,26 @@ tfd = tfp.distributions
 JAX_MODE = False
 
 
+def snaper_criterion_dummy_direction(previous_state, *args, **kwargs):
+  # Technically direction should be normalized, but omitting the normalization
+  # term only rescales the criterion so we're fine.
+  return tfp.experimental.mcmc.snaper_criterion(
+      previous_state,
+      *args,
+      direction=tf.nest.map_structure(tf.ones_like, previous_state),
+      **kwargs,
+  )
+
+
+def snaper_criterion_2d_direction(previous_state, *args, **kwargs):
+  return tfp.experimental.mcmc.snaper_criterion(
+      previous_state,
+      *args,
+      direction=tf.constant([0., 1.], previous_state.dtype),
+      **kwargs,
+  )
+
+
 @test_util.test_graph_and_eager_modes
 class GradientBasedTrajectoryLengthAdaptationTestGeneric(
     test_util.TestCase, parameterized.TestCase):
@@ -69,9 +89,13 @@ class GradientBasedTrajectoryLengthAdaptationTestGeneric(
     with self.assertRaisesRegex(Exception, 'Step size must be a scalar'):
       self.evaluate(kernel.bootstrap_results(tf.constant(1.)))
 
-  @parameterized.named_parameters(('StaticShape', True),
-                                  ('DynamicShape', False))
-  def testChEESTooFewChains(self, use_static_shape):
+  @parameterized.named_parameters(
+      ('ChEESStaticShape', True, tfp.experimental.mcmc.chees_criterion),
+      ('ChEESDynamicShape', False, tfp.experimental.mcmc.chees_criterion),
+      ('SNAPERStaticShape', True, snaper_criterion_dummy_direction),
+      ('SNAPERDynamicShape', False, snaper_criterion_dummy_direction),
+  )
+  def testTooFewChains(self, use_static_shape, criterion_fn):
     state = tf1.placeholder_with_default(
         [[0.1, 0.2]], shape=[1, 2] if use_static_shape else None)
     accept_prob = tf1.placeholder_with_default(
@@ -82,18 +106,20 @@ class GradientBasedTrajectoryLengthAdaptationTestGeneric(
           tfp.experimental.mcmc.chees_criterion(
               state, state, accept_prob, 1., validate_args=True))
 
-  @parameterized.named_parameters(('StaticShape', True),
-                                  ('DynamicShape', False))
-  def testChEESNoBatchDims(self, use_static_shape):
+  @parameterized.named_parameters(
+      ('ChEESStaticShape', True, tfp.experimental.mcmc.chees_criterion),
+      ('ChEESDynamicShape', False, tfp.experimental.mcmc.chees_criterion),
+      ('SNAPERStaticShape', True, snaper_criterion_dummy_direction),
+      ('SNAPERDynamicShape', False, snaper_criterion_dummy_direction),
+  )
+  def testNoBatchDims(self, use_static_shape, criterion_fn):
     state = tf1.placeholder_with_default(
         [[0.1, 0.2]], shape=[1, 2] if use_static_shape else None)
     accept_prob = tf1.placeholder_with_default(
         1., shape=[] if use_static_shape else None)
-    with self.assertRaisesRegex(Exception,
-                                'chees_criterion requires at least 2 chains'):
+    with self.assertRaisesRegex(Exception, 'requires at least 2 chains'):
       self.evaluate(
-          tfp.experimental.mcmc.chees_criterion(
-              state, state, accept_prob, 1., validate_args=True))
+          criterion_fn(state, state, accept_prob, 1., validate_args=True))
 
 
 class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
@@ -168,7 +194,25 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         [tf.math.reduce_variance(x, axis=[0, 1]) for x in chain],
         rtol=0.2)
 
-  def testScalarState(self):
+  def testStateMeanSNAPER(self):
+    state = np.array([[0.1, 0.2]], self.dtype)
+    accept_prob = np.ones([], self.dtype)
+    # This doesn't fail because state_mean is provided externally.
+    self.evaluate(tfp.experimental.mcmc.snaper_criterion(
+        state,
+        state,
+        accept_prob,
+        2.,
+        direction=tf.ones_like(state),
+        state_mean=state,
+        state_mean_weight=0.1,
+    ))
+
+  @parameterized.named_parameters(
+      ('ChEES', tfp.experimental.mcmc.chees_criterion),
+      ('SNAPER', snaper_criterion_dummy_direction),
+  )
+  def testScalarState(self, criterion_fn):
 
     def target_log_prob_fn(x):
       return -x**2 / 2
@@ -182,6 +226,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         kernel,
         num_adaptation_steps=5,
         adaptation_rate=1.,
+        criterion_fn=criterion_fn,
         validate_args=True)
 
     state = tf.zeros([64], self.dtype)
@@ -199,7 +244,11 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         np.abs(init_kernel_results.max_trajectory_length -
                final_kernel_results.max_trajectory_length), 0.0005)
 
-  def testTensorState(self):
+  @parameterized.named_parameters(
+      ('ChEES', tfp.experimental.mcmc.chees_criterion),
+      ('SNAPER', snaper_criterion_dummy_direction),
+  )
+  def testTensorState(self, criterion_fn):
 
     def target_log_prob_fn(x):
       return -tf.reduce_mean(x**2, [-1, -2]) / 2
@@ -214,6 +263,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
             kernel,
             num_adaptation_steps=5,
             adaptation_rate=1.,
+            criterion_fn=criterion_fn,
             validate_args=True))
 
     state = tf.zeros([64, 2, 3], self.dtype)
@@ -231,7 +281,11 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         np.abs(init_kernel_results.max_trajectory_length -
                final_kernel_results.max_trajectory_length), 0.0005)
 
-  def testListState(self):
+  @parameterized.named_parameters(
+      ('ChEES', tfp.experimental.mcmc.chees_criterion),
+      ('SNAPER', snaper_criterion_dummy_direction),
+  )
+  def testListState(self, criterion_fn):
 
     def target_log_prob_fn(x, y):
       return -x**2 / 2 - y**2 / 2
@@ -245,6 +299,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         kernel,
         num_adaptation_steps=5,
         adaptation_rate=1.,
+        criterion_fn=criterion_fn,
         validate_args=True)
 
     state = [tf.zeros([64], self.dtype), tf.zeros([64], self.dtype)]
@@ -262,7 +317,11 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
         np.abs(init_kernel_results.max_trajectory_length -
                final_kernel_results.max_trajectory_length), 0.0005)
 
-  def testChEESRAdaptation(self):
+  @parameterized.named_parameters(
+      ('ChEES', tfp.experimental.mcmc.chees_rate_criterion),
+      ('SNAPER', snaper_criterion_2d_direction),
+  )
+  def testAdaptation(self, criterion_fn):
     if tf.executing_eagerly() and not JAX_MODE:
       self.skipTest('Too slow for TF Eager.')
 
@@ -283,7 +342,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=num_adaptation_steps,
-        criterion_fn=tfp.experimental.mcmc.chees_rate_criterion,
+        criterion_fn=criterion_fn,
         validate_args=True)
     kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=num_adaptation_steps)
@@ -314,6 +373,8 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
 
     self.assertAllClose(0.75, p_accept, atol=0.1)
     self.assertAllClose(1.5, mean_step_size, atol=0.2)
+    # Both SNAPER and ChEES-rate find roughly the same trajectory length for
+    # this target.
     self.assertAllClose(15., mean_max_trajectory_length, rtol=0.3)
     self.assertAllClose(
         target.mean(), tf.reduce_mean(chain, axis=[0, 1]),
@@ -427,10 +488,10 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
   @parameterized.named_parameters(
       ('ChEES', tfp.experimental.mcmc.chees_criterion),
       ('ChEESR', tfp.experimental.mcmc.chees_rate_criterion),
+      ('SNAPER', snaper_criterion_dummy_direction),
   )
   def testCriterionStateEquivalence(self, criterion_fn):
-    # ChEES criterion should not care about the exact arrangement of state
-    # parts.
+    # Criteria should not care about the exact arrangement of state parts.
     previous_state = np.random.randn(4, 6).astype(self.dtype)
     new_state = np.random.randn(4, 6).astype(self.dtype)
     accept_prob = np.random.uniform(size=(4,)).astype(self.dtype)
@@ -483,6 +544,7 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
   @parameterized.named_parameters(
       ('ChEES', tfp.experimental.mcmc.chees_criterion),
       ('ChEESR', tfp.experimental.mcmc.chees_rate_criterion),
+      ('SNAPER', snaper_criterion_dummy_direction),
   )
   def test_gbtla_kernel_computes_same_criterion_info_with_sharded_state(
       self,
@@ -533,6 +595,7 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
   @parameterized.named_parameters(
       ('ChEES', tfp.experimental.mcmc.chees_criterion),
       ('ChEESR', tfp.experimental.mcmc.chees_rate_criterion),
+      ('SNAPER', snaper_criterion_dummy_direction),
   )
   def test_gbtla_kernel_can_shard_chains_across_devices(self, criterion_fn):
 
@@ -576,8 +639,12 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
       self.assertAllClose(avg_sq_grad[0], avg_sq_grad[i])
       self.assertAllClose(avg_max_tl[0], avg_max_tl[i])
 
-  def test_cheesr_adaptation(self):
-    # Compare this to testChEESRAdaptation. There we don't use SPMD, but should
+  @parameterized.named_parameters(
+      ('ChEES', tfp.experimental.mcmc.chees_rate_criterion),
+      ('SNAPER', snaper_criterion_2d_direction),
+  )
+  def test_adaptation(self, criterion_fn):
+    # Compare this to testAdaptation. There we don't use SPMD, but should
     # get the same hyperparameters.
 
     if not JAX_MODE:
@@ -601,7 +668,7 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
       kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
           kernel,
           num_adaptation_steps=num_adaptation_steps,
-          criterion_fn=tfp.experimental.mcmc.chees_rate_criterion,
+          criterion_fn=criterion_fn,
           experimental_reduce_chain_axis_names=self.axis_name,
           validate_args=True)
       kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
@@ -647,6 +714,7 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
             )))
 
     self.assertAllClose(0.75, p_accept.mean(), atol=0.1)
+    # Both ChEES-rate and SNAPER learn roughly the same trajectory length.
     self.assertAllClose(1.5, mean_step_size[0], atol=0.2)
     self.assertAllClose(15., mean_max_trajectory_length[0], rtol=0.3)
     self.assertAllClose(

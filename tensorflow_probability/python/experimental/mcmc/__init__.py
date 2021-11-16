@@ -23,6 +23,7 @@ from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_l
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import chees_rate_criterion
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptation
 from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import GradientBasedTrajectoryLengthAdaptationResults
+from tensorflow_probability.python.experimental.mcmc.gradient_based_trajectory_length_adaptation import snaper_criterion
 from tensorflow_probability.python.experimental.mcmc.initialization import init_near_unconstrained_zero
 from tensorflow_probability.python.experimental.mcmc.initialization import retry_init
 from tensorflow_probability.python.experimental.mcmc.kernel_builder import KernelBuilder
@@ -122,6 +123,7 @@ __all__ = [
     'sample_sequential_monte_carlo',
     'Sharded',
     'simple_heuristic_tuning',
+    'snaper_criterion',
     'step_kernel',
     'windowed_adaptive_hmc',
     'windowed_adaptive_nuts'

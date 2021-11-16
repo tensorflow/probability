@@ -38,6 +38,7 @@ __all__ = [
     'chees_rate_criterion',
     'GradientBasedTrajectoryLengthAdaptation',
     'GradientBasedTrajectoryLengthAdaptationResults',
+    'snaper_criterion',
 ]
 
 MAX_HALTON_SEQUENCE_BITS = 10  # Generates up to 1024 unique trajectory lengths.
@@ -83,7 +84,9 @@ class GradientBasedTrajectoryLengthAdaptationResults(
   __slots__ = ()
 
 
-def _map_structure_up_to_with_axes(structure, fn, *args,
+def _map_structure_up_to_with_axes(structure,
+                                   fn,
+                                   *args,
                                    experimental_shard_axis_names=None):
   if experimental_shard_axis_names is None:
     return nest.map_structure_up_to(structure, fn, *args)
@@ -123,8 +126,7 @@ def hmc_like_proposed_velocity_getter_fn(kernel_results):
   if momentum_distribution is None:
     proposed_velocity = final_momentum
   else:
-    momentum_log_prob = getattr(momentum_distribution,
-                                '_log_prob_unnormalized',
+    momentum_log_prob = getattr(momentum_distribution, '_log_prob_unnormalized',
                                 momentum_distribution.log_prob)
     kinetic_energy_fn = lambda *args: -momentum_log_prob(*args)
     _, proposed_velocity = mcmc_util.maybe_call_fn_and_grads(
@@ -188,8 +190,8 @@ def chees_criterion(previous_state,
     proposed_state: (Possibly nested) floating point `Tensor`. The proposed
       state of the HMC chain.
     accept_prob: Floating `Tensor`. Probability of acceping the proposed state.
-    trajectory_length: Floating `Tensor`. Mean trajectory length (not used
-      in this criterion).
+    trajectory_length: Floating `Tensor`. Mean trajectory length (not used in
+      this criterion).
     validate_args: Whether to perform non-static argument validation.
     experimental_shard_axis_names: A structure of string names indicating how
       members of the state are sharded.
@@ -206,8 +208,8 @@ def chees_criterion(previous_state,
   #### References
 
   [1]: Hoffman, M., Radul, A., & Sountsov, P. (2020). An Adaptive MCMC Scheme
-       for Setting Trajectory Lengths in Hamiltonian Monte Carlo. In
-       preparation.
+       for Setting Trajectory Lengths in Hamiltonian Monte Carlo.
+       <https://proceedings.mlr.press/v130/hoffman21a>
 
   """
   del trajectory_length
@@ -215,39 +217,27 @@ def chees_criterion(previous_state,
   batch_axes = ps.range(batch_ndims, dtype=tf.int32)
   reduce_chain_axis_names = distribute_lib.canonicalize_named_axis(
       experimental_reduce_chain_axis_names)
-  # Number of total chains is local batch size * distributed axis size
-  local_axis_size = ps.maximum(ps.size(accept_prob), 1)
-  distributed_axis_size = int(ps.reduce_prod([
-      distribute_lib.get_axis_size(a) for a in reduce_chain_axis_names]))
-  num_chains = local_axis_size * distributed_axis_size
-  num_chains_ = tf.get_static_value(num_chains)
-  if num_chains_ is not None:
-    if num_chains_ < 2:
-      raise ValueError(
-          'chees_criterion requires at least 2 chains. Got: {}'.format(
-              num_chains_))
-  elif validate_args:
-    with tf.control_dependencies([
-        assert_util.assert_greater_equal(
-            num_chains, 2, 'chees_criterion requires at least 2 chains.')
-    ]):
-      previous_state = tf.nest.map_structure(tf.identity, previous_state)
+
+  accept_prob = _check_at_least_two_chains(
+      accept_prob,
+      reduce_chain_axis_names=reduce_chain_axis_names,
+      validate_args=validate_args,
+      message='chees_criterion requires at least 2 chains.',
+  )
 
   def _center_previous_state(x):
     # The empirical mean here is a stand-in for the true mean, so we drop the
     # gradient that flows through this term.
-    x_mean = _reduce_mean_with_axes(
-        x, batch_axes, reduce_chain_axis_names)
+    x_mean = _reduce_mean_with_axes(x, batch_axes, reduce_chain_axis_names)
     return x - tf.stop_gradient(x_mean)
 
   def _center_proposed_state(x):
-    # The empirical mean here is a stand-in for the true mean, so we drop the
-    # gradient that flows through this term. The goal here is to get a reliable
-    # diagnostic of the unrelying dynamics, rather than incorporating the effect
-    # of the MetropolisHastings correction.
+    # Note that we don't do a monte carlo average of the accepted chain
+    # position, but rather try to get an estimate of the underlying dynamics.
+    # This is done by only looking at proposed states where the integration
+    # error is low.
     # TODO(mhoffman): Needs more experimentation.
-    expanded_accept_prob = bu.left_justified_expand_dims_like(
-        accept_prob, x)
+    expanded_accept_prob = bu.left_justified_expand_dims_like(accept_prob, x)
 
     # accept_prob is zero when x is NaN, but we still want to sanitize such
     # values.
@@ -260,6 +250,8 @@ def chees_criterion(previous_state,
         (_reduce_sum_with_axes(expanded_accept_prob, batch_axes,
                                reduce_chain_axis_names) + 1e-20))
 
+    # The empirical mean here is a stand-in for the true mean, so we drop the
+    # gradient that flows through this term.
     return x - tf.stop_gradient(x_center)
 
   def _sum_event_part(x, shard_axes=None):
@@ -268,7 +260,9 @@ def chees_criterion(previous_state,
 
   def _sum_event(x):
     event_parts = _map_structure_up_to_with_axes(
-        x, _sum_event_part, x,
+        x,
+        _sum_event_part,
+        x,
         experimental_shard_axis_names=experimental_shard_axis_names)
     return sum(tf.nest.flatten(event_parts))
 
@@ -298,7 +292,7 @@ def chees_rate_criterion(previous_state,
   length:
   ```none
   ChEES rate = 1/4 E[(||x' - E[x]||**2 - ||x - E[x]||**2)**2 /
-    trajectory_length**power]
+    trajectory_length]
   ```
 
   Args:
@@ -327,6 +321,158 @@ def chees_rate_criterion(previous_state,
       experimental_shard_axis_names=experimental_shard_axis_names,
       experimental_reduce_chain_axis_names=experimental_reduce_chain_axis_names,
   ) / trajectory_length
+
+
+def snaper_criterion(previous_state,
+                     proposed_state,
+                     accept_prob,
+                     trajectory_length,
+                     direction,
+                     state_mean=None,
+                     state_mean_weight=0.,
+                     validate_args=False,
+                     experimental_shard_axis_names=None,
+                     experimental_reduce_chain_axis_names=None):
+  """The SNAPER criterion from [1].
+
+  SNAPER stands for Squared Norm Along Principal component ESJD Rate:
+
+  ```None
+  SNAPER = E[(((x' - E[x'])^T p)**2 - ((x' - E[x])^T p)**2)**2 /
+             trajectory_length],
+  ```
+
+  where `x` is the previous chain state, `x'` is the next chain state, and `p`
+  is a unit vector (the `direction` argument). Both expectations are with
+  respect to the chain's stationary distribution. In practice, the inner
+  expectation is replaced by the empirical mean across chains, so computing this
+  criterion requires that at least 2 chains are present unless `state_mean` and
+  `state_mean_weight` are set. The outer expectation is computed by the caller
+  (e.g. in the `GradientBasedTrajectoryLengthAdaptation` kernel).
+
+  This can be thought of as the standard expected squared jump distance (ESJD)
+  criterion, except that the jump distance is computed in the space of squared
+  projections onto a vector.
+
+  The `direction` vector is typically chosen to be an approximation to the first
+  principal component of the state covariance matrix.
+
+  `state_mean` and `state_mean_weight` can be used to supplement the empirical
+  means as follows:
+
+  ```None
+  E[x] ≈ (1 - state_mean_weight) * x.mean() + state_mean_weight * state_mean.
+  ```
+
+  Args:
+    previous_state: (Possibly nested) floating point `Tensor`. The previous
+      state of the HMC chain.
+    proposed_state: (Possibly nested) floating point `Tensor`. The proposed
+      state of the HMC chain.
+    accept_prob: Floating `Tensor`. Probability of acceping the proposed state.
+    trajectory_length: Floating `Tensor`. Mean trajectory length (not used in
+      this criterion).
+    direction: (Possibly nested) floating point `Tensor`. A unit vector onto
+      which the centered state should be projected before computing ESJD.
+      Typically this chosen to be an approximation to the first principal
+      component of the state covariance matrix.
+    state_mean: Optional (Possibly nested) floating point `Tensor`. The
+      estimated state mean.
+    state_mean_weight: Floating point `Tensor`. The weight of the `state_mean`.
+    validate_args: Whether to perform non-static argument validation.
+    experimental_shard_axis_names: A structure of string names indicating how
+      members of the state are sharded.
+    experimental_reduce_chain_axis_names: A string or list of string names
+      indicating which named chain axes to reduce over when computing the
+      criterion.
+
+  Returns:
+    snaper: The value of the SNAPER criterion.
+
+  #### References
+
+  [1]: Sountsov, P. & Hoffman, M. (2021). Focusing on Difficult Directions for
+       Learning HMC Trajectory Lengths. <https://arxiv.org/abs/2110.11576>
+
+  """
+  batch_ndims = ps.rank(accept_prob)
+  batch_axes = ps.range(batch_ndims, dtype=tf.int32)
+  reduce_chain_axis_names = distribute_lib.canonicalize_named_axis(
+      experimental_reduce_chain_axis_names)
+
+  if state_mean is None:
+    state_mean = tf.nest.map_structure(lambda _: None, previous_state)
+
+    accept_prob = _check_at_least_two_chains(
+        accept_prob,
+        reduce_chain_axis_names=reduce_chain_axis_names,
+        validate_args=validate_args,
+        message='snaper_criterion requires at least 2 chains when `state_mean` is `None`'
+    )
+
+  def _mix_in_state_mean(empirical_mean, state_mean):
+    if state_mean is None:
+      return empirical_mean
+    else:
+      return ((1. - state_mean_weight) * empirical_mean +
+              state_mean_weight * state_mean)
+
+  def _center_previous_state(x, x_mean):
+    # The empirical mean here is a stand-in for the true mean, so we drop the
+    # gradient that flows through this term.
+    emp_x_mean = tf.stop_gradient(
+        distribute_lib.reduce_mean(x, batch_axes, reduce_chain_axis_names))
+    x_mean = _mix_in_state_mean(emp_x_mean, x_mean)
+    return x - x_mean
+
+  def _center_proposed_state(x, x_mean):
+    # Note that we don't do a monte carlo average of the accepted chain
+    # position, but rather try to get an estimate of the underlying dynamics.
+    # This is done by only looking at proposed states where the integration
+    # error is low.
+    expanded_accept_prob = bu.left_justified_expand_dims_like(accept_prob, x)
+
+    # accept_prob is zero when x is NaN, but we still want to sanitize such
+    # values.
+    x_safe = tf.where(tf.math.is_finite(x), x, tf.zeros_like(x))
+    # The empirical mean here is a stand-in for the true mean, so we drop the
+    # gradient that flows through this term.
+    # If all accept_prob's are zero, the x_center will have a nonsense value,
+    # but we'll discard the resultant gradients later on, so it's fine.
+    emp_x_mean = tf.stop_gradient(
+        distribute_lib.reduce_sum(expanded_accept_prob * x_safe, batch_axes,
+                                  reduce_chain_axis_names) /
+        (distribute_lib.reduce_sum(expanded_accept_prob, batch_axes,
+                                   reduce_chain_axis_names) + 1e-20))
+
+    x_mean = _mix_in_state_mean(emp_x_mean, x_mean)
+    return x - x_mean
+
+  def _dot_product_part(x, p, shard_axes=None):
+    event_axes = ps.range(batch_ndims, ps.rank(x))
+    return distribute_lib.reduce_sum(x * p, event_axes, shard_axes)
+
+  def _dot_product(x):
+    dot_products = _map_structure_up_to_with_axes(
+        x,
+        _dot_product_part,
+        x,
+        direction,
+        experimental_shard_axis_names=experimental_shard_axis_names)
+    return sum(tf.nest.flatten(dot_products))
+
+  previous_state = tf.nest.map_structure(_center_previous_state, previous_state,
+                                         state_mean)
+  proposed_state = tf.nest.map_structure(_center_proposed_state, proposed_state,
+                                         state_mean)
+
+  previous_proj = _dot_product(previous_state)
+  proposed_proj = _dot_product(proposed_state)
+
+  snaper = (
+      tf.square(tf.square(proposed_proj) - tf.square(previous_proj)) /
+      trajectory_length)
+  return snaper
 
 
 class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
@@ -421,8 +567,8 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
         burn-vs-warm-iterative-simulation-algorithms/#comment-627745>
 
   [2]: Hoffman, M., Radul, A., & Sountsov, P. (2020). An Adaptive MCMC Scheme
-       for Setting Trajectory Lengths in Hamiltonian Monte Carlo. In
-       preparation.
+       for Setting Trajectory Lengths in Hamiltonian Monte Carlo.
+       <https://proceedings.mlr.press/v130/hoffman21a>
 
   """
 
@@ -764,13 +910,19 @@ def _halton_sequence(i, max_bits=MAX_HALTON_SEQUENCE_BITS):
                    0.5 / bit_masks)
 
 
-def _update_trajectory_grad(previous_kernel_results, previous_state,
-                            proposed_state, proposed_velocity,
-                            trajectory_jitter, accept_prob, step_size,
-                            criterion_fn, max_leapfrog_steps,
+def _update_trajectory_grad(previous_kernel_results,
+                            previous_state,
+                            proposed_state,
+                            proposed_velocity,
+                            trajectory_jitter,
+                            accept_prob,
+                            step_size,
+                            criterion_fn,
+                            max_leapfrog_steps,
                             experimental_shard_axis_names=None,
                             reduce_chain_axis_names=None):
   """Updates the trajectory length."""
+
   # Compute criterion grads.
   def leapfrog_action(dt):
     # This represents the effect on the criterion value as the state follows the
@@ -781,7 +933,10 @@ def _update_trajectory_grad(previous_kernel_results, previous_state,
       return x + broadcasted_dt * v
 
     adjusted_state = _map_structure_up_to_with_axes(
-        proposed_state, adjust_state, proposed_state, proposed_velocity,
+        proposed_state,
+        adjust_state,
+        proposed_state,
+        proposed_velocity,
         experimental_shard_axis_names=experimental_shard_axis_names)
     return criterion_fn(
         previous_state=previous_state,
@@ -805,10 +960,9 @@ def _update_trajectory_grad(previous_kernel_results, previous_state,
   trajectory_grad = tf.where(
       tf.math.is_finite(trajectory_grad), trajectory_grad, 0.)
   trajectory_grad = (
-      _reduce_sum_with_axes(trajectory_grad * accept_prob,
-                            None, reduce_chain_axis_names) /
-      _reduce_sum_with_axes(accept_prob + 1e-20, None,
-                            reduce_chain_axis_names))
+      _reduce_sum_with_axes(trajectory_grad * accept_prob, None,
+                            reduce_chain_axis_names) /
+      _reduce_sum_with_axes(accept_prob + 1e-20, None, reduce_chain_axis_names))
 
   # Compute Adam/RMSProp step size.
   dtype = previous_kernel_results.adaptation_rate.dtype
@@ -857,3 +1011,23 @@ def _clip_max_trajectory_length(max_trajectory_length, step_size,
           max_trajectory_length, 0.,
           step_size * tf.cast(max_leapfrog_steps, max_trajectory_length.dtype)),
       max_trajectory_length)
+
+
+def _check_at_least_two_chains(accept_prob, reduce_chain_axis_names,
+                               validate_args, message):
+  """Checks that the number of chains is at least 2."""
+  # Number of total chains is local batch size * distributed axis size
+  local_axis_size = ps.size(accept_prob)
+  distributed_axis_size = int(
+      ps.reduce_prod(
+          [distribute_lib.get_axis_size(a) for a in reduce_chain_axis_names]))
+  num_chains = local_axis_size * distributed_axis_size
+  num_chains_ = tf.get_static_value(num_chains)
+  if num_chains_ is not None:
+    if num_chains_ < 2:
+      raise ValueError('{} Got: {}'.format(message, num_chains_))
+  elif validate_args:
+    with tf.control_dependencies(
+        [assert_util.assert_greater_equal(num_chains, 2, message)]):
+      accept_prob = tf.identity(accept_prob)
+  return accept_prob
