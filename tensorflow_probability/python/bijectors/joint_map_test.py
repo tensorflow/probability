@@ -150,8 +150,9 @@ class JointMapBijectorTest(test_util.TestCase):
     self.assertAllCloseNested(call_forward(unflat, x), bij.forward(x))
 
     # Type spec can be encoded/decoded.
-    enc = tf.__internal__.saved_model.encode_structure(bij._type_spec)
-    dec = tf.__internal__.saved_model.decode_proto(enc)
+    struct_coder = tf.__internal__.saved_model.StructureCoder()
+    enc = struct_coder.encode_structure(bij._type_spec)
+    dec = struct_coder.decode_proto(enc)
     self.assertEqual(bij._type_spec, dec)
 
   def testNonCompositeTensor(self):

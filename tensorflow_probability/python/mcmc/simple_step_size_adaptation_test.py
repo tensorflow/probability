@@ -471,7 +471,7 @@ class SimpleStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
   )
   def testBroadcasting(self, old_step_size, new_step_size):
     log_accept_ratio = tf.constant(
-        [[np.log(0.73), np.log(0.76), np.log(0.73)],
+        [[np.log(0.72), np.log(0.76), np.log(0.73)],
          [np.log(0.77), np.log(0.77), np.log(0.73)]],
         dtype=tf.float64)
     log_accept_ratio = tf1.placeholder_with_default(

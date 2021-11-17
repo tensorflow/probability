@@ -432,8 +432,9 @@ class ChainBijectorTest(test_util.TestCase):
     self.assertAllClose(call_forward(unflat, x), chain.forward(x))
 
     # TypeSpec can be encoded/decoded.
-    enc = tf.__internal__.saved_model.encode_structure(chain._type_spec)
-    dec = tf.__internal__.saved_model.decode_proto(enc)
+    struct_coder = tf.__internal__.saved_model.StructureCoder()
+    enc = struct_coder.encode_structure(chain._type_spec)
+    dec = struct_coder.decode_proto(enc)
     self.assertEqual(chain._type_spec, dec)
 
   def testNonCompositeTensor(self):
