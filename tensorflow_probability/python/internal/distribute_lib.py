@@ -62,8 +62,13 @@ def _make_reduce_op(tensor_reduce_fn, collective_reduce_fn):
 
   def reduce_fn(x, axis=None, named_axis=None, **kwargs):
     named_axis = canonicalize_named_axis(named_axis)
+    allow_all_gather = kwargs.pop('allow_all_gather', None)
     x = tensor_reduce_fn(x, axis=axis, **kwargs)
-    return collective_reduce_fn(x, named_axis=named_axis)
+    if allow_all_gather is None:
+      collection_kwargs = {}
+    else:
+      collection_kwargs = {'allow_all_gather': allow_all_gather}
+    return collective_reduce_fn(x, named_axis=named_axis, **collection_kwargs)
 
   return reduce_fn
 
@@ -95,35 +100,62 @@ def pmean(x, named_axis=None):
 reduce_mean = _make_reduce_op(tf.reduce_mean, pmean)
 
 
-def pmax(x, named_axis=None):
+def pmax(x, named_axis=None, allow_all_gather=False):
+  """Generic `pmax` implementation."""
   # TODO(b/187173243): fix gradients for pmax
   axes = canonicalize_named_axis(named_axis)
   for axis in axes:
-    if not JAX_MODE:
-      raise NotImplementedError('`pmax` not supported in TF')
-    x = lax.pmax(x, axis)
+    if JAX_MODE:
+      x = lax.pmax(x, axis)
+    elif allow_all_gather:
+      ctx = tf.distribute.get_replica_context()
+      x = tf.reduce_max(ctx.all_gather(x[tf.newaxis], axis=0), axis=0)
+    else:
+      raise NotImplementedError(
+          '`pmax` has no native implementation in TF. Pass in '
+          '`allow_all_gather=True` to enable a potentially '
+          'inefficient `all_gather`-based fallback. Also see b/191501877.'
+      )
   return x
 
 
 reduce_max = _make_reduce_op(tf.reduce_max, pmax)
 
 
-def pmin(x, named_axis=None):
+def pmin(x, named_axis=None, allow_all_gather=False):
+  """Generic `pmin` implementation."""
   # TODO(b/187173243): fix gradients for pmin
-  axis_name = canonicalize_named_axis(named_axis)
-  for name in axis_name:
-    if not JAX_MODE:
-      raise NotImplementedError('`pmax` not supported in TF')
-    x = lax.pmin(x, name)
+  axes = canonicalize_named_axis(named_axis)
+  for axis in axes:
+    if JAX_MODE:
+      x = lax.pmin(x, axis)
+    elif allow_all_gather:
+      ctx = tf.distribute.get_replica_context()
+      x = tf.reduce_min(ctx.all_gather(x[tf.newaxis], axis=0), axis=0)
+    else:
+      raise NotImplementedError(
+          '`pmin` has no native implementation in TF. Pass in '
+          '`allow_all_gather=True` to enable a potentially '
+          'inefficient `all_gather`-based fallback. Also see b/191501877.'
+      )
   return x
 
 
 reduce_min = _make_reduce_op(tf.reduce_min, pmin)
 
 
-def reduce_logsumexp(x, axis=None, named_axis=None, **kwargs):
+def reduce_logsumexp(x,
+                     axis=None,
+                     named_axis=None,
+                     allow_all_gather=False,
+                     **kwargs):
+  """`logsumexp` wrapper."""
   xmax = reduce_max(
-      tf.stop_gradient(x), axis=axis, named_axis=named_axis, keepdims=True)
+      tf.stop_gradient(x),
+      axis=axis,
+      named_axis=named_axis,
+      keepdims=True,
+      allow_all_gather=allow_all_gather)
   xmax = tf.where(tf.math.is_finite(xmax), xmax, tf.zeros_like(xmax))
   result = tf.math.log(
       reduce_sum(tf.exp(x - xmax), axis=axis, named_axis=named_axis, **kwargs))

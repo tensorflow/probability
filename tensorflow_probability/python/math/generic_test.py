@@ -37,6 +37,10 @@ tfd = tfp.distributions
 JAX_MODE = False
 
 
+def _allow_all_gather(fn):
+  return functools.partial(fn, experimental_allow_all_gather=True)
+
+
 @test_util.test_all_tf_execution_regimes
 class LogHarmonicMeanExpTest(test_util.TestCase):
 
@@ -704,19 +708,19 @@ del _KahanSumTest
 @test_util.test_all_tf_execution_regimes
 class CollectiveTest(distribute_test_lib.DistributedTest):
 
+  @test_util.numpy_disable_test_missing_functionality(
+      'NumPy backend does not support distributed computation.')
   @parameterized.named_parameters(*(
-      (f'{name} {ax}', (op, jo), ax)  # pylint: disable=g-complex-comprehension
-      for (name, op, jo), ax in itertools.product((
-          ('logmeanexp', tfp.math.reduce_logmeanexp, True),
-          ('log_harmonicmeanexp', tfp.math.reduce_log_harmonic_mean_exp, True),
-          ('reduce_weighted_logsumexp', tfp.math.reduce_weighted_logsumexp,
-           True),
-          ), (None, 0, 1, 2, [0, 1], [1, 2], [0, 2], [0, 1, 2]))))
+      (f'{name} {ax}', op, ax)  # pylint: disable=g-complex-comprehension
+      for (name, op), ax in itertools.product((
+          ('logmeanexp', _allow_all_gather(tfp.math.reduce_logmeanexp)),
+          ('log_harmonicmeanexp',
+           _allow_all_gather(tfp.math.reduce_log_harmonic_mean_exp)),
+          ('reduce_weighted_logsumexp',
+           _allow_all_gather(tfp.math.reduce_weighted_logsumexp)),
+      ), (None, 0, 1, 2, [0, 1], [1, 2], [0, 2], [0, 1, 2]))))
   def test_reduce_with_collectives_matches_reduce_without_collectives(
-      self, op_info, axes):
-    reduce_op, jax_only = op_info
-    if not JAX_MODE and jax_only:
-      self.skipTest('Only supported in JAX.')
+      self, reduce_op, axes):
 
     if axes is None:
       pos_axes = list(range(2))

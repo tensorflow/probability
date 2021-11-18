@@ -212,8 +212,12 @@ def reduce_kahan_sum(input_tensor, axis=None, keepdims=False, name=None):
         _reduce_kahan_sum(operands, inits, axis=axis, keepdims=keepdims))
 
 
-def reduce_logmeanexp(input_tensor, axis=None, keepdims=False,
-                      experimental_named_axis=None, name=None):
+def reduce_logmeanexp(input_tensor,
+                      axis=None,
+                      keepdims=False,
+                      experimental_named_axis=None,
+                      experimental_allow_all_gather=False,
+                      name=None):
   """Computes `log(mean(exp(input_tensor)))`.
 
   Reduces `input_tensor` along the dimensions given in `axis`.  Unless
@@ -237,6 +241,10 @@ def reduce_logmeanexp(input_tensor, axis=None, keepdims=False,
       Default value: `False` (i.e., squeeze the reduced dimensions).
     experimental_named_axis: A `str or list of `str` axis names to additionally
       reduce over. Providing `None` will not reduce over any axes.
+    experimental_allow_all_gather: Allow using an `all_gather`-based fallback
+      under TensorFlow when computing the distributed maximum. This fallback is
+      only efficient when `axis` reduces away most of the dimensions of
+      `input_tensor`.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., `'reduce_logmeanexp'`).
 
@@ -245,9 +253,12 @@ def reduce_logmeanexp(input_tensor, axis=None, keepdims=False,
   """
   with tf.name_scope(name or 'reduce_logmeanexp'):
     named_axes = distribute_lib.canonicalize_named_axis(experimental_named_axis)
-    lse = distribute_lib.reduce_logsumexp(input_tensor, axis=axis,
-                                          keepdims=keepdims,
-                                          named_axis=named_axes)
+    lse = distribute_lib.reduce_logsumexp(
+        input_tensor,
+        axis=axis,
+        keepdims=keepdims,
+        named_axis=named_axes,
+        allow_all_gather=experimental_allow_all_gather)
     n = ps.size(input_tensor) // ps.size(lse)
     for named_axis in named_axes:
       n = n * distribute_lib.get_axis_size(named_axis)
@@ -261,6 +272,7 @@ def reduce_weighted_logsumexp(logx,
                               keep_dims=False,
                               return_sign=False,
                               experimental_named_axis=None,
+                              experimental_allow_all_gather=False,
                               name=None):
   """Computes `log(abs(sum(weight * exp(elements across tensor dimensions))))`.
 
@@ -315,6 +327,11 @@ def reduce_weighted_logsumexp(logx,
     return_sign: If `True`, returns the sign of the result.
     experimental_named_axis: A `str or list of `str` axis names to additionally
       reduce over. Providing `None` will not reduce over any axes.
+    experimental_allow_all_gather: Allow using an `all_gather`-based fallback
+      under TensorFlow when computing the distributed maximum. This fallback is
+      only efficient when `axis` reduces away most of the dimensions of
+      `input_tensor`.
+
     name: A name for the operation (optional).
 
   Returns:
@@ -324,9 +341,12 @@ def reduce_weighted_logsumexp(logx,
   with tf.name_scope(name or 'reduce_weighted_logsumexp'):
     logx = tf.convert_to_tensor(logx, name='logx')
     if w is None:
-      lswe = distribute_lib.reduce_logsumexp(logx, axis=axis,
-                                             keepdims=keep_dims,
-                                             named_axis=experimental_named_axis)
+      lswe = distribute_lib.reduce_logsumexp(
+          logx,
+          axis=axis,
+          keepdims=keep_dims,
+          named_axis=experimental_named_axis,
+          allow_all_gather=experimental_allow_all_gather)
       if return_sign:
         sgn = tf.ones_like(lswe)
         return lswe, sgn
@@ -361,6 +381,7 @@ def reduce_log_harmonic_mean_exp(input_tensor,
                                  axis=None,
                                  keepdims=False,
                                  experimental_named_axis=None,
+                                 experimental_allow_all_gather=False,
                                  name=None):
   """Computes `log(1 / mean(1 / exp(input_tensor)))`.
 
@@ -385,6 +406,10 @@ def reduce_log_harmonic_mean_exp(input_tensor,
       Default value: `False` (i.e., squeeze the reduced dimensions).
     experimental_named_axis: A `str or list of `str` axis names to additionally
       reduce over. Providing `None` will not reduce over any axes.
+    experimental_allow_all_gather: Allow using an `all_gather`-based fallback
+      under TensorFlow when computing the distributed maximum. This fallback is
+      only efficient when `axis` reduces away most of the dimensions of
+      `input_tensor`.
     name: Python `str` name prefixed to Ops created by this function.
       Default value: `None` (i.e., `'reduce_log_harmonic_mean_exp'`).
 
@@ -392,8 +417,12 @@ def reduce_log_harmonic_mean_exp(input_tensor,
     log_mean_exp: The reduced tensor.
   """
   with tf.name_scope(name or 'reduce_log_harmonic_mean_exp'):
-    return -reduce_logmeanexp(-input_tensor, axis=axis, keepdims=keepdims,
-                              experimental_named_axis=experimental_named_axis)
+    return -reduce_logmeanexp(
+        -input_tensor,
+        axis=axis,
+        keepdims=keepdims,
+        experimental_named_axis=experimental_named_axis,
+        experimental_allow_all_gather=experimental_allow_all_gather)
 
 
 def soft_threshold(x, threshold, name=None):

@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Tests for tensorflow_probability.python.experimental.distribute.distribute_lib."""
+import functools
 import itertools
 
 from absl.testing import parameterized
@@ -31,6 +32,10 @@ if JAX_MODE:
   from jax import random  # pylint: disable=g-import-not-at-top
 
 
+def _allow_all_gather(fn):
+  return functools.partial(fn, allow_all_gather=True)
+
+
 @test_util.test_all_tf_execution_regimes
 class CollectiveTest(test_lib.DistributedTest):
 
@@ -44,13 +49,12 @@ class CollectiveTest(test_lib.DistributedTest):
   @parameterized.named_parameters(
       ('sum', tf.reduce_sum, distribute_lib.reduce_sum),
       ('mean', tf.reduce_mean, distribute_lib.reduce_mean),
-      ('max', tf.reduce_max, distribute_lib.reduce_max, True),
-      ('min', tf.reduce_min, distribute_lib.reduce_min, True),
-      ('logsumexp', tf.reduce_logsumexp, distribute_lib.reduce_logsumexp, True))
+      ('max', tf.reduce_max, _allow_all_gather(distribute_lib.reduce_max)),
+      ('min', tf.reduce_min, _allow_all_gather(distribute_lib.reduce_min)),
+      ('logsumexp', tf.reduce_logsumexp,
+       _allow_all_gather(distribute_lib.reduce_logsumexp)))
   def test_distributed_reduce_works_as_normal_with_int_axes(
-      self, reduce_op, distributed_op, jax_only=False):
-    if not JAX_MODE and jax_only:
-      self.skipTest('Only supported in JAX.')
+      self, reduce_op, distributed_op):
     x = tf.reshape(
         tf.range(test_lib.NUM_DEVICES * 6.) / 5., [test_lib.NUM_DEVICES, 3, 2])
 
@@ -63,24 +67,24 @@ class CollectiveTest(test_lib.DistributedTest):
       self.assertAllEqual(reduce_out, dist_out)
 
   @parameterized.named_parameters(*(
-      (f'{name} {ax}', (op, d_op, jo), ax)  # pylint: disable=g-complex-comprehension
-      for (name, op, d_op, jo), ax in itertools.product((
-          ('sum', tf.reduce_sum, distribute_lib.reduce_sum, False),
-          ('mean', tf.reduce_mean, distribute_lib.reduce_mean, False),
-          ('max', tf.reduce_max, distribute_lib.reduce_max, True),
-          ('min', tf.reduce_min, distribute_lib.reduce_min, True),
-          ('logsumexp', tf.reduce_logsumexp, distribute_lib.reduce_logsumexp,
-           True)), (None, 0, 1, 2, [0, 1], [1, 2], [0, 2], [0, 1, 2]))))
+      (f'{name} {ax}', (op, d_op), ax)  # pylint: disable=g-complex-comprehension
+      for (name, op, d_op), ax in itertools.product((
+          ('sum', tf.reduce_sum, distribute_lib.reduce_sum),
+          ('mean', tf.reduce_mean, distribute_lib.reduce_mean),
+          ('max', tf.reduce_max, _allow_all_gather(distribute_lib.reduce_max)),
+          ('min', tf.reduce_min, _allow_all_gather(distribute_lib.reduce_min)),
+          ('logsumexp', tf.reduce_logsumexp,
+           _allow_all_gather(distribute_lib.reduce_logsumexp))), (
+               None, 0, 1, 2, [0, 1], [1, 2], [0, 2], [0, 1, 2]))))
   def test_reduce_with_collectives_matches_reduce_without_collectives(
       self, ops, axes):
-    reduce_op, distributed_op, jax_only = ops
-    if not JAX_MODE and jax_only:
-      self.skipTest('Only supported in JAX.')
+    reduce_op, distributed_op = ops
     x = tf.reshape(
         tf.range(test_lib.NUM_DEVICES * 6.) / 5., [test_lib.NUM_DEVICES, 3, 2])
 
     def run(x):
-      return distributed_op(x, axis=pos_axes, named_axis=named_axes)
+      return distributed_op(
+          x, axis=pos_axes, named_axis=named_axes)
 
     def distributed_run(x):
       return self.per_replica_to_tensor(
@@ -104,16 +108,15 @@ class CollectiveTest(test_lib.DistributedTest):
       self.assertAllClose(reduce_out, dist_out)
 
   @parameterized.named_parameters(
-      ('sum', tf.reduce_sum, distribute_lib.reduce_sum, False, True),
-      ('mean', tf.reduce_mean, distribute_lib.reduce_mean, False, True),
-      ('max', tf.reduce_max, distribute_lib.reduce_max, True, False),
-      ('min', tf.reduce_min, distribute_lib.reduce_min, True, False),
-      ('logsumexp', tf.reduce_logsumexp, distribute_lib.reduce_logsumexp, True,
-       True))
+      ('sum', tf.reduce_sum, distribute_lib.reduce_sum, True),
+      ('mean', tf.reduce_mean, distribute_lib.reduce_mean, True),
+      ('max', tf.reduce_max, _allow_all_gather(
+          distribute_lib.reduce_max), False),
+      ('min', tf.reduce_min, _allow_all_gather(distribute_lib.reduce_min),
+       False), ('logsumexp', tf.reduce_logsumexp,
+                _allow_all_gather(distribute_lib.reduce_logsumexp), True))
   def test_reduce_with_collective_grads_matches_without_collectives(
-      self, reduce_op, distributed_op, jax_only, is_supported):
-    if not JAX_MODE and jax_only:
-      self.skipTest('Only supported in JAX.')
+      self, reduce_op, distributed_op, is_supported):
     if not is_supported:
       self.skipTest('Gradient of operation not supported.')
     x = tf.reshape(
@@ -121,8 +124,10 @@ class CollectiveTest(test_lib.DistributedTest):
 
     def compute_dist_grads(x):
       return tfp.math.value_and_gradient(
-          lambda x: distributed_op(x, axis=[0, 1], named_axis=self.axis_name),
-          [x])[1][0]
+          lambda x: distributed_op(  # pylint: disable=g-long-lambda
+              x,
+              axis=[0, 1],
+              named_axis=self.axis_name), [x])[1][0]
 
     def distributed_run(x):
       return self.per_replica_to_tensor(
