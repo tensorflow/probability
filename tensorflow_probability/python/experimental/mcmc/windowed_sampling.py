@@ -872,8 +872,14 @@ def _windowed_adaptive_impl(n_draws,
 
   # TODO(b/180011931): if num_adaptation_steps is small, this throws an error.
   dual_averaging_kwargs['num_adaptation_steps'] = num_adaptation_steps
-  dual_averaging_kwargs.setdefault('reduce_fn',
-                                   generic_math.reduce_log_harmonic_mean_exp)
+  dual_averaging_kwargs.setdefault(
+      'reduce_fn',
+      functools.partial(
+          generic_math.reduce_log_harmonic_mean_exp,
+          # There is only one log_accept_prob per chain, and we reduce across
+          # all chains, so typically the all_gather will be gathering scalars,
+          # which should be relatively efficient.
+          experimental_allow_all_gather=True))
   # By default, reduce over named axes for step size adaptation
   dual_averaging_kwargs.setdefault('experimental_reduce_chain_axis_names',
                                    chain_axis_names)

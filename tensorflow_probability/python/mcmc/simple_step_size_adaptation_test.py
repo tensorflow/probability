@@ -15,6 +15,7 @@
 """Tests for SimpleStepSizeAdaptation kernel."""
 
 import collections
+import functools
 
 # Dependency imports
 
@@ -532,14 +533,13 @@ class DistributedSimpleStepSizeAdaptationTest(
     distribute_test_lib.DistributedTest):
 
   @parameterized.named_parameters(
-      ('mean', reduce_mean, False),
-      ('logmeanexp', tfp.math.reduce_logmeanexp, True))
+      ('mean', reduce_mean),
+      ('logmeanexp',
+       functools.partial(
+           tfp.math.reduce_logmeanexp, experimental_allow_all_gather=True)))
   @test_util.numpy_disable_test_missing_functionality(
       'NumPy backend does not support distributed computation.')
-  def test_kernel_can_shard_chains_across_devices(self, reduce_fn, jax_only):
-
-    if not JAX_MODE and jax_only:
-      self.skipTest('Reduce not supported in TF backend.')
+  def test_kernel_can_shard_chains_across_devices(self, reduce_fn):
 
     def target_log_prob(a, b):
       return (

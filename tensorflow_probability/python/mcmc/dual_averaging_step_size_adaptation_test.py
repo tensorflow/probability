@@ -15,6 +15,7 @@
 """Tests for DualAveragingStepSizeAdaptation kernel."""
 
 import collections
+import functools
 
 # Dependency imports
 
@@ -725,12 +726,12 @@ class DistributedDualAveragingStepSizeAdaptationTest(
 
   @parameterized.named_parameters(
       ('mean', reduce_mean),
-      ('logmeanexp', tfp.math.reduce_logmeanexp))
+      ('logmeanexp',
+       functools.partial(
+           tfp.math.reduce_logmeanexp, experimental_allow_all_gather=True)))
   @test_util.numpy_disable_test_missing_functionality(
       'NumPy backend does not support distributed computation.')
   def test_kernel_can_shard_chains_across_devices(self, reduce_fn):
-    if not JAX_MODE:
-      self.skipTest('`reduce_logmeanexp` not supported in TF backend.')
 
     def target_log_prob(a, b):
       return (
@@ -768,7 +769,8 @@ class DistributedDualAveragingStepSizeAdaptationTest(
         self.per_replica_to_tensor(self.strategy_run(
             run, args=(seeds, log_accept_ratios), axis_name=self.axis_name), 0))
 
-    true_error_sum = 0.5 - tf.math.exp(reduce_fn(log_accept_ratios))
+    true_error_sum = 0.5 - tf.math.exp(
+        reduce_fn(self.per_replica_to_tensor(log_accept_ratios)))
     for i in range(distribute_test_lib.NUM_DEVICES):
       self.assertAllClose(error_sum[0][i], true_error_sum)
       self.assertAllClose(step_size[0], step_size[i])

@@ -572,7 +572,12 @@ class DualAveragingStepSizeAdaptation(kernel_base.TransitionKernel):
       reduced_log_accept_prob = reduce_logmeanexp(
           log_accept_prob,
           axis=ps.range(num_reduce_dims),
-          experimental_named_axis=self.experimental_reduce_chain_axis_names)
+          experimental_named_axis=self.experimental_reduce_chain_axis_names,
+          # There is only one log_accept_prob per chain, and we typically reduce
+          # across all chains, so typically the all_gather will be gathering
+          # scalars, which should be relatively efficient.
+          experimental_allow_all_gather=True,
+      )
       reduce_indices = get_differing_dims(reduced_log_accept_prob,
                                           step_size_part)
       reduced_log_accept_prob = reduce_logmeanexp(
