@@ -927,6 +927,27 @@ def ensure_high_gt_low(low, high):
   return new_high
 
 
+def ensure_low_lt_high(low, high):
+  """Returns a value with shape matching `low` and lt broadcastable `high`."""
+  new_low = tf.minimum(high - tf.abs(high) * .1 - .1, low)
+  reduce_dims = []
+  if (tensorshape_util.rank(new_low.shape) >
+      tensorshape_util.rank(low.shape)):
+    reduced_leading_axes = tf.range(
+        tensorshape_util.rank(new_low.shape) -
+        tensorshape_util.rank(low.shape))
+    new_low = tf.math.reduce_min(
+        new_low, axis=reduced_leading_axes)
+  reduce_dims = [
+      d for d in range(tensorshape_util.rank(low.shape))
+      if low.shape[d] < new_low.shape[d]
+  ]
+  if reduce_dims:
+    new_low = tf.math.reduce_min(
+        new_low, axis=reduce_dims, keepdims=True)
+  return new_low
+
+
 def softplus_plus_eps(eps=1e-6):
   return lambda x: tf.nn.softplus(x) + eps
 

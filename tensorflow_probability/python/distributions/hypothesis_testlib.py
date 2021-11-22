@@ -165,6 +165,16 @@ def fix_triangular(d):
   return dict(d, peak=peak, high=high)
 
 
+def fix_truncated_normal(params):
+  new_params = dict(params, high=tfp_hps.ensure_high_gt_low(
+      params['low'], params['high']))
+  max_low = params['loc'] + 5 * params['scale']
+  min_high = params['loc'] - 5 * params['scale']
+  new_params['high'] = tfp_hps.ensure_high_gt_low(min_high, new_params['high'])
+  new_params['low'] = tfp_hps.ensure_low_lt_high(new_params['low'], max_low)
+  return new_params
+
+
 def fix_wishart(d):
   df = d['df']
   scale = d.get('scale', d.get('scale_tril'))
@@ -341,9 +351,7 @@ CONSTRAINTS = {
     'TruncatedCauchy':
         lambda d: dict(d, high=tfp_hps.ensure_high_gt_low(  # pylint:disable=g-long-lambda
             d['low'], d['high'])),
-    'TruncatedNormal':
-        lambda d: dict(d, high=tfp_hps.ensure_high_gt_low(  # pylint:disable=g-long-lambda
-            d['low'], d['high'])),
+    'TruncatedNormal': fix_truncated_normal,
     'Uniform':
         lambda d: dict(d, high=tfp_hps.ensure_high_gt_low(  # pylint:disable=g-long-lambda
             d['low'], d['high'])),
