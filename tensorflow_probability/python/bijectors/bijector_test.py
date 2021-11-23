@@ -904,6 +904,7 @@ class BijectorCachingTest(test_util.TestCase):
     z = instance_cache_bijector.forward(x)
     self.assertIsNot(y, z)
 
+  @test_util.jax_disable_test_missing_functionality('keras')
   @parameterized.named_parameters(
       ('Keras', True),
       ('NoKeras', False))
@@ -911,7 +912,6 @@ class BijectorCachingTest(test_util.TestCase):
     bijector = InverseOnlyBijector(scale=2.)
     y = tf.constant(10.)
     if keras:
-      self.skipTest('TODO(b/206660667)')
       y = tf.keras.layers.Input(shape=(), dtype=tf.float32, tensor=y)
     x = bijector.inverse(y)
     # Forward computation should work here because it should look up

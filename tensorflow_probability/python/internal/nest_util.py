@@ -339,6 +339,12 @@ def convert_to_nested_tensor(value, dtype=None, dtype_hint=None,
                                 ).format(value, path))
     if as_shape_tensor:
       return ps.convert_to_shape_tensor(value, dtype, dtype_hint, name=name)
+    elif 'KerasTensor' in str(type(value)):
+      # This is a hack to detect symbolic Keras tensors to work around
+      # b/206660667.  The issue was that symbolic Keras tensors would
+      # break the Bijector cache on forward/inverse log det jacobian,
+      # because tf.convert_to_tensor is not a no-op thereon.
+      return value
     else:
       return tf.convert_to_tensor(value, dtype, dtype_hint, name=name)
 
