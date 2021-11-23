@@ -82,6 +82,7 @@ multi_substrate_py_library(
         ":sample_sequential_monte_carlo",
         ":sequential_monte_carlo_kernel",
         ":sharded",
+        ":snaper_hmc",
         ":step",
         ":thermodynamic_integrals",
         ":thinning_kernel",
@@ -988,6 +989,45 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/internal:distribute_test_lib",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "snaper_hmc",
+    srcs = ["snaper_hmc.py"],
+    srcs_version = "PY3",
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:broadcast_util",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/math:gradient",
+        "//tensorflow_probability/python/mcmc:kernel",
+        "//tensorflow_probability/python/mcmc:simple_step_size_adaptation",
+        "//tensorflow_probability/python/mcmc:transformed_kernel",
+        "//tensorflow_probability/python/mcmc/internal",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "snaper_hmc_test",
+    size = "large",
+    srcs = ["snaper_hmc_test.py"],
+    disabled_substrates = ["numpy"],  # Mostly gradient-based tests.
+    python_version = "PY3",
+    shard_count = 3,
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribute_lib",
+        "//tensorflow_probability/python/internal:distribute_test_lib",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:unnest",
     ],
 )
 

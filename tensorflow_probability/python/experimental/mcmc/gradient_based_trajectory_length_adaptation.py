@@ -601,8 +601,8 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
     Args:
       inner_kernel: `TransitionKernel`-like object.
       num_adaptation_steps: Scalar `int` `Tensor` number of initial steps to
-        during which to adjust the step size. This may be greater, less than, or
-        equal to the number of burnin steps.
+        during which to adjust the trajectory length. This may be greater, less
+        than, or equal to the number of burnin steps.
       use_halton_sequence_jitter: Python bool. Whether to use a Halton sequence
         for jittering the trajectory length. This makes the procedure more
         stable than sampling trajectory lengths from a uniform distribution.
