@@ -41,6 +41,17 @@ from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tenso
 tfl = tf.linalg
 
 
+FilterResults = collections.namedtuple(
+    'FilterResults',
+    ['log_likelihoods',
+     'filtered_means',
+     'filtered_covs',
+     'predicted_means',
+     'predicted_covs',
+     'observation_means',
+     'observation_covs'])
+
+
 def _safe_concat(values):
   """Concat along axis=0 that works even when some arguments have size 0."""
   initial_value_shape = ps.shape(values[0])
@@ -885,7 +896,8 @@ class LinearGaussianStateSpaceModel(
     x = tf.convert_to_tensor(x, name='x')
     mask = self._get_mask(mask)
     with self._name_and_control_scope('forward_filter', x, {'mask': mask}):
-      return self._forward_filter(x, mask=mask, final_step_only=final_step_only)
+      return FilterResults(
+          *self._forward_filter(x, mask=mask, final_step_only=final_step_only))
 
   def _forward_filter(self, x, mask=None, final_step_only=False):
     mask = self._get_mask(mask)
