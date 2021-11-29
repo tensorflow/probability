@@ -74,16 +74,26 @@ def base_equal(a, b):
   return base_dtype(a) == base_dtype(b)
 
 
-def common_dtype(args_list, dtype_hint=None):
-  """Returns explict dtype from `args_list` if there is one."""
+class _NotYetSeen(object):
+  """Sentinel class for uninspected arguments' dtype."""
+
+  def __repr__(self):
+    return '...'
+
+_NOT_YET_SEEN = _NotYetSeen()
+
+
+def common_dtype(args, dtype_hint=None):
+  """Returns explict dtype from `args` if there is one."""
   dtype = None
-  seen = []
-  for a in tf.nest.flatten(args_list):
+  flattened_args = tf.nest.flatten(args)
+  seen = [_NOT_YET_SEEN] * len(flattened_args)
+  for i, a in enumerate(flattened_args):
     if hasattr(a, 'dtype') and a.dtype:
       dt = as_numpy_dtype(a.dtype)
-      seen.append(dt)
+      seen[i] = dt
     else:
-      seen.append(None)
+      seen[i] = None
       continue
     if dtype is None:
       dtype = dt
@@ -93,7 +103,7 @@ def common_dtype(args_list, dtype_hint=None):
       else:
         raise TypeError(
             'Found incompatible dtypes, {} and {}. Seen so far: {}'.format(
-                dtype, dt, seen))
+                dtype, dt, tf.nest.pack_sequence_as(args, seen)))
   return base_dtype(dtype_hint) if dtype is None else base_dtype(dtype)
 
 
