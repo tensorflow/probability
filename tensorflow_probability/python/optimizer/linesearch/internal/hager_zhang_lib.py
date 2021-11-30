@@ -98,8 +98,8 @@ def secant2(value_and_gradients_function,
       - failed: Boolean `Tensor` of shape [n], indicating batch members
           where search has already failed. Interval for these batch members
           wont be modified.
-      - iterations: Scalar int32 `Tensor`. Number of line search iterations
-          so far.
+      - iterations: int32 `Tensor` of shape [n]. Number of line search
+          iterations so far.
       - func_evals: Scalar int32 `Tensor`. Number of function evaluations
           so far.
       - left: A namedtuple, as returned by value_and_gradients_function,
@@ -449,8 +449,8 @@ def bracket(value_and_gradients_function,
       - failed: Boolean `Tensor` of shape [n], indicating batch members
           where search has already failed. Interval for these batch members
           wont be modified.
-      - iterations: Scalar int32 `Tensor`. Number of line search iterations
-          so far.
+      - iterations: int32 `Tensor` of shape [n]. Number of line search
+          iterations so far.
       - func_evals: Scalar int32 `Tensor`. Number of function evaluations
           so far.
       - left: A namedtuple, as returned by value_and_gradients_function
@@ -467,8 +467,8 @@ def bracket(value_and_gradients_function,
 
   Returns:
     A namedtuple with the following fields.
-      iteration: An int32 scalar `Tensor`. The number of iterations performed.
-        Bounded above by `max_iterations` parameter.
+      iteration: An int32 `Tensor` of shape [n]. The number of iterations
+        performed. Bounded above by `max_iterations` parameter.
       stopped: A boolean `Tensor` of shape [n]. True for those batch members
         where the algorithm terminated before reaching `max_iterations`.
       failed: A boolean `Tensor` of shape [n]. True for those batch members
@@ -517,8 +517,7 @@ def bracket(value_and_gradients_function,
       right=search_interval.right)
 
   def _loop_cond(curr):
-    return (curr.iteration <
-            max_iterations) & ~tf.reduce_all(curr.stopped)
+    return tf.reduce_any((curr.iteration < max_iterations) & ~curr.stopped)
 
   def _loop_body(curr):
     """Main body of bracketing loop."""
@@ -537,7 +536,7 @@ def bracket(value_and_gradients_function,
     bracketed = _is_rising(right)
     needs_bisect = _needs_bisect(right, f_lim)
     return [_IntermediateResult(
-        iteration=curr.iteration + 1,
+        iteration=curr.iteration + tf.cast(~curr.stopped, tf.int32),
         stopped=curr.stopped | failed | finished | bracketed | needs_bisect,
         failed=failed,
         num_evals=curr.num_evals + 1,

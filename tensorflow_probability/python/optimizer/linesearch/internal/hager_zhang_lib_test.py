@@ -38,7 +38,7 @@ def _interval(val_left, val_right):
       converged=false,
       failed=false,
       func_evals=tf.constant(0),
-      iterations=tf.constant(0),
+      iterations=tf.zeros_like(val_left.x, dtype=tf.int32),
       left=val_left,
       right=val_right)
 

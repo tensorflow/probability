@@ -121,6 +121,35 @@ class HagerZhangTest(test_util.TestCase):
     self.assertLess(results_batched.func_evals,
                     sum(r.func_evals for r in results_mapped))
 
+  def test_batch_bracket_failures(self):
+    # To bracket successfully, we must find the narrow window with positive
+    # derivative -- roughly [1.39, 2.72].
+    def _fdf(x):
+      z = x - 1
+      return ValueAndGradient(
+          x=x,
+          f=tf.math.exp(-z) - tf.math.exp(-z*z),
+          df=2*z*tf.math.exp(-z*z) - tf.math.exp(-z))
+
+    start = tf.convert_to_tensor([0.01, 0.1, 1.0, 1.5, 2.0, 3.0])
+    results = self.evaluate(tfp.optimizer.linesearch.hager_zhang(
+        _fdf, initial_step_size=start))
+
+    # Bracketing will do something like: check `5^0 * start`, `5^1 * start`,
+    # `5^2 * start`, ..., looking for a point where the derivative is positive.
+    # This search will find a point with positive derivative when `start` is
+    # `0.1`, `1.5`, or `2.0`, but will fail for the other values.
+    self.assertAllEqual([False, True, False, True, True, False],
+                        results.converged)
+    self.assertAllEqual([True, False, True, False, False, True],
+                        results.failed)
+
+    val_0 = self.evaluate(_fdf(tf.convert_to_tensor(0.0)))
+    self.assertAllEqual(
+        [False, True, False, True, True, False],
+        _is_exact_wolfe(results.left.x, results.left.f, results.left.df,
+                        val_0.f, val_0.df, 0.1, 0.9))
+
   def test_rosenbrock(self):
     """Tests one pass of line search on the Rosenbrock function.
 

@@ -226,7 +226,7 @@ def hager_zhang(value_and_gradients_function,
       failed: Boolean `Tensor` of shape [n]. Whether line search failed e.g.
         if either the objective function or the gradient are not finite at
         an evaluation point.
-      iterations: Scalar int32 `Tensor`. Number of line search iterations made.
+      iterations: int32 `Tensor` of shape [n]. Number of line search iterations.
       func_evals: Scalar int32 `Tensor`. Number of function evaluations made.
       left: A namedtuple, as returned by value_and_gradients_function,
         of the left end point of the final bracketing interval. Values are
@@ -259,7 +259,7 @@ def hager_zhang(value_and_gradients_function,
         converged=init_converged,
         failed=failed,
         func_evals=prepare_evals,
-        iterations=tf.convert_to_tensor(0),
+        iterations=tf.zeros_like(valid_inputs, dtype=tf.int32),
         left=val_0,
         right=hzl.val_where(init_converged, val_0, val_initial))
 
@@ -343,7 +343,7 @@ def _bracket_and_search(
       failed: Boolean `Tensor` of shape [n]. Whether line search failed e.g.
         if either the objective function or the gradient are not finite at
         an evaluation point.
-      iterations: Scalar int32 `Tensor`. Number of line search iterations made.
+      iterations: int32 `Tensor` of shape [n]. Number of line search iterations.
       func_evals: Scalar int32 `Tensor`. Number of function evaluations made.
       left: A namedtuple, as returned by value_and_gradients_function,
         of the left end point of the updated bracketing interval.
@@ -428,7 +428,7 @@ def _line_search_after_bracketing(
       failed: Boolean `Tensor` of shape [n]. Whether line search failed e.g.
         if either the objective function or the gradient are not finite at
         an evaluation point.
-      iterations: Scalar int32 `Tensor`. Number of line search iterations made.
+      iterations: int32 `Tensor` of shape [n]. Number of line search iterations.
       func_evals: Scalar int32 `Tensor`. Number of function evaluations made.
       left: A namedtuple, as returned by value_and_gradients_function,
         of the left end point of the updated bracketing interval.
@@ -439,18 +439,21 @@ def _line_search_after_bracketing(
   def _loop_cond(curr_interval):
     """Loop condition."""
     active = ~(curr_interval.converged | curr_interval.failed)
-    return (curr_interval.iterations <
-            max_iterations) & tf.reduce_any(active)
+    return tf.reduce_any((curr_interval.iterations < max_iterations) & active)
 
   def _loop_body(curr_interval):
     """The loop body."""
+    active = ~(curr_interval.converged | curr_interval.failed)
+    # TODO(b/208441613): Skip updates for batch members that are not active?
     secant2_raw_result = hzl.secant2(
         value_and_gradients_function, val_0, curr_interval, f_lim,
         sufficient_decrease_param, curvature_param)
     secant2_result = HagerZhangLineSearchResult(
-        converged=secant2_raw_result.converged,
-        failed=secant2_raw_result.failed,
-        iterations=curr_interval.iterations + 1,
+        ## TODO(b/208441613): `& ~curr_interval.failed` should not be needed.
+        converged=secant2_raw_result.converged & ~curr_interval.failed,
+        ## TODO(b/208441613): `| curr_interval.failed` should not be needed.
+        failed=secant2_raw_result.failed | curr_interval.failed,
+        iterations=curr_interval.iterations + tf.cast(active, tf.int32),
         func_evals=secant2_raw_result.num_evals,
         left=secant2_raw_result.left,
         right=secant2_raw_result.right)
