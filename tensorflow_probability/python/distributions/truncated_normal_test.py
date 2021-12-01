@@ -229,6 +229,22 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     log_pdf_at_boundary = self.evaluate(dist.log_prob([[-4.], [2.]]))
     self.assertTrue(np.isfinite(log_pdf_at_boundary).all())
 
+  def testTruncatedAtTail(self):
+    dist = tfd.TruncatedNormal(
+        loc=0., scale=1., low=13., high=15., validate_args=True)
+    sp_dist = scipy_trunc_norm_dist(0., 1., 13., 15.)
+
+    actual_log_prob = self.evaluate(dist.log_prob(14.))
+    self.assertTrue(np.isfinite(actual_log_prob))
+    expected_log_prob = sp_dist.logpdf(14.)
+    self.assertAlmostEqual(actual_log_prob, expected_log_prob, places=4)
+
+    actual_cdf = self.evaluate(dist.cdf(14.))
+    self.assertAlmostEqual(actual_cdf, 1., places=4)
+
+    actual_log_cdf = self.evaluate(dist.log_cdf(14.))
+    self.assertAlmostEqual(actual_log_cdf, 0., places=4)
+
   def testNegativeSigmaFailsVarAssignment(self):
     dist = tfd.TruncatedNormal(
         loc=0., scale=tf.Variable(0.1), low=-1.0, high=1.0, validate_args=True)
@@ -571,6 +587,20 @@ class TruncatedNormalTestCompareWithScipy(_TruncatedNormalTestCase):
     tf_cdf = self.evaluate(tf_dist.cdf(test_x))
     sp_cdf = sp_dist.cdf(test_x)
     self.assertAllClose(tf_cdf, sp_cdf, rtol=1e-4, atol=1e-4)
+
+  def testLogCDF(self, loc, scale, low, high):
+    test_x = list(np.float32(np.random.uniform(low, high, 10)))
+    test_x += [
+        low, high, low + 100 * EPSILON, low - EPSILON, high + EPSILON,
+        high - EPSILON, low - 100., high + 100.
+    ]
+
+    tf_dist, sp_dist = self.constructDists(
+        loc, scale, low, high, validate_args=False)
+
+    tf_log_cdf = self.evaluate(tf_dist.log_cdf(test_x))
+    sp_log_cdf = sp_dist.logcdf(test_x)
+    self.assertAllClose(tf_log_cdf, sp_log_cdf, rtol=1e-4, atol=1e-4)
 
   def testMoments(self, loc, scale, low, high):
     tf_dist, sp_dist = self.constructDists(loc, scale, low, high)

@@ -51,6 +51,27 @@ def _normal_log_pdf(x):
   return -0.5 * (tf.math.log(two_pi) + tf.square(x))
 
 
+def _normal_cdf_difference(x, y):
+  """Computes ndtr(x) - ndtr(y) assuming that x >= y."""
+  # When x >= y >= 0, we will return ndtr(-y) - ndtr(-x)
+  # because ndtr does not have a good precision for large positive x, y.
+  is_y_positive = y >= 0
+  x_hat = tf.where(is_y_positive, -y, x)
+  y_hat = tf.where(is_y_positive, -x, y)
+  return special_math.ndtr(x_hat) - special_math.ndtr(y_hat)
+
+
+def _normal_cdf_log_difference(x, y):
+  """Computes log(ndtr(x) - ndtr(y)) assuming that x >= y."""
+  # When x >= y >= 0, we will return log(ndtr(-y) - ndtr(-x))
+  # because ndtr does not have a good precision for large positive x, y.
+  is_y_positive = y >= 0
+  x_hat = tf.where(is_y_positive, -y, x)
+  y_hat = tf.where(is_y_positive, -x, y)
+  return _log_sub_exp(
+      special_math.log_ndtr(x_hat), special_math.log_ndtr(y_hat))
+
+
 class TruncatedNormal(distribution.AutoCompositeTensorDistribution):
   """The Truncated Normal distribution.
 
@@ -178,18 +199,6 @@ class TruncatedNormal(distribution.AutoCompositeTensorDistribution):
         loc=loc, scale=scale, low=low, high=high)
     return (low - loc) / scale, (high - loc) / scale
 
-  def _normalizer(self,
-                  loc=None,
-                  scale=None,
-                  low=None,
-                  high=None,
-                  std_low=None,
-                  std_high=None):
-    if std_low is None or std_high is None:
-      std_low, std_high = self._standardized_low_and_high(
-          loc=loc, scale=scale, low=low, high=high)
-    return special_math.ndtr(std_high) - special_math.ndtr(std_low)
-
   def _log_normalizer(self,
                       loc=None,
                       scale=None,
@@ -200,8 +209,7 @@ class TruncatedNormal(distribution.AutoCompositeTensorDistribution):
     if std_low is None or std_high is None:
       std_low, std_high = self._standardized_low_and_high(
           loc=loc, scale=scale, low=low, high=high)
-    return _log_sub_exp(
-        special_math.log_ndtr(std_high), special_math.log_ndtr(std_low))
+    return _normal_cdf_log_difference(std_high, std_low)
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
@@ -296,10 +304,9 @@ class TruncatedNormal(distribution.AutoCompositeTensorDistribution):
         lower_broadcast = lower[..., tf.newaxis]
         upper_broadcast = upper[..., tf.newaxis]
 
-        cdf_samples = ((special_math.ndtr(std_samples) -
-                        special_math.ndtr(lower_broadcast)) /
-                       (special_math.ndtr(upper_broadcast) -
-                        special_math.ndtr(lower_broadcast)))
+        cdf_samples = (
+            _normal_cdf_difference(std_samples, lower_broadcast) /
+            _normal_cdf_difference(upper_broadcast, lower_broadcast))
 
         # tiny, eps are tolerance parameters to ensure we stay away from giving
         # a zero arg to the log CDF expression.
@@ -350,22 +357,21 @@ class TruncatedNormal(distribution.AutoCompositeTensorDistribution):
     return bounded_log_prob
 
   def _cdf(self, x):
-    loc, scale, low, high = self._loc_scale_low_high()
-    std_low, std_high = self._standardized_low_and_high(
-        low=low, high=high, loc=loc, scale=scale)
-    cdf_in_support = ((special_math.ndtr(
-        (x - loc) / scale) - special_math.ndtr(std_low)) /
-                      self._normalizer(std_low=std_low, std_high=std_high))
-    return tf.clip_by_value(cdf_in_support, 0., 1.)
+    return tf.exp(self._log_cdf(x))
 
   def _log_cdf(self, x):
+    np_dtype = dtype_util.as_numpy_dtype(x.dtype)
     loc, scale, low, high = self._loc_scale_low_high()
     std_low, std_high = self._standardized_low_and_high(
         low=low, high=high, loc=loc, scale=scale)
-    return (_log_sub_exp(
-        special_math.log_ndtr(
-            (x - loc) / scale), special_math.log_ndtr(std_low)) -
-            self._log_normalizer(std_low=std_low, std_high=std_high))
+    std_x = (x - loc) / scale
+    log_cdf = (
+        _normal_cdf_log_difference(std_x, std_low) -
+        self._log_normalizer(std_low=std_low, std_high=std_high))
+    # cdf(x) is 0 when x < low and is 1 when x > high.
+    bounded_log_cdf = tf.where(x > high, np_dtype(0.), log_cdf)
+    bounded_log_cdf = tf.where(x < low, np_dtype(-np.inf), bounded_log_cdf)
+    return bounded_log_cdf
 
   def _entropy(self):
     loc, scale, low, high = self._loc_scale_low_high()
@@ -412,8 +418,8 @@ class TruncatedNormal(distribution.AutoCompositeTensorDistribution):
     std_low, std_high = self._standardized_low_and_high(
         low=low, high=high, loc=loc, scale=scale)
     quantile = tf.math.ndtri(
-        special_math.ndtr(std_low) + p *
-        (special_math.ndtr(std_high) - special_math.ndtr(std_low))) * scale + loc
+        special_math.ndtr(std_low) +
+        p * _normal_cdf_difference(std_high, std_low)) * scale + loc
     return quantile
 
   def _variance(self):

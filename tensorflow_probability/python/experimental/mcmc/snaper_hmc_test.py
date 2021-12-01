@@ -283,7 +283,7 @@ class DistributedSNAPERHMCTest(distribute_test_lib.DistributedTest):
 
     # Adaptation results.
     self.assertAllClose(1.75, trace['step_size'][0, -1], rtol=0.2)
-    self.assertAllClose(4., trace['mean_trajectory_length'][0, -1], atol=1.)
+    self.assertAllClose(4., trace['mean_trajectory_length'][0, -1], atol=1.1)
     self.assertAllClose(np.diag(covariance), trace['variance'][0, -1], rtol=0.2)
     self.assertAllClose(
         principal_component / np.sign(principal_component[0]),
