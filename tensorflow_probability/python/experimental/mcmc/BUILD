@@ -109,6 +109,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "initialization_test",
+    size = "medium",
     srcs = ["initialization_test.py"],
     srcs_version = "PY3",
     deps = [
