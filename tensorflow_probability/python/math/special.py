@@ -1385,8 +1385,6 @@ def _owens_t_method1(h, a, m):
     should_stop = index >= m
     return should_stop, index + 1., new_ai, new_di, new_gi, new_series_sum
 
-  broadcast_shape = prefer_static.broadcast_shape(
-      prefer_static.shape(h), prefer_static.shape(a))
   initial_ai = a / numpy_dtype(2 * np.pi)
   initial_di = tf.math.expm1(neg_half_h_squared)
   initial_gi = neg_half_h_squared * tf.math.exp(neg_half_h_squared)
@@ -1397,7 +1395,12 @@ def _owens_t_method1(h, a, m):
       cond=lambda stop, *_: tf.reduce_any(~stop),
       body=series_evaluation,
       loop_vars=(
-          tf.zeros(broadcast_shape, dtype=tf.bool),
+          # Use constant-tensor multiplication rather than static or dynamic
+          # shape broadcasting logic, since the former will be robust to
+          # partially-static shapes.
+          tf.cast(
+              tf.zeros_like(h) * tf.zeros_like(a),
+              dtype=tf.bool),
           tf.cast(2., dtype=dtype),
           initial_ai,
           initial_di,
@@ -1430,8 +1433,6 @@ def _owens_t_method2(h, a, m):
     should_stop = index >= num_iterations
     return should_stop, index + 2., new_summand, new_term, new_series_sum
 
-  broadcast_shape = prefer_static.broadcast_shape(
-      prefer_static.shape(h), prefer_static.shape(a))
   initial_summand = -0.5 * tf.math.erf(a * h) / h
   initial_sum = initial_summand
   initial_term = a * tf.math.exp(
@@ -1441,7 +1442,12 @@ def _owens_t_method2(h, a, m):
       cond=lambda stop, *_: tf.reduce_any(~stop),
       body=series_evaluation,
       loop_vars=(
-          tf.zeros(broadcast_shape, dtype=tf.bool),
+          # Use constant-tensor multiplication rather than static or dynamic
+          # shape broadcasting logic, since the former will be robust to
+          # partially-static shapes.
+          tf.cast(
+              tf.zeros_like(h) * tf.zeros_like(a),
+              dtype=tf.bool),
           tf.cast(1., dtype=dtype),
           initial_summand,
           initial_term,
@@ -1522,8 +1528,6 @@ def _owens_t_method4(h, a, m):
     should_stop = index >= num_iterations
     return should_stop, index + 2., new_term, new_coeff, new_series_sum
 
-  broadcast_shape = prefer_static.broadcast_shape(
-      prefer_static.shape(h), prefer_static.shape(a))
   initial_term = a * tf.math.exp(
       -0.5 * h_squared * (1 - nega_squared)) / (2 * np.pi)
   initial_sum = initial_term
@@ -1532,10 +1536,12 @@ def _owens_t_method4(h, a, m):
       cond=lambda stop, *_: tf.reduce_any(~stop),
       body=series_evaluation,
       loop_vars=(
-          tf.zeros(broadcast_shape, dtype=tf.bool),
+          tf.cast(
+              tf.zeros_like(h) * tf.zeros_like(a),
+              dtype=tf.bool),
           tf.cast(3., dtype=dtype),
           initial_term,
-          tf.ones(broadcast_shape, dtype=dtype),
+          tf.ones_like(h) * tf.ones_like(a),
           initial_sum))
   return series_sum
 

@@ -19,6 +19,7 @@ import functools
 from absl.testing import parameterized
 import numpy as np
 from scipy import special as scipy_special
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -461,6 +462,17 @@ class OwensTTest(test_util.TestCase):
     err = self.compute_max_gradient_error(
         lambda x: tfp.math.owens_t(x, -a), [h])
     self.assertLess(err, 2e-4)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason="Only relevant for dynamic shapes in TF.")
+  def testOwensPartiallyKnownShape(self):
+    h = tf1.placeholder_with_default(np.array([1.]).reshape([1, 1]),
+                                     shape=(None, 1))
+    a = tf1.placeholder_with_default(np.array([1.]).reshape([1, 1]),
+                                     shape=(None, 1))
+    # We simply verify that this runs without an Exception.
+    _ = tfp.math.owens_t(h, a)
 
 
 @test_util.test_graph_and_eager_modes
