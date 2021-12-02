@@ -34,7 +34,6 @@ multi_substrate_py_library(
         ":proximal_hessian_sparse",
         ":sgld",
         ":variational_sgd",
-        "//tensorflow_probability/python/optimizer/convergence_criteria",
     ],
     deps = [
         ":bfgs",

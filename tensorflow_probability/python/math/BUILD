@@ -34,7 +34,6 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     substrates_omit_deps = [
-        ":minimize",
         ":sparse",
     ],
     deps = [
@@ -320,7 +319,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "minimize",
     srcs = [
         "minimize.py",
@@ -330,17 +329,22 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:loop_util",
+        "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "minimize_test",
     size = "small",
     srcs = ["minimize_test.py"],
+    numpy_tags = ["notap"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
         # numpy dep,
+        # optax dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

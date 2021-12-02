@@ -56,6 +56,7 @@ from tensorflow_probability.python.math.linalg import pivoted_cholesky
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matmul
 from tensorflow_probability.python.math.linalg import sparse_or_dense_matvecmul
 from tensorflow_probability.python.math.minimize import minimize
+from tensorflow_probability.python.math.minimize import minimize_stateless
 from tensorflow_probability.python.math.minimize import MinimizeTraceableQuantities
 from tensorflow_probability.python.math.numeric import clip_by_value_preserve_gradient
 from tensorflow_probability.python.math.numeric import log1psquare
@@ -135,6 +136,7 @@ _allowed_symbols = [
     'lu_reconstruct',
     'lu_solve',
     'minimize',
+    'minimize_stateless',
     'MinimizeTraceableQuantities',
     'ode',
     'owens_t',
