@@ -194,9 +194,9 @@ class LinearOperatorHouseholder(linear_operator.LinearOperator):
     return d_shape.concatenate(d_shape[-1:])
 
   def _shape_tensor(self):
-    d_shape = array_ops.shape(self._reflection_axis)
+    d_shape = prefer_static.shape(self._reflection_axis)
     k = d_shape[-1]
-    return array_ops.concat((d_shape, [k]), 0)
+    return prefer_static.concat((d_shape, [k]), 0)
 
   def _assert_non_singular(self):
     return control_flow_ops.no_op("assert_non_singular")
@@ -269,12 +269,12 @@ class LinearOperatorHouseholder(linear_operator.LinearOperator):
 
   def _eigvals(self):
     # We have (n - 1) +1 eigenvalues and a single -1 eigenvalue.
-    result_shape = array_ops.shape(self.reflection_axis)
+    result_shape = prefer_static.shape(self.reflection_axis)
     n = result_shape[-1]
-    ones_shape = array_ops.concat([result_shape[:-1], [n - 1]], axis=-1)
-    neg_shape = array_ops.concat([result_shape[:-1], [1]], axis=-1)
+    ones_shape = prefer_static.concat([result_shape[:-1], [n - 1]], axis=-1)
+    neg_shape = prefer_static.concat([result_shape[:-1], [1]], axis=-1)
     eigvals = array_ops.ones(shape=ones_shape, dtype=self.dtype)
-    eigvals = array_ops.concat(
+    eigvals = prefer_static.concat(
         [-array_ops.ones(shape=neg_shape, dtype=self.dtype), eigvals], axis=-1)  # pylint: disable=invalid-unary-operand-type
     return eigvals
 
@@ -302,4 +302,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

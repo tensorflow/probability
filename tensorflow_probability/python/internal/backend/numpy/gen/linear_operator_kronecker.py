@@ -52,7 +52,7 @@ __all__ = ["LinearOperatorKronecker"]
 def _prefer_static_shape(x):
   if tensor_shape.TensorShape(x.shape).is_fully_defined():
     return tensor_shape.TensorShape(x.shape)
-  return array_ops.shape(x)
+  return prefer_static.shape(x)
 
 
 def _prefer_static_concat_shape(first_shape, second_shape_int_list):
@@ -72,7 +72,7 @@ def _prefer_static_concat_shape(first_shape, second_shape_int_list):
   if (isinstance(first_shape, tensor_shape.TensorShape) and
       all(s is not None for s in second_shape_int_list_static)):
     return first_shape.concatenate(second_shape_int_list_static)
-  return array_ops.concat([first_shape, second_shape_int_list], axis=0)
+  return prefer_static.concat([first_shape, second_shape_int_list], axis=0)
 
 
 # @tf_export("linalg.LinearOperatorKronecker")
@@ -301,7 +301,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       batch_shape = array_ops.broadcast_dynamic_shape(
           batch_shape, operator.batch_shape_tensor())
 
-    return array_ops.concat((batch_shape, matrix_shape), 0)
+    return prefer_static.concat((batch_shape, matrix_shape), 0)
 
   def _solve_matmul_internal(
       self,
@@ -451,8 +451,8 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       diag_part = diag_part * op_diag_part
       diag_part = array_ops.reshape(
           diag_part,
-          shape=array_ops.concat(
-              [array_ops.shape(diag_part)[:-2], [-1]], axis=0))
+          shape=prefer_static.concat(
+              [prefer_static.shape(diag_part)[:-2], [-1]], axis=0))
     if self.range_dimension > self.domain_dimension:
       diag_dimension = self.domain_dimension
     else:
@@ -498,7 +498,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
       # Reshape to [B, R1 * R2]
       product = array_ops.reshape(
           product,
-          shape=array_ops.concat([array_ops.shape(product)[:-2], [-1]], axis=0))
+          shape=prefer_static.concat([prefer_static.shape(product)[:-2], [-1]], axis=0))
     tensorshape_util.set_shape(product, tensor_shape.TensorShape(self.shape)[:-1])
     return product
 
@@ -542,4 +542,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

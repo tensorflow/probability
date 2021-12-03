@@ -411,7 +411,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
         batch_shape = array_ops.broadcast_dynamic_shape(
             batch_shape, operator.batch_shape_tensor())
 
-    return array_ops.concat((batch_shape, matrix_shape), 0)
+    return prefer_static.concat((batch_shape, matrix_shape), 0)
 
   def matmul(self, x, adjoint=False, adjoint_arg=False, name="matmul"):
     """Transform [batch] matrix `x` with left multiplication:  `x --> Ax`.
@@ -539,7 +539,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
 
     result_list = linear_operator_util.broadcast_matrix_batch_dims(
         result_list)
-    return array_ops.concat(result_list, axis=-2)
+    return prefer_static.concat(result_list, axis=-2)
 
   def matvec(self, x, adjoint=False, name="matvec"):
     """Transform [batch] vector `x` with left multiplication:  `x --> Ax`.
@@ -779,7 +779,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
 
       solution_list = linear_operator_util.broadcast_matrix_batch_dims(
           solution_list)
-      return array_ops.concat(solution_list, axis=-2)
+      return prefer_static.concat(solution_list, axis=-2)
 
   def solvevec(self, rhs, adjoint=False, name="solve"):
     """Solve single equation with best effort: `A X = rhs`.
@@ -850,7 +850,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
       # final two dimensions as batch dimensions.
       diag_list.append(op.diag_part()[..., _ops.newaxis])
     diag_list = linear_operator_util.broadcast_matrix_batch_dims(diag_list)
-    diagonal = array_ops.concat(diag_list, axis=-2)
+    diagonal = prefer_static.concat(diag_list, axis=-2)
     return array_ops.squeeze(diagonal, axis=-1)
 
   def _trace(self):
@@ -868,18 +868,18 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
         flat_broadcast_operators[i * (i + 1) // 2:(i + 1) * (i + 2) // 2]
         for i in range(len(self.operators))]
     for row_blocks in broadcast_operators:
-      batch_row_shape = array_ops.shape(row_blocks[0])[:-1]
-      num_cols = num_cols + array_ops.shape(row_blocks[-1])[-1]
-      zeros_to_pad_after_shape = array_ops.concat(
+      batch_row_shape = prefer_static.shape(row_blocks[0])[:-1]
+      num_cols = num_cols + prefer_static.shape(row_blocks[-1])[-1]
+      zeros_to_pad_after_shape = prefer_static.concat(
           [batch_row_shape,
            [self.domain_dimension_tensor() - num_cols]], axis=-1)
       zeros_to_pad_after = array_ops.zeros(
           shape=zeros_to_pad_after_shape, dtype=self.dtype)
 
       row_blocks.append(zeros_to_pad_after)
-      dense_rows.append(array_ops.concat(row_blocks, axis=-1))
+      dense_rows.append(prefer_static.concat(row_blocks, axis=-1))
 
-    mat = array_ops.concat(dense_rows, axis=-2)
+    mat = prefer_static.concat(dense_rows, axis=-2)
     tensorshape_util.set_shape(mat, tensor_shape.TensorShape(self.shape))
     return mat
 
@@ -893,7 +893,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
       # Extend the axis for broadcasting.
       eig_list.append(op.eigvals()[..., _ops.newaxis])
     eig_list = linear_operator_util.broadcast_matrix_batch_dims(eig_list)
-    eigs = array_ops.concat(eig_list, axis=-2)
+    eigs = prefer_static.concat(eig_list, axis=-2)
     return array_ops.squeeze(eigs, axis=-1)
 
   @property
@@ -912,4 +912,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

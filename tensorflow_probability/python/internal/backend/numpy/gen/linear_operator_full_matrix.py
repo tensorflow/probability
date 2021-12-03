@@ -198,7 +198,7 @@ class LinearOperatorFullMatrix(linear_operator.LinearOperator):
     return tensor_shape.TensorShape(self._matrix.shape)
 
   def _shape_tensor(self):
-    return array_ops.shape(self._matrix)
+    return prefer_static.shape(self._matrix)
 
   def _matmul(self, x, adjoint=False, adjoint_arg=False):
     return _linalg.matmul(
@@ -226,4 +226,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

@@ -41,6 +41,7 @@ from tensorflow_probability.python.internal.backend.numpy import test_lib as tes
 from tensorflow_probability.python.internal.backend.numpy.control_flow import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.dtype import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.functional_ops import *  # pylint: disable=wildcard-import
+from tensorflow_probability.python.internal.backend.numpy.gen.tensor_shape import dimension_value
 from tensorflow_probability.python.internal.backend.numpy.gen.tensor_shape import TensorShape
 from tensorflow_probability.python.internal.backend.numpy.misc import *  # pylint: disable=wildcard-import
 from tensorflow_probability.python.internal.backend.numpy.numpy_array import *  # pylint: disable=wildcard-import
@@ -138,8 +139,7 @@ class _SingleReplicaContext(object):
 # --- Begin Public Functions --------------------------------------------------
 
 
-compat = collections.namedtuple('compat', 'dimension_value')(
-    lambda dim: None if dim is None else int(dim))
+compat = collections.namedtuple('compat', 'dimension_value')(dimension_value)
 
 distribute = collections.namedtuple('distribute', 'get_replica_context')(
     _SingleReplicaContext)

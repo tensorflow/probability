@@ -66,6 +66,9 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 """
 
 LINOP_UTIL_SUFFIX = """
@@ -174,6 +177,8 @@ def gen_module(module_name):
   code = re.sub(r'([_a-zA-Z0-9.\[\]]+).is_integer',
                 'np.issubdtype(\\1, np.integer)', code)
 
+  code = code.replace('array_ops.shape', 'prefer_static.shape')
+  code = code.replace('array_ops.concat', 'prefer_static.concat')
   code = code.replace('array_ops.broadcast_static_shape',
                       '_ops.broadcast_static_shape')
   code = code.replace('array_ops.broadcast_to', '_ops.broadcast_to')

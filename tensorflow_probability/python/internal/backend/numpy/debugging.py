@@ -17,6 +17,7 @@ import numpy as np
 import six
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
+from tensorflow_probability.python.internal.backend.numpy import dtype as dt
 from tensorflow_probability.python.internal.backend.numpy import ops
 
 
@@ -40,6 +41,7 @@ __all__ = [
     'assert_rank_at_least',
     'assert_rank_in',
     'assert_scalar',
+    'assert_same_float_dtype',
     'check_numerics',
 ]
 
@@ -210,6 +212,21 @@ def _assert_rank_in(*_, **__):  # pylint: disable=unused-argument
   pass
 
 
+def _assert_same_float_dtype(tensors=None, dtype=None):  # pylint: disable=unused-argument,redefined-outer-name
+  """Checks that all tensors have the same dtype."""
+  expected_dtype = None
+  if tensors:
+    expected_dtype = dtype
+    for t in tensors:
+      if not expected_dtype:
+        expected_dtype = t.dtype
+      elif expected_dtype != t.dtype:
+        raise ValueError(f'Mismatched dtypes.: {expected_dtype} vs. {t.dtype}')
+  if not expected_dtype:
+    expected_dtype = dt.float32
+  return expected_dtype
+
+
 # --- Begin Public Functions --------------------------------------------------
 
 
@@ -289,6 +306,10 @@ assert_rank_at_least = utils.copy_docstring(
 assert_rank_in = utils.copy_docstring(
     'tf.debugging.assert_rank_in',
     _assert_rank_in)
+
+assert_same_float_dtype = utils.copy_docstring(
+    'tf.debugging.assert_same_float_dtype',
+    _assert_same_float_dtype)
 
 check_numerics = utils.copy_docstring(
     'tf.debugging.check_numerics',

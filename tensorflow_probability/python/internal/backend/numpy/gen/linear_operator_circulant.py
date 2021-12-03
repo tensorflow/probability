@@ -48,6 +48,9 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as linalg
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator
@@ -211,7 +214,7 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
       return linear_operator_util.shape_tensor(
           self.block_shape.as_list(), name="block_shape")
     spectrum_shape = (
-        array_ops.shape(self.spectrum)
+        prefer_static.shape(self.spectrum)
         if spectrum_shape is None else spectrum_shape)
     return spectrum_shape[-self.block_depth:]
 
@@ -248,8 +251,8 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
       vec_leading_shape = tensor_shape.TensorShape(vec.shape)[:-1]
       final_shape = vec_leading_shape.concatenate(self.block_shape)
     else:
-      vec_leading_shape = array_ops.shape(vec)[:-1]
-      final_shape = array_ops.concat(
+      vec_leading_shape = prefer_static.shape(vec)[:-1]
+      final_shape = prefer_static.concat(
           (vec_leading_shape, self.block_shape_tensor()), 0)
     return array_ops.reshape(vec, final_shape)
 
@@ -276,10 +279,10 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
       # flat_shape = [v0, v1, v2*v3]
       flat_shape = vec_leading_shape + [np.prod(vec_block_shape)]
     else:
-      vec_shape = array_ops.shape(vec)
+      vec_shape = prefer_static.shape(vec)
       vec_leading_shape = vec_shape[:-self.block_depth]
       vec_block_shape = vec_shape[-self.block_depth:]
-      flat_shape = array_ops.concat(
+      flat_shape = prefer_static.concat(
           (vec_leading_shape, [math_ops.reduce_prod(vec_block_shape)]), 0)
     vec_flat = array_ops.reshape(vec, flat_shape)
 
@@ -353,12 +356,12 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
   def _shape_tensor(self, spectrum=None):
     spectrum = self.spectrum if spectrum is None else spectrum
     # See tensor_shape.TensorShape(self.shape) for explanation of steps
-    s_shape = array_ops.shape(spectrum)
+    s_shape = prefer_static.shape(spectrum)
     batch_shape = s_shape[:-self.block_depth]
     trailing_dims = s_shape[-self.block_depth:]
     n = math_ops.reduce_prod(trailing_dims)
     n_x_n = [n, n]
-    return array_ops.concat((batch_shape, n_x_n), 0)
+    return prefer_static.concat((batch_shape, n_x_n), 0)
 
   def assert_hermitian_spectrum(self, name="assert_hermitian_spectrum"):
     """Returns an `Op` that asserts this operator has Hermitian spectrum.
@@ -415,16 +418,16 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
     batch_shape = self._batch_shape_tensor(
         shape=self._shape_tensor(spectrum=spectrum))
     spec_mat = array_ops.reshape(
-        spectrum, array_ops.concat((batch_shape, [-1, 1]), axis=0))
+        spectrum, prefer_static.concat((batch_shape, [-1, 1]), axis=0))
     # Second, broadcast, possibly requiring an addition of array of zeros.
     x, spec_mat = linear_operator_util.broadcast_matrix_batch_dims((x,
                                                                     spec_mat))
     # Third, put the block shape back into spectrum.
-    x_batch_shape = array_ops.shape(x)[:-2]
-    spectrum_shape = array_ops.shape(spectrum)
+    x_batch_shape = prefer_static.shape(x)[:-2]
+    spectrum_shape = prefer_static.shape(spectrum)
     spectrum = array_ops.reshape(
         spec_mat,
-        array_ops.concat(
+        prefer_static.concat(
             (x_batch_shape,
              self._block_shape_tensor(spectrum_shape=spectrum_shape)),
             axis=0))
@@ -1173,4 +1176,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

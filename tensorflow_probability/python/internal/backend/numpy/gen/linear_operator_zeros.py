@@ -274,7 +274,7 @@ class LinearOperatorZeros(linear_operator.LinearOperator):
     if self._batch_shape_arg is None:
       return matrix_shape
 
-    return array_ops.concat((self._batch_shape_arg, matrix_shape), 0)
+    return prefer_static.concat((self._batch_shape_arg, matrix_shape), 0)
 
   def _assert_non_singular(self):
     raise errors.InvalidArgumentError(
@@ -318,7 +318,7 @@ class LinearOperatorZeros(linear_operator.LinearOperator):
     # Dynamic broadcast:
     #   Always add to an array of zeros, rather than using a "cond", since a
     #   cond would require copying data from GPU --> CPU.
-    special_shape = array_ops.concat((self.batch_shape_tensor(), [1, 1]), 0)
+    special_shape = prefer_static.concat((self.batch_shape_tensor(), [1, 1]), 0)
     zeros = array_ops.zeros(shape=special_shape, dtype=self.dtype)
     return x + zeros
 
@@ -330,20 +330,20 @@ class LinearOperatorZeros(linear_operator.LinearOperator):
     if self.is_square:
       # Note that adjoint has no effect since this matrix is self-adjoint.
       if adjoint_arg:
-        output_shape = array_ops.concat([
-            array_ops.shape(x)[:-2],
-            [array_ops.shape(x)[-1], array_ops.shape(x)[-2]]], axis=0)
+        output_shape = prefer_static.concat([
+            prefer_static.shape(x)[:-2],
+            [prefer_static.shape(x)[-1], prefer_static.shape(x)[-2]]], axis=0)
       else:
-        output_shape = array_ops.shape(x)
+        output_shape = prefer_static.shape(x)
 
       return self._possibly_broadcast_batch_shape(
           array_ops.zeros(shape=output_shape, dtype=x.dtype))
 
-    x_shape = array_ops.shape(x)
+    x_shape = prefer_static.shape(x)
     n = self._num_columns if adjoint else self._num_rows
     m = x_shape[-2] if adjoint_arg else x_shape[-1]
 
-    output_shape = array_ops.concat([x_shape[:-2], [n, m]], axis=0)
+    output_shape = prefer_static.concat([x_shape[:-2], [n, m]], axis=0)
 
     zeros = array_ops.zeros(shape=output_shape, dtype=x.dtype)
     return self._possibly_broadcast_batch_shape(zeros)
@@ -478,7 +478,7 @@ class LinearOperatorZeros(linear_operator.LinearOperator):
     if tensor_shape.TensorShape(self.shape).is_fully_defined():
       d_shape = self.batch_shape.concatenate([self._min_matrix_dim()])
     else:
-      d_shape = array_ops.concat(
+      d_shape = prefer_static.concat(
           [self.batch_shape_tensor(),
            [self._min_matrix_dim_tensor()]], axis=0)
 
@@ -508,4 +508,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

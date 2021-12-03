@@ -199,7 +199,7 @@ class LinearOperatorAdjoint(linear_operator.LinearOperator):
   def _shape_tensor(self):
     # Rotate last dimension
     shape = self.operator.shape_tensor()
-    return array_ops.concat([
+    return prefer_static.concat([
         shape[:-2], [shape[-1], shape[-2]]], axis=-1)
 
   def _matmul(self, x, adjoint=False, adjoint_arg=False):
@@ -262,4 +262,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

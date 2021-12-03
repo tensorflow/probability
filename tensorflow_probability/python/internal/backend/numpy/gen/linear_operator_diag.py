@@ -202,9 +202,9 @@ class LinearOperatorDiag(linear_operator.LinearOperator):
     return d_shape.concatenate(d_shape[-1:])
 
   def _shape_tensor(self):
-    d_shape = array_ops.shape(self._diag)
+    d_shape = prefer_static.shape(self._diag)
     k = d_shape[-1]
-    return array_ops.concat((d_shape, [k]), 0)
+    return prefer_static.concat((d_shape, [k]), 0)
 
   @property
   def diag(self):
@@ -297,4 +297,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

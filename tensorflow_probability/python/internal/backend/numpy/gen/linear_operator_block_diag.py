@@ -312,9 +312,9 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
     zeros = array_ops.zeros(shape=self.operators[0].batch_shape_tensor())
     for operator in self.operators[1:]:
       zeros = zeros + array_ops.zeros(shape=operator.batch_shape_tensor())
-    batch_shape = array_ops.shape(zeros)
+    batch_shape = prefer_static.shape(zeros)
 
-    return array_ops.concat((batch_shape, matrix_shape), 0)
+    return prefer_static.concat((batch_shape, matrix_shape), 0)
 
   # TODO(b/188080761): Add a more efficient implementation of `cond` that
   # constructs the condition number from the blockwise singular values.
@@ -431,7 +431,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
 
     result_list = linear_operator_util.broadcast_matrix_batch_dims(
         result_list)
-    return array_ops.concat(result_list, axis=-2)
+    return prefer_static.concat(result_list, axis=-2)
 
   def matvec(self, x, adjoint=False, name="matvec"):
     """Transform [batch] vector `x` with left multiplication:  `x --> Ax`.
@@ -619,7 +619,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
 
       solution_list = linear_operator_util.broadcast_matrix_batch_dims(
           solution_list)
-      return array_ops.concat(solution_list, axis=-2)
+      return prefer_static.concat(solution_list, axis=-2)
 
   def solvevec(self, rhs, adjoint=False, name="solve"):
     """Solve single equation with best effort: `A X = rhs`.
@@ -694,7 +694,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
       # Extend the axis for broadcasting.
       diag_list = diag_list + [operator.diag_part()[..., _ops.newaxis]]
     diag_list = linear_operator_util.broadcast_matrix_batch_dims(diag_list)
-    diagonal = array_ops.concat(diag_list, axis=-2)
+    diagonal = prefer_static.concat(diag_list, axis=-2)
     return array_ops.squeeze(diagonal, axis=-1)
 
   def _trace(self):
@@ -714,23 +714,23 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
     broadcasted_blocks = linear_operator_util.broadcast_matrix_batch_dims(
         broadcasted_blocks)
     for block in broadcasted_blocks:
-      batch_row_shape = array_ops.shape(block)[:-1]
+      batch_row_shape = prefer_static.shape(block)[:-1]
 
-      zeros_to_pad_before_shape = array_ops.concat(
+      zeros_to_pad_before_shape = prefer_static.concat(
           [batch_row_shape, [num_cols]], axis=-1)
       zeros_to_pad_before = array_ops.zeros(
           shape=zeros_to_pad_before_shape, dtype=block.dtype)
-      num_cols = num_cols + array_ops.shape(block)[-1]
-      zeros_to_pad_after_shape = array_ops.concat(
+      num_cols = num_cols + prefer_static.shape(block)[-1]
+      zeros_to_pad_after_shape = prefer_static.concat(
           [batch_row_shape,
            [self.domain_dimension_tensor() - num_cols]], axis=-1)
       zeros_to_pad_after = array_ops.zeros(
           shape=zeros_to_pad_after_shape, dtype=block.dtype)
 
-      rows.append(array_ops.concat(
+      rows.append(prefer_static.concat(
           [zeros_to_pad_before, block, zeros_to_pad_after], axis=-1))
 
-    mat = array_ops.concat(rows, axis=-2)
+    mat = prefer_static.concat(rows, axis=-2)
     tensorshape_util.set_shape(mat, tensor_shape.TensorShape(self.shape))
     return mat
 
@@ -756,7 +756,7 @@ class LinearOperatorBlockDiag(linear_operator.LinearOperator):
       # Extend the axis for broadcasting.
       eig_list = eig_list + [operator.eigvals()[..., _ops.newaxis]]
     eig_list = linear_operator_util.broadcast_matrix_batch_dims(eig_list)
-    eigs = array_ops.concat(eig_list, axis=-2)
+    eigs = prefer_static.concat(eig_list, axis=-2)
     return array_ops.squeeze(eigs, axis=-1)
 
   @property
@@ -775,4 +775,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

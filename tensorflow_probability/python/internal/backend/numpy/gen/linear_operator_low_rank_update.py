@@ -317,7 +317,7 @@ class LinearOperatorLowRankUpdate(linear_operator.LinearOperator):
       if tensor_shape.dimension_value(tensor_shape.TensorShape(self.u.shape)[-1]) is not None:
         r = tensor_shape.dimension_value(tensor_shape.TensorShape(self.u.shape)[-1])
       else:
-        r = array_ops.shape(self.u)[-1]
+        r = prefer_static.shape(self.u)[-1]
       self._diag_operator = linear_operator_identity.LinearOperatorIdentity(
           num_rows=r, dtype=self.dtype)
 
@@ -379,11 +379,11 @@ class LinearOperatorLowRankUpdate(linear_operator.LinearOperator):
         self.diag_operator.batch_shape_tensor())
     batch_shape = array_ops.broadcast_dynamic_shape(
         batch_shape,
-        array_ops.shape(self.u)[:-2])
+        prefer_static.shape(self.u)[:-2])
     batch_shape = array_ops.broadcast_dynamic_shape(
         batch_shape,
-        array_ops.shape(self.v)[:-2])
-    return array_ops.concat(
+        prefer_static.shape(self.v)[:-2])
+    return prefer_static.concat(
         [batch_shape, self.base_operator.shape_tensor()[-2:]], axis=0)
 
   def _get_uv_as_tensors(self):
@@ -535,4 +535,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

@@ -105,7 +105,7 @@ class BaseLinearOperatorIdentity(linear_operator.LinearOperator):
     if tensor_shape.TensorShape(self.shape).is_fully_defined():
       d_shape = self.batch_shape.concatenate([self._min_matrix_dim()])
     else:
-      d_shape = array_ops.concat(
+      d_shape = prefer_static.concat(
           [self.batch_shape_tensor(),
            [self._min_matrix_dim_tensor()]], axis=0)
 
@@ -332,7 +332,7 @@ class LinearOperatorIdentity(BaseLinearOperatorIdentity):
     if self._batch_shape_arg is None:
       return matrix_shape
 
-    return array_ops.concat((self._batch_shape_arg, matrix_shape), 0)
+    return prefer_static.concat((self._batch_shape_arg, matrix_shape), 0)
 
   def _assert_non_singular(self):
     return control_flow_ops.no_op("assert_non_singular")
@@ -372,7 +372,7 @@ class LinearOperatorIdentity(BaseLinearOperatorIdentity):
     # Dynamic broadcast:
     #   Always add to an array of zeros, rather than using a "cond", since a
     #   cond would require copying data from GPU --> CPU.
-    special_shape = array_ops.concat((self.batch_shape_tensor(), [1, 1]), 0)
+    special_shape = prefer_static.concat((self.batch_shape_tensor(), [1, 1]), 0)
     zeros = array_ops.zeros(shape=special_shape, dtype=self.dtype)
     return x + zeros
 
@@ -687,8 +687,8 @@ class LinearOperatorScaledIdentity(BaseLinearOperatorIdentity):
   def _shape_tensor(self):
     matrix_shape = array_ops.stack((self._num_rows, self._num_rows), axis=0)
 
-    batch_shape = array_ops.shape(self.multiplier)
-    return array_ops.concat((batch_shape, matrix_shape), 0)
+    batch_shape = prefer_static.shape(self.multiplier)
+    return prefer_static.concat((batch_shape, matrix_shape), 0)
 
   def _assert_non_singular(self):
     return check_ops.assert_positive(
@@ -813,4 +813,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

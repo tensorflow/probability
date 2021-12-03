@@ -206,10 +206,10 @@ class LinearOperatorToeplitz(linear_operator.LinearOperator):
     row = self.row if row is None else row
     col = self.col if col is None else col
     v_shape = array_ops.broadcast_dynamic_shape(
-        array_ops.shape(row),
-        array_ops.shape(col))
+        prefer_static.shape(row),
+        prefer_static.shape(col))
     k = v_shape[-1]
-    return array_ops.concat((v_shape, [k]), 0)
+    return prefer_static.concat((v_shape, [k]), 0)
 
   def _assert_self_adjoint(self):
     return check_ops.assert_equal(
@@ -233,10 +233,10 @@ class LinearOperatorToeplitz(linear_operator.LinearOperator):
     # http://math.mit.edu/icg/resources/teaching/18.085-spring2015/toeplitz.pdf
     # for more details.
     x = linalg.adjoint(x) if adjoint_arg else x
-    expanded_x = array_ops.concat([x, array_ops.zeros_like(x)], axis=-2)
+    expanded_x = prefer_static.concat([x, array_ops.zeros_like(x)], axis=-2)
     col = ops.convert_to_tensor(self.col)
     row = ops.convert_to_tensor(self.row)
-    circulant_col = array_ops.concat(
+    circulant_col = prefer_static.concat(
         [col,
          array_ops.zeros_like(col[..., 0:1]),
          array_ops.reverse(row[..., 1:], axis=[-1])], axis=-1)
@@ -264,13 +264,13 @@ class LinearOperatorToeplitz(linear_operator.LinearOperator):
     row = ops.convert_to_tensor(self.row)
     col = ops.convert_to_tensor(self.col)
     total_shape = array_ops.broadcast_dynamic_shape(
-        array_ops.shape(row), array_ops.shape(col))
-    n = array_ops.shape(row)[-1]
+        prefer_static.shape(row), prefer_static.shape(col))
+    n = prefer_static.shape(row)[-1]
     row = _ops.broadcast_to(row, total_shape)
     col = _ops.broadcast_to(col, total_shape)
     # We concatenate the column in reverse order to the row.
     # This gives us 2*n + 1 elements.
-    elements = array_ops.concat(
+    elements = prefer_static.concat(
         [array_ops.reverse(col, axis=[-1]), row[..., 1:]], axis=-1)
     # Given the above vector, the i-th row of the Toeplitz matrix
     # is the last n elements of the above vector shifted i right
@@ -318,4 +318,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

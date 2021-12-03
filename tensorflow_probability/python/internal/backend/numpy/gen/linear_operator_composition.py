@@ -251,9 +251,9 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
     zeros = array_ops.zeros(shape=self.operators[0].batch_shape_tensor())
     for operator in self.operators[1:]:
       zeros = zeros + array_ops.zeros(shape=operator.batch_shape_tensor())
-    batch_shape = array_ops.shape(zeros)
+    batch_shape = prefer_static.shape(zeros)
 
-    return array_ops.concat((batch_shape, matrix_shape), 0)
+    return prefer_static.concat((batch_shape, matrix_shape), 0)
 
   def _matmul(self, x, adjoint=False, adjoint_arg=False):
     # If self.operators = [A, B], and not adjoint, then
@@ -317,4 +317,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

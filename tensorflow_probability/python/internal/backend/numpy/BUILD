@@ -133,6 +133,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":_utils",
+        ":dtype",
         ":v1",
         ":v2",
         # six dep,

@@ -201,7 +201,7 @@ class LinearOperatorLowerTriangular(linear_operator.LinearOperator):
     return tensor_shape.TensorShape(self._tril.shape)
 
   def _shape_tensor(self):
-    return array_ops.shape(self._tril)
+    return prefer_static.shape(self._tril)
 
   def _assert_non_singular(self):
     return linear_operator_util.assert_no_entries_with_modulus_zero(
@@ -246,4 +246,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 

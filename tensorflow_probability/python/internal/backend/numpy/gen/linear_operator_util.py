@@ -250,7 +250,7 @@ def assert_compatible_matrix_dimensions(operator, x):
   """
   # Static checks are done in the base class.  Only tensor asserts here.
   assert_same_dd = check_ops.assert_equal(
-      array_ops.shape(x)[-2],
+      prefer_static.shape(x)[-2],
       operator.domain_dimension_tensor(),
       # This error message made to look similar to error raised by static check
       # in the base class.
@@ -358,22 +358,22 @@ def broadcast_matrix_batch_dims(batch_matrices, name=None):
     if bcast_batch_shape.is_fully_defined():
       for i, mat in enumerate(batch_matrices):
         if tensor_shape.TensorShape(mat.shape)[:-2] != bcast_batch_shape:
-          bcast_shape = array_ops.concat(
-              [bcast_batch_shape.as_list(), array_ops.shape(mat)[-2:]], axis=0)
+          bcast_shape = prefer_static.concat(
+              [bcast_batch_shape.as_list(), prefer_static.shape(mat)[-2:]], axis=0)
           batch_matrices[i] = _ops.broadcast_to(mat, bcast_shape)
       return batch_matrices
 
     # Since static didn't work, do dynamic, which always copies data.
-    bcast_batch_shape = array_ops.shape(batch_matrices[0])[:-2]
+    bcast_batch_shape = prefer_static.shape(batch_matrices[0])[:-2]
     for mat in batch_matrices[1:]:
       bcast_batch_shape = array_ops.broadcast_dynamic_shape(
           bcast_batch_shape,
-          array_ops.shape(mat)[:-2])
+          prefer_static.shape(mat)[:-2])
     for i, mat in enumerate(batch_matrices):
       batch_matrices[i] = _ops.broadcast_to(
           mat,
-          array_ops.concat(
-              [bcast_batch_shape, array_ops.shape(mat)[-2:]], axis=0))
+          prefer_static.concat(
+              [bcast_batch_shape, prefer_static.shape(mat)[-2:]], axis=0))
 
     return batch_matrices
 
@@ -426,8 +426,8 @@ def _reshape_for_efficiency(a,
   b_extra_ndims = tensor_shape.TensorShape(b.shape).ndims - tensor_shape.TensorShape(a.shape).ndims
 
   # b_extra_sh = S, b_main_sh = C + [n, r]
-  b_extra_sh = array_ops.shape(b)[:b_extra_ndims]
-  b_main_sh = array_ops.shape(b)[b_extra_ndims:]
+  b_extra_sh = prefer_static.shape(b)[:b_extra_ndims]
+  b_main_sh = prefer_static.shape(b)[b_extra_ndims:]
 
   # No reason to flip unless the extra dims of b are big enough.  Why?
   # Assume adjoint/transpose = False.  Then...
@@ -465,8 +465,8 @@ def _reshape_for_efficiency(a,
   still_need_to_transpose = False
 
   # Recompute shapes, since the transpose/adjoint may have changed them.
-  b_extra_sh = array_ops.shape(b)[:b_extra_ndims]
-  b_main_sh = array_ops.shape(b)[b_extra_ndims:]
+  b_extra_sh = prefer_static.shape(b)[:b_extra_ndims]
+  b_main_sh = prefer_static.shape(b)[b_extra_ndims:]
 
   # Permutation to put the extra dims at the end.
   perm = (
@@ -477,14 +477,14 @@ def _reshape_for_efficiency(a,
 
   # Now squash this end into one long dim.
   b_squashed_end = array_ops.reshape(
-      b_extra_on_end, array_ops.concat((b_main_sh[:-1], [-1]), 0))
+      b_extra_on_end, prefer_static.concat((b_main_sh[:-1], [-1]), 0))
 
   def reshape_inv(y):
     # Expand the extra dims hanging off the end, "b_extra_sh".
     # Note we use y_sh[:-1] + [b_main_sh[-1]] rather than b_main_sh, because y
     # Could have different batch dims than a and b, because of broadcasting.
-    y_extra_shape = array_ops.concat(
-        (array_ops.shape(y)[:-1], [b_main_sh[-1]], b_extra_sh), 0)
+    y_extra_shape = prefer_static.concat(
+        (prefer_static.shape(y)[:-1], [b_main_sh[-1]], b_extra_sh), 0)
     y_extra_on_end = array_ops.reshape(y, y_extra_shape)
     inverse_perm = np.argsort(perm)
     return array_ops.transpose(y_extra_on_end, perm=inverse_perm)
@@ -626,4 +626,7 @@ distribution_util = private.LazyLoader(
 tensorshape_util = private.LazyLoader(
     "tensorshape_util", globals(),
     "tensorflow_probability.substrates.numpy.internal.tensorshape_util")
+prefer_static = private.LazyLoader(
+    "prefer_static", globals(),
+    "tensorflow_probability.substrates.numpy.internal.prefer_static")
 
