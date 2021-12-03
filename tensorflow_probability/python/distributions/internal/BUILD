@@ -66,7 +66,8 @@ multi_substrate_py_test(
 )
 
 py_library(
-    name = "correlation_matrix_volumes_py",
+    name = "correlation_matrix_volumes_lib",
+#     testonly = 1,  # DisableOnExport
     srcs = [
         "correlation_matrix_volumes_lib.py",
     ],
@@ -77,17 +78,19 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:test_util_scipy",
         "//tensorflow_probability/python/math:linalg",
     ],
 )
 
 py_binary(
     name = "correlation_matrix_volumes",
+#     testonly = 1,  # DisableOnExport
     srcs = ["correlation_matrix_volumes.py"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
-        ":correlation_matrix_volumes_py",
+        ":correlation_matrix_volumes_lib",
         ":init",
         # absl:app dep,
         # absl/flags dep,
@@ -106,7 +109,7 @@ py_test(
         "optonly",
     ],
     deps = [
-        ":correlation_matrix_volumes_py",
+        ":correlation_matrix_volumes_lib",
         ":statistical_testing",
         # numpy dep,
         # tensorflow dep,

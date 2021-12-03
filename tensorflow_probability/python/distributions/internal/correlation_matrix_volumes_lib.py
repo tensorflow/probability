@@ -28,7 +28,6 @@ method](https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval),
 also implemented here.
 """
 
-import importlib
 import sys
 
 # Dependency imports
@@ -39,24 +38,13 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import test_util_scipy
 from tensorflow_probability.python.math.linalg import fill_triangular
 
 __all__ = [
     "correlation_matrix_volume_rejection_samples",
     "compute_true_volumes",
 ]
-
-
-def try_import(name):  # pylint: disable=invalid-name
-  module = None
-  try:
-    module = importlib.import_module(name)
-  except ImportError as e:
-    tf1.logging.warning("Could not import %s: %s" % (name, str(e)))
-  return module
-
-optimize = try_import("scipy.optimize")
-stats = try_import("scipy.stats")
 
 
 def _psd_mask(x):
@@ -250,9 +238,6 @@ def _clopper_pearson_confidence_interval(samples, error_rate):
   #   robustness is more important than speed here, which may make
   #   bisection search actively better.
   # - The rest is just a matter of rewriting in the appropriate style.
-  if optimize is None or stats is None:
-    raise ValueError(
-        "Scipy is required for computing Clopper-Pearson confidence intervals")
   if len(samples.shape) != 1:
     raise ValueError("Batch semantics not implemented")
   n = len(samples)
@@ -269,14 +254,8 @@ def _clopper_pearson_confidence_interval(samples, error_rate):
     msg = ("Purportedly Bernoulli distribution had distinct samples"
            " {}, {}, and {}".format(uniques[0], uniques[1], uniques[2]))
     raise ValueError(msg)
-  def p_small_enough(p):
-    prob = stats.binom.logcdf(successes, n, p)
-    return prob - np.log(error_rate / 2.)
-  def p_big_enough(p):
-    prob = stats.binom.logsf(successes, n, p)
-    return prob - np.log(error_rate / 2.)
-  high_p = optimize.brentq(p_small_enough, successes / n, 1., rtol=1e-9)
-  low_p = optimize.brentq(p_big_enough, 0., successes / n, rtol=1e-9)
+  low_p, high_p = test_util_scipy.binomial_confidence_interval(
+      successes, n, error_rate)
   low_interval = low + (high - low) * low_p
   high_interval = low + (high - low) * high_p
   return (low_interval, high_interval)

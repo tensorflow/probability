@@ -717,6 +717,20 @@ multi_substrate_py_test(
     ],
 )
 
+# Not part of test_util to segregate the scipy dependency.  Though,
+# maybe that segregation is futile, since TF (apparently) depends on
+# scipy anyway (through Keras).
+multi_substrate_py_library(
+    name = "test_util_scipy",
+#     testonly = 1,  # DisableOnExport
+    srcs = ["test_util_scipy.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # scipy dep,
+    ],
+)
+
 multi_substrate_py_library(
     name = "test_combinations",
 #     testonly = 1,  # DisableOnExport
