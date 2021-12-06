@@ -133,9 +133,11 @@ check_for_common_package_conflicts() {
     exit 1
   fi
 }
+python -m pip install tf-nightly-cpu
+python -m pip uninstall tensorflow-io-gcs-filesystem 0.22.0
 
 install_python_packages() {
-  install_tensorflow "${TF_NIGHTLY_PACKAGE}" "${PIP_FLAGS}"
+#  install_tensorflow "${TF_NIGHTLY_PACKAGE}" "${PIP_FLAGS}"
   install_jax "${PIP_FLAGS}"
   install_common_packages "${PIP_FLAGS}"
   install_test_only_packages "${PIP_FLAGS}"

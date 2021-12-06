@@ -34,6 +34,7 @@ _allowed_symbols = [
     'AdditiveStateSpaceModel',
     'Autoregressive',
     'AutoregressiveStateSpaceModel',
+    'AutoregressiveMovingAverageStateSpaceModel',
     'ConstrainedSeasonalStateSpaceModel',
     'DynamicLinearRegression',
     'DynamicLinearRegressionStateSpaceModel',

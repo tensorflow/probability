@@ -68,6 +68,32 @@ py_test(
 )
 
 py_library(
+    name = "autoregressive_moving_average",
+    srcs = ["autoregressive_moving_average.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+py_test(
+    name = "autoregressive_moving_average_test",
+    size = "medium",
+    srcs = ["autoregressive_moving_average_test.py"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+py_library(
     name = "dynamic_regression",
     srcs = ["dynamic_regression.py"],
     srcs_version = "PY3",

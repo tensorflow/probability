@@ -18,6 +18,7 @@
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.sts.components.autoregressive import Autoregressive
 from tensorflow_probability.python.sts.components.autoregressive import AutoregressiveStateSpaceModel
+from tensorflow_probability.python.sts.components.autoregressive_moving_average import AutoregressiveMovingAverageStateSpaceModel
 from tensorflow_probability.python.sts.components.dynamic_regression import DynamicLinearRegression
 from tensorflow_probability.python.sts.components.dynamic_regression import DynamicLinearRegressionStateSpaceModel
 from tensorflow_probability.python.sts.components.local_level import LocalLevel
@@ -41,6 +42,7 @@ _allowed_symbols = [
     'AdditiveStateSpaceModel',
     'Autoregressive',
     'AutoregressiveStateSpaceModel',
+    'AutoregressiveMovingAverageStateSpaceModel',
     'ConstrainedSeasonalStateSpaceModel',
     'DynamicLinearRegression',
     'DynamicLinearRegressionStateSpaceModel',
