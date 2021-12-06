@@ -60,11 +60,20 @@ class _SoftClipBijectorBase(tfp_test_util.TestCase):
       self.assertAllLessEqual(ys, high)
       self.assertAllClose(ys[-1], high)
 
-  def test_is_nearly_identity_within_range(self):
+  @parameterized.parameters(
+      (-5., 5.),
+      (None, 5.),
+      (-5., None),
+      (-3.5, 3.5),
+      (None, 10.),
+      (-10., None))
+  def test_is_nearly_identity_within_range(self, low, high):
     xs = tf.convert_to_tensor(np.linspace(-3., 3., 20), dtype=self.dtype)
-    b = tfb.SoftClip(tf.convert_to_tensor(-5., self.dtype),
-                     tf.convert_to_tensor(5., self.dtype),
-                     hinge_softness=0.01)
+    if low is not None:
+      low = tf.convert_to_tensor(low, self.dtype)
+    if high is not None:
+      high = tf.convert_to_tensor(high, self.dtype)
+    b = tfb.SoftClip(low, high, hinge_softness=0.01)
     ys = self.evaluate(b.forward(xs))
     self.assertAllClose(ys, xs)
     xs_inverted = self.evaluate(b.inverse(ys))

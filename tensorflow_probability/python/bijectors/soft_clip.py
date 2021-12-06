@@ -250,7 +250,7 @@ class SoftClip(bijector.AutoCompositeTensorBijector):
                       scale.Scale(negate),
                       softplus_bijector,
                       scale.Scale(negate),
-                      shift.Shift(high)]
+                      shift.Shift(tfp_util.DeferredTensor(high, lambda x: -x))]
 
       self._low = low
       self._high = high
