@@ -16,6 +16,7 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.sts.components.autoregressive import make_ar_transition_matrix
 
 
@@ -222,14 +223,16 @@ def make_ma_observation_matrix(coefficients):
     observation_matrix = [1, theta[0], theta[1], ..., theta[p-1]]
     ```
 
+    To ensure broadcasting with the transition matrix, we return a shape of:
+    `concat([batch_shape, [order, order])`
+
     Args:
         coefficients: float `Tensor` of shape `concat([batch_shape, [order - 1])`.
 
     Returns:
-        ma_matrix: float `Tensor` with shape `concat([batch_shape, [order])`.
+        ma_matrix: float `Tensor` with shape `concat([batch_shape, [order, order])`.
     """
-    top_entry = tf.ones([1, 1], dtype=coefficients.dtype)
-    ma_matrix = tf.concat(
-        [top_entry, coefficients[..., tf.newaxis, :]], axis=-1
-    )
+    top_entry = tf.ones_like(coefficients)[..., 0:1]
+    ma_matrix = tf.concat([top_entry, coefficients], axis=-1)
+    ma_matrix = tf.expand_dims(ma_matrix, axis=-2)
     return ma_matrix

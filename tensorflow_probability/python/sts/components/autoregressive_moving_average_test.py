@@ -133,9 +133,10 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
     level_scale = self._build_placeholder(
         np.exp(np.random.randn(*batch_shape)))
 
-    ssm = AutoregressiveStateSpaceModel(
+    ssm = AutoregressiveMovingAverageStateSpaceModel(
         num_timesteps=10,
-        coefficients=coefficients,
+        ar_coefficients=coefficients,
+        ma_coefficients=coefficients[..., :-1],
         level_scale=level_scale,
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(np.ones([order]))))
