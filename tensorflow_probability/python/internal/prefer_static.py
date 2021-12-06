@@ -327,8 +327,9 @@ def dimension_size(x, idx):
   static_idx = tf.get_static_value(idx)
   if static_idx is not None:
     idx = static_idx
-    if tf.compat.dimension_value(x_shape[idx]) is None:
-      x_shape = _shape(x)
+    if tf.compat.dimension_value(x_shape[idx]) is not None:
+      return tf.compat.dimension_value(x_shape[idx])
+    x_shape = _shape(x)
   else:  # `dimension_idx` is not static.
     x_shape = convert_to_shape_tensor(_shape(x))
   return x_shape[idx]

@@ -279,8 +279,12 @@ class ShapeTest(test_util.TestCase):
 
     # case: static-shape Tensor input.
     self.assertEqual(ps.dimension_size(tf.zeros(shape), idx), shape[idx])
+    self.assertNotIsInstance(
+        ps.dimension_size(tf.zeros(shape), idx), tf1.Dimension)
     self.assertEqual(ps.dimension_size(tf.zeros(shape), idx_tensor),
                      shape[idx])
+    self.assertNotIsInstance(
+        ps.dimension_size(tf.zeros(shape), idx_tensor), tf1.Dimension)
 
     if tf.executing_eagerly():
       return
