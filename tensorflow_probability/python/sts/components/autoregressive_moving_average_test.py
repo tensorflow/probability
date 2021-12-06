@@ -98,6 +98,7 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
     self.assertAllClose(ar1_lp, arma1_lp)
     self.assertAllClose(ar2_lp, arma2_lp)
 
+    # TODO: Implement this test
   # def testLogprobCorrectness(self):
   #   # Compare the state-space model's log-prob to an explicit implementation.
   #   num_timesteps = 10

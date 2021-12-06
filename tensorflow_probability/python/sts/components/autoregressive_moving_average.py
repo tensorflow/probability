@@ -86,8 +86,8 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
     in the formal sense. Setting `observation_noise_scale` to a nonzero value
     corresponds to a latent ARMA(p, p-1) process observed under an iid noise model.
 
-    References: http://web.pdx.edu/~crkl/readings/Hamilton94.pdf
-
+    See the [Wikipedia article](http://web.pdx.edu/~crkl/readings/Hamilton94.pdf)
+    for details on the Hamilton state space formulation for ARMA(p, p-1) processes.
     """
 
     def __init__(self,
