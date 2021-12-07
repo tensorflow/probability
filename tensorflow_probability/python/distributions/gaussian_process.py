@@ -312,7 +312,11 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
     parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
-          [index_points, observation_noise_variance, jitter], tf.float32)
+          {
+              'index_points': index_points,
+              'observation_noise_variance': observation_noise_variance,
+              'jitter': jitter
+          }, tf.float32)
       index_points = tensor_util.convert_nonref_to_tensor(
           index_points, dtype=dtype, name='index_points')
       jitter = tensor_util.convert_nonref_to_tensor(
