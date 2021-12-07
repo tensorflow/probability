@@ -25,6 +25,7 @@ from jax import core as jax_core
 from jax import linear_util as lu
 from jax import tree_util
 from jax import util as jax_util
+from jax._src import dtypes
 from jax.interpreters import partial_eval as pe
 
 __all__ = [
@@ -42,7 +43,8 @@ safe_map = jax_util.safe_map
 def get_shaped_aval(x):
   """Converts a JAX value type into a shaped abstract value."""
   if hasattr(x, 'dtype') and hasattr(x, 'shape'):
-    return abstract_arrays.ShapedArray(x.shape, x.dtype)
+    return abstract_arrays.ShapedArray(
+        x.shape, dtypes.canonicalize_dtype(x.dtype))
   return abstract_arrays.raise_to_shaped(jax_core.get_aval(x))
 
 
