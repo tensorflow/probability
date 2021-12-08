@@ -113,7 +113,7 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
                 level[t-1] + ... + ar_coefficients[order-1] * level[t-order+1]`.
             ma_coefficients: `float` `Tensor` of shape `concat(batch_shape, [order])`
                 defining  the moving average coefficients. The ma_coefficients are defined
-                backwards in time: `noise[t] + ma_coefficients[1] * noise[t-1]
+                backwards in time: `noise[t] + ma_coefficients[0] * noise[t-1]
                 + ... + ma_coefficients[order-2] * noise[t-order+1]`.
             level_scale: Scalar (any additional dimensions are treated as batch
                 dimensions) `float` `Tensor` indicating the standard deviation of the
