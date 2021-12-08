@@ -28,6 +28,7 @@ from tensorflow_probability.substrates.numpy import math
 from tensorflow_probability.substrates.numpy import mcmc
 from tensorflow_probability.substrates.numpy import optimizer
 from tensorflow_probability.substrates.numpy import random
+from tensorflow_probability.substrates.numpy import sts
 from tensorflow_probability.substrates.numpy import stats
 from tensorflow_probability.substrates.numpy import util
 

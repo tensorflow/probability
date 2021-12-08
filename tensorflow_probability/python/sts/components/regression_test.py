@@ -19,7 +19,9 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import SparseLinearRegression
@@ -53,6 +55,9 @@ class _LinearRegressionTest(test_util.TestCase):
     self.assertAllEqual(*self.evaluate((ssm.stddev(),
                                         tf.zeros_like(predicted_time_series))))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason="Uses TF stateful optimizers")
   def test_simple_regression_correctness(self):
     # Verify that optimizing a simple linear regression by gradient descent
     # recovers the known-correct weights.
@@ -123,12 +128,15 @@ class _LinearRegressionTest(test_util.TestCase):
     self.assertAllEqual(batch_shape,
                         self.evaluate(weights.prior.batch_shape_tensor()))
 
-    prior_sampled_weights = weights.prior.sample()
+    seed = test_util.test_seed(sampler_type="stateless")
+    weights_seed, ssm_seed, shape_seed, sample_seed = tfp.random.split_seed(
+        seed, n=4)
+    prior_sampled_weights = weights.prior.sample(seed=weights_seed)
     ssm = linear_regression.make_state_space_model(
         num_timesteps=num_timesteps,
         param_vals={"weights": prior_sampled_weights})
 
-    lp = ssm.log_prob(ssm.sample())
+    lp = ssm.log_prob(ssm.sample(seed=ssm_seed))
     self.assertAllEqual(batch_shape,
                         self.evaluate(lp).shape)
 
@@ -138,9 +146,10 @@ class _LinearRegressionTest(test_util.TestCase):
         self.evaluate(
             weights.prior.log_prob(
                 weights.bijector(
-                    tf.random.normal(tf.shape(weights.prior.sample(64)),
-                                     seed=test_util.test_seed(),
-                                     dtype=self.dtype)))))
+                    tf.random.stateless_normal(
+                        tf.shape(weights.prior.sample(64, seed=shape_seed)),
+                        seed=sample_seed,
+                        dtype=self.dtype)))))
 
   def _build_placeholder(self, ndarray):
     """Convert a numpy array to a TF placeholder.
@@ -168,6 +177,8 @@ class _SparseLinearRegressionTest(test_util.TestCase):
     num_features = 2
     design_matrix = self._build_placeholder(
         np.random.randn(*(batch_shape + [num_timesteps, num_features])))
+    seed = test_util.test_seed(sampler_type="stateless")
+    prior_seed, ssm_seed = tfp.random.split_seed(seed, n=2)
 
     weights_batch_shape = []
     if not self.use_static_shape:
@@ -176,16 +187,16 @@ class _SparseLinearRegressionTest(test_util.TestCase):
     sparse_regression = SparseLinearRegression(
         design_matrix=design_matrix,
         weights_batch_shape=weights_batch_shape)
-    prior_params = [param.prior.sample()
+    prior_params = [param.prior.sample(seed=prior_seed)
                     for param in sparse_regression.parameters]
 
     ssm = sparse_regression.make_state_space_model(
         num_timesteps=num_timesteps,
         param_vals=prior_params)
     if self.use_static_shape:
-      output_shape = ssm.sample().shape.as_list()
+      output_shape = tensorshape_util.as_list(ssm.sample(seed=ssm_seed).shape)
     else:
-      output_shape = self.evaluate(tf.shape(ssm.sample()))
+      output_shape = self.evaluate(tf.shape(ssm.sample(seed=ssm_seed)))
     self.assertAllEqual(output_shape, batch_shape + [num_timesteps, 1])
 
   def _build_placeholder(self, ndarray):

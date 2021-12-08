@@ -47,6 +47,7 @@ from tensorflow_probability.substrates.jax import mcmc
 from tensorflow_probability.substrates.jax import optimizer
 from tensorflow_probability.substrates.jax import random
 from tensorflow_probability.substrates.jax import stats
+from tensorflow_probability.substrates.jax import sts
 from tensorflow_probability.substrates.jax import util
 
 from tensorflow_probability.python.internal.backend import jax as tf2jax

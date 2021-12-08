@@ -192,11 +192,12 @@ class LinearRegression(StructuralTimeSeries):
           design_matrix_batch_shape_ = design_matrix.batch_shape
         else:
           design_matrix_batch_shape_ = design_matrix.batch_shape_tensor()
+        dtype = design_matrix.dtype
         weights_prior = tfd.StudentT(
-            df=5,
+            df=tf.constant(5, dtype=dtype),
             loc=tf.zeros(
-                design_matrix_batch_shape_, dtype=design_matrix.dtype),
-            scale=10 * tf.ones([], dtype=design_matrix.dtype))
+                design_matrix_batch_shape_, dtype=dtype),
+            scale=tf.constant(10, dtype=dtype) * tf.ones([], dtype=dtype))
       # Sugar: if prior is static scalar, lift it to a prior on feature vectors.
       if weights_prior.event_shape.ndims == 0:
         weights_prior = tfd.Sample(weights_prior, sample_shape=[num_features])

@@ -20,6 +20,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
 from tensorflow_probability.python.sts import SemiLocalLinearTrendStateSpaceModel
@@ -134,6 +135,7 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
 
   def test_batch_shape(self):
     batch_shape = [4, 2]
+    seed = test_util.test_seed(sampler_type='stateless')
 
     level_scale = self._build_placeholder(
         np.exp(np.random.randn(*(batch_shape))))
@@ -151,14 +153,14 @@ class _SemiLocalLinearTrendStateSpaceModelTest(object):
             scale_diag=self._build_placeholder([1., 1.])))
 
     if self.use_static_shape:
-      model_batch_shape = ssm.batch_shape.as_list()
+      model_batch_shape = tensorshape_util.as_list(ssm.batch_shape)
     else:
       model_batch_shape = self.evaluate(ssm.batch_shape_tensor())
     self.assertAllEqual(model_batch_shape, batch_shape)
 
-    y = ssm.sample()
+    y = ssm.sample(seed=seed)
     if self.use_static_shape:
-      y_batch_shape = y.shape.as_list()[:-2]
+      y_batch_shape = tensorshape_util.as_list(y.shape)[:-2]
     else:
       y_batch_shape = self.evaluate(tf.shape(y))[:-2]
     self.assertAllEqual(y_batch_shape, batch_shape)
@@ -200,5 +202,5 @@ class SemiLocalLinearTrendStateSpaceModelTestStaticShape64(
   dtype = np.float64
   use_static_shape = True
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   test_util.main()

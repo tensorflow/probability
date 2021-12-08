@@ -22,7 +22,8 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts.internal import missing_values_util
 from tensorflow_probability.python.sts.internal import util as sts_util
@@ -41,7 +42,7 @@ class MultivariateNormalUtilsTest(test_util.TestCase):
     mvn2 = tfd.MultivariateNormalFullCovariance(
         loc=tf.ones(batch_shape + [2]),
         covariance_matrix=(tf.ones(batch_shape + [2, 2]) *
-                           [[5., -2], [-2, 3.1]]))
+                           tf.constant([[5., -2], [-2, 3.1]])))
 
     joint = sts_util.factored_joint_mvn([mvn1, mvn2])
     self.assertEqual(self.evaluate(joint.event_shape_tensor()),
@@ -284,13 +285,13 @@ class _UtilityTests(test_util.TestCase):
       ('array_with_nans',
        np.array([3., 4., np.nan]), [3, 1], [False, False, True]),
       ('tensor_with_nans',
-       tf.constant([3., 4., np.nan]), [3, 1], [False, False, True]),
+       lambda: tf.constant([3., 4., np.nan]), [3, 1], [False, False, True]),
       ('masked_time_series',
        tfp.sts.MaskedTimeSeries([1., 2., 3.], [False, True, False]),
        [3, 1], [False, True, False]),
       ('masked_time_series_tensor',
-       tfp.sts.MaskedTimeSeries(tf.constant([1., 2., 3.]),
-                                tf.constant([False, True, False])),
+       lambda: tfp.sts.MaskedTimeSeries(tf.constant([1., 2., 3.]),  # pylint: disable=g-long-lambda
+                                        tf.constant([False, True, False])),
        [3, 1], [False, True, False]),
       ('series_fully_observed',
        pd.Series([1., 2., 3.],
@@ -314,6 +315,8 @@ class _UtilityTests(test_util.TestCase):
        [2, 3, 1], [[False, True, False], [False, False, True]]))
   def test_canonicalizes_observed_time_series(
       self, observed_time_series, expected_shape, expected_is_missing):
+    if callable(observed_time_series):
+      observed_time_series = observed_time_series()
     observed_time_series, is_missing = (
         sts_util.canonicalize_observed_time_series_with_mask(
             observed_time_series))
@@ -337,7 +340,7 @@ class _UtilityTests(test_util.TestCase):
 
   def _shape_as_list(self, tensor):
     if self.use_static_shape:
-      return tensor.shape.as_list()
+      return tensorshape_util.as_list(tensor.shape)
     else:
       return list(self.evaluate(tf.shape(tensor)))
 

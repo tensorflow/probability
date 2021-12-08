@@ -76,7 +76,8 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
         drift_scale=drift_scale,
         initial_state_prior=initial_state_prior)
 
-    sample = ssm.sample()
+    seed = test_util.test_seed(sampler_type='stateless')
+    sample = ssm.sample(seed=seed)
 
     ll, means, _, _, _, _, _ = ssm.forward_filter(sample)
 
@@ -158,5 +159,5 @@ class DynamicRegressionStateSpaceModelTestStaticShape64(
   use_static_shape = True
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   test_util.main()

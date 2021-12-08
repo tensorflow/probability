@@ -53,7 +53,11 @@ if have_tf:
     """Wrapper of `tf.test.TestCase`."""
 
     def evaluate(self, x):
-      return tf.nest.map_structure(onp.array, x)
+      def _evaluate(x):
+        if x is None:
+          return x
+        return onp.array(x)
+      return tf.nest.map_structure(_evaluate, x)
 
     def _GetNdArray(self, a):
       return onp.array(a)

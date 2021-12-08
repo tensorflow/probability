@@ -20,6 +20,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
@@ -241,7 +242,7 @@ def make_ar_transition_matrix(coefficients):
   batch_shape, order = coef_shape[:-1], coef_shape[-1]
   remaining_rows = tf.concat([
       tf.eye(order - 1, dtype=coefficients.dtype, batch_shape=batch_shape),
-      tf.zeros(tf.concat([batch_shape, (order - 1, 1)], axis=0),
+      tf.zeros(ps.concat([batch_shape, (order - 1, 1)], axis=0),
                dtype=coefficients.dtype)
   ], axis=-1)
   ar_matrix = tf.concat([top_row, remaining_rows], axis=-2)
@@ -342,8 +343,8 @@ class Autoregressive(StructuralTimeSeries):
         observed_stddev, observed_initial = (
             tf.convert_to_tensor(value=1., dtype=dtype),
             tf.convert_to_tensor(value=0., dtype=dtype))
-      batch_ones = tf.ones(tf.concat([
-          tf.shape(observed_initial),  # Batch shape
+      batch_ones = tf.ones(ps.concat([
+          ps.shape(observed_initial),  # Batch shape
           [order]], axis=0), dtype=dtype)
 
       # Heuristic default priors. Overriding these may dramatically

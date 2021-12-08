@@ -62,6 +62,7 @@ class _LocalLevelStateSpaceModelTest(object):
     self.assertAllClose(variance, expected_variance)
 
   def test_batch_shape(self):
+    seed = test_util.test_seed(sampler_type='stateless')
     batch_shape = [4, 2]
 
     level_scale = self._build_placeholder(
@@ -75,11 +76,11 @@ class _LocalLevelStateSpaceModelTest(object):
         initial_state_prior=initial_state_prior)
     self.assertAllEqual(self.evaluate(ssm.batch_shape_tensor()), batch_shape)
 
-    y = ssm.sample()
+    y = ssm.sample(seed=seed)
     self.assertAllEqual(self.evaluate(tf.shape(y))[:-2], batch_shape)
 
   def test_joint_sample(self):
-    strm = test_util.test_seed_stream()
+    seed = test_util.test_seed(sampler_type='stateless')
     batch_shape = [4, 2]
 
     level_scale = self._build_placeholder(2 * np.ones(batch_shape))
@@ -96,7 +97,7 @@ class _LocalLevelStateSpaceModelTest(object):
 
     num_samples = 10000
     sampled_latents, sampled_obs = ssm._joint_sample_n(n=num_samples,
-                                                       seed=strm())
+                                                       seed=seed)
     latent_mean, obs_mean = ssm._joint_mean()
     latent_cov, obs_cov = ssm._joint_covariances()
     (sampled_latents_, sampled_obs_,
@@ -159,5 +160,5 @@ class LocalLevelStateSpaceModelTestStaticShape64(
   use_static_shape = True
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   test_util.main()

@@ -25,6 +25,7 @@ __all__ = [
 ]
 
 JAX_MODE = False
+NUMPY_MODE = False
 
 DEFAULT_METHODS_EXCLUDED_FROM_JIT = (
     # tfd.Distribution
@@ -47,92 +48,91 @@ DEFAULT_METHODS_EXCLUDED_FROM_JIT = (
     'inverse_event_ndims'
 )
 
+if NUMPY_MODE:
+  JitPublicMethods = lambda f, trace_only=False: f
+else:
+  class JitPublicMethods(object):
+    """Wrapper to compile an object's public methods using XLA."""
 
-class JitPublicMethods(object):
-  """Wrapper to compile an object's public methods using XLA."""
+    def __init__(self,
+                 object_to_wrap,
+                 trace_only=False,
+                 methods_to_exclude=DEFAULT_METHODS_EXCLUDED_FROM_JIT):
+      """Wraps an object's public methods using `tf.function`/`jax.jit`.
 
-  def __init__(self,
-               object_to_wrap,
-               trace_only=False,
-               methods_to_exclude=DEFAULT_METHODS_EXCLUDED_FROM_JIT):
-    """Wraps an object's public methods using `tf.function`/`jax.jit`.
+      Args:
+        object_to_wrap: Any Python object; for example, a
+          `tfd.Distribution` instance.
+        trace_only: Python `bool`; if `True`, the object's methods are
+          not compiled, but only traced with `tf.function(jit_compile=False)`.
+          This is only valid in the TensorFlow backend; in JAX, passing
+          `trace_only=True` will raise an exception.
+          Default value: `False`.
+        methods_to_exclude: List of Python `str` method names not to wrap.
+          For example, these may include methods that do not take or return
+          Tensor values. By default, a number of `tfd.Distribution` and
+          `tfb.Bijector` methods and properties are excluded (e.g.,
+          `event_shape`, `batch_shape`, `dtype`, etc.).
+          Default value:
+            tfp.experimental.util.DEFAULT_METHODS_EXCLUDED_FROM_JIT`
 
-    Args:
-      object_to_wrap: Any Python object; for example, a
-        `tfd.Distribution` instance.
-      trace_only: Python `bool`; if `True`, the object's methods are
-        not compiled, but only traced with `tf.function(jit_compile=False)`.
-        This is only valid in the TensorFlow backend; in JAX, passing
-        `trace_only=True` will raise an exception.
-        Default value: `False`.
-      methods_to_exclude: List of Python `str` method names not to wrap.
-        For example, these may include methods that do not take or return
-        Tensor values. By default, a number of `tfd.Distribution` and
-        `tfb.Bijector` methods and properties are excluded (e.g., `event_shape`,
-        `batch_shape`, `dtype`, etc.).
-        Default value: `tfp.experimental.util.DEFAULT_METHODS_EXCLUDED_FROM_JIT`
+      """
+      self._object_to_wrap = object_to_wrap
+      self._methods_to_exclude = methods_to_exclude
+      self._trace_only = trace_only
 
-    """
-    if JAX_MODE and trace_only:
-      raise ValueError('JitPublicMethods with `trace_only=True` is not valid '
-                       'in the JAX backend.')
-    self._object_to_wrap = object_to_wrap
-    self._methods_to_exclude = methods_to_exclude
-    self._trace_only = trace_only
+    @property
+    def methods_to_exclude(self):
+      return self._methods_to_exclude
 
-  @property
-  def methods_to_exclude(self):
-    return self._methods_to_exclude
+    @property
+    def trace_only(self):
+      return self._trace_only
 
-  @property
-  def trace_only(self):
-    return self._trace_only
+    @property
+    def object_to_wrap(self):
+      return self._object_to_wrap
 
-  @property
-  def object_to_wrap(self):
-    return self._object_to_wrap
+    def copy(self, **kwargs):
+      return type(self)(self.object_to_wrap.copy(**kwargs),
+                        trace_only=self.trace_only,
+                        methods_to_exclude=self.methods_to_exclude)
 
-  def copy(self, **kwargs):
-    return type(self)(self.object_to_wrap.copy(**kwargs),
-                      trace_only=self.trace_only,
-                      methods_to_exclude=self.methods_to_exclude)
+    def __getitem__(self, slices):
+      return type(self)(self.object_to_wrap[slices],
+                        trace_only=self.trace_only,
+                        methods_to_exclude=self.methods_to_exclude)
 
-  def __getitem__(self, slices):
-    return type(self)(self.object_to_wrap[slices],
-                      trace_only=self.trace_only,
-                      methods_to_exclude=self.methods_to_exclude)
+    def __getattr__(self, name):
+      # Note: this method is called only as a fallback if an attribute isn't
+      # otherwise set.
 
-  def __getattr__(self, name):
-    # Note: this method is called only as a fallback if an attribute isn't
-    # otherwise set.
+      if name == 'object_to_wrap':
+        # Avoid triggering an infinite loop if __init__ hasn't run yet.
+        raise AttributeError()
+      attr = getattr(self.object_to_wrap, name)
 
-    if name == 'object_to_wrap':
-      # Avoid triggering an infinite loop if __init__ hasn't run yet.
-      raise AttributeError()
-    attr = getattr(self.object_to_wrap, name)
+      if callable(attr):
+        if not (name.startswith('_') or name in self.methods_to_exclude):
+          # On the first call to a method, wrap it, and store the wrapped
+          # function to be reused by future calls.
+          attr = tf.function(autograph=False,
+                             jit_compile=not self.trace_only)(attr)
+          setattr(self, name, attr)
 
-    if callable(attr):
-      if not (name.startswith('_') or name in self.methods_to_exclude):
-        # On the first call to a method, wrap it, and store the wrapped
-        # function to be reused by future calls.
-        attr = tf.function(autograph=False,
-                           jit_compile=not self.trace_only)(attr)
-        setattr(self, name, attr)
+      return attr
 
-    return attr
-
-
-@kullback_leibler.RegisterKL(JitPublicMethods, distribution_lib.Distribution)
-@kullback_leibler.RegisterKL(distribution_lib.Distribution, JitPublicMethods)
-@kullback_leibler.RegisterKL(JitPublicMethods, JitPublicMethods)
-def _compiled_kl_divergence(d1, d2, name=None):
-  """Compiled KL divergence between two distributions."""
-  trace_only = True
-  if isinstance(d1, JitPublicMethods):
-    trace_only &= d1.trace_only
-    d1 = d1.object_to_wrap
-  if isinstance(d2, JitPublicMethods):
-    trace_only &= d2.trace_only
-    d2 = d2.object_to_wrap
-  return tf.function(autograph=False, jit_compile=not trace_only)(
-      d1.kl_divergence)(d2, name=name)
+  @kullback_leibler.RegisterKL(JitPublicMethods, distribution_lib.Distribution)
+  @kullback_leibler.RegisterKL(distribution_lib.Distribution, JitPublicMethods)
+  @kullback_leibler.RegisterKL(JitPublicMethods, JitPublicMethods)
+  def _compiled_kl_divergence(d1, d2, name=None):
+    """Compiled KL divergence between two distributions."""
+    trace_only = True
+    if isinstance(d1, JitPublicMethods):
+      trace_only &= d1.trace_only
+      d1 = d1.object_to_wrap
+    if isinstance(d2, JitPublicMethods):
+      trace_only &= d2.trace_only
+      d2 = d2.object_to_wrap
+    return tf.function(autograph=False, jit_compile=not trace_only)(
+        d1.kl_divergence)(d2, name=name)

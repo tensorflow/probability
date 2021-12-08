@@ -35,6 +35,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
     # Test that the Seasonal SSM is equivalent to individually modeling
     # a random walk on each season's slice of timesteps.
 
+    seed = test_util.test_seed(sampler_type='stateless')
     drift_scale = 0.6
     observation_noise_scale = 0.1
 
@@ -58,7 +59,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=self._build_placeholder([1.])))
 
-    sampled_time_series = day_of_week.sample()
+    sampled_time_series = day_of_week.sample(seed=seed)
     (sampled_time_series_, total_lp_,
      prior_mean_, prior_variance_) = self.evaluate([
          sampled_time_series,
@@ -85,6 +86,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
 
   def test_month_of_year_example(self):
 
+    seed = test_util.test_seed(sampler_type='stateless')
     num_days_per_month = np.array(
         [31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31])
 
@@ -110,7 +112,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
         initial_step=initial_step)
 
     sampled_series_, prior_mean_, prior_variance_ = self.evaluate(
-        (month_of_year.sample()[..., 0],
+        (month_of_year.sample(seed=seed)[..., 0],
          month_of_year.mean()[..., 0],
          month_of_year.variance()[..., 0]))
 
@@ -149,6 +151,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
 
   def test_month_of_year_with_leap_day_example(self):
 
+    seed = test_util.test_seed(sampler_type='stateless')
     num_days_per_month = np.array(
         [[31, 28, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],
          [31, 29, 31, 30, 30, 31, 31, 31, 30, 31, 30, 31],  # year with leap day
@@ -177,7 +180,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
         initial_step=initial_step)
 
     sampled_series_, prior_mean_, prior_variance_ = self.evaluate(
-        (month_of_year.sample()[..., 0],
+        (month_of_year.sample(seed=seed)[..., 0],
          month_of_year.mean()[..., 0],
          month_of_year.variance()[..., 0]))
 
@@ -217,6 +220,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
   def test_batch_shape(self):
     batch_shape = [3, 2]
     partial_batch_shape = [2]
+    seed = test_util.test_seed(sampler_type='stateless')
 
     num_seasons = 24
     initial_state_prior = tfd.MultivariateNormalDiag(
@@ -239,7 +243,7 @@ class _SeasonalStateSpaceModelTest(test_util.TestCase):
     # of parameters, as expected.
 
     self.assertAllEqual(self.evaluate(ssm.batch_shape_tensor()), batch_shape)
-    y_ = self.evaluate(ssm.sample())
+    y_ = self.evaluate(ssm.sample(seed=seed))
     self.assertAllEqual(y_.shape[:-2], batch_shape)
 
     # Next check that the broadcasting works as expected, and the batch log_prob
@@ -309,6 +313,7 @@ class _ConstrainedSeasonalStateSpaceModelTest(test_util.TestCase):
   def test_batch_shape(self):
     batch_shape = [3, 2]
     partial_batch_shape = [2]
+    seed = test_util.test_seed(sampler_type='stateless')
 
     num_seasons = 24
     initial_state_prior = tfd.MultivariateNormalDiag(
@@ -332,7 +337,7 @@ class _ConstrainedSeasonalStateSpaceModelTest(test_util.TestCase):
     # of parameters, as expected.
 
     self.assertAllEqual(self.evaluate(ssm.batch_shape_tensor()), batch_shape)
-    y_ = self.evaluate(ssm.sample())
+    y_ = self.evaluate(ssm.sample(seed=seed))
     self.assertAllEqual(y_.shape[:-2], batch_shape)
 
     # Next check that the broadcasting works as expected, and the batch log_prob
@@ -402,5 +407,5 @@ class ConstrainedSeasonalStateSpaceModelTestStaticShape64(
 del _SeasonalStateSpaceModelTest
 del _ConstrainedSeasonalStateSpaceModelTest
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   test_util.main()

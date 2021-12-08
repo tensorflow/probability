@@ -23,6 +23,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
@@ -571,7 +572,7 @@ def build_seasonal_transition_matrix(
           tf.matmul(seasonal_permutation_matrix, basis_change_matrix_inv))
 
     identity_matrix = tf.eye(
-        tf.shape(seasonal_permutation_matrix)[-1], dtype=dtype)
+        ps.shape(seasonal_permutation_matrix)[-1], dtype=dtype)
 
     def seasonal_transition_matrix(t):
       return tf.linalg.LinearOperatorFullMatrix(
@@ -818,16 +819,16 @@ class Seasonal(StructuralTimeSeries):
 
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
-      if drift_scale_prior is None:
-        drift_scale_prior = tfd.LogNormal(
-            loc=tf.math.log(.01 * observed_stddev), scale=3.)
       if initial_effect_prior is None:
         initial_effect_prior = tfd.Normal(
             loc=observed_initial,
             scale=tf.abs(observed_initial) + observed_stddev)
-
-      dtype = dtype_util.common_dtype(
-          [drift_scale_prior, initial_effect_prior])
+      dtype = initial_effect_prior.dtype
+      if drift_scale_prior is None:
+        scale_factor = tf.convert_to_tensor(.01, dtype=dtype)
+        drift_scale_prior = tfd.LogNormal(
+            loc=tf.math.log(scale_factor * observed_stddev),
+            scale=3.)
 
       if isinstance(initial_effect_prior, tfd.Normal):
         initial_state_prior = tfd.MultivariateNormalDiag(

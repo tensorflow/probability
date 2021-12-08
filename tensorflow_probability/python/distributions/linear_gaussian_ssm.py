@@ -61,7 +61,8 @@ def _safe_concat(values):
   for x in values:
     try:
       full_values.append(ps.reshape(x, reference_shape))
-    except ValueError:  # JAX/numpy don't like `-1`'s in size-zero shapes.
+    except (TypeError, ValueError):
+      # JAX/numpy don't like `-1`'s in size-zero shapes.
       full_values.append(ps.reshape(x, trivial_shape))
   return ps.concat(full_values, axis=0)
 

@@ -13,6 +13,12 @@
 # limitations under the License.
 # ============================================================================
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 licenses(["notice"])
 
 package(
@@ -21,7 +27,7 @@ package(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
@@ -32,7 +38,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "missing_values_util",
     srcs = [
         "missing_values_util.py",
@@ -45,7 +51,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "missing_values_util_test",
     size = "small",
     srcs = ["missing_values_util_test.py"],
@@ -59,7 +65,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "seasonality_util",
     srcs = [
         "seasonality_util.py",
@@ -72,7 +78,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "seasonality_util_test",
     size = "small",
     srcs = ["seasonality_util_test.py"],
@@ -87,7 +93,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "util",
     srcs = [
         "util.py",
@@ -97,10 +103,13 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensorshape_util",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "util_test",
     size = "small",
     srcs = ["util_test.py"],
@@ -112,6 +121,7 @@ py_test(
         # pandas dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

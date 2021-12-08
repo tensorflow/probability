@@ -57,6 +57,7 @@ py_library(
         "//tensorflow_probability/python/optimizer:optimizer.jax",
         "//tensorflow_probability/python/random:random.jax",
         "//tensorflow_probability/python/stats:stats.jax",
+        "//tensorflow_probability/python/sts:sts.jax",
         "//tensorflow_probability/python/util:util.jax",
     ],
 )
@@ -79,6 +80,7 @@ py_library(
         "//tensorflow_probability/python/optimizer:optimizer.numpy",
         "//tensorflow_probability/python/random:random.numpy",
         "//tensorflow_probability/python/stats:stats.numpy",
+        "//tensorflow_probability/python/sts:sts.numpy",
         "//tensorflow_probability/python/util:util.numpy",
     ],
 )

@@ -21,7 +21,8 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import AdditiveStateSpaceModel
 from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
@@ -54,6 +55,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(local_lp), self.evaluate(additive_lp))
 
   def test_nesting_additive_ssms(self):
+    seed = test_util.test_seed(sampler_type='stateless')
 
     ssm1 = self._dummy_model(batch_shape=[1, 2])
     ssm2 = self._dummy_model(batch_shape=[3, 2])
@@ -69,7 +71,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
         observation_noise_scale=observation_noise_scale)
 
     # Test that both models behave equivalently.
-    y = self.evaluate(nested_additive_ssm.sample())
+    y = self.evaluate(nested_additive_ssm.sample(seed=seed))
 
     additive_lp = additive_ssm.log_prob(y)
     nested_additive_lp = nested_additive_ssm.log_prob(y)
@@ -155,20 +157,24 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
 
   def test_batch_shape(self):
     batch_shape = [3, 2]
+    seed = test_util.test_seed(sampler_type='stateless')
 
     ssm = self._dummy_model(batch_shape=batch_shape)
     additive_ssm = AdditiveStateSpaceModel([ssm, ssm])
-    y = additive_ssm.sample()
+    y = additive_ssm.sample(seed=seed)
 
     if self.use_static_shape:
-      self.assertAllEqual(additive_ssm.batch_shape.as_list(), batch_shape)
-      self.assertAllEqual(y.shape.as_list()[:-2], batch_shape)
+      self.assertAllEqual(
+          tensorshape_util.as_list(additive_ssm.batch_shape), batch_shape)
+      self.assertAllEqual(
+          tensorshape_util.as_list(y.shape)[:-2], batch_shape)
     else:
       self.assertAllEqual(self.evaluate(additive_ssm.batch_shape_tensor()),
                           batch_shape)
       self.assertAllEqual(self.evaluate(tf.shape(y))[:-2], batch_shape)
 
   def test_multivariate_observations(self):
+    seed = test_util.test_seed(sampler_type='stateless')
 
     # since STS components are scalar by design, we manually construct
     # a multivariate-output model to verify that the additive SSM handles
@@ -184,12 +190,13 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
     combined_ssm = AdditiveStateSpaceModel([multivariate_ssm,
                                             multivariate_ssm])
 
-    y = combined_ssm.sample()
+    y = combined_ssm.sample(seed=seed)
     expected_event_shape = [num_timesteps, observation_size]
     if self.use_static_shape:
-      self.assertAllEqual(combined_ssm.event_shape.as_list(),
+      self.assertAllEqual(tensorshape_util.as_list(combined_ssm.event_shape),
                           expected_event_shape)
-      self.assertAllEqual(y.shape.as_list()[-2:], expected_event_shape)
+      self.assertAllEqual(tensorshape_util.as_list(y.shape)[-2:],
+                          expected_event_shape)
     else:
       self.assertAllEqual(self.evaluate(combined_ssm.event_shape_tensor()),
                           expected_event_shape)
@@ -197,6 +204,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
           self.evaluate(tf.shape(y))[-2:], expected_event_shape)
 
   def test_mismatched_num_timesteps_error(self):
+    seed = test_util.test_seed(sampler_type='stateless')
 
     ssm1 = self._dummy_model(num_timesteps=10)
     ssm2 = self._dummy_model(num_timesteps=8)
@@ -209,9 +217,10 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
           component_ssms=[ssm1, ssm2])
 
       # In the dynamic case, the exception is raised at runtime.
-      _ = self.evaluate(additive_ssm.sample())
+      _ = self.evaluate(additive_ssm.sample(seed=seed))
 
   def test_broadcasting_batch_shape(self):
+    seed = test_util.test_seed(sampler_type='stateless')
 
     # Build three SSMs with broadcast batch shape.
     ssm1 = self._dummy_model(batch_shape=[2])
@@ -220,13 +229,13 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
 
     additive_ssm = AdditiveStateSpaceModel(
         component_ssms=[ssm1, ssm2, ssm3])
-    y = additive_ssm.sample()
+    y = additive_ssm.sample(seed=seed)
 
     broadcast_batch_shape = [3, 2]
     if self.use_static_shape:
-      self.assertAllEqual(additive_ssm.batch_shape.as_list(),
+      self.assertAllEqual(tensorshape_util.as_list(additive_ssm.batch_shape),
                           broadcast_batch_shape)
-      self.assertAllEqual(y.shape.as_list()[:-2],
+      self.assertAllEqual(tensorshape_util.as_list(y.shape)[:-2],
                           broadcast_batch_shape)
     else:
       self.assertAllEqual(self.evaluate(additive_ssm.batch_shape_tensor()),
@@ -235,6 +244,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
           self.evaluate(tf.shape(y))[:-2], broadcast_batch_shape)
 
   def test_broadcasting_correctness(self):
+    seed = test_util.test_seed(sampler_type='stateless')
 
     # This test verifies that broadcasting of component parameters works as
     # expected. We construct a SSM with no batch shape, and test that when we
@@ -289,11 +299,12 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
 
     # Both additive SSMs define the same model, so they should give the same
     # log_probs.
-    y = self.evaluate(broadcast_additive_ssm.sample(seed=42))
+    y = self.evaluate(broadcast_additive_ssm.sample(seed=seed))
     self.assertAllClose(self.evaluate(broadcast_additive_ssm.log_prob(y)),
                         self.evaluate(manual_additive_ssm.log_prob(y)))
 
   def test_mismatched_observation_size_error(self):
+    seed = test_util.test_seed(sampler_type='stateless')
     ssm1 = self._dummy_model(observation_size=1)
     ssm2 = self._dummy_model(observation_size=2)
 
@@ -304,7 +315,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
           component_ssms=[ssm1, ssm2])
 
       # In the dynamic case, the exception is raised at runtime.
-      _ = self.evaluate(additive_ssm.sample())
+      _ = self.evaluate(additive_ssm.sample(seed=seed))
 
   def test_mismatched_dtype_error(self):
     ssm1 = self._dummy_model(dtype=self.dtype)

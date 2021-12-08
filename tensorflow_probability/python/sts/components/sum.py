@@ -22,7 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
@@ -219,7 +219,7 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
                                               name='constant_offset',
                                               dtype=dtype) *
                          tf.ones([1], dtype=dtype))
-      offset_length = prefer_static.shape(constant_offset)[-1]
+      offset_length = ps.shape(constant_offset)[-1]
       assertions = []
 
       # Construct an initial state prior as a block-diagonal combination
@@ -274,12 +274,12 @@ class AdditiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       # Build the observation matrix, concatenating (broadcast) observation
       # matrices from components. We also take this as an opportunity to enforce
       # any dynamic assertions we may have generated above.
-      broadcast_batch_shape = tf.convert_to_tensor(
-          value=sts_util.broadcast_batch_shape(
+      broadcast_batch_shape = ps.cast(
+          sts_util.broadcast_batch_shape(
               [ssm.get_observation_matrix_for_timestep(initial_step)
                for ssm in component_ssms]), dtype=tf.int32)
       broadcast_obs_matrix = tf.ones(
-          tf.concat([broadcast_batch_shape, [1, 1]], axis=0), dtype=dtype)
+          ps.concat([broadcast_batch_shape, [1, 1]], axis=0), dtype=dtype)
       if assertions:
         with tf.control_dependencies(assertions):
           broadcast_obs_matrix = tf.identity(broadcast_obs_matrix)

@@ -19,7 +19,8 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability import distributions as tfd
+from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import AutoregressiveStateSpaceModel
 from tensorflow_probability.python.sts import LocalLevelStateSpaceModel
@@ -113,6 +114,7 @@ class _AutoregressiveStateSpaceModelTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(lp), expected_logp)
 
   def testBatchShape(self):
+    seed = test_util.test_seed(sampler_type='stateless')
     # Check that the model builds with batches of parameters.
     order = 3
     batch_shape = [4, 2]
@@ -130,13 +132,14 @@ class _AutoregressiveStateSpaceModelTest(test_util.TestCase):
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(np.ones([order]))))
     if self.use_static_shape:
-      self.assertAllEqual(ssm.batch_shape.as_list(), batch_shape)
+      self.assertAllEqual(
+          tensorshape_util.as_list(ssm.batch_shape), batch_shape)
     else:
       self.assertAllEqual(self.evaluate(ssm.batch_shape_tensor()), batch_shape)
 
-    y = ssm.sample()
+    y = ssm.sample(seed=seed)
     if self.use_static_shape:
-      self.assertAllEqual(y.shape.as_list()[:-2], batch_shape)
+      self.assertAllEqual(tensorshape_util.as_list(y.shape)[:-2], batch_shape)
     else:
       self.assertAllEqual(self.evaluate(tf.shape(y))[:-2], batch_shape)
 
@@ -179,5 +182,5 @@ class AutoregressiveStateSpaceModelTestStaticShape64(
 
 del _AutoregressiveStateSpaceModelTest  # Don't run tests for the base class.
 
-if __name__ == "__main__":
+if __name__ == '__main__':
   test_util.main()

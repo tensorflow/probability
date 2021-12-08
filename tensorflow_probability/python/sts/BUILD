@@ -15,6 +15,12 @@
 # Description:
 #   Framework for Bayesian structural time series models
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 licenses(["notice"])
 
 package(
@@ -23,10 +29,19 @@ package(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sts",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
+    substrates_omit_deps = [
+        ":decomposition",
+        ":default_model",
+        ":fitting",
+        ":forecast",
+        ":holiday_effects",
+        ":regularization",
+        "//tensorflow_probability/python/sts/anomaly_detection",
+    ],
     deps = [
         ":decomposition",
         ":default_model",
@@ -219,7 +234,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "structural_time_series",
     srcs = ["structural_time_series.py"],
     srcs_version = "PY3",
@@ -234,10 +249,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "structural_time_series_test",
     size = "medium",
     srcs = ["structural_time_series_test.py"],
+    jax_size = "large",
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [

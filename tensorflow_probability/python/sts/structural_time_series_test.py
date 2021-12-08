@@ -38,6 +38,7 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 class _StructuralTimeSeriesTests(object):
 
   def test_broadcast_batch_shapes(self):
+    seed = test_util.test_seed(sampler_type='stateless')
 
     batch_shape = [3, 1, 4]
     partial_batch_shape = [2, 1]
@@ -65,7 +66,7 @@ class _StructuralTimeSeriesTests(object):
                         initial_effect_prior=loc_prior)
     model = Sum([linear_trend, seasonal],
                 observation_noise_scale_prior=partial_scale_prior)
-    param_samples = [p.prior.sample() for p in model.parameters]
+    param_samples = [p.prior.sample(seed=seed) for p in model.parameters]
     ssm = model.make_state_space_model(num_timesteps=2,
                                        param_vals=param_samples)
 
@@ -169,10 +170,10 @@ class StructuralTimeSeriesTestsStaticShape64(
 class _StsTestHarness(object):
 
   def test_state_space_model(self):
-    seed = test_util.test_seed_stream()
+    seed = test_util.test_seed(sampler_type='stateless')
     model = self._build_sts()
 
-    dummy_param_vals = [p.prior.sample(seed=seed()) for p in model.parameters]
+    dummy_param_vals = [p.prior.sample(seed=seed) for p in model.parameters]
     initial_state_prior = tfd.MultivariateNormalDiag(
         loc=-2. + tf.zeros([model.latent_size]),
         scale_diag=3. * tf.ones([model.latent_size]))
@@ -203,15 +204,16 @@ class _StsTestHarness(object):
         model.latent_size)
 
     # Verify that the SSM tracks its parameters.
+    seed = test_util.test_seed(sampler_type='stateless')
     observed_time_series = self.evaluate(
-        samplers.normal([10, 1], seed=test_util.test_seed()))
+        samplers.normal([10, 1], seed=seed))
     ssm_copy = ssm.copy(name='copied_ssm')
     self.assertAllClose(*self.evaluate((
         ssm.log_prob(observed_time_series),
         ssm_copy.log_prob(observed_time_series))))
 
   def test_log_joint(self):
-    seed = test_util.test_seed_stream()
+    seed = test_util.test_seed(sampler_type='stateless')
     model = self._build_sts()
     num_timesteps = 5
 
@@ -219,8 +221,11 @@ class _StsTestHarness(object):
     log_joint_fn = model.joint_log_prob(
         observed_time_series=np.float32(
             np.random.standard_normal([num_timesteps, 1])))
+    lp_seed1, lp_seed2 = tfp.random.split_seed(seed, n=2)
+    seeds = tfp.random.split_seed(lp_seed1, n=len(model.parameters))
     lp = self.evaluate(
-        log_joint_fn(*[p.prior.sample(seed=seed()) for p in model.parameters]))
+        log_joint_fn(*[p.prior.sample(seed=seed) for seed, p in zip(
+            seeds, model.parameters)]))
     self.assertEqual(tf.TensorShape([]), lp.shape)
 
     # more complex case: y has sample and batch shapes, some parameters
@@ -236,10 +241,11 @@ class _StsTestHarness(object):
     # We alternate full_batch_shape, partial_batch_shape in sequence so that in
     # a model with only one parameter, that parameter is constructed with full
     # batch shape.
+    seeds = tfp.random.split_seed(lp_seed2, n=len(model.parameters))
     batch_shaped_parameters_ = self.evaluate([
         p.prior.sample(sample_shape=full_batch_shape if (i % 2 == 0)
-                       else partial_batch_shape, seed=seed())
-        for (i, p) in enumerate(model.parameters)])
+                       else partial_batch_shape, seed=seed)
+        for (i, (seed, p)) in enumerate(zip(seeds, model.parameters))])
 
     lp = self.evaluate(log_joint_fn(*batch_shaped_parameters_))
     self.assertEqual(tf.TensorShape(full_batch_shape), lp.shape)
@@ -256,7 +262,8 @@ class _StsTestHarness(object):
     model = self._build_sts(observed_time_series=observed_time_series)
     for parameter in model.parameters:
       param_samples = self.evaluate(
-          parameter.prior.sample(30, seed=test_util.test_seed()))
+          parameter.prior.sample(
+              30, seed=test_util.test_seed(sampler_type='stateless')))
       self.assertAllGreater(tf.math.reduce_std(param_samples), 0.)
 
   def test_log_joint_with_missing_observations(self):
@@ -264,7 +271,7 @@ class _StsTestHarness(object):
     # cases, it is sufficient that the component accesses only
     # `empirical_statistics(observed_time_series)`.
     # TODO(b/139483802): De-flake this test when run with --vary_seed.
-    seed = test_util.test_seed_stream(hardcoded_seed=123)
+    seed = test_util.test_seed(hardcoded_seed=123, sampler_type='stateless')
     observed_time_series = np.array(
         [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
     observation_mask = np.array(
@@ -276,8 +283,10 @@ class _StsTestHarness(object):
 
     log_joint_fn = model.joint_log_prob(
         observed_time_series=masked_time_series)
+    seeds = tfp.random.split_seed(seed, n=len(model.parameters))
     lp = self.evaluate(
-        log_joint_fn(*[p.prior.sample(seed=seed()) for p in model.parameters]))
+        log_joint_fn(*[p.prior.sample(seed=seed) for seed, p in zip(
+            seeds, model.parameters)]))
 
     self.assertEqual(tf.TensorShape([]), lp.shape)
     self.assertTrue(np.isfinite(lp))
@@ -286,7 +295,7 @@ class _StsTestHarness(object):
     model = self._build_sts()
     ys, param_samples = model.prior_sample(
         num_timesteps=5, params_sample_shape=[2], trajectories_sample_shape=[3],
-        seed=test_util.test_seed())
+        seed=test_util.test_seed(sampler_type='stateless'))
 
     self.assertAllEqual(ys.shape, [3, 2, 5, 1])
     self.assertEqual(len(param_samples), len(model.parameters))
@@ -333,7 +342,7 @@ class _StsTestHarness(object):
       self.assertEqual(param.bijector, jd_bijectors[param.name])
 
   def test_default_priors_follow_batch_shapes(self):
-    seed = test_util.test_seed_stream()
+    seed = test_util.test_seed(sampler_type='stateless')
     num_timesteps = 3
     time_series_sample_shape = [4, 2]
     observation_shape_full = time_series_sample_shape + [num_timesteps]
@@ -351,7 +360,9 @@ class _StsTestHarness(object):
     # The initial state prior should also have the appropriate batch shape.
     # To test this, we build the ssm and test that it has a consistent
     # broadcast batch shape.
-    param_samples = [p.prior.sample(seed=seed()) for p in model.parameters]
+    seeds = tfp.random.split_seed(seed, n=len(model.parameters))
+    param_samples = [p.prior.sample(seed=seed) for seed, p in zip(
+        seeds, model.parameters)]
     ssm = model.make_state_space_model(
         num_timesteps=num_timesteps, param_vals=param_samples)
     self.assertEqual(ssm.batch_shape, time_series_sample_shape)
@@ -364,7 +375,8 @@ class _StsTestHarness(object):
                         [p.name for p in copy.parameters])
 
   def test_add_component(self):
-    model = self._build_sts(observed_time_series=[1., 2., 3.])
+    model = self._build_sts(
+        observed_time_series=np.array([1., 2., 3.], np.float32))
     new_component = tfp.sts.LocalLevel(name='LocalLevel2')
     sum_model = model + new_component
     ledom_mus = new_component + model  # `sum_model` backwards.

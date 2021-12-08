@@ -32,7 +32,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "util",
     srcs = ["__init__.py"],
-    numpy_omit_deps = [":jit_public_methods"],
     srcs_version = "PY3",
     substrates_omit_deps = [
         ":composite_tensor",

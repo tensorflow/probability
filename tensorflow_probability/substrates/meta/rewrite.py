@@ -94,7 +94,7 @@ DISABLED_BY_PKG = {
          'marginalize', 'nn', 'sequential', 'substrates', 'vi'),
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
-        'optimizer', 'random', 'staging', 'stats', 'util')
+        'optimizer', 'random', 'staging', 'stats', 'sts', 'util')
 INTERNALS = ('assert_util', 'auto_composite_tensor',
              'batched_rejection_sampler',
              'batch_shape_lib', 'broadcast_util', 'cache_util',

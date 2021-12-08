@@ -20,7 +20,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions import linear_gaussian_ssm
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.sts.internal import util as sts_util
 from tensorflow_probability.python.sts.structural_time_series import Parameter
@@ -203,8 +203,8 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
         batch_shape = self.batch_shape
       else:
         batch_shape = self.batch_shape_tensor()
-      sample_and_batch_shape = tf.cast(
-          prefer_static.concat([[n], batch_shape], axis=0), tf.int32)
+      sample_and_batch_shape = ps.cast(
+          ps.concat([[n], batch_shape], axis=0), tf.int32)
 
       # Sample the initial timestep from the prior.  Since we want
       # this sample to have full batch shape (not just the batch shape
@@ -221,14 +221,14 @@ class LocalLevelStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       # Sample the latent random walk and observed noise, more efficiently than
       # the generic loop in `LinearGaussianStateSpaceModel`.
       level_jumps = self.level_scale[..., tf.newaxis] * samplers.normal(
-          prefer_static.concat(
+          ps.concat(
               [sample_and_batch_shape, [self.num_timesteps - 1]], axis=0),
           dtype=self.dtype, seed=level_jumps_seed)
       prior_level_sample = tf.cumsum(tf.concat(
           [initial_level, level_jumps], axis=-1), axis=-1)
       prior_observation_sample = prior_level_sample + (  # Sample noise.
           self.observation_noise_scale[..., tf.newaxis] *
-          samplers.normal(prefer_static.shape(prior_level_sample),
+          samplers.normal(ps.shape(prior_level_sample),
                           dtype=self.dtype,
                           seed=prior_observation_seed))
 
