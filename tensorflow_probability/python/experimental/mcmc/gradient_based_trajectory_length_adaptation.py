@@ -53,6 +53,7 @@ class GradientBasedTrajectoryLengthAdaptationResults(
         'adaptation_rate',
         'jitter_amount',
         'averaged_sq_grad',
+        'averaged_sq_grad_adaptation_rate',
         'averaged_max_trajectory_length',
         'criterion',
         'seed',
@@ -72,6 +73,9 @@ class GradientBasedTrajectoryLengthAdaptationResults(
       jitter_amount) * max_trajectory_length, max_trajectory_length]`.
     averaged_sq_grad: Floating point scalar `Tensor`. Moving average of squared
       criterion gradients.
+    averaged_sq_grad_adaptation_rate: Floating point scalar `Tensor`. How
+      rapidly to adapt the running average squared gradient. This is `1 -
+      beta_2` from Adam.
     averaged_max_trajectory_length: Floating point scalar `Tensor`. Moving
       average of the maximum of trajectory length. This is used after the burnin
       period.
@@ -581,6 +585,7 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
       jitter_amount=1.,
       criterion_fn=chees_criterion,
       max_leapfrog_steps=1000,
+      averaged_sq_grad_adaptation_rate=0.05,
       num_leapfrog_steps_getter_fn=hmc_like_num_leapfrog_steps_getter_fn,
       num_leapfrog_steps_setter_fn=hmc_like_num_leapfrog_steps_setter_fn,
       step_size_getter_fn=hmc_like_step_size_getter_fn,
@@ -615,6 +620,9 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
         -> criterion`. Computes the criterion value.
       max_leapfrog_steps: Int32 scalar `Tensor`. Clips the number of leapfrog
         steps to this value.
+      averaged_sq_grad_adaptation_rate: Floating point scalar `Tensor`. How
+        rapidly to adapt the running average squared gradient. This is `1 -
+        beta_2` from Adam.
       num_leapfrog_steps_getter_fn: A callable with the signature
         `(kernel_results) -> num_leapfrog_steps` where `kernel_results` are the
         results of the `inner_kernel`, and `num_leapfrog_steps` is a floating
@@ -678,6 +686,7 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
         jitter_amount=jitter_amount,
         criterion_fn=criterion_fn,
         max_leapfrog_steps=max_leapfrog_steps,
+        averaged_sq_grad_adaptation_rate=averaged_sq_grad_adaptation_rate,
         num_leapfrog_steps_getter_fn=num_leapfrog_steps_getter_fn,
         num_leapfrog_steps_setter_fn=num_leapfrog_steps_setter_fn,
         step_size_getter_fn=step_size_getter_fn,
@@ -718,6 +727,10 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
   @property
   def max_leapfrog_steps(self):
     return self._parameters['max_leapfrog_steps']
+
+  @property
+  def averaged_sq_grad_adaptation_rate(self):
+    return self._parameters['averaged_sq_grad_adaptation_rate']
 
   def num_leapfrog_steps_getter_fn(self, kernel_results):
     return self._parameters['num_leapfrog_steps_getter_fn'](kernel_results)
@@ -849,6 +862,10 @@ class GradientBasedTrajectoryLengthAdaptation(kernel_base.TransitionKernel):
           jitter_amount=tf.convert_to_tensor(
               self.parameters['jitter_amount'], dtype, name='jitter_amount'),
           averaged_sq_grad=tf.zeros([], dtype),
+          averaged_sq_grad_adaptation_rate=tf.convert_to_tensor(
+              self.averaged_sq_grad_adaptation_rate,
+              dtype,
+              name='averaged_sq_grad_adaptation_rate'),
           averaged_max_trajectory_length=tf.zeros([], dtype),
           criterion=tf.zeros_like(
               self.log_accept_prob_getter_fn(inner_results)),
@@ -967,12 +984,13 @@ def _update_trajectory_grad(previous_kernel_results,
   # Compute Adam/RMSProp step size.
   dtype = previous_kernel_results.adaptation_rate.dtype
   iteration_f = tf.cast(previous_kernel_results.step, dtype) + 1.
-  msg_adaptation_rate = 0.05
-  new_averaged_sq_grad = (
-      (1 - msg_adaptation_rate) * previous_kernel_results.averaged_sq_grad +
-      msg_adaptation_rate * trajectory_grad**2)
+  averaged_sq_grad_adaptation_rate = (
+      previous_kernel_results.averaged_sq_grad_adaptation_rate)
+  new_averaged_sq_grad = ((1 - averaged_sq_grad_adaptation_rate) *
+                          previous_kernel_results.averaged_sq_grad +
+                          averaged_sq_grad_adaptation_rate * trajectory_grad**2)
   adjusted_averaged_sq_grad = new_averaged_sq_grad / (
-      1. - (1 - msg_adaptation_rate)**iteration_f)
+      1. - (1 - averaged_sq_grad_adaptation_rate)**iteration_f)
   trajectory_step_size = (
       previous_kernel_results.adaptation_rate /
       tf.sqrt(adjusted_averaged_sq_grad + 1e-20))
