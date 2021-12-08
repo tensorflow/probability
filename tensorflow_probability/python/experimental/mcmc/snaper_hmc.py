@@ -379,6 +379,9 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
         ),
         **self.preconditioned_hamiltonian_monte_carlo_kwargs,
     )
+    gbtla_kwargs = (
+        self.gradient_based_trajectory_length_adaptation_kwargs.copy())
+    gbtla_kwargs.setdefault('averaged_sq_grad_adaptation_rate', 0.5)
     kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=self.num_adaptation_steps,
@@ -395,7 +398,7 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
             state_mean_weight=state_ema_points / (state_ema_points + 1),
         ),
         validate_args=self.validate_args,
-        **self.gradient_based_trajectory_length_adaptation_kwargs,
+        **gbtla_kwargs,
     )
     return kernel
 
