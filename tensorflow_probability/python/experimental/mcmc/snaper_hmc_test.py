@@ -175,6 +175,19 @@ class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
         kr.ema_variance,
         init_x)
 
+  @test_util.jax_disable_test_missing_functionality('No stateful PRNGs')
+  def testStatefulSeed(self):
+    kernel = tfp.experimental.mcmc.SNAPERHamiltonianMonteCarlo(
+        tfd.Normal(0., 1.).log_prob, step_size=0.1, num_adaptation_steps=1)
+    _, kr = tfp.mcmc.sample_chain(
+        current_state=tf.zeros(2),
+        kernel=kernel,
+        num_results=1,
+        # seed is intentionally not specified so that the kernel gets a None
+        # seed.
+        trace_fn=lambda _, kr: kr)
+    self.assertEqual([1, 2], list(kr.seed.shape))
+
 
 @test_util.test_graph_and_eager_modes
 class SNAPERHMCTestFloat32(_SNAPERHMCTest):

@@ -533,6 +533,7 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
               kernel.inner_kernel.parameters['momentum_distribution']),  # pylint: disable=protected-access
       )
 
+      seed = samplers.sanitize_seed(seed)
       state_parts, inner_results = kernel.one_step(
           tf.nest.flatten(current_state),
           inner_results,
