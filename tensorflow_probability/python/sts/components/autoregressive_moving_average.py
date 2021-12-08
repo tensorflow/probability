@@ -1,4 +1,4 @@
-# Copyright 2018 The TensorFlow Probability Authors.
+# Copyright 2021 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,9 +38,9 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
     noise, and a linear function of previous Gaussian noise:
 
     ```python
-    level[t+1] = (sum(coefficients * levels[t:t-order:-1]) +
+    level[t+1] = (sum(ar_coefficients * levels[t:t-order:-1]) +
     Normal(0., level_scale) +
-    sum(coefficients * noise[t:t-order:-1]))
+    sum(ma_coefficients * noise[t:t-order:-1]))
     ```
 
     The process is characterized by a vector `coefficients` whose size determines
@@ -66,11 +66,11 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
     current value. This is formally encoded by the transition model:
 
     ```
-    transition_matrix = [ phi[0], phi[1],     ..., phi[p]
-                          1.,       0 ,       ..., 0.
-                          0.,       1.,       ..., 0.
+    transition_matrix = [ ar_coefs[0],  ar_coefs[1],    ..., ar_coefs[p]
+                          1.,           0,              ..., 0.
+                          0.,           1,              ..., 0.
                           ...
-                          0.,       0.,  ...,  1.,  0.   ]
+                          0.,           0.,  ...,       1.,  0.   ]
 
     transition_noise ~ N(loc=0., scale=diag([level_scale, 0., 0., ..., 0.]))
     ```
@@ -79,7 +79,7 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
     sums the previous noise and optionally adds independent noise at each step:
 
     ```
-    observation_matrix = [1, theta[0], theta[1], ..., theta[p-1]]
+    observation_matrix = [1, ma_coefs[0], ma_coefs[1], ..., ma_coefs[p-1]]
     observation_noise ~ N(loc=0, scale=observation_noise_scale)
     ```
 
@@ -87,8 +87,10 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
     in the formal sense. Setting `observation_noise_scale` to a nonzero value
     corresponds to a latent ARMA(p, p-1) process observed under an iid noise model.
 
-    See the [Wikipedia article](http://web.pdx.edu/~crkl/readings/Hamilton94.pdf)
-    for details on the Hamilton state space formulation for ARMA(p, p-1) processes.
+    #### References
+
+    [1] James D. Hamilton. State-space models. __Handbook of Econometrics, Volume
+      IV__ (1994): 3039-3080. http://web.pdx.edu/~crkl/readings/Hamilton94.pdf
     """
 
     def __init__(self,
@@ -106,13 +108,13 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
             num_timesteps: Scalar `int` `Tensor` number of timesteps to model
                 with this distribution.
             ar_coefficients: `float` `Tensor` of shape `concat(batch_shape, [order])`
-                defining  the autoregressive coefficients. The coefficients are defined
-                backwards in time: `coefficients[0] * level[t] + coefficients[1] *
-                level[t-1] + ... + coefficients[order-1] * level[t-order+1]`.
+                defining  the autoregressive coefficients. The ar_coefficients are defined
+                backwards in time: `ar_coefficients[0] * level[t] + ar_coefficients[1] *
+                level[t-1] + ... + ar_coefficients[order-1] * level[t-order+1]`.
             ma_coefficients: `float` `Tensor` of shape `concat(batch_shape, [order])`
-                defining  the moving average coefficients. The coefficients are defined
-                backwards in time: `coefficients[0] * noise[t] + coefficients[1] *
-                noise[t-1] + ... + coefficients[order-1] * noise[t-order+1]`.
+                defining  the moving average coefficients. The ma_coefficients are defined
+                backwards in time: `noise[t] + ma_coefficients[1] * noise[t-1]
+                + ... + ma_coefficients[order-2] * noise[t-order+1]`.
             level_scale: Scalar (any additional dimensions are treated as batch
                 dimensions) `float` `Tensor` indicating the standard deviation of the
                 transition noise at each step.
@@ -129,10 +131,11 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
                 to the base `tfd.LinearGaussianStateSpaceModel` constructor.
 
         Notes:
-            This representation is a ARMA(p, p - 1) process where q = p - 1.
-            If q + 1 != p, then either `ar_coefficients` or `ma_coefficients`
-            will be padded with zeros by the required amount to become a
-            ARMA(p, p - 1) process.
+            This distribution is always represented as a ARMA(p, p - 1) process
+            internally where q = p - 1 due to 'Mathematical Details' above.
+            If q + 1 != p is desired, then either `ar_coefficients` or
+            `ma_coefficients` will be automatically padded with zeros by the
+            required amount to become a ARMA(p, p - 1) process.
         """
         parameters = dict(locals())
         parameters.update(linear_gaussian_ssm_kwargs)
@@ -194,10 +197,6 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
     @property
     def order(self):
         return self._order
-
-    @order.setter
-    def order(self, order):
-        self._order = order
 
     @property
     def ar_coefficients(self):
