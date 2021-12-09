@@ -16,7 +16,6 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.sts.components.autoregressive import make_ar_transition_matrix
 
 
