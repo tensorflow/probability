@@ -19,6 +19,7 @@ import functools
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from inference_gym.internal import test_util
 from inference_gym.targets import lorenz_system
 
@@ -57,7 +58,7 @@ class LorenzSystemTest(test_util.InferenceGymTestCase):
 
   def testLorenzSystem(self):
     """Checks that unconstrained parameters yield finite joint densities."""
-    model = lorenz_system.LorenzSystem(**_test_dataset())
+    model = lorenz_system.LorenzSystem(**_test_dataset(), use_markov_chain=True)
     self.validate_log_prob_and_transforms(
         model, sample_transformation_shapes=dict(identity=[30, 3]))
 
@@ -73,7 +74,7 @@ class LorenzSystemTest(test_util.InferenceGymTestCase):
 
   def testConvectionLorenzBridge(self):
     """Checks that unconstrained parameters yield finite joint densities."""
-    model = lorenz_system.ConvectionLorenzBridge()
+    model = lorenz_system.ConvectionLorenzBridge(use_markov_chain=True)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(identity=[30, 3]),
@@ -84,7 +85,7 @@ class LorenzSystemTest(test_util.InferenceGymTestCase):
   @test_util.numpy_disable_gradient_test
   def testConvectionLorenzBridgeHMC(self):
     """Checks approximate samples from the model against the ground truth."""
-    model = lorenz_system.ConvectionLorenzBridge()
+    model = lorenz_system.ConvectionLorenzBridge(use_markov_chain=True)
 
     self.validate_ground_truth_using_hmc(
         model,
@@ -93,6 +94,18 @@ class LorenzSystemTest(test_util.InferenceGymTestCase):
         num_leapfrog_steps=240,
         step_size=0.03,
     )
+
+  def testMarkovChainLogprobMatchesOriginal(self):
+    model = lorenz_system.ConvectionLorenzBridge(use_markov_chain=False)
+    markov_chain_model = lorenz_system.ConvectionLorenzBridge(
+        use_markov_chain=True)
+
+    x = self.evaluate(model.prior_distribution().sample(
+        20, seed=tfp_test_util.test_seed()))
+    self.assertAllClose(model.unnormalized_log_prob(x),
+                        markov_chain_model.unnormalized_log_prob(
+                            tf.stack(x, axis=-2)),
+                        atol=1e-2)
 
 
 @test_util.multi_backend_test(globals(), 'targets.lorenz_system_test')
@@ -103,7 +116,8 @@ class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
     dataset = _test_dataset()
     del dataset['innovation_scale']
     del dataset['observation_scale']
-    model = lorenz_system.LorenzSystemUnknownScales(**dataset)
+    model = lorenz_system.LorenzSystemUnknownScales(use_markov_chain=True,
+                                                    **dataset)
     self.validate_log_prob_and_transforms(
         model, sample_transformation_shapes=dict(
             identity={'innovation_scale': [],
@@ -123,7 +137,8 @@ class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
 
   def testConvectionLorenzBridge(self):
     """Checks that unconstrained parameters yield finite joint densities."""
-    model = lorenz_system.ConvectionLorenzBridgeUnknownScales()
+    model = lorenz_system.ConvectionLorenzBridgeUnknownScales(
+        use_markov_chain=True)
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -138,7 +153,8 @@ class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
   def testConvectionLorenzBridgeHMC(self):
     """Checks approximate samples from the model against the ground truth."""
     self.skipTest('b/171518508')
-    model = lorenz_system.ConvectionLorenzBridgeUnknownScales()
+    model = lorenz_system.ConvectionLorenzBridgeUnknownScales(
+        use_markov_chain=True)
 
     self.validate_ground_truth_using_hmc(
         model,
@@ -147,6 +163,20 @@ class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
         num_leapfrog_steps=240,
         step_size=0.03,
     )
+
+  def testMarkovChainLogprobMatchesOriginal(self):
+    model = lorenz_system.ConvectionLorenzBridgeUnknownScales(
+        use_markov_chain=False)
+    markov_chain_model = lorenz_system.ConvectionLorenzBridgeUnknownScales(
+        use_markov_chain=True)
+
+    x = self.evaluate(model.prior_distribution().sample(
+        20, seed=tfp_test_util.test_seed()))
+    self.assertAllClose(model.unnormalized_log_prob(x),
+                        markov_chain_model.unnormalized_log_prob(
+                            type(markov_chain_model.dtype)(
+                                x[0], x[1], tf.stack(x[2:], axis=-2))),
+                        atol=1e-2)
 
 
 if __name__ == '__main__':

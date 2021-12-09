@@ -1,4 +1,3 @@
-# Lint as: python3
 # Copyright 2020 The TensorFlow Probability Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,8 +40,22 @@ __all__ = [
 Root = tfd.JointDistributionCoroutine.Root
 
 
-def lorenz_system_prior_fn(num_timesteps, innovation_scale, step_size,
-                           dtype=tf.float32):
+def lorenz_transition_fn(_, loc, innovation_scale, step_size):
+  x, y, z = tf.unstack(loc, axis=-1)
+  dx = 10 * (y - x)
+  dy = x * (28 - z) - y
+  dz = x * y - 8 / 3 * z
+  delta = tf.stack([dx, dy, dz], axis=-1)
+  return tfd.Independent(
+      tfd.Normal(loc + step_size * delta,
+                 tf.sqrt(step_size) * innovation_scale[..., tf.newaxis]),
+      reinterpreted_batch_ndims=1)
+
+
+def lorenz_system_as_explicit_steps(num_timesteps,
+                                    innovation_scale,
+                                    step_size,
+                                    dtype):
   """Generative process for the Lorenz System model."""
   innovation_scale = tensor_util.convert_nonref_to_tensor(
       innovation_scale, name='innovation_scale', dtype=dtype)
@@ -50,42 +63,61 @@ def lorenz_system_prior_fn(num_timesteps, innovation_scale, step_size,
       step_size, name='step_size', dtype=dtype)
   loc = yield Root(tfd.Sample(tfd.Normal(0., 1.), sample_shape=3))
   for _ in range(num_timesteps - 1):
-    x, y, z = tf.unstack(loc, axis=-1)
-    dx = 10 * (y - x)
-    dy = x * (28 - z) - y
-    dz = x * y - 8 / 3 * z
-    delta = tf.stack([dx, dy, dz], axis=-1)
-    loc = yield tfd.Independent(
-        tfd.Normal(loc + step_size * delta,
-                   tf.sqrt(step_size) * innovation_scale[..., tf.newaxis]),
-        reinterpreted_batch_ndims=1)
+    loc = yield lorenz_transition_fn(
+        _, loc, innovation_scale=innovation_scale, step_size=step_size)
+
+
+def lorenz_system_as_markov_chain(num_timesteps, innovation_scale, step_size,
+                                  dtype=tf.float32):
+  """Represents a Lorenz system as a single MarkovChain distribution."""
+  innovation_scale = tensor_util.convert_nonref_to_tensor(
+      innovation_scale, name='innovation_scale', dtype=dtype)
+  step_size = tensor_util.convert_nonref_to_tensor(
+      step_size, name='step_size', dtype=dtype)
+  return tfd.MarkovChain(
+      initial_state_prior=tfd.Sample(tfd.Normal(0., 1.), sample_shape=3),
+      transition_fn=functools.partial(lorenz_transition_fn,
+                                      innovation_scale=innovation_scale,
+                                      step_size=step_size),
+      num_steps=num_timesteps)
 
 
 def lorenz_system_unknown_scales_prior_fn(num_timesteps,
                                           step_size,
+                                          use_markov_chain=False,
                                           dtype=tf.float32):
+  """Generative process for the Lorenz System model with unknown scales."""
   innovation_scale = yield Root(tfd.LogNormal(-1., 1., name='innovation_scale'))
   _ = yield Root(tfd.LogNormal(-1., 1., name='observation_scale'))
-  yield from lorenz_system_prior_fn(num_timesteps=num_timesteps,
-                                    innovation_scale=innovation_scale,
-                                    step_size=step_size,
-                                    dtype=dtype)
+  if use_markov_chain:
+    yield lorenz_system_as_markov_chain(num_timesteps,
+                                        innovation_scale=innovation_scale,
+                                        step_size=step_size,
+                                        dtype=dtype)
+  else:
+    yield from lorenz_system_as_explicit_steps(
+        num_timesteps=num_timesteps,
+        innovation_scale=innovation_scale,
+        step_size=step_size,
+        dtype=dtype)
 
 
 def lorenz_system_log_likelihood_fn(params, observed_values, observation_scale,
                                     observation_index, observation_mask,
+                                    use_markov_chain=False,
                                     dtype=tf.float32):
   """Likelihood of a series under the Lorenz System model."""
   if observation_scale is None:  # Scales are random variables.
-    (_, observation_scale), params = params[:2], params[2:]
-
+    (_, observation_scale) = params[:2]
+    params = params[2] if use_markov_chain else params[2:]
   observed_values = tensor_util.convert_nonref_to_tensor(
       observed_values, name='observation_values', dtype=dtype)
   observation_scale = tensor_util.convert_nonref_to_tensor(
       observation_scale, name='observation_scale', dtype=dtype)
   num_observations = tf.compat.dimension_value(observed_values.shape[0])
   observation_indices = list(np.arange(num_observations)[observation_mask])
-  series_values = tf.stack(params, axis=-2)[..., observation_index]
+  series_values = (params if use_markov_chain
+                   else tf.stack(params, axis=-2))[..., observation_index]
   masked_series = tf.gather(series_values, observation_indices, axis=-1)
   masked_observations = tf.gather(observed_values, observation_indices, axis=-1)
 
@@ -125,6 +157,7 @@ class LorenzSystem(bayesian_model.BayesianModel):
                observation_mask,
                observation_index,
                step_size,
+               use_markov_chain=False,
                name='lorenz_system',
                pretty_name='Lorenz System'):
     """Constructs a Lorenz System model.
@@ -139,6 +172,10 @@ class LorenzSystem(bayesian_model.BayesianModel):
       observation_index: Python `int` or `list` of `int`s that determines which
         latent time series are observed.
       step_size: Python `float` used for integrating the Lorenz dynamics.
+      use_markov_chain: Python `bool` indicating whether to use the
+        `MarkovChain` distribution in place of separate random variables for
+        each time step. The default of `False` is for backwards compatibility;
+        setting this to `True` should significantly improve performance.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
@@ -146,20 +183,26 @@ class LorenzSystem(bayesian_model.BayesianModel):
       dtype = dtype_util.common_dtype(
           [observed_values, innovation_scale, observation_scale, step_size],
           dtype_hint=tf.float32)
-
       if not isinstance(observation_index, int):
         raise NotImplementedError('Observing multiple time series is not yet'
                                   ' supported.')
 
       num_timesteps = observed_values.shape[0]
 
-      self._prior_dist = tfd.JointDistributionCoroutine(
-          functools.partial(
-              lorenz_system_prior_fn,
-              num_timesteps=num_timesteps,
-              innovation_scale=innovation_scale,
-              step_size=step_size,
-              dtype=dtype))
+      if use_markov_chain:
+        self._prior_dist = lorenz_system_as_markov_chain(
+            num_timesteps=num_timesteps,
+            innovation_scale=innovation_scale,
+            step_size=step_size,
+            dtype=dtype)
+      else:
+        self._prior_dist = tfd.JointDistributionCoroutine(
+            functools.partial(
+                lorenz_system_as_explicit_steps,
+                num_timesteps=num_timesteps,
+                innovation_scale=innovation_scale,
+                step_size=step_size,
+                dtype=dtype))
 
       self._log_likelihood_fn = functools.partial(
           lorenz_system_log_likelihood_fn,
@@ -167,10 +210,11 @@ class LorenzSystem(bayesian_model.BayesianModel):
           observation_scale=observation_scale,
           observation_mask=observation_mask,
           observation_index=observation_index,
+          use_markov_chain=use_markov_chain,
           dtype=dtype)
 
       def _ext_identity(params):
-        return tf.stack(params, -2)
+        return params
 
       sample_transformations = {
           'identity':
@@ -180,8 +224,10 @@ class LorenzSystem(bayesian_model.BayesianModel):
               )
       }
 
-      event_space_bijector = type(
-          self._prior_dist.dtype)(*([tfb.Identity()] * num_timesteps))
+      event_space_bijector = (
+          tfb.Identity() if use_markov_chain
+          else type(self._prior_dist.dtype)(
+              *([tfb.Identity()] * num_timesteps)))
     super(LorenzSystem, self).__init__(
         default_event_space_bijector=event_space_bijector,
         event_shape=self._prior_dist.event_shape,
@@ -214,11 +260,15 @@ class ConvectionLorenzBridge(LorenzSystem):
   GROUND_TRUTH_MODULE = convection_lorenz_bridge
 
   def __init__(self,
+               use_markov_chain=False,
                name='convection_lorenz_bridge',
                pretty_name='Ambrogioni Lorenz System'):
     dataset = data.convection_lorenz_bridge()
-    params = dict(dataset, name=name, pretty_name=pretty_name)
-    super(ConvectionLorenzBridge, self).__init__(**params)
+    super(ConvectionLorenzBridge, self).__init__(
+        name=name,
+        pretty_name=pretty_name,
+        use_markov_chain=use_markov_chain,
+        **dataset)
 
 
 class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
@@ -259,6 +309,7 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
                observation_mask,
                observation_index,
                step_size,
+               use_markov_chain=False,
                name='lorenz_system',
                pretty_name='Lorenz System'):
     """Constructs a Lorenz System model.
@@ -270,6 +321,10 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
       observation_index: Python `int` or `list` of `int`s that determines which
         latent time series are observed.
       step_size: Python `float` used for integrating the Lorenz dynamics.
+      use_markov_chain: Python `bool` indicating whether to use the
+        `MarkovChain` distribution in place of separate random variables for
+        each time step. The default of `False` is for backwards compatibility;
+        setting this to `True` should significantly improve performance.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
@@ -277,7 +332,6 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
       dtype = dtype_util.common_dtype(
           [observed_values, step_size],
           dtype_hint=tf.float32)
-
       if not isinstance(observation_index, int):
         raise NotImplementedError('Observing multiple time series is not yet'
                                   ' supported.')
@@ -289,6 +343,7 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
               lorenz_system_unknown_scales_prior_fn,
               num_timesteps=num_timesteps,
               step_size=step_size,
+              use_markov_chain=use_markov_chain,
               dtype=dtype))
 
       self._log_likelihood_fn = functools.partial(
@@ -297,12 +352,14 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
           observation_scale=None,
           observation_mask=observation_mask,
           observation_index=observation_index,
-          dtype=dtype)
+          dtype=dtype,
+          use_markov_chain=use_markov_chain)
 
       def _ext_identity(params):
         return {'innovation_scale': params[0],
                 'observation_scale': params[1],
-                'latents': tf.stack(params[2:], -2)}
+                'latents': (params[2] if use_markov_chain
+                            else tf.stack(params[2:], -2))}
 
       sample_transformations = {
           'identity':
@@ -316,9 +373,12 @@ class LorenzSystemUnknownScales(bayesian_model.BayesianModel):
       }
 
       event_space_bijector = type(
-          self._prior_dist.dtype)(*([tfb.Softplus(),
-                                     tfb.Softplus()
-                                     ] + [tfb.Identity()] * num_timesteps))
+          self._prior_dist.dtype)(
+              *([
+                  tfb.Softplus(),
+                  tfb.Softplus()
+              ] + [tfb.Identity()] * (
+                  1 if use_markov_chain else num_timesteps)))
     super(LorenzSystemUnknownScales, self).__init__(
         default_event_space_bijector=event_space_bijector,
         event_shape=self._prior_dist.event_shape,
@@ -353,10 +413,14 @@ class ConvectionLorenzBridgeUnknownScales(LorenzSystemUnknownScales):
   GROUND_TRUTH_MODULE = convection_lorenz_bridge_unknown_scales
 
   def __init__(self,
+               use_markov_chain=False,
                name='convection_lorenz_bridge_unknown_scales',
                pretty_name='Ambrogioni Lorenz System'):
     dataset = data.convection_lorenz_bridge()
     del dataset['innovation_scale']
     del dataset['observation_scale']
-    params = dict(dataset, name=name, pretty_name=pretty_name)
-    super(ConvectionLorenzBridgeUnknownScales, self).__init__(**params)
+    super(ConvectionLorenzBridgeUnknownScales, self).__init__(
+        name=name,
+        pretty_name=pretty_name,
+        use_markov_chain=use_markov_chain,
+        **dataset)

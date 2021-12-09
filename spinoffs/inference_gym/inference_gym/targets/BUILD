@@ -300,6 +300,7 @@ py_test(
         ":lorenz_system",
         # numpy dep,
         # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )
