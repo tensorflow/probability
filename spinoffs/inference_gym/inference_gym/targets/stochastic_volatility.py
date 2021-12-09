@@ -37,10 +37,7 @@ __all__ = [
 Root = tfd.JointDistributionCoroutine.Root
 
 
-def autoregressive_series_fn(num_timesteps,
-                             mean,
-                             noise_scale,
-                             persistence):
+def autoregressive_series_fn(num_timesteps, mean, noise_scale, persistence):
   """Generative process for an order-1 autoregressive process."""
   x_t = yield Root(tfd.Normal(
       loc=mean,
@@ -56,11 +53,25 @@ def autoregressive_series_fn(num_timesteps,
         name='x_{:06d}'.format(t))
 
 
-def stochastic_volatility_prior_fn(num_timesteps):
+def autoregressive_series_markov_chain(num_timesteps, mean, noise_scale,
+                                       persistence, name):
+  return tfd.MarkovChain(
+      initial_state_prior=tfd.Normal(
+          loc=mean,
+          scale=noise_scale / tf.math.sqrt(tf.ones([]) - persistence**2)),
+      transition_fn=lambda _, x_t: tfd.Normal(  # pylint: disable=g-long-lambda
+          loc=persistence * (x_t -  mean) + mean,
+          scale=noise_scale),
+      num_steps=num_timesteps,
+      name=name)
+
+
+def stochastic_volatility_prior_fn(num_timesteps, use_markov_chain):
   """Generative process for the stochastic volatility model."""
   persistence_of_volatility = yield Root(
       tfd.TransformedDistribution(
-          tfd.Beta(concentration1=20., concentration0=1.5),
+          tfd.Beta(concentration1=20.,
+                   concentration0=1.5),
           tfb.Shift(-1.)(tfb.Scale(2.)),
           name='persistence_of_volatility'))
   mean_log_volatility = yield Root(tfd.Cauchy(loc=0., scale=5.,
@@ -68,18 +79,28 @@ def stochastic_volatility_prior_fn(num_timesteps):
   white_noise_shock_scale = yield Root(tfd.HalfCauchy(
       loc=0., scale=2., name='white_noise_shock_scale'))
 
-  _ = yield tfd.JointDistributionCoroutine(
-      functools.partial(autoregressive_series_fn,
-                        num_timesteps=num_timesteps,
-                        mean=mean_log_volatility,
-                        noise_scale=white_noise_shock_scale,
-                        persistence=persistence_of_volatility),
-      name='log_volatility')
+  if use_markov_chain:
+    yield autoregressive_series_markov_chain(
+        num_timesteps=num_timesteps,
+        mean=mean_log_volatility,
+        noise_scale=white_noise_shock_scale,
+        persistence=persistence_of_volatility,
+        name='log_volatility')
+  else:
+    yield tfd.JointDistributionCoroutine(
+        functools.partial(autoregressive_series_fn,
+                          num_timesteps=num_timesteps,
+                          mean=mean_log_volatility,
+                          noise_scale=white_noise_shock_scale,
+                          persistence=persistence_of_volatility),
+        name='log_volatility')
 
 
-def stochastic_volatility_log_likelihood_fn(values, centered_returns):
+def stochastic_volatility_log_likelihood_fn(
+    values, centered_returns, use_markov_chain):
   """Likelihood of observed returns under the hypothesized volatilities."""
-  log_volatility = tf.stack(values[-1], axis=-1)
+  log_volatility = (values[-1] if use_markov_chain
+                    else tf.stack(values[-1], axis=-1))
   likelihood = tfd.Normal(loc=0., scale=tf.exp(log_volatility / 2.))
   return tf.reduce_sum(likelihood.log_prob(centered_returns), axis=-1)
 
@@ -122,6 +143,7 @@ class StochasticVolatility(bayesian_model.BayesianModel):
   def __init__(
       self,
       centered_returns,
+      use_markov_chain=False,
       name='stochastic_volatility',
       pretty_name='Stochastic Volatility'):
     """Construct the stochastic volatility model.
@@ -130,6 +152,10 @@ class StochasticVolatility(bayesian_model.BayesianModel):
       centered_returns: Float `Tensor` of shape `[num_timesteps]` giving the
         mean-adjusted return (change in asset price, minus the average change)
         observed at each step.
+      use_markov_chain: Python `bool` indicating whether to use the
+        `MarkovChain` distribution in place of separate random variables for
+        each time step. The default of `False` is for backwards compatibility;
+        setting this to `True` should significantly improve performance.
       name: Python `str` name prefixed to Ops created by this class.
       pretty_name: A Python `str`. The pretty name of this model.
     """
@@ -141,18 +167,22 @@ class StochasticVolatility(bayesian_model.BayesianModel):
 
       self._prior_dist = tfd.JointDistributionCoroutine(
           functools.partial(stochastic_volatility_prior_fn,
-                            num_timesteps=num_timesteps))
+                            num_timesteps=num_timesteps,
+                            use_markov_chain=use_markov_chain))
 
       self._log_likelihood_fn = functools.partial(
           stochastic_volatility_log_likelihood_fn,
-          centered_returns=centered_returns)
+          centered_returns=centered_returns,
+          use_markov_chain=use_markov_chain)
 
       def _ext_identity(params):
         res = collections.OrderedDict()
         res['persistence_of_volatility'] = params.persistence_of_volatility
         res['mean_log_volatility'] = params.mean_log_volatility
         res['white_noise_shock_scale'] = params.white_noise_shock_scale
-        res['log_volatility'] = tf.stack(params.log_volatility, axis=-1)
+        res['log_volatility'] = (params.log_volatility
+                                 if use_markov_chain
+                                 else tf.stack(params.log_volatility, axis=-1))
         return res
 
       sample_transformations = {
@@ -168,14 +198,17 @@ class StochasticVolatility(bayesian_model.BayesianModel):
               )
       }
 
+    if use_markov_chain:
+      log_volatility_bijector = tfb.Identity()
+    else:
+      log_volatility_bijector = type(self._prior_dist.dtype[-1])(*(
+          (tfb.Identity(),) * num_timesteps))
     super(StochasticVolatility, self).__init__(
         default_event_space_bijector=type(self._prior_dist.dtype)(
             tfb.Sigmoid(-1., 1.),
             tfb.Identity(),
             tfb.Softplus(),
-            type(self._prior_dist.dtype[-1])(*(
-                (tfb.Identity(),) * num_timesteps)),
-        ),
+            log_volatility_bijector),
         event_shape=self._prior_dist.event_shape,
         dtype=self._prior_dist.dtype,
         name=name,
@@ -195,11 +228,12 @@ class StochasticVolatilitySP500(StochasticVolatility):
 
   GROUND_TRUTH_MODULE = stochastic_volatility_sp500
 
-  def __init__(self):
+  def __init__(self, use_markov_chain=False):
     dataset = data.sp500_returns()
     super(StochasticVolatilitySP500, self).__init__(
         name='stochastic_volatility_sp500',
         pretty_name='Stochastic volatility model of S&P500 returns.',
+        use_markov_chain=use_markov_chain,
         **dataset)
 
 
@@ -208,9 +242,10 @@ class StochasticVolatilitySP500Small(StochasticVolatility):
 
   GROUND_TRUTH_MODULE = stochastic_volatility_sp500_small
 
-  def __init__(self):
+  def __init__(self, use_markov_chain=False):
     dataset = data.sp500_returns(num_points=100)
     super(StochasticVolatilitySP500Small, self).__init__(
         name='stochastic_volatility_sp500_small',
         pretty_name='Smaller stochastic volatility model of S&P500 returns.',
+        use_markov_chain=use_markov_chain,
         **dataset)

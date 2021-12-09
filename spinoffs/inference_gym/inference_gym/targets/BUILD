@@ -520,6 +520,8 @@ py_test(
         ":stochastic_volatility",
         # absl/testing:parameterized dep,
         # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
+        "//inference_gym/internal:data",
         "//inference_gym/internal:test_util",
     ],
 )

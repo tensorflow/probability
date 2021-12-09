@@ -17,6 +17,9 @@
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
+
+from inference_gym.internal import data
 from inference_gym.internal import test_util
 from inference_gym.targets import stochastic_volatility
 
@@ -47,7 +50,8 @@ class StochasticVolatilityTest(test_util.InferenceGymTestCase):
   def testSP500Small(self):
     """Checks that unconstrained parameters yield finite joint densities."""
     model = (
-        stochastic_volatility.StochasticVolatilitySP500Small())
+        stochastic_volatility.StochasticVolatilitySP500Small(
+            use_markov_chain=True))
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -64,7 +68,7 @@ class StochasticVolatilityTest(test_util.InferenceGymTestCase):
   def testSP500(self):
     """Checks that unconstrained parameters yield finite joint densities."""
     model = (
-        stochastic_volatility.StochasticVolatilitySP500())
+        stochastic_volatility.StochasticVolatilitySP500(use_markov_chain=True))
     self.validate_log_prob_and_transforms(
         model,
         sample_transformation_shapes=dict(
@@ -77,6 +81,21 @@ class StochasticVolatilityTest(test_util.InferenceGymTestCase):
         check_ground_truth_mean_standard_error=True,
         check_ground_truth_mean=True,
         check_ground_truth_standard_deviation=True)
+
+  def testMarkovChainLogprobMatchesOriginal(self):
+    # Use a very short dataset since the non-markov-chain model is slow.
+    dataset = data.sp500_returns(num_points=10)
+    model = stochastic_volatility.StochasticVolatility(
+        use_markov_chain=False, **dataset)
+    markov_chain_model = stochastic_volatility.StochasticVolatility(
+        use_markov_chain=True, **dataset)
+
+    xs = self.evaluate(model.prior_distribution().sample(
+        10, seed=tfp_test_util.test_seed()))
+    xs_stacked = xs[:-1] + (tf.stack(xs[-1], axis=-1),)
+    self.assertAllClose(model.unnormalized_log_prob(xs),
+                        markov_chain_model.unnormalized_log_prob(xs_stacked),
+                        atol=1e-2)
 
 if __name__ == '__main__':
   tf.test.main()
