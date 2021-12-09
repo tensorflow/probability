@@ -46,6 +46,36 @@ def ar_explicit_logp(y, coefs, level_scale):
   return lp
 
 
+def arma_explicit_logp(y, ar_coefs, ma_coefs, level_scale):
+    """Manual log-prob computation for arma(p, q) process.
+
+    References:
+        page 132 of http://www.ru.ac.bd/stat/wp-content/uploads/sites/25/2019/03/504_02_Hamilton_Time-Series-Analysis.pdf
+
+    """
+    p = len(ar_coefs); T = len(y); q = len(ma_coefs)
+
+    # For the first few steps of y, where previous values
+    # are not available, we model them as zero-mean with
+    # stddev `prior_scale`.
+    # for i in range(p):
+    #     zero_padded_y = np.zeros([p])
+    #     zero_padded_y[p - i:p] = y[:i]
+    #     pred_y = np.dot(zero_padded_y, ar_coefs[::-1])
+    #     lp += tfd.Normal(pred_y, level_scale).log_prob(y[i])
+
+    e = np.zeros([T])
+    for i in range(p, len(y)):
+        pred_y = np.dot(y[i - p:i], ar_coefs[::-1]) + \
+                 np.dot(e[i - q:i], ma_coefs[::-1])
+        e[i] = y[i] - pred_y
+    lp = -((T - p) / 2) * np.log(2 * np.pi) \
+          - ((T - p) / 2) * np.log(level_scale ** 2) \
+          - np.sum(e[p:T] ** 2 / (2 * level_scale ** 2))
+
+    return lp
+
+
 class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
 
   def testEqualsAutoregressive(self):
@@ -98,29 +128,30 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
     self.assertAllClose(ar1_lp, arma1_lp)
     self.assertAllClose(ar2_lp, arma2_lp)
 
-    # TODO: Implement this test
-  # def testLogprobCorrectness(self):
-  #   # Compare the state-space model's log-prob to an explicit implementation.
-  #   num_timesteps = 10
-  #   observed_time_series_ = np.random.randn(num_timesteps)
-  #   coefficients_ = np.array([.7, -.1]).astype(self.dtype)
-  #   level_scale_ = 1.0
-  #
-  #   observed_time_series = self._build_placeholder(observed_time_series_)
-  #   level_scale = self._build_placeholder(level_scale_)
-  #
-  #   expected_logp = ar_explicit_logp(
-  #       observed_time_series_, coefficients_, level_scale_)
-  #
-  #   ssm = AutoregressiveStateSpaceModel(
-  #       num_timesteps=num_timesteps,
-  #       coefficients=coefficients_,
-  #       level_scale=level_scale,
-  #       initial_state_prior=tfd.MultivariateNormalDiag(
-  #           scale_diag=[level_scale, 0.]))
-  #
-  #   lp = ssm.log_prob(observed_time_series[..., tf.newaxis])
-  #   self.assertAllClose(self.evaluate(lp), expected_logp)
+  def testLogprobCorrectness(self):
+    # Compare the state-space model's log-prob to an explicit implementation.
+    num_timesteps = 10
+    observed_time_series_ = np.random.randn(num_timesteps)
+    ar_coefficients_ = np.array([.7, -.1]).astype(self.dtype)
+    ma_coefficients_ = np.array([0.5, -0.4]).astype(self.dtype)
+    level_scale_ = 1.0
+
+    observed_time_series = self._build_placeholder(observed_time_series_)
+    level_scale = self._build_placeholder(level_scale_)
+
+    expected_logp = arma_explicit_logp(
+        observed_time_series_, ar_coefficients_, ma_coefficients_, level_scale_)
+
+    ssm = AutoregressiveMovingAverageStateSpaceModel(
+        num_timesteps=num_timesteps,
+        ar_coefficients=ar_coefficients_,
+        ma_coefficients=ma_coefficients_,
+        level_scale=level_scale,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            scale_diag=[level_scale, 0., 0.]))
+
+    lp = ssm.log_prob(observed_time_series[..., tf.newaxis])
+    self.assertAllClose(self.evaluate(lp), expected_logp)
 
   def testBatchShape(self):
     # Check that the model builds with batches of parameters.
@@ -129,6 +160,7 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
 
     # No `_build_placeholder`, because coefficients must have static shape.
     coefficients = np.random.randn(*(batch_shape + [order])).astype(self.dtype)
+    order = max(order, order + 1)  # shape of initial_state_prior, scale_diag
 
     level_scale = self._build_placeholder(
         np.exp(np.random.randn(*batch_shape)))
@@ -136,7 +168,7 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
     ssm = AutoregressiveMovingAverageStateSpaceModel(
         num_timesteps=10,
         ar_coefficients=coefficients,
-        ma_coefficients=coefficients[..., :-1],
+        ma_coefficients=coefficients,
         level_scale=level_scale,
         initial_state_prior=tfd.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(np.ones([order]))))

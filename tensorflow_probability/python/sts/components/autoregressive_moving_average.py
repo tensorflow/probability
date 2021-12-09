@@ -164,11 +164,11 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
             # if p != q + 1, then pad either of the arguments to ensure
             # we end up fitting an ARMA(p, p-1) process.
             if p > q + 1:
-                pad = tf.zeros([p - q - 1], dtype=dtype)
-                ma_coefficients = tf.concat([ma_coefficients, pad], axis=-1)
+                ma_coefficients = _pad_tensor_with_trailing_zeros(
+                    ma_coefficients, p - q - 1)
             elif q + 1 > p:
-                pad = tf.zeros([q + 1 - p], dtype=dtype)
-                ar_coefficients = tf.concat([ar_coefficients, pad], axis=-1)
+                ar_coefficients = _pad_tensor_with_trailing_zeros(
+                    ar_coefficients, q + 1 - p)
 
             order = max(p, q + 1)
             if order is None:
@@ -178,6 +178,14 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
             self._ar_coefficients = ar_coefficients
             self._ma_coefficients = ma_coefficients
             self._level_scale = level_scale
+
+            # ensure the prior's shape matches the padded order
+            prior_event_shape = tf.compat.dimension_value(
+                initial_state_prior.event_shape[-1])
+            if prior_event_shape != self.order:
+                raise ValueError('prior event shape needs to match max(p, q + 1). '
+                                 f'prior event shape: {prior_event_shape}, '
+                                 f'max(p, q + 1): {self.order}.')
 
             super(AutoregressiveMovingAverageStateSpaceModel, self).__init__(
                 num_timesteps=num_timesteps,
@@ -209,6 +217,12 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
     @property
     def level_scale(self):
         return self._level_scale
+
+
+def _pad_tensor_with_trailing_zeros(x, num_zeros):
+    pad = tf.zeros_like(x, dtype=x.dtype)[..., 0:1]
+    pad = tf.repeat(pad, num_zeros, axis=-1)
+    return tf.concat([x, pad], axis=-1)
 
 
 def make_ma_observation_matrix(coefficients):
