@@ -219,7 +219,7 @@ class AutoregressiveMovingAverageStateSpaceModel(tfd.LinearGaussianStateSpaceMod
 
 
 def _pad_tensor_with_trailing_zeros(x, num_zeros):
-    pad = tf.zeros_like(x, dtype=x.dtype)[..., 0:1]
+    pad = tf.zeros_like(x[..., 0:1])
     pad = tf.repeat(pad, num_zeros, axis=-1)
     return tf.concat([x, pad], axis=-1)
 
