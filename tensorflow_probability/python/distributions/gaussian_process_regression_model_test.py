@@ -221,6 +221,64 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     self.assertAllClose(self.evaluate(precomputed_gprm.mean()),
                         self.evaluate(gprm.mean()))
 
+  def testPrecomputedWithMasking(self):
+    amplitude = np.array([1., 2.], np.float64)
+    length_scale = np.array([[.1], [.2], [.3]], np.float64)
+    observation_noise_variance = np.array([[1e-2], [1e-4], [1e-6]], np.float64)
+
+    rng = test_util.test_np_rng()
+    observations_mask = np.array([
+        [False, True, False, True, False, True],
+        [True, True, True, True, True, True],
+        [True, True, False, False, True, True],
+    ]).reshape((3, 1, 6))
+    observation_index_points = np.where(
+        observations_mask[..., np.newaxis],
+        rng.uniform(-1., 1., (3, 1, 6, 2)).astype(np.float64),
+        np.nan)
+    observations = np.where(
+        observations_mask,
+        rng.uniform(-1., 1., (3, 1, 6)).astype(np.float64),
+        np.nan)
+
+    index_points = rng.uniform(-1., 1., (5, 2)).astype(np.float64)
+
+    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+    gprm = tfd.GaussianProcessRegressionModel.precompute_regression_model(
+        kernel=kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observations_mask=observations_mask,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+
+    self.assertAllNotNan(gprm.mean())
+    self.assertAllNotNan(gprm.variance())
+    self.assertAllNotNan(gprm.covariance())
+
+    # For each batch member of `gprm`, check that the distribution is the same
+    # as a GaussianProcessRegressionModel with no masking but conditioned on
+    # only the not-masked-out index points.
+    x = gprm.sample(seed=test_util.test_seed())
+    for i in range(3):
+      observation_index_points_i = tf.gather(
+          observation_index_points[i, 0], observations_mask[i, 0].nonzero()[0])
+      observations_i = tf.gather(
+          observations[i, 0], observations_mask[i, 0].nonzero()[0])
+      gprm_i = tfd.GaussianProcessRegressionModel.precompute_regression_model(
+          kernel=kernel[i],
+          index_points=index_points,
+          observation_index_points=observation_index_points_i,
+          observations=observations_i,
+          observation_noise_variance=observation_noise_variance[i, 0],
+          validate_args=True)
+
+      self.assertAllClose(gprm.mean()[i], gprm_i.mean())
+      self.assertAllClose(gprm.variance()[i], gprm_i.variance())
+      self.assertAllClose(gprm.covariance()[i], gprm_i.covariance())
+      self.assertAllClose(gprm.log_prob(x)[i], gprm_i.log_prob(x[i]))
+
   @test_util.disable_test_for_backend(
       disable_numpy=True, disable_jax=True,
       reason='Numpy and JAX have no notion of CompositeTensor/saved_model')

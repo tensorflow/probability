@@ -120,6 +120,41 @@ class SchurComplementTest(test_util.TestCase):
       expected = k_x_y - cov_dec
       self.assertAllClose(expected, self.evaluate(k.apply(x, y)))
 
+  def testMasking(self):
+    seed1, seed2, seed3 = tfp.random.split_seed(test_util.test_seed(), n=3)
+    base_kernel = tfpk.ExponentiatedQuadratic(5.0, 1.0, feature_ndims=1)
+    mask = np.array([
+        [True, False, True, False, True],
+        [False, True, False, True, True],
+        [False, True, True, False, False],
+    ])
+    fixed_inputs = tf.where(mask[..., np.newaxis],
+                            tf.random.stateless_uniform(
+                                [3, 5, 4], seed=seed1, minval=-1.0, maxval=1.0),
+                            np.nan)
+    k = tfpk.SchurComplement(base_kernel, fixed_inputs, fixed_inputs_mask=mask)
+
+    x = tf.random.stateless_uniform([6, 4], seed=seed2, minval=-1.0, maxval=1.0)
+    y = tf.random.stateless_uniform(
+        [2, 1, 2, 4], seed=seed3, minval=-1.0, maxval=1.0)
+
+    k_x_y = k.matrix(x, y)
+    k_x_x = k.apply(x, x, example_ndims=1)
+    k_y_y = k.apply(y, y, example_ndims=1)
+
+    # For each batch member of `k`, compare `k.matrix` and `k.apply` to the
+    # Schur complement computed using only the subset `fixed_inputs` that are
+    # not masked out.
+    for i in range(3):
+      fixed_i = tf.gather(fixed_inputs[i], mask[i].nonzero()[0])
+      k_i = tfpk.SchurComplement(base_kernel, fixed_i)
+      self.assertAllClose(
+          k_i.matrix(x, y), k_x_y[:, i:i+1], atol=1e-5, rtol=1e-5)
+      self.assertAllClose(
+          k_i.apply(x, x), k_x_x[i], atol=1e-5, rtol=1e-5)
+      self.assertAllClose(
+          k_i.apply(y, y), k_y_y[:, i:i+1], atol=1e-5, rtol=1e-5)
+
   def testApplyShapesAreCorrect(self):
     for example_ndims in range(0, 4):
       # An integer generator.

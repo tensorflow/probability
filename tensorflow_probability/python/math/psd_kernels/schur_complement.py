@@ -18,6 +18,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
@@ -55,6 +56,32 @@ def _compute_divisor_matrix(
     divisor_matrix = _add_diagonal_shift(
         divisor_matrix, diag_shift[..., tf.newaxis])
   return divisor_matrix
+
+
+def _mask_matrix(x, mask=None):
+  """Copies a matrix, replacing masked-out rows/cols from the identity matrix.
+
+  Args:
+    x: A Tensor of shape `[..., n, n]`, representing a batch of n-by-n matrices.
+    mask: A boolean Tensor of shape `[..., n]`, representing a batch of masks.
+      If `mask` is None, `x` is returned.
+  Returns:
+    A Tensor of shape `[..., n, n]`, representing a batch of n-by-n matrices.
+    For each batch member `r`, element `r[i, j]` equals `eye(n)[i, j]` if
+    dimension `i` or `j` is False in the corresponding input mask.  Otherwise,
+    `r[i, j]` equals the corresponding element from `x`.
+  """
+  if mask is None:
+    return x
+
+  x = tf.convert_to_tensor(x)
+  mask = tf.convert_to_tensor(mask, dtype=tf.bool)
+
+  n = ps.dimension_size(x, -1)
+
+  return tf.where(~mask[..., tf.newaxis] | ~mask[..., tf.newaxis, :],
+                  tf.eye(n, dtype=x.dtype),
+                  x)
 
 
 class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
@@ -178,6 +205,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   def __init__(self,
                base_kernel,
                fixed_inputs,
+               fixed_inputs_mask=None,
                diag_shift=None,
                cholesky_fn=None,
                validate_args=False,
@@ -206,6 +234,10 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         decomposition of the k(Z, Z) matrix. The batch shape elements of
         `fixed_inputs` must be broadcast compatible with
         `base_kernel.batch_shape`.
+      fixed_inputs_mask: A boolean Tensor of shape `[..., N]`.  When `mask` is
+        not None and an element of `mask` is `False`, this kernel will return
+        values computed as if the divisor matrix did not contain the
+        corresponding row or column.
       diag_shift: A floating point scalar to be added to the diagonal of the
         divisor_matrix before computing its Cholesky.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
@@ -238,6 +270,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
           diag_shift, dtype=dtype, name='diag_shift')
       self._fixed_inputs = tensor_util.convert_nonref_to_tensor(
           fixed_inputs, dtype=dtype, name='fixed_inputs')
+      self._fixed_inputs_mask = tensor_util.convert_nonref_to_tensor(
+          fixed_inputs_mask, dtype=tf.bool, name='fixed_inputs_mask')
       self._cholesky_bijector = invert.Invert(
           cholesky_outer_product.CholeskyOuterProduct())
       self._precomputed_divisor_matrix_cholesky = _precomputed_divisor_matrix_cholesky
@@ -261,6 +295,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   def with_precomputed_divisor(
       base_kernel,
       fixed_inputs,
+      fixed_inputs_mask=None,
       diag_shift=None,
       cholesky_fn=None,
       validate_args=False,
@@ -298,6 +333,10 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         decomposition of the k(Z, Z) matrix. The batch shape elements of
         `fixed_inputs` must be broadcast compatible with
         `base_kernel.batch_shape`.
+      fixed_inputs_mask: A boolean Tensor of shape `[..., N]`.  When `mask` is
+        not None and an element of `mask` is False, the returned kernel will
+        return values computed as if the divisor matrix did not contain the
+        corresponding row or column.
       diag_shift: A floating point scalar to be added to the diagonal of the
         divisor_matrix before computing its Cholesky.
       cholesky_fn: Callable which takes a single (batch) matrix argument and
@@ -313,6 +352,8 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     dtype = dtype_util.common_dtype(
         [base_kernel, fixed_inputs, diag_shift], tf.float32)
     fixed_inputs = tf.convert_to_tensor(fixed_inputs, dtype)
+    if fixed_inputs_mask is not None:
+      fixed_inputs_mask = tf.convert_to_tensor(fixed_inputs_mask, tf.bool)
     if diag_shift is not None:
       diag_shift = tf.convert_to_tensor(diag_shift, dtype)
 
@@ -322,15 +363,16 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
 
     # TODO(b/196219597): Add a check to ensure that we have a `base_kernel`
     # that is explicitly concretized.
-    divisor_matrix_cholesky = cholesky_fn(
-        _compute_divisor_matrix(
-            base_kernel,
-            diag_shift=diag_shift,
-            fixed_inputs=fixed_inputs))
+    divisor_matrix_cholesky = cholesky_fn(_mask_matrix(
+        _compute_divisor_matrix(base_kernel,
+                                diag_shift=diag_shift,
+                                fixed_inputs=fixed_inputs),
+        mask=fixed_inputs_mask))
 
     schur_complement = SchurComplement(
         base_kernel=base_kernel,
         fixed_inputs=fixed_inputs,
+        fixed_inputs_mask=fixed_inputs_mask,
         diag_shift=diag_shift,
         cholesky_fn=cholesky_fn,
         validate_args=validate_args,
@@ -366,16 +408,23 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       return k12
 
     fixed_inputs = tf.convert_to_tensor(self._fixed_inputs)
+    if self._fixed_inputs_mask is not None:
+      fixed_mask = tf.convert_to_tensor(self._fixed_inputs_mask)
+      fixed_mask = util.pad_shape_with_ones(fixed_mask, example_ndims, -2)
 
     # Shape: bc(Bk, B1, Bz) + E1 + [ez]
     k1z = self.base_kernel.tensor(x1, fixed_inputs,
                                   x1_example_ndims=example_ndims,
                                   x2_example_ndims=1)
+    if self._fixed_inputs_mask is not None:
+      k1z = tf.where(fixed_mask, k1z, tf.zeros([], k1z.dtype))
 
     # Shape: bc(Bk, B2, Bz) + E2 + [ez]
     k2z = self.base_kernel.tensor(x2, fixed_inputs,
                                   x1_example_ndims=example_ndims,
                                   x2_example_ndims=1)
+    if self._fixed_inputs_mask is not None:
+      k2z = tf.where(fixed_mask, k2z, tf.zeros([], k2z.dtype))
 
     # Shape: bc(Bz, Bk) + [ez, ez]
     div_mat_chol = self._divisor_matrix_cholesky(
@@ -408,12 +457,19 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
       return k12
 
     fixed_inputs = tf.convert_to_tensor(self._fixed_inputs)
+    if self._fixed_inputs_mask is not None:
+      fixed_mask = tf.convert_to_tensor(self._fixed_inputs_mask)
+      fixed_mask = fixed_mask[..., tf.newaxis, :]
 
-    # Shape: bc(Bk, B1, Bz) + E1 + [ez]
+    # Shape: bc(Bk, B1, Bz) + [e1] + [ez]
     k1z = self.base_kernel.matrix(x1, fixed_inputs)
+    if self._fixed_inputs_mask is not None:
+      k1z = tf.where(fixed_mask, k1z, tf.zeros([], k1z.dtype))
 
-    # Shape: bc(Bk, B2, Bz) + E2 + [ez]
+    # Shape: bc(Bk, B2, Bz) + [e2] + [ez]
     k2z = self.base_kernel.matrix(x2, fixed_inputs)
+    if self._fixed_inputs_mask is not None:
+      k2z = tf.where(fixed_mask, k2z, tf.zeros([], k2z.dtype))
 
     # Shape: bc(Bz, Bk) + [ez, ez]
     div_mat_chol = self._divisor_matrix_cholesky(
@@ -421,13 +477,13 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
 
     div_mat_chol_linop = tf.linalg.LinearOperatorLowerTriangular(div_mat_chol)
 
-    # Shape: bc(Bz, Bk, B2) + [ez] + E1
+    # Shape: bc(Bz, Bk, B2) + [ez] + [e1]
     cholinv_kz1 = div_mat_chol_linop.solve(k1z, adjoint_arg=True)
-    # Shape: bc(Bz, Bk, B2) + [ez] + E2
+    # Shape: bc(Bz, Bk, B2) + [ez] + [e2]
     cholinv_kz2 = div_mat_chol_linop.solve(k2z, adjoint_arg=True)
     k1z_kzzinv_kz2 = tf.linalg.matmul(
         cholinv_kz1, cholinv_kz2, transpose_a=True)
-    # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
+    # Shape: bc(Bz, Bk, B1, B2) + [e1, e2]
     return k12 - k1z_kzzinv_kz2
 
   @property
@@ -457,30 +513,38 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
         base_kernel=parameter_properties.BatchedComponentProperties(),
         fixed_inputs=parameter_properties.ParameterProperties(
             event_ndims=lambda self: self.base_kernel.feature_ndims + 1),
+        fixed_inputs_mask=parameter_properties.ParameterProperties(
+            event_ndims=1),
         diag_shift=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
                 lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
         _precomputed_divisor_matrix_cholesky=(
             parameter_properties.ParameterProperties(event_ndims=2)))
 
-  def _divisor_matrix(self, fixed_inputs=None):
+  def _divisor_matrix(self, fixed_inputs=None, fixed_inputs_mask=None):
     fixed_inputs = tf.convert_to_tensor(
         self._fixed_inputs if fixed_inputs is None else fixed_inputs)
-    return _compute_divisor_matrix(
-        self._base_kernel,
-        diag_shift=self._diag_shift,
-        fixed_inputs=fixed_inputs)
+    if fixed_inputs_mask is None:
+      fixed_inputs_mask = self._fixed_inputs_mask
+    # NOTE: Replacing masked-out rows/columns of the divisor matrix with
+    # rows/columns from the identity matrix is equivalent to using a divisor
+    # matrix in which those rows and columns have been dropped.
+    return _mask_matrix(
+        _compute_divisor_matrix(self._base_kernel,
+                                diag_shift=self._diag_shift,
+                                fixed_inputs=fixed_inputs),
+        mask=fixed_inputs_mask)
 
   def divisor_matrix(self):
     return self._divisor_matrix()
 
-  def _divisor_matrix_cholesky(self, fixed_inputs=None):
+  def _divisor_matrix_cholesky(self, fixed_inputs=None, fixed_inputs_mask=None):
     if self._precomputed_divisor_matrix_cholesky is not None:
       return self._precomputed_divisor_matrix_cholesky
     return self.cholesky_bijector.forward(
-        self._divisor_matrix(fixed_inputs))
+        self._divisor_matrix(fixed_inputs, fixed_inputs_mask))
 
-  def divisor_matrix_cholesky(self, fixed_inputs=None):
+  def divisor_matrix_cholesky(self, fixed_inputs=None, fixed_inputs_mask=None):
     if self._precomputed_divisor_matrix_cholesky is not None:
       return self._precomputed_divisor_matrix_cholesky
-    return self._divisor_matrix_cholesky(fixed_inputs)
+    return self._divisor_matrix_cholesky(fixed_inputs, fixed_inputs_mask)
