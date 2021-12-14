@@ -1807,14 +1807,20 @@ class NumpyTest(test_util.TestCase):
                             strategy_list,
                             xla_disabled=False,
                             **_):
+    # Make sure we have logs recording which of the NUMPY_TEST_CASES
+    # aren't running, and why.  The skipTest flags to anyone
+    # investigating which individual methods' logs might be worth
+    # checking.
     if xla_disabled and FLAGS.test_mode == 'xla':
       logging.warning(
           'The test for %s is disabled on XLA.', numpy_function.__name__)
+      self.skipTest('Disabled.')
     if not strategy_list:
       logging.warning(
           'The test for %s contains no strategies.', numpy_function.__name__)
+      self.skipTest('No strategies.')
     else:
-      self.skipTest('Has coverage.')
+      pass
 
   def tpu_strategy(self):  # For TPU testing.
     if not FLAGS.use_tpu:
