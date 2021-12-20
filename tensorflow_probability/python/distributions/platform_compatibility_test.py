@@ -180,7 +180,7 @@ XLA_LOGPROB_RTOL.update({
     'Chi2': 5e-5,
     'CholeskyLKJ': 1e-4,
     'ContinuousBernoulli': 2e-6,
-    'Dirichlet': 1e-3,
+    'Dirichlet': 1e-2,  # TODO(b/211121663)
     'DirichletMultinomial': 5e-4,
     'ExpRelaxedOneHotCategorical': 1e-3,  # TODO(b/163118820)
     'ExpGamma': 5e-2,  # TODO(b/166257329)
