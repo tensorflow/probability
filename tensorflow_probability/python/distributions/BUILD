@@ -4233,7 +4233,7 @@ py_test(
     size = "large",
     srcs = ["stochastic_process_properties_test.py"],
     python_version = "PY3",
-    shard_count = 3,
+    shard_count = 10,
     srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
