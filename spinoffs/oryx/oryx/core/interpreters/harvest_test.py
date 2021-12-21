@@ -257,6 +257,18 @@ class HarvestTest(test_util.TestCase):
       harvest_variables(f)({}, 1.)
     self.assertDictEqual(trace_util._thread_local_state.dynamic_contexts, {})
 
+  def test_can_jit_compile_nest(self):
+
+    def f(x):
+      return variable(x, name='x')
+
+    self.assertTupleEqual(
+        harvest_variables(jax.jit(nest(f, scope='foo')))({}, 1.), (1., {
+            'foo': {
+                'x': 1.
+            }
+        }))
+
 
 class ControlFlowTest(test_util.TestCase):
 
