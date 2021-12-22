@@ -14,6 +14,7 @@
 # ============================================================================
 """Tests for minimization utils."""
 
+import collections
 # Dependency imports
 import numpy as np
 
@@ -22,6 +23,8 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+
+tfd = tfp.distributions
 
 JAX_MODE = False
 
@@ -386,6 +389,26 @@ class MinimizeStatelessTests(test_util.TestCase):
             optimizer=optax.adam(0.1)))
     self.assertAllClose(final_x, target_x, atol=0.2)
     self.assertAllClose(losses[-1], 0., atol=0.2)
+
+  def test_optax_supports_namedtuple_parameters(self):
+    if not JAX_MODE:
+      return
+    import optax  # pylint: disable=g-import-not-at-top
+
+    NormalParameters = collections.namedtuple('NormalParameters',
+                                              ['loc', 'scale'])
+    def loss_fn(loc, scale):
+      return -tf.reduce_sum(tfd.Normal(loc, scale).log_prob([-1., 1.]))
+
+    final_x, _ = self.evaluate(
+        tfp.math.minimize_stateless(
+            loss_fn,
+            init=NormalParameters(loc=-1., scale=0.1),
+            num_steps=250,
+            optimizer=optax.adam(0.1)))
+    # Returned parameters should match `init` structure.
+    self.assertAllClose(final_x.loc, 0., atol=0.1)
+    self.assertAllClose(final_x.scale, 1., atol=0.2)
 
   def test_batch_of_optimizations(self):
     init_x = np.array([0., 0.]).astype(np.float32)

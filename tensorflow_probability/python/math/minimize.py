@@ -212,6 +212,8 @@ def _make_stateless_optimizer_step_fn(loss_fn, optimizer):
                                        parameters)
     except TypeError:
       loss, grads = value_and_gradient(loss_fn, parameters)
+    # Coerce grads to the same sequence type (e.g., namedtuple) as parameters.
+    grads = tf.nest.pack_sequence_as(parameters, tf.nest.flatten(grads))
     updates, optimizer_state = optimizer.update(grads,
                                                 optimizer_state,
                                                 parameters)
