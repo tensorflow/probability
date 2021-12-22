@@ -17,7 +17,7 @@ import collections
 import enum
 
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import prefer_static as ps
 

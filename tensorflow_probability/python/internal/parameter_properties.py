@@ -16,7 +16,7 @@
 
 import collections
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 __all__ = [
     'BIJECTOR_NOT_IMPLEMENTED',

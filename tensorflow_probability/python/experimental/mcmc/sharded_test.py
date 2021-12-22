@@ -14,7 +14,7 @@
 # ============================================================================
 """Tests for tensorflow_probability.python.experimental.mcmc.sharded."""
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.experimental.mcmc import sharded
 from tensorflow_probability.python.internal import distribute_test_lib

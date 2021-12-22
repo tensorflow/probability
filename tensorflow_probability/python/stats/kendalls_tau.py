@@ -14,7 +14,7 @@
 # ==============================================================================
 """Implements Kendall's Tau metric and loss."""
 
-import tensorflow as tf
+import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util

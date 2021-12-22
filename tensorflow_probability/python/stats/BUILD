@@ -33,6 +33,7 @@ multi_substrate_py_library(
     name = "stats",
     srcs = ["__init__.py"],
     jax_omit_deps = [
+        ":kendalls_tau",
         ":ranking",
     ],
     srcs_version = "PY3",
@@ -230,6 +231,7 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "kendalls_tau_test",
     srcs = ["kendalls_tau_test.py"],
+    jax_tags = ["notap"],
     deps = [
         ":kendalls_tau",
         "//tensorflow_probability",
