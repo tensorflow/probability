@@ -265,7 +265,8 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
             -tf.math.multiply_no_nan(safe_logits, x))
 
     result = tf.where(
-        logits < 0., result_negative_logits, result_positive_logits)
+        logits < 0., result_negative_logits,
+        tf.where(logits > 0., result_positive_logits, tf.math.log(x)))
 
     # Finally, handle the case where `logits` and `p` are on the boundary,
     # as the above expressions can result in ratio of `infs` in that case as

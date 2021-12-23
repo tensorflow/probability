@@ -394,6 +394,12 @@ class ContinuousBernoulliTest(test_util.TestCase):
             ],
             dtype=np.float32))
 
+  def testCdfCornerCase(self):
+    logit = 0.
+    dist = tfd.ContinuousBernoulli(logits=logit)
+    xs = np.linspace(0.0, 1.0, 10)
+    self.assertAllClose(self.evaluate(dist.cdf(xs)), xs)
+
   def testSurvivalAndLogSurvival(self):
     prob = 0.2
     dist = tfd.ContinuousBernoulli(probs=prob)
