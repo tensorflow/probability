@@ -105,7 +105,8 @@ INTERNALS = ('assert_util', 'auto_composite_tensor',
              'numerics_testing', 'parameter_properties', 'prefer_static',
              'samplers', 'slicing', 'special_math', 'structural_tuple',
              'tensor_util', 'tensorshape_util', 'test_combinations',
-             'test_util', 'unnest', 'variadic_reduce', 'vectorization_util')
+             'test_util', 'trainable_state_util', 'unnest', 'variadic_reduce',
+             'vectorization_util')
 OPTIMIZERS = ('convergence_criteria', 'linesearch',)
 LINESEARCH = ('internal',)
 SAMPLERS = ('categorical', 'normal', 'poisson', 'uniform', 'shuffle')

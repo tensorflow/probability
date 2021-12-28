@@ -602,6 +602,32 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "trainable_state_util",
+    srcs = ["trainable_state_util.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":samplers",
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "trainable_state_util_test",
+    srcs = ["trainable_state_util_test.py"],
+    jax_size = "medium",
+    numpy_tags = ["notap"],
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        # optax dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/internal:trainable_state_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "vectorization_util",
     srcs = ["vectorization_util.py"],
     srcs_version = "PY3",
