@@ -211,15 +211,11 @@ def trace_scan(loop_fn,
 
       return i + 1, state, num_steps_traced, trace_arrays
 
-    if condition_fn is None:
-      cond = lambda i, *_: i < length
-    else:
-      cond = lambda i, *rest: (i < length) & condition_fn(i, *rest)
-
     _, final_state, _, trace_arrays = tf.while_loop(
-        cond=cond,
+        cond=condition_fn if condition_fn is not None else lambda *_: True,
         body=_body,
         loop_vars=(0, initial_state, 0, trace_arrays),
+        maximum_iterations=length,
         parallel_iterations=parallel_iterations)
 
     # unflatten

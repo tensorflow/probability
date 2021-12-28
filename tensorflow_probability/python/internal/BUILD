@@ -392,6 +392,8 @@ multi_substrate_py_test(
         ":test_util",
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/math",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

@@ -28,6 +28,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import loop_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -181,6 +182,16 @@ class TraceScanTest(test_util.TestCase):
     self.assertAllClose([1., 3.], trace[2].loc)
     self.assertAllClose([0.1, 0.1], trace[2].scale)
 
+  @test_util.numpy_disable_gradient_test
+  def test_can_take_loop_gradient_inside_xla(self):
+    def loss_fn(v):
+      return loop_util.trace_scan(lambda x, t: x + v,
+                                  0.,
+                                  tf.range(10),
+                                  trace_fn=lambda x: x)[0]
+    xla_grad = tf.function(lambda v: tfp_math.value_and_gradient(loss_fn, v)[1],
+                           jit_compile=True)(0.)
+    self.assertAllClose(xla_grad, 10.)
 
 if __name__ == '__main__':
   test_util.main()
