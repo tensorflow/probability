@@ -14,15 +14,20 @@
 # ============================================================================
 """Trainable instances of distributions and bijectors."""
 
+import functools
+
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.internal import docstring_util
 from tensorflow_probability.python.internal import samplers
-from tensorflow_probability.python.util import deferred_tensor
+from tensorflow_probability.python.internal import trainable_state_util
+
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'make_trainable',
+    'make_trainable_stateless'
 ]
 
 
@@ -67,20 +72,19 @@ def _default_parameter_init_fn(initial_parameters):
   return _initialize_with_sampler_fallback
 
 
-def make_trainable(cls,
-                   initial_parameters=None,
-                   batch_and_event_shape=(),
-                   parameter_dtype=tf.float32,
-                   seed=None,
-                   **init_kwargs):
+def _make_trainable(cls,
+                    initial_parameters=None,
+                    batch_and_event_shape=(),
+                    parameter_dtype=tf.float32,
+                    **init_kwargs):
   """Constructs a distribution or bijector instance with trainable parameters.
 
-  This is a convenience method that instantiates a class using
-  `tf.Variables` for its underlying trainable parameters. Parameters are
-  randomly initialized, and transformed to enforce any domain constraints. This
-  method assumes that the class exposes a `parameter_properties` method
-  annotating its trainable parameters, and that the caller provides any
-  additional (non-trainable) arguments required by the class.
+  This is a convenience method that instantiates a class with trainable
+  parameters. Parameters are randomly initialized, and transformed to enforce
+  any domain constraints. This method assumes that the class exposes a
+  `parameter_properties` method annotating its trainable parameters, and that
+  the caller provides any additional (non-trainable) arguments required by the
+  class.
 
   Args:
     cls: Python class that implements `cls.parameter_properties()`, e.g., a TFP
@@ -97,16 +101,17 @@ def make_trainable(cls,
       of the trainable parameters.
       Default value: `()`.
     parameter_dtype: Optional float `dtype` for trainable variables.
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
-      Default value: `None`.
     **init_kwargs: Additional keyword arguments passed to `cls.__init__()` to
       specify any non-trainable parameters. If a value is passed for
       an otherwise-trainable parameter---for example,
       `trainable(tfd.Normal, scale=1.)`---it will be taken as a fixed value and
       no variable will be constructed for that parameter.
-  Returns:
-    trainable_instance: an instance of `cls` parameterized by trainable
-      variables.
+  Yields:
+    *parameters: sequence of `trainable_state_util.Parameter` namedtuples.
+      These are intended to be consumed by
+      `trainable_state_util.as_stateful_builder` and
+      `trainable_state_util.as_stateless_builder` to define stateful and
+      stateless variants respectively.
 
   #### Example
 
@@ -125,16 +130,7 @@ def make_trainable(cls,
   distribution, and explicitly optimize to find the maximum-likelihood estimate
   for the parameters given our data:
 
-  ```python
-  model = tfp.util.make_trainable(tfd.Normal)
-  losses = tfp.math.minimize(
-    lambda: -model.log_prob(samples),
-    optimizer=tf.optimizers.Adam(0.1),
-    num_steps=200)
-  print('Fit Normal distribution with mean {} and stddev {}'.format(
-    model.mean(),
-    model.stddev()))
-  ```
+  ${minimize_example_code}
 
   In this trivial case, doing the explicit optimization has few advantages over
   the first approach in which we simply matched the empirical moments of the
@@ -170,15 +166,45 @@ def make_trainable(cls,
 
       parameter_shape = properties.shape_fn(batch_and_event_shape)
       constraining_bijector = properties.default_constraining_bijector_fn()
-      seed, init_seed = samplers.split_seed(seed)
-      init_kwargs[parameter_name] = deferred_tensor.TransformedVariable(
-          parameter_init_fn(
+
+      init_kwargs[parameter_name] = yield trainable_state_util.Parameter(
+          init_fn=functools.partial(
+              parameter_init_fn,
               parameter_name,
               shape=parameter_shape,
               dtype=parameter_dtype,
-              seed=init_seed,
               constraining_bijector=constraining_bijector),
-          constraining_bijector,
+          constraining_bijector=constraining_bijector,
           name=parameter_name)
 
   return cls(**init_kwargs)
+
+make_trainable = docstring_util.expand_docstring(
+    minimize_example_code="""
+```python
+model = tfp.util.make_trainable(tfd.Normal)
+losses = tfp.math.minimize(
+  lambda: -model.log_prob(samples),
+  optimizer=tf.optimizers.Adam(0.1),
+  num_steps=200)
+print('Fit Normal distribution with mean {} and stddev {}'.format(
+  model.mean(),
+  model.stddev()))
+```""")(trainable_state_util.as_stateful_builder(_make_trainable))
+
+make_trainable_stateless = docstring_util.expand_docstring(
+    minimize_example_code="""
+```python
+init_fn, apply_fn = tfe_util.make_trainable_stateless(tfd.Normal)
+
+import optax  # JAX only.
+mle_params, losses = tfp.math.minimize_stateless(
+  lambda *params: -apply_fn(params).log_prob(samples),
+  init=init_fn(),
+  optimizer=optax.adam(0.1),
+  num_steps=200)
+model = apply_fn(mle_params)
+print('Fit Normal distribution with mean {} and stddev {}'.format(
+  model.mean(),
+  model.stddev()))
+```""")(trainable_state_util.as_stateless_builder(_make_trainable))

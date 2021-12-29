@@ -20,6 +20,7 @@ from tensorflow_probability.python.experimental.util.deferred_module import Defe
 from tensorflow_probability.python.experimental.util.jit_public_methods import DEFAULT_METHODS_EXCLUDED_FROM_JIT
 from tensorflow_probability.python.experimental.util.jit_public_methods import JitPublicMethods
 from tensorflow_probability.python.experimental.util.trainable import make_trainable
+from tensorflow_probability.python.experimental.util.trainable import make_trainable_stateless
 from tensorflow_probability.python.internal import all_util
 
 
@@ -29,6 +30,7 @@ _allowed_symbols = [
     'DeferredModule',
     'JitPublicMethods',
     'make_trainable',
+    'make_trainable_stateless',
     'register_composite',
 ]
 

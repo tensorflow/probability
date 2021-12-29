@@ -1169,6 +1169,9 @@ class JointDistribution(distribution_lib.Distribution):
 
 def get_explicit_name_for_component(d):
   """Returns the explicitly-passed `name` of a Distribution, or None."""
+  if hasattr(d, '_build_module'):
+    # Ensure we inspect the distribution itself, not a DeferredModule wrapper.
+    d = d._build_module()  # pylint: disable=protected-access
   name = d.parameters.get('name', None)
   if name and d.__class__.__name__ in name:
     name = None

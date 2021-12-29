@@ -36,7 +36,6 @@ multi_substrate_py_library(
     substrates_omit_deps = [
         ":composite_tensor",
         ":deferred_module",
-        ":trainable",
     ],
     deps = [
         ":composite_tensor",
@@ -110,23 +109,26 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "trainable",
     srcs = ["trainable.py"],
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:samplers",
-        "//tensorflow_probability/python/util:deferred_tensor",
+        "//tensorflow_probability/python/internal:trainable_state_util",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "trainable_test",
     srcs = ["trainable_test.py"],
+    jax_size = "medium",
+    numpy_tags = ["notap"],
     python_version = "PY3",
     srcs_version = "PY3",
     deps = [
+        # optax dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

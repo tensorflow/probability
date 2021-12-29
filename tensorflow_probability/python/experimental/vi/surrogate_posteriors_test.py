@@ -31,6 +31,13 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
+def _as_concrete_instance(d):
+  """Forces evaluation of a DeferredModule object."""
+  if hasattr(d, '_build_module'):
+    return d._build_module()
+  return d
+
+
 class _SurrogatePosterior(object):
   """Common methods for testing ADVI surrogate posteriors."""
 
@@ -264,8 +271,9 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
       ds = [surrogate_posterior]
     for cls, d in zip(
         nest_util.broadcast_structure(ds, base_distribution_cls), ds):
+      d = _as_concrete_instance(d)
       while isinstance(d, tfd.Independent):
-        d = d.distribution
+        d = _as_concrete_instance(d.distribution)
       self.assertIsInstance(d, cls)
 
   def test_that_gamma_fitting_example_runs(self):
