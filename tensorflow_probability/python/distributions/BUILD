@@ -150,7 +150,6 @@ multi_substrate_py_library(
         ":truncated_normal",
         ":uniform",
         ":variational_gaussian_process",
-        ":vector_exponential_diag",
         ":von_mises",
         ":von_mises_fisher",
         ":weibull",
@@ -2218,20 +2217,6 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
-    name = "vector_exponential_diag",
-    srcs = ["vector_exponential_diag.py"],
-    deps = [
-        ":vector_exponential_linear_operator",
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:softplus",
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:parameter_properties",
-        "//tensorflow_probability/python/internal:tensor_util",
-    ],
-)
-
-multi_substrate_py_library(
     name = "vector_exponential_linear_operator",
     srcs = ["vector_exponential_linear_operator.py"],
     deps = [
@@ -4011,17 +3996,6 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "vector_exponential_diag_test",
-    srcs = ["vector_exponential_diag_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

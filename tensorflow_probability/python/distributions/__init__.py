@@ -128,7 +128,6 @@ from tensorflow_probability.python.distributions.truncated_cauchy import Truncat
 from tensorflow_probability.python.distributions.truncated_normal import TruncatedNormal
 from tensorflow_probability.python.distributions.uniform import Uniform
 from tensorflow_probability.python.distributions.variational_gaussian_process import VariationalGaussianProcess
-from tensorflow_probability.python.distributions.vector_exponential_diag import VectorExponentialDiag
 from tensorflow_probability.python.distributions.von_mises import VonMises
 from tensorflow_probability.python.distributions.von_mises_fisher import VonMisesFisher
 from tensorflow_probability.python.distributions.weibull import Weibull
@@ -283,7 +282,6 @@ __all__ = [
     'Uniform',
     'VariationalGaussianProcess',
     'VectorDeterministic',
-    'VectorExponentialDiag',
     'VonMises',
     'VonMisesFisher',
     'Weibull',

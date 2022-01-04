@@ -204,7 +204,6 @@ XLA_LOGPROB_RTOL.update({
     'RelaxedOneHotCategorical': 2e-3,  # TODO(b/163118820)
     'SigmoidBeta': 5e-4,
     'TruncatedCauchy': 5e-5,
-    'VectorExponentialDiag': 7e-5,
     'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
     'WishartTriL': 1e-5,

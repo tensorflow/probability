@@ -46,7 +46,6 @@ TF2_UNFRIENDLY_DISTS = (
     'MultivariateNormalDiag',
     'MultivariateNormalFullCovariance',
     'MultivariateNormalTriL',
-    'VectorExponentialDiag',
 )
 
 
