@@ -23,6 +23,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import test_util as tfp_test_util
 from inference_gym.internal import test_util
 from inference_gym.targets import vectorized_stochastic_volatility
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -366,4 +367,4 @@ class VectorizedStochasticVolatilityTest(test_util.InferenceGymTestCase,
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

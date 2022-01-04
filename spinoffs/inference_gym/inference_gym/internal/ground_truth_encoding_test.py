@@ -18,7 +18,6 @@ import importlib
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_util
 from inference_gym.internal import ground_truth_encoding
@@ -71,4 +70,4 @@ class GroundTruthEncodingTest(test_util.TestCase):
 
 
 if __name__ == "__main__":
-  tf.test.main()
+  test_util.main()

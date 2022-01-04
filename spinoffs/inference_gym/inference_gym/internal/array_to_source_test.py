@@ -14,8 +14,6 @@
 #
 """Tests for array_to_source."""
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal import test_util
 from inference_gym.internal import array_to_source
 
@@ -42,4 +40,4 @@ class ArrayToSourceTest(test_util.TestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  test_util.main()

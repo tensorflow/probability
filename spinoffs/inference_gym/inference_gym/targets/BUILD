@@ -75,6 +75,7 @@ py_test(
     deps = [
         ":banana",
         # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )
@@ -270,6 +271,7 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )
@@ -349,6 +351,7 @@ py_test(
     deps = [
         ":neals_funnel",
         # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )
@@ -372,6 +375,7 @@ py_test(
     deps = [
         ":non_identifiable_quartic",
         # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )
@@ -429,6 +433,7 @@ py_test(
         # absl/testing:parameterized dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )
@@ -548,6 +553,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         # tensorflow_probability dep,
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/internal:test_util",
     ],
 )

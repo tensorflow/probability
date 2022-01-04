@@ -180,4 +180,4 @@ class LorenzSystemUnknownScalesTest(test_util.InferenceGymTestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

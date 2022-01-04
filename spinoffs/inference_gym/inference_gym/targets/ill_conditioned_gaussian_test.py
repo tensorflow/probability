@@ -15,8 +15,6 @@
 # ============================================================================
 """Tests for inference_gym.targets.ill_conditioned_gaussian."""
 
-import tensorflow.compat.v2 as tf
-
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from inference_gym.internal import test_util
 from inference_gym.targets import ill_conditioned_gaussian
@@ -72,4 +70,4 @@ class IllConditionedGaussianTest(test_util.InferenceGymTestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

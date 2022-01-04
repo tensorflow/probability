@@ -17,7 +17,6 @@
 
 from absl.testing import parameterized
 import numpy as np
-import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from inference_gym.internal import test_util
@@ -115,4 +114,4 @@ class PlasmaSpectroscopyTest(test_util.InferenceGymTestCase):
 
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

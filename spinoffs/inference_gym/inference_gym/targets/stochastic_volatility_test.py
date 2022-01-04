@@ -18,7 +18,6 @@
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-
 from inference_gym.internal import data
 from inference_gym.internal import test_util
 from inference_gym.targets import stochastic_volatility
@@ -98,4 +97,4 @@ class StochasticVolatilityTest(test_util.InferenceGymTestCase):
                         atol=1e-2)
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()

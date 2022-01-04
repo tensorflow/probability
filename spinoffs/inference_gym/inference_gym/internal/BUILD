@@ -57,7 +57,6 @@ py_test(
     srcs_version = "PY3",
     deps = [
         ":array_to_source",
-        # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
     ],
 )
@@ -84,6 +83,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         # tensorflow_datasets dep,  # buildcleaner: keep
+        # tensorflow_probability/python/internal:test_util dep,
         # tensorflow/compiler/jit dep,
     ],
 )
@@ -108,7 +108,6 @@ py_test(
         ":ground_truth_encoding",
         # absl/testing:parameterized dep,
         # numpy dep,
-        # tensorflow dep,
         # tensorflow_probability/python/internal:test_util dep,
     ],
 )
@@ -148,6 +147,7 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         # tensorflow_probability dep,
+        # tensorflow_probability/python/internal:test_util dep,
         "//inference_gym/targets",
     ],
 )

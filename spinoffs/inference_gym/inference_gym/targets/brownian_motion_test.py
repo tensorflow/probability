@@ -145,4 +145,4 @@ class BrownianMotionTest(test_util.InferenceGymTestCase):
                         atol=1e-2)
 
 if __name__ == '__main__':
-  tf.test.main()
+  tfp_test_util.main()
