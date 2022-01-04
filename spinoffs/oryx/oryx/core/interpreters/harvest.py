@@ -148,6 +148,7 @@ from jax import util as jax_util
 from jax._src.lax import control_flow as lcf
 from jax.interpreters import ad
 from jax.interpreters import batching
+from jax.interpreters import mlir
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 from jax.lib import xla_client as xc
@@ -243,6 +244,18 @@ def _nest_translation_rule(*args, name, call_jaxpr, scope, **_):
 
 
 xla.register_translation(nest_p, _nest_translation_rule)
+
+
+def _nest_lowering(ctx, *args, name, call_jaxpr, scope, **_):
+  return mlir._xla_call_lower(  # pylint: disable=protected-access
+      ctx,
+      *args,
+      name=jax_util.wrap_name(name, f'nest[{scope}]'),
+      call_jaxpr=call_jaxpr,
+      donated_invars=(False,) * len(args))
+
+
+mlir.register_lowering(nest_p, _nest_lowering)
 
 
 def _nest_transpose_rule(*args, **kwargs):
