@@ -166,6 +166,38 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
     else:
       self.assertAllEqual(tf.shape(y)[:-2], batch_shape)
 
+  def testLevelDrift(self):
+    num_steps = 20
+    ar_coef = 0.3
+    level_drift = 1.3
+    ssm_no_drift = AutoregressiveMovingAverageStateSpaceModel(
+        num_timesteps=num_steps,
+        ar_coefficients=[ar_coef],
+        ma_coefficients=[0.2, 0.05],
+        level_drift=0.,
+        level_scale=0.1,
+        observation_noise_scale=0.,
+        initial_state_prior=tfd.MultivariateNormalDiag(
+            loc=tf.zeros([3]),
+            scale_diag=tf.ones([3])))
+    seed = test_util.test_seed(sampler_type='stateless')
+    sample_no_drift = self.evaluate(ssm_no_drift.sample(seed=seed)[..., 0])
+    ssm_with_drift = ssm_no_drift.copy(level_drift=level_drift)
+    sample_with_drift = self.evaluate(ssm_with_drift.sample(seed=seed)[..., 0])
+    # We expect that the long-run effect of drift is to increase the value of
+    # a sampled series by
+    # `level_drift * (1 + ar_coef + ar_coef**2 + ar_coef**3 + ...)`
+    # ` = level_drift / (1 - ar_coef)` (for `ar_coef` in [0., 1.])
+    # relative to what it otherwise would have been. This behavior relies on
+    # drift terms from previous timesteps being incorporated in the state space.
+    # Since we initialize with a mean-zero state, allow a few steps of warmup
+    # before asserting this condition.
+    num_warmup_steps = 10
+    self.assertAllClose(
+        level_drift / (1 - ar_coef) * tf.ones([num_steps - num_warmup_steps]),
+        (sample_with_drift - sample_no_drift)[num_warmup_steps:],
+        atol=1e-3)
+
   def _build_placeholder(self, ndarray):
     """Convert a numpy array to a TF placeholder.
 

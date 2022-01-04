@@ -13,9 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """Autoregressive Moving Average model."""
-# Dependency imports
+
+import numpy as np
+
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.sts.components.autoregressive import make_ar_transition_matrix
 
 
@@ -38,9 +41,12 @@ class AutoregressiveMovingAverageStateSpaceModel(
     noise, and a linear function of previous Gaussian noise:
 
     ```python
-    level[t+1] = (sum(ar_coefficients * levels[t:t-order:-1]) +
-    Normal(0., level_scale) +
-    sum(ma_coefficients * noise[t:t-order:-1]))
+    level[t + 1] = (
+      level_drift
+      + noise[t + 1]
+      + sum(ar_coefficients * levels[t:t-order:-1])
+      + sum(ma_coefficients * noise[t:t-order:-1]))
+    noise[t + 1] ~ Normal(0., scale=level_scale)
     ```
 
     The process is characterized by a vector `coefficients` whose size
@@ -73,7 +79,8 @@ class AutoregressiveMovingAverageStateSpaceModel(
                           ...
                           0.,           0.,  ...,       1.,  0.   ]
 
-    transition_noise ~ N(loc=0., scale=diag([level_scale, 0., 0., ..., 0.]))
+    transition_noise ~ N(loc=level_drift / (1. + sum(ma_coefficients)),
+                         scale=diag([level_scale, 0., 0., ..., 0.]))
     ```
 
     The observation model simply extracts the current (topmost) value,
@@ -102,6 +109,7 @@ class AutoregressiveMovingAverageStateSpaceModel(
                ma_coefficients,
                level_scale,
                initial_state_prior,
+               level_drift=0.,
                observation_noise_scale=0.,
                name=None,
                **linear_gaussian_ssm_kwargs):
@@ -127,6 +135,10 @@ class AutoregressiveMovingAverageStateSpaceModel(
         initial_state_prior: instance of `tfd.MultivariateNormal`
           representing the prior distribution on latent states.  Must have
           event shape `[order]`.
+        level_drift: Scalar (any additional dimensions are
+          treated as batch dimensions) `float` `Tensor` indicating a
+          deterministic drift added to the level at each step.
+          Default value: 0.
         observation_noise_scale: Scalar (any additional dimensions are
           treated as batch dimensions) `float` `Tensor` indicating the
           standard deviation of the observation noise.
@@ -155,34 +167,28 @@ class AutoregressiveMovingAverageStateSpaceModel(
           value=ma_coefficients, name='ma_coefficients', dtype=dtype)
       level_scale = tf.convert_to_tensor(
           value=level_scale, name='level_scale', dtype=dtype)
+      level_drift = tf.convert_to_tensor(
+          value=level_drift, name='level_drift', dtype=dtype)
       observation_noise_scale = tf.convert_to_tensor(
           value=observation_noise_scale,
           name='observation_noise_scale',
           dtype=dtype)
 
-      p = tf.compat.dimension_value(ar_coefficients.shape[-1])
-      q = tf.compat.dimension_value(ma_coefficients.shape[-1])
-
-      if p is None or q is None:
-        raise ValueError('coefficients must have static shape.')
-
-      # if p != q + 1, then pad either of the arguments to ensure
-      # we end up fitting an ARMA(p, p-1) process.
-      if p > q + 1:
-        ma_coefficients = _pad_tensor_with_trailing_zeros(
-            ma_coefficients, p - q - 1)
-      elif q + 1 > p:
-        ar_coefficients = _pad_tensor_with_trailing_zeros(
-            ar_coefficients, q + 1 - p)
-
-      order = max(p, q + 1)
-      if order is None:
-        raise ValueError('coefficients must have static shape.')
+      # Canonicalize as ARMA[order, order - 1], where order = max(p, q + 1).
+      ar_order = ps.shape(ar_coefficients)[-1]
+      ma_order = ps.shape(ma_coefficients)[-1]
+      order = ps.maximum(ar_order, ma_order + 1)
+      ar_coefficients = _pad_tensor_with_trailing_zeros(
+          ar_coefficients, order - ar_order)
+      ma_coefficients = _pad_tensor_with_trailing_zeros(
+          ma_coefficients, (order - 1) - ma_order)
 
       self._order = order
       self._ar_coefficients = ar_coefficients
       self._ma_coefficients = ma_coefficients
       self._level_scale = level_scale
+      self._level_drift = level_drift
+      self._observation_noise_scale = observation_noise_scale
 
       # Ensure the prior's shape matches the padded order.
       prior_event_dimension = tf.compat.dimension_value(
@@ -193,14 +199,22 @@ class AutoregressiveMovingAverageStateSpaceModel(
                          f'prior event dimension: {prior_event_dimension}, '
                          f'max(p, q + 1): {self.order}.')
 
+      # Incorporate drift in the latent process, divided by `1 + sum(ma_coefs)`
+      # to preserve the magnitude of the effect on the observed series.
+      # TODO(b/211794069): Handle `level_drift` stably when sum(ma_coefs) ~= -1.
+      ma_factor = 1. + tf.reduce_sum(ma_coefficients, axis=-1)
+      latent_level_drift = level_drift / tf.where(
+          # Prevent blowup in the drift-free case.
+          tf.equal(level_drift, 0.), tf.ones_like(ma_factor), ma_factor)
       super(AutoregressiveMovingAverageStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
           transition_matrix=make_ar_transition_matrix(ar_coefficients),
           transition_noise=tfd.MultivariateNormalDiag(
-              scale_diag=tf.stack(
-                  [level_scale] + [tf.zeros_like(level_scale)] *
-                  (self.order - 1),
-                  axis=-1)),
+              loc=_pad_tensor_with_trailing_zeros(
+                  latent_level_drift[..., tf.newaxis],
+                  self.order - 1),
+              scale_diag=_pad_tensor_with_trailing_zeros(
+                  level_scale[..., tf.newaxis], self.order - 1)),
           observation_matrix=make_ma_observation_matrix(ma_coefficients),
           observation_noise=tfd.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
@@ -222,14 +236,24 @@ class AutoregressiveMovingAverageStateSpaceModel(
     return self._ma_coefficients
 
   @property
+  def level_drift(self):
+    return self._level_drift
+
+  @property
   def level_scale(self):
     return self._level_scale
 
+  @property
+  def observation_noise_scale(self):
+    return self._observation_noise_scale
+
 
 def _pad_tensor_with_trailing_zeros(x, num_zeros):
-  pad = tf.zeros_like(x[..., 0:1])
-  pad = tf.repeat(pad, num_zeros, axis=-1)
-  return tf.concat([x, pad], axis=-1)
+  return tf.pad(
+      x,
+      ps.concat([ps.zeros([ps.rank(x) - 1, 2], dtype=np.int32),
+                 [[0, num_zeros]]],
+                axis=0))
 
 
 def make_ma_observation_matrix(coefficients):
@@ -244,15 +268,14 @@ def make_ma_observation_matrix(coefficients):
   ```
 
   To ensure broadcasting with the transition matrix, we return a shape of:
-  `concat([batch_shape, [order, order])`
+  `concat([batch_shape, [1, order])`
 
   Args:
     coefficients: float `Tensor` of shape `concat([batch_shape, [order - 1])`.
   Returns:
-    ma_matrix: float `Tensor` with shape `concat([batch_shape, [order,
-    order])`.
+    ma_matrix: float `Tensor` with shape `concat([batch_shape, [1, order])`.
   """
-  top_entry = tf.ones_like(coefficients)[..., 0:1]
-  ma_matrix = tf.concat([top_entry, coefficients], axis=-1)
-  ma_matrix = tf.expand_dims(ma_matrix, axis=-2)
-  return ma_matrix
+  batch_shape = ps.shape(coefficients)[:-1]
+  top_entry = tf.ones(ps.concat([batch_shape, [1, 1]], axis=0),
+                      dtype=coefficients.dtype)
+  return tf.concat([top_entry, coefficients[..., tf.newaxis, :]], axis=-1)
