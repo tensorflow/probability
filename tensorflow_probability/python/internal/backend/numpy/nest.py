@@ -185,14 +185,18 @@ def flatten(structure, expand_composites=False):
   return dm_tree.flatten(structure)
 
 
-def flatten_up_to(*args, **kwargs):
+def flatten_up_to(*args, expand_composites=False, **kwargs):
   # Internal `tree` does not accept check_types here; see b/198436438.
   # Apparently the open-source version of same still does.
 #   kwargs.pop('check_types', None)  # DisableOnExport
+  if expand_composites:
+    raise NotImplementedError(
+        '`expand_composites=True` is not supported in JAX.')
   return dm_tree.flatten_up_to(*args, **kwargs)
 
 
-def flatten_with_joined_string_paths(structure, separator='/'):
+def flatten_with_joined_string_paths(structure, separator='/',
+                                     expand_composites=False):
   """Returns a list of (string path, data element) tuples.
 
   The order of tuples produced matches that of `nest.flatten`. This allows you
@@ -204,6 +208,8 @@ def flatten_with_joined_string_paths(structure, separator='/'):
     structure: the nested structure to flatten.
     separator: string to separate levels of hierarchy in the results, defaults
       to '/'.
+    expand_composites: Python bool included for compatibility; `True` values
+      are not supported.
 
   Returns:
     A list of (string, data element) tuples.
@@ -211,19 +217,29 @@ def flatten_with_joined_string_paths(structure, separator='/'):
 
   def stringify_and_join(path_elements):
     return separator.join(str(path_element) for path_element in path_elements)
-
+  if expand_composites:
+    raise NotImplementedError(
+        '`expand_composites=True` is not supported in JAX.')
   return [(stringify_and_join(pe), v)
           for pe, v in dm_tree.flatten_with_path(structure)]
 
 
-def flatten_with_tuple_paths(structure):
+def flatten_with_tuple_paths(structure, expand_composites=False):
+  if expand_composites:
+    raise NotImplementedError(
+        '`expand_composites=True` is not supported in JAX.')
   return dm_tree.flatten_with_path(structure)
 
 
 def flatten_with_tuple_paths_up_to(shallow_structure,
                                    input_structure,
-                                   check_types=True):
-  return dm_tree.flatten_with_path_up_to(shallow_structure, input_structure,
+                                   check_types=True,
+                                   expand_composites=False):
+  if expand_composites:
+    raise NotImplementedError(
+        '`expand_composites=True` is not supported in JAX.')
+  return dm_tree.flatten_with_path_up_to(shallow_structure,
+                                         input_structure,
                                          check_types)
 
 
@@ -306,7 +322,7 @@ def map_structure_with_tuple_paths(func, *structures, **kwargs):
 
 
 def map_structure_with_tuple_paths_up_to(shallow_structure, func, *structures,
-                                         **kwargs):
+                                         expand_composites=False, **kwargs):
   """Wraps nest.map_structure_with_path_up_to, with structure/type checking."""
   if not structures:
     raise ValueError('Cannot map over no sequences')
@@ -314,12 +330,15 @@ def map_structure_with_tuple_paths_up_to(shallow_structure, func, *structures,
   check_types = kwargs.get('check_types', True)
 #   kwargs.pop('check_types', None)  # DisableOnExport
 
+  if expand_composites:
+    raise NotImplementedError(
+        '`expand_composites=True` is not supported in JAX.')
+
   for input_tree in structures:
     assert_shallow_structure(
         shallow_structure, input_tree, check_types=check_types)
-
-  return dm_tree.map_structure_with_path_up_to(shallow_structure, func,
-                                               *structures, **kwargs)
+  return dm_tree.map_structure_with_path_up_to(
+      shallow_structure, func, *structures, **kwargs)
 
 
 def pack_sequence_as(structure, flat_sequence, **kwargs):
@@ -376,7 +395,7 @@ def _sequence_like(instance, args):
     return type(instance)(args)
 
 
-def yield_flat_paths(nest):
+def yield_flat_paths(nest, expand_composites=False):
   """Yields paths for some nested structure.
 
   Paths are lists of objects which can be str-converted, which may include
@@ -406,13 +425,14 @@ def yield_flat_paths(nest):
 
   Args:
     nest: the value to produce a flattened paths list for.
-
+    expand_composites: Python bool included for compatibility; `True` values
+      are not supported.
   Yields:
     Tuples containing index or key values which form the path to a specific
       leaf value in the nested structure.
   """
-
-  for k, _ in flatten_with_tuple_paths(nest):
+  for k, _ in flatten_with_tuple_paths(nest,
+                                       expand_composites=expand_composites):
     yield k
 
 
