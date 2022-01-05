@@ -40,7 +40,10 @@ class _TrainableASVISurrogate(object):
         original_dist = original_dist.distribution
       except AttributeError:
         pass
-      dist = automatic_structured_vi._as_substituted_distribution(original_dist)
+      dist = automatic_structured_vi._as_substituted_distribution(
+          original_dist,
+          prior_substitution_rules=(
+              automatic_structured_vi.ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES))
       dist_params = dist.parameters
       for param, value in dist_params.items():
         if (param not in automatic_structured_vi._NON_STATISTICAL_PARAMS
@@ -352,12 +355,12 @@ class TestASVIDistributionSubstitution(test_util.TestCase):
       yield tfd.Normal(
           loc=0., scale=tf.sqrt(global_scale * local_scale), name='weights')
 
-    tfp.experimental.vi.register_asvi_substitution_rule(
-        condition=tfd.HalfCauchy,
-        substitution_fn=(
-            lambda d: tfb.Softplus(1e-6)(tfd.Normal(loc=d.loc, scale=d.scale))))
     surrogate = tfp.experimental.vi.build_asvi_surrogate_posterior(
-        centered_horseshoe)
+        centered_horseshoe,
+        prior_substitution_rules=tuple([
+            (tfd.HalfCauchy,
+             lambda d: tfb.Softplus(1e-6)(tfd.Normal(loc=d.loc, scale=d.scale)))
+        ]) + automatic_structured_vi.ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES)
     self.assertAllEqualNested(centered_horseshoe.event_shape,
                               surrogate.event_shape)
 
