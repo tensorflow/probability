@@ -28,15 +28,15 @@ This module implements the Hager-Zhang algorithm.
 
 import collections
 
-import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.internal import broadcast_util
 from tensorflow_probability.python.internal import prefer_static
 
 
 def val_where(cond, tval, fval):
   """Like tf.where but works on namedtuples."""
   if isinstance(tval, tf.Tensor):
-    return tf1.where(cond, tval, fval)
+    return broadcast_util.where_left_justified_mask(cond, tval, fval)
   elif isinstance(tval, tuple):
     cls = type(tval)
     return cls(*(val_where(cond, t, f) for t, f in zip(tval, fval)))

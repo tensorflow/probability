@@ -241,14 +241,11 @@ class LBfgsTest(test_util.TestCase):
       return (x * x + y - 11) ** 2 + (x + y * y - 7) ** 2
 
     dtype = 'float64'
-    starts = tf.constant([[1, 1],
-                          [-2, 2],
-                          [-1, -1],
-                          [1, -2]], dtype=dtype)
-    expected_minima = np.array([[3, 2],
-                                [-2.805118, 3.131312],
-                                [-3.779310, -3.283186],
-                                [3.584428, -1.848126]], dtype=dtype)
+    starts = tf.constant([[[1, 1], [-2, 2]],
+                          [[-1, -1], [1, -2]]], dtype=dtype)
+    expected_minima = np.array([
+        [[3, 2], [-2.805118, 3.131312]],
+        [[-3.779310, -3.283186], [3.584428, -1.848126]]], dtype=dtype)
     batch_results = self.evaluate(tfp.optimizer.lbfgs_minimize(
         himmelblau, initial_position=starts,
         stopping_condition=tfp.optimizer.converged_all, tolerance=1e-8))
@@ -258,7 +255,7 @@ class LBfgsTest(test_util.TestCase):
 
     # All converged points are near expected minima.
     for actual, expected in zip(batch_results.position, expected_minima):
-      self.assertArrayNear(actual, expected, 1e-5)
+      self.assertAllClose(actual, expected)
     self.assertEqual(batch_results.num_objective_evaluations, 36)
 
   def test_himmelblau_batch_any(self):
@@ -488,7 +485,8 @@ class LBfgsTest(test_util.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum),
+                           axis=-1)
 
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):

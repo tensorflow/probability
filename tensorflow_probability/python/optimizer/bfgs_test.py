@@ -498,7 +498,8 @@ class BfgsTest(test_util.TestCase):
 
     @_make_val_and_grad_fn
     def quadratic(x):
-      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum))
+      return tf.reduce_sum(scales * tf.math.squared_difference(x, minimum),
+                           axis=-1)
 
     # Test with a vector of unknown dimension, and a fully unknown shape.
     for shape in ([None], None):

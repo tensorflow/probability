@@ -38,6 +38,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:broadcast_util",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
