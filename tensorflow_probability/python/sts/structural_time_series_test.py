@@ -23,6 +23,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts import Autoregressive
+from tensorflow_probability.python.sts import AutoregressiveIntegratedMovingAverage
 from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import LocalLevel
@@ -311,7 +312,7 @@ class _StsTestHarness(object):
         # Dummy series to build the model with float64 priors. Working in
         # float64 minimizes numeric inconsistencies between log-prob
         # implementations.
-        observed_time_series=np.float64([1., 0.]))
+        observed_time_series=np.float64([1., 0., 1., 0.]))
     jd = model.joint_distribution(trajectories_shape=[2], num_timesteps=11)
     self.assertLen(jd.dtype, len(model.parameters) + 1)
 
@@ -399,6 +400,33 @@ class AutoregressiveTest(test_util.TestCase, _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None):
     return Autoregressive(order=3, observed_time_series=observed_time_series)
+
+
+@test_util.test_all_tf_execution_regimes
+class ARMATest(test_util.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    one = 1.
+    if observed_time_series is not None:
+      observed_time_series = (
+          sts_util.canonicalize_observed_time_series_with_mask(
+              observed_time_series))
+      one = tf.ones_like(observed_time_series.time_series[..., 0, 0])
+    return AutoregressiveIntegratedMovingAverage(
+        ar_order=3,
+        ma_order=1,
+        integration_degree=0,
+        level_drift_prior=tfd.Normal(loc=one, scale=one),
+        observed_time_series=observed_time_series)
+
+
+@test_util.test_all_tf_execution_regimes
+class ARIMATest(test_util.TestCase, _StsTestHarness):
+
+  def _build_sts(self, observed_time_series=None):
+    return AutoregressiveIntegratedMovingAverage(
+        ar_order=1, ma_order=2, integration_degree=2,
+        observed_time_series=observed_time_series)
 
 
 @test_util.test_all_tf_execution_regimes

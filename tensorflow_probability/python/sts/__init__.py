@@ -33,11 +33,13 @@ from tensorflow_probability.python.sts.structural_time_series import StructuralT
 _allowed_symbols = [
     'AdditiveStateSpaceModel',
     'Autoregressive',
+    'AutoregressiveIntegratedMovingAverage',
     'AutoregressiveMovingAverageStateSpaceModel',
     'AutoregressiveStateSpaceModel',
     'ConstrainedSeasonalStateSpaceModel',
     'DynamicLinearRegression',
     'DynamicLinearRegressionStateSpaceModel',
+    'IntegratedStateSpaceModel',
     'LinearRegression',
     'LocalLevel',
     'LocalLevelStateSpaceModel',

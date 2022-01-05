@@ -251,10 +251,11 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "structural_time_series_test",
-    size = "medium",
+    size = "large",
     srcs = ["structural_time_series_test.py"],
     jax_size = "large",
     python_version = "PY3",
+    shard_count = 4,
     srcs_version = "PY3",
     deps = [
         # numpy dep,

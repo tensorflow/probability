@@ -35,6 +35,7 @@ multi_substrate_py_library(
     srcs_version = "PY3",
     deps = [
         ":autoregressive",
+        ":autoregressive_integrated_moving_average",
         ":autoregressive_moving_average",
         ":dynamic_regression",
         ":local_level",
@@ -77,6 +78,33 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_library(
+    name = "autoregressive_integrated_moving_average",
+    srcs = ["autoregressive_integrated_moving_average.py"],
+    deps = [
+        ":autoregressive_moving_average",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/sts/internal",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "autoregressive_integrated_moving_average_test",
+    size = "medium",
+    srcs = ["autoregressive_integrated_moving_average_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/sts/components",
+    ],
+)
+
+multi_substrate_py_library(
     name = "autoregressive_moving_average",
     srcs = ["autoregressive_moving_average.py"],
     srcs_version = "PY3",
@@ -84,6 +112,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/sts/internal",
     ],
 )

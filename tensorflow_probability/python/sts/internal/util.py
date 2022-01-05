@@ -49,6 +49,14 @@ def broadcast_batch_shape(distributions):
   return tf.convert_to_tensor(value=batch_shape)
 
 
+def pad_tensor_with_trailing_zeros(x, num_zeros):
+  return tf.pad(
+      x,
+      ps.concat([ps.zeros([ps.rank(x) - 1, 2], dtype=np.int32),
+                 [[0, num_zeros]]],
+                axis=0))
+
+
 def pad_batch_dimension_for_multiple_chains(
     observed_time_series, model, chain_batch_shape):
   """"Expand the observed time series with extra batch dimension(s)."""

@@ -14,12 +14,11 @@
 # ============================================================================
 """Autoregressive Moving Average model."""
 
-import numpy as np
-
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.sts.components.autoregressive import make_ar_transition_matrix
+from tensorflow_probability.python.sts.internal import util as sts_util
 
 
 class AutoregressiveMovingAverageStateSpaceModel(
@@ -178,9 +177,9 @@ class AutoregressiveMovingAverageStateSpaceModel(
       ar_order = ps.shape(ar_coefficients)[-1]
       ma_order = ps.shape(ma_coefficients)[-1]
       order = ps.maximum(ar_order, ma_order + 1)
-      ar_coefficients = _pad_tensor_with_trailing_zeros(
+      ar_coefficients = sts_util.pad_tensor_with_trailing_zeros(
           ar_coefficients, order - ar_order)
-      ma_coefficients = _pad_tensor_with_trailing_zeros(
+      ma_coefficients = sts_util.pad_tensor_with_trailing_zeros(
           ma_coefficients, (order - 1) - ma_order)
 
       self._order = order
@@ -210,10 +209,10 @@ class AutoregressiveMovingAverageStateSpaceModel(
           num_timesteps=num_timesteps,
           transition_matrix=make_ar_transition_matrix(ar_coefficients),
           transition_noise=tfd.MultivariateNormalDiag(
-              loc=_pad_tensor_with_trailing_zeros(
+              loc=sts_util.pad_tensor_with_trailing_zeros(
                   latent_level_drift[..., tf.newaxis],
                   self.order - 1),
-              scale_diag=_pad_tensor_with_trailing_zeros(
+              scale_diag=sts_util.pad_tensor_with_trailing_zeros(
                   level_scale[..., tf.newaxis], self.order - 1)),
           observation_matrix=make_ma_observation_matrix(ma_coefficients),
           observation_noise=tfd.MultivariateNormalDiag(
@@ -246,14 +245,6 @@ class AutoregressiveMovingAverageStateSpaceModel(
   @property
   def observation_noise_scale(self):
     return self._observation_noise_scale
-
-
-def _pad_tensor_with_trailing_zeros(x, num_zeros):
-  return tf.pad(
-      x,
-      ps.concat([ps.zeros([ps.rank(x) - 1, 2], dtype=np.int32),
-                 [[0, num_zeros]]],
-                axis=0))
 
 
 def make_ma_observation_matrix(coefficients):

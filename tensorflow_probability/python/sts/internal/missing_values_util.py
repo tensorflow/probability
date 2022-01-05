@@ -183,3 +183,11 @@ def initial_value_of_masked_time_series(time_series_tensor, broadcast_mask):
                     # Since we've gathered exactly one step from the
                     # `num_timesteps` axis, we can remove that axis entirely.
                     axis=-1)
+
+
+def differentiate_masked_time_series(masked_time_series):
+  time_series, is_missing = masked_time_series
+  return MaskedTimeSeries(
+      time_series=time_series[..., 1:, :] - time_series[..., :-1, :],
+      is_missing=(None if is_missing is None
+                  else is_missing[..., 1:] | is_missing[..., :-1]))
