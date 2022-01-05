@@ -22,6 +22,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -434,6 +435,118 @@ class NestUtilTest(test_util.TestCase):
   def testCoerceStructureRaises(self, target, source, message):
     with self.assertRaisesRegex((ValueError, TypeError), message):
       nest_util.coerce_structure(target, source)
+
+
+def _product_generator(a, b):
+  """Toy generator for testing `map_structure_coroutine`."""
+  yield a * b
+
+
+def _get_yielded_and_returned_values(gen, values_to_send=()):
+  """Helper for testing generators and coroutines."""
+  yvals = []
+  try:
+    yvals.append(next(gen))
+    for s in values_to_send:
+      yvals.append(gen.send(s))
+    while True:  # Loop until `gen` returns, even if no more values to send.
+      yvals.append(next(gen))
+  except StopIteration as e:
+    rvals = e.value
+  return yvals, rvals
+
+
+class MapStructureCoroutineTest(test_util.TestCase):
+
+  def testYieldsInFlattenedOrder(self):
+    a = {'y': 2., 'x': 3., 'z': 2.}
+    b = {'y': 10., 'x': 0.1, 'z': -4.}
+    expected_result = tf.nest.flatten(
+        tf.nest.map_structure(lambda a, b: a * b, a, b))
+    yvals, _ = _get_yielded_and_returned_values(
+        nest_util.map_structure_coroutine(_product_generator, a, b=b))
+    self.assertAllClose(expected_result, yvals)
+
+  def testReturnsExpectedStructure(self):
+
+    def _return_product_generator(a, b):
+      return a * b
+      yield  # pylint: disable=unreachable
+
+    a = {'y': 2., 'x': 3., 'z': 2.}
+    b = {'y': 10., 'x': 0.1, 'z': -4.}
+    _, rvals = _get_yielded_and_returned_values(
+        nest_util.map_structure_coroutine(_return_product_generator, a, b))
+    self.assertAllCloseNested(rvals,
+                              tf.nest.map_structure(lambda a, b: a * b, a, b))
+
+  def testNamedAndPositionalArgs(self):
+    a = {'y': 2., 'x': 3., 'z': 2.}
+    b = {'y': 10., 'x': 0.1, 'z': -4.}
+    yvals_positional, _ = _get_yielded_and_returned_values(
+        nest_util.map_structure_coroutine(_product_generator, a, b))
+    yvals_named, _ = _get_yielded_and_returned_values(
+        nest_util.map_structure_coroutine(_product_generator, a=a, b=b))
+    yvals_mixed, _ = _get_yielded_and_returned_values(
+        nest_util.map_structure_coroutine(_product_generator, a, b=b))
+    self.assertAllCloseNested(yvals_positional, yvals_named)
+    self.assertAllCloseNested(yvals_positional, yvals_mixed)
+
+    # Out-of-order arguments raise an error.
+    with self.assertRaisesRegex(TypeError, 'got multiple values for argument'):
+      _get_yielded_and_returned_values(
+          nest_util.map_structure_coroutine(_product_generator, b, a=a))
+
+  def testUpTo(self):
+    a = {'y': 3., 'z': 2.}
+    b = {'y': [10., -1.], 'z': [-4., 2.]}
+    def g(a, b):
+      b1, b2 = b
+      yield a * b1
+      return a * b2
+    yvals, rvals = _get_yielded_and_returned_values(
+        nest_util.map_structure_coroutine(g, a, b, _up_to=a))
+    self.assertAllCloseNested(yvals, [30., -8.])
+    self.assertAllCloseNested(rvals, {'y': -3., 'z': 4.})
+
+  def testWithTuplePaths(self):
+    def g(path, _):
+      return path
+      yield  # pylint: disable=unreachable
+    a = {'y': 2., 'x': 3., 'z': 2.}
+    _, rvals = _get_yielded_and_returned_values(
+        nest_util.map_structure_coroutine(g, a, _with_tuple_paths=True))
+    self.assertAllEqualNested(
+        rvals,
+        nest.map_structure_with_tuple_paths(lambda path, a: path, a))
+
+  def testDocstringJDCExample(self):
+    def _horseshoe(path, scale):
+      # Auxiliary-variable representation of a horseshoe prior.
+      name = ','.join(path)
+      z = yield tfd.HalfCauchy(loc=0, scale=scale, name=name + '_z')
+      w_noncentered = yield tfd.Normal(
+          loc=0., scale=z, name=name + '_w_noncentered')
+      return z * w_noncentered
+
+    @tfd.JointDistributionCoroutineAutoBatched
+    def model():
+      weights = yield from nest_util.map_structure_coroutine(
+          _horseshoe,
+          scale={'a': tf.ones([5]) * 100., 'b': tf.ones([2]) * 1e-2},
+          _with_tuple_paths=True)
+      yield tfd.Deterministic(
+          tf.sqrt(tf.norm(weights['a'])**2 + tf.norm(weights['b'])**2),
+          name='weights_norm')
+    event_shape = model.event_shape
+    print(event_shape)
+    self.assertAllEqualNested(
+        event_shape._asdict(),
+        {'a_z': tf.constant([5]),
+         'a_w_noncentered': tf.constant([5]),
+         'b_z': tf.constant([2]),
+         'b_w_noncentered': tf.constant([2]),
+         'weights_norm': tf.constant([])})
 
 if __name__ == '__main__':
   test_util.main()

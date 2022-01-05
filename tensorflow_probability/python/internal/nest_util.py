@@ -138,6 +138,128 @@ def map_structure_with_named_args(func,
                 expand_composites=_expand_composites)
 
 
+def map_structure_coroutine(coroutine,
+                            *structures,
+                            _expand_composites=False,  # pylint: disable=invalid-name
+                            _up_to=UNSPECIFIED,  # pylint: disable=invalid-name
+                            _with_tuple_paths=False,  # pylint: disable=invalid-name
+                            **named_structures):
+  # pylint: disable=g-doc-return-or-yield
+  """Invokes a coroutine multiple times with args from provided structures.
+
+  This is semantically identical to `map_structure_with_named_args`, except
+  that the first argument is a generator or coroutine (a callable whose body
+  contains `yield` statements) rather than a function. This is invoked with
+  arguments from the provided structure(s), thus defining an outer generator/
+  coroutine that `yield`s values in sequence from each call to the inner
+  `coroutine`.
+
+  The argument structures are traversed, and the coroutine is invoked, in
+  the order defined by `tf.nest.flatten`. A stripped-down implementation of
+  the core logic is as follows:
+
+  ```python
+  def map_structure_coroutine(coroutine, *structures):
+    flat_results = []
+    for args in zip(*[tf.nest.flatten(s) for s in structures]):
+      retval = yield from coroutine(*args)
+      flat_results.append(retval)
+    return tf.nest.pack_sequence_as(structures[0], flat_results)
+  ```
+
+  Args:
+    coroutine: a generator/coroutine callable that accepts one or more named
+      arguments.
+    *structures: Structures of arguments passed positionally to `coroutine`.
+    _expand_composites: Forwarded as
+      `tf.nest.flatten(..., expand_composites=_expand_composites)`.
+    _up_to: Optional shallow structure to map up to. If provided,
+      `nest.map_structure_up_to` is called rather than `nest.map_structure`.
+      Default value: `UNSPECIFIED`.
+    _with_tuple_paths: Python bool. If `True`, the first argument to `coroutine`
+      is a tuple path to the current leaf of the argument structure(s).
+      Default value: `False`.
+    **named_structures: Structures of arguments passed by name to `coroutine`.
+  Yields:
+    Values `yield`ed by each invocation of `coroutine`, with invocations in
+      order corresponding to `tf.nest.flatten`.
+  Returns:
+    A new structure matching that of the input structures (or the shallow
+      structure `_up_to`, if specified), in which each element is the return
+      value from applying `coroutine` to the corresponding elements of the input
+      structures.
+
+  ## Examples
+
+  A JointDistributionCoroutine may define a reusable submodel as its own
+  coroutine, for example:
+
+  ```python
+  def horseshoe_prior(path, scale):
+    # Auxiliary-variable representation of a horseshoe prior on sparse weights.
+    name = ','.join(path)
+    z = yield tfd.HalfCauchy(loc=0., scale=scale, name=name + '_z')
+    w_noncentered = yield tfd.Normal(
+        loc=0., scale=z, name=name + '_w_noncentered')
+    return z * w_noncentered
+  ```
+
+  Note that this submodel yields two auxiliary random variables, and returns the
+  sampled weight as a third value.
+
+  Using `map_structure_coroutine` we can define a structure of such submodels,
+  and collect their return values:
+
+  ```
+  @tfd.JointDistributionCoroutineAutoBatched
+  def model():
+    weights = yield from nest_util.map_structure_coroutine(
+        horseshoe_prior,
+        scale={'a': tf.ones([5]) * 100., 'b': tf.ones([2]) * 1e-2},
+        _with_tuple_paths=True)
+    # ==> `weights` is a dict of weight values.
+    yield tfd.Deterministic(
+        tf.sqrt(tf.norm(weights['a'])**2 + tf.norm(weights['b'])**2),
+        name='weights_norm')
+
+  print(model.event_shape)
+  # ==> StructTuple(
+  #       a_z=TensorShape([5]),
+  #       a_w_noncentered=TensorShape([5]),
+  #       b_z=TensorShape([2]),
+  #       b_w_noncentered=TensorShape([2]),
+  #       weights_norm=TensorShape([]))
+  ```
+  """
+  # pylint: enable=g-doc-return-or-yield
+
+  names, named_structure_values = (zip(*named_structures.items())
+                                   if named_structures else ((), ()))
+  all_structures = structures + named_structure_values
+  result_structure = all_structures[0] if _up_to is UNSPECIFIED else _up_to
+  flat_arg_structures = [
+      nest.flatten_up_to(result_structure, s)
+      for s in all_structures]
+
+  if _with_tuple_paths:
+    # Pass tuple paths as a first positional arg (before any provided args).
+    flat_paths = nest.yield_flat_paths(result_structure,
+                                       expand_composites=_expand_composites)
+    flat_arg_structures = [list(flat_paths)] + flat_arg_structures
+    num_positional_args = 1 + len(structures)
+  else:
+    num_positional_args = len(structures)
+
+  flat_results = []
+  for leaf_values in zip(*flat_arg_structures):
+    result = yield from coroutine(
+        *leaf_values[:num_positional_args],
+        **dict(zip(names, leaf_values[num_positional_args:])))
+    flat_results.append(result)
+
+  return nest.pack_sequence_as(result_structure, flat_results)
+
+
 def _force_leaf(struct):
   # Returns `True` if `struct` should be treated as a leaf, rather than
   # expanded/recursed into.

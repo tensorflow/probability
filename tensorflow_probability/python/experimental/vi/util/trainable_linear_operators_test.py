@@ -14,6 +14,7 @@
 # ============================================================================
 """Tests for trainable `LinearOperator` builders."""
 
+import functools
 from absl.testing import parameterized
 
 import numpy as np
@@ -26,6 +27,27 @@ from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+
+def _strip_defer(op):
+  if isinstance(op, tfp.experimental.util.DeferredModule):
+    return op._build_module()
+  return op
+
+
+def diag_operator(shape, dtype):
+  init_fn = functools.partial(
+      samplers.uniform, shape, maxval=2., dtype=dtype)
+  apply_fn = lambda scale_diag: tf.linalg.LinearOperatorDiag(  # pylint: disable=g-long-lambda
+      scale_diag, is_non_singular=True)
+  return init_fn, apply_fn
+
+
+def scaled_identity_operator(shape, dtype):
+  init_fn = lambda _: ()
+  apply_fn = lambda _: tf.linalg.LinearOperatorScaledIdentity(  # pylint: disable=g-long-lambda
+      num_rows=shape[-1], multiplier=tf.constant(1., dtype=dtype))
+  return init_fn, apply_fn
 
 
 @test_util.test_all_tf_execution_regimes
@@ -91,11 +113,7 @@ class TrainableLinearOperators(test_util.TestCase):
        True),
       ((2, 4), (3,),
        ((tf.linalg.LinearOperatorLowerTriangular,),
-        (tf.linalg.LinearOperatorZeros,
-         lambda s, dtype, seed: tf.linalg.LinearOperatorDiag(  # pylint: disable=g-long-lambda
-             tf.Variable(
-                 samplers.uniform(s, maxval=2., dtype=dtype, seed=seed)),
-             is_non_singular=True))),
+        (tf.linalg.LinearOperatorZeros, diag_operator)),
        tf.float64,
        False),
       )
@@ -110,7 +128,8 @@ class TrainableLinearOperators(test_util.TestCase):
     dim = sum(block_dims)
     self._test_linear_operator_shape_and_gradients(
         op, batch_shape, dim, dim, dtype)
-    self.assertIsInstance(op, tf.linalg.LinearOperatorBlockLowerTriangular)
+    self.assertIsInstance(_strip_defer(op),
+                          tf.linalg.LinearOperatorBlockLowerTriangular)
 
     # Test that bijector builds.
     tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
@@ -125,9 +144,7 @@ class TrainableLinearOperators(test_util.TestCase):
        tf.float64,
        True),
       ((3, 2), (2, 2),
-       (tf.linalg.LinearOperatorDiag,
-        lambda s, dtype, seed: tf.linalg.LinearOperatorScaledIdentity(  # pylint: disable=g-long-lambda
-            num_rows=s[-1], multiplier=tf.Variable(1., dtype=dtype))),
+       (tf.linalg.LinearOperatorDiag, scaled_identity_operator),
        tf.float32,
        False)
       )
@@ -142,7 +159,7 @@ class TrainableLinearOperators(test_util.TestCase):
     dim = sum(block_dims)
     self._test_linear_operator_shape_and_gradients(
         op, batch_shape, dim, dim, dtype)
-    self.assertIsInstance(op, tf.linalg.LinearOperatorBlockDiag)
+    self.assertIsInstance(_strip_defer(op), tf.linalg.LinearOperatorBlockDiag)
 
     # Test that bijector builds.
     tfb.ScaleMatvecLinearOperatorBlock(op, validate_args=True)
@@ -189,7 +206,7 @@ class TrainableLinearOperators(test_util.TestCase):
     op = tfp.experimental.vi.util.build_linear_operator_zeros(
         _build_shape(shape, is_static=use_static_shape), dtype=dtype)
     self.assertAllEqual(self.evaluate(op.shape_tensor()), shape)
-    self.assertIsInstance(op, tf.linalg.LinearOperatorZeros)
+    self.assertIsInstance(_strip_defer(op), tf.linalg.LinearOperatorZeros)
     self.assertDTypeEqual(self.evaluate(op.to_dense()), dtype.as_numpy_dtype)
 
 

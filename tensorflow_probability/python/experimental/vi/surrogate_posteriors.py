@@ -619,8 +619,16 @@ def build_affine_surrogate_posterior_from_base_distribution(
     flat_base_distribution = invert.Invert(
         unflatten_and_reshape)(base_distribution)
 
-    return transformed_distribution.TransformedDistribution(
+    td = transformed_distribution.TransformedDistribution(
         flat_base_distribution, bijector=bijector, validate_args=validate_args)
+
+    # Ensure that the surrogate tracks variables from the trainable linear
+    # operator. (This should happen automatically, but in the absence of this
+    # workaround appears to fail for variables contained in the user-passed
+    # `operators`).
+    td._also_track = linop_bijector.trainable_variables  # pylint: disable=protected-access
+
+    return td
 
 
 def build_split_flow_surrogate_posterior(

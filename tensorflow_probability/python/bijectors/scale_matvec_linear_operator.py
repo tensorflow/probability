@@ -128,8 +128,10 @@ class ScaleMatvecLinearOperator(_ScaleMatvecLinearOperatorBase):
     parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
-      if not isinstance(scale, tf.linalg.LinearOperator):
-        raise TypeError('scale is not an instance of tf.LinearOperator')
+      if not hasattr(scale, 'is_non_singular'):
+        raise TypeError(
+            'scale does not implement the interface of tf.LinearOperator '
+            '(saw: {}).'.format(scale))
       if validate_args and not scale.is_non_singular:
         raise ValueError('Scale matrix must be non-singular.')
       self._scale = scale
@@ -196,8 +198,10 @@ class ScaleMatvecLinearOperatorBlock(_ScaleMatvecLinearOperatorBase):
     parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype([scale], dtype_hint=tf.float32)
-      if not isinstance(scale, tf.linalg.LinearOperator):
-        raise TypeError('scale is not an instance of tf.LinearOperator')
+      if not hasattr(scale, 'is_non_singular'):
+        raise TypeError(
+            'scale does not implement the interface of tf.LinearOperator '
+            '(saw: {}).'.format(scale))
       if validate_args and not scale.is_non_singular:
         raise ValueError('Scale matrix must be non-singular.')
 

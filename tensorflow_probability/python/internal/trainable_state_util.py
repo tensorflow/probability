@@ -335,7 +335,9 @@ def as_stateful_builder(generator):
               lambda t, n=name: t if t is None else tf.Variable(t, name=n),
               value, expand_composites=True))
     return deferred_module.DeferredModule(
-        functools.partial(_apply_parameters, g), *params_as_variables)
+        functools.partial(_apply_parameters, g),
+        *params_as_variables,
+        also_track=(args, kwargs))
 
   # Update docstring.
   if generator.__doc__:

@@ -441,6 +441,7 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
