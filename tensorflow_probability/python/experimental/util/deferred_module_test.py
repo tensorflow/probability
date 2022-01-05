@@ -52,6 +52,18 @@ class DeferredModuleTest(test_util.TestCase):
     for grad in grads:
       self.assertIsNotNone(grad)
 
+  def testTracksExogenousTrainableVariables(self):
+    loc = tf.Variable(0., name='loc')
+    def build_normal(scale):
+      return tfd.Normal(loc=loc, scale=scale)
+    dist = tfp.experimental.util.DeferredModule(
+        build_normal, scale=tf.Variable(1., name='scale'), also_track=loc)
+
+    # Check that variable tracking works recursively, as well as directly.
+    wrapped_dist = tfd.Sample(dist, sample_shape=[2])
+    self.assertLen(getattr(wrapped_dist, 'trainable_variables'), 2)
+    self.assertLen(getattr(dist, 'trainable_variables'), 2)
+
   def testDistributionBatchSlicing(self):
 
     batch_shape = [4, 3]

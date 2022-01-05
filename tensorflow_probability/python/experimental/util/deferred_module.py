@@ -116,7 +116,7 @@ class DeferredModule(tf.Module, special_methods.SpecialMethods):
 
   """
 
-  def __init__(self, build_fn, *args, **kwargs):
+  def __init__(self, build_fn, *args, also_track=None, **kwargs):
     """Defers initialization of an object with transformed arguments.
 
     Args:
@@ -125,17 +125,23 @@ class DeferredModule(tf.Module, special_methods.SpecialMethods):
         `module = build_fn(*args, **kwargs)`. The return value `module` is an
         instance of `tf.Module`.
       *args: Optional positional arguments to `build_fn`.
+      also_track: Optional instance or structure of instances of `tf.Variable`
+        and/or `tf.Module`, containing any additional trainable variables that
+        the `build_fn` may access beyond the given `args` and `kwargs`. This
+        ensures that such variables will be correctly tracked in
+        `self.trainable_variables`.
+        Default value: `None`.
       **kwargs: Optional keyword arguments to `build_fn`.
     """
     self._build_fn = build_fn
     self._param_args = args
     self._param_kwargs = kwargs
+    self._deferred_module_also_track = also_track
 
     # In order for DeferredModule to work as a tf.Module, we need to ensure that
     # attrs used by tf.Module are handled directly, rather than being forwarded
     # to the inner class.
     self._module_attrs = set(dir(tf.Module()))
-
     super(DeferredModule, self).__init__()
 
   def __action__(self, fn, *args, **kwargs):
@@ -149,7 +155,8 @@ class DeferredModule(tf.Module, special_methods.SpecialMethods):
     if attr in ('_build_fn',
                 '_param_args',
                 '_param_kwargs',
-                '_module_attrs'):
+                '_module_attrs',
+                '_deferred_module_also_track'):
       raise AttributeError()
     if attr in self._module_attrs:
       raise AttributeError()
