@@ -44,10 +44,12 @@ from tensorflow_probability.substrates.jax import experimental
 from tensorflow_probability.substrates.jax import internal
 from tensorflow_probability.substrates.jax import math
 from tensorflow_probability.substrates.jax import mcmc
+from tensorflow_probability.substrates.jax import monte_carlo
 from tensorflow_probability.substrates.jax import optimizer
 from tensorflow_probability.substrates.jax import random
 from tensorflow_probability.substrates.jax import stats
 from tensorflow_probability.substrates.jax import sts
 from tensorflow_probability.substrates.jax import util
+from tensorflow_probability.substrates.jax import vi
 
 from tensorflow_probability.python.internal.backend import jax as tf2jax

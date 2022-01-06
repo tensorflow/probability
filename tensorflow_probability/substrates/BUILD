@@ -54,11 +54,13 @@ py_library(
         "//tensorflow_probability/python/internal:internal.jax",
         "//tensorflow_probability/python/math:math.jax",
         "//tensorflow_probability/python/mcmc:mcmc.jax",
+        "//tensorflow_probability/python/monte_carlo:monte_carlo.jax",
         "//tensorflow_probability/python/optimizer:optimizer.jax",
         "//tensorflow_probability/python/random:random.jax",
         "//tensorflow_probability/python/stats:stats.jax",
         "//tensorflow_probability/python/sts:sts.jax",
         "//tensorflow_probability/python/util:util.jax",
+        "//tensorflow_probability/python/vi:vi.jax",
     ],
 )
 
@@ -77,10 +79,12 @@ py_library(
         "//tensorflow_probability/python/internal:internal.numpy",
         "//tensorflow_probability/python/math:math.numpy",
         "//tensorflow_probability/python/mcmc:mcmc.numpy",
+        "//tensorflow_probability/python/monte_carlo:monte_carlo.numpy",
         "//tensorflow_probability/python/optimizer:optimizer.numpy",
         "//tensorflow_probability/python/random:random.numpy",
         "//tensorflow_probability/python/stats:stats.numpy",
         "//tensorflow_probability/python/sts:sts.numpy",
         "//tensorflow_probability/python/util:util.numpy",
+        "//tensorflow_probability/python/vi:vi.numpy",
     ],
 )

@@ -21,6 +21,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 tfd = tfp.distributions
@@ -722,6 +723,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         seed=seed)
     self.assertAllClose(iwae_10_loss_again, iwae_10_loss)
 
+  @test_util.numpy_disable_gradient_test
   def test_score_trick(self):
     d = 5  # Dimension
     sample_size = int(4.5e5)
@@ -846,65 +848,60 @@ class CsiszarVIMCOTest(test_util.TestCase):
     log_avg_u = np.log(np.mean(u, axis=0))
     return log_avg_u, log_sooavg_u
 
+  @test_util.numpy_disable_gradient_test
   def test_vimco_and_gradient(self):
     dims = 5  # Dimension
     num_draws = int(1e3)
     num_batch_draws = int(3)
-    seed = test_util.test_seed()
+    seed = test_util.test_seed(sampler_type='stateless')
 
-    with tf.GradientTape(persistent=True) as tape:
-      f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
-      np_f = lambda logu: -logu
+    f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
+    np_f = lambda logu: -logu
+    p = tfd.MultivariateNormalFullCovariance(
+        covariance_matrix=tridiag(dims, diag_value=1, offdiag_value=0.5))
+    # Variance is very high when approximating Forward KL, so we make
+    # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
+    # smaller.
+    build_q = (
+        lambda s: tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [dims])))
 
-      s = tf.constant(1.)
-      tape.watch(s)
-      p = tfd.MultivariateNormalFullCovariance(
-          covariance_matrix=tridiag(dims, diag_value=1, offdiag_value=0.5))
-
-      # Variance is very high when approximating Forward KL, so we make
-      # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
-      # smaller.
-      q = tfd.MultivariateNormalDiag(
-          scale_diag=tf.tile([s], [dims]))
-
-      vimco = tfp.vi.csiszar_vimco(
+    def vimco_loss(s):
+      return tfp.vi.csiszar_vimco(
           f=f,
           p_log_prob=p.log_prob,
-          q=q,
+          q=build_q(s),
           num_draws=num_draws,
           num_batch_draws=num_batch_draws,
           seed=seed)
 
-      # We want the seed to be the same since we will use computations
-      # with the same underlying sample to show correctness of vimco.
-      if tf.executing_eagerly():
-        tf.random.set_seed(seed)
+    def logu(s):
+      q = build_q(s)
       x = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
       x = tf.stop_gradient(x)
-      logu = p.log_prob(x) - q.log_prob(x)
-      f_log_sum_u = f(tfp.stats.log_soomean_exp(logu, axis=0)[::-1][0])
-      q_log_prob_x = q.log_prob(x)
+      return p.log_prob(x) - q.log_prob(x)
 
-    grad_vimco = tape.gradient(vimco, s)
-    grad_mean_f_log_sum_u = tape.gradient(f_log_sum_u, s) / num_batch_draws
-    jacobian_logqx = tape.jacobian(q_log_prob_x, s)
+    def f_log_sum_u(s):
+      return f(tfp.stats.log_soomean_exp(logu(s), axis=0)[::-1][0])
 
-    [
-        logu_,
-        jacobian_logqx_,
-        vimco_,
-        grad_vimco_,
-        f_log_sum_u_,
-        grad_mean_f_log_sum_u_,
-    ] = self.evaluate([
-        logu,
-        jacobian_logqx,
-        vimco,
-        grad_vimco,
-        f_log_sum_u,
-        grad_mean_f_log_sum_u,
-    ])
+    def q_log_prob_x(s):
+      q = build_q(s)
+      x = q.sample(sample_shape=[num_draws, num_batch_draws], seed=seed)
+      x = tf.stop_gradient(x)
+      return q.log_prob(x)
 
+    s = tf.constant(1.)
+    logu_ = self.evaluate(logu(s))
+    vimco_, grad_vimco_ = self.evaluate(
+        tfp.math.value_and_gradient(vimco_loss, s))
+    f_log_sum_u_, grad_mean_f_log_sum_u_ = self.evaluate(
+        tfp.math.value_and_gradient(f_log_sum_u, s))
+    grad_mean_f_log_sum_u_ /= num_batch_draws
+    jacobian_logqx_ = self.evaluate(
+        # Compute `jacobian(q_log_prob_x, s)` using `batch_jacobian` and messy
+        # indexing.
+        gradient.batch_jacobian(
+            lambda s: q_log_prob_x(s[0, 0, ...])[None, ...],
+            s[tf.newaxis, tf.newaxis, ...])[0, ..., 0])
     np_log_avg_u, np_log_sooavg_u = self._csiszar_vimco_helper(logu_)
 
     # Test VIMCO loss is correct.

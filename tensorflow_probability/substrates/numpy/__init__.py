@@ -26,10 +26,12 @@ from tensorflow_probability.substrates.numpy import experimental
 from tensorflow_probability.substrates.numpy import internal
 from tensorflow_probability.substrates.numpy import math
 from tensorflow_probability.substrates.numpy import mcmc
+from tensorflow_probability.substrates.numpy import monte_carlo
 from tensorflow_probability.substrates.numpy import optimizer
 from tensorflow_probability.substrates.numpy import random
 from tensorflow_probability.substrates.numpy import sts
 from tensorflow_probability.substrates.numpy import stats
 from tensorflow_probability.substrates.numpy import util
+from tensorflow_probability.substrates.numpy import vi
 
 from tensorflow_probability.python.internal.backend import numpy as tf2numpy

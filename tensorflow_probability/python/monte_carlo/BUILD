@@ -15,6 +15,12 @@
 # Description:
 #   Support for Monte Carlo expectations
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 licenses(["notice"])
 
 package(
@@ -23,7 +29,7 @@ package(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "monte_carlo",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
@@ -33,7 +39,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "expectation",
     srcs = ["expectation.py"],
     srcs_version = "PY3",
@@ -44,7 +50,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "expectation_test",
     size = "small",
     srcs = ["expectation_test.py"],

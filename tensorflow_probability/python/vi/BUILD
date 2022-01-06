@@ -15,6 +15,12 @@
 # Description:
 #   Methods and objectives for variational inference.
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 licenses(["notice"])
 
 package(
@@ -23,10 +29,14 @@ package(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "vi",
     srcs = ["__init__.py"],
     srcs_version = "PY3",
+    substrates_omit_deps = [
+        ":optimization",
+        ":mutual_information",
+    ],
     deps = [
         ":csiszar_divergence",
         ":mutual_information",
@@ -35,7 +45,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "csiszar_divergence",
     srcs = ["csiszar_divergence.py"],
     srcs_version = "PY3",
@@ -51,10 +61,12 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "csiszar_divergence_test",
     size = "small",
     srcs = ["csiszar_divergence_test.py"],
+    jax_size = "medium",
+    numpy_size = "medium",
     python_version = "PY3",
     shard_count = 5,
     srcs_version = "PY3",
