@@ -73,14 +73,29 @@ def log_prob(f):
 
   return wrapped
 
-failed_log_prob = object()  # sentinel for being unable to compute a log_prob
+
+@tree_util.register_pytree_node_class
+class FailedLogProb:
+
+  def tree_flatten(self):
+    return (), ()
+
+  @classmethod
+  def tree_unflatten(cls, data, xs):
+    del data, xs
+    return FailedLogProb()
+
+
+# sentinel for being unable to compute a log_prob
+failed_log_prob = FailedLogProb()
 
 
 def log_prob_jaxpr(jaxpr, constcells, flat_incells, flat_outcells):
   """Runs log_prob propagation on a Jaxpr."""
 
   def reducer(env, eqn, curr_log_prob, new_log_prob):
-    if curr_log_prob is failed_log_prob or new_log_prob is failed_log_prob:
+    if (isinstance(curr_log_prob, FailedLogProb)
+        or isinstance(new_log_prob, FailedLogProb)):
       # If `curr_log_prob` is `None` that means we were unable to compute
       # a log_prob elsewhere, so the propagate failed.
       return failed_log_prob
