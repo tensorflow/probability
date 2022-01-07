@@ -25,6 +25,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import slicing
 from tensorflow_probability.python.internal import tensorshape_util
@@ -1234,6 +1235,13 @@ class _NonCompositeTensorSumKernel(PositiveSemidefiniteKernel):
         validate_args=any([k.validate_args for k in kernels]),
         parameters=parameters)
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        kernels=parameter_properties.BatchedComponentProperties(
+            event_ndims=(
+                lambda self: [0 for _ in self.kernels])))
+
   @property
   def kernels(self):
     """The list of kernels this _SumKernel sums over."""
@@ -1267,7 +1275,6 @@ class _SumKernel(_NonCompositeTensorSumKernel, AutoCompositeTensorPsdKernel):
                  for k in kernels):
         return _NonCompositeTensorSumKernel(kernels, name=name)
     return super(_SumKernel, cls).__new__(cls)
-
 
 _SumKernel.__doc__ = _NonCompositeTensorSumKernel.__doc__ + '\n' + (
     'When an `_SumKernel` is constructed, if any element of its `kernels`'
@@ -1328,6 +1335,13 @@ class _NonCompositeTensorProductKernel(PositiveSemidefiniteKernel):
         name=name,
         validate_args=any([k.validate_args for k in kernels]),
         parameters=parameters)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        kernels=parameter_properties.BatchedComponentProperties(
+            event_ndims=(
+                lambda self: [0 for _ in self.kernels])))
 
   @property
   def kernels(self):
