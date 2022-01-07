@@ -247,6 +247,8 @@ def main(argv):
     contents = contents.replace('tfp.substrates.numpy', 'tfp.substrates.jax')
     contents = contents.replace('substrates.numpy', 'substrates.jax')
     contents = contents.replace('backend.numpy', 'backend.jax')
+    contents = contents.replace('backend import numpy as tf',
+                                'backend import jax as tf')
 
     contents = contents.replace('def _call_jax', 'def __call__')
     contents = contents.replace('JAX_MODE = False', 'JAX_MODE = True')
