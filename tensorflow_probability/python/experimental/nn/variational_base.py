@@ -38,7 +38,7 @@ tfd = distribution_lib
 
 def unpack_kernel_and_bias(weights):
   """Returns `kernel`, `bias` tuple."""
-  if isinstance(weights, collections.Mapping):
+  if isinstance(weights, collections.abc.Mapping):
     kernel = weights.get('kernel', None)
     bias = weights.get('bias', None)
   elif len(weights) == 1:

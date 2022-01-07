@@ -280,11 +280,7 @@ def make_fit_op(loss_fn, optimizer, trainable_variables,
     grads = tf.nest.pack_sequence_as(
         trainable_variables,
         tape.gradient(loss, tf.nest.flatten(trainable_variables)))
-    try:
-      seq_type = collections.abc.Sequence
-    except AttributeError:
-      seq_type = collections.Sequence
-    if isinstance(optimizer, seq_type):
+    if isinstance(optimizer, collections.abc.Sequence):
       for opt, g, v in zip(optimizer, grads, trainable_variables):
         _apply_gradients(opt, g, v)
     else:

@@ -324,7 +324,7 @@ def recover_state_from_args(args: 'Sequence[Any]', kwargs: 'Mapping[Text, Any]',
                             state_structure: 'Any') -> 'Any':
   """Attempts to recover the state that was transmitted via *args, **kwargs."""
   orig_args = args
-  if isinstance(state_structure, collections.Mapping):
+  if isinstance(state_structure, collections.abc.Mapping):
     state = type(state_structure)()
     # Mappings can be ordered and not ordered, and this information is lost when
     # passed via **kwargs. We iterate using the reference structure order so we
@@ -344,7 +344,7 @@ def recover_state_from_args(args: 'Sequence[Any]', kwargs: 'Mapping[Text, Any]',
                                               _tree_repr(state_structure)))
         state[k] = kwargs[k]
     return state
-  elif (isinstance(state_structure, collections.Sequence) and
+  elif (isinstance(state_structure, collections.abc.Sequence) and
         not _is_namedtuple_like(state_structure)):
     # Sadly, we have no way of inferring the state index from kwargs, so we
     # disallow them.
@@ -497,7 +497,7 @@ def call_transport_map(
                     'A common solution is to adjust the `return`s in `fn` to '
                     'be `return args, ()`.')
 
-  if not isinstance(ret, collections.Sequence) or len(ret) != 2:
+  if not isinstance(ret, collections.abc.Sequence) or len(ret) != 2:
     args_s = _tree_repr(args)
     ret_s = _tree_repr(ret)
     raise TypeError(

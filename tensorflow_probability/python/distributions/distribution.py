@@ -2140,14 +2140,14 @@ def _recursively_replace_dict_for_pretty_dict(x):
     return _PrettyDict({
         k: _recursively_replace_dict_for_pretty_dict(v)
         for k, v in x.items()})
-  if (isinstance(x, collections.Sequence) and
+  if (isinstance(x, collections.abc.Sequence) and
       not isinstance(x, six.string_types)):
     args = (_recursively_replace_dict_for_pretty_dict(x_) for x_ in x)
     is_named_tuple = (isinstance(x, tuple) and
                       hasattr(x, '_asdict') and
                       hasattr(x, '_fields'))
     return type(x)(*args) if is_named_tuple else type(x)(args)
-  if isinstance(x, collections.Mapping):
+  if isinstance(x, collections.abc.Mapping):
     return type(x)(**{k: _recursively_replace_dict_for_pretty_dict(v)
                       for k, v in x.items()})
   return x

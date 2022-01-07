@@ -205,7 +205,7 @@ def batch_slice(batch_object,
   Returns:
     new_batch_object: A batch-sliced `tfd.Distribution`.
   """
-  if not isinstance(slices, collections.Sequence):
+  if not isinstance(slices, collections.abc.Sequence):
     slices = (slices,)
   # We track the history of slice and copy(**param_overrides) in order to trace
   # back to the original object's source variables.

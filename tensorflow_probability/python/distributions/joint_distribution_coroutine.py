@@ -358,5 +358,5 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   def _model_flatten(self, xs):
     if self._sample_dtype is None:
       return tuple((xs[k] for k in self._flat_resolve_names())
-                   if isinstance(xs, collections.Mapping) else xs)
+                   if isinstance(xs, collections.abc.Mapping) else xs)
     return nest.flatten_up_to(self._sample_dtype, xs)

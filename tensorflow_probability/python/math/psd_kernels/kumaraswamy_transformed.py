@@ -105,7 +105,8 @@ class KumaraswamyTransformed(feature_transformed.FeatureTransformed):
       overrides['kernel'] = self.kernel[slices]
 
     conc_slices = (
-        list(slices) if isinstance(slices, collections.Sequence) else [slices])
+        list(slices)
+        if isinstance(slices, collections.abc.Sequence) else [slices])
     conc_slices += [slice(None)] * self.kernel.feature_ndims
 
     if self.parameters.get('concentration0', None) is not None:

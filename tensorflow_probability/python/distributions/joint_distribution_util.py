@@ -99,6 +99,6 @@ def independent_joint_distribution_from_structure(structure_of_distributions,
 
   # Otherwise, build a JD from the current structure.
   if (hasattr(structure_of_distributions, '_asdict') or
-      isinstance(structure_of_distributions, collections.Mapping)):
+      isinstance(structure_of_distributions, collections.abc.Mapping)):
     return jdnamed(structure_of_distributions, validate_args=validate_args)
   return jdsequential(structure_of_distributions, validate_args=validate_args)

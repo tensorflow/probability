@@ -212,7 +212,7 @@ class PSDKernelSlicingTest(test_util.TestCase):
 
     # Come up with the slices for apply (which must also include example dims).
     apply_slices = (
-        tuple(slices) if isinstance(slices, collections.Sequence) else
+        tuple(slices) if isinstance(slices, collections.abc.Sequence) else
         (slices,))
     apply_slices += tuple([slice(None)] * example_ndims)
 

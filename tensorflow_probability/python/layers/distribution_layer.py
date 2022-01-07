@@ -164,7 +164,7 @@ class DistributionLambda(tf.keras.layers.Lambda):
     def _fn(*fargs, **fkwargs):
       """Wraps `make_distribution_fn` to return both dist and concrete value."""
       d = make_distribution_fn(*fargs, **fkwargs)
-      value_is_seq = isinstance(d.dtype, collections.Sequence)
+      value_is_seq = isinstance(d.dtype, collections.abc.Sequence)
       maybe_composite_convert_to_tensor_fn = (
           (lambda d: tensor_tuple.TensorTuple(convert_to_tensor_fn(d)))
           if value_is_seq else convert_to_tensor_fn)

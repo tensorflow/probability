@@ -378,7 +378,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
 
   def _build(self, model):
     """Creates `dist_fn`, `dist_fn_wrapped`, `dist_fn_args`."""
-    if not isinstance(model, collections.Sequence):
+    if not isinstance(model, collections.abc.Sequence):
       raise TypeError('`model` must be `list`-like (saw: {}).'.format(
           type(model).__name__))
     self._dist_fn = model

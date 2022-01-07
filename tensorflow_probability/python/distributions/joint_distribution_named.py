@@ -433,7 +433,7 @@ def _prob_chain_rule_model_flatten(named_makers):
 
 def _is_dict_like(x):
   """Returns `True` if input is convertible to `dict`, `False` otherwise."""
-  return hasattr(x, '_asdict') or isinstance(x, collections.Mapping)
+  return hasattr(x, '_asdict') or isinstance(x, collections.abc.Mapping)
 
 
 def _convert_to_dict(x):

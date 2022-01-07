@@ -204,7 +204,7 @@ class Independent(distribution_lib.Distribution):
     if self._static_reinterpreted_batch_ndims is None:
       raise NotImplementedError(
           'Cannot slice Independent with non-static reinterpreted_batch_ndims')
-    slices = (tuple(slices) if isinstance(slices, collections.Sequence)
+    slices = (tuple(slices) if isinstance(slices, collections.abc.Sequence)
               else (slices,))
     if Ellipsis not in slices:
       slices = slices + (Ellipsis,)

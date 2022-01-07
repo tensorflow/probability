@@ -526,7 +526,7 @@ class DistributionSlicingTest(test_util.TestCase):
 
     # Come up with the slices for samples (which must also include event dims).
     sample_slices = (
-        tuple(slices) if isinstance(slices, collections.Sequence) else
+        tuple(slices) if isinstance(slices, collections.abc.Sequence) else
         (slices,))
     if Ellipsis not in sample_slices:
       sample_slices += (Ellipsis,)
