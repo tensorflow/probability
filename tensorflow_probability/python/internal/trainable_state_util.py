@@ -340,7 +340,7 @@ def as_stateful_builder(generator):
     return deferred_module.DeferredModule(
         functools.partial(_apply_parameters, g),
         *params_as_variables,
-        also_track=(args, kwargs))
+        also_track=tf.nest.flatten((args, kwargs)))
 
   # Update docstring.
   if generator.__doc__:

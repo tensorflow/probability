@@ -32,11 +32,6 @@ package(
 multi_substrate_py_library(
     name = "vi",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
-    substrates_omit_deps = [
-        ":surrogate_posteriors",
-        "//tensorflow_probability/python/experimental/vi/util",
-    ],
     deps = [
         ":automatic_structured_vi",
         ":surrogate_posteriors",
@@ -48,7 +43,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "automatic_structured_vi",
     srcs = ["automatic_structured_vi.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
@@ -75,10 +69,9 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "surrogate_posteriors",
     srcs = ["surrogate_posteriors.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:chain",
@@ -110,7 +103,6 @@ multi_substrate_py_test(
     numpy_tags = ["notap"],
     python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -122,13 +114,12 @@ multi_substrate_py_test(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "surrogate_posteriors_test",
     size = "large",
     srcs = ["surrogate_posteriors_test.py"],
-    python_version = "PY3",
+    numpy_tags = ["notap"],
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

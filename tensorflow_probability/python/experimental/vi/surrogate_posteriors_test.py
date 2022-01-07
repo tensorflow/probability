@@ -23,12 +23,15 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 tfb = tfp.bijectors
 tfd = tfp.distributions
+
+JAX_MODE = False
 
 
 def _as_concrete_instance(d):
@@ -40,6 +43,22 @@ def _as_concrete_instance(d):
 
 class _SurrogatePosterior(object):
   """Common methods for testing ADVI surrogate posteriors."""
+
+  def _initialize_surrogate(
+      self, family_str, seed, is_stateless=JAX_MODE, **kwargs):
+    """Initializes a stateless (JAX) or stateful (TF) surrogate posterior."""
+    # TODO(davmre): refactor to support testing gradients of stateless
+    # surrogates.
+    if is_stateless:
+      build_fn = getattr(tfp.experimental.vi, family_str + '_stateless')
+      init_fn, apply_fn = build_fn(**kwargs)
+      return apply_fn(init_fn(seed=seed))
+    else:
+      build_fn = getattr(tfp.experimental.vi, family_str)
+      surrogate_posterior = build_fn(seed=seed, **kwargs)
+      self.evaluate([v.initializer
+                     for v in surrogate_posterior.trainable_variables])
+      return surrogate_posterior
 
   def _test_shapes(self, surrogate_posterior, batch_shape, event_shape, seed):
 
@@ -128,13 +147,14 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'bijector': tfb.Sigmoid(),
        'dtype': np.float64,
        'is_static': True},
-      {'testcase_name': 'ListEvent',
+      {'testcase_name': 'ListEventStateless',
        'event_shape': [tf.TensorShape([3]),
                        tf.TensorShape([]),
                        tf.TensorShape([2, 2])],
        'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
        'dtype': np.float32,
-       'is_static': False},
+       'is_static': False,
+       'is_stateless': True},
       {'testcase_name': 'DictEvent',
        'event_shape': {'x': tf.TensorShape([1]), 'y': tf.TensorShape([])},
        'bijector': None,
@@ -149,35 +169,39 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'is_static': True},
   )
   def test_specifying_event_shape(
-      self, event_shape, bijector, dtype, is_static):
-    seed = test_util.test_seed_stream()
-    surrogate_posterior = (
-        tfp.experimental.vi.build_factored_surrogate_posterior(
-            event_shape=tf.nest.map_structure(
-                lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
-                    np.array(s, dtype=np.int32), is_static=is_static),
-                event_shape),
-            bijector=bijector,
-            dtype=dtype,
-            seed=seed(),
-            validate_args=True))
-    self.evaluate([v.initializer
-                   for v in surrogate_posterior.trainable_variables])
+      self, event_shape, bijector, dtype, is_static, is_stateless=JAX_MODE):
+    init_seed, grads_seed, shapes_seed, dtype_seed = samplers.split_seed(
+        test_util.test_seed(sampler_type='stateless'),
+        n=4)
+
+    surrogate_posterior = self._initialize_surrogate(
+        'build_factored_surrogate_posterior',
+        is_stateless=is_stateless,
+        seed=init_seed,
+        event_shape=tf.nest.map_structure(
+            lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
+                np.array(s, dtype=np.int32), is_static=is_static),
+            event_shape),
+        bijector=bijector,
+        dtype=dtype,
+        validate_args=True)
 
     self._test_shapes(
         surrogate_posterior, batch_shape=[], event_shape=event_shape,
-        seed=seed())
-    self._test_gradients(surrogate_posterior, seed=seed())
-    self._test_dtype(surrogate_posterior, dtype, seed())
+        seed=shapes_seed)
+    self._test_dtype(surrogate_posterior, dtype, seed=dtype_seed)
+    if not is_stateless:
+      self._test_gradients(surrogate_posterior, seed=grads_seed)
 
   @parameterized.named_parameters(
-      {'testcase_name': 'TensorEvent',
+      {'testcase_name': 'TensorEventStateless',
        'event_shape': [4],
        'initial_loc': np.array([[[0.9, 0.1, 0.5, 0.7]]]),
        'batch_shape': [1, 1],
        'bijector': tfb.Sigmoid(),
        'dtype': np.float32,
-       'is_static': False},
+       'is_static': False,
+       'is_stateless': True},
       {'testcase_name': 'ListEvent',
        'event_shape': [[3], [], [2, 2]],
        'initial_loc': [np.array([0.1, 7., 3.]),
@@ -204,7 +228,12 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'is_static': False},
   )
   def test_specifying_initial_loc(
-      self, event_shape, initial_loc, batch_shape, bijector, dtype, is_static):
+      self, event_shape, initial_loc, batch_shape, bijector, dtype,
+      is_static, is_stateless=JAX_MODE):
+
+    init_seed, grads_seed, shapes_seed, dtype_seed, sample_seed = (
+        samplers.split_seed(test_util.test_seed(sampler_type='stateless'), n=5))
+
     initial_loc = tf.nest.map_structure(
         lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
             np.array(s, dtype=dtype), is_static=is_static),
@@ -217,28 +246,29 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
     else:
       initial_unconstrained_loc = initial_loc
 
-    surrogate_posterior = (
-        tfp.experimental.vi.build_factored_surrogate_posterior(
-            event_shape=event_shape,
-            initial_parameters=tf.nest.map_structure(
-                lambda x: {'loc': x, 'scale': 1e-6},
-                initial_unconstrained_loc),
-            batch_shape=batch_shape,
-            dtype=dtype,
-            bijector=bijector,
-            validate_args=True))
-    self.evaluate([v.initializer
-                   for v in surrogate_posterior.trainable_variables])
+    surrogate_posterior = self._initialize_surrogate(
+        'build_factored_surrogate_posterior',
+        is_stateless=is_stateless,
+        seed=init_seed,
+        event_shape=event_shape,
+        initial_parameters=tf.nest.map_structure(
+            lambda x: {'loc': x, 'scale': 1e-6},
+            initial_unconstrained_loc),
+        batch_shape=batch_shape,
+        dtype=dtype,
+        bijector=bijector,
+        validate_args=True)
 
-    seed = test_util.test_seed_stream()
     self._test_shapes(
         surrogate_posterior, batch_shape=batch_shape,
-        event_shape=event_shape, seed=seed())
-    self._test_gradients(surrogate_posterior, seed=seed())
-    self._test_dtype(surrogate_posterior, dtype, seed())
+        event_shape=event_shape, seed=shapes_seed)
+    self._test_dtype(surrogate_posterior, dtype, seed=dtype_seed)
+    if not is_stateless:
+      self._test_gradients(surrogate_posterior, seed=grads_seed)
 
     # Check that the sampled values are close to the initial locs.
-    posterior_sample_ = self.evaluate(surrogate_posterior.sample(seed=seed()))
+    posterior_sample_ = self.evaluate(
+        surrogate_posterior.sample(seed=sample_seed))
     self.assertAllCloseNested(
         tf.nest.map_structure(lambda x, y: tf.broadcast_to(x, ps.shape(y)),
                               initial_loc, posterior_sample_),
@@ -249,24 +279,29 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
       {'testcase_name': 'TensorEventAllDeterministic',
        'event_shape': [4],
        'base_distribution_cls': tfd.Deterministic},
-      {'testcase_name': 'ListEventSingleDeterministic',
+      {'testcase_name': 'ListEventSingleDeterministicStateless',
        'event_shape': [[3], [], [2, 2]],
-       'base_distribution_cls': tfd.Deterministic},
+       'base_distribution_cls': tfd.Deterministic,
+       'is_stateless': True},
       {'testcase_name': 'ListEventDeterministicNormalStudentT',
        'event_shape': [[3], [], [2, 2]],
        'base_distribution_cls': [tfd.Deterministic, tfd.Normal, tfd.StudentT]},
   )
   def test_specifying_distribution_type(
-      self, event_shape, base_distribution_cls):
-    surrogate_posterior = (
-        tfp.experimental.vi.build_factored_surrogate_posterior(
-            event_shape=event_shape,
-            base_distribution_cls=base_distribution_cls,
-            validate_args=True))
+      self, event_shape, base_distribution_cls, is_stateless=JAX_MODE):
+    init_seed, sample_seed = samplers.split_seed(
+        test_util.test_seed(sampler_type='stateless'), n=2)
+    surrogate_posterior = self._initialize_surrogate(
+        'build_factored_surrogate_posterior',
+        is_stateless=is_stateless,
+        seed=init_seed,
+        event_shape=event_shape,
+        base_distribution_cls=base_distribution_cls,
+        validate_args=True)
 
     # Test that the surrogate uses the expected distribution types.
     if tf.nest.is_nested(surrogate_posterior.event_shape):
-      ds, _ = surrogate_posterior.sample_distributions()
+      ds, _ = surrogate_posterior.sample_distributions(seed=sample_seed)
     else:
       ds = [surrogate_posterior]
     for cls, d in zip(
@@ -276,6 +311,7 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
         d = _as_concrete_instance(d.distribution)
       self.assertIsInstance(d, cls)
 
+  @test_util.jax_disable_variable_test
   def test_that_gamma_fitting_example_runs(self):
     model = self._make_gamma_model()
     surrogate_posterior = (
@@ -290,15 +326,13 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
         'b': tfd.Normal(0., 1.),
         'c': lambda b, a: tfd.Sample(tfd.Normal(b, a), sample_shape=[5])})
 
-    surrogate_posterior = (
-        tfp.experimental.vi.build_factored_surrogate_posterior(
-            event_shape=dist.event_shape,
-            bijector=(
-                dist.experimental_default_event_space_bijector()),
-            validate_args=True))
-    self.evaluate([v.initializer
-                   for v in surrogate_posterior.trainable_variables])
-
+    surrogate_posterior = self._initialize_surrogate(
+        'build_factored_surrogate_posterior',
+        seed=test_util.test_seed(),
+        event_shape=dist.event_shape,
+        bijector=(
+            dist.experimental_default_event_space_bijector()),
+        validate_args=True)
     # Test that the posterior has the specified event shape(s).
     self.assertAllEqualNested(
         self.evaluate(dist.event_shape_tensor()),
@@ -348,7 +382,7 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'bijector': [tfb.FillTriangular(), None, tfb.Softplus()],
        'dtype': np.float64,
        'is_static': True},
-      {'testcase_name': 'DictEvent',
+      {'testcase_name': 'DictEventStateless',
        'dist_classes': {'x': tfd.Logistic, 'y': tfd.Normal},
        'event_shape': {'x': [2], 'y': []},
        'operators': 'tril',
@@ -357,14 +391,20 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'implicit_batch_shape': [1],
        'bijector': None,
        'dtype': np.float32,
-       'is_static': False},
+       'is_static': False,
+       'is_stateless': True},
   )
   def test_constrained_affine_from_distributions(
       self, dist_classes, event_shape, operators, initial_loc,
-      implicit_batch_shape, bijector, dtype, is_static):
+      implicit_batch_shape, bijector, dtype, is_static, is_stateless=JAX_MODE):
     if not tf.executing_eagerly() and not is_static:
       self.skipTest('tfb.Reshape requires statically known shapes in graph'
                     ' mode.')
+
+    init_seed, grads_seed, shapes_seed, dtype_seed = samplers.split_seed(
+        test_util.test_seed(sampler_type='stateless'),
+        n=4)
+
     # pylint: disable=g-long-lambda
     initial_loc = tf.nest.map_structure(
         lambda s: self.maybe_static(np.array(s, dtype=dtype),
@@ -377,13 +417,15 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
             reinterpreted_batch_ndims=ps.rank_from_shape(s)),
         dist_classes, initial_loc, event_shape)
     # pylint: enable=g-long-lambda
-    surrogate_posterior = (
-        tfp.experimental.vi.
-        build_affine_surrogate_posterior_from_base_distribution(
-            distributions,
-            operators=operators,
-            bijector=bijector,
-            validate_args=True))
+
+    surrogate_posterior = self._initialize_surrogate(
+        'build_affine_surrogate_posterior_from_base_distribution',
+        is_stateless=is_stateless,
+        seed=init_seed,
+        base_distribution=distributions,
+        operators=operators,
+        bijector=bijector,
+        validate_args=True)
 
     event_shape = nest.map_structure(
         lambda d: d.event_shape_tensor(), distributions)
@@ -392,15 +434,12 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
           lambda b, s: s if b is None else b.forward_event_shape_tensor(s),
           bijector, event_shape)
 
-    self.evaluate(
-        [v.initializer for v in surrogate_posterior.trainable_variables])
-
-    seed = test_util.test_seed_stream()
     self._test_shapes(
         surrogate_posterior, batch_shape=implicit_batch_shape,
-        event_shape=event_shape, seed=seed())
-    self._test_gradients(surrogate_posterior, seed=seed())
-    self._test_dtype(surrogate_posterior, dtype, seed())
+        event_shape=event_shape, seed=shapes_seed)
+    self._test_dtype(surrogate_posterior, dtype, dtype_seed)
+    if not is_stateless:
+      self._test_gradients(surrogate_posterior, seed=grads_seed)
 
   @parameterized.named_parameters(
       {'testcase_name': 'TensorEvent',
@@ -428,13 +467,14 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'bijector': None,
        'dtype': np.float64,
        'is_static': True},
-      {'testcase_name': 'BatchShape',
+      {'testcase_name': 'BatchShapeStateless',
        'event_shape': [tf.TensorShape([3]), tf.TensorShape([])],
        'operators': 'tril',
        'batch_shape': (2, 1),
        'bijector': [tfb.Softplus(), None,],
        'dtype': np.float32,
-       'is_static': True},
+       'is_static': True,
+       'is_stateless': True},
       {'testcase_name': 'DynamicBatchShape',
        'event_shape': [tf.TensorShape([3]), tf.TensorShape([])],
        'operators': 'tril',
@@ -444,7 +484,13 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
        'is_static': False},
   )
   def test_constrained_affine_from_event_shape(
-      self, event_shape, operators, bijector, batch_shape, dtype, is_static):
+      self, event_shape, operators, bijector, batch_shape, dtype, is_static,
+      is_stateless=JAX_MODE):
+
+    init_seed, grads_seed, shapes_seed, dtype_seed = samplers.split_seed(
+        test_util.test_seed(sampler_type='stateless'),
+        n=4)
+
     if not is_static:
       event_shape = tf.nest.map_structure(
           lambda s: tf1.placeholder_with_default(  # pylint: disable=g-long-lambda
@@ -453,26 +499,24 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
               shape=[len(s)]),
           event_shape)
 
-    surrogate_posterior = (
-        tfp.experimental.vi.
-        build_affine_surrogate_posterior(
-            event_shape=event_shape,
-            operators=operators,
-            bijector=bijector,
-            batch_shape=self.maybe_static(np.int32(batch_shape),
-                                          is_static=is_static),
-            dtype=dtype,
-            validate_args=True))
+    surrogate_posterior = self._initialize_surrogate(
+        'build_affine_surrogate_posterior',
+        is_stateless=is_stateless,
+        seed=init_seed,
+        event_shape=event_shape,
+        operators=operators,
+        bijector=bijector,
+        batch_shape=self.maybe_static(np.int32(batch_shape),
+                                      is_static=is_static),
+        dtype=dtype,
+        validate_args=True)
 
-    self.evaluate(
-        [v.initializer for v in surrogate_posterior.trainable_variables])
-
-    seed = test_util.test_seed_stream()
     self._test_shapes(
         surrogate_posterior, batch_shape=batch_shape, event_shape=event_shape,
-        seed=seed())
-    self._test_gradients(surrogate_posterior, seed=seed())
-    self._test_dtype(surrogate_posterior, dtype, seed())
+        seed=shapes_seed)
+    self._test_dtype(surrogate_posterior, dtype, seed=dtype_seed)
+    if not is_stateless:
+      self._test_gradients(surrogate_posterior, seed=grads_seed)
 
   def test_constrained_affine_from_joint_inputs(self):
     base_distribution = tfd.JointDistributionSequential(
@@ -489,17 +533,15 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
         is_non_singular=True)
     bijector = tfb.JointMap([tfb.Exp(), tfb.Identity(), tfb.Softplus()],
                             validate_args=True)
-    surrogate_posterior = (
-        tfp.experimental.vi.
-        build_affine_surrogate_posterior_from_base_distribution(
-            base_distribution,
-            operators=operator,
-            bijector=bijector,
-            validate_args=True))
+    surrogate_posterior = self._initialize_surrogate(
+        'build_affine_surrogate_posterior_from_base_distribution',
+        seed=test_util.test_seed(),
+        base_distribution=base_distribution,
+        operators=operator,
+        bijector=bijector,
+        validate_args=True)
     posterior_sample = surrogate_posterior.sample(seed=test_util.test_seed())
     posterior_logprob = surrogate_posterior.log_prob(posterior_sample)
-    self.evaluate(
-        [v.initializer for v in surrogate_posterior.trainable_variables])
     sample_, log_prob_ = self.evaluate([posterior_sample, posterior_logprob])
     self.assertEmpty(ps.shape(log_prob_))
     self.assertAllFinite(log_prob_)
@@ -512,29 +554,30 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
                          'b': tfd.Logistic(tf.zeros([], dtype=tf.float64), 1.)}
     operators = [tf.linalg.LinearOperatorDiag] * 2
     with self.assertRaisesRegexp(NotImplementedError, 'mixed dtype'):
-      (tfp.experimental.vi.
-       build_affine_surrogate_posterior_from_base_distribution(
-           base_distribution, operators=operators, validate_args=True))
+      init_fn, apply_fn = (
+          tfp.experimental.vi.
+          build_affine_surrogate_posterior_from_base_distribution_stateless(
+              base_distribution, operators=operators, validate_args=True))
+      apply_fn(init_fn(seed=test_util.test_seed(sampler_type='stateless')))
 
   def test_deterministic_initialization_from_seed(self):
     initial_samples = []
     seed = test_util.test_seed(sampler_type='stateless')
     init_seed, sample_seed = tfp.random.split_seed(seed)
     for _ in range(2):
-      surrogate_posterior = (
-          tfp.experimental.vi.build_affine_surrogate_posterior(
-              event_shape={'x': tf.TensorShape([3]), 'y': tf.TensorShape([])},
-              operators='tril',
-              bijector=None,
-              dtype=tf.float32,
-              seed=init_seed,
-              validate_args=True))
-      self.evaluate(
-          [v.initializer for v in surrogate_posterior.trainable_variables])
+      surrogate_posterior = self._initialize_surrogate(
+          'build_affine_surrogate_posterior',
+          event_shape={'x': tf.TensorShape([3]), 'y': tf.TensorShape([])},
+          operators='tril',
+          bijector=None,
+          dtype=tf.float32,
+          seed=init_seed,
+          validate_args=True)
       initial_samples.append(
           surrogate_posterior.sample([5], seed=sample_seed))
     self.assertAllEqualNested(initial_samples[0], initial_samples[1])
 
+  @test_util.jax_disable_variable_test
   def test_that_gamma_fitting_example_runs(self):
     model = self._make_gamma_model()
     surrogate_posterior = (
@@ -576,6 +619,7 @@ class SplitFlowSurrogatePosterior(
        'dtype': np.float64,
        'is_static': True},
   )
+  @test_util.jax_disable_variable_test
   def test_shapes_and_gradients(
       self, event_shape, constraining_bijector, batch_shape, dtype, is_static):
     if not tf.executing_eagerly() and not is_static:

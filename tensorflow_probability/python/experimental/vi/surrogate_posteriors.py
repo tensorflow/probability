@@ -31,12 +31,16 @@ from tensorflow_probability.python.distributions import joint_distribution_util
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
-from tensorflow_probability.python.experimental import util as tfe_util
+from tensorflow_probability.python.experimental.util import trainable
+
 from tensorflow_probability.python.experimental.vi.util import trainable_linear_operators
 from tensorflow_probability.python.internal import distribution_util
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import trainable_state_util
+
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -51,14 +55,13 @@ def _get_event_shape_shallow_structure(event_shape):
   return nest.get_traverse_shallow_structure(_not_list_of_ints, event_shape)
 
 
-def build_factored_surrogate_posterior(  # pylint: disable=dangerous-default-value
+def _factored_surrogate_posterior(  # pylint: disable=dangerous-default-value
     event_shape=None,
     bijector=None,
     batch_shape=(),
     base_distribution_cls=normal.Normal,
     initial_parameters={'scale': 1e-2},
     dtype=tf.float32,
-    seed=None,
     validate_args=False,
     name=None):
   """Builds a joint variational posterior that factors over model variables.
@@ -99,17 +102,18 @@ def build_factored_surrogate_posterior(  # pylint: disable=dangerous-default-val
     dtype: Optional float `dtype` for trainable parameters. May
       optionally be a structure of such `dtype`s matching `event_shape`.
       Default value: `tf.float32`.
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     validate_args: Python `bool`. Whether to validate input with asserts. This
       imposes a runtime cost. If `validate_args` is `False`, and the inputs are
       invalid, correct behavior is not guaranteed.
       Default value: `False`.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., 'build_factored_surrogate_posterior').
-
-  Returns:
-    surrogate_posterior: A `tfd.Distribution` instance whose samples have
-      shape and structure matching that of `event_shape` or `initial_loc`.
+  Yields:
+    *parameters: sequence of `trainable_state_util.Parameter` namedtuples.
+      These are intended to be consumed by
+      `trainable_state_util.as_stateful_builder` and
+      `trainable_state_util.as_stateless_builder` to define stateful and
+      stateless variants respectively.
 
   ### Examples
 
@@ -212,17 +216,13 @@ def build_factored_surrogate_posterior(  # pylint: disable=dangerous-default-val
       initial_parameters = nest.map_structure(lambda x: initial_parameters,
                                               event_shape)
 
-    unconstrained_trainable_distributions = (
-        nest_util.map_structure_with_named_args(
-            tfe_util.make_trainable,
+    unconstrained_trainable_distributions = yield from (
+        nest_util.map_structure_coroutine(
+            trainable._make_trainable,  # pylint: disable=protected-access
             cls=base_distribution_cls,
             initial_parameters=initial_parameters,
             batch_and_event_shape=unconstrained_batch_and_event_shape,
             parameter_dtype=nest_util.broadcast_structure(event_shape, dtype),
-            seed=tf.nest.pack_sequence_as(
-                event_shape,
-                samplers.split_seed(seed,
-                                    n=len(tf.nest.flatten(event_shape)))),
             _up_to=event_shape))
     unconstrained_trainable_distribution = (
         joint_distribution_util.independent_joint_distribution_from_structure(
@@ -235,14 +235,19 @@ def build_factored_surrogate_posterior(  # pylint: disable=dangerous-default-val
         unconstrained_trainable_distribution, event_space_bijector)
 
 
-def build_affine_surrogate_posterior(
+build_factored_surrogate_posterior = trainable_state_util.as_stateful_builder(
+    _factored_surrogate_posterior)
+build_factored_surrogate_posterior_stateless = (
+    trainable_state_util.as_stateless_builder(_factored_surrogate_posterior))
+
+
+def _affine_surrogate_posterior(
     event_shape,
     operators='diag',
     bijector=None,
     base_distribution=normal.Normal,
     dtype=tf.float32,
     batch_shape=(),
-    seed=None,
     validate_args=False,
     name=None):
   """Builds a joint variational posterior with a given `event_shape`.
@@ -289,18 +294,18 @@ def build_affine_surrogate_posterior(
     batch_shape: Batch shape (Python tuple, list, or int) of the surrogate
       posterior, to enable parallel optimization from multiple initializations.
       Default value: `()`.
-    seed: Python integer to seed the random number generator for initial values.
-      Default value: `None`.
     validate_args: Python `bool`. Whether to validate input with asserts. This
       imposes a runtime cost. If `validate_args` is `False`, and the inputs are
       invalid, correct behavior is not guaranteed.
       Default value: `False`.
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e., 'build_affine_surrogate_posterior').
-
-  Returns:
-    surrogate_distribution: Trainable `tfd.Distribution` with event shape equal
-      to `event_shape`.
+  Yields:
+    *parameters: sequence of `trainable_state_util.Parameter` namedtuples.
+      These are intended to be consumed by
+      `trainable_state_util.as_stateful_builder` and
+      `trainable_state_util.as_stateless_builder` to define stateful and
+      stateless variants respectively.
 
   #### Examples
 
@@ -383,12 +388,17 @@ def build_affine_surrogate_posterior(
               d, to_shape=batch_shape, validate_args=validate_args),
           standard_base_distribution)
 
-    return build_affine_surrogate_posterior_from_base_distribution(
+    surrogate_posterior = yield from _affine_surrogate_posterior_from_base_distribution(
         standard_base_distribution,
         operators=operators,
         bijector=bijector,
-        seed=seed,
         validate_args=validate_args)
+    return surrogate_posterior
+
+build_affine_surrogate_posterior = trainable_state_util.as_stateful_builder(
+    _affine_surrogate_posterior)
+build_affine_surrogate_posterior_stateless = (
+    trainable_state_util.as_stateless_builder(_affine_surrogate_posterior))
 
 
 # Default constructors for
@@ -397,12 +407,11 @@ _sample_uniform_initial_loc = functools.partial(
     samplers.uniform, minval=-2., maxval=2., dtype=tf.float32)
 
 
-def build_affine_surrogate_posterior_from_base_distribution(
+def _affine_surrogate_posterior_from_base_distribution(
     base_distribution,
     operators='diag',
     bijector=None,
     initial_unconstrained_loc_fn=_sample_uniform_initial_loc,
-    seed=None,
     validate_args=False,
     name=None):
   """Builds a variational posterior by linearly transforming base distributions.
@@ -453,8 +462,6 @@ def build_affine_surrogate_posterior_from_base_distribution(
       each variable.
       Default value: `functools.partial(tf.random.stateless_uniform,
         minval=-2., maxval=2., dtype=tf.float32)`.
-    seed: Python integer to seed the random number generator for initial values.
-      Default value: `None`.
     validate_args: Python `bool`. Whether to validate input with asserts. This
       imposes a runtime cost. If `validate_args` is `False`, and the inputs are
       invalid, correct behavior is not guaranteed.
@@ -462,9 +469,12 @@ def build_affine_surrogate_posterior_from_base_distribution(
     name: Python `str` name prefixed to ops created by this function.
       Default value: `None` (i.e.,
       'build_affine_surrogate_posterior_from_base_distribution').
-
-  Returns:
-    surrogate_distribution: Trainable `tfd.JointDistribution` instance.
+  Yields:
+    *parameters: sequence of `trainable_state_util.Parameter` namedtuples.
+      These are intended to be consumed by
+      `trainable_state_util.as_stateful_builder` and
+      `trainable_state_util.as_stateless_builder` to define stateful and
+      stateless variants respectively.
   Raises:
     NotImplementedError: Base distributions with mixed dtypes are not supported.
 
@@ -533,7 +543,7 @@ def build_affine_surrogate_posterior_from_base_distribution(
 
   """
   with tf.name_scope(
-      name or 'build_affine_surrogate_posterior_from_base_distribution'):
+      name or 'affine_surrogate_posterior_from_base_distribution'):
 
     if nest.is_nested(base_distribution):
       base_distribution = (
@@ -554,7 +564,8 @@ def build_affine_surrogate_posterior_from_base_distribution(
     flat_event_size = nest.flatten(
         nest.map_structure(ps.reduce_prod, event_shape))
 
-    base_dtypes = set(nest.flatten(base_distribution.dtype))
+    base_dtypes = set([dtype_util.base_dtype(d)
+                       for d in nest.flatten(base_distribution.dtype)])
     if len(base_dtypes) > 1:
       raise NotImplementedError(
           'Base distributions with mixed dtype are not supported. Saw '
@@ -577,28 +588,28 @@ def build_affine_surrogate_posterior_from_base_distribution(
           'the `operators` arg.'.format(operators))
 
     if nest.is_nested(operators):
-      seed, operators_seed = samplers.split_seed(seed)
-      operators = (
-          trainable_linear_operators.build_trainable_linear_operator_block(
-              operators,
-              block_dims=flat_event_size,
-              dtype=base_dtype,
-              batch_shape=batch_shape,
-              seed=operators_seed))
+      operators = yield from trainable_linear_operators._trainable_linear_operator_block(  # pylint: disable=protected-access
+          operators,
+          block_dims=flat_event_size,
+          dtype=base_dtype,
+          batch_shape=batch_shape)
 
     linop_bijector = (
         scale_matvec_linear_operator.ScaleMatvecLinearOperatorBlock(
             scale=operators, validate_args=validate_args))
+
+    def generate_shift_bijector(s):
+      x = yield trainable_state_util.Parameter(
+          functools.partial(initial_unconstrained_loc_fn,
+                            ps.concat([batch_shape, [s]], axis=0),
+                            dtype=base_dtype))
+      return shift.Shift(x)
+
+    loc_bijectors = yield from nest_util.map_structure_coroutine(
+        generate_shift_bijector,
+        flat_event_size)
     loc_bijector = joint_map.JointMap(
-        tf.nest.map_structure(
-            lambda s, seed: shift.Shift(  # pylint: disable=g-long-lambda
-                tf.Variable(
-                    initial_unconstrained_loc_fn(
-                        ps.concat([batch_shape, [s]], axis=0),
-                        dtype=base_dtype,
-                        seed=seed))),
-            flat_event_size,
-            samplers.split_seed(seed, n=len(flat_event_size))),
+        loc_bijectors,
         validate_args=validate_args)
 
     unflatten_and_reshape = chain.Chain(
@@ -619,16 +630,15 @@ def build_affine_surrogate_posterior_from_base_distribution(
     flat_base_distribution = invert.Invert(
         unflatten_and_reshape)(base_distribution)
 
-    td = transformed_distribution.TransformedDistribution(
+    return transformed_distribution.TransformedDistribution(
         flat_base_distribution, bijector=bijector, validate_args=validate_args)
 
-    # Ensure that the surrogate tracks variables from the trainable linear
-    # operator. (This should happen automatically, but in the absence of this
-    # workaround appears to fail for variables contained in the user-passed
-    # `operators`).
-    td._also_track = linop_bijector.trainable_variables  # pylint: disable=protected-access
-
-    return td
+build_affine_surrogate_posterior_from_base_distribution = (
+    trainable_state_util.as_stateful_builder(
+        _affine_surrogate_posterior_from_base_distribution))
+build_affine_surrogate_posterior_from_base_distribution_stateless = (
+    trainable_state_util.as_stateless_builder(
+        _affine_surrogate_posterior_from_base_distribution))
 
 
 def build_split_flow_surrogate_posterior(

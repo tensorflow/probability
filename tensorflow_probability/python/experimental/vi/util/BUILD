@@ -15,6 +15,11 @@
 # Description:
 #   Experimental methods and objectives for variational inference.
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+)
+
 licenses(["notice"])
 
 package(
@@ -23,20 +28,18 @@ package(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "util",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":trainable_linear_operators",
         "//tensorflow_probability/python/internal:all_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "trainable_linear_operators",
     srcs = ["trainable_linear_operators.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -52,8 +55,6 @@ py_test(
     name = "trainable_linear_operators_test",
     size = "small",
     srcs = ["trainable_linear_operators_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
