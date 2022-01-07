@@ -23,7 +23,6 @@ licenses(["notice"])
 py_library(
     name = "distributions",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":distribution_extensions",
         # tensorflow_probability/substrates:jax dep,
@@ -34,7 +33,6 @@ py_library(
 py_library(
     name = "distribution_extensions",
     srcs = ["distribution_extensions.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/core:primitive",
@@ -52,7 +50,6 @@ py_library(
 py_test(
     name = "distribution_extensions_test",
     srcs = ["distribution_extensions_test.py"],
-    python_version = "PY3",
     deps = [
         ":distributions",
         # absl/testing:absltest dep,

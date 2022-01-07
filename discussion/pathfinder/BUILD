@@ -33,7 +33,6 @@ py_library(
 pytest_test(
     name = "pathfinder_test",
     srcs = ["pathfinder_test.py"],
-    python_version = "PY3",
     deps = [
         ":pathfinder",
         # jax dep,

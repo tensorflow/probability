@@ -23,7 +23,6 @@ package(
 py_library(
     name = "losses",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":losses_lib",
         "//tensorflow_probability/python/internal:all_util",
@@ -33,7 +32,6 @@ py_library(
 py_library(
     name = "losses_lib",
     srcs = ["losses.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:kullback_leibler",

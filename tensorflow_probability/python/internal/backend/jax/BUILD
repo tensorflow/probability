@@ -124,7 +124,6 @@ GEN_FILENAMES = [
 py_library(
     name = "jax",
     srcs = [":{}.py".format(f) for f in FILENAMES + GEN_FILENAMES if "_test" not in f],
-    srcs_version = "PY3",
     deps = [],  # The JAX dependency is a weak dependency, opt-in by user.
 )
 
@@ -132,7 +131,6 @@ py_library(
     name = "jax_testlib",
     testonly = 1,
     srcs = [":{}.py".format(f) for f in FILENAMES + GEN_FILENAMES if "_test" in f],
-    srcs_version = "PY3",
     deps = [
         ":jax",
     ],
@@ -142,7 +140,6 @@ py_test(
     name = "tensor_array_ops_test",
     srcs = ["tensor_array_ops_test.py"],
     main = "tensor_array_ops_test.py",
-    python_version = "PY3",
     tags = ["tfp_jax"],
     deps = [
         ":jax",
@@ -160,7 +157,6 @@ py_test(
     name = "jax_test",
     srcs = ["numpy_test.py"],
     main = "numpy_test.py",
-    python_version = "PY3",
     shard_count = 8,
     tags = ["tfp_jax"],
     deps = [
@@ -179,8 +175,6 @@ py_test(
 py_binary(
     name = "rewrite",
     srcs = ["rewrite.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl:app dep,
         # absl/flags dep,

@@ -31,7 +31,6 @@ package(
 multi_substrate_py_library(
     name = "distribute",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":joint_distribution",
         ":sharded",
@@ -58,7 +57,6 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["diagonal_mass_matrix_adaptation_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
     deps = [
         ":joint_distribution",
         ":sharded",
@@ -90,7 +88,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["sharded_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
     deps = [
         ":sharded",
         # tensorflow dep,
@@ -107,7 +104,6 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["joint_distribution_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
     deps = [
         ":joint_distribution",
         ":sharded",

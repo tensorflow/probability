@@ -26,7 +26,6 @@ package(
 py_library(
     name = "nn",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":affine_layers",
         ":convolutional_layers",
@@ -44,7 +43,6 @@ py_library(
 py_library(
     name = "affine_layers",
     srcs = ["affine_layers.py"],
-    srcs_version = "PY3",
     deps = [
         ":layers",
         ":variational_base",
@@ -60,8 +58,6 @@ py_test(
     name = "affine_layers_test",
     size = "medium",
     srcs = ["affine_layers_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -75,7 +71,6 @@ py_test(
 py_library(
     name = "convolutional_layers",
     srcs = ["convolutional_layers.py"],
-    srcs_version = "PY3",
     deps = [
         ":layers",
         ":variational_base",
@@ -91,8 +86,6 @@ py_test(
     name = "convolutional_layers_test",
     size = "medium",
     srcs = ["convolutional_layers_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -104,7 +97,6 @@ py_test(
 py_library(
     name = "convolutional_layers_v2",
     srcs = ["convolutional_layers_v2.py"],
-    srcs_version = "PY3",
     deps = [
         ":layers",
         ":variational_base",
@@ -120,9 +112,7 @@ py_test(
     name = "convolutional_layers_v2_test",
     size = "medium",
     srcs = ["convolutional_layers_v2_test.py"],
-    python_version = "PY3",
     shard_count = 2,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -135,7 +125,6 @@ py_test(
 py_library(
     name = "convolutional_transpose_layers",
     srcs = ["convolutional_transpose_layers.py"],
-    srcs_version = "PY3",
     deps = [
         ":layers",
         ":variational_base",
@@ -150,8 +139,6 @@ py_test(
     name = "convolutional_transpose_layers_test",
     size = "medium",
     srcs = ["convolutional_transpose_layers_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -162,7 +149,6 @@ py_test(
 py_library(
     name = "layers",
     srcs = ["layers.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/nn/util:utils",
@@ -174,8 +160,6 @@ py_test(
     name = "layers_test",
     size = "small",
     srcs = ["layers_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -186,7 +170,6 @@ py_test(
 py_library(
     name = "variational_base",
     srcs = ["variational_base.py"],
-    srcs_version = "PY3",
     deps = [
         ":layers",
         # tensorflow dep,

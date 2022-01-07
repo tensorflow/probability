@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "einsum",
     srcs = ["einsum.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/experimental/matching:jax_rewrite",
@@ -35,7 +34,6 @@ py_library(
 py_library(
     name = "canonicalize",
     srcs = ["canonicalize.py"],
-    srcs_version = "PY3",
     deps = [
         ":addn",
         ":einsum",
@@ -50,7 +48,6 @@ py_library(
 py_library(
     name = "addn",
     srcs = ["addn.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/experimental/matching:jax_rewrite",
@@ -62,8 +59,6 @@ py_library(
 py_test(
     name = "einsum_test",
     srcs = ["einsum_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":einsum",
         # absl/testing:absltest dep,
@@ -80,8 +75,6 @@ py_test(
 py_test(
     name = "canonicalize_test",
     srcs = ["canonicalize_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":addn",
         ":canonicalize",
@@ -98,8 +91,6 @@ py_test(
 py_test(
     name = "addn_test",
     srcs = ["addn_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":addn",
         # absl/testing:absltest dep,

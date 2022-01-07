@@ -28,7 +28,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "random",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":random_ops",
         "//tensorflow_probability/python/internal:all_util",
@@ -41,7 +40,6 @@ multi_substrate_py_library(
     srcs = [
         "random_ops.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:samplers",

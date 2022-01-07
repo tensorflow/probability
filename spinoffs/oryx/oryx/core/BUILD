@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "core",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":primitive",
         ":pytree",
@@ -44,14 +43,12 @@ py_library(
 py_library(
     name = "serialize",
     srcs = ["serialize.py"],
-    srcs_version = "PY3",
 )
 
 # pytype_strict
 py_library(
     name = "pytree",
     srcs = ["pytree.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
     ],
@@ -61,7 +58,6 @@ py_library(
 py_library(
     name = "primitive",
     srcs = ["primitive.py"],
-    srcs_version = "PY3",
     deps = [
         ":trace_util",
         # jax dep,
@@ -72,7 +68,6 @@ py_library(
 py_library(
     name = "trace_util",
     srcs = ["trace_util.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
     ],
@@ -82,7 +77,6 @@ py_library(
 py_library(
     name = "kwargs_util",
     srcs = ["kwargs_util.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
     ],
@@ -92,7 +86,6 @@ py_library(
 py_test(
     name = "serialize_test",
     srcs = ["serialize_test.py"],
-    python_version = "PY3",
     deps = [
         ":serialize",
         # absl/testing:absltest dep,
@@ -109,8 +102,6 @@ py_test(
 py_test(
     name = "kwargs_util_test",
     srcs = ["kwargs_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":kwargs_util",
         # absl/testing:absltest dep,

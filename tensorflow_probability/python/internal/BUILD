@@ -34,7 +34,6 @@ package(
 multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":test_util",  # EnableOnExport
     ],
@@ -43,14 +42,12 @@ multi_substrate_py_library(
 py_library(
     name = "all_util",
     srcs = ["all_util.py"],
-    srcs_version = "PY3",
     deps = [],
 )
 
 multi_substrate_py_library(
     name = "auto_composite_tensor",
     srcs = ["auto_composite_tensor.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -61,8 +58,6 @@ py_test(
     name = "auto_composite_tensor_test",
     srcs = ["auto_composite_tensor_test.py"],
     data = glob(["testdata/auto_composite_tensor/**"]),
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":auto_composite_tensor",
         ":tensor_util",
@@ -78,7 +73,6 @@ py_test(
 multi_substrate_py_library(
     name = "assert_util",
     srcs = ["assert_util.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -88,7 +82,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "batch_shape_lib",
     srcs = ["batch_shape_lib.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -109,7 +102,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "distribute_lib",
     srcs = ["distribute_lib.py"],
-    srcs_version = "PY3",
     deps = [
         ":custom_gradient",
         ":prefer_static",
@@ -124,8 +116,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["distribute_lib_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":distribute_lib",
         ":distribute_test_lib",
@@ -140,7 +130,6 @@ multi_substrate_py_library(
     name = "distribute_test_lib",
     testonly = 1,
     srcs = ["distribute_test_lib.py"],
-    srcs_version = "PY3",
     deps = [
         ":distribution_util",
         ":test_util",
@@ -248,8 +237,6 @@ py_test(
     name = "cache_util_test",
     size = "small",
     srcs = ["cache_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":cache_util",
         # numpy dep,
@@ -263,7 +250,6 @@ py_library(
     srcs = [
         "docstring_util.py",
     ],
-    srcs_version = "PY3",
     deps = [
     ],
 )
@@ -272,8 +258,6 @@ py_test(
     name = "docstring_util_test",
     size = "small",
     srcs = ["docstring_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":docstring_util",
         # numpy dep,
@@ -285,7 +269,6 @@ py_test(
 multi_substrate_py_library(
     name = "dtype_util",
     srcs = ["dtype_util.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -308,7 +291,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "distribution_util",
     srcs = ["distribution_util.py"],
-    srcs_version = "PY3",
     deps = [
         ":assert_util",
         ":dtype_util",
@@ -325,8 +307,6 @@ py_test(
     name = "distribution_util_test",
     size = "small",
     srcs = ["distribution_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":distribution_util",
         ":tensorshape_util",
@@ -362,8 +342,6 @@ py_test(
     name = "implementation_selection_test_gpu",
     srcs = ["implementation_selection_test.py"],
     main = "implementation_selection_test.py",
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         ":implementation_selection",
@@ -375,7 +353,6 @@ py_test(
 multi_substrate_py_library(
     name = "loop_util",
     srcs = ["loop_util.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -400,13 +377,11 @@ multi_substrate_py_test(
 py_library(
     name = "lazy_loader",
     srcs = ["lazy_loader.py"],
-    srcs_version = "PY3",
 )
 
 multi_substrate_py_library(
     name = "monte_carlo",
     srcs = ["monte_carlo.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -415,7 +390,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "name_util",
     srcs = ["name_util.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -424,7 +398,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "nest_util",
     srcs = ["nest_util.py"],
-    srcs_version = "PY3",
     deps = [
         ":prefer_static",
         # numpy dep,
@@ -449,7 +422,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "numerics_testing",
     srcs = ["numerics_testing.py"],
-    srcs_version = "PY3",
     deps = [
         ":dtype_util",
         # absl/logging dep,
@@ -505,7 +477,6 @@ multi_substrate_py_test(
 py_library(
     name = "reparameterization",
     srcs = ["reparameterization.py"],
-    srcs_version = "PY3",
 )
 
 multi_substrate_py_library(
@@ -559,7 +530,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "tensor_util",
     srcs = ["tensor_util.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -571,8 +541,6 @@ py_test(
     name = "tensor_util_test",
     size = "small",
     srcs = ["tensor_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":tensor_util",
         # numpy dep,
@@ -585,7 +553,6 @@ py_test(
 multi_substrate_py_library(
     name = "tensorshape_util",
     srcs = ["tensorshape_util.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -607,7 +574,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "trainable_state_util",
     srcs = ["trainable_state_util.py"],
-    srcs_version = "PY3",
     deps = [
         ":samplers",
         # tensorflow dep,
@@ -619,8 +585,6 @@ multi_substrate_py_test(
     srcs = ["trainable_state_util_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # optax dep,
         # tensorflow dep,
@@ -633,7 +597,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "vectorization_util",
     srcs = ["vectorization_util.py"],
-    srcs_version = "PY3",
     deps = [
         ":samplers",
         # tensorflow dep,
@@ -644,7 +607,6 @@ multi_substrate_py_library(
     name = "hypothesis_testlib",
 #     testonly = 1,  # DisableOnExport
     srcs = ["hypothesis_testlib.py"],
-    srcs_version = "PY3",
     deps = [
         ":tensorshape_util",
         # hypothesis dep,
@@ -659,9 +621,7 @@ py_test(
     name = "hypothesis_testlib_test",
     size = "small",
     srcs = ["hypothesis_testlib_test.py"],
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         ":hypothesis_testlib",
         # absl/testing:parameterized dep,
@@ -700,7 +660,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "structural_tuple",
     srcs = ["structural_tuple.py"],
-    srcs_version = "PY3",
 )
 
 multi_substrate_py_test(
@@ -718,7 +677,6 @@ multi_substrate_py_library(
     name = "test_util",
 #     testonly = 1,  # DisableOnExport
     srcs = ["test_util.py"],
-    srcs_version = "PY3",
     deps = [
         ":dtype_util",
         ":test_combinations",
@@ -753,7 +711,6 @@ multi_substrate_py_library(
     name = "test_util_scipy",
 #     testonly = 1,  # DisableOnExport
     srcs = ["test_util_scipy.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # scipy dep,
@@ -764,7 +721,6 @@ multi_substrate_py_library(
     name = "test_combinations",
 #     testonly = 1,  # DisableOnExport
     srcs = ["test_combinations.py"],
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # six dep,
@@ -802,7 +758,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "unnest",
     srcs = ["unnest.py"],
-    srcs_version = "PY3",
     deps = [],
 )
 
@@ -823,7 +778,6 @@ multi_substrate_py_library(
     srcs = [
         "variadic_reduce.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":implementation_selection",
         ":prefer_static",

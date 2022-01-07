@@ -23,7 +23,6 @@ package(
 py_library(
     name = "util",
     srcs = ["util.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -33,7 +32,6 @@ py_library(
 py_library(
     name = "backend",
     srcs = ["backend.py"],
-    srcs_version = "PY3",
     deps = [
         ":util",
         # tensorflow dep,

@@ -29,7 +29,6 @@ py_library(
     srcs = [
         "__init__.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":jax",
         ":numpy",
@@ -42,7 +41,6 @@ py_library(
 py_library(
     name = "jax",
     srcs = ["jax/__init__.py"],
-    srcs_version = "PY3",
     tags = ["alt_dep=//tensorflow_probability:jax"],
     deps = [
 #         "//tensorflow_probability/google:google.jax",  # DisableOnExport
@@ -67,7 +65,6 @@ py_library(
 py_library(
     name = "numpy",
     srcs = ["numpy/__init__.py"],
-    srcs_version = "PY3",
     tags = ["alt_dep=//tensorflow_probability:numpy"],
     deps = [
 #         "//tensorflow_probability/google:google.numpy",  # DisableOnExport

@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "oryx",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":version",
         # jax dep,
@@ -40,7 +39,6 @@ py_library(
 py_library(
     name = "version",
     srcs = ["version.py"],
-    srcs_version = "PY3",
 )
 
 # third_party_dependency(package = "py/oryx")  # DisableOnExport

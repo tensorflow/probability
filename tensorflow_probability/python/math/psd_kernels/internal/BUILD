@@ -32,7 +32,6 @@ package(
 multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":util",
     ],

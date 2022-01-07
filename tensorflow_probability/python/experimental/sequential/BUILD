@@ -32,7 +32,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "sequential",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":ensemble_adjustment_kalman_filter",
         ":ensemble_kalman_filter",
@@ -46,7 +45,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "extended_kalman_filter",
     srcs = ["extended_kalman_filter.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",
@@ -59,7 +57,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "ensemble_kalman_filter",
     srcs = ["ensemble_kalman_filter.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
@@ -70,7 +67,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "ensemble_adjustment_kalman_filter",
     srcs = ["ensemble_adjustment_kalman_filter.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
@@ -83,8 +79,7 @@ multi_substrate_py_test(
     size = "large",
     timeout = "long",
     srcs = ["extended_kalman_filter_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
+
     # shard_count = 6,
     deps = [
         ":extended_kalman_filter",
@@ -100,8 +95,6 @@ multi_substrate_py_test(
     name = "ensemble_kalman_filter_test",
     size = "medium",
     srcs = ["ensemble_kalman_filter_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":ensemble_kalman_filter",
         # numpy dep,
@@ -116,8 +109,6 @@ multi_substrate_py_test(
     name = "ensemble_adjustment_kalman_filter_test",
     size = "medium",
     srcs = ["ensemble_adjustment_kalman_filter_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":ensemble_adjustment_kalman_filter",
         # numpy dep,
@@ -131,7 +122,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "iterated_filter",
     srcs = ["iterated_filter.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",
@@ -145,8 +135,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["iterated_filter_test.py"],
     jax_size = "large",
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":iterated_filter",
         # numpy dep,

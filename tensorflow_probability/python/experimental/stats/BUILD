@@ -32,7 +32,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "stats",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":sample_stats",
     ],
@@ -41,7 +40,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "sample_stats",
     srcs = ["sample_stats.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -59,8 +57,6 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["sample_stats_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":sample_stats",
         # numpy dep,

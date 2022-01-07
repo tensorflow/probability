@@ -32,7 +32,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "base",
     srcs = ["base.py"],
-    srcs_version = "PY3",
     deps = [
         # six dep,
         # tensorflow dep,
@@ -45,7 +44,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "bdf",
     srcs = ["bdf.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         ":bdf_util",
@@ -61,7 +59,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "dormand_prince",
     srcs = ["dormand_prince.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         ":runge_kutta_util",
@@ -74,7 +71,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "bdf_util",
     srcs = ["bdf_util.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -88,8 +84,6 @@ multi_substrate_py_test(
     name = "bdf_util_test",
     size = "small",
     srcs = ["bdf_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":bdf",
         ":bdf_util",
@@ -103,7 +97,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "runge_kutta_util",
     srcs = ["runge_kutta_util.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -116,8 +109,6 @@ multi_substrate_py_test(
     name = "runge_kutta_util_test",
     size = "small",
     srcs = ["runge_kutta_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":runge_kutta_util",
         # numpy dep,
@@ -129,7 +120,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "ode",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         ":bdf",
@@ -141,9 +131,7 @@ multi_substrate_py_test(
     name = "ode_test",
     size = "large",
     srcs = ["ode_test.py"],
-    python_version = "PY3",
     shard_count = 8,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -158,9 +146,7 @@ py_test(
     srcs = ["xla_test.py"],
     args = ["--test_device=cpu"],
     main = "xla_test.py",
-    python_version = "PY3",
     shard_count = 1,
-    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
     ],
@@ -179,9 +165,7 @@ py_test(
     srcs = ["xla_test.py"],
     args = ["--test_device=gpu"],
     main = "xla_test.py",
-    python_version = "PY3",
     shard_count = 1,
-    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",
@@ -211,8 +195,6 @@ multi_substrate_py_test(
     name = "util_test",
     size = "small",
     srcs = ["util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":util",
         # absl/testing:parameterized dep,

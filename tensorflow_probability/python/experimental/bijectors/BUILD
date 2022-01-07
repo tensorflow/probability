@@ -31,7 +31,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "bijectors",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":distribution_bijectors",
         ":highway_flow",
@@ -43,7 +42,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "scalar_function_with_inferred_inverse",
     srcs = ["scalar_function_with_inferred_inverse.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -60,7 +58,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["scalar_function_with_inferred_inverse_test.py"],
     jax_size = "medium",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -72,7 +69,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "distribution_bijectors",
     srcs = ["distribution_bijectors.py"],
-    srcs_version = "PY3",
     deps = [
         ":scalar_function_with_inferred_inverse",
         # numpy dep,
@@ -85,9 +81,7 @@ multi_substrate_py_test(
     name = "distribution_bijectors_test",
     size = "medium",
     srcs = ["distribution_bijectors_test.py"],
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # hypothesis dep,
@@ -105,7 +99,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "highway_flow",
     srcs = ["highway_flow.py"],
-    srcs_version = "PY3",
     deps = [
         ":scalar_function_with_inferred_inverse",
         # numpy dep,
@@ -122,8 +115,6 @@ multi_substrate_py_test(
     srcs = ["highway_flow_test.py"],
     disabled_substrates = ["numpy"],
     jax_size = "medium",
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -150,7 +141,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["sharded_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
     deps = [
         ":sharded",
         # tensorflow dep,

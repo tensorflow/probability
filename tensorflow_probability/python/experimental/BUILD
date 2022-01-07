@@ -35,7 +35,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/distribute",
         "//tensorflow_probability/python/experimental/stats",
     ],
-    srcs_version = "PY3",
     substrates_omit_deps = [
         "//tensorflow_probability/python/experimental/auto_batching",
         "//tensorflow_probability/python/experimental/linalg",

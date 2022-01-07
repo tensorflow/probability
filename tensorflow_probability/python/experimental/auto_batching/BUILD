@@ -26,7 +26,6 @@ licenses(["notice"])
 py_library(
     name = "auto_batching",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":allocation_strategy",
         ":dsl",
@@ -46,7 +45,6 @@ py_library(
 py_library(
     name = "instructions",
     srcs = ["instructions.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,  # For pywrap_tensorflow.IsNamedtuple
@@ -58,7 +56,6 @@ py_library(
     srcs = [
         "numpy_backend.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
         # numpy dep,
@@ -70,7 +67,6 @@ py_library(
     srcs = [
         "tf_backend.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
         ":xla",
@@ -83,7 +79,6 @@ py_library(
     srcs = [
         "type_inference.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
         # absl/logging dep,
@@ -95,7 +90,6 @@ py_library(
     srcs = [
         "virtual_machine.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
     ],
@@ -106,7 +100,6 @@ py_library(
     srcs = [
         "liveness.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
     ],
@@ -117,7 +110,6 @@ py_library(
     srcs = [
         "lowering.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
         ":liveness",
@@ -129,7 +121,6 @@ py_library(
     srcs = [
         "stack_optimization.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
     ],
@@ -140,7 +131,6 @@ py_library(
     srcs = [
         "allocation_strategy.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
         ":liveness",
@@ -152,7 +142,6 @@ py_library(
     srcs = [
         "stackless.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
     ],
@@ -163,7 +152,6 @@ py_library(
     srcs = [
         "dsl.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
     ],
@@ -175,7 +163,6 @@ py_library(
         "frontend.py",
         "gast_util.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":allocation_strategy",
         ":dsl",
@@ -196,7 +183,6 @@ py_library(
     srcs = [
         "backend_test_lib.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -205,7 +191,6 @@ py_library(
 py_library(
     name = "test_programs",
     srcs = ["test_programs.py"],
-    srcs_version = "PY3",
     deps = [
         ":instructions",
         # numpy dep,
@@ -215,7 +200,6 @@ py_library(
 py_library(
     name = "xla",
     srcs = ["xla.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -227,9 +211,7 @@ py_test(
     srcs = ["virtual_machine_test.py"],
     args = ["--test_device=cpu"],
     main = "virtual_machine_test.py",
-    python_version = "PY3",
     shard_count = 10,
-    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
     ],
@@ -249,9 +231,7 @@ py_test(
     srcs = ["virtual_machine_test.py"],
     args = ["--test_device=gpu"],
     main = "virtual_machine_test.py",
-    python_version = "PY3",
     shard_count = 10,
-    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",
@@ -270,8 +250,6 @@ py_test(
     name = "instructions_test",
     size = "small",
     srcs = ["instructions_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":instructions",
         ":test_programs",
@@ -284,8 +262,6 @@ py_test(
     name = "numpy_backend_test",
     size = "small",
     srcs = ["numpy_backend_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":backend_test_lib",
         ":instructions",
@@ -301,8 +277,6 @@ py_test(
     name = "tf_backend_test",
     size = "large",
     srcs = ["tf_backend_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":backend_test_lib",
         ":instructions",
@@ -319,8 +293,6 @@ py_test(
     name = "lowering_test",
     size = "small",
     srcs = ["lowering_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":allocation_strategy",
         ":lowering",
@@ -336,8 +308,6 @@ py_test(
     name = "allocation_strategy_test",
     size = "small",
     srcs = ["allocation_strategy_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":allocation_strategy",
         ":instructions",
@@ -351,8 +321,6 @@ py_test(
     name = "stackless_test",
     size = "small",
     srcs = ["stackless_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":allocation_strategy",
         ":numpy_backend",
@@ -367,8 +335,6 @@ py_test(
     name = "stack_optimization_test",
     size = "small",
     srcs = ["stack_optimization_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":stack_optimization",
         ":test_programs",
@@ -380,9 +346,7 @@ py_test(
     name = "type_inference_test",
     size = "small",
     srcs = ["type_inference_test.py"],
-    python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         ":allocation_strategy",
         ":lowering",
@@ -402,8 +366,6 @@ py_test(
     name = "dsl_test",
     size = "small",
     srcs = ["dsl_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":allocation_strategy",
         ":dsl",
@@ -422,9 +384,7 @@ py_test(
     name = "frontend_test",
     size = "small",
     srcs = ["frontend_test.py"],
-    python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         ":frontend",
         ":instructions",

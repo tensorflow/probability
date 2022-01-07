@@ -26,7 +26,6 @@ licenses(["notice"])
 py_library(
     name = "logeinsumexp",
     srcs = ["logeinsumexp.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # opt_einsum dep,
@@ -40,8 +39,6 @@ py_test(
     srcs = [
         "logeinsumexp_test.py",
     ],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":logeinsumexp",
         # hypothesis dep,
@@ -55,7 +52,6 @@ py_test(
 py_library(
     name = "marginalize",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":logeinsumexp",
         ":marginalizable",
@@ -65,7 +61,6 @@ py_library(
 py_library(
     name = "marginalizable",
     srcs = ["marginalizable.py"],
-    srcs_version = "PY3",
     deps = [
         ":logeinsumexp",
         # tensorflow dep,
@@ -80,8 +75,6 @@ py_test(
     name = "marginalizable_test",
     size = "medium",
     srcs = ["marginalizable_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":marginalize",
         # absl/testing:parameterized dep,

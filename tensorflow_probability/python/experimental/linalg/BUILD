@@ -26,7 +26,6 @@ package(
 py_library(
     name = "linalg",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":linear_operator_psd_kernel",
         ":no_pivot_ldl",
@@ -37,7 +36,6 @@ py_library(
 py_library(
     name = "linear_operator_psd_kernel",
     srcs = ["linear_operator_psd_kernel.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -51,8 +49,6 @@ py_test(
     name = "linear_operator_psd_kernel_test",
     size = "small",
     srcs = ["linear_operator_psd_kernel_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -65,7 +61,6 @@ py_test(
 py_library(
     name = "no_pivot_ldl",
     srcs = ["no_pivot_ldl.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -74,7 +69,6 @@ py_library(
 py_test(
     name = "no_pivot_ldl_test",
     srcs = ["no_pivot_ldl_test.py"],
-    python_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

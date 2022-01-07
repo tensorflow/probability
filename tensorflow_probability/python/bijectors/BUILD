@@ -140,9 +140,7 @@ py_test(
     name = "bijector_properties_test",
     size = "large",
     srcs = ["bijector_properties_test.py"],
-    python_version = "PY3",
     shard_count = 35,
-    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         ":bijectors",
@@ -450,7 +448,6 @@ multi_substrate_py_library(
 py_library(
     name = "glow",
     srcs = ["glow.py"],
-    srcs_version = "PY3",
     deps = [
         ":bijector",
         ":blockwise",
@@ -714,7 +711,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "rational_quadratic_spline",
     srcs = ["rational_quadratic_spline.py"],
-    srcs_version = "PY3",
     deps = [
         ":bijector",
         ":softplus",
@@ -1120,8 +1116,6 @@ py_test(
     name = "glow_test",
     size = "medium",
     srcs = ["glow_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":bijector_test_util",
         # numpy dep,

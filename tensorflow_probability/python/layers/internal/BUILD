@@ -26,7 +26,6 @@ package(
 py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":distribution_tensor_coercible",
         ":tensor_tuple",
@@ -36,7 +35,6 @@ py_library(
 py_library(
     name = "distribution_tensor_coercible",
     srcs = ["distribution_tensor_coercible.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
@@ -51,8 +49,6 @@ py_test(
     name = "distribution_tensor_coercible_test",
     size = "small",
     srcs = ["distribution_tensor_coercible_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":distribution_tensor_coercible",
         # absl/testing:parameterized dep,
@@ -66,7 +62,6 @@ py_test(
 py_library(
     name = "tensor_tuple",
     srcs = ["tensor_tuple.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -76,8 +71,6 @@ py_test(
     name = "tensor_tuple_test",
     size = "small",
     srcs = ["tensor_tuple_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":tensor_tuple",
         # tensorflow dep,

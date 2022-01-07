@@ -26,7 +26,6 @@ licenses(["notice"])
 py_library(
     name = "glm",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":family",
         ":fisher_scoring",
@@ -38,7 +37,6 @@ py_library(
 py_library(
     name = "fisher_scoring",
     srcs = ["fisher_scoring.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -53,8 +51,6 @@ py_test(
     name = "fisher_scoring_test",
     size = "small",
     srcs = ["fisher_scoring_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -66,7 +62,6 @@ py_test(
 py_library(
     name = "proximal_hessian",
     srcs = ["proximal_hessian.py"],
-    srcs_version = "PY3",
     deps = [
         ":fisher_scoring",
         # numpy dep,
@@ -80,9 +75,7 @@ py_test(
     name = "proximal_hessian_test",
     size = "medium",
     srcs = ["proximal_hessian_test.py"],
-    python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -95,7 +88,6 @@ py_test(
 py_library(
     name = "family",
     srcs = ["family.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -109,8 +101,6 @@ py_test(
     name = "family_test",
     size = "small",
     srcs = ["family_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

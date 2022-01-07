@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "optimizers",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":optix",
     ],
@@ -33,7 +32,6 @@ py_library(
 py_library(
     name = "optix",
     srcs = ["optix.py"],
-    srcs_version = "PY3",
     visibility = ["//visibility:private"],
     deps = [
         # jax dep,
@@ -46,8 +44,6 @@ py_library(
 py_test(
     name = "optix_test",
     srcs = ["optix_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":optix",
         # absl/testing:absltest dep,

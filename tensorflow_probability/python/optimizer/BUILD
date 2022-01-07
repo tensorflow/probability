@@ -28,7 +28,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "optimizer",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     substrates_omit_deps = [
         ":differential_evolution",
         ":proximal_hessian_sparse",
@@ -52,7 +51,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "sgld",
     srcs = ["sgld.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -74,7 +72,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "variational_sgd",
     srcs = ["variational_sgd.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -96,7 +93,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "bfgs",
     srcs = ["bfgs.py"],
-    srcs_version = "PY3",
     deps = [
         ":bfgs_utils",
         # tensorflow dep,
@@ -124,7 +120,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "lbfgs",
     srcs = ["lbfgs.py"],
-    srcs_version = "PY3",
     deps = [
         ":bfgs_utils",
         # tensorflow dep,
@@ -151,7 +146,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "bfgs_utils",
     srcs = ["bfgs_utils.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
@@ -162,7 +156,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "nelder_mead",
     srcs = ["nelder_mead.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
@@ -186,7 +179,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "differential_evolution",
     srcs = ["differential_evolution.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -213,7 +205,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "proximal_hessian_sparse",
     srcs = ["proximal_hessian_sparse.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",

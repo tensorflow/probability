@@ -26,7 +26,6 @@ package(
 py_library(
     name = "neutra",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":neutra_kernel",
     ],
@@ -35,7 +34,6 @@ py_library(
 py_library(
     name = "neutra_kernel",
     srcs = ["neutra_kernel.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -49,9 +47,7 @@ py_test(
     name = "neutra_kernel_test",
     size = "medium",
     srcs = ["neutra_kernel_test.py"],
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         ":neutra",
         # absl/testing:parameterized dep,

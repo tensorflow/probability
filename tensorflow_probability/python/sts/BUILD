@@ -32,7 +32,6 @@ package(
 multi_substrate_py_library(
     name = "sts",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     substrates_omit_deps = [
         ":decomposition",
         ":default_model",
@@ -59,7 +58,6 @@ multi_substrate_py_library(
 py_library(
     name = "decomposition",
     srcs = ["decomposition.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -72,9 +70,7 @@ py_test(
     name = "decomposition_test",
     size = "medium",
     srcs = ["decomposition_test.py"],
-    python_version = "PY3",
     shard_count = 6,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -87,7 +83,6 @@ py_test(
 py_library(
     name = "default_model",
     srcs = ["default_model.py"],
-    srcs_version = "PY3",
     deps = [
         ":regularization",
         ":structural_time_series",
@@ -119,7 +114,6 @@ py_test(
 py_library(
     name = "fitting",
     srcs = ["fitting.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -138,9 +132,7 @@ py_test(
     name = "fitting_test",
     size = "large",
     srcs = ["fitting_test.py"],
-    python_version = "PY3",
     shard_count = 6,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -153,7 +145,6 @@ py_test(
 py_library(
     name = "forecast",
     srcs = ["forecast.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -166,9 +157,7 @@ py_test(
     name = "forecast_test",
     size = "medium",
     srcs = ["forecast_test.py"],
-    python_version = "PY3",
     shard_count = 6,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -180,7 +169,6 @@ py_test(
 py_library(
     name = "holiday_effects",
     srcs = ["holiday_effects.py"],
-    srcs_version = "PY3",
     deps = [
         # holidays dep,
         # numpy dep,
@@ -194,9 +182,8 @@ py_test(
     name = "holiday_effects_test",
     size = "medium",
     srcs = ["holiday_effects_test.py"],
-    python_version = "PY3",
     shard_count = 6,
-    srcs_version = "PY3",
+
     # TODO(gcluo): Add the holidays package to the OSS testing setup.
     tags = ["no-oss-ci"],
     deps = [
@@ -211,7 +198,6 @@ py_test(
 py_library(
     name = "regularization",
     srcs = ["regularization.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -221,7 +207,6 @@ py_test(
     name = "regularization_test",
     size = "small",
     srcs = ["regularization_test.py"],
-    python_version = "PY3",
     srcs_version = "PY2AND3",
     deps = [
         ":regularization",
@@ -237,7 +222,6 @@ py_test(
 multi_substrate_py_library(
     name = "structural_time_series",
     srcs = ["structural_time_series.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -254,9 +238,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["structural_time_series_test.py"],
     jax_size = "large",
-    python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

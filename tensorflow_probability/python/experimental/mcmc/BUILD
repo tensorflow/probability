@@ -38,7 +38,6 @@ multi_substrate_py_library(
     numpy_omit_deps = [
         ":preconditioned_hmc",
     ],
-    srcs_version = "PY3",
     substrates_omit_deps = [
         ":covariance_reducer",
         ":elliptical_slice_sampler",
@@ -98,7 +97,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "initialization",
     srcs = ["initialization.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors",
@@ -111,7 +109,6 @@ multi_substrate_py_test(
     name = "initialization_test",
     size = "medium",
     srcs = ["initialization_test.py"],
-    srcs_version = "PY3",
     deps = [
         ":initialization",
         # tensorflow dep,
@@ -125,7 +122,6 @@ multi_substrate_py_test(
 py_library(
     name = "kernel_builder",
     srcs = ["kernel_builder.py"],
-    srcs_version = "PY3",
     deps = [
         ":kernel_outputs",
         ":preconditioned_hmc",
@@ -150,8 +146,6 @@ py_test(
     name = "kernel_builder_test",
     size = "small",
     srcs = ["kernel_builder_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":kernel_builder",
         ":sample_discarding_kernel",
@@ -169,7 +163,6 @@ py_test(
 py_library(
     name = "kernel_outputs",
     srcs = ["kernel_outputs.py"],
-    srcs_version = "PY3",
     deps = [
         ":tracing_reducer",
         "//tensorflow_probability/python/internal:unnest",
@@ -181,8 +174,6 @@ py_test(
     name = "kernel_outputs_test",
     size = "small",
     srcs = ["kernel_outputs_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":kernel_builder",
         # tensorflow dep,
@@ -193,7 +184,6 @@ py_test(
 multi_substrate_py_library(
     name = "diagonal_mass_matrix_adaptation",
     srcs = ["diagonal_mass_matrix_adaptation.py"],
-    srcs_version = "PY3",
     deps = [
         ":preconditioning_utils",
         # tensorflow dep,
@@ -211,8 +201,6 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["diagonal_mass_matrix_adaptation_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -229,7 +217,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "preconditioning_utils",
     srcs = ["preconditioning_utils.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:reshape",
@@ -253,7 +240,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "preconditioned_nuts",
     srcs = ["preconditioned_nuts.py"],
-    srcs_version = "PY3",
     deps = [
         ":preconditioning_utils",
         # numpy dep,
@@ -275,9 +261,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["pnuts_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
     shard_count = 10,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -295,7 +279,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "preconditioned_hmc",
     srcs = ["preconditioned_hmc.py"],
-    srcs_version = "PY3",
     deps = [
         ":preconditioning_utils",
         # tensorflow dep,
@@ -314,8 +297,6 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["preconditioned_hmc_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -330,7 +311,6 @@ multi_substrate_py_test(
 py_library(
     name = "progress_bar_reducer",
     srcs = ["progress_bar_reducer.py"],
-    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -342,8 +322,6 @@ py_test(
     name = "progress_bar_reducer_test",
     size = "small",
     srcs = ["progress_bar_reducer_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -356,7 +334,6 @@ py_test(
 py_library(
     name = "elliptical_slice_sampler",
     srcs = ["elliptical_slice_sampler.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -371,9 +348,7 @@ py_test(
     size = "large",
     timeout = "long",
     srcs = ["elliptical_slice_sampler_test.py"],
-    python_version = "PY3",
     shard_count = 6,
-    srcs_version = "PY3",
     deps = [
         ":elliptical_slice_sampler",
         # numpy dep,
@@ -386,7 +361,6 @@ py_test(
 py_library(
     name = "nuts_autobatching",
     srcs = ["nuts_autobatching.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -402,7 +376,6 @@ py_library(
     name = "nuts_autobatching_testlib",
     testonly = 1,
     srcs = ["nuts_autobatching_test.py"],
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,
@@ -417,9 +390,7 @@ py_test(
     name = "nuts_autobatching_test",
     size = "medium",
     srcs = ["nuts_autobatching_test.py"],
-    python_version = "PY3",
     shard_count = 7,
-    srcs_version = "PY3",
     tags = ["nozapfhahn"],
     deps = [
         ":nuts_autobatching_testlib",
@@ -431,9 +402,7 @@ py_test(
     name = "nuts_autobatching_test_gpu",
     srcs = ["nuts_autobatching_test.py"],
     main = "nuts_autobatching_test.py",
-    python_version = "PY3",
     shard_count = 7,
-    srcs_version = "PY3",
     tags = [
         "notap",
         "nozapfhahn",
@@ -451,9 +420,7 @@ py_test(
     srcs = ["nuts_autobatching_xla_test.py"],
     args = ["--test_device=cpu"],
     main = "nuts_autobatching_xla_test.py",
-    python_version = "PY3",
     shard_count = 1,
-    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
     ],
@@ -473,9 +440,7 @@ py_test(
     srcs = ["nuts_autobatching_xla_test.py"],
     args = ["--test_device=gpu"],
     main = "nuts_autobatching_xla_test.py",
-    python_version = "PY3",
     shard_count = 1,
-    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
         "requires-gpu-nvidia",
@@ -493,7 +458,6 @@ py_test(
 multi_substrate_py_library(
     name = "particle_filter",
     srcs = ["particle_filter.py"],
-    srcs_version = "PY3",
     deps = [
         ":sequential_monte_carlo_kernel",
         ":weighted_resampling",
@@ -512,8 +476,6 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["particle_filter_test.py"],
     numpy_tags = ["notap"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":particle_filter",
         # numpy dep,
@@ -527,7 +489,6 @@ multi_substrate_py_test(
 py_library(
     name = "particle_filter_augmentation",
     srcs = ["particle_filter_augmentation.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -542,8 +503,6 @@ py_test(
     name = "particle_filter_augmentation_test",
     size = "medium",
     srcs = ["particle_filter_augmentation_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":particle_filter_augmentation",
         # numpy dep,
@@ -556,7 +515,6 @@ py_test(
 multi_substrate_py_library(
     name = "sample_sequential_monte_carlo",
     srcs = ["sample_sequential_monte_carlo.py"],
-    srcs_version = "PY3",
     deps = [
         ":weighted_resampling",
         # numpy dep,
@@ -589,7 +547,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "sequential_monte_carlo_kernel",
     srcs = ["sequential_monte_carlo_kernel.py"],
-    srcs_version = "PY3",
     deps = [
         ":weighted_resampling",
         # numpy dep,
@@ -605,8 +562,6 @@ multi_substrate_py_test(
     name = "sequential_monte_carlo_kernel_test",
     size = "medium",
     srcs = ["sequential_monte_carlo_kernel_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -620,7 +575,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "weighted_resampling",
     srcs = ["weighted_resampling.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -649,7 +603,6 @@ multi_substrate_py_test(
 py_library(
     name = "step",
     srcs = ["step.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -661,9 +614,7 @@ py_test(
     name = "step_test",
     size = "small",
     srcs = ["step_test.py"],
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -676,7 +627,6 @@ py_test(
 py_library(
     name = "reducer",
     srcs = ["reducer.py"],
-    srcs_version = "PY3",
     deps = [
         # six dep,
     ],
@@ -685,7 +635,6 @@ py_library(
 py_library(
     name = "covariance_reducer",
     srcs = ["covariance_reducer.py"],
-    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -698,8 +647,6 @@ py_test(
     name = "covariance_reducer_test",
     size = "small",
     srcs = ["covariance_reducer_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":covariance_reducer",
         ":step",
@@ -713,7 +660,6 @@ py_test(
 py_library(
     name = "with_reductions",
     srcs = ["with_reductions.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/mcmc:kernel",
@@ -724,8 +670,6 @@ py_library(
 py_test(
     name = "with_reductions_test",
     srcs = ["with_reductions_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -737,7 +681,6 @@ py_test(
 py_library(
     name = "sample",
     srcs = ["sample.py"],
-    srcs_version = "PY3",
     deps = [
         ":step",
         ":tracing_reducer",
@@ -752,8 +695,6 @@ py_test(
     name = "sample_test",
     size = "small",
     srcs = ["sample_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":step",
         # tensorflow dep,
@@ -766,7 +707,6 @@ py_test(
 py_library(
     name = "sample_fold",
     srcs = ["sample_fold.py"],
-    srcs_version = "PY3",
     deps = [
         ":sample_discarding_kernel",
         ":step",
@@ -783,9 +723,7 @@ py_test(
     name = "sample_fold_test",
     size = "small",
     srcs = ["sample_fold_test.py"],
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -798,7 +736,6 @@ py_test(
 py_library(
     name = "sample_discarding_kernel",
     srcs = ["sample_discarding_kernel.py"],
-    srcs_version = "PY3",
     deps = [
         ":step",
         # tensorflow dep,
@@ -811,8 +748,6 @@ py_test(
     name = "sample_discarding_kernel_test",
     size = "small",
     srcs = ["sample_discarding_kernel_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -825,7 +760,6 @@ py_test(
 multi_substrate_py_library(
     name = "thermodynamic_integrals",
     srcs = ["thermodynamic_integrals.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/mcmc/internal",
@@ -836,8 +770,6 @@ multi_substrate_py_test(
     name = "thermodynamic_integrals_test",
     size = "medium",
     srcs = ["thermodynamic_integrals_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":thermodynamic_integrals",
         # numpy dep,
@@ -850,7 +782,6 @@ multi_substrate_py_test(
 py_library(
     name = "thinning_kernel",
     srcs = ["thinning_kernel.py"],
-    srcs_version = "PY3",
     deps = [
         ":step",
         # tensorflow dep,
@@ -863,8 +794,6 @@ py_test(
     name = "thinning_kernel_test",
     size = "small",
     srcs = ["thinning_kernel_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":thinning_kernel",
         # numpy dep,
@@ -878,7 +807,6 @@ py_test(
 py_library(
     name = "tracing_reducer",
     srcs = ["tracing_reducer.py"],
-    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -890,8 +818,6 @@ py_test(
     name = "tracing_reducer_test",
     size = "small",
     srcs = ["tracing_reducer_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -904,7 +830,6 @@ py_test(
 py_library(
     name = "expectations_reducer",
     srcs = ["expectations_reducer.py"],
-    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -915,9 +840,7 @@ py_library(
 py_test(
     name = "expectations_reducer_test",
     srcs = ["expectations_reducer_test.py"],
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -930,7 +853,6 @@ py_test(
 py_library(
     name = "potential_scale_reduction_reducer",
     srcs = ["potential_scale_reduction_reducer.py"],
-    srcs_version = "PY3",
     deps = [
         ":reducer",
         # tensorflow dep,
@@ -942,8 +864,6 @@ py_test(
     name = "potential_scale_reduction_reducer_test",
     size = "small",
     srcs = ["potential_scale_reduction_reducer_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -956,7 +876,6 @@ py_test(
 multi_substrate_py_library(
     name = "gradient_based_trajectory_length_adaptation",
     srcs = ["gradient_based_trajectory_length_adaptation.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -978,9 +897,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["gradient_based_trajectory_length_adaptation_test.py"],
     disabled_substrates = ["numpy"],  # Mostly gradient-based tests.
-    python_version = "PY3",
     shard_count = 3,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -996,7 +913,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "snaper_hmc",
     srcs = ["snaper_hmc.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:broadcast_util",
@@ -1016,9 +932,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["snaper_hmc_test.py"],
     disabled_substrates = ["numpy"],  # Mostly gradient-based tests.
-    python_version = "PY3",
     shard_count = 3,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -1035,7 +949,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "windowed_sampling",
     srcs = ["windowed_sampling.py"],
-    srcs_version = "PY3",
     deps = [
         ":diagonal_mass_matrix_adaptation",
         ":initialization",
@@ -1066,9 +979,7 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["windowed_sampling_test.py"],
     disabled_substrates = ["numpy"],
-    python_version = "PY3",
     shard_count = 12,
-    srcs_version = "PY3",
     tags = [
         "no-oss-ci",  # Prohibitively slow.
         "requires-mem:16g",
@@ -1090,7 +1001,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "sharded",
     srcs = ["sharded.py"],
-    srcs_version = "PY3",
     deps = [
         "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:samplers",
@@ -1102,8 +1012,6 @@ multi_substrate_py_test(
     name = "sharded_test",
     size = "small",
     srcs = ["sharded_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":sharded",
         # tensorflow dep,

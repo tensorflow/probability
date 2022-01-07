@@ -24,7 +24,6 @@ exports_files(["LICENSE"])
 py_library(
     name = "tensorflow_probability",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
 #         "//tensorflow_probability/google/staging",  # DisableOnExport
@@ -37,7 +36,6 @@ py_library(
 # The public target for `import tensorflow_probability.substrates.jax as tfp`
 py_library(
     name = "jax",
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = ["//tensorflow_probability/substrates:jax"],
 )
@@ -45,7 +43,6 @@ py_library(
 # The public target for `import tensorflow_probability.substrates.numpy as tfp`
 py_library(
     name = "numpy",
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = ["//tensorflow_probability/substrates:numpy"],
 )

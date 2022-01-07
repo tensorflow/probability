@@ -101,7 +101,6 @@ multi_substrate_py_test(
     size = "large",
     srcs = ["automatic_structured_vi_test.py"],
     numpy_tags = ["notap"],
-    python_version = "PY3",
     shard_count = 4,
     deps = [
         # absl/testing:parameterized dep,

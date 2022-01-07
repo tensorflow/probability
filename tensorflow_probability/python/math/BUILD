@@ -32,7 +32,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "math",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     substrates_omit_deps = [
         ":sparse",
     ],
@@ -65,7 +64,6 @@ multi_substrate_py_library(
     srcs = [
         "bessel.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -93,7 +91,6 @@ multi_substrate_py_library(
     srcs = [
         "custom_gradient.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -118,7 +115,6 @@ multi_substrate_py_library(
     srcs = [
         "gram_schmidt.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:prefer_static",
@@ -142,7 +138,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "generic",
     srcs = ["generic.py"],
-    srcs_version = "PY3",
     deps = [
         ":scan_associative",
         # numpy dep,
@@ -176,7 +171,6 @@ multi_substrate_py_library(
     srcs = [
         "gradient.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:tensor_util",
@@ -201,7 +195,6 @@ multi_substrate_py_library(
     srcs = [
         "hypergeometric.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -232,7 +225,6 @@ multi_substrate_py_library(
     srcs = [
         "integration.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
@@ -258,7 +250,6 @@ multi_substrate_py_library(
     srcs = [
         "interpolation.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -287,7 +278,6 @@ multi_substrate_py_library(
     srcs = [
         "linalg.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -324,7 +314,6 @@ multi_substrate_py_library(
     srcs = [
         "minimize.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -340,8 +329,6 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["minimize_test.py"],
     numpy_tags = ["notap"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # optax dep,
@@ -357,7 +344,6 @@ multi_substrate_py_library(
     srcs = [
         "numeric.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -398,7 +384,6 @@ multi_substrate_py_library(
     srcs = [
         "diag_jacobian.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":gradient",
         # tensorflow dep,
@@ -424,7 +409,6 @@ multi_substrate_py_library(
     srcs = [
         "root_search.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:callable_util",
@@ -450,7 +434,6 @@ py_library(
     srcs = [
         "sparse.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
@@ -461,8 +444,6 @@ py_test(
     name = "sparse_test",
     size = "small",
     srcs = ["sparse_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -474,7 +455,6 @@ py_test(
 multi_substrate_py_library(
     name = "scan_associative",
     srcs = ["scan_associative.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -488,7 +468,6 @@ multi_substrate_py_test(
     srcs = ["scan_associative_test.py"],
     numpy_tags = ["notap"],
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         ":scan_associative",
         # numpy dep,
@@ -503,7 +482,6 @@ multi_substrate_py_library(
     srcs = [
         "special.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

@@ -26,7 +26,6 @@ licenses(["notice"])
 py_library(
     name = "substrates",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:lazy_loader",

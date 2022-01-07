@@ -32,7 +32,6 @@ package(
 multi_substrate_py_library(
     name = "vi",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     substrates_omit_deps = [
         ":mutual_information",
     ],
@@ -47,7 +46,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "csiszar_divergence",
     srcs = ["csiszar_divergence.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -66,9 +64,7 @@ multi_substrate_py_test(
     srcs = ["csiszar_divergence_test.py"],
     jax_size = "medium",
     numpy_size = "medium",
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -80,7 +76,6 @@ multi_substrate_py_test(
 py_library(
     name = "mutual_information",
     srcs = ["mutual_information.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -94,9 +89,7 @@ py_test(
     name = "mutual_information_test",
     size = "small",
     srcs = ["mutual_information_test.py"],
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # scipy dep,
@@ -109,7 +102,6 @@ py_test(
 multi_substrate_py_library(
     name = "optimization",
     srcs = ["optimization.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -124,9 +116,7 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["optimization_test.py"],
     numpy_tags = ["notap"],
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # optax dep,

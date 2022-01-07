@@ -26,7 +26,6 @@ package(
 py_library(
     name = "turnkey_inference_candidate",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":window_tune_nuts_sampling",
     ],
@@ -35,7 +34,6 @@ py_library(
 py_library(
     name = "window_tune_nuts_sampling",
     srcs = ["window_tune_nuts_sampling.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -51,9 +49,7 @@ py_test(
     name = "window_tune_nuts_sampling_test",
     size = "enormous",
     srcs = ["window_tune_nuts_sampling_test.py"],
-    python_version = "PY3",
     shard_count = 1,
-    srcs_version = "PY3",
     tags = [
         "nozapfhahn",
     ],
@@ -72,9 +68,7 @@ py_test(
     size = "enormous",
     srcs = ["window_tune_nuts_sampling_test.py"],
     main = "window_tune_nuts_sampling_test.py",
-    python_version = "PY3",
     shard_count = 1,
-    srcs_version = "PY3",
     tags = [
         "notap",
         "nozapfhahn",

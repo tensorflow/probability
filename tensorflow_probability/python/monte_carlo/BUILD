@@ -32,7 +32,6 @@ package(
 multi_substrate_py_library(
     name = "monte_carlo",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":expectation",
         "//tensorflow_probability/python/internal:all_util",
@@ -42,7 +41,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "expectation",
     srcs = ["expectation.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -54,8 +52,6 @@ multi_substrate_py_test(
     name = "expectation_test",
     size = "small",
     srcs = ["expectation_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

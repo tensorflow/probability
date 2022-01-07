@@ -33,7 +33,6 @@ licenses(["notice"])
 # pytype_strict
 py_library(
     name = "inference_gym",
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         ":using_jax",
@@ -45,7 +44,6 @@ py_library(
 py_library(
     name = "using_numpy",
     srcs = ["using_numpy.py"],
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         ":backend_numpy",
@@ -58,7 +56,6 @@ py_library(
 py_library(
     name = "using_jax",
     srcs = ["using_jax.py"],
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         ":backend_jax",
@@ -72,7 +69,6 @@ py_library(
 py_library(
     name = "using_tensorflow",
     srcs = ["using_tensorflow.py"],
-    srcs_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         ":backend_tensorflow",
@@ -87,21 +83,18 @@ py_library(
 py_library(
     name = "backend_numpy",
     srcs = ["dynamic/backend_numpy/__init__.py"],
-    srcs_version = "PY3",
 )
 
 # pytype_strict
 py_library(
     name = "backend_jax",
     srcs = ["dynamic/backend_jax/__init__.py"],
-    srcs_version = "PY3",
 )
 
 # pytype_strict
 py_library(
     name = "backend_tensorflow",
     srcs = ["dynamic/backend_tensorflow/__init__.py"],
-    srcs_version = "PY3",
 )
 
 # third_party_dependency(package = "py/inference_gym")  # DisableOnExport

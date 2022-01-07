@@ -26,7 +26,6 @@ package(
 py_library(
     name = "backend",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         "//tensorflow_probability/python/internal/backend/jax",
         "//tensorflow_probability/python/internal/backend/numpy",

@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "mcmc",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":kernels",
         ":utils",
@@ -34,7 +33,6 @@ py_library(
 py_library(
     name = "kernels",
     srcs = ["kernels.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/core:primitive",
@@ -49,7 +47,6 @@ py_library(
 py_library(
     name = "utils",
     srcs = ["utils.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/core/interpreters/inverse:core",
@@ -61,9 +58,7 @@ py_library(
 py_test(
     name = "kernels_test",
     srcs = ["kernels_test.py"],
-    python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         ":kernels",
         ":utils",

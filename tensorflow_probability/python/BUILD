@@ -28,7 +28,6 @@ package(
 py_library(
     name = "python",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     visibility = ["//tensorflow_probability:__pkg__"],
     deps = [
         ":version",
@@ -55,5 +54,4 @@ py_library(
 py_library(
     name = "version",
     srcs = ["version.py"],
-    srcs_version = "PY3",
 )

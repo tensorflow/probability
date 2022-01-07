@@ -23,7 +23,6 @@ licenses(["notice"])
 py_library(
     name = "bijectors",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":bijector_extensions",
         # tensorflow_probability/substrates:jax dep,
@@ -34,7 +33,6 @@ py_library(
 py_library(
     name = "bijector_extensions",
     srcs = ["bijector_extensions.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         # six dep,
@@ -49,7 +47,6 @@ py_library(
 py_test(
     name = "bijector_extensions_test",
     srcs = ["bijector_extensions_test.py"],
-    python_version = "PY3",
     deps = [
         ":bijectors",
         # absl/testing:absltest dep,

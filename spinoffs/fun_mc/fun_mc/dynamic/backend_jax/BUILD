@@ -23,13 +23,11 @@ package(
 py_library(
     name = "backend_jax",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
 )
 
 py_library(
     name = "util",
     srcs = ["util.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         # jax:stax dep,
@@ -39,7 +37,6 @@ py_library(
 py_library(
     name = "tf_on_jax",
     srcs = ["tf_on_jax.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         # jax:stax dep,
@@ -49,7 +46,6 @@ py_library(
 py_library(
     name = "backend",
     srcs = ["backend.py"],
-    srcs_version = "PY3",
     deps = [
         ":tf_on_jax",
         ":util",

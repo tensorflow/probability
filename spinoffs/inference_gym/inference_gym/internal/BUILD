@@ -32,7 +32,6 @@ licenses(["notice"])
 py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":array_to_source",
         ":data",
@@ -43,7 +42,6 @@ py_library(
 py_library(
     name = "array_to_source",
     srcs = ["array_to_source.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -53,8 +51,6 @@ py_library(
 py_test(
     name = "array_to_source_test",
     srcs = ["array_to_source_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":array_to_source",
         # tensorflow_probability/python/internal:test_util dep,
@@ -64,7 +60,6 @@ py_test(
 py_library(
     name = "data",
     srcs = ["data.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         "//inference_gym/internal/datasets",
@@ -75,8 +70,6 @@ py_library(
 py_test(
     name = "data_test",
     srcs = ["data_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":data",
         ":test_util",
@@ -92,7 +85,6 @@ py_test(
 py_library(
     name = "ground_truth_encoding",
     srcs = ["ground_truth_encoding.py"],
-    srcs_version = "PY3",
     deps = [
         ":array_to_source",
     ],
@@ -102,8 +94,6 @@ py_library(
 py_test(
     name = "ground_truth_encoding_test",
     srcs = ["ground_truth_encoding_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":ground_truth_encoding",
         # absl/testing:parameterized dep,
@@ -118,7 +108,6 @@ py_library(
     name = "test_util",
     testonly = True,
     srcs = ["test_util.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         # tensorflow_probability dep,
@@ -138,8 +127,6 @@ py_library(
 py_test(
     name = "test_util_test",
     srcs = ["test_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":test_util",
         # absl/logging dep,

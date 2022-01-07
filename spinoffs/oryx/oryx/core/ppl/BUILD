@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "ppl",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":effect_handler",
         ":transformations",
@@ -34,7 +33,6 @@ py_library(
 py_library(
     name = "transformations",
     srcs = ["transformations.py"],
-    srcs_version = "PY3",
     deps = [
         ":plate_util",
         # jax dep,
@@ -48,7 +46,6 @@ py_library(
 py_library(
     name = "plate_util",
     srcs = ["plate_util.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/core:primitive",
@@ -61,7 +58,6 @@ py_library(
 py_library(
     name = "effect_handler",
     srcs = ["effect_handler.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/core:trace_util",
@@ -72,8 +68,6 @@ py_library(
 py_test(
     name = "transformations_test",
     srcs = ["transformations_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":transformations",
         # absl/testing:absltest dep,
@@ -89,8 +83,6 @@ py_test(
 py_test(
     name = "effect_handler_test",
     srcs = ["effect_handler_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":effect_handler",
         # absl/testing:absltest dep,

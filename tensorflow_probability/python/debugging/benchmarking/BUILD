@@ -25,7 +25,6 @@ licenses(["notice"])
 py_library(
     name = "benchmarking",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":benchmark_tf_function",
     ],
@@ -34,7 +33,6 @@ py_library(
 py_library(
     name = "benchmark_tf_function",
     srcs = ["benchmark_tf_function.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],

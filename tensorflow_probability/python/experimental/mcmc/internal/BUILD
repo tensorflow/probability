@@ -27,7 +27,6 @@ package(
 py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":test_fixtures",
     ],
@@ -36,7 +35,6 @@ py_library(
 py_library(
     name = "test_fixtures",
     srcs = ["test_fixtures.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",

@@ -30,7 +30,6 @@ licenses(["notice"])
 py_library(
     name = "datasets",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":brownian_motion_missing_middle_observations",
         ":convection_lorenz_bridge",
@@ -46,7 +45,6 @@ py_library(
 py_library(
     name = "synthetic_item_response_theory",
     srcs = ["synthetic_item_response_theory.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -56,7 +54,6 @@ py_library(
 py_library(
     name = "sp500_closing_prices",
     srcs = ["sp500_closing_prices.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -66,7 +63,6 @@ py_library(
 py_library(
     name = "brownian_motion_missing_middle_observations",
     srcs = ["brownian_motion_missing_middle_observations.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -76,7 +72,6 @@ py_library(
 py_library(
     name = "synthetic_log_gaussian_cox_process",
     srcs = ["synthetic_log_gaussian_cox_process.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -86,7 +81,6 @@ py_library(
 py_library(
     name = "convection_lorenz_bridge",
     srcs = ["convection_lorenz_bridge.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -96,7 +90,6 @@ py_library(
 py_library(
     name = "synthetic_plasma_spectroscopy",
     srcs = ["synthetic_plasma_spectroscopy.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -106,7 +99,6 @@ py_library(
 py_library(
     name = "synthetic_plasma_spectroscopy_with_bump",
     srcs = ["synthetic_plasma_spectroscopy_with_bump.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
