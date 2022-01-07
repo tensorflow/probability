@@ -17,7 +17,7 @@
 
 ## Probabilistic programs
 A probabilistic program is defined as a JAX function that takes in a
-`jax.random.PRNGKey as its first input, and any number of subsequent
+`jax.random.PRNGKey` as its first input, and any number of subsequent
 conditioning arguments. The output of the function is the output of the
 probabilistic program.
 
@@ -106,6 +106,20 @@ def f(key):
   return np.exp(random_normal(key))
 log_prob(f)(np.exp(0.))  # ==> -0.9189385
 log_prob(f)(np.exp(1.))  # ==> -2.4189386
+```
+
+### `trace`
+`trace` takes a probabilistic program and returns a program that when executed
+returns both the original program's output and a dictionary that includes the
+latent random variables sampled during the original program's execution.
+
+Example:
+```python
+def f(key):
+  k1, k2 = random.split(key)
+  z = random_variable(random.normal, name='z')(k1)
+  return z + random_variable(random.normal, name='x')(k2)
+trace(f)(random.PRNGKey(0))  # ==> (0.1435, {'z': -0.0495, 'x': 0.193})
 ```
 
 ### `joint_sample`
@@ -375,12 +389,22 @@ def function_log_prob(f: Program) -> LogProbFunction:
   return lp.log_prob(f)
 
 
+def trace(f: Program) -> Program:
+  """Returns a program that additionally outputs sampled latents."""
+  return harvest.call_and_reap(f, tag=RANDOM_VARIABLE)
+
+
+def trace_log_prob(f: Program) -> LogProbFunction:
+  """Returns a function that computes the log probability program's output and its random variables."""
+  return lambda obs, latents, *args: log_prob(trace(f))((obs, latents), *args)
+
+
 def joint_sample(f: Program) -> Program:
   """Returns a program that outputs a dictionary of latent random variable samples."""
   return harvest.reap(f, tag=RANDOM_VARIABLE)
 
 
-def joint_log_prob(f: Program) -> Scalar:
+def joint_log_prob(f: Program) -> LogProbFunction:
   """Returns a function that computes the log probability of all of a program's random variables."""
   return log_prob(joint_sample(f))
 

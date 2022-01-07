@@ -41,6 +41,8 @@ joint_sample = transformations.joint_sample
 log_prob = transformations.log_prob
 plate = transformations.plate
 random_variable = transformations.random_variable
+trace = transformations.trace
+trace_log_prob = transformations.trace_log_prob
 
 # Define a random normal primitive so we can register it with the `log_prob`
 # transformation.
@@ -111,6 +113,19 @@ class SampleTest(test_util.TestCase):
             'z': z,
             'x': z + random.normal(k2)
         })
+
+  def test_trace_should_return_output_and_latents(self):
+
+    def model(key):
+      k1, k2 = random.split(key)
+      z = random_variable(random_normal, name='z')(k1)
+      return random_variable(lambda key: random_normal(key) + z)(k2)
+
+    k1, k2 = random.split(seed(0))
+    z = random.normal(k1)
+    output, latents = trace(model)(seed(0))
+    self.assertEqual(output, z + random.normal(k2))
+    self.assertDictEqual(latents, dict(z=z))
 
   def test_block_should_result_in_ignored_names_in_joint_sample(self):
 
@@ -258,6 +273,21 @@ class LogProbTest(test_util.TestCase):
             'x': 1.
         }),
         tfd.Normal(0., 1.).log_prob(1.) + tfd.Normal(0., 1.).log_prob(0.))
+
+  def test_log_prob_should_work_with_trace(self):
+
+    def model(key):
+      k1, k2 = random.split(key)
+      z = random_variable(random_normal, name='z')(k1)
+      return random_variable(lambda key: random_normal(key) + z)(k2)
+
+    log_prob_value = (
+        tfd.Normal(0., 1.).log_prob(1.)
+        + tfd.Normal(0., 1.).log_prob(0.))
+
+    self.assertEqual(log_prob(trace(model))((1., dict(z=1.))), log_prob_value)
+
+    self.assertEqual(trace_log_prob(model)(1., dict(z=1.)), log_prob_value)
 
   def test_log_prob_should_work_with_nondependent_latents(self):
 

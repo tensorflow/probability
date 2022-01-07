@@ -29,3 +29,5 @@ from oryx.core.ppl.transformations import Program
 from oryx.core.ppl.transformations import random_variable
 from oryx.core.ppl.transformations import RANDOM_VARIABLE
 from oryx.core.ppl.transformations import rv
+from oryx.core.ppl.transformations import trace
+from oryx.core.ppl.transformations import trace_log_prob
