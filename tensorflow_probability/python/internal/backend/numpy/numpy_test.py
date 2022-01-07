@@ -557,13 +557,16 @@ def linspace_params(draw):
 
 @hps.composite
 def searchsorted_params(draw):
-  sorted_array_shape = shapes(min_dims=1)
-  sorted_array = draw(single_arrays(shape=sorted_array_shape))
-  sorted_array = np.sort(sorted_array)
+  array_shape = shapes(min_dims=1)
+  array = draw(single_arrays(shape=array_shape))
+  # JAX and TF's searchsorted do not behave the same for negative zero, so we
+  # avoid generating inputs containing negative zero.  See b/213512538 .
+  sorted_array = np.sort(np.where(array == -0.0, 0.0, array))
   num_values = hps.integers(1, 20)
   values = draw(single_arrays(
       shape=shapes(min_dims=1, max_dims=1, max_side=draw(num_values)),
       batch_shape=sorted_array.shape[:-1]))
+  values = np.where(values == -0.0, 0.0, values)
   search_side = draw(hps.one_of(hps.just('left'), hps.just('right')))
   return sorted_array, values, search_side
 
