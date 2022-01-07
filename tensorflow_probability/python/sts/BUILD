@@ -33,12 +33,7 @@ multi_substrate_py_library(
     name = "sts",
     srcs = ["__init__.py"],
     substrates_omit_deps = [
-        ":decomposition",
-        ":default_model",
         ":fitting",
-        ":forecast",
-        ":holiday_effects",
-        ":regularization",
         "//tensorflow_probability/python/sts/anomaly_detection",
     ],
     deps = [
@@ -55,7 +50,7 @@ multi_substrate_py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "decomposition",
     srcs = ["decomposition.py"],
     deps = [
@@ -66,7 +61,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "decomposition_test",
     size = "medium",
     srcs = ["decomposition_test.py"],
@@ -76,11 +71,12 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "default_model",
     srcs = ["default_model.py"],
     deps = [
@@ -90,14 +86,13 @@ py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:inverse_gamma",
         "//tensorflow_probability/python/distributions:normal",
-        "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/sts/components",
         "//tensorflow_probability/python/sts/internal",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "default_model_test",
     size = "medium",
     srcs = ["default_model_test.py"],
@@ -142,7 +137,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "forecast",
     srcs = ["forecast.py"],
     deps = [
@@ -153,10 +148,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "forecast_test",
     size = "medium",
     srcs = ["forecast_test.py"],
+    numpy_tags = ["notap"],
     shard_count = 6,
     deps = [
         # numpy dep,
@@ -166,7 +162,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "holiday_effects",
     srcs = ["holiday_effects.py"],
     deps = [
@@ -178,7 +174,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "holiday_effects_test",
     size = "medium",
     srcs = ["holiday_effects_test.py"],
@@ -195,7 +191,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "regularization",
     srcs = ["regularization.py"],
     deps = [
@@ -203,7 +199,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "regularization_test",
     size = "small",
     srcs = ["regularization_test.py"],

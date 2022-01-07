@@ -79,6 +79,8 @@ class DefaultModelTests(test_util.TestCase):
         self._build_test_series(shape=[48, 3], freq=pd.DateOffset(hours=1)))
     self.assertAllEqual(model.batch_shape, [3])
 
+  @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_docstring_fitting_example(self):
     # Construct a series of eleven data points, covering a period of two weeks
     # with three missing days.

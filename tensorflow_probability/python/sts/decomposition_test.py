@@ -20,10 +20,14 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 
 tfl = tf.linalg
+
+
+JAX_MODE = False
 
 
 class _DecompositionTest(test_util.TestCase):
@@ -128,7 +132,7 @@ class _DecompositionTest(test_util.TestCase):
   def _get_tensor_shape(self, tensor):
     if self.use_static_shape:
       # If input shapes are static, result shapes should be too.
-      return tensor.shape.as_list()
+      return tensorshape_util.as_list(tensor.shape)
     else:
       return self.evaluate(tf.shape(tensor))
 
@@ -145,6 +149,8 @@ class _DecompositionTest(test_util.TestCase):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype)
+    if JAX_MODE:
+      return ndarray
     return tf1.placeholder_with_default(
         ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
@@ -156,6 +162,7 @@ class DecompositionTestStatic32(_DecompositionTest):
 
 
 # Run in graph mode only to reduce test weight.
+@test_util.jax_disable_test_missing_functionality('dynamic shape')
 class DecompositionTestDynamic64(_DecompositionTest):
   dtype = np.float64
   use_static_shape = False
