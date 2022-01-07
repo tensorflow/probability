@@ -256,7 +256,7 @@ class StructuralTimeSeries(object):
   def joint_distribution(self,
                          observed_time_series=None,
                          num_timesteps=None,
-                         trajectories_shape=None,
+                         trajectories_shape=(),
                          initial_step=0,
                          mask=None,
                          experimental_parallelize=False):
@@ -275,11 +275,9 @@ class StructuralTimeSeries(object):
         `observed_time_series`.
         Default value: `0`.
       trajectories_shape: `int` `Tensor` shape of sampled trajectories
-        for each set of parameter values. If not specified (either directly
-        or by passing an `observed_time_series`), defaults to a
-        one-to-one correspondence between trajectories and parameter settings
-        (implicitly `trajectories_shape=()`).
-        Default value: `None`.
+        for each set of parameter values. Ignored if an `observed_time_series`
+        is passed.
+        Default value: `()`.
       initial_step: Optional scalar `int` `Tensor` specifying the starting
         timestep.
         Default value: `0`.
