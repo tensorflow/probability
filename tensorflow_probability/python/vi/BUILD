@@ -34,7 +34,6 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     substrates_omit_deps = [
-        ":optimization",
         ":mutual_information",
     ],
     deps = [
@@ -107,7 +106,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "optimization",
     srcs = ["optimization.py"],
     srcs_version = "PY3",
@@ -120,15 +119,17 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "optimization_test",
     size = "medium",
     srcs = ["optimization_test.py"],
+    numpy_tags = ["notap"],
     python_version = "PY3",
     shard_count = 5,
     srcs_version = "PY3",
     deps = [
         # numpy dep,
+        # optax dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

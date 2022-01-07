@@ -36,6 +36,10 @@ from tensorflow_probability.python.vi.csiszar_divergence import t_power
 from tensorflow_probability.python.vi.csiszar_divergence import total_variation
 from tensorflow_probability.python.vi.csiszar_divergence import triangular
 from tensorflow_probability.python.vi.optimization import fit_surrogate_posterior
+from tensorflow_probability.python.vi.optimization import fit_surrogate_posterior_stateless
+
+
+JAX_MODE = False
 
 
 _allowed_symbols = [
@@ -45,7 +49,7 @@ _allowed_symbols = [
     'chi_square',
     'csiszar_vimco',
     'dual_csiszar_function',
-    'fit_surrogate_posterior',
+    'fit_surrogate_posterior_stateless',
     'jensen_shannon',
     'jeffreys',
     'kl_forward',
@@ -61,5 +65,8 @@ _allowed_symbols = [
     'triangular',
     't_power',
 ]
+
+if not JAX_MODE:
+  _allowed_symbols += ['fit_surrogate_posterior']
 
 all_util.remove_undocumented(__name__, _allowed_symbols)
