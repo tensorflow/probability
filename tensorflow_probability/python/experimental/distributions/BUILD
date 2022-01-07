@@ -133,6 +133,7 @@ multi_substrate_py_test(
     name = "marginal_fns_test",
     srcs = ["marginal_fns_test.py"],
     numpy_tags = ["notap"],
+    shard_count = 3,
     deps = [
         # numpy dep,
         # tensorflow dep,
