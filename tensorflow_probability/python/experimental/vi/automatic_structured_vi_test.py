@@ -20,6 +20,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.vi import automatic_structured_vi
+from tensorflow_probability.python.internal import custom_gradient
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
@@ -27,10 +28,13 @@ from tensorflow_probability.python.internal import test_util
 tfb = tfp.bijectors
 tfd = tfp.distributions
 
+JAX_MODE = False
+
 
 @test_util.test_all_tf_execution_regimes
 class _TrainableASVISurrogate(object):
 
+  @test_util.jax_disable_variable_test
   def _expected_num_trainable_variables(self, prior_dist):
     """Infers the expected number of trainable variables for a non-nested JD."""
     prior_dists = prior_dist._get_single_sample_distributions()  # pylint: disable=protected-access
@@ -52,6 +56,7 @@ class _TrainableASVISurrogate(object):
           expected_num_trainable_variables += 2
     return expected_num_trainable_variables
 
+  @test_util.jax_disable_variable_test
   def test_dims_and_gradients(self):
 
     prior_dist = self.make_prior_dist()
@@ -81,6 +86,41 @@ class _TrainableASVISurrogate(object):
                          surrogate_posterior.trainable_variables)
     self.assertTrue(all(g is not None for g in grad))
 
+  def test_dims_and_gradients_stateless(self):
+
+    prior_dist = self.make_prior_dist()
+
+    surrogate_init_fn, surrogate_apply_fn = (
+        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(
+            prior=prior_dist))
+    raw_params = surrogate_init_fn(
+        seed=test_util.test_seed(sampler_type='stateless'))
+
+    # Test that the correct number of trainable variables are being tracked
+    self.assertLen(tf.nest.flatten(raw_params),
+                   self._expected_num_trainable_variables(prior_dist))
+
+    # Test that the sample shape is correct.
+    surrogate_posterior = surrogate_apply_fn(raw_params)
+    three_posterior_samples = surrogate_posterior.sample(
+        3, seed=test_util.test_seed(sampler_type='stateless'))
+    three_prior_samples = prior_dist.sample(
+        3, seed=test_util.test_seed(sampler_type='stateless'))
+    self.assertAllEqualNested(
+        [s.shape for s in tf.nest.flatten(three_prior_samples)],
+        [s.shape for s in tf.nest.flatten(three_posterior_samples)])
+
+    # Test that gradients are available wrt the variational parameters.
+    posterior_sample = surrogate_posterior.sample(
+        seed=test_util.test_seed(sampler_type='stateless'))
+    _, grad = tfp.math.value_and_gradient(
+        lambda params: surrogate_apply_fn(params).log_prob(posterior_sample),
+        [raw_params])
+    self.assertTrue(
+        all(custom_gradient.is_valid_gradient(g)
+            for g in tf.nest.flatten(grad)))
+
+  @test_util.jax_disable_variable_test
   def test_initialization_is_deterministic_following_seed(self):
     prior_dist = self.make_prior_dist()
     seed = test_util.test_seed(sampler_type='stateless')
@@ -126,10 +166,12 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
 
   def get_observations(self, prior_dist):
     observation_noise = 0.15
-    ground_truth = prior_dist.sample()
+    ground_truth = prior_dist.sample(
+        seed=test_util.test_seed(sampler_type='stateless'))
     likelihood = self.make_likelihood_model(
         x=ground_truth, observation_noise=observation_noise)
-    return likelihood.sample(1)
+    return likelihood.sample(
+        1, seed=test_util.test_seed(sampler_type='stateless'))
 
   def get_target_log_prob(self, observations, prior_dist):
 
@@ -141,6 +183,7 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
 
     return target_log_prob
 
+  @test_util.jax_disable_variable_test
   def test_fitting_surrogate_posterior(self):
 
     prior_dist = self.make_prior_dist()
@@ -159,7 +202,8 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
 
     # Compute posterior statistics.
     with tf.control_dependencies([losses]):
-      posterior_samples = surrogate_posterior.sample(100)
+      posterior_samples = surrogate_posterior.sample(
+          100, seed=test_util.test_seed(sampler_type='stateless'))
       posterior_mean = tf.nest.map_structure(tf.reduce_mean, posterior_samples)
       posterior_stddev = tf.nest.map_structure(tf.math.reduce_std,
                                                posterior_samples)
@@ -168,6 +212,35 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
     _ = self.evaluate(losses)
     _ = self.evaluate(posterior_mean)
     _ = self.evaluate(posterior_stddev)
+
+  def test_fitting_surrogate_posterior_stateless(self):
+    if not JAX_MODE:
+      self.skipTest('Requires optax.')
+    import optax  # pylint: disable=g-import-not-at-top
+
+    prior_dist = self.make_prior_dist()
+    observations = self.get_observations(prior_dist)
+    init_fn, build_surrogate_posterior_fn = (
+        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(
+            prior=prior_dist))
+    target_log_prob = self.get_target_log_prob(observations, prior_dist)
+
+    def loss_fn(*params, seed=None):
+      surrogate_posterior = build_surrogate_posterior_fn(*params)
+      zs, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
+          10, seed=seed)
+      return tf.reduce_mean(q_lp - target_log_prob(*zs), axis=0)
+
+    # Test vi fit surrogate posterior works
+    optimized_params, _ = tfp.math.minimize_stateless(
+        loss_fn,
+        init=init_fn(seed=test_util.test_seed()),
+        num_steps=5,  # Don't optimize to completion.
+        optimizer=optax.adam(0.1),
+        seed=test_util.test_seed(sampler_type='stateless'))
+    surrogate_posterior = build_surrogate_posterior_fn(optimized_params)
+    surrogate_posterior.sample(
+        100, seed=test_util.test_seed(sampler_type='stateless'))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -316,7 +389,7 @@ class ASVISurrogatePosteriorTestMarkovChain(test_util.TestCase,
 
 
 @test_util.test_all_tf_execution_regimes
-class TestASVIDistributionSubstitution(test_util.TestCase):
+class TestASVISubstitutionAndSurrogateRules(test_util.TestCase):
 
   def test_default_substitutes_trainable_families(self):
 
@@ -330,11 +403,13 @@ class TestASVIDistributionSubstitution(test_util.TestCase):
       yield tfd.Exponential(rate=[1., 2.], name='c')
       yield tfd.Chi2(df=3., name='d')
 
-    surrogate = tfp.experimental.vi.build_asvi_surrogate_posterior(
-        model)
+    init_fn, apply_fn = (
+        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(model))
+    surrogate = apply_fn(init_fn(seed=test_util.test_seed()))
     self.assertAllEqualNested(model.event_shape, surrogate.event_shape)
 
-    surrogate_dists, _ = surrogate.sample_distributions()
+    surrogate_dists, _ = surrogate.sample_distributions(
+        seed=test_util.test_seed(sampler_type='stateless'))
     self.assertIsInstance(surrogate_dists.a, tfd.Independent)
     self.assertIsInstance(surrogate_dists.a.distribution,
                           tfd.TransformedDistribution)
@@ -355,12 +430,16 @@ class TestASVIDistributionSubstitution(test_util.TestCase):
       yield tfd.Normal(
           loc=0., scale=tf.sqrt(global_scale * local_scale), name='weights')
 
-    surrogate = tfp.experimental.vi.build_asvi_surrogate_posterior(
-        centered_horseshoe,
-        prior_substitution_rules=tuple([
-            (tfd.HalfCauchy,
-             lambda d: tfb.Softplus(1e-6)(tfd.Normal(loc=d.loc, scale=d.scale)))
-        ]) + automatic_structured_vi.ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES)
+    init_fn, apply_fn = (
+        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(
+            centered_horseshoe,
+            prior_substitution_rules=tuple([
+                (tfd.HalfCauchy,
+                 lambda d: tfb.Softplus(1e-6)(  # pylint: disable=g-long-lambda
+                     tfd.Normal(loc=d.loc, scale=d.scale)))
+            ]) + automatic_structured_vi.ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES))
+
+    surrogate = apply_fn(init_fn(seed=test_util.test_seed()))
     self.assertAllEqualNested(centered_horseshoe.event_shape,
                               surrogate.event_shape)
 
@@ -368,12 +447,32 @@ class TestASVIDistributionSubstitution(test_util.TestCase):
     # model, so that it had to be `tfb.Restructure`'d, then this
     # sample_distributions call will fail because the surrogate isn't an
     # instance of tfd.JointDistribution.
-    surrogate_dists, _ = surrogate.sample_distributions()
+    surrogate_dists, _ = surrogate.sample_distributions(
+        seed=test_util.test_seed(sampler_type='stateless'))
     self.assertIsInstance(surrogate_dists.global_scale.distribution,
                           tfd.Normal)
     self.assertIsInstance(surrogate_dists.local_scale.distribution,
                           tfd.Normal)
     self.assertIsInstance(surrogate_dists.weights, tfd.Normal)
+
+  def test_can_specify_custom_surrogate(self):
+
+    def student_t_surrogate(
+        dist, build_nested_surrogate, sample_shape=None):
+      del build_nested_surrogate  # Unused.
+      del sample_shape  # Unused.
+      return tfp.experimental.util.make_trainable_stateless(
+          tfd.StudentT, batch_and_event_shape=dist.batch_shape)
+
+    init_fn, apply_fn = (
+        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(
+            tfd.Normal(2., scale=[3., 1.]),
+            surrogate_rules=(
+                (tfd.Normal, student_t_surrogate),
+                ) + automatic_structured_vi.ASVI_DEFAULT_SURROGATE_RULES))
+    surrogate = apply_fn(init_fn(seed=test_util.test_seed()))
+    self.assertIsInstance(surrogate, tfd.StudentT)
+
 
 # TODO(kateslin): Add an ASVI surrogate posterior test for gamma distributions.
 # TODO(kateslin): Add an ASVI surrogate posterior test with for a model with

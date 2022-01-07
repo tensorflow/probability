@@ -179,7 +179,7 @@ def _call_init_fn(init_fn, seed):
     pass
   try:
     return init_fn()  # Maybe init_fn is deterministic?
-  except TypeError:
+  except (TypeError, ValueError):
     pass
   return init_fn(seed)  # Fall back to passing seed as positional arg.
 
@@ -221,13 +221,16 @@ def _initialize_parameters(generator, seed=None):
   param_value = None
   try:
     while True:
-      parameter = (
-          next(gen) if param_value is None else gen.send(param_value))
+      parameter = gen.send(param_value)
       if not hasattr(parameter, 'init_fn'):
         raise ValueError('Expected generator to yield a '
                          'trainable_state_util.Parameter namedtuple, but saw '
                          '{} instead.'.format(parameter))
       seed, local_seed = samplers.split_seed(seed, n=2)
+      # Note: this framework guarantees that the `init_fn` is only ever called
+      # here, immediately after being yielded before control is returned
+      # to the coroutine. This allows the coroutine to safely incorporate
+      # loop-dependent state in the closure of `init_fn` if desired.
       param_value = _call_init_fn(parameter.init_fn, seed=local_seed)
       raw_value = (param_value if parameter.constraining_bijector is None
                    else parameter.constraining_bijector.inverse(param_value))
