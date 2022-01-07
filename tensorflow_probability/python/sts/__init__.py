@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Framework for Bayesian structural time series models."""
+"""Framework for Bayesian structural time series models.
+
+See the [blog post](
+https://blog.tensorflow.org/2019/03/structural-time-series-modeling-in.html)
+for an introductory example.
+"""
 
 from tensorflow_probability.python.internal import all_util
 from tensorflow_probability.python.sts.components import *
