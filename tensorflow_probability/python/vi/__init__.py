@@ -21,6 +21,7 @@ from tensorflow_probability.python.vi.csiszar_divergence import arithmetic_geome
 from tensorflow_probability.python.vi.csiszar_divergence import chi_square
 from tensorflow_probability.python.vi.csiszar_divergence import csiszar_vimco
 from tensorflow_probability.python.vi.csiszar_divergence import dual_csiszar_function
+from tensorflow_probability.python.vi.csiszar_divergence import GradientEstimators
 from tensorflow_probability.python.vi.csiszar_divergence import jeffreys
 from tensorflow_probability.python.vi.csiszar_divergence import jensen_shannon
 from tensorflow_probability.python.vi.csiszar_divergence import kl_forward
@@ -38,6 +39,7 @@ from tensorflow_probability.python.vi.optimization import fit_surrogate_posterio
 
 
 _allowed_symbols = [
+    'GradientEstimators',
     'amari_alpha',
     'arithmetic_geometric',
     'chi_square',

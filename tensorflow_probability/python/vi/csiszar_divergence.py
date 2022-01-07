@@ -14,6 +14,9 @@
 # ============================================================================
 """Csiszar f-Divergence and helpers."""
 
+import enum
+import warnings
+
 # Dependency imports
 import numpy as np
 
@@ -26,8 +29,11 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
 from tensorflow_probability.python.stats.leave_one_out import log_soomean_exp
 
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
+    'GradientEstimators',
     'amari_alpha',
     'arithmetic_geometric',
     'chi_square',
@@ -47,6 +53,86 @@ __all__ = [
     'total_variation',
     'triangular',
 ]
+
+
+class GradientEstimators(enum.Enum):
+  """Gradient estimators for variational losses.
+
+  Variational losses implemented by `monte_carlo_variational_loss` are
+  defined in general as an expectation of some `fn` under the surrogate
+  posterior,
+
+  ```
+  loss = expectation(fn, surrogate_posterior)
+  ```
+
+  where the expectation is estimated in practice using a finite `sample_size`
+  number of samples:
+
+  ```
+  zs = surrogate_posterior.sample(sample_size)
+  loss_estimate = 1 / sample_size * sum([fn(z) for z in z])
+  ```
+
+  Gradient estimators define a stochastic estimate of the *gradient* of the
+  above expectation with respect to the parameters of the surrogate posterior.
+
+  Members:
+    SCORE_FUNCTION: Also known as REINFORCE [1] or the log-derivative gradient
+      estimator [2]. This estimator works with any surrogate posterior, but
+      gradient estimates may be very noisy.
+    REPARAMETERIZATION: Reparameterization gradients as introduced by Kingma
+      and Welling [3]. These require a continuous-valued surrogate that sets
+      `reparameterization_type=FULLY_REPARAMETERIZED` (which must implement
+      reparameterized sampling either directly or via implicit
+      reparameterization [4]), and typically yield much lower-variance gradient
+      estimates than the generic score function estimator.
+    DOUBLY_REPARAMETERIZED: The doubly-reparameterized estimator presented by
+      Tucker et al. [5] for importance-weighted bounds. Note that this includes
+      the sticking-the-landing estimator developed by Roeder et al. [6] as a
+      special case when `importance_sample_size=1`. Compared to 'vanilla'
+      reparameterization, this can provide even lower-variance gradient
+      estimates, but requires a copy of the surrogate posterior with no gradient
+      to its parameters (passed to the loss as `stopped_surrogate_posterior`),
+      and incurs an additional evaluation of the surrogate density at each step.
+    VIMCO: An extension of the score-function estimator, introduced by Minh and
+      Rezende [7], with reduced variance when `importance_sample_size > 1`.
+
+  #### References
+
+  [1] R. J. Williams. Simple statistical gradient-following algorithms
+      for connectionist reinforcement learning.
+      __Machine Learning, 8(3-4), 229–256__, 1992.
+
+  [2] Shakir Mohamed. Machine Learning Trick of the Day: Log Derivative Trick.
+      2015.
+      https://blog.shakirm.com/2015/11/machine-learning-trick-of-the-day-5-log-derivative-trick/
+
+  [3] Diederik P. Kingma, and Max Welling. Auto-encoding variational bayes.
+      __arXiv preprint arXiv:1312.6114__, 2013. https://arxiv.org/abs/1312.6114
+
+  [4] Michael Figurnov, Shakir Mohamed, and Andriy Mnih. Implicit
+      reparameterization gradients. __arXiv preprint arXiv:1805.08498__, 2018.
+      https://arxiv.org/abs/1805.08498
+
+  [5] George Tucker, Dieterich Lawson, Shixiang Gu, and Chris J. Maddison.
+      Doubly reparameterized gradient estimators for Monte Carlo objectives.
+      __arXiv preprint arXiv:1810.04152__, 2018.
+      https://arxiv.org/abs/1810.04152
+
+  [6] Geoffrey Roeder, Yuhuai Wu, and David Duvenaud. Sticking the landing:
+      Simple, lower-variance gradient estimators for variational inference.
+      __arXiv preprint arXiv:1703.09194__, 2017.
+      https://arxiv.org/abs/1703.09194
+
+  [7] Andriy Mnih and Danilo Rezende. Variational Inference for Monte Carlo
+      objectives. In _International Conference on Machine Learning_, 2016.
+      https://arxiv.org/abs/1602.06725
+  """
+  SCORE_FUNCTION = 0
+  REPARAMETERIZATION = 1
+  DOUBLY_REPARAMETERIZED = 2
+  VIMCO = 3
 
 
 def amari_alpha(logu, alpha=1., self_normalized=False, name=None):
@@ -782,14 +868,42 @@ def symmetrized_csiszar_function(logu, csiszar_function, name=None):
                   dual_csiszar_function(logu, csiszar_function))
 
 
-def monte_carlo_variational_loss(target_log_prob_fn,
-                                 surrogate_posterior,
-                                 sample_size=1,
-                                 importance_sample_size=1,
-                                 discrepancy_fn=kl_reverse,
-                                 use_reparameterization=None,
-                                 seed=None,
-                                 name=None):
+def _choose_gradient_estimator(use_reparameterization,
+                               reparameterization_types):
+  """Infers a default gradient estimator from args to a variational loss."""
+  if use_reparameterization is None:
+    use_reparameterization = all(
+        reparameterization_type == FULLY_REPARAMETERIZED
+        for reparameterization_type in reparameterization_types)
+  if use_reparameterization:
+    return GradientEstimators.REPARAMETERIZATION
+  else:
+    warnings.warn(
+        'Using score-function gradient estimate, which may have high '
+        'variance. To disable this warning, explicitly pass '
+        '`gradient_estimator=tfp.vi.GradientEstimators.SCORE_FUNCTION`.')
+    return GradientEstimators.SCORE_FUNCTION
+
+
+@deprecation.deprecated_args(
+    '2022-06-01',
+    'Please pass either '
+    '`gradient_estimator=GradientEstimators.REPARAMETERIZATION` (for '
+    '`use_reparameterization=True`) or '
+    '`gradient_estimator=GradientEstimators.SCORE_FUNCTION` (for '
+    '`use_reparameterization=False`).',
+    'use_reparameterization')
+def monte_carlo_variational_loss(
+    target_log_prob_fn,
+    surrogate_posterior,
+    sample_size=1,
+    importance_sample_size=1,
+    discrepancy_fn=kl_reverse,
+    use_reparameterization=None,
+    gradient_estimator=None,
+    stopped_surrogate_posterior=None,
+    seed=None,
+    name=None):
   """Monte-Carlo approximation of an f-Divergence variational loss.
 
   Variational losses measure the divergence between an unnormalized target
@@ -826,11 +940,11 @@ def monte_carlo_variational_loss(target_log_prob_fn,
       shape `[sample_size]`.
     surrogate_posterior: A `tfp.distributions.Distribution`
       instance defining a variational posterior (could be a
-      `tfd.JointDistribution`). Crucially, the distribution's `log_prob` and
-      (if reparameterizeable) `sample` methods must directly invoke all ops
-      that generate gradients to the underlying variables. One way to ensure
-      this is to use `tfp.util.TransformedVariable` and/or
-      `tfp.util.DeferredTensor` to represent any parameters defined as
+      `tfd.JointDistribution`). If using `tf.Variable` parameters, the
+      distribution's `log_prob` and (if reparameterizeable) `sample` methods
+      must directly invoke all ops that generate gradients to the underlying
+      variables. One way to ensure this is to use `tfp.util.TransformedVariable`
+      and/or `tfp.util.DeferredTensor` to represent any parameters defined as
       transformations of unconstrained variables, so that the transformations
       execute at runtime instead of at distribution creation.
     sample_size: Integer scalar number of Monte Carlo samples used to
@@ -848,12 +962,19 @@ def monte_carlo_variational_loss(target_log_prob_fn,
       in log-space. That is, `discrepancy_fn(log(u)) = f(u)`, where `f` is
       convex in `u`.
       Default value: `tfp.vi.kl_reverse`.
-    use_reparameterization: Python `bool`. When `None` (the default),
-      automatically set to:
-      `surrogate_posterior.reparameterization_type ==
-      tfd.FULLY_REPARAMETERIZED`. When `True` uses the standard Monte-Carlo
-      average. When `False` uses the score-gradient trick. (See above for
-      details.)  When `False`, consider using `csiszar_vimco`.
+    use_reparameterization: Deprecated; use `gradient_estimator` instead.
+    gradient_estimator: Optional element from `tfp.vi.GradientEstimators`
+      specifying the stochastic gradient estimator to associate with the
+      variational loss. If `None`, a default estimator (either score-function or
+      reparameterization) is chosen based on
+      `surrogate_posterior.reparameterization_type`.
+      Default value: `None`.
+    stopped_surrogate_posterior: Optional copy of `surrogate_posterior` with
+      stopped gradients to the parameters, e.g.,
+      `tfd.Normal(loc=tf.stop_gradient(loc), scale=tf.stop_gradient(scale))`.
+      Required if and only if
+      `gradient_estimator == tfp.vi.GradientEstimators.DOUBLY_REPARAMETERIZED`.
+      Default value: `None`.
     seed: PRNG seed for `surrogate_posterior.sample`; see
       `tfp.random.sanitize_seed` for details.
     name: Python `str` name prefixed to Ops created by this function.
@@ -885,33 +1006,6 @@ def monte_carlo_variational_loss(target_log_prob_fn,
   For example, `f = lambda u: -log(u)` recovers `KL[q||p]`, while `f =
   lambda u: u * log(u)` recovers the forward `KL[p||q]`. These and other
   functions are available in `tfp.vi`.
-
-  #### Tricks: Reparameterization and Score-Gradient
-
-  When q is "reparameterized", i.e., a diffeomorphic transformation of a
-  parameterless distribution (e.g.,
-  `Normal(Y; m, s) <=> Y = sX + m, X ~ Normal(0,1)`), we can swap gradient and
-  expectation, i.e.,
-  `grad[Avg{ s_i : i=1...n }] = Avg{ grad[s_i] : i=1...n }` where `S_n=Avg{s_i}`
-  and `s_i = f(x_i), x_i ~iid q(X)`.
-
-  However, if q is not reparameterized, TensorFlow's gradient will be incorrect
-  since the chain-rule stops at samples of unreparameterized distributions. In
-  this circumstance using the Score-Gradient trick results in an unbiased
-  gradient, i.e.,
-
-  ```none
-  grad[ E_q[f(X)] ]
-  = grad[ int dx q(x) f(x) ]
-  = int dx grad[ q(x) f(x) ]
-  = int dx [ q'(x) f(x) + q(x) f'(x) ]
-  = int dx q(x) [q'(x) / q(x) f(x) + f'(x) ]
-  = int dx q(x) grad[ f(x) q(x) / stop_grad[q(x)] ]
-  = E_q[ grad[ f(x) q(x) / stop_grad[q(x)] ] ]
-  ```
-
-  Unless `q.reparameterization_type != tfd.FULLY_REPARAMETERIZED` it is
-  usually preferable to set `use_reparameterization = True`.
 
   #### Example Application:
 
@@ -947,35 +1041,46 @@ def monte_carlo_variational_loss(target_log_prob_fn,
 
   """
   with tf.name_scope(name or 'monte_carlo_variational_loss'):
-    reparameterization_types = tf.nest.flatten(
-        surrogate_posterior.reparameterization_type)
-    if use_reparameterization is None:
-      use_reparameterization = all(
-          reparameterization_type == FULLY_REPARAMETERIZED
-          for reparameterization_type in reparameterization_types)
-    elif (use_reparameterization and
-          any(reparameterization_type != FULLY_REPARAMETERIZED
-              for reparameterization_type in reparameterization_types)):
-      # TODO(jvdillon): Consider only raising an exception if the gradient is
-      # requested.
-      raise ValueError(
-          'Distribution `surrogate_posterior` must be reparameterized, i.e.,'
-          'a diffeomorphic transformation of a parameterless distribution. '
-          '(Otherwise this function has a biased gradient.)')
     if not callable(target_log_prob_fn):
       raise TypeError('`target_log_prob_fn` must be a Python `callable`'
                       'function.')
 
-    if use_reparameterization:
-      # Attempt to avoid bijector inverses by computing the surrogate log prob
-      # during the forward sampling pass.
-      q_samples, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
-          [sample_size * importance_sample_size], seed=seed)
-    else:
+    reparameterization_types = tf.nest.flatten(
+        surrogate_posterior.reparameterization_type)
+    if gradient_estimator is None:
+      gradient_estimator = _choose_gradient_estimator(
+          use_reparameterization=use_reparameterization,
+          reparameterization_types=reparameterization_types)
+
+    if gradient_estimator == GradientEstimators.VIMCO:
+      return csiszar_vimco(f=discrepancy_fn,
+                           p_log_prob=target_log_prob_fn,
+                           q=surrogate_posterior,
+                           num_draws=importance_sample_size,
+                           num_batch_draws=sample_size,
+                           seed=seed)
+    if gradient_estimator == GradientEstimators.SCORE_FUNCTION:
+      if tf.get_static_value(importance_sample_size) != 1:
+        # TODO(b/213378570): Support score function gradients for
+        # importance-weighted bounds.
+        raise ValueError('Score-function gradients are not supported for '
+                         'losses with `importance_sample_size != 1`.')
       # Score fn objective requires explicit gradients of `log_prob`.
       q_samples = surrogate_posterior.sample(
           [sample_size * importance_sample_size], seed=seed)
       q_lp = None
+    else:
+      if any(reparameterization_type != FULLY_REPARAMETERIZED
+             for reparameterization_type in reparameterization_types):
+        warnings.warn(
+            'Reparameterization gradients requested, but '
+            '`surrogate_posterior.reparameterization_type` is not fully '
+            'reparameterized (saw: {}). Gradient estimates may be '
+            'biased.'.format(surrogate_posterior.reparameterization_type))
+      # Attempt to avoid bijector inverses by computing the surrogate log prob
+      # during the forward sampling pass.
+      q_samples, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
+          [sample_size * importance_sample_size], seed=seed)
 
     return monte_carlo.expectation(
         f=_make_importance_weighted_divergence_fn(
@@ -983,11 +1088,15 @@ def monte_carlo_variational_loss(target_log_prob_fn,
             surrogate_posterior=surrogate_posterior,
             discrepancy_fn=discrepancy_fn,
             precomputed_surrogate_log_prob=q_lp,
-            importance_sample_size=importance_sample_size),
+            importance_sample_size=importance_sample_size,
+            gradient_estimator=gradient_estimator,
+            stopped_surrogate_posterior=(
+                stopped_surrogate_posterior)),
         samples=q_samples,
-        # Log-prob is only used if use_reparameterization=False.
+        # Log-prob is only used if `gradient_estimator == SCORE_FUNCTION`.
         log_prob=surrogate_posterior.log_prob,
-        use_reparameterization=use_reparameterization)
+        use_reparameterization=(
+            gradient_estimator != GradientEstimators.SCORE_FUNCTION))
 
 
 def _make_importance_weighted_divergence_fn(
@@ -995,19 +1104,32 @@ def _make_importance_weighted_divergence_fn(
     surrogate_posterior,
     discrepancy_fn,
     precomputed_surrogate_log_prob=None,
-    importance_sample_size=1):
+    importance_sample_size=1,
+    gradient_estimator=GradientEstimators.REPARAMETERIZATION,
+    stopped_surrogate_posterior=None):
   """Defines a function to compute an importance-weighted divergence."""
 
   def divergence_fn(q_samples):
     q_lp = precomputed_surrogate_log_prob
+    target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
+
+    if gradient_estimator == GradientEstimators.DOUBLY_REPARAMETERIZED:
+      # Sticking-the-landing is the special case of doubly-reparameterized
+      # gradients with `importance_sample_size=1`.
+      q_lp = stopped_surrogate_posterior.log_prob(q_samples)
+      log_weights = target_log_prob - q_lp
+    else:
+      if q_lp is None:
+        q_lp = surrogate_posterior.log_prob(q_samples)
+    log_weights = target_log_prob - q_lp
+    return discrepancy_fn(log_weights)
+
+  def importance_weighted_divergence_fn(q_samples):
+    q_lp = precomputed_surrogate_log_prob
     if q_lp is None:
       q_lp = surrogate_posterior.log_prob(q_samples)
-
     target_log_prob = nest_util.call_fn(target_log_prob_fn, q_samples)
     log_weights = target_log_prob - q_lp
-    if tf.get_static_value(importance_sample_size) == 1:
-      # Bypass importance weighting.
-      return discrepancy_fn(log_weights)
 
     # Explicitly break out `importance_sample_size` as a separate axis.
     log_weights = tf.reshape(
@@ -1017,11 +1139,32 @@ def _make_importance_weighted_divergence_fn(
     log_sum_weights = tf.reduce_logsumexp(log_weights, axis=1)
     log_avg_weights = log_sum_weights - tf.math.log(
         tf.cast(importance_sample_size, dtype=log_weights.dtype))
+
+    if gradient_estimator == GradientEstimators.DOUBLY_REPARAMETERIZED:
+      # Adapted from original implementation at
+      # https://github.com/google-research/google-research/blob/master/dreg_estimators/model.py
+      normalized_weights = tf.stop_gradient(tf.nn.softmax(log_weights, axis=1))
+      log_weights_with_stopped_q = tf.reshape(
+          target_log_prob - stopped_surrogate_posterior.log_prob(q_samples),
+          ps.shape(log_weights))
+      dreg_objective = tf.reduce_sum(
+          log_weights_with_stopped_q * tf.square(normalized_weights), axis=1)
+      # Replace the objective's gradient with the doubly-reparameterized
+      # gradient.
+      log_avg_weights = tf.stop_gradient(log_avg_weights) + (
+          dreg_objective - tf.stop_gradient(dreg_objective))
+
     return discrepancy_fn(log_avg_weights)
 
-  return divergence_fn
+  if tf.get_static_value(importance_sample_size) == 1:
+    return divergence_fn
+  return importance_weighted_divergence_fn
 
 
+@deprecation.deprecated(
+    '2022-06-01',
+    'Use `monte_carlo_variational_loss` with '
+    '`gradient_estimator=tfp.vi.GradientEstimators.VIMCO`.')
 def csiszar_vimco(f,
                   p_log_prob,
                   q,

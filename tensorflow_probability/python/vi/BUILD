@@ -63,7 +63,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "csiszar_divergence_test",
-    size = "small",
+    size = "medium",
     srcs = ["csiszar_divergence_test.py"],
     jax_size = "medium",
     numpy_size = "medium",

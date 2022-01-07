@@ -14,16 +14,22 @@
 # ============================================================================
 """Tests for Csiszar divergences."""
 
+import functools
+
 # Dependency imports
+from absl.testing import parameterized
+
 import numpy as np
 
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import gradient
 
 
+tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
@@ -734,8 +740,7 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
     # smaller.
     s = tf.constant(1.)
 
-    def construct_monte_carlo_csiszar_f_divergence(
-        func, use_reparameterization=True):
+    def construct_monte_carlo_csiszar_f_divergence(func, gradient_estimator):
       def _fn(s):
         p = tfd.MultivariateNormalFullCovariance(
             covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
@@ -745,23 +750,26 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
             surrogate_posterior=q,
             discrepancy_fn=func,
             sample_size=sample_size,
-            use_reparameterization=use_reparameterization,
+            gradient_estimator=gradient_estimator,
             seed=seed)
       return _fn
 
     approx_kl = construct_monte_carlo_csiszar_f_divergence(
-        tfp.vi.kl_reverse)
+        tfp.vi.kl_reverse,
+        gradient_estimator=tfp.vi.GradientEstimators.REPARAMETERIZATION)
 
     approx_kl_self_normalized = construct_monte_carlo_csiszar_f_divergence(
-        lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True))
+        lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
+        gradient_estimator=tfp.vi.GradientEstimators.REPARAMETERIZATION)
 
     approx_kl_score_trick = construct_monte_carlo_csiszar_f_divergence(
-        tfp.vi.kl_reverse, use_reparameterization=False)
+        tfp.vi.kl_reverse,
+        gradient_estimator=tfp.vi.GradientEstimators.SCORE_FUNCTION)
 
     approx_kl_self_normalized_score_trick = (
         construct_monte_carlo_csiszar_f_divergence(
             lambda logu: tfp.vi.kl_reverse(logu, self_normalized=True),
-            use_reparameterization=False))
+            gradient_estimator=tfp.vi.GradientEstimators.SCORE_FUNCTION))
 
     def exact_kl(s):
       p = tfd.MultivariateNormalFullCovariance(
@@ -815,6 +823,130 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
         approx_kl_self_normalized_score_trick_grad_, exact_kl_grad_,
         rtol=0.04, atol=0.)
 
+  @test_util.numpy_disable_gradient_test
+  def test_sticking_the_landing_gradient_is_zero_at_optimum(self):
+    target_dist = tfd.Normal(loc=2., scale=3.)
+
+    def apply_fn(loc, raw_scale):
+      return tfd.Normal(loc=loc, scale=tf.nn.softplus(raw_scale))
+    optimal_params = (target_dist.mean(),
+                      tfb.Softplus().inverse(target_dist.stddev()))
+
+    def loss(params, gradient_estimator):
+      return tfp.vi.monte_carlo_variational_loss(
+          target_dist.log_prob,
+          surrogate_posterior=apply_fn(*params),
+          stopped_surrogate_posterior=apply_fn(
+              *[tf.stop_gradient(p) for p in params]),
+          gradient_estimator=gradient_estimator,
+          seed=test_util.test_seed(sampler_type='stateless'))
+
+    elbo_loss, _ = tfp.math.value_and_gradient(
+        functools.partial(
+            loss,
+            gradient_estimator=tfp.vi.GradientEstimators.REPARAMETERIZATION),
+        [optimal_params])
+    stl_loss, stl_grad = tfp.math.value_and_gradient(
+        functools.partial(
+            loss,
+            gradient_estimator=(
+                tfp.vi.GradientEstimators.DOUBLY_REPARAMETERIZED)),
+        [optimal_params])
+    self.assertAllClose(elbo_loss, stl_loss)
+    for g in stl_grad[0]:
+      self.assertAllClose(g, tf.zeros_like(g))
+
+  @test_util.numpy_disable_gradient_test
+  def test_doubly_reparameterized_reduces_iwae_gradient_variance(self):
+
+    target_dist = tfd.Normal(loc=2., scale=3.)
+
+    def apply_fn(loc, raw_scale):
+      return tfd.Normal(loc=loc, scale=tf.nn.softplus(raw_scale))
+    initial_params = (-3., tfb.Softplus().inverse(1.))
+
+    def loss(params, gradient_estimator, seed):
+      return tfp.vi.monte_carlo_variational_loss(
+          target_dist.log_prob,
+          surrogate_posterior=apply_fn(*params),
+          stopped_surrogate_posterior=apply_fn(
+              *[tf.stop_gradient(p) for p in params]),
+          gradient_estimator=gradient_estimator,
+          sample_size=10,
+          importance_sample_size=10,
+          seed=seed)
+
+    seeds = samplers.split_seed(test_util.test_seed(sampler_type='stateless'),
+                                n=30)
+    iwae_grads = []
+    dreg_grads = []
+    for seed in seeds:
+      iwae_loss, iwae_grad = tfp.math.value_and_gradient(
+          functools.partial(
+              loss,
+              gradient_estimator=tfp.vi.GradientEstimators.REPARAMETERIZATION,
+              seed=seed),
+          [initial_params])
+      dreg_loss, dreg_grad = tfp.math.value_and_gradient(
+          functools.partial(
+              loss,
+              gradient_estimator=(
+                  tfp.vi.GradientEstimators.DOUBLY_REPARAMETERIZED),
+              seed=seed),
+          [initial_params])
+      self.assertAllClose(iwae_loss, dreg_loss)
+      iwae_grads.append(tf.convert_to_tensor(iwae_grad))
+      dreg_grads.append(tf.convert_to_tensor(dreg_grad))
+
+    self.assertAllClose(tf.reduce_mean(iwae_grads, axis=0),
+                        tf.reduce_mean(dreg_grads, axis=0), atol=0.1)
+
+    self.assertAllGreater(
+        (tf.math.reduce_std(dreg_grads, axis=0) -
+         tf.math.reduce_std(iwae_grads, axis=0)),
+        0.)
+
+  @parameterized.named_parameters(
+      ('_score_function',
+       # TODO(b/213378570): Support score function gradients for
+       # importance-weighted bounds.
+       tfp.vi.GradientEstimators.SCORE_FUNCTION, 1),
+      ('_reparameterization',
+       tfp.vi.GradientEstimators.REPARAMETERIZATION, 5),
+      ('_doubly_reparameterized',
+       tfp.vi.GradientEstimators.DOUBLY_REPARAMETERIZED, 5),
+      ('_vimco', tfp.vi.GradientEstimators.VIMCO, 5))
+  def test_gradient_estimators_do_not_modify_loss(self,
+                                                  gradient_estimator,
+                                                  importance_sample_size):
+
+    def target_log_prob_fn(x):
+      return tfd.Normal(4., scale=1.).log_prob(x)
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    sample_size = 10000
+
+    surrogate_posterior = tfd.Normal(loc=7., scale=2.)
+
+    # Manually estimate the expected multi-sample / IWAE loss.
+    zs, q_lp = surrogate_posterior.experimental_sample_and_log_prob(
+        [sample_size, importance_sample_size], seed=seed)
+    log_weights = target_log_prob_fn(zs) - q_lp
+    iwae_loss = -tf.reduce_mean(
+        tf.math.reduce_logsumexp(log_weights, axis=1) - tf.math.log(
+            tf.cast(importance_sample_size, dtype=log_weights.dtype)),
+        axis=0)
+
+    loss = tfp.vi.monte_carlo_variational_loss(
+        target_log_prob_fn,
+        surrogate_posterior=surrogate_posterior,
+        gradient_estimator=gradient_estimator,
+        stopped_surrogate_posterior=surrogate_posterior,  # Gradients unused.
+        importance_sample_size=importance_sample_size,
+        sample_size=sample_size,
+        seed=seed)
+    self.assertAllClose(iwae_loss, loss, atol=0.03)
+
 
 @test_util.test_all_tf_execution_regimes
 class CsiszarVIMCOTest(test_util.TestCase):
@@ -866,12 +998,13 @@ class CsiszarVIMCOTest(test_util.TestCase):
         lambda s: tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [dims])))
 
     def vimco_loss(s):
-      return tfp.vi.csiszar_vimco(
-          f=f,
-          p_log_prob=p.log_prob,
-          q=build_q(s),
-          num_draws=num_draws,
-          num_batch_draws=num_batch_draws,
+      return tfp.vi.monte_carlo_variational_loss(
+          p.log_prob,
+          surrogate_posterior=build_q(s),
+          importance_sample_size=num_draws,
+          sample_size=num_batch_draws,
+          gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
+          discrepancy_fn=f,
           seed=seed)
 
     def logu(s):
@@ -957,18 +1090,18 @@ class CsiszarVIMCOTest(test_util.TestCase):
 
     seed = test_util.test_seed()
 
-    reverse_kl_sequential = tfp.vi.csiszar_vimco(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p_log_prob,
-        q=q_sequential,
-        num_draws=int(3e5),
+    reverse_kl_sequential = tfp.vi.monte_carlo_variational_loss(
+        p_log_prob,
+        surrogate_posterior=q_sequential,
+        importance_sample_size=int(3e5),
+        gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
         seed=seed)
 
-    reverse_kl_named = tfp.vi.csiszar_vimco(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p_log_prob,
-        q=q_named,
-        num_draws=int(3e5),
+    reverse_kl_named = tfp.vi.monte_carlo_variational_loss(
+        p_log_prob,
+        surrogate_posterior=q_named,
+        importance_sample_size=int(3e5),
+        gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
         seed=seed)
 
     [reverse_kl_sequential_, reverse_kl_named_
@@ -990,18 +1123,18 @@ class CsiszarVIMCOTest(test_util.TestCase):
 
     seed = test_util.test_seed(sampler_type='stateless')
 
-    reverse_kl = tfp.vi.csiszar_vimco(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p_log_prob,
-        q=q,
-        num_draws=10,
+    reverse_kl = tfp.vi.monte_carlo_variational_loss(
+        p_log_prob,
+        surrogate_posterior=q,
+        importance_sample_size=10,
+        gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
         seed=seed)
 
-    reverse_kl_again = tfp.vi.csiszar_vimco(
-        f=tfp.vi.kl_reverse,
-        p_log_prob=p_log_prob,
-        q=q,
-        num_draws=10,
+    reverse_kl_again = tfp.vi.monte_carlo_variational_loss(
+        p_log_prob,
+        surrogate_posterior=q,
+        importance_sample_size=10,
+        gradient_estimator=tfp.vi.GradientEstimators.VIMCO,
         seed=seed)
 
     self.assertAllClose(reverse_kl_again, reverse_kl)
