@@ -33,11 +33,43 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     srcs_version = "PY3",
     deps = [
+        ":importance_resample",
         ":increment_log_prob",
         ":joint_distribution_pinned",
         ":marginal_fns",
         ":mvn_precision_factor_linop",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "importance_resample",
+    srcs = ["importance_resample.py"],
+    srcs_version = "PY3",
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/mcmc:weighted_resampling",
+        "//tensorflow_probability/python/internal:nest_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "importance_resample_test",
+    size = "medium",
+    srcs = ["importance_resample_test.py"],
+    jax_size = "medium",
+    srcs_version = "PY3",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
