@@ -28,11 +28,14 @@ class RunTest(test_util.TestCase):
   def test_simple_reduction(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     result = tfp.experimental.mcmc.sample_chain(
         num_results=5,
         current_state=0.,
         kernel=fake_kernel,
         reducer=fake_reducer,
+        seed=seed1,
     )
     last_sample, reduction_result, kernel_results = self.evaluate([
         result.final_state, result.reduction_results,
@@ -50,6 +53,7 @@ class RunTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=fake_reducer,
         previous_kernel_results=kernel_results,
+        seed=seed2,
     )
     last_sample_2, reduction_result_2, kernel_results_2 = self.evaluate([
         result_2.final_state, result_2.reduction_results,
@@ -63,11 +67,14 @@ class RunTest(test_util.TestCase):
   def test_reducer_warm_restart(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     result = tfp.experimental.mcmc.sample_chain(
         num_results=5,
         current_state=0.,
         kernel=fake_kernel,
         reducer=fake_reducer,
+        seed=seed1,
     )
     last_sample, red_res, kernel_results = self.evaluate([
         result.final_state, result.reduction_results,
@@ -81,7 +88,7 @@ class RunTest(test_util.TestCase):
     # Warm-restart the underlying kernel and the reduction using the provided
     # restart package
     result_2 = tfp.experimental.mcmc.sample_chain(
-        num_results=5, **result.resume_kwargs)
+        num_results=5, seed=seed2, **result.resume_kwargs)
     last_sample_2, reduction_result_2, kernel_results_2 = self.evaluate([
         result_2.final_state, result_2.reduction_results,
         result_2.final_kernel_results
@@ -99,7 +106,8 @@ class RunTest(test_util.TestCase):
         current_state=0.,
         kernel=fake_kernel,
         reducer=fake_reducer,
-        trace_fn=lambda _state, _kr, reductions: reductions
+        trace_fn=lambda _state, _kr, reductions: reductions,
+        seed=test_util.test_seed(),
     )
     trace = self.evaluate(result.trace)
     self.assertAllEqual(trace, [1.0, 1.5, 2.0, 2.5, 3.0])
@@ -110,7 +118,8 @@ class RunTest(test_util.TestCase):
         num_results=5,
         current_state=0.,
         kernel=fake_kernel,
-        trace_fn=lambda state, _kr: state + 10
+        trace_fn=lambda state, _kr: state + 10,
+        seed=test_util.test_seed(),
     )
     trace = self.evaluate(result.trace)
     self.assertAllEqual(trace, [11.0, 12.0, 13.0, 14.0, 15.0])

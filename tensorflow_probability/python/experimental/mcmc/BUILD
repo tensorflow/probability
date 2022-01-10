@@ -39,23 +39,12 @@ multi_substrate_py_library(
         ":preconditioned_hmc",
     ],
     substrates_omit_deps = [
-        ":covariance_reducer",
         ":elliptical_slice_sampler",
-        ":expectations_reducer",
         ":kernel_builder",
         ":kernel_outputs",
         ":nuts_autobatching",
         ":particle_filter_augmentation",
-        ":potential_scale_reduction_reducer",
         ":progress_bar_reducer",
-        ":reducer",
-        ":sample",
-        ":step",
-        ":sample_discarding_kernel",
-        ":sample_fold",
-        ":thinning_kernel",
-        ":tracing_reducer",
-        ":with_reductions",
     ],
     deps = [
         ":covariance_reducer",
@@ -600,7 +589,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "step",
     srcs = ["step.py"],
     deps = [
@@ -610,7 +599,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "step_test",
     size = "small",
     srcs = ["step_test.py"],
@@ -624,7 +613,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "reducer",
     srcs = ["reducer.py"],
     deps = [
@@ -632,7 +621,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "covariance_reducer",
     srcs = ["covariance_reducer.py"],
     deps = [
@@ -643,7 +632,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "covariance_reducer_test",
     size = "small",
     srcs = ["covariance_reducer_test.py"],
@@ -657,7 +646,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "with_reductions",
     srcs = ["with_reductions.py"],
     deps = [
@@ -667,9 +656,10 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "with_reductions_test",
     srcs = ["with_reductions_test.py"],
+    shard_count = 2,
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -678,7 +668,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sample",
     srcs = ["sample.py"],
     deps = [
@@ -691,7 +681,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sample_test",
     size = "small",
     srcs = ["sample_test.py"],
@@ -704,7 +694,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sample_fold",
     srcs = ["sample_fold.py"],
     deps = [
@@ -719,7 +709,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sample_fold_test",
     size = "small",
     srcs = ["sample_fold_test.py"],
@@ -733,18 +723,19 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sample_discarding_kernel",
     srcs = ["sample_discarding_kernel.py"],
     deps = [
         ":step",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/mcmc/internal",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "sample_discarding_kernel_test",
     size = "small",
     srcs = ["sample_discarding_kernel_test.py"],
@@ -779,7 +770,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "thinning_kernel",
     srcs = ["thinning_kernel.py"],
     deps = [
@@ -790,7 +781,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "thinning_kernel_test",
     size = "small",
     srcs = ["thinning_kernel_test.py"],
@@ -804,7 +795,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "tracing_reducer",
     srcs = ["tracing_reducer.py"],
     deps = [
@@ -814,7 +805,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "tracing_reducer_test",
     size = "small",
     srcs = ["tracing_reducer_test.py"],
@@ -827,7 +818,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "expectations_reducer",
     srcs = ["expectations_reducer.py"],
     deps = [
@@ -837,7 +828,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "expectations_reducer_test",
     srcs = ["expectations_reducer_test.py"],
     shard_count = 5,
@@ -850,7 +841,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "potential_scale_reduction_reducer",
     srcs = ["potential_scale_reduction_reducer.py"],
     deps = [
@@ -860,7 +851,7 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "potential_scale_reduction_reducer_test",
     size = "small",
     srcs = ["potential_scale_reduction_reducer_test.py"],

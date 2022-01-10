@@ -37,7 +37,8 @@ class StepKernelTest(test_util.TestCase):
         num_steps=2,
         current_state=0,
         kernel=fake_kernel,
-        return_final_kernel_results=True
+        return_final_kernel_results=True,
+        seed=test_util.test_seed(),
     )
     final_state, kernel_results = self.evaluate([final_state, kernel_results])
     self.assertEqual(final_state, 2)
@@ -54,7 +55,8 @@ class StepKernelTest(test_util.TestCase):
         current_state=0,
         previous_kernel_results=init_pkr,
         kernel=fake_kernel,
-        return_final_kernel_results=True
+        return_final_kernel_results=True,
+        seed=test_util.test_seed(),
     )
     final_state, kernel_results = self.evaluate([final_state, kernel_results])
     self.assertEqual(final_state, 2)
@@ -68,6 +70,7 @@ class StepKernelTest(test_util.TestCase):
         num_steps=2,
         current_state=1,
         kernel=fake_kernel,
+        seed=test_util.test_seed(),
     )
     final_state = self.evaluate(final_state)
     self.assertEqual(final_state, 3)
@@ -93,7 +96,7 @@ class StepKernelTest(test_util.TestCase):
     seed = samplers.sanitize_seed(test_util.test_seed())
     last_state_t = step_kernel(
         num_steps=1,
-        current_state=0,
+        current_state=0.,
         kernel=test_fixtures.RandomTransitionKernel(),
         seed=seed,
     )
@@ -118,6 +121,7 @@ class StepKernelTest(test_util.TestCase):
       last_state_t = first_final_state_t
 
   @test_util.test_graph_mode_only
+  @test_util.numpy_disable_test_missing_functionality('while_loop')
   def test_smart_for_loop_uses_tf_while(self):
     dtype = np.float32
     true_mean = dtype([0, 0])
@@ -143,8 +147,7 @@ class StepKernelTest(test_util.TestCase):
         return_final_kernel_results=False,
         seed=test_util.test_seed())
 
-    target_calls = 4 if tf.executing_eagerly() else 2
-    self.assertAllEqual(dict(target_calls=target_calls), counter)
+    self.assertAllEqual(dict(target_calls=2), counter)
 
 
 if __name__ == '__main__':

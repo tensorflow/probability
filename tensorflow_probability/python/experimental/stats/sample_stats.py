@@ -314,7 +314,7 @@ def _batch_outer_product(target, event_ndims):
 
 
 def _float_dtype_like(dtype):
-  if dtype is tf.int64:
+  if dtype_util.as_numpy_dtype(dtype) == np.int64:
     return tf.float64
   if dtype_util.is_integer(dtype):
     return tf.float32

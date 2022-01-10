@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class TracingReducerTest(test_util.TestCase):
 
+  @test_util.jax_disable_test_missing_functionality('dynamic-size TensorArray')
   def test_tf_while(self):
     def trace_fn(sample, pkr):
       return sample, (sample, pkr), {'one': sample, 'two': pkr}
@@ -44,6 +45,7 @@ class TracingReducerTest(test_util.TestCase):
     self.assertAllEqual(([1, 2], [2, 4]), final_trace[1])
     self.assertAllEqualNested(final_trace[2], ({'one': [1, 2], 'two': [2, 4]}))
 
+  @test_util.jax_disable_test_missing_functionality('dynamic-size TensorArray')
   def test_in_sample_fold(self):
     tracer = tfp.experimental.mcmc.TracingReducer()
     fake_kernel = test_fixtures.TestTransitionKernel()
@@ -51,7 +53,8 @@ class TracingReducerTest(test_util.TestCase):
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
-        reducer=tracer)
+        reducer=tracer,
+        seed=test_util.test_seed())
     trace, final_state, kernel_results = self.evaluate([
         trace,
         final_state,

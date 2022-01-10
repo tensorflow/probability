@@ -73,15 +73,15 @@ class ExpectationsReducerTest(test_util.TestCase):
         num_steps=5,
         current_state=8,
         kernel=reduced_kernel,
-        return_final_kernel_results=True)
+        return_final_kernel_results=True,
+        seed=test_util.test_seed())
     reduction_results = self.evaluate(
         mean_reducer.finalize(kernel_results.reduction_results))
     self.assertEqual(11, reduction_results)
 
+  @test_util.numpy_disable_test_missing_functionality('composite tensors')
   def test_composite_kernel_results(self):
-    composite_normal_cls = tfp.experimental.auto_composite_tensor(
-        tfd.Normal, omit_kwargs='name')
-    kr = composite_normal_cls(0., 1.)
+    kr = tfd.Normal(0., 1.)
     mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
     state = mean_reducer.initialize(tf.zeros((2,)), kr)
     state = mean_reducer.one_step(tf.ones((2,)), state, kr)

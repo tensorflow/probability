@@ -15,7 +15,10 @@
 # Description:
 #   Internal utilities for TensorFlow probability.
 
-licenses(["notice"])
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+)
 
 package(
     default_visibility = [
@@ -24,7 +27,9 @@ package(
     ],
 )
 
-py_library(
+licenses(["notice"])
+
+multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
     deps = [
@@ -32,7 +37,7 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "test_fixtures",
     srcs = ["test_fixtures.py"],
     deps = [

@@ -31,10 +31,12 @@ class ThinningTest(test_util.TestCase):
     thinner = tfp.experimental.mcmc.ThinningKernel(
         fake_inner_kernel,
         num_steps_to_skip=1,)
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = thinner.one_step(
-        0., thinner.bootstrap_results(0.))
+        0., thinner.bootstrap_results(0.), seed=seed1)
     second_state, kernel_results = thinner.one_step(
-        first_state, kernel_results)
+        first_state, kernel_results, seed=seed2)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
     self.assertEqual(2, first_state)
@@ -47,10 +49,12 @@ class ThinningTest(test_util.TestCase):
     thinner = tfp.experimental.mcmc.ThinningKernel(
         fake_inner_kernel,
         num_steps_to_skip=0,)
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = thinner.one_step(
-        0., thinner.bootstrap_results(0.))
+        0., thinner.bootstrap_results(0.), seed=seed1)
     second_state, kernel_results = thinner.one_step(
-        first_state, kernel_results)
+        first_state, kernel_results, seed=seed2)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
     self.assertEqual(1, first_state)
@@ -63,10 +67,12 @@ class ThinningTest(test_util.TestCase):
     thinner = tfp.experimental.mcmc.ThinningKernel(
         fake_inner_kernel,
         num_steps_to_skip=1,)
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     first_state, _ = thinner.one_step(
-        0., thinner.bootstrap_results(0.))
+        0., thinner.bootstrap_results(0.), seed=seed1)
     second_state, kernel_results = thinner.one_step(
-        first_state, thinner.bootstrap_results(first_state))
+        first_state, thinner.bootstrap_results(first_state), seed=seed2)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
     self.assertEqual(2, first_state)
@@ -95,9 +101,11 @@ class ThinningTest(test_util.TestCase):
         reducer=cov_reducer
     )
     current_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
+    seed = test_util.test_seed(sampler_type='stateless')
     for _ in range(2):
+      mcmc_seed, seed = tfp.random.split_seed(seed)
       current_state, kernel_results = reducer_kernel.one_step(
-          current_state, kernel_results)
+          current_state, kernel_results, seed=mcmc_seed)
     cov = self.evaluate(cov_reducer.finalize(kernel_results.reduction_results))
     self.assertAllEqual(6, current_state)
     self.assertAllEqual(6, kernel_results.inner_results.counter_1)
@@ -110,17 +118,18 @@ class ThinningTest(test_util.TestCase):
         fake_inner_kernel,
         num_steps_to_skip=1,)
 
-    def _loop_body(i, curr_state, pkr):
+    def _loop_body(i, seed, curr_state, pkr):
+      mcmc_seed, seed = tfp.random.split_seed(seed)
       new_state, kernel_results = thinner.one_step(
-          curr_state, pkr,
+          curr_state, pkr, seed=mcmc_seed,
       )
-      return (i + 1, new_state, kernel_results)
+      return (i + 1, seed, new_state, kernel_results)
 
     pkr = thinner.bootstrap_results(0.)
-    _, final_sample, kernel_results = tf.while_loop(
+    _, _, final_sample, kernel_results = tf.while_loop(
         lambda i, *_: i < 2,
         _loop_body,
-        (0., 0., pkr),
+        (0., test_util.test_seed(sampler_type='stateless'), 0., pkr),
     )
     final_sample, kernel_results = self.evaluate([
         final_sample, kernel_results])
@@ -134,17 +143,18 @@ class ThinningTest(test_util.TestCase):
         fake_inner_kernel,
         num_steps_to_skip=tf.convert_to_tensor(1),)
 
-    def _loop_body(i, curr_state, pkr):
+    def _loop_body(i, seed, curr_state, pkr):
+      mcmc_seed, seed = tfp.random.split_seed(seed)
       new_state, kernel_results = thinner.one_step(
-          curr_state, pkr,
+          curr_state, pkr, seed=mcmc_seed,
       )
-      return (i + 1, new_state, kernel_results)
+      return (i + 1, seed, new_state, kernel_results)
 
     pkr = thinner.bootstrap_results(0.)
-    _, final_sample, kernel_results = tf.while_loop(
-        lambda i, _, __: i < 2,
+    _, _, final_sample, kernel_results = tf.while_loop(
+        lambda i, *_: i < 2,
         _loop_body,
-        (0., 0., pkr),
+        (0., test_util.test_seed(sampler_type='stateless'), 0., pkr),
     )
 
     final_sample, kernel_results = self.evaluate([
@@ -153,6 +163,7 @@ class ThinningTest(test_util.TestCase):
     self.assertEqual(4, kernel_results.counter_1)
     self.assertEqual(8, kernel_results.counter_2)
 
+  @test_util.jax_disable_variable_test
   def test_non_static_thinning(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
     num_steps_to_skip = tf.Variable(1, dtype=tf.int32)
@@ -168,7 +179,7 @@ class ThinningTest(test_util.TestCase):
 
     pkr = thinner.bootstrap_results(0.)
     _, final_sample, kernel_results = tf.while_loop(
-        lambda i, _, __: i < 2,
+        lambda i, *_: i < 2,
         _loop_body,
         (0., 0., pkr),
     )

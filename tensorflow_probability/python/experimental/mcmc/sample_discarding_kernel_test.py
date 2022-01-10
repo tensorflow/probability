@@ -31,10 +31,12 @@ class SampleDiscardingTest(test_util.TestCase):
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_steps_between_results=1,)
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = discarder.one_step(
-        0., discarder.bootstrap_results(0.))
+        0., discarder.bootstrap_results(0.), seed=seed1)
     second_state, kernel_results = discarder.one_step(
-        first_state, kernel_results)
+        first_state, kernel_results, seed=seed2)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
     self.assertEqual(2, first_state)
@@ -48,8 +50,9 @@ class SampleDiscardingTest(test_util.TestCase):
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,
         num_burnin_steps=5,)
+    seed = test_util.test_seed(sampler_type='stateless')
     sample, kernel_results = discarder.one_step(
-        0., discarder.bootstrap_results(0.))
+        0., discarder.bootstrap_results(0.), seed=seed)
     sample, kernel_results = self.evaluate([
         sample, kernel_results])
     self.assertEqual(6, sample)
@@ -61,10 +64,12 @@ class SampleDiscardingTest(test_util.TestCase):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
     discarder = tfp.experimental.mcmc.SampleDiscardingKernel(
         fake_inner_kernel,)
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = discarder.one_step(
-        0., discarder.bootstrap_results(0.))
+        0., discarder.bootstrap_results(0.), seed=seed1)
     second_state, kernel_results = discarder.one_step(
-        first_state, kernel_results)
+        first_state, kernel_results, seed=seed2)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
     self.assertEqual(1, first_state)
@@ -79,10 +84,12 @@ class SampleDiscardingTest(test_util.TestCase):
         fake_inner_kernel,
         num_burnin_steps=10,
         num_steps_between_results=1,)
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     first_state, kernel_results = discarder.one_step(
-        0., discarder.bootstrap_results(0.))
+        0., discarder.bootstrap_results(0.), seed=seed1)
     second_state, kernel_results = discarder.one_step(
-        first_state, kernel_results)
+        first_state, kernel_results, seed=seed2)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
     # the first `one_step` performs burn-in and thinning to skip
@@ -100,10 +107,12 @@ class SampleDiscardingTest(test_util.TestCase):
         fake_inner_kernel,
         num_burnin_steps=10,
         num_steps_between_results=1,)
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     first_state, _ = discarder.one_step(
-        0., discarder.bootstrap_results(0.))
+        0., discarder.bootstrap_results(0.), seed=seed1)
     second_state, kernel_results = discarder.one_step(
-        first_state, discarder.bootstrap_results(first_state))
+        first_state, discarder.bootstrap_results(first_state), seed=seed2)
     first_state, second_state, kernel_results = self.evaluate([
         first_state, second_state, kernel_results])
     # the first `one_step` performs burn-in and thinning to skip
@@ -139,9 +148,11 @@ class SampleDiscardingTest(test_util.TestCase):
         reducer=cov_reducer
     )
     current_state, kernel_results = 0., reducer_kernel.bootstrap_results(0.)
+    seed = test_util.test_seed(sampler_type='stateless')
     for _ in range(2):
+      mcmc_seed, seed = tfp.random.split_seed(seed)
       current_state, kernel_results = reducer_kernel.one_step(
-          current_state, kernel_results)
+          current_state, kernel_results, seed=mcmc_seed)
     cov = cov_reducer.finalize(kernel_results.reduction_results)
     self.assertAllEqual(16, current_state)
     self.assertAllEqual(2, kernel_results.inner_results.call_counter)
@@ -158,17 +169,18 @@ class SampleDiscardingTest(test_util.TestCase):
         num_burnin_steps=10,
         num_steps_between_results=1,)
 
-    def _loop_body(i, curr_state, pkr):
+    def _loop_body(i, seed, curr_state, pkr):
+      mcmc_seed, seed = tfp.random.split_seed(seed)
       new_state, kernel_results = discarder.one_step(
-          curr_state, pkr,
+          curr_state, pkr, seed=mcmc_seed,
       )
-      return (i + 1, new_state, kernel_results)
+      return (i + 1, seed, new_state, kernel_results)
 
     pkr = discarder.bootstrap_results(0.)
-    _, final_sample, kernel_results = tf.while_loop(
+    _, _, final_sample, kernel_results = tf.while_loop(
         lambda i, *_: i < 2,
         _loop_body,
-        (0., 0., pkr),
+        (0., test_util.test_seed(sampler_type='stateless'), 0., pkr),
     )
     final_sample, kernel_results = self.evaluate([
         final_sample, kernel_results])
@@ -184,17 +196,18 @@ class SampleDiscardingTest(test_util.TestCase):
         num_burnin_steps=tf.convert_to_tensor(10),
         num_steps_between_results=tf.convert_to_tensor(1),)
 
-    def _loop_body(i, curr_state, pkr):
+    def _loop_body(i, seed, curr_state, pkr):
+      mcmc_seed, seed = tfp.random.split_seed(seed)
       new_state, kernel_results = discarder.one_step(
-          curr_state, pkr,
+          curr_state, pkr, seed=mcmc_seed,
       )
-      return (i + 1, new_state, kernel_results)
+      return (i + 1, seed, new_state, kernel_results)
 
     pkr = discarder.bootstrap_results(0.)
-    _, final_sample, kernel_results = tf.while_loop(
-        lambda i, _, __: i < 2,
+    _, _, final_sample, kernel_results = tf.while_loop(
+        lambda i, *_: i < 2,
         _loop_body,
-        (0., 0., pkr),
+        (0., test_util.test_seed(sampler_type='stateless'), 0., pkr),
     )
 
     final_sample, kernel_results = self.evaluate([
@@ -204,6 +217,7 @@ class SampleDiscardingTest(test_util.TestCase):
     self.assertEqual(14, kernel_results.inner_results.counter_1)
     self.assertEqual(28, kernel_results.inner_results.counter_2)
 
+  @test_util.jax_disable_variable_test
   def test_non_static_thinning_and_burnin(self):
     fake_inner_kernel = test_fixtures.TestTransitionKernel()
     num_burnin_steps = tf.Variable(10, dtype=tf.int32)
@@ -221,7 +235,7 @@ class SampleDiscardingTest(test_util.TestCase):
 
     pkr = discarder.bootstrap_results(0.)
     _, final_sample, kernel_results = tf.while_loop(
-        lambda i, _, __: i < 2,
+        lambda i, *_: i < 2,
         _loop_body,
         (0., 0., pkr),
     )
@@ -241,17 +255,18 @@ class SampleDiscardingTest(test_util.TestCase):
         num_burnin_steps=tf.convert_to_tensor(0),
         num_steps_between_results=tf.convert_to_tensor(1),)
 
-    def _loop_body(i, curr_state, pkr):
+    def _loop_body(i, seed, curr_state, pkr):
+      mcmc_seed, seed = tfp.random.split_seed(seed)
       new_state, kernel_results = discarder.one_step(
-          curr_state, pkr,
+          curr_state, pkr, seed=mcmc_seed,
       )
-      return (i + 1, new_state, kernel_results)
+      return (i + 1, seed, new_state, kernel_results)
 
     pkr = discarder.bootstrap_results(0.)
-    _, final_sample, kernel_results = tf.while_loop(
-        lambda i, _, __: i < 2,
+    _, _, final_sample, kernel_results = tf.while_loop(
+        lambda i, *_: i < 2,
         _loop_body,
-        (0., 0., pkr),
+        (0., test_util.test_seed(sampler_type='stateless'), 0., pkr),
     )
     final_sample, kernel_results = self.evaluate([
         final_sample, kernel_results])
@@ -267,17 +282,18 @@ class SampleDiscardingTest(test_util.TestCase):
         num_burnin_steps=10,
         num_steps_between_results=1,)
 
-    def _loop_body(i, curr_state, pkr):
+    def _loop_body(i, seed, curr_state, pkr):
+      mcmc_seed, seed = tfp.random.split_seed(seed)
       new_state, kernel_results = discarder.one_step(
-          curr_state, pkr,
+          curr_state, pkr, seed=mcmc_seed,
       )
-      return (i + 1, new_state, kernel_results)
+      return (i + 1, seed, new_state, kernel_results)
 
     pkr = discarder.bootstrap_results(0.)
-    _, _, kernel_results = tf.while_loop(
+    _, _, _, kernel_results = tf.while_loop(
         lambda i, *_: i < 2,
         _loop_body,
-        (0., 0., pkr),
+        (0., test_util.test_seed(sampler_type='stateless'), 0., pkr),
     )
     self.assertTrue(tf.int32, kernel_results.call_counter.dtype)
 
