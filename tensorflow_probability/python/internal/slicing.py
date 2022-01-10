@@ -209,9 +209,12 @@ def batch_slice(batch_object,
     slices = (slices,)
   # We track the history of slice and copy(**param_overrides) in order to trace
   # back to the original object's source variables.
+  #
+  # NOTE: We must not modify `slice_overrides_seq`, as it could be an attribute
+  # of `batch_object and this method should not modify `batch_object`.
   orig_batch_object, slice_overrides_seq = getattr(
       batch_object, PROVENANCE_ATTR, (batch_object, []))
-  slice_overrides_seq += [(slices, params_overrides)]
+  slice_overrides_seq = slice_overrides_seq + [(slices, params_overrides)]
   # Re-doing the full sequence of slice+copy override work here enables
   # gradients all the way back to the original batch_objectribution's arguments.
   batch_object = _apply_slice_sequence(
