@@ -246,7 +246,7 @@ class PositiveSemidefiniteKernel(tf.Module):
   @classmethod
   def _parameter_properties(cls, dtype):
     raise NotImplementedError(
-        '_parameter_properties` is not implemented: {cls.__name__}')
+        f'_parameter_properties` is not implemented: {cls.__name__}')
 
   @property
   def parameters(self):
