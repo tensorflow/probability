@@ -287,6 +287,47 @@ class _WeibullTest(object):
     self.assertAllClose(expected_kl, kl_sample_val, atol=0.0, rtol=1e-2)
     self.assertAllClose(expected_kl, self.evaluate(kl))
 
+  def testWeibullGammaKL(self):
+    a_concentration = np.array([3.])
+    a_scale = np.array([2.])
+    b_concentration = np.array([6.])
+    b_rate = np.array([0.25])
+
+    a = tfd.Weibull(
+        concentration=a_concentration, scale=a_scale, validate_args=True)
+    b = tfd.Gamma(
+        concentration=b_concentration, rate=b_rate, validate_args=True)
+
+    kl = tfd.kl_divergence(a, b)
+
+    x = a.sample(int(1e5), seed=test_util.test_seed())
+    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_sample_val = self.evaluate(kl_sample)
+
+    self.assertAllClose(kl_sample_val, self.evaluate(kl), atol=0.0, rtol=1e-2)
+
+  def testWeibullGammaKLAgreeWeibullWeibull(self):
+    a_concentration = np.array([3.])
+    a_scale = np.array([2.])
+    b_concentration = np.array([1.])
+    b_rate = np.array([0.25])
+
+    a = tfd.Weibull(
+        concentration=a_concentration, scale=a_scale, validate_args=True)
+    b = tfd.Gamma(
+        concentration=b_concentration, rate=b_rate, validate_args=True)
+    c = tfd.Weibull(
+        concentration=b_concentration, scale=1 / b_rate, validate_args=True)
+
+    kl_weibull_weibull = tfd.kl_divergence(a, c)
+    kl_weibull_gamma = tfd.kl_divergence(a, b)
+
+    self.assertAllClose(
+        self.evaluate(kl_weibull_gamma),
+        self.evaluate(kl_weibull_weibull),
+        atol=0.0,
+        rtol=1e-6)
+
 
 @test_util.test_all_tf_execution_regimes
 class WeibullTestStaticShapeFloat32(test_util.TestCase, _WeibullTest):

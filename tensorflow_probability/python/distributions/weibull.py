@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.distributions.gamma import Gamma
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -231,7 +232,7 @@ def _kl_weibull_weibull(a, b, name=None):
   Args:
     a: instance of a Weibull distribution object.
     b: instance of a Weibull distribution object.
-    name: (optional) Name to use for created operations. default is
+    name: (optional) Name to use for created operations. Default is
       'kl_weibull_weibull'.
 
   Returns:
@@ -253,3 +254,41 @@ def _kl_weibull_weibull(a, b, name=None):
             ((a_scale / b_scale)**b_concentration *
              tf.exp(tf.math.lgamma(b_concentration / a_concentration + 1.))) -
             1.)
+
+
+@kullback_leibler.RegisterKL(Weibull, Gamma)
+def _kl_weibull_gamma(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a Weibull and b Gamma.
+
+  Derivation from [this reference](https://arxiv.org/abs/1401.6853) formula
+  (28).
+
+  Args:
+    a: instance of a Weibull distribution object.
+    b: instance of a Gamma distribution object.
+    name: (optional) Name to use for created operations. Default is
+      'kl_weibull_gamma'.
+
+  Returns:
+    Batchwise KL(a || b)
+  """
+  with tf.name_scope(name or 'kl_weibull_gamma'):
+    a_concentration = tf.convert_to_tensor(a.concentration)
+    a_scale = tf.convert_to_tensor(a.scale)
+    b_concentration = tf.convert_to_tensor(b.concentration)
+    b_rate = tf.convert_to_tensor(b.rate)
+
+    # We'll use formula (28) in the reference with
+    #   a1 = a_scale
+    #   d1 = p1 = a_concentration
+    #   a2 = 1 / b_rate
+    #   d2 = b_concentration
+    #   p2 = 1
+    # Note that the terms `d1 * log(a1)` in the formula have been canceled out.
+    a_scale_times_b_rate = a_scale * b_rate
+    return (tf.math.log(a_concentration) -
+            b_concentration * tf.math.log(a_scale_times_b_rate) +
+            tf.math.lgamma(b_concentration) + np.euler_gamma *
+            (b_concentration / a_concentration - 1.) +
+            (a_scale_times_b_rate *
+             tf.exp(tf.math.lgamma(1. / a_concentration + 1.))) - 1.)
