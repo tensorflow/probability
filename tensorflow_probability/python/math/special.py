@@ -254,7 +254,8 @@ def erfcinv(z, name=None):
   """
   with tf.name_scope(name or 'erfcinv'):
     z = tf.convert_to_tensor(z)
-    return -tf.math.ndtri(0.5 * z) * np.sqrt(0.5)
+    np_dtype = dtype_util.as_numpy_dtype(z.dtype)
+    return -tf.math.ndtri(0.5 * z) * np.sqrt(np_dtype(0.5))
 
 
 def _erfcx_naive(x):
