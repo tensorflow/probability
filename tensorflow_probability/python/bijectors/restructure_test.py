@@ -169,6 +169,15 @@ class RestructureBijectorTest(test_util.TestCase):
         bij.forward(x),
         tf.function(lambda b_: b_.forward(x))(unflat))
 
+  def testFloat64LDJ(self):
+    bij = tfb.Restructure([0, 1])
+    x = [tf.zeros([], tf.float64), tf.zeros([], tf.float64)]
+    event_ndims = [0, 0]
+    fldj = bij.forward_log_det_jacobian(x, event_ndims)
+    ildj = bij.inverse_log_det_jacobian(x, event_ndims)
+    self.assertEqual(tf.float64, fldj.dtype)
+    self.assertEqual(tf.float64, ildj.dtype)
+
 
 if __name__ == '__main__':
   test_util.main()
