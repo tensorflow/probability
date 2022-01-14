@@ -66,11 +66,6 @@ flags.DEFINE_string('test_regex', '',
                      'matches "<TestCase>.<test_method>".'),
                     allow_override=True)
 
-flags.DEFINE_bool('allow_test_regex_without_matches', False,
-                  ('If set, `test_regex` settings which match no tests '
-                   'will not raise an exception.'),
-                  allow_override=True)
-
 # Flags for controlling test_teed behavior.
 flags.DEFINE_bool('vary_seed', False,
                   ('Whether to vary the PRNG seed unpredictably.  '
@@ -1307,11 +1302,6 @@ class _TestLoader(absltest.TestLoader):
           name for name in names
           if pattern.search(f'{testCaseClass.__name__}.{name}')
       ]
-      if not names and not FLAGS.allow_test_regex_without_matches:
-        raise ValueError(
-            f'test_regex "{FLAGS.test_regex}" did not match any '
-            'tests. Pass the `--allow_test_regex_without_matches` to suprress '
-            'this error if that is okay.')
     return names
 
 
