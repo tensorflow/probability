@@ -80,7 +80,6 @@ class PreconditionedNUTSKernelResults(
         [
             'target_log_prob',
             'grads_target_log_prob',
-            'velocity_state_memory',
             'step_size',
             'log_accept_ratio',
             'leapfrogs_taken',
@@ -403,6 +402,10 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
           read_instruction=read_instruction
           )
 
+      velocity_state_memory = VelocityStateSwap(
+          velocity_swap=self.init_velocity_state_memory(init_momentum),
+          state_swap=self.init_velocity_state_memory(current_state))
+
       step_size = _prepare_step_size(
           previous_kernel_results.step_size,
           current_target_log_prob.dtype,
@@ -413,7 +416,7 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
               tf.reduce_any(metastate.continue_tree)),
           body=lambda iter_, seed, state, metastate: self._loop_tree_doubling(  # pylint: disable=g-long-lambda
               step_size,
-              previous_kernel_results.velocity_state_memory,
+              velocity_state_memory,
               current_step_meta_info,
               iter_,
               state,
@@ -432,7 +435,6 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
           target_log_prob=new_step_metastate.candidate_state.target,
           grads_target_log_prob=(
               new_step_metastate.candidate_state.target_grad_parts),
-          velocity_state_memory=previous_kernel_results.velocity_state_memory,
           step_size=previous_kernel_results.step_size,
           log_accept_ratio=tf.math.log(
               new_step_metastate.energy_diff_sum /
@@ -455,6 +457,15 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
 
       return result_state, kernel_results
 
+  def init_velocity_state_memory(self, input_tensors):
+    """Allocate TensorArray for storing state and momentum."""
+    shape_and_dtype = [(ps.shape(x_), x_.dtype) for x_ in input_tensors]
+    return [  # pylint: disable=g-complex-comprehension
+        ps.zeros(
+            ps.concat([[max(self._write_instruction) + 1], s], axis=0),
+            dtype=d) for (s, d) in shape_and_dtype
+    ]
+
   def bootstrap_results(self, init_state):
     """Creates initial `previous_kernel_results` using a supplied `state`."""
     with tf.name_scope(self.name + '.bootstrap_results'):
@@ -476,24 +487,9 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
           momentum_distribution, ps.shape(current_target_log_prob))
       momentum_parts = momentum_distribution.sample(seed=samplers.zeros_seed())
 
-      def _init(shape_and_dtype):
-        """Allocate TensorArray for storing state and velocity."""
-        return [  # pylint: disable=g-complex-comprehension
-            ps.zeros(
-                ps.concat([[max(self._write_instruction) + 1], s], axis=0),
-                dtype=d) for (s, d) in shape_and_dtype
-        ]
-
-      get_shapes_and_dtypes = lambda x: [(ps.shape(x_), x_.dtype)  # pylint: disable=g-long-lambda
-                                         for x_ in x]
-      velocity_state_memory = VelocityStateSwap(
-          velocity_swap=_init(get_shapes_and_dtypes(momentum_parts)),
-          state_swap=_init(get_shapes_and_dtypes(init_state)))
-
       return PreconditionedNUTSKernelResults(
           target_log_prob=current_target_log_prob,
           grads_target_log_prob=current_grads_log_prob,
-          velocity_state_memory=velocity_state_memory,
           step_size=tf.nest.map_structure(
               lambda x: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
                   x,

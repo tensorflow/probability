@@ -78,7 +78,6 @@ class NUTSKernelResults(
         [
             'target_log_prob',
             'grads_target_log_prob',
-            'momentum_state_memory',
             'step_size',
             'log_accept_ratio',
             'leapfrogs_taken',  # How many leapfrogs each chain took this step.
@@ -394,6 +393,10 @@ class NoUTurnSampler(TransitionKernel):
           read_instruction=read_instruction
           )
 
+      momentum_state_memory = MomentumStateSwap(
+          momentum_swap=self.init_momentum_state_memory(init_momentum),
+          state_swap=self.init_momentum_state_memory(current_state))
+
       step_size = _prepare_step_size(
           previous_kernel_results.step_size,
           current_target_log_prob.dtype,
@@ -404,7 +407,7 @@ class NoUTurnSampler(TransitionKernel):
               tf.reduce_any(metastate.continue_tree)),
           body=lambda iter_, seed, state, metastate: self._loop_tree_doubling(  # pylint: disable=g-long-lambda
               step_size,
-              previous_kernel_results.momentum_state_memory,
+              momentum_state_memory,
               current_step_meta_info,
               iter_,
               state,
@@ -422,7 +425,6 @@ class NoUTurnSampler(TransitionKernel):
           target_log_prob=new_step_metastate.candidate_state.target,
           grads_target_log_prob=(
               new_step_metastate.candidate_state.target_grad_parts),
-          momentum_state_memory=previous_kernel_results.momentum_state_memory,
           step_size=previous_kernel_results.step_size,
           log_accept_ratio=tf.math.log(
               new_step_metastate.energy_diff_sum /
@@ -442,6 +444,15 @@ class NoUTurnSampler(TransitionKernel):
           state_structure, new_step_metastate.candidate_state.state)
       return result_state, kernel_results
 
+  def init_momentum_state_memory(self, input_tensors):
+    """Allocate TensorArray for storing state and momentum."""
+    shape_and_dtype = [(ps.shape(x_), x_.dtype) for x_ in input_tensors]
+    return [  # pylint: disable=g-complex-comprehension
+        ps.zeros(
+            ps.concat([[max(self._write_instruction) + 1], s], axis=0),
+            dtype=d) for (s, d) in shape_and_dtype
+    ]
+
   def bootstrap_results(self, init_state):
     """Creates initial `previous_kernel_results` using a supplied `state`."""
     with tf.name_scope(self.name + '.bootstrap_results'):
@@ -449,19 +460,6 @@ class NoUTurnSampler(TransitionKernel):
         init_state = [init_state]
       dummy_momentum = [tf.ones_like(state) for state in init_state]
 
-      def _init(shape_and_dtype):
-        """Allocate TensorArray for storing state and momentum."""
-        return [  # pylint: disable=g-complex-comprehension
-            ps.zeros(
-                ps.concat([[max(self._write_instruction) + 1], s], axis=0),
-                dtype=d) for (s, d) in shape_and_dtype
-        ]
-
-      get_shapes_and_dtypes = lambda x: [(ps.shape(x_), x_.dtype)  # pylint: disable=g-long-lambda
-                                         for x_ in x]
-      momentum_state_memory = MomentumStateSwap(
-          momentum_swap=_init(get_shapes_and_dtypes(dummy_momentum)),
-          state_swap=_init(get_shapes_and_dtypes(init_state)))
       [
           _,
           _,
@@ -477,7 +475,6 @@ class NoUTurnSampler(TransitionKernel):
       return NUTSKernelResults(
           target_log_prob=current_target_log_prob,
           grads_target_log_prob=current_grads_log_prob,
-          momentum_state_memory=momentum_state_memory,
           step_size=tf.nest.map_structure(
               lambda x: tf.convert_to_tensor(  # pylint: disable=g-long-lambda
                   x,
