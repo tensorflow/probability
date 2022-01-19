@@ -76,10 +76,10 @@ class RationalQuadraticSpline(bijector.AutoCompositeTensorBijector):
     def __init__(self, nbins=32, interval_width=2, range_min=-1,
                  min_bin_width=1e-3, min_slope=1e-3):
       self._nbins = nbins
-      self._interval_width = interval_width
-      self._range_min = range_min
-      self._min_bin_width = min_bin_width
-      self._min_slope = min_slope
+      self._interval_width = interval_width # Sum of bin widths.
+      self._range_min = range_min # Position of first knot.
+      self._min_bin_width = min_bin_width # Bin width lower bound.
+      self._min_slope = min_slope # Lower bound for slopes at internal knots.
       self._built = False
       self._bin_widths = None
       self._bin_heights = None
@@ -91,8 +91,8 @@ class RationalQuadraticSpline(bijector.AutoCompositeTensorBijector):
           out_shape = tf.concat((tf.shape(x)[:-1], (nunits, self._nbins)), 0)
           x = tf.reshape(x, out_shape)
           return tf.math.softmax(x, axis=-1) * (
-                self._interval_width - self._nbins * self._min_bin_width) + \
-                 self._min_bin_width
+                self._interval_width - self._nbins * self._min_bin_width
+                ) + self._min_bin_width
 
         def _slopes(x):
           out_shape = tf.concat((
