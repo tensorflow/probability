@@ -280,7 +280,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
         optional `validate_args`, `allow_nan_stats` and `name` arguments, and
         returns a multivariate normal subclass of `tfd.Distribution`.
         At most one of `cholesky_fn` and `marginal_fn` should be set.
-        Default value: `None`, in which case a Cholesky-factorizing function is
+        Default value: `None`, in which case a Cholesky-factorizing function
         is created using `make_cholesky_factored_marginal_fn` and the
         `cholesky_fn` argument.
       cholesky_fn: Callable which takes a single (batch) matrix argument and

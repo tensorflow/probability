@@ -332,7 +332,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
       marginal_fn: A Python callable that takes a location, covariance matrix,
         optional `validate_args`, `allow_nan_stats` and `name` arguments, and
         returns a multivariate Student-T subclass of `tfd.Distribution`.
-        Default value: `None`, in which case a Cholesky-factorizing function is
+        Default value: `None`, in which case a Cholesky-factorizing function
         is created using `make_cholesky_with_jitter_fn`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
