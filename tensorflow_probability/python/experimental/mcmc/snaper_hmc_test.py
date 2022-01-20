@@ -31,6 +31,20 @@ tfd = tfp.distributions
 JAX_MODE = False
 
 
+class CountingReducer(tfp.experimental.mcmc.Reducer):
+
+  def initialize(self, *_, **__):
+    return 0
+
+  def one_step(
+      self, new_chain_state, current_reducer_state, previous_kernel_results):
+    del new_chain_state, previous_kernel_results
+    return current_reducer_state + 1
+
+  def finalize(self, final_reducer_state):
+    return 10 * final_reducer_state
+
+
 class _SNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
   dtype = np.float32
 
@@ -202,6 +216,319 @@ class SNAPERHMCTestFloat64(_SNAPERHMCTest):
 del _SNAPERHMCTest
 
 
+def _make_joint_model(dtype):
+
+  @tfd.JointDistributionCoroutine
+  def model():
+    x = yield tfd.Normal(tf.zeros([], dtype), 1.)
+    yield tfd.Sample(tfd.Exponential(tf.exp(x)), 2)
+
+  return model
+
+
+def _make_joint_named_model(dtype):
+
+  return tfd.JointDistributionNamed({
+      'x': tfd.Normal(tf.zeros([], dtype), 1.),
+      'y': lambda x: tfd.Sample(tfd.Exponential(tf.exp(x)), 2),
+  })
+
+
+def _make_joint_nested_model(dtype):
+
+  @tfd.JointDistributionCoroutine
+  def inner_model():
+    yield tfd.Normal(tf.zeros([], dtype), 1., name='x')
+
+  @tfd.JointDistributionCoroutine
+  def model():
+    x = yield inner_model
+    yield tfd.Sample(tfd.Exponential(tf.exp(x.x)), 2)
+
+  return model
+
+
+class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
+  dtype = np.float32
+
+  def testEndToEnd(self):
+    if tf.executing_eagerly() and not JAX_MODE:
+      self.skipTest('Too slow for TF Eager.')
+
+    num_dims = 8
+
+    eigenvalues = np.exp(np.linspace(0., 3., num_dims))
+    q, r = np.linalg.qr(np.random.randn(num_dims, num_dims))
+    q *= np.sign(np.diag(r))
+    covariance = (q * eigenvalues).dot(q.T).astype(self.dtype)
+
+    gaussian = tfd.MultivariateNormalTriL(
+        loc=tf.zeros(num_dims, self.dtype),
+        scale_tril=tf.linalg.cholesky(covariance),
+    )
+
+    @tf.function(jit_compile=True)
+    def run(seed):
+      results = tfp.experimental.mcmc.sample_snaper_hmc(
+          model=gaussian,
+          num_results=500,
+          reducer=tfp.experimental.mcmc.PotentialScaleReductionReducer(),
+          seed=seed,
+      )
+
+      return results.trace, results.reduction_results
+
+    (chain, trace), reduction_results = self.evaluate(
+        run(test_util.test_seed(sampler_type='stateless')))
+
+    self.assertEqual(self.dtype, chain.dtype)
+    self.assertAllClose(1.75, trace['step_size'][-1], rtol=0.2)
+    self.assertAllClose(8., trace['max_trajectory_length'][-1], atol=2.)
+    self.assertAllClose(chain.var((0, 1)), np.diag(covariance), rtol=0.2)
+    self.assertAllClose(
+        np.ones(num_dims, self.dtype), reduction_results, atol=0.1)
+
+  @parameterized.named_parameters(
+      ('_scalar', lambda dtype: tfd.Normal(tf.zeros([], dtype), 1.)),
+      ('_scalar_constrained',
+       lambda dtype: tfd.LogNormal(tf.zeros([], dtype), 1.)),
+      ('_vector',
+       lambda dtype: tfd.Sample(tfd.LogNormal(tf.zeros([], dtype), 1.), 2)),
+      ('_joint', _make_joint_model),
+      ('_joint_nested', _make_joint_nested_model),
+      ('_joint_named', _make_joint_named_model),
+  )
+  def testWithDistribution(self, model_fn):
+    model = model_fn(self.dtype)
+    seed = test_util.test_seed(sampler_type='stateless')
+    results = tfp.experimental.mcmc.sample_snaper_hmc(
+        model, 2, num_burnin_steps=2, seed=seed)
+    trace = self.evaluate(results.trace)
+    states = trace[0]
+    self.assertAllAssertsNested(self.assertAllNotNan, states)
+    self.assertEqual(model.dtype,
+                     tf.nest.map_structure(lambda x: x.dtype, states))
+    self.assertTrue(hasattr(results.final_kernel_results, 'target_accept_prob'))
+
+  @parameterized.named_parameters(
+      ('_no_init_no_bijector_static', False, False, False),
+      ('_with_init_no_bijector_static', True, False, False),
+      ('_no_init_with_bijector_static', False, True, False),
+      ('_with_init_with_bijector_static', True, True, False),
+      ('_no_init_no_bijector_dynamic', False, False, True),
+      ('_with_init_no_bijector_dynamic', True, False, True),
+      ('_no_init_with_bijector_dynamic', False, True, True),
+      ('_with_init_with_bijector_dynamic', True, True, True),
+  )
+  def testWithCallable(self, use_init_state, use_bijector, use_dynamic_shape):
+    if (JAX_MODE or tf.executing_eagerly()) and use_dynamic_shape:
+      self.skipTest('Dynamic shape test.')
+
+    def target_log_prob_fn(x, y):
+      return tf.reduce_sum(-x**2, -1) - y**2
+
+    dtype = {
+        'x': self.dtype,
+        'y': self.dtype,
+    }
+    if use_init_state:
+      if use_dynamic_shape:
+        kwargs = dict(
+            init_state={
+                'x': tf.zeros((64, 2), dtype=self.dtype),
+                'y': tf.zeros(64, dtype=self.dtype),
+            })
+      else:
+        kwargs = dict(
+            init_state={
+                'x':
+                    tf1.placeholder_with_default(
+                        tf.zeros((64,
+                                  2), dtype=self.dtype), shape=[None, None]),
+                'y':
+                    tf1.placeholder_with_default(
+                        tf.zeros(64, dtype=self.dtype), shape=[None]),
+            })
+    else:
+      if use_dynamic_shape:
+        kwargs = dict(
+            event_dtype=dtype,
+            event_shape={
+                'x':
+                    tf1.placeholder_with_default(
+                        tf.constant([2], dtype=tf.int32), shape=[1]),
+                'y':
+                    tf1.placeholder_with_default(
+                        tf.constant([], dtype=tf.int32), shape=[0]),
+            },
+        )
+      else:
+        kwargs = dict(
+            event_dtype=dtype,
+            event_shape={
+                'x': [2],
+                'y': [],
+            },
+        )
+    if use_bijector:
+      kwargs.update(event_space_bijector={'x': tfb.Exp(), 'y': tfb.Identity()})
+
+    seed = test_util.test_seed(sampler_type='stateless')
+    results = tfp.experimental.mcmc.sample_snaper_hmc(
+        target_log_prob_fn, 2, num_burnin_steps=2, seed=seed, **kwargs)
+    trace = self.evaluate(results.trace)
+    states = trace[0]
+    self.assertAllAssertsNested(self.assertAllNotNan, states)
+    self.assertEqual(dtype, tf.nest.map_structure(lambda x: x.dtype, states))
+    self.assertTrue(hasattr(results.final_kernel_results, 'target_accept_prob'))
+
+  @parameterized.named_parameters(
+      ('_no_discard_no_thin', False, 0, 8 + 16, 16, 8 + 16),
+      ('_discard_no_thin', True, 0, 0 + 16, 16, 8 + 16),
+      ('_no_discard_thin', False, 1, 8 + 16, 2 * 16, 2 * (8 + 16)),
+      ('_discard_thin', True, 1, 0 + 16, 2 * 16, 2 * (8 + 16)),
+  )
+  def testOutputControl(self, discard_burnin_steps, num_steps_between_results,
+                        expected_num_results, expected_num_reductions,
+                        expected_steps):
+    model = tfd.Normal(tf.zeros([], self.dtype), 1.)
+    seed = test_util.test_seed(sampler_type='stateless')
+
+    results = tfp.experimental.mcmc.sample_snaper_hmc(
+        model,
+        16,
+        num_burnin_steps=8,
+        discard_burnin_steps=discard_burnin_steps,
+        num_steps_between_results=num_steps_between_results,
+        reducer=CountingReducer(),
+        seed=seed)
+
+    chain, step, reduction_results = self.evaluate([
+        results.trace[0], results.final_kernel_results.step,
+        results.reduction_results
+    ])
+
+    self.assertEqual(expected_num_results, chain.shape[0])
+    self.assertEqual(expected_steps, step)
+    self.assertEqual(expected_num_reductions * 10, reduction_results)
+    self.assertTrue(hasattr(results.final_kernel_results, 'target_accept_prob'))
+
+
+@test_util.test_graph_and_eager_modes
+class SampleSNAPERHMCTestFloat32(_SampleSNAPERHMCTest):
+  dtype = np.float32
+
+
+@test_util.test_graph_and_eager_modes
+class SampleSNAPERHMCTestFloat64(_SampleSNAPERHMCTest):
+  dtype = np.float64
+
+
+del _SampleSNAPERHMCTest
+
+
+@test_util.test_graph_and_eager_modes
+class DistributedSampleSNAPERHMCTest(distribute_test_lib.DistributedTest):
+
+  def testShardedChainAxes(self):
+    """Compare to SampleSNAPERHMCTest.testEndToEnd above.
+
+    This shards the independent chains.
+    """
+    if not JAX_MODE:
+      self.skipTest('b/181800108')
+
+    num_dims = 8
+
+    eigenvalues = np.exp(np.linspace(0., 3., num_dims))
+    q, r = np.linalg.qr(np.random.randn(num_dims, num_dims))
+    q *= np.sign(np.diag(r))
+    covariance = (q * eigenvalues).dot(q.T).astype(np.float32)
+
+    gaussian = tfd.MultivariateNormalTriL(
+        loc=tf.zeros(num_dims),
+        scale_tril=tf.linalg.cholesky(covariance),
+    )
+
+    seed = test_util.test_seed(sampler_type='stateless')
+
+    @tf.function(autograph=False)
+    def run(_):
+      results = tfp.experimental.mcmc.sample_snaper_hmc(
+          model=gaussian,
+          num_results=500,
+          experimental_reduce_chain_axis_names=self.axis_name,
+          seed=seed,
+      )
+
+      return results.trace
+
+    chain, trace = self.evaluate(
+        self.per_replica_to_tensor(
+            self.strategy_run(
+                run,
+                args=(tf.zeros(distribute_test_lib.NUM_DEVICES),),
+                axis_name=self.axis_name,
+            )))
+
+    # Adaptation results.
+    self.assertAllClose(1.75, trace['step_size'][0, -1], rtol=0.2)
+    self.assertAllClose(chain.var((0, 1, 2)), np.diag(covariance), rtol=0.2)
+
+    # Shard consistency.
+    self.assertAllClose(trace['step_size'][0], trace['step_size'][1])
+    self.assertAllClose(trace['max_trajectory_length'][0],
+                        trace['max_trajectory_length'][1])
+
+  def testShardedState(self):
+
+    if not JAX_MODE:
+      self.skipTest('b/181800108')
+
+    local_scale = self.shard_values(
+        1. + tf.one_hot(0, distribute_test_lib.NUM_DEVICES))
+    seed = test_util.test_seed(sampler_type='stateless')
+
+    @tf.function(autograph=False)
+    def run(local_scale):
+
+      @tfp.experimental.distribute.JointDistributionCoroutine
+      def model():
+        yield tfd.Normal(0., 1., name='x')
+        yield tfp.experimental.distribute.Sharded(
+            tfd.Normal(0., local_scale),
+            shard_axis_name=self.axis_name,
+            name='y')
+
+      results = tfp.experimental.mcmc.sample_snaper_hmc(
+          model=model,
+          num_results=500,
+          experimental_shard_axis_names=model.experimental_shard_axis_names,
+          seed=seed,
+      )
+
+      return results.trace
+
+    chain, trace = self.evaluate(
+        self.per_replica_to_tensor(
+            self.strategy_run(
+                run,
+                args=(local_scale,),
+                axis_name=self.axis_name,
+            )))
+
+    self.assertAllClose(1., chain.x[0].var((0, 1)), atol=0.1)
+    expected_local_variance = np.ones(distribute_test_lib.NUM_DEVICES)
+    expected_local_variance[0] = 4.
+    self.assertAllClose(
+        expected_local_variance, chain.y.var((1, 2)), rtol=0.2)
+
+    # Shard consistency.
+    self.assertAllClose(trace['step_size'][0], trace['step_size'][1])
+    self.assertAllClose(trace['max_trajectory_length'][0],
+                        trace['max_trajectory_length'][1])
+
+
 @test_util.test_graph_and_eager_modes
 class DistributedSNAPERHMCTest(distribute_test_lib.DistributedTest):
 
@@ -213,7 +540,10 @@ class DistributedSNAPERHMCTest(distribute_test_lib.DistributedTest):
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
 
   def testShardedChainAxes(self):
-    """Compare to testDocstring above. This shards the independent chains."""
+    """Compare to SNAPERHMCTest.testEndToEnd above.
+
+    This shards the independent chains.
+    """
     if not JAX_MODE:
       self.skipTest('b/181800108')
 

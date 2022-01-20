@@ -865,12 +865,12 @@ class RunningPotentialScaleReduction(ACClass):
       # b/n is the between-chain variance (the variance of the chain means)
       b_div_n = diagnostic._reduce_variance(  # pylint:disable=protected-access
           tf.convert_to_tensor(chain_variances.mean),
-          axis=tf.range(chain_ndims),
+          axis=ps.range(chain_ndims),
           biased=False)
 
       # W is the within sequence variance (the mean of the chain variances)
       sum_of_chain_squared_residuals = tf.reduce_sum(
-          chain_variances.sum_squared_residuals, axis=tf.range(chain_ndims))
+          chain_variances.sum_squared_residuals, axis=ps.range(chain_ndims))
       w = sum_of_chain_squared_residuals / (m * (n - 1))
 
       # the `true_variance_estimate` is denoted as sigma^2_+ in the 1998 paper

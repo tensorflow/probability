@@ -57,6 +57,8 @@ from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kern
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
 from tensorflow_probability.python.experimental.mcmc.sharded import Sharded
+from tensorflow_probability.python.experimental.mcmc.snaper_hmc import sample_snaper_hmc
+from tensorflow_probability.python.experimental.mcmc.snaper_hmc import SampleSNAPERHamiltonianMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.snaper_hmc import SNAPERHamiltonianMonteCarlo
 from tensorflow_probability.python.experimental.mcmc.snaper_hmc import SNAPERHamiltonianMonteCarloResults
 from tensorflow_probability.python.experimental.mcmc.step import step_kernel
@@ -88,11 +90,13 @@ __all__ = [
     'PreconditionedNoUTurnSampler',
     'ProgressBarReducer',
     'Reducer',
-    'SampleDiscardingKernel',
-    'SequentialMonteCarlo',
-    'SequentialMonteCarloResults',
     'SNAPERHamiltonianMonteCarlo',
     'SNAPERHamiltonianMonteCarloResults',
+    'SampleDiscardingKernel',
+    'SampleSNAPERHamiltonianMonteCarloResults',
+    'SequentialMonteCarlo',
+    'SequentialMonteCarloResults',
+    'Sharded',
     'StateWithHistory',
     'ThinningKernel',
     'TracingReducer',
@@ -125,7 +129,7 @@ __all__ = [
     'sample_chain_with_burnin',
     'sample_fold',
     'sample_sequential_monte_carlo',
-    'Sharded',
+    'sample_snaper_hmc',
     'simple_heuristic_tuning',
     'snaper_criterion',
     'step_kernel',
