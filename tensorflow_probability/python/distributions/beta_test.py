@@ -454,6 +454,74 @@ class BetaTest(test_util.TestCase):
     self.assertAllEqual(mk_beta(1.1, 1.).log_prob(-.1), -float('inf'))
     self.assertAllEqual(mk_beta(1., 1.1).log_prob(1.1), -float('inf'))
 
+  def testBetaFromMeanVariance(self):
+    concentration1 = 2.
+    concentration0 = np.repeat(5., 3).astype(np.float32)
+    x = np.array([0.1, 0.4, 0.75], dtype=np.float32)
+    mu = sp_stats.beta.mean(a=concentration1, b=concentration0)
+    var = sp_stats.beta.var(a=concentration1, b=concentration0)
+    beta_mean_var = tfd.Beta.experimental_from_mean_variance(
+        mu, variance=var, validate_args=True)
+    expected_log_pdf = sp_stats.beta.logpdf(
+        x, a=concentration1, b=concentration0)
+    log_pdf = beta_mean_var.log_prob(x)
+    self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+
+  def testBetaFromMeanConcentration(self):
+    concentration1 = np.array([2., 0.1, 5.]).astype(np.float64)
+    concentration0 = np.array([4., 5., 0.5]).astype(np.float64)
+    x = np.array([0.1, 0.4, 0.75], dtype=np.float32)
+    mu = sp_stats.beta.mean(
+        a=concentration1, b=concentration0).astype(np.float32)
+    total_concentration = (concentration1 + concentration0).astype(np.float32)
+    beta_mean_conc = tfd.Beta.experimental_from_mean_concentration(
+        mu, total_concentration=total_concentration, validate_args=True)
+    expected_log_pdf = sp_stats.beta.logpdf(
+        x, a=concentration1, b=concentration0)
+    log_pdf = beta_mean_conc.log_prob(x)
+    self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+
+  @test_util.jax_disable_test_missing_functionality('GradientTape')
+  @test_util.numpy_disable_gradient_test
+  def testBetaFromMeanVarianceTapeSafe(self):
+    concentration1 = 1.
+    concentration0 = np.float32(3.)
+    x = np.array([0.4, 0.05, 0.7], dtype=np.float32)
+
+    mean = tf.convert_to_tensor(
+        sp_stats.beta.mean(
+            a=concentration1, b=concentration0).astype(np.float32))
+    variance = tf.convert_to_tensor(
+        sp_stats.beta.var(
+            a=concentration1, b=concentration0).astype(np.float32))
+
+    dist = tfd.Beta.experimental_from_mean_variance(
+        mean, variance, validate_args=True)
+    with tf.GradientTape() as tape:
+      tape.watch((mean, variance))
+      lp = dist.log_prob(x)
+    grads = tape.gradient(lp, (mean, variance))
+    self.assertAllNotNone(grads)
+
+  @test_util.jax_disable_test_missing_functionality('GradientTape')
+  @test_util.numpy_disable_gradient_test
+  def testBetaFromMeanConcentrationTapeSafe(self):
+    concentration1 = np.float64(1.)
+    concentration0 = np.float64(3.)
+    x = np.array([0.4, 0.05, 0.7], dtype=np.float64)
+
+    mean = tf.convert_to_tensor(
+        sp_stats.beta.mean(a=concentration1, b=concentration0))
+    total_concentration = tf.convert_to_tensor(concentration1 + concentration0)
+
+    dist = tfd.Beta.experimental_from_mean_concentration(
+        mean, total_concentration, validate_args=True)
+    with tf.GradientTape() as tape:
+      tape.watch((mean, total_concentration))
+      lp = dist.log_prob(x)
+    grads = tape.gradient(lp, (mean, total_concentration))
+    self.assertAllNotNone(grads)
+
 
 if __name__ == '__main__':
   test_util.main()
