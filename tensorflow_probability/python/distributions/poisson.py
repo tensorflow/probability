@@ -356,6 +356,30 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
         output_dtype=self.dtype,
         seed=seed)[0]
 
+  def _quantile(self, value):
+    value = tf.cast(value, dtype=tf.float32)
+    if value == 0:
+      return 0
+    if value == 1:
+      return np.inf
+    x = 0
+    sigma = tf.sqrt(self._rate)
+    if value < 0.5:
+      x = -tf.math.erfcinv(2 * value) * tf.sqrt(tf.constant(2, dtype=tf.float32))
+    else:
+      x = tf.math.erfcinv(2 * (1 - value)) * tf.sqrt(tf.constant(2, dtype=tf.float32))
+    corr = x + (tf.pow(x, 2) - 1) / (6 * sigma)
+    q = tf.round(self._rate + sigma * corr)
+    if self._cdf(q) >= value:
+      cond = lambda q: q > 0 and self._cdf(q - 1) >= value
+      update = lambda q: (tf.add(q, -1), )
+      q = tf.while_loop(cond, update, [q])[0]
+      return q
+    cond = lambda q: self._cdf(q) < value
+    update = lambda q: (tf.add(q, 1), )
+    q = tf.while_loop(cond, update, [q])[0]
+    return q
+
   def rate_parameter(self, name=None):
     """Rate vec computed from non-`None` input arg (`rate` or `log_rate`)."""
     with self._name_and_control_scope(name or 'rate_parameter'):
