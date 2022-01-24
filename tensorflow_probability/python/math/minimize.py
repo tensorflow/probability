@@ -161,7 +161,7 @@ def _minimize_common(num_steps,
           initial_loss, initial_grads, initial_parameters)
 
     with tf.control_dependencies([initial_loss]):
-      has_converged = tf.zeros(tf.shape(initial_loss), dtype=tf.bool)
+      has_converged = tf.zeros(ps.shape(initial_loss), dtype=tf.bool)
       initial_state = MinimizeTraceableQuantities(
           loss=initial_loss,
           gradients=initial_grads,

@@ -24,6 +24,7 @@ from tensorflow_probability.python.sts.components import *
 from tensorflow_probability.python.sts.decomposition import decompose_by_component
 from tensorflow_probability.python.sts.decomposition import decompose_forecast_by_component
 from tensorflow_probability.python.sts.fitting import build_factored_surrogate_posterior
+from tensorflow_probability.python.sts.fitting import build_factored_surrogate_posterior_stateless
 from tensorflow_probability.python.sts.fitting import fit_with_hmc
 from tensorflow_probability.python.sts.fitting import sample_uniform_initial_state
 from tensorflow_probability.python.sts.forecast import forecast
@@ -62,6 +63,7 @@ _allowed_symbols = [
     'StructuralTimeSeries',
     'Sum',
     'build_factored_surrogate_posterior',
+    'build_factored_surrogate_posterior_stateless',
     'decompose_by_component',
     'decompose_forecast_by_component',
     'fit_with_hmc',
