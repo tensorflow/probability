@@ -361,7 +361,7 @@ def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint
 
 
 def _transpose(a, perm=None, conjugate=False, name='transpose'):  # pylint: disable=unused-argument
-  x = np.transpose(a, perm)
+  x = np.transpose(ops.convert_to_tensor(a), perm)
   return np.conjugate(x) if conjugate else x
 
 

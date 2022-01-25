@@ -33,7 +33,6 @@ multi_substrate_py_library(
     name = "sts",
     srcs = ["__init__.py"],
     substrates_omit_deps = [
-        ":fitting",
         "//tensorflow_probability/python/sts/anomaly_detection",
     ],
     deps = [
@@ -106,7 +105,7 @@ multi_substrate_py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "fitting",
     srcs = ["fitting.py"],
     deps = [
@@ -123,14 +122,16 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "fitting_test",
     size = "large",
     srcs = ["fitting_test.py"],
+    disabled_substrates = ["numpy"],
     shard_count = 6,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
+        # optax dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

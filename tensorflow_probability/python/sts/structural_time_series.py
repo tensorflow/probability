@@ -500,10 +500,10 @@ class StructuralTimeSeries(object):
         # adding `param_lp + observation_lp` would broadcast the param priors
         # over the sample shape, which incorrectly multi-counts the param
         # priors.
-        sample_ndims = tf.maximum(0,
-                                  tf.rank(observation_lp) - tf.rank(param_lp))
+        sample_ndims = ps.maximum(
+            0, ps.rank(observation_lp) - ps.rank(param_lp))
         observation_lp = tf.reduce_sum(
-            observation_lp, axis=tf.range(sample_ndims))
+            observation_lp, axis=ps.range(sample_ndims))
 
         return param_lp + observation_lp
 
@@ -524,7 +524,7 @@ def _assert_dict_contents_are_equal(
   for k in combined_keys - set(ignore):
     a_val = a.get(k, None)
     b_val = b.get(k, None)
-    if not _strict_equals(a_val, b_val):
+    if not equals_fn(a_val, b_val):
       raise ValueError(message +
                        ' `{}`: {} vs {}.'.format(k, a_val, b_val))
 
