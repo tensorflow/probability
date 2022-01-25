@@ -356,13 +356,10 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
         output_dtype=self.dtype,
         seed=seed)[0]
 
-  def _quantile(self, _value):
+  def _quantile(self, value):
     def _body(value):
       value = tf.cast(value, dtype=tf.float32)
-      q, done = tf.cond(tf.equal(value, 0), lambda: (0, 1), lambda: (-1, 0))
-      q, done = tf.cond(tf.equal(value, 1), lambda: (np.inf, 1), lambda: (q, done))
-      if done:
-        return q
+      #TODO: Handle trivial 0 and 1 cases
       x = 0
       sigma = tf.sqrt(self._rate)
       x = tf.cond(value < 0.5,
@@ -370,14 +367,19 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
                   lambda: tf.math.erfcinv(2 * (1 - value)) * tf.sqrt(tf.constant(2, dtype=tf.float32)))
       corr = x + (tf.pow(x, 2) - 1) / (6 * sigma)
       q = tf.round(self._rate + sigma * corr)
-      cond_reduce = lambda q: q > 0 and self._cdf(q - 1) >= value
-      update_reduce = lambda q: (tf.add(q, -1), )
-      improve_reduce = lambda: tf.while_loop(cond_reduce, update_reduce, [q])[0]
+
+      cond_decrease = lambda q: q > 0 and self._cdf(q - 1) >= value
+      update_decrease = lambda q: (tf.add(q, -1), )
+      improve_decrease = lambda: tf.while_loop(cond_decrease, update_decrease, [q])[0]
+
       cond_increase = lambda q: self._cdf(q) < value
       update_increase = lambda q: (tf.add(q, 1), )
       improve_increase = lambda: tf.while_loop(cond_increase, update_increase, [q])[0]
       return q
-    return tf.constant(np.vectorize(_body)(_value), dtype=tf.float32)
+
+    vectorized = lambda: tf.vectorized_map(_body, value)
+    single = lambda: _body(value)
+    return tf.cond(tf.convert_to_tensor(value).shape != [], vectorized, single)
 
   def rate_parameter(self, name=None):
     """Rate vec computed from non-`None` input arg (`rate` or `log_rate`)."""
