@@ -114,7 +114,7 @@ def one_step_predictive(model, observed_time_series, parameter_samples,
     surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
       model=model)
     loss_curve = tfp.vi.fit_surrogate_posterior(
-      target_log_prob_fn=model.joint_log_prob(observed_time_series),
+      target_log_prob_fn=model.joint_distribution(observed_time_series).log_prob,
       surrogate_posterior=surrogate_posterior,
       optimizer=tf.optimizers.Adam(learning_rate=0.1),
       num_steps=200)
@@ -267,7 +267,7 @@ def forecast(model,
     surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
       model=model)
     loss_curve = tfp.vi.fit_surrogate_posterior(
-      target_log_prob_fn=model.joint_log_prob(observed_time_series),
+      target_log_prob_fn=model.joint_distribution(observed_time_series).log_prob,
       surrogate_posterior=surrogate_posterior,
       optimizer=tf.optimizers.Adam(learning_rate=0.1),
       num_steps=200)

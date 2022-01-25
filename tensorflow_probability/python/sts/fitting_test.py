@@ -54,7 +54,7 @@ class _VariationalInferenceTests(object):
     variational_posterior = tfp.sts.build_factored_surrogate_posterior(
         model, batch_shape=num_inits)
     loss_curve = tfp.vi.fit_surrogate_posterior(
-        model.joint_log_prob(observed_time_series),
+        model.joint_distribution(observed_time_series).log_prob,
         surrogate_posterior=variational_posterior,
         sample_size=3,
         num_steps=10,
@@ -115,7 +115,7 @@ class _VariationalInferenceTests(object):
     @tf.function(autograph=False)  # Ensure the loss is computed efficiently
     def loss_fn(sample_size=3):
       return tfp.vi.monte_carlo_variational_loss(
-          model.joint_log_prob(observed_time_series),
+          model.joint_distribution(observed_time_series).log_prob,
           surrogate_posterior,
           sample_size=sample_size)
 
@@ -144,7 +144,8 @@ class _VariationalInferenceTests(object):
     surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
         model=model)
     variational_loss = tfp.vi.monte_carlo_variational_loss(
-        target_log_prob_fn=model.joint_log_prob(observed_time_series),
+        target_log_prob_fn=model.joint_distribution(
+            observed_time_series).log_prob,
         surrogate_posterior=surrogate_posterior)
     self.evaluate(tf1.global_variables_initializer())
     loss_ = self.evaluate(variational_loss)

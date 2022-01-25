@@ -128,7 +128,7 @@ def build_factored_surrogate_posterior(
     surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
       model=model)
     loss_curve = tfp.vi.fit_surrogate_posterior(
-      target_log_prob_fn=model.joint_log_prob(observed_time_series),
+      target_log_prob_fn=model.joint_distribution(observed_time_series).log_prob,
       surrogate_posterior=surrogate_posterior,
       optimizer=tf.optimizers.Adam(learning_rate=0.1),
       num_steps=200)
@@ -146,7 +146,7 @@ def build_factored_surrogate_posterior(
     @tf.function(autograph=False)  # Ensure the loss is computed efficiently
     def loss_fn():
       return tfp.vi.monte_carlo_variational_loss(
-        model.joint_log_prob(observed_time_series),
+        model.joint_distribution(observed_time_series).log_prob,
         surrogate_posterior,
         sample_size=10)
 
@@ -418,7 +418,7 @@ def fit_with_hmc(model,
   transformed_hmc_kernel = tfp.mcmc.TransformedTransitionKernel(
       inner_kernel=tfp.mcmc.DualAveragingStepSizeAdaptation(
           inner_kernel=tfp.mcmc.HamiltonianMonteCarlo(
-              target_log_prob_fn=model.joint_log_prob(observed_time_series),
+              target_log_prob_fn=model.joint_distribution(observed_time_series).log_prob,
               step_size=step_size,
               num_leapfrog_steps=num_leapfrog_steps,
               state_gradients_are_stopped=True,
@@ -451,7 +451,7 @@ def fit_with_hmc(model,
 
     observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=chain_batch_shape)
-    target_log_prob_fn = model.joint_log_prob(observed_time_series)
+    target_log_prob_fn = model.joint_distribution(observed_time_series).log_prob
 
     # Initialize state and step sizes from a variational posterior if not
     # specified.

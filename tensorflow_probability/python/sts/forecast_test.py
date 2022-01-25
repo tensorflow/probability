@@ -168,6 +168,10 @@ class _ForecastTest(object):
 
   @test_util.jax_disable_test_missing_functionality('fit_with_hmc')
   def test_forecast_from_hmc(self):
+    if not (tf1.control_flow_v2_enabled() or self.use_static_shape):
+      self.skipTest('test_forecast_from_hmc does not currently work with TF1 '
+                    'and dynamic shapes')
+
     # test that we can directly plug in the output of an HMC chain as
     # the input to `forecast`, as done in the example, with no `sess.run` call.
     num_results = 5
