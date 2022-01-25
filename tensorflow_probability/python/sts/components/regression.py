@@ -147,6 +147,11 @@ class LinearRegression(StructuralTimeSeries):
       the features in each design matrix have the same semantics (e.g.,
       grouping observations by country, with per-country design matrices
       capturing the same set of national economic indicators per country).
+      For applications requiring multiple samples of weights (VI, HMC),
+      `weights_prior.batch_shape` should be inflated with singleton dimensions
+      so that its rank is at least that of `design_matrix.batch_shape`; this
+      prevents the sample dimensions from colliding with the design matrix batch
+      dimensions.
     * `weights_prior.batch_shape == `design_matrix.batch_shape`: fits separate
       weights for each design matrix. If there are multiple observed time series
       for each design matrix, this shares statistical strength over those
@@ -238,6 +243,8 @@ class LinearRegression(StructuralTimeSeries):
                               initial_state_prior=None,
                               **linear_gaussian_ssm_kwargs):
 
+    # TODO(b/215267145): Automatically ensure that sample dimensions of
+    # `weights` do not collide with batch dimensions of `design_matrix`.
     weights = param_map['weights']  # shape: [B, num_features]
     predicted_timeseries = self.design_matrix.matmul(weights[..., tf.newaxis])
     # Move timestep to the first dim (before any batch dimensions).
