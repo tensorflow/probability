@@ -277,6 +277,14 @@ class PoissonTest(test_util.TestCase):
         self.evaluate(poisson.mean()), stats.poisson.mean(lam_v))
     self.assertAllClose(self.evaluate(poisson.mean()), lam_v)
 
+  def testNormalQuantile(self):
+    lam_v = np.array([1.0, 3.0, 2.5], dtype=np.float32)
+    poisson = self._make_poisson(rate=lam_v)
+    p = np.array([0., 0.1, 0.25, 0.45, 0.5, 0.55, 0.75, 0.9, 1.], dtype=np.float32)
+    quantile = poisson.quantile(p)
+    self.assertEqual(quantile.shape, (9,))
+    self.assertAllClose(self.evaluate(quantile), stats.poisson.ppf(p, lam_v))
+
   def testPoissonVariance(self):
     lam_v = np.array([1.0, 3.0, 2.5], dtype=np.float32)
     poisson = self._make_poisson(rate=lam_v)
