@@ -32,6 +32,8 @@
 # ==============================================================================
 """Composes one or more `LinearOperators`."""
 
+import warnings
+
 from tensorflow_probability.python.internal.backend.numpy import ops as common_shapes
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -191,9 +193,12 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
       is_non_singular = True
 
     # Initialization.
+
     graph_parents = []
-    for operator in operators:
-      graph_parents.extend(operator.graph_parents)
+    with warnings.catch_warnings():
+      warnings.simplefilter("ignore")
+      for operator in operators:
+        graph_parents.extend(operator.graph_parents)
 
     if name is None:
       name = "_o_".join(operator.name for operator in operators)
