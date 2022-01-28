@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.distributions import kullback_leibler
 
 import tensorflow_probability.python.distributions as tfd
 import tensorflow_probability.python.bijectors as tfb
@@ -225,10 +226,50 @@ class GeneralizedGamma(distribution.Distribution):
     if is_init != tensor_util.is_ref(self.concentration):
       assertions.append(assert_util.assert_positive(
         self.concentration,
-        message='Argument `shape` must be positive.'))
+        message='Argument `concentration` must be positive.'))
     if is_init != tensor_util.is_ref(self.exponent):
       assertions.append(assert_util.assert_positive(
         self.exponent,
         message='Argument `exponent` must be positive.'))
     return assertions
 
+
+@kullback_leibler.RegisterKL(GeneralizedGamma, GeneralizedGamma)
+def _kl_ggamma_ggamma(a, b, name=None):
+  """Calculate the batched KL divergence KL(a || b) with a and b GeneralizedGamma.
+  \begin{align}
+  D_{KL} (f_1 \parallel f_2) 
+  & = \int_{0}^{\infty} f_1(x; a_1, d_1, p_1) \, \ln \frac{f_1(x; a_1, d_1, p_1)}{f_2(x; a_2, d_2, p_2)} \, dx\\
+  & = \ln \frac{p_1 \, a_2^{d_2} \, \Gamma\left(d_2 / p_2\right)}{p_2 \, a_1^{d_1} \, \Gamma\left(d_1 /p_1\right)} 
+      + \left[ \frac{\psi\left( d_1 / p_1 \right)}{p_1} + \ln a_1 \right]  (d_1 - d_2) 
+      + \frac{\Gamma\bigl((d_1+p_2) / p_1 \bigr)}{\Gamma\left(d_1 / p_1\right)} \left( \frac{a_1}{a_2} \right)^{p_2} 
+      - \frac{d_1}{p_1}
+  \end{align}
+  Args:
+    a: instance of a GeneralizedGamma distribution object.
+    b: instance of a GeneralizedGamma distribution object.
+    name: (optional) Name to use for created operations. Default is
+      '_kl_ggamma_ggamma'.
+
+  Returns:
+    Batchwise KL(a || b)
+  """
+  with tf.name_scope(name or '_kl_ggamma_ggamma'):
+    # Result from https://arxiv.org/pdf/1310.3713.pdf
+    a_concentration = tf.convert_to_tensor(a.concentration)
+    b_concentration = tf.convert_to_tensor(b.concentration)
+    a_scale = tf.convert_to_tensor(a.scale)
+    b_scale = tf.convert_to_tensor(b.scale)
+    a_exponent = tf.convert_to_tensor(a.exponent)
+    b_exponent = tf.convert_to_tensor(b.exponent)
+
+    return (
+      tf.math.log(a_exponent) - tf.math.log(b_exponent) 
+      + b_concentration*tf.math.log(b_scale) - a_concentration*tf.math.log(a_scale)
+      + tf.math.lgamma(b_concentration/b_exponent) - tf.math.lgamma(a_concentration/a_exponent)
+      + (a_concentration - b_concentration)*(tf.math.digamma(a_concentration/a_exponent)/a_exponent + tf.math.log(a_scale))
+      + tf.math.exp(tf.math.lgamma(
+        (a_concentration + b_exponent)/a_exponent
+        )-tf.math.lgamma(a_concentration/a_exponent) * tf.math.pow(a_scale/b_scale, b_exponent))
+      - a_concentration/a_exponent
+    )
