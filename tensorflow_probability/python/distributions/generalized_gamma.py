@@ -135,6 +135,21 @@ class GeneralizedGamma(distribution.Distribution):
   def _stddev(self):
     return tf.math.sqrt(self._variance())
 
+  def _mode(self):
+    concentration = tf.convert_to_tensor(self.concentration)
+    exponent = tf.convert_to_tensor(self.exponent)
+    scale = tf.convert_to_tensor(self.scale)
+    mode = scale*tf.math.pow(
+      (concentration - 1.)/exponent,
+      1./exponent
+    )
+    mode = tf.where(
+      concentration > 1.,
+      mode,
+      tf.zeros_like(mode)
+      )
+    return mode
+      
   def _default_event_space_bijector(self):
     return softplus_bijector.Softplus(validate_args=self.validate_args)
 
@@ -170,7 +185,6 @@ class GeneralizedGamma(distribution.Distribution):
     return tf.broadcast_static_shape(
       self.scale.shape,
       self.concentration.shape,
-      self.exponent.shape
       )
 
   def _event_shape_tensor(self):
