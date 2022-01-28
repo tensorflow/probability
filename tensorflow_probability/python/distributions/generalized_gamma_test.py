@@ -31,12 +31,12 @@ from tensorflow_probability.python.internal import test_util
 class _GeneralizedGammaTest(object):
 
   def testGeneralizedGammaShape(self):
-    shape = np.array([1.] * 5, dtype=self.dtype)
+    concentration = np.array([1.] * 5, dtype=self.dtype)
     scale = np.array([2.] * 5, dtype=self.dtype)
     exponent = np.array([1.] * 5, dtype=self.dtype)
     GeneralizedGamma = tfd.GeneralizedGamma(
         scale=self.make_input(scale),
-        shape=self.make_input(shape),
+        concentration=self.make_input(concentration),
         exponent=self.make_input(exponent),
         validate_args=True)
     if self.use_static_shape:
@@ -48,12 +48,12 @@ class _GeneralizedGammaTest(object):
   def testInvalidScale(self):
     scale = self.make_input(np.array([-0.01, 0., 2.], dtype=self.dtype))
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      GeneralizedGamma = tfd.GeneralizedGamma(shape=1., scale=scale, exponent=1., validate_args=True)
+      GeneralizedGamma = tfd.GeneralizedGamma(concentration=1., scale=scale, exponent=1., validate_args=True)
       self.evaluate(GeneralizedGamma.mean())
 
     scale = tf.Variable([0.01])
     self.evaluate(scale.initializer)
-    GeneralizedGamma = tfd.GeneralizedGamma(shape=1., scale=scale, exponent=1., validate_args=True)
+    GeneralizedGamma = tfd.GeneralizedGamma(concentration=1., scale=scale, exponent=1., validate_args=True)
     self.assertIs(scale, GeneralizedGamma.scale)
     self.evaluate(GeneralizedGamma.mean())
     with tf.control_dependencies([scale.assign([-0.01])]):
@@ -61,34 +61,34 @@ class _GeneralizedGammaTest(object):
         self.evaluate(GeneralizedGamma.mean())
 
   def testInvalidShape(self):
-    shape = [-0.01, 0., 2.]
-    with self.assertRaisesOpError('Argument `shape` must be positive.'):
+    concentration = [-0.01, 0., 2.]
+    with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       GeneralizedGamma = tfd.GeneralizedGamma(
-          shape=shape, scale=1., exponent=1., validate_args=True)
+          concentration=concentration, scale=1., exponent=1., validate_args=True)
       self.evaluate(GeneralizedGamma.mean())
 
-    shape = tf.Variable([0.01])
-    self.evaluate(shape.initializer)
+    concentration = tf.Variable([0.01])
+    self.evaluate(concentration.initializer)
     GeneralizedGamma = tfd.GeneralizedGamma(
-        shape=shape, scale=1., exponent=1., validate_args=True)
-    self.assertIs(shape, GeneralizedGamma.shape)
+        concentration=concentration, scale=1., exponent=1., validate_args=True)
+    self.assertIs(concentration, GeneralizedGamma.concentration)
     self.evaluate(GeneralizedGamma.mean())
-    with tf.control_dependencies([shape.assign([-0.01])]):
+    with tf.control_dependencies([concentration.assign([-0.01])]):
       with self.assertRaisesOpError(
-          'Argument `shape` must be positive.'):
+          'Argument `concentration` must be positive.'):
         self.evaluate(GeneralizedGamma.mean())
         
   def testInvalidExponent(self):
     exponent = [-0.01, 0., 2.]
     with self.assertRaisesOpError('Argument `exponent` must be positive.'):
       GeneralizedGamma = tfd.GeneralizedGamma(
-          shape=1., scale=1., exponent=exponent, validate_args=True)
+          concentration=1., scale=1., exponent=exponent, validate_args=True)
       self.evaluate(GeneralizedGamma.mean())
 
     exponent = tf.Variable([0.01])
     self.evaluate(exponent.initializer)
     GeneralizedGamma = tfd.GeneralizedGamma(
-        shape=1., scale=1., exponent=exponent, validate_args=True)
+        concentration=1., scale=1., exponent=exponent, validate_args=True)
     self.assertIs(exponent, GeneralizedGamma.exponent)
     self.evaluate(GeneralizedGamma.mean())
     with tf.control_dependencies([exponent.assign([-0.01])]):
@@ -97,21 +97,21 @@ class _GeneralizedGammaTest(object):
         self.evaluate(GeneralizedGamma.mean())
 
   def testGeneralizedGammaEntropy(self):
-    shape = np.array([7.8], dtype=self.dtype)
+    concentration = np.array([7.8], dtype=self.dtype)
     scale = np.array([1.1], dtype=self.dtype)
     exponent = np.array([1.0], dtype=self.dtype)
 
     GeneralizedGamma = tfd.GeneralizedGamma(
-        shape=self.make_input(shape),
+        concentration=self.make_input(concentration),
         scale=self.make_input(scale),
         exponent=self.make_input(exponent),
         validate_args=True)
 
     entropy = GeneralizedGamma.entropy()
     expected_entropy = (
-      np.log(scale) + np.special.gammaln(shape/exponent)
-      - np.log(exponent) + shape/exponent
-      + (1.0 - shape)/exponent*special.digamma(shape/exponent)
+      np.log(scale) + np.special.gammaln(concentration/exponent)
+      - np.log(exponent) + concentration/exponent
+      + (1.0 - concentration)/exponent*special.digamma(concentration/exponent)
     )
 
     self.assertAllClose(
@@ -121,13 +121,13 @@ class _GeneralizedGammaTest(object):
 
 
   def testGeneralizedGammaSample(self):
-    shape = self.dtype(4.)
+    concentration = self.dtype(4.)
     scale = self.dtype(1.)
     exponent = self.dtype(1.)
     n = int(100e3)
 
     GeneralizedGamma = tfd.GeneralizedGamma(
-        shape=self.make_input(shape),
+        concentration=self.make_input(concentration),
         scale=self.make_input(scale),
         exponent=self.make_input(exponent),
         validate_args=True)
@@ -160,12 +160,12 @@ class _GeneralizedGammaTest(object):
       self.assertEqual(self.dtype, getattr(dist, method)().dtype)
 
   def testSupportBijectorOutsideRange(self):
-    shape = np.array([2., 4., 5.], dtype=self.dtype)
+    concentration = np.array([2., 4., 5.], dtype=self.dtype)
     scale = np.array([2., 4., 5.], dtype=self.dtype)
     exponent = np.array([2., 4., 5.], dtype=self.dtype)
 
     dist = tfd.GeneralizedGamma(
-        shape=shape, scale=scale, exponent=exponent, validate_args=True)
+        concentration=concentration, scale=scale, exponent=exponent, validate_args=True)
     x = np.array([-8.3, -0.4, -1e-6])
     bijector_inverse_x = dist.experimental_default_event_space_bijector(
     ).inverse(x)

@@ -32,14 +32,13 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 
+import tensorflow_probability.python.distributions as tfd
+import tensorflow_probability.python.bijectors as tfb
+
 
 __all__ = [
   'GeneralizedGamma',
 ]
-
-tfd = tfp.distributions
-tfb = tfp.bijectors
-
 
 class GeneralizedGamma(distribution.Distribution):
   """Generalized Gamma distribution
@@ -52,23 +51,23 @@ class GeneralizedGamma(distribution.Distribution):
   
   Following the wikipedia parameterization 
   https://en.wikipedia.org/wiki/Generalized_gamma_distribution
-  f(x; a=scale, d=shape, p=exponent) = 
+  f(x; a=scale, d=concentration, p=exponent) = 
     \frac{(p/a^d) x^{d-1} e^{-(x/a)^p}}{\Gamma(d/p)}
   """
 
   def __init__(self,
-         scale, shape, exponent,
+         scale, concentration, exponent,
          validate_args=False,
          allow_nan_stats=True,
          name='GeneralizedGamma'):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
       dtype = dtype_util.common_dtype(
-        [scale, shape, exponent], dtype_hint=tf.float32)
+        [scale, concentration, exponent], dtype_hint=tf.float32)
       self._scale = tensor_util.convert_nonref_to_tensor(
         scale, dtype=dtype, name='scale')
-      self._shape = tensor_util.convert_nonref_to_tensor(
-        shape, dtype=dtype, name='shape')
+      self._concentration = tensor_util.convert_nonref_to_tensor(
+        concentration, dtype=dtype, name='concentration')
       self._exponent = tensor_util.convert_nonref_to_tensor(
         exponent, dtype=dtype, name='exponent')
 
@@ -84,53 +83,53 @@ class GeneralizedGamma(distribution.Distribution):
 
   def _mean(self):
     return self.scale * tf.math.exp(
-      tf.math.lgamma((self.shape + 1.)/self.exponent)
-      - tf.math.lgamma(self.shape/self.exponent)
+      tf.math.lgamma((self.concentration + 1.)/self.exponent)
+      - tf.math.lgamma(self.concentration/self.exponent)
     )
 
   def _variance(self):
     return self._scale**2 * (
       tf.math.exp(
-        tf.math.lgamma((self.shape+2.)/self.exponent)
-        - tf.math.lgamma(self.shape/self.exponent)
+        tf.math.lgamma((self.concentration+2.)/self.exponent)
+        - tf.math.lgamma(self.concentration/self.exponent)
       )
       - tf.math.exp(
         2*(
-          tf.math.lgamma((self.shape+1.)/self.exponent)
-          - tf.math.lgamma(self.shape/self.exponent)
+          tf.math.lgamma((self.concentration+1.)/self.exponent)
+          - tf.math.lgamma(self.concentration/self.exponent)
         )
 
       )
     )
 
   def _cdf(self, x):
-    return tf.math.igamma(self.shape/self.exponent,
+    return tf.math.igamma(self.concentration/self.exponent,
                 (x/self.scale)**self.exponent) * tf.exp(
-      -tf.math.lgamma(self.shape/self.exponent)
+      -tf.math.lgamma(self.concentration/self.exponent)
     )
 
-  def _log_prob(self, x, scale=None, shape=None, exponent=None):
+  def _log_prob(self, x, scale=None, concentration=None, exponent=None):
     scale = tensor_util.convert_nonref_to_tensor(
       self.scale if scale is None else scale)
-    shape = tensor_util.convert_nonref_to_tensor(
-      self.shape if shape is None else shape)
+    concentration = tensor_util.convert_nonref_to_tensor(
+      self.concentration if concentration is None else concentration)
     exponent = tensor_util.convert_nonref_to_tensor(
       self.exponent if exponent is None else exponent)
     log_unnormalized_prob = (
-      tf.math.xlogy(shape-1., x) - (x/scale)**exponent)
+      tf.math.xlogy(concentration-1., x) - (x/scale)**exponent)
     log_prefactor = (
-      tf.math.log(exponent) - tf.math.xlogy(shape, scale)
-      - tf.math.lgamma(shape/exponent))
+      tf.math.log(exponent) - tf.math.xlogy(concentration, scale)
+      - tf.math.lgamma(concentration/exponent))
     return log_unnormalized_prob + log_prefactor
 
   def _entropy(self):
     scale = tf.convert_to_tensor(self.scale)
-    shape = tf.convert_to_tensor(self.shape)
+    concentration = tf.convert_to_tensor(self.concentration)
     exponent = tf.convert_to_tensor(self.exponent)
     return (
-      tf.math.log(scale) + tf.math.lgamma(shape/exponent)
-      - tf.math.log(exponent) + shape/exponent
-      + (1.0 - shape)/exponent*tf.math.digamma(shape/exponent)
+      tf.math.log(scale) + tf.math.lgamma(concentration/exponent)
+      - tf.math.log(exponent) + concentration/exponent
+      + (1.0 - concentration)/exponent*tf.math.digamma(concentration/exponent)
     )
 
   def _stddev(self):
@@ -152,25 +151,27 @@ class GeneralizedGamma(distribution.Distribution):
     return self._scale
 
   @property
-  def shape(self):
-    return self._shape
+  def concentration(self):
+    return self._concentration
 
   @property
   def exponent(self):
     return self._exponent
 
-  def _batch_shape_tensor(self, scale=None, shape=None, exponent=None):
+  def _batch_shape_tensor(self, scale=None, concentration=None, exponent=None):
     return prefer_static.broadcast_shape(
       prefer_static.shape(
         self.scale if scale is None else scale),
-      prefer_static.shape(self.shape if shape is None else shape),
+      prefer_static.shape(self.concentration if concentration is None else concentration),
       prefer_static.shape(
         self.exponent if exponent is None else exponent))
 
   def _batch_shape(self):
     return tf.broadcast_static_shape(
       self.scale.shape,
-      self.shape.shape)
+      self.concentration.shape,
+      self.exponent.shape
+      )
 
   def _event_shape_tensor(self):
     return tf.constant([], dtype=tf.int32)
@@ -186,7 +187,7 @@ class GeneralizedGamma(distribution.Distribution):
     """
     gamma_samples = tf.random.gamma(
       shape=[n],
-      alpha=self.shape/self.exponent,
+      alpha=self.concentration/self.exponent,
       beta=1.,
       dtype=self.dtype,
       seed=seed
@@ -207,9 +208,9 @@ class GeneralizedGamma(distribution.Distribution):
       assertions.append(assert_util.assert_positive(
         self.scale,
         message='Argument `scale` must be positive.'))
-    if is_init != tensor_util.is_ref(self.shape):
+    if is_init != tensor_util.is_ref(self.concentration):
       assertions.append(assert_util.assert_positive(
-        self.shape,
+        self.concentration,
         message='Argument `shape` must be positive.'))
     if is_init != tensor_util.is_ref(self.exponent):
       assertions.append(assert_util.assert_positive(
@@ -217,8 +218,3 @@ class GeneralizedGamma(distribution.Distribution):
         message='Argument `exponent` must be positive.'))
     return assertions
 
-if __name__ == "__main__":
-  test=GeneralizedGamma(1,1,1)
-  b=test.sample(10)
-  c=test.mean()
-  pass
