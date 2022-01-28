@@ -22,8 +22,6 @@ package(default_visibility = ["//visibility:public"])
 py_binary(
     name = "build_oryx_docs",
     srcs = ["build_oryx_docs.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl:app dep,
         # absl/flags dep,

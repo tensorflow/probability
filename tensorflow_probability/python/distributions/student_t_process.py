@@ -281,7 +281,7 @@ class StudentTProcess(distribution.AutoCompositeTensorDistribution):
       marginal_fn: A Python callable that takes a location, covariance matrix,
         optional `validate_args`, `allow_nan_stats` and `name` arguments, and
         returns a multivariate normal subclass of `tfd.Distribution`.
-        Default value: `None`, in which case a Cholesky-factorizing function is
+        Default value: `None`, in which case a Cholesky-factorizing function
         is created using `make_cholesky_factored_marginal_fn` and the
         `jitter` argument.
       cholesky_fn: Callable which takes a single (batch) matrix argument and

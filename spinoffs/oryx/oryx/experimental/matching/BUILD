@@ -24,7 +24,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "matching",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":jax_rewrite",
         ":matcher",
@@ -36,7 +35,6 @@ py_library(
 py_library(
     name = "matcher",
     srcs = ["matcher.py"],
-    srcs_version = "PY3",
     deps = [
     ],
 )
@@ -45,7 +43,6 @@ py_library(
 py_library(
     name = "rules",
     srcs = ["rules.py"],
-    srcs_version = "PY3",
     deps = [":matcher"],
 )
 
@@ -53,7 +50,6 @@ py_library(
 py_library(
     name = "jax_rewrite",
     srcs = ["jax_rewrite.py"],
-    srcs_version = "PY3",
     deps = [
         ":matcher",
         ":rules",
@@ -67,8 +63,6 @@ py_library(
 py_test(
     name = "matcher_test",
     srcs = ["matcher_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":matcher",
         # absl/testing:absltest dep,
@@ -80,8 +74,6 @@ py_test(
 py_test(
     name = "rules_test",
     srcs = ["rules_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":matcher",
         ":rules",
@@ -94,8 +86,6 @@ py_test(
 py_test(
     name = "jax_rewrite_test",
     srcs = ["jax_rewrite_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":jax_rewrite",
         ":matcher",

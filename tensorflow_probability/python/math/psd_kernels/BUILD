@@ -60,6 +60,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:slicing",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],
@@ -379,7 +380,6 @@ py_library(
     name = "hypothesis_testlib",
     testonly = True,
     srcs = ["hypothesis_testlib.py"],
-    srcs_version = "PY3",
     deps = [
         # hypothesis dep,
         # numpy dep,
@@ -392,9 +392,7 @@ py_test(
     name = "psd_kernel_properties_test",
     size = "medium",
     srcs = ["psd_kernel_properties_test.py"],
-    python_version = "PY3",
     shard_count = 20,
-    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         # absl/logging dep,

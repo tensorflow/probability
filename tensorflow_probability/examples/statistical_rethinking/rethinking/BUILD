@@ -26,14 +26,12 @@ licenses(["notice"])
 py_library(
     name = "rethinking",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [":quap"],
 )
 
 py_library(
     name = "quap",
     srcs = ["quap.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -44,8 +42,6 @@ py_test(
     name = "quap_test",
     size = "large",
     srcs = ["quap_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":rethinking",
         # tensorflow dep,

@@ -32,7 +32,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "util",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     substrates_omit_deps = [
         ":composite_tensor",
         ":deferred_module",
@@ -48,7 +47,6 @@ multi_substrate_py_library(
 py_library(
     name = "deferred_module",
     srcs = ["deferred_module.py"],
-    srcs_version = "PY3",
     deps = [
         ":special_methods",
         # numpy dep,
@@ -61,7 +59,6 @@ py_test(
     name = "deferred_module_test",
     size = "small",
     srcs = ["deferred_module_test.py"],
-    python_version = "PY3",
     deps = [
         ":deferred_module",
         # absl/testing:parameterized dep,
@@ -76,7 +73,6 @@ py_test(
 multi_substrate_py_library(
     name = "jit_public_methods",
     srcs = ["jit_public_methods.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -103,7 +99,6 @@ multi_substrate_py_test(
 py_library(
     name = "special_methods",
     srcs = ["special_methods.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -112,7 +107,6 @@ py_library(
 multi_substrate_py_library(
     name = "trainable",
     srcs = ["trainable.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:samplers",
@@ -125,8 +119,6 @@ multi_substrate_py_test(
     srcs = ["trainable_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # optax dep,
         # tensorflow dep,
@@ -138,7 +130,6 @@ multi_substrate_py_test(
 py_library(
     name = "composite_tensor",
     srcs = ["composite_tensor.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",
@@ -148,8 +139,6 @@ py_library(
 py_test(
     name = "composite_tensor_test",
     srcs = ["composite_tensor_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

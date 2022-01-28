@@ -32,7 +32,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "joint_distribution_layers",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":layers",
     ],
@@ -41,7 +40,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "layers",
     srcs = ["layers.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -57,7 +55,6 @@ multi_substrate_py_test(
     name = "layers_test",
     size = "medium",
     srcs = ["layers_test.py"],
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # tensorflow dep,

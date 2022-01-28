@@ -26,7 +26,6 @@ py_test(
     name = "numpy_integration_test",
     size = "small",
     srcs = ["numpy_integration_test.py"],
-    python_version = "PY3",
     tags = ["tfp_numpy"],
     deps = [
         "//tensorflow_probability/substrates:numpy",
@@ -36,7 +35,6 @@ py_test(
 py_test(
     name = "jax_integration_test",
     srcs = ["jax_integration_test.py"],
-    python_version = "PY3",
     tags = ["tfp_jax"],
     deps = [
         # jax dep,
@@ -47,8 +45,6 @@ py_test(
 py_binary(
     name = "rewrite",
     srcs = ["rewrite.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl:app dep,
     ],

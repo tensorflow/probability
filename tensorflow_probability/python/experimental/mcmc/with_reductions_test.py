@@ -234,6 +234,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     self.assertAllEqual(6, kernel_results.inner_results.counter_1)
     self.assertAllEqual(12, kernel_results.inner_results.counter_2)
 
+  @test_util.numpy_disable_gradient_test
   def test_multivariate_normal_covariance_with_sample_chain(self):
     mu = [1, 2, 3]
     cov = [[0.36, 0.12, 0.06],
@@ -280,6 +281,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
         current_state=0.,
         kernel=reducer_kernel,
         return_final_kernel_results=True,
+        seed=test_util.test_seed(),
     )
     final_cov = self.evaluate(
         cov_reducer.finalize(kernel_results.reduction_results))
@@ -293,6 +295,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     self.assertAllEqual(6, kernel_results.inner_results.counter_1)
     self.assertAllEqual(12, kernel_results.inner_results.counter_2)
 
+  @test_util.numpy_disable_test_missing_functionality('composite tensor')
   def test_covariance_before_transformation(self):
     fake_kernel = test_fixtures.TestTransitionKernel(
         target_log_prob_fn=lambda x: -x**2 / 2)
@@ -324,6 +327,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     self.assertAllClose(
         np.cov(np.log(samples).T, ddof=0), final_cov, rtol=1e-6)
 
+  @test_util.numpy_disable_test_missing_functionality('composite tensor')
   def test_covariance_after_transformation(self):
     fake_kernel = test_fixtures.TestTransitionKernel(
         target_log_prob_fn=lambda x: -x**2 / 2)
@@ -355,6 +359,7 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     self.assertAllClose(
         np.cov(samples.T, ddof=0), final_cov, rtol=1e-6)
 
+  @test_util.numpy_disable_gradient_test
   def test_nested_in_step_size_adaptation(self):
     target_dist = tfp.distributions.MultivariateNormalDiag(
         loc=[0., 0.], scale_diag=[1., 10.])

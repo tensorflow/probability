@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "util",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":summary",
     ],
@@ -33,7 +32,6 @@ py_library(
 py_library(
     name = "summary",
     srcs = ["summary.py"],
-    srcs_version = "PY3",
     deps = ["//oryx/core/interpreters:harvest"],
 )
 
@@ -41,7 +39,6 @@ py_library(
 py_test(
     name = "summary_test",
     srcs = ["summary_test.py"],
-    python_version = "PY3",
     deps = [
         ":summary",
         # absl/testing:absltest dep,

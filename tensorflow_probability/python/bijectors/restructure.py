@@ -20,6 +20,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
@@ -260,11 +261,13 @@ class Restructure(bijector.AutoCompositeTensorBijector):
 
   def _call_forward_log_det_jacobian(self, x, event_ndims, name, **kwargs):
     with self._name_and_control_scope(name):
-      return tf.zeros([], tf.float32)
+      dtype = dtype_util.common_dtype(x, dtype_hint=tf.float32)
+      return tf.zeros([], dtype)
 
   def _call_inverse_log_det_jacobian(self, y, event_ndims, name, **kwargs):
     with self._name_and_control_scope(name):
-      return tf.zeros([], tf.float32)
+      dtype = dtype_util.common_dtype(y, dtype_hint=tf.float32)
+      return tf.zeros([], dtype)
 
 
 def tree_flatten(example, name='restructure'):

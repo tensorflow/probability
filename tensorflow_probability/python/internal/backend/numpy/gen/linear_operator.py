@@ -36,7 +36,6 @@ import abc
 import contextlib
 
 import numpy as np
-import six
 
 from tensorflow_probability.python.internal.backend.numpy import composite_tensor
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
@@ -67,8 +66,8 @@ __all__ = ["LinearOperator"]
 
 # TODO(langmore) Use matrix_solve_ls for singular or non-square matrices.
 # @tf_export("linalg.LinearOperator")
-@six.add_metaclass(abc.ABCMeta)
-class LinearOperator(module.Module, composite_tensor.CompositeTensor):
+class LinearOperator(
+    module.Module, composite_tensor.CompositeTensor, metaclass=abc.ABCMeta):
   """Base class defining a [batch of] linear operator[s].
 
   Subclasses of `LinearOperator` provide access to common methods on a
@@ -184,7 +183,7 @@ class LinearOperator(module.Module, composite_tensor.CompositeTensor):
      )
      ...
      super().__init__(..., parameters=parameters)
-   ```
+  ```
 
    Users can then access `my_linear_operator.parameters` to see all arguments
    passed to its initializer.
@@ -202,7 +201,7 @@ class LinearOperator(module.Module, composite_tensor.CompositeTensor):
                is_square=None,
                name=None,
                parameters=None):
-    r"""Initialize the `LinearOperator`.
+    """Initialize the `LinearOperator`.
 
     **This is a private method for subclass use.**
     **Subclasses should copy-paste this `__init__` documentation.**

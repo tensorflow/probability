@@ -28,9 +28,13 @@ tfb = tfp.bijectors
 tfd = tfp.distributions
 
 
+JAX_MODE = False
+
+
 @test_util.test_all_tf_execution_regimes
 class OptimizationTests(test_util.TestCase):
 
+  @test_util.jax_disable_variable_test
   def test_variational_em(self):
 
     seed = test_util.test_seed()
@@ -79,6 +83,7 @@ class OptimizationTests(test_util.TestCase):
     self.assertAllClose(final_q_loc_, z_posterior_mean, atol=0.2)
     self.assertAllClose(final_q_scale_, z_posterior_stddev, atol=0.1)
 
+  @test_util.jax_disable_variable_test
   def test_importance_sampling_example(self):
     init_seed, opt_seed, eval_seed = tfp.random.split_seed(
         test_util.test_seed(sampler_type='stateless'), n=3)
@@ -128,6 +133,7 @@ class OptimizationTests(test_util.TestCase):
     loss_curve_again = self.evaluate(loss_curve_again)
     self.assertAllClose(loss_curve_again, loss_curve)
 
+  @test_util.jax_disable_variable_test
   def test_fit_posterior_with_joint_q(self):
 
     # Target distribution: equiv to MVNFullCovariance(cov=[[1., 1.], [1., 2.]])
@@ -155,7 +161,8 @@ class OptimizationTests(test_util.TestCase):
     # loss should be (approximately) zero.
     self.assertAllClose(loss_curve_[-1], 0., atol=0.1)
 
-  def test_imhogeneous_poisson_process_example(self):
+  @test_util.jax_disable_variable_test
+  def test_inhomogeneous_poisson_process_example(self):
     # Toy 1D data.
     index_points = np.array([-10., -7.2, -4., -0.1, 0.1, 4., 6.2, 9.]).reshape(
         [-1, 1]).astype(np.float32)
@@ -210,6 +217,137 @@ class OptimizationTests(test_util.TestCase):
     self.assertLess(losses_[-1], 80.)  # Optimal loss is roughly 40.
     # Optimal latent logits are approximately the log observed counts.
     self.assertAllClose(sample_path_[-1], np.log(observed_counts), atol=1.0)
+
+
+@test_util.test_all_tf_execution_regimes
+class StatelessOptimizationTests(test_util.TestCase):
+
+  def test_importance_sampling_example(self):
+    if not JAX_MODE:
+      self.skipTest('Requires optax.')
+    import optax  # pylint: disable=g-import-not-at-top
+
+    init_seed, opt_seed, eval_seed = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'), n=3)
+
+    def log_prob(z, x):
+      return tfd.Normal(0., 1.).log_prob(z) + tfd.Normal(z, 1.).log_prob(x)
+    conditioned_log_prob = lambda z: log_prob(z, x=5.)
+
+    init_normal, build_normal = tfp.experimental.util.make_trainable_stateless(
+        tfd.Normal)
+    # Fit `q` with an importance-weighted variational loss.
+    optimized_parameters, _ = tfp.vi.fit_surrogate_posterior_stateless(
+        conditioned_log_prob,
+        build_surrogate_posterior_fn=build_normal,
+        initial_parameters=init_normal(seed=init_seed),
+        importance_sample_size=10,
+        optimizer=optax.adam(0.1),
+        num_steps=200,
+        seed=opt_seed)
+    q_z = build_normal(*optimized_parameters)
+
+    # Estimate posterior statistics with importance sampling.
+    zs, q_log_prob = self.evaluate(q_z.experimental_sample_and_log_prob(
+        1000, seed=eval_seed))
+    self_normalized_log_weights = tf.nn.log_softmax(
+        conditioned_log_prob(zs) - q_log_prob)
+    posterior_mean = tf.reduce_sum(
+        tf.exp(self_normalized_log_weights) * zs,
+        axis=0)
+    self.assertAllClose(posterior_mean, 2.5, atol=1e-1)
+
+    posterior_variance = tf.reduce_sum(
+        tf.exp(self_normalized_log_weights) * (zs - posterior_mean)**2,
+        axis=0)
+    self.assertAllClose(posterior_variance, 0.5, atol=1e-1)
+
+  def test_inhomogeneous_poisson_process_example(self):
+    opt_seed, eval_seed = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'), n=2)
+
+    # Toy 1D data.
+    index_points = np.array([-10., -7.2, -4., -0.1, 0.1, 4., 6.2, 9.]).reshape(
+        [-1, 1]).astype(np.float32)
+    observed_counts = np.array(
+        [100, 90, 60, 13, 18, 37, 55, 42]).astype(np.float32)
+
+    # Generative model.
+    def model_fn():
+      kernel_amplitude = yield tfd.LogNormal(
+          loc=0., scale=1., name='kernel_amplitude')
+      kernel_lengthscale = yield tfd.LogNormal(
+          loc=0., scale=1., name='kernel_lengthscale')
+      observation_noise_scale = yield tfd.LogNormal(
+          loc=0., scale=1., name='observation_noise_scale')
+      kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+          amplitude=kernel_amplitude,
+          length_scale=kernel_lengthscale)
+      latent_log_rates = yield tfd.GaussianProcess(
+          kernel,
+          index_points=index_points,
+          observation_noise_variance=observation_noise_scale,
+          name='latent_log_rates')
+      yield tfd.Independent(tfd.Poisson(log_rate=latent_log_rates),
+                            reinterpreted_batch_ndims=1,
+                            name='y')
+    model = tfd.JointDistributionCoroutineAutoBatched(model_fn)
+    pinned = model.experimental_pin(y=observed_counts)
+
+    initial_parameters = (0., 0., 0.,  # Raw kernel parameters.
+                          tf.zeros_like(observed_counts),  # `logit_locs`
+                          tf.zeros_like(observed_counts))  # `logit_raw_scales`
+
+    def build_surrogate_posterior_fn(
+        raw_kernel_amplitude, raw_kernel_lengthscale,
+        raw_observation_noise_scale,
+        logit_locs, logit_raw_scales):
+
+      def variational_model_fn():
+        # Fit the kernel parameters as point masses.
+        yield tfd.Deterministic(
+            tf.nn.softplus(raw_kernel_amplitude), name='kernel_amplitude')
+        yield tfd.Deterministic(
+            tf.nn.softplus(raw_kernel_lengthscale), name='kernel_lengthscale')
+        yield tfd.Deterministic(
+            tf.nn.softplus(raw_observation_noise_scale),
+            name='kernel_observation_noise_scale')
+        # Factored normal posterior over the GP logits.
+        yield tfd.Independent(
+            tfd.Normal(loc=logit_locs,
+                       scale=tf.nn.softplus(logit_raw_scales)),
+            reinterpreted_batch_ndims=1,
+            name='latent_log_rates')
+      return tfd.JointDistributionCoroutineAutoBatched(variational_model_fn)
+
+    if not JAX_MODE:
+      return
+    import optax  # pylint: disable=g-import-not-at-top
+
+    [
+        optimized_parameters,
+        (losses, _, sample_path)
+    ] = tfp.vi.fit_surrogate_posterior_stateless(
+        target_log_prob_fn=pinned.unnormalized_log_prob,
+        build_surrogate_posterior_fn=build_surrogate_posterior_fn,
+        initial_parameters=initial_parameters,
+        optimizer=optax.adam(learning_rate=0.1),
+        sample_size=1,
+        num_steps=500,
+        trace_fn=lambda traceable_quantities: (  # pylint: disable=g-long-lambda
+            traceable_quantities.loss,
+            tf.nn.softplus(traceable_quantities.parameters[0]),
+            build_surrogate_posterior_fn(
+                *traceable_quantities.parameters).sample(seed=eval_seed)[-1]),
+        seed=opt_seed)
+    surrogate_posterior = build_surrogate_posterior_fn(*optimized_parameters)
+    surrogate_posterior.sample(seed=eval_seed)
+
+    losses_, sample_path_ = self.evaluate((losses, sample_path))
+    self.assertLess(losses_[-1], 80.)  # Optimal loss is roughly 40.
+    # Optimal latent logits are approximately the log observed counts.
+    self.assertAllClose(sample_path_[-1], np.log(observed_counts), atol=1.0)
+
 
 if __name__ == '__main__':
   test_util.main()

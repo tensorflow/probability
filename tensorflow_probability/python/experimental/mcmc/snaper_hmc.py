@@ -25,15 +25,28 @@ import functools
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import restructure
 from tensorflow_probability.python.experimental.mcmc import gradient_based_trajectory_length_adaptation as gbtla
 from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc
 from tensorflow_probability.python.experimental.mcmc import preconditioning_utils
+from tensorflow_probability.python.experimental.mcmc import reducer as reducer_lib
+from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
+from tensorflow_probability.python.experimental.mcmc import sharded
+from tensorflow_probability.python.experimental.mcmc import thinning_kernel
+from tensorflow_probability.python.experimental.mcmc import with_reductions
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import distribute_lib
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import loop_util
+from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import unnest
+from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -42,6 +55,8 @@ from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-i
 __all__ = [
     'SNAPERHamiltonianMonteCarlo',
     'SNAPERHamiltonianMonteCarloResults',
+    'SampleSNAPERHamiltonianMonteCarloResults',
+    'sample_snaper_hmc',
 ]
 
 
@@ -597,7 +612,7 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       # Number of total chains is local batch size * distributed axis size
       reduce_chain_axis_names = distribute_lib.canonicalize_named_axis(
           self.experimental_reduce_chain_axis_names)
-      local_axis_size = ps.maximum(ps.size(tlp), 1)
+      local_axis_size = ps.size(tlp)
       distributed_axis_size = int(
           ps.reduce_prod([
               distribute_lib.get_axis_size(a) for a in reduce_chain_axis_names
@@ -666,6 +681,620 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
 
   def experimental_with_shard_axes(self, shard_axis_names):
     return self.copy(experimental_shard_axis_names=shard_axis_names)
+
+
+def _init_chain_state(
+    model,
+    event_space_bijector,
+    num_chains,
+    event_dtype,
+    event_shape,
+    init_state,
+    experimental_shard_axis_names,
+):
+  """Initializes chain state for sample_snaper_hmc."""
+  # TODO(siege): Consider what, if anything, can be shared with
+  # mcmc.init_near_unconstrained_zero.
+  with tf.name_scope('init_mcmc_state'):
+    if event_space_bijector is None:
+      if hasattr(model, 'experimental_default_event_space_bijector'):
+        event_space_bijector = model.experimental_default_event_space_bijector()
+    else:
+      if not isinstance(event_space_bijector, bijector_lib.Bijector):
+        event_space_bijector = joint_map.JointMap(event_space_bijector)
+
+    if init_state is not None:
+      with tf.name_scope('init_state'):
+        init_state = tf.nest.map_structure(tf.convert_to_tensor, init_state)
+
+    # Impute shape/dtype. There's 3 possible states here.
+    # 1. init_state is specified.
+    # 2. init_state is not specified, and we use a distribution.
+    # 3. init_state is not specified, and we use manual annotations.
+
+    if event_dtype is None:
+      if init_state is None:
+        if hasattr(model, 'dtype'):
+          event_dtype = model.dtype  # (2)
+        else:
+          raise ValueError(
+              '`event_dtype` must be specified if `model` does not '
+              'have an `event_shape` property and `init_state` is not '
+              'specified.')  # (3)
+      else:
+        event_dtype = tf.nest.map_structure(lambda x: x.dtype,
+                                            init_state)  # (1)
+
+    if event_shape is None:
+      if init_state is None:
+        if hasattr(model, 'event_shape'):
+          event_shape = model.event_shape  # (2)
+          if not all(
+              tf.nest.flatten(
+                  tf.nest.map_structure(tensorshape_util.is_fully_defined,
+                                        event_shape))):
+            event_shape = model.event_shape_tensor
+        else:
+          raise ValueError(
+              '`event_shape` must be specified if `model` does not '
+              'have an `event_shape` property and `init_state` is not '
+              'specified.')  # (2)
+      else:
+        event_shape = tf.nest.map_structure(ps.shape, init_state)  # (1)
+
+    # Get a flat current state.
+    flat_event_space_bijector = restructure.pack_sequence_as(event_dtype)
+    if event_space_bijector is not None:
+      flat_event_space_bijector = event_space_bijector(
+          flat_event_space_bijector)
+
+    if init_state is None:
+      # TODO(siege): See if we can somehow extract this into an API similar to
+      # init_near_unconstrained_zero. Key issue is that we do the static shape
+      # canonicalization differently.
+      if num_chains is None:
+        # Default to 64 from the paper, lower might be fine too.
+        num_chains = 64
+      static_event_shape = nest.map_structure_up_to(event_dtype,
+                                                    tf.get_static_value,
+                                                    event_shape)
+      event_shape_is_static = all(
+          map(lambda x: x is not None,
+              nest.flatten_up_to(event_dtype, static_event_shape)))
+      if event_shape_is_static:
+        unconstrained_shape = flat_event_space_bijector.inverse_event_shape(
+            static_event_shape)
+      else:
+        unconstrained_shape = flat_event_space_bijector.inverse_event_shape_tensor(
+            event_shape)
+      unconstrained_dtype = flat_event_space_bijector.inverse_dtype(event_dtype)
+
+      with tf.name_scope('unconstrained_state'):
+        unconstrained_state = nest.map_structure_up_to(
+            unconstrained_dtype,
+            lambda s, d: tf.zeros(ps.concat([[num_chains], s], 0), d),
+            unconstrained_shape, unconstrained_dtype)
+
+    else:
+      unconstrained_state = flat_event_space_bijector.inverse(init_state)
+
+    shard_axis_names_parts = None
+    if experimental_shard_axis_names is None:
+      if hasattr(model, 'experimental_shard_axis_names'):
+        experimental_shard_axis_names = model.experimental_shard_axis_names
+
+      # Canonicalize non-sharded axis sharded names to None to skip the check
+      # below.
+      if not nest.flatten(experimental_shard_axis_names):
+        experimental_shard_axis_names = None
+
+    if experimental_shard_axis_names is None:
+      shard_axis_names_parts = None
+    else:
+      # TODO(siege): This assumes that the event bijector doesn't alter the
+      # structure of the event. We're missing some sort of
+      # forward_sharded_axis_names type of function. This check cannot detect
+      # pure shuffles, but they are just as problematic.
+      shard_axis_names_parts = nest.flatten_up_to(
+          event_dtype, experimental_shard_axis_names)
+      if len(shard_axis_names_parts) != len(unconstrained_state):
+        raise ValueError('`event_space_bijector`s that alter the state shape '
+                         'are not supported when sharded axes are used.')
+
+  return unconstrained_state, flat_event_space_bijector, shard_axis_names_parts
+
+
+def _init_step_size(target_log_prob_fn, state_parts, shard_axis_names_parts):
+  """Initializes step size for sample_snaper_hmc."""
+  dtype = dtype_util.common_dtype(state_parts)
+  tlp_rank = ps.rank(target_log_prob_fn(*state_parts))
+  if shard_axis_names_parts is None:
+    shard_axis_names_parts = [None] * len(state_parts)
+  num_dims = sum(
+      distribute_lib.reduce_sum(
+          ps.reduce_prod(ps.shape(x)[tlp_rank:]), named_axis=na)
+      for x, na in zip(state_parts, shard_axis_names_parts))
+  # See Beskos, A., Pillai, N. S., Roberts, G. O., Sanz-Serna, J. M., & Stuart,
+  # A. M. 2010. "Optimal tuning of the Hybrid Monte-Carlo Algorithm."
+  return 1e-2 * tf.cast(num_dims, dtype) ** -0.25
+
+
+def _make_snaper_kernel(
+    model,
+    reducer,
+    unconstrained_state,
+    flat_event_space_bijector,
+    init_step_size,
+    num_burnin_steps,
+    num_adaptation_steps,
+    dual_averaging_kwargs,
+    discard_burnin_steps,
+    num_steps_between_results,
+    shard_axis_names_parts,
+    experimental_reduce_chain_axis_names,
+    validate_args,
+    snaper_kwargs,
+):
+  """Initializes the kernel for sample_snaper_hmc."""
+  # We don't use TransformedTransition kernel because it has poor support for
+  # general event types.
+  def flat_target_log_prob_fn(*unconstrained_state):
+    if hasattr(model, 'unnormalized_log_prob'):
+      target_log_prob_fn = model.unnormalized_log_prob
+    else:
+      target_log_prob_fn = model
+    # Restructure bijector expects a list.
+    unconstrained_state = list(unconstrained_state)
+
+    state = flat_event_space_bijector.forward(unconstrained_state)
+    tlp = nest_util.call_fn(target_log_prob_fn, state)
+    tlp_rank = ps.rank(tlp)
+    fldj = flat_event_space_bijector.forward_log_det_jacobian(
+        unconstrained_state,
+        event_ndims=tf.nest.map_structure(lambda s: ps.rank(s) - tlp_rank,
+                                          unconstrained_state))
+    return tlp + fldj
+
+  if init_step_size is None:
+    init_step_size = _init_step_size(
+        target_log_prob_fn=flat_target_log_prob_fn,
+        state_parts=unconstrained_state,
+        shard_axis_names_parts=shard_axis_names_parts)
+
+  if snaper_kwargs is None:
+    snaper_kwargs = {}
+
+  if dual_averaging_kwargs is None:
+    dual_averaging_kwargs = {}
+
+  dual_averaging_kwargs.setdefault('target_accept_prob', 0.8)
+
+  kernel = SNAPERHamiltonianMonteCarlo(
+      target_log_prob_fn=flat_target_log_prob_fn,
+      step_size=init_step_size,
+      num_adaptation_steps=num_adaptation_steps,
+      experimental_shard_axis_names=shard_axis_names_parts,
+      experimental_reduce_chain_axis_names=(
+          experimental_reduce_chain_axis_names),
+      validate_args=validate_args,
+      **snaper_kwargs,
+  )
+
+  kernel = dassa.DualAveragingStepSizeAdaptation(
+      kernel,
+      num_adaptation_steps=num_adaptation_steps,
+      experimental_reduce_chain_axis_names=experimental_reduce_chain_axis_names,
+      **dual_averaging_kwargs,
+  )
+
+  num_outer_kernels = 0
+  if reducer is not None:
+    kernel = with_reductions.WithReductions(
+        kernel,
+        reducer=_SNAPERReducer(
+            reducer,
+            num_burnin_steps=num_burnin_steps * (num_steps_between_results + 1),
+            flat_event_space_bijector=flat_event_space_bijector))
+    num_outer_kernels += 1
+
+  if experimental_reduce_chain_axis_names is not None:
+    kernel = sharded.Sharded(kernel, experimental_reduce_chain_axis_names)
+    # Sharded doesn't add a wrapper over the results, so we don't increment the
+    # num_outer_kernels.
+
+  if discard_burnin_steps:
+    kernel = sample_discarding_kernel.SampleDiscardingKernel(
+        kernel,
+        # This behavior is different than sample_chain because otherwise
+        # discarding or keeping the burnin steps would affect the length of the
+        # burnin, which is confusing. sample_chain doesn't have this problem
+        # because it doesn't have an option to keep burnin.
+        num_burnin_steps=num_burnin_steps * (num_steps_between_results + 1),
+        num_steps_between_results=num_steps_between_results)
+    num_outer_kernels += 1
+  elif num_steps_between_results > 0:
+    kernel = thinning_kernel.ThinningKernel(
+        kernel, num_steps_to_skip=num_steps_between_results)
+    # ThinningKernel doesn't add a wrapper over the results, so we don't
+    # increment the num_outer_kernels.
+
+  def get_inner_results(kernel_results):
+    for _ in range(num_outer_kernels):
+      kernel_results = kernel_results.inner_results
+    return kernel_results
+
+  return kernel, get_inner_results
+
+
+def _sample_snaper_loop(
+    unconstrained_state,
+    kernel,
+    trace_fn,
+    reducer,
+    flat_event_space_bijector,
+    num_results,
+    num_burnin_steps,
+    discard_burnin_steps,
+    get_inner_results,
+    seed,
+):
+  """The sampling loop for sample_snaper_hmc."""
+  with tf.name_scope('sample_snaper_loop'):
+    # TODO(siege): Figure out if we can use sample_chain_with_burnin here:
+    #
+    # - We need to manually transform the state (could be addressed by fixing
+    # the TransformedTransitionKernel).
+    # - We want to use masking to deal with delayed reduction rather than what
+    # sample_chain_with_burnin is doing.
+    def loop_fn(all_state, _):
+      unconstrained_state, kernel_results, seed = all_state
+      seed, hmc_seed = samplers.split_seed(seed)
+
+      unconstrained_state, kernel_results = kernel.one_step(
+          unconstrained_state, kernel_results, seed=hmc_seed)
+
+      return unconstrained_state, kernel_results, seed
+
+    def outer_trace_fn(all_state):
+      unconstrained_state, kernel_results, _ = all_state
+
+      state = flat_event_space_bijector(unconstrained_state)
+      reducer_state = unnest.get_innermost(kernel_results, 'reduction_results',
+                                           None)
+      inner_results = get_inner_results(kernel_results)
+
+      return trace_fn(
+          state=state,
+          is_burnin=inner_results.step < num_burnin_steps,
+          kernel_results=inner_results,
+          reducer=reducer,
+          reducer_state=reducer_state)
+
+    output_size = num_results
+    if not discard_burnin_steps:
+      output_size += num_burnin_steps
+
+    kernel_results = kernel.bootstrap_results(unconstrained_state)
+
+    all_state, trace = loop_util.trace_scan(
+        loop_fn=loop_fn,
+        initial_state=(unconstrained_state, kernel_results,
+                       samplers.sanitize_seed(seed)),
+        elems=tf.range(output_size),
+        trace_fn=outer_trace_fn,
+    )
+
+    unconstrained_state, kernel_results, _ = all_state
+
+    return unconstrained_state, kernel_results, trace
+
+
+def default_snaper_trace_fn(state, is_burnin, kernel_results, reducer,
+                            reducer_state):
+  del reducer, reducer_state
+  kr = kernel_results
+  energy_diff = unnest.get_innermost(kr, 'log_accept_ratio')
+  # The ~ is here to catch NaNs.
+  has_divergence = ~(tf.math.abs(energy_diff) < 500.)
+  return state, {
+      'step_size':
+          unnest.get_innermost(kr, 'step_size'),
+      'n_steps':
+          unnest.get_innermost(kr, 'num_leapfrog_steps'),
+      'tune':
+          is_burnin,
+      'max_trajectory_length':
+          unnest.get_innermost(kr, 'max_trajectory_length'),
+      'variance_scaling':
+          unnest.get_innermost(kr, 'ema_variance'),
+      'diverging':
+          has_divergence,
+      'accept_ratio':
+          tf.minimum(tf.ones_like(energy_diff), tf.exp(energy_diff)),
+      'is_accepted':
+          unnest.get_innermost(kr, 'is_accepted'),
+  }
+
+
+class SampleSNAPERHamiltonianMonteCarloResults(
+    mcmc_util.PrettyNamedTupleMixin,
+    collections.namedtuple('SampleSNAPERHamiltonianMonteCarloResults', [
+        'trace',
+        'reduction_results',
+        'final_state',
+        'final_kernel_results',
+    ])):
+  """Results of `sample_snaper_hmc`.
+
+  Attributes:
+    trace: Traced quantities defined by `trace_fn`.
+    reduction_results: Finalized reducer results.
+    final_state: Final state of the MCMC chain.
+    final_kernel_results: The final results of `DualAveragingStepSizeAdaptation`
+      wrapping `SNAPERHamiltonianMonteCarlo` kernels.
+  """
+  __slots__ = ()
+
+
+def sample_snaper_hmc(model,
+                      num_results,
+                      reducer=None,
+                      trace_fn=default_snaper_trace_fn,
+                      num_burnin_steps=1000,
+                      num_adaptation_steps=None,
+                      num_chains=None,
+                      discard_burnin_steps=True,
+                      num_steps_between_results=0,
+                      init_state=None,
+                      init_step_size=None,
+                      event_space_bijector=None,
+                      event_dtype=None,
+                      event_shape=None,
+                      experimental_shard_axis_names=None,
+                      experimental_reduce_chain_axis_names=None,
+                      dual_averaging_kwargs=None,
+                      snaper_kwargs=None,
+                      seed=None,
+                      validate_args=False,
+                      name='snaper_hmc'):
+  """Generates samples using SNAPER HMC [1] with step size adaptation.
+
+  This utility function generates samples from a probabilistic model using
+  `SNAPERHamiltonianMonteCarlo` kernel combined with
+  `DualAveragingStepSizeAdaptation` kernel. The `model` argument can either be
+  an instance of `tfp.distributions.Distribution` or a callable that computes
+  the target log-density. In the latter case, it is also necessary to specify
+  `event_space_bijector`, `event_dtype` and `event_shape` (these are inferred if
+  `model` is a distribution instance).
+
+  This function can accept a structure of `tfp.experimental.mcmc.Reducer`s,
+  which allow computing streaming statitics with minimal memory usage. The
+  reducers only incorporate samples after the burnin period.
+
+  By default, this function traces the following quantities:
+
+  - The chain state.
+  - A dict of auxiliary information, using keys from ArviZ [2].
+    - step_size: Float scalar `Tensor`. HMC step size.
+    - n_steps: Int `Tensor`. Number of HMC leapfrog steps.
+    - tune: Bool `Tensor`. Whether this step is part of the burnin.
+    - max_trajectory_length: Float `Tensor`. Maximum HMC trajectory length.
+    - variance_scaling: List of float `Tensor`s. The diagonal variance of the
+      unconstrained state, used as the inverse mass matrix.
+    - diverging: Bool `Tensor`. Whether the sampler is divering.
+    - accept_ratio: Float `Tensor`. Probability of acceptance of the proposal
+      for this step.
+    - is_accepted: Bool `Tensor. Whether this step is a result of an accepted
+      proposal.
+
+  It is possible to trace nothing at all, and rely on the reducers to compute
+  the necessary statitiscs.
+
+  Args:
+    model: Either an instance of `tfp.distributions.Distribution` or a callable
+      that evaluates the target log-density at a batch of chain states.
+    num_results: Number of MCMC results to return after burnin.
+    reducer: A structure of reducers.
+    trace_fn: A callable with signature: `(state, is_burnin, kernel_results,
+      reducer, reducer_state) -> structure` which defines what quantities to
+      trace.
+    num_burnin_steps: Python `int`. Number of burnin steps.
+    num_adaptation_steps: Python `int`. Number of adaptation steps. Default:
+      `0.9 * num_burnin_steps`.
+    num_chains: Python `int`. Number of chains. This can be inferred from
+      `init_state`. Otherwise, this is 64 by default.
+    discard_burnin_steps: Python `bool`. Whether to discard the burnin steps
+      when returning the trace. Burning steps are never used for the reducers.
+    num_steps_between_results: Python `int`. Number of steps to take between
+      MCMC results. This acts as a multiplier on the total number of steps taken
+      by the MCMC (burnin included). The size of the output trace tensors is not
+      affected, but each element is produced by this many sub-steps.
+    init_state: Structure of `Tensor`s. Initial state of the chain. Default:
+      `num_chains` worth of zeros in unconstrained space.
+    init_step_size: Scalar float `Tensor`. Initial step size. Default: `1e-2 *
+      total_num_dims ** -0.25`,
+    event_space_bijector: Bijector or a list of bijectors used to go from
+      unconstrained to constrained space to improve MCMC mixing. Default: Either
+      inferred from `model` or an identity.
+    event_dtype: Structure of dtypes. The event dtype. Default: Inferred from
+      `model` or `init_state`.
+    event_shape: Structure of tuples. The event shape. Default: Inferred from
+      `model` or `init_state`.
+    experimental_shard_axis_names: A structure of string names indicating how
+      members of the state are sharded.
+    experimental_reduce_chain_axis_names: A string or list of string names
+      indicating which named axes to average cross-chain statistics over.
+    dual_averaging_kwargs: Keyword arguments passed into
+      `DualAveragingStepSizeAdaptation` kernel. Default: `{'target_accept_prob':
+      0.8}`.
+    snaper_kwargs: Keyword arguments passed into `SNAPERHamiltonianMonteCarlo`
+      kernel. Default: `{}`.
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+    validate_args: Python `bool`. When `True`, kernel parameters are checked
+      for validity. When `False`, invalid inputs may silently render incorrect
+      outputs.
+    name: Python `str` name prefixed to Ops created by this class.
+
+  Returns:
+    results: `SampleSNAPERHamiltonianMonteCarloResults`.
+
+  #### Tuning
+
+  The defaults for this function should function well for many models, but it
+  does provide a number of arguments for verifying sampler behavior. If there's
+  a question of efficiency, the first thing to do is to set
+  `discard_burnin_steps=False` and examine the `step_size` and
+  `max_trajectory_length` and `variance_scaling` traces. A well-functioning
+  sampler will have these quantities converge before sampling begins. If they
+  are not converged, consider increasing `num_burnin_steps`, or adjusting the
+  `snaper_kwargs` to tune SNAPER more.
+
+  #### Examples
+
+  Here we sample from a simple model while performing a reduction.
+
+  ```
+  num_dims = 8
+
+  eigenvalues = np.exp(np.linspace(0., 3., num_dims))
+  q, r = np.linalg.qr(np.random.randn(num_dims, num_dims))
+  q *= np.sign(np.diag(r))
+  covariance = (q * eigenvalues).dot(q.T).astype(self.dtype)
+
+  gaussian = tfd.MultivariateNormalTriL(
+      loc=tf.zeros(num_dims, self.dtype),
+      scale_tril=tf.linalg.cholesky(covariance),
+  )
+
+  @tf.function(jit_compile=True)
+  def run():
+    results = tfp.experimental.mcmc.sample_snaper_hmc(
+        model=gaussian,
+        num_results=500,
+        reducer=tfp.experimental.mcmc.PotentialScaleReductionReducer(),
+    )
+
+    return results.trace, results.reduction_results
+
+  (chain, trace), potential_scale_reduction = run(tfp.random.sanitize_seed(0))
+
+  # Compute sampler diagnostics.
+
+  # Should be high (at least 100-1000).
+  tfp.mcmc.effective_sample_size(chain, cross_chain_dims=1)
+  # Should be close to 1.
+  potential_scale_reduction
+
+  # Compute downstream statistics.
+
+  # Should be close to np.diag(covariance)
+  tf.math.reduce_variance(chain, [0, 1])
+  ```
+
+  #### References
+
+  [1]: Sountsov, P. & Hoffman, M. (2021). Focusing on Difficult Directions for
+       Learning HMC Trajectory Lengths. <https://arxiv.org/abs/2110.11576>
+
+  [2]: Kumar, R., Carroll, C., Hartikainen, A., & Martin, O. (2019). ArviZ a
+       unified library for exploratory analysis of Bayesian models in Python.
+       Journal of Open Source Software, 4(33), 1143.
+
+  """
+  with tf.name_scope(name):
+    (unconstrained_state, flat_event_space_bijector,
+     shard_axis_names_parts) = _init_chain_state(
+         model,
+         event_space_bijector=event_space_bijector,
+         num_chains=num_chains,
+         event_dtype=event_dtype,
+         event_shape=event_shape,
+         init_state=init_state,
+         experimental_shard_axis_names=experimental_shard_axis_names,
+     )
+
+    if num_adaptation_steps is None:
+      num_adaptation_steps = int(0.9 * num_burnin_steps)
+
+    kernel, get_inner_results = _make_snaper_kernel(
+        model=model,
+        unconstrained_state=unconstrained_state,
+        flat_event_space_bijector=flat_event_space_bijector,
+        init_step_size=init_step_size,
+        num_burnin_steps=num_burnin_steps,
+        num_adaptation_steps=num_adaptation_steps,
+        num_steps_between_results=num_steps_between_results,
+        shard_axis_names_parts=shard_axis_names_parts,
+        experimental_reduce_chain_axis_names=experimental_reduce_chain_axis_names,
+        validate_args=validate_args,
+        snaper_kwargs=snaper_kwargs,
+        dual_averaging_kwargs=dual_averaging_kwargs,
+        reducer=reducer,
+        discard_burnin_steps=discard_burnin_steps,
+    )
+
+    unconstrained_state, kernel_results, trace = _sample_snaper_loop(
+        unconstrained_state=unconstrained_state,
+        kernel=kernel,
+        reducer=reducer,
+        flat_event_space_bijector=flat_event_space_bijector,
+        num_results=num_results,
+        num_burnin_steps=num_burnin_steps,
+        discard_burnin_steps=discard_burnin_steps,
+        get_inner_results=get_inner_results,
+        trace_fn=trace_fn,
+        seed=seed,
+    )
+
+    if reducer is None:
+      reduction_results = None
+    else:
+      reduction_results = nest.map_structure_up_to(
+          reducer, lambda r, rs: r.finalize(rs), reducer,
+          unnest.get_innermost(kernel_results, 'reduction_results'))
+
+    final_state = flat_event_space_bijector(unconstrained_state)
+
+    return SampleSNAPERHamiltonianMonteCarloResults(
+        trace=trace,
+        reduction_results=reduction_results,
+        final_state=final_state,
+        final_kernel_results=get_inner_results(kernel_results),
+    )
+
+
+class _SNAPERReducer(reducer_lib.Reducer):
+  """A Reducer utility wrapper for `snaper_hmc`.
+
+  This does two things:
+  - Pre-transforms the chain state.
+  - Prevents reduction before num_burnin_steps.
+  """
+
+  def __init__(self, reducer, num_burnin_steps, flat_event_space_bijector):
+    self._reducer = reducer
+    self._num_burnin_steps = num_burnin_steps
+    self._flat_event_space_bijector = flat_event_space_bijector
+
+  def initialize(self, initial_chain_state, initial_inner_kernel_results):
+    initial_chain_state = self._flat_event_space_bijector(initial_chain_state)
+    return tf.nest.map_structure(lambda r: r.initialize(initial_chain_state),
+                                 self._reducer)
+
+  def one_step(self, new_chain_state, current_reducer_state,
+               previous_kernel_results):
+    new_chain_state = self._flat_event_space_bijector(new_chain_state)
+    new_reducer_state = nest.map_structure_up_to(
+        self._reducer,
+        lambda r, rs: r.one_step(new_chain_state, rs, previous_kernel_results),
+        self._reducer, current_reducer_state)
+    return mcmc_util.choose(
+        previous_kernel_results.step > self._num_burnin_steps,
+        new_reducer_state, current_reducer_state)
+
+  def finalize(self, final_reducer_state):
+    return nest.map_structure_up_to(self._reducer, lambda r, rs: r.finalize(rs),
+                                    self._reducer, final_reducer_state)
 
 
 def _dot_product(x, y, axis, named_axis):

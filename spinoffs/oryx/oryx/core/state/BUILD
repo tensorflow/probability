@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "state",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":api",
         ":function",
@@ -36,7 +35,6 @@ py_library(
 py_library(
     name = "api",
     srcs = ["api.py"],
-    srcs_version = "PY3",
     deps = [
         ":module",
         # jax dep,
@@ -47,7 +45,6 @@ py_library(
 py_library(
     name = "function",
     srcs = ["function.py"],
-    srcs_version = "PY3",
     deps = [
         ":api",
         ":module",
@@ -64,7 +61,6 @@ py_library(
 py_library(
     name = "module",
     srcs = ["module.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/core:primitive",
@@ -79,7 +75,6 @@ py_library(
 py_library(
     name = "registrations",
     srcs = ["registrations.py"],
-    srcs_version = "PY3",
     deps = [
         ":api",
         # jax dep,
@@ -90,8 +85,6 @@ py_library(
 py_test(
     name = "function_test",
     srcs = ["function_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":api",
         ":function",
@@ -108,7 +101,6 @@ py_test(
 py_test(
     name = "registrations_test",
     srcs = ["registrations_test.py"],
-    python_version = "PY3",
     deps = [
         ":api",
         ":function",

@@ -259,6 +259,12 @@ class SlicingTest(test_util.TestCase):
     self.assertAllEqual(dist[0, ..., tf.newaxis].batch_shape_tensor(), [1])
     self.assertAllEqual(dist[..., tf.newaxis].batch_shape_tensor(), [1, 1])
 
+  def test_slicing_does_not_modify_the_sliced_distribution(self):
+    dist = tfd.Exponential(tf.ones((5, 2, 3)))
+    sliced = dist[:4, :, 2]
+    self.assertAllEqual([2], sliced[-1].batch_shape_tensor())
+    self.assertAllEqual([3], sliced[:-1, 1].batch_shape_tensor())
+
 
 if __name__ == '__main__':
   test_util.main()

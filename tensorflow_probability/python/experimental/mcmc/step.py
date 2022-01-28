@@ -19,6 +19,7 @@ import warnings
 
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import loop_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
 
@@ -76,8 +77,8 @@ def step_kernel(
     warnings.warn('supplied `TransitionKernel` is not calibrated. Markov '
                   'chain may not converge to intended target distribution.')
   with tf.name_scope(name or 'mcmc_step_kernel'):
-    num_steps = tf.convert_to_tensor(
-        num_steps, dtype=tf.int32, name='num_steps')
+    num_steps = ps.convert_to_shape_tensor(
+        num_steps, dtype_hint=tf.int32, name='num_steps')
     current_state = tf.nest.map_structure(
         lambda x: tf.convert_to_tensor(x, name='current_state'),
         current_state)

@@ -15,6 +15,12 @@
 # Description:
 #   Experimental methods and objectives for variational inference.
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 licenses(["notice"])
 
 package(
@@ -23,10 +29,9 @@ package(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "vi",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":automatic_structured_vi",
         ":surrogate_posteriors",
@@ -35,10 +40,9 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "automatic_structured_vi",
     srcs = ["automatic_structured_vi.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
@@ -65,10 +69,9 @@ py_library(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "surrogate_posteriors",
     srcs = ["surrogate_posteriors.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:chain",
@@ -93,29 +96,29 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "automatic_structured_vi_test",
     size = "large",
     srcs = ["automatic_structured_vi_test.py"],
-    python_version = "PY3",
+    numpy_tags = ["notap"],
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
+        # optax dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "surrogate_posteriors_test",
     size = "large",
     srcs = ["surrogate_posteriors_test.py"],
-    python_version = "PY3",
+    numpy_tags = ["notap"],
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

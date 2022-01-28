@@ -32,7 +32,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":leapfrog_integrator",
         ":slice_sampler_utils",
@@ -43,7 +42,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "slice_sampler_utils",
     srcs = ["slice_sampler_utils.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:gamma",
@@ -53,7 +51,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "util",
     srcs = ["util.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -81,7 +78,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "leapfrog_integrator",
     srcs = ["leapfrog_integrator.py"],
-    srcs_version = "PY3",
     deps = [
         ":util",
         # tensorflow dep,

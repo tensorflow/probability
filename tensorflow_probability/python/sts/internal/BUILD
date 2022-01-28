@@ -30,7 +30,6 @@ package(
 multi_substrate_py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":missing_values_util",
         ":seasonality_util",
@@ -43,7 +42,6 @@ multi_substrate_py_library(
     srcs = [
         "missing_values_util.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -55,8 +53,6 @@ multi_substrate_py_test(
     name = "missing_values_util_test",
     size = "small",
     srcs = ["missing_values_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -70,7 +66,6 @@ multi_substrate_py_library(
     srcs = [
         "seasonality_util.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -82,8 +77,6 @@ multi_substrate_py_test(
     name = "seasonality_util_test",
     size = "small",
     srcs = ["seasonality_util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # pandas dep,
@@ -98,7 +91,6 @@ multi_substrate_py_library(
     srcs = [
         "util.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -113,8 +105,6 @@ multi_substrate_py_test(
     name = "util_test",
     size = "small",
     srcs = ["util_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = ["tf1-broken"],
     deps = [
         # numpy dep,

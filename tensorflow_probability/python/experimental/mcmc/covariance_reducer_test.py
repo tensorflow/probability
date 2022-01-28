@@ -127,10 +127,9 @@ class CovarianceReducersTest(test_util.TestCase):
     self.assertEqual(2, len(final_cov))
     self.assertAllEqual(np.ones((2, 2, 2)) * 2, final_cov)
 
+  @test_util.numpy_disable_test_missing_functionality('composite tensors')
   def test_composite_kernel_results(self):
-    composite_normal_cls = tfp.experimental.auto_composite_tensor(
-        tfd.Normal, omit_kwargs='name')
-    kr = composite_normal_cls(0., 1.)
+    kr = tfd.Normal(0., 1.)
     cov_red = tfp.experimental.mcmc.CovarianceReducer()
     state = cov_red.initialize(tf.zeros((2,)), kr)
     state = cov_red.one_step(tf.ones((2,)), state, kr)

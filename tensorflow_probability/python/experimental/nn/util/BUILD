@@ -24,7 +24,6 @@ package(
 py_library(
     name = "convolution_util",
     srcs = ["convolution_util.py"],
-    srcs_version = "PY3",
     deps = [
         ":utils",
         # tensorflow dep,
@@ -38,9 +37,7 @@ py_test(
     name = "convolution_util_test",
     size = "medium",
     srcs = ["convolution_util_test.py"],
-    python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         ":convolution_util",
         # absl/testing:parameterized dep,
@@ -55,7 +52,6 @@ py_test(
 py_library(
     name = "kernel_bias",
     srcs = ["kernel_bias.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:chain",
@@ -76,9 +72,7 @@ py_test(
     name = "kernel_bias_test",
     size = "small",
     srcs = ["kernel_bias_test.py"],
-    python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -89,7 +83,6 @@ py_test(
 py_library(
     name = "util",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":convolution_util",
         ":kernel_bias",
@@ -102,7 +95,6 @@ py_library(
 py_library(
     name = "random_variable",
     srcs = ["random_variable.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:distribution",
@@ -114,8 +106,6 @@ py_test(
     name = "random_variable_test",
     size = "medium",
     srcs = ["random_variable_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -128,7 +118,6 @@ py_test(
 py_library(
     name = "utils",
     srcs = ["utils.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

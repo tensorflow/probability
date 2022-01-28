@@ -266,7 +266,7 @@ class ExpectedCalibrationErrorQuantiles(test_util.TestCase):
     self.assertAllClose([0., 0., 1.], acc, rtol=1e-6, atol=1e-6)
     self.assertAllClose([0.075, 0.2, 0.826667], conf, rtol=1e-6, atol=0.)
     self.assertAllClose([2., 1., 3.], cnt, rtol=1e-6, atol=0.)
-    self.assertAllClose(np.log([0.05, 0.2, 0.5, 0.99]), edges,
+    self.assertAllClose(tf.math.log([0.05, 0.2, 0.5, 0.99]), edges,
                         rtol=1e-6, atol=0.)
     self.assertAllEqual([0, 0, 2, 1, 2, 2], buckets)
 
@@ -328,8 +328,8 @@ class ExpectedCalibrationErrorQuantiles(test_util.TestCase):
                                       [2., 1., 3.]]),
                         cnt,
                         rtol=1e-6, atol=0.)
-    self.assertAllClose(np.log(np.transpose([[0.05, 0.2, 0.5, 0.99],
-                                             [0.05, 0.2, 0.5, 0.99]])),
+    self.assertAllClose(tf.math.log(tf.transpose([[0.05, 0.2, 0.5, 0.99],
+                                                  [0.05, 0.2, 0.5, 0.99]])),
                         edges,
                         rtol=1e-6, atol=0.)
     self.assertAllEqual([[0, 0, 2, 1, 2, 2],

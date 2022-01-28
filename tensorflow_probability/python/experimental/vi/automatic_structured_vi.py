@@ -20,7 +20,6 @@ import functools
 import inspect
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import identity
 from tensorflow_probability.python.bijectors import restructure
 from tensorflow_probability.python.bijectors import scale as scale_lib
@@ -39,15 +38,18 @@ from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import truncated_normal
 from tensorflow_probability.python.distributions import uniform
+
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
+from tensorflow_probability.python.internal import trainable_state_util
 
 
 __all__ = [
     'ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES',
     'ASVI_DEFAULT_SURROGATE_RULES',
-    'build_asvi_surrogate_posterior'
+    'build_asvi_surrogate_posterior',
+    'build_asvi_surrogate_posterior_stateless'
 ]
 
 
@@ -120,9 +122,7 @@ def _asvi_surrogate_for_distribution(dist,
                                      base_distribution_surrogate_fn,
                                      prior_substitution_rules,
                                      surrogate_rules,
-                                     sample_shape=None,
-                                     variables=None,
-                                     seed=None):
+                                     sample_shape=None):
   """Recursively creates ASVI surrogates, and creates new variables if needed.
 
   Args:
@@ -151,20 +151,12 @@ def _asvi_surrogate_for_distribution(dist,
       independent sample dimensions, i.e., it will have event shape
       `concat([sample_shape, dist.event_shape], axis=0)`.
       Default value: `None`.
-    variables: Optional nested structure of `tf.Variable`s returned from a
-      previous call to `_asvi_surrogate_for_distribution`. If `None`,
-      new variables will be created; otherwise, constructs a surrogate posterior
-      backed by the passed-in variables.
-      Default value: `None`.
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
-  Returns:
-    surrogate_posterior: Instance of `tfd.Distribution` representing a trainable
-      surrogate posterior distribution, with the same structure and `name` as
-      `dist`.
-    variables: Nested structure of `tf.Variable` trainable parameters for the
-      surrogate posterior. If `dist` is a base distribution, this is
-      a `dict` of `ASVIParameters` instances. If `dist` is a joint
-      distribution, this is a `dist.dtype` structure of such `dict`s.
+  Yields:
+    *parameters: sequence of `trainable_state_util.Parameter` namedtuples.
+      These are intended to be consumed by
+      `trainable_state_util.as_stateful_builder` and
+      `trainable_state_util.as_stateless_builder` to define stateful and
+      stateless variants respectively.
   """
   dist_name = _get_name(dist)   # Attempt to preserve the original name.
   dist = _as_substituted_distribution(dist, prior_substitution_rules)
@@ -172,7 +164,9 @@ def _asvi_surrogate_for_distribution(dist,
   surrogate_posterior = None
   for condition, surrogate_fn in surrogate_rules:
     if _satisfies_condition(dist, condition):
-      surrogate_posterior, variables = surrogate_fn(
+      # The surrogate fn may be a generator (internal interface) or a stateless
+      # trainable builder returning `(init_fn, apply_fn)` (external interface).
+      maybe_gen = surrogate_fn(
           dist,
           build_nested_surrogate=functools.partial(
               _asvi_surrogate_for_distribution,
@@ -180,9 +174,13 @@ def _asvi_surrogate_for_distribution(dist,
               prior_substitution_rules=prior_substitution_rules,
               surrogate_rules=surrogate_rules,
               sample_shape=sample_shape),
-          sample_shape=sample_shape,
-          variables=variables,
-          seed=seed)
+          sample_shape=sample_shape)
+      if inspect.isgenerator(maybe_gen):
+        surrogate_posterior = yield from maybe_gen
+      else:
+        init_fn, apply_fn = maybe_gen
+        params = yield trainable_state_util.Parameter(init_fn)
+        surrogate_posterior = apply_fn(params)
       break
   if surrogate_posterior is None:
     if (hasattr(dist, 'distribution') and
@@ -192,9 +190,9 @@ def _asvi_surrogate_for_distribution(dist,
           'None of the provided substitution rules matched meta-distribution: '
           '`{}`.'.format(dist))
     else:
-      surrogate_posterior, variables = base_distribution_surrogate_fn(
-          dist=dist, sample_shape=sample_shape, variables=variables, seed=seed)
-  return _set_name(surrogate_posterior, dist_name), variables
+      surrogate_posterior = yield from base_distribution_surrogate_fn(
+          dist=dist, sample_shape=sample_shape)
+  return _set_name(surrogate_posterior, dist_name)
 
 
 # Check only for explicit TransformedDistributions, as opposed to using
@@ -203,100 +201,73 @@ def _asvi_surrogate_for_distribution(dist,
 # handled as 'base' distribution types.
 @_asvi_surrogate_rule(
     lambda dist: type(dist) == transformed_distribution.TransformedDistribution)  # pylint: disable=unidiomatic-typecheck
-def _asvi_surrogate_for_transformed_distribution(dist, build_nested_surrogate,
-                                                 variables=None, seed=None):
+def _asvi_surrogate_for_transformed_distribution(dist, build_nested_surrogate):
   """Builds the surrogate for a `tfd.TransformedDistribution`."""
-  nested_surrogate, variables = build_nested_surrogate(
-      dist.distribution, variables=variables, seed=seed)
+  nested_surrogate = yield from build_nested_surrogate(dist.distribution)
   return transformed_distribution.TransformedDistribution(
       nested_surrogate,
-      bijector=dist.bijector), variables
+      bijector=dist.bijector)
 
 
 @_asvi_surrogate_rule(sample.Sample, pass_sample_shape=True)
-def _asvi_surrogate_for_sample(
-    dist, build_nested_surrogate, variables=None, sample_shape=None, seed=None):
+def _asvi_surrogate_for_sample(dist, build_nested_surrogate,
+                               sample_shape=None):
   """Builds the surrogate for a `tfd.Sample`-wrapped distribution."""
   dist_sample_shape = distribution_util.expand_to_vector(dist.sample_shape)
-  nested_surrogate, variables = build_nested_surrogate(
+  nested_surrogate = yield from build_nested_surrogate(
       dist=dist.distribution,
       sample_shape=(
           dist_sample_shape if sample_shape is None
-          else ps.concat([sample_shape, dist_sample_shape], axis=0)),
-      variables=variables,
-      seed=seed)
-  surrogate = independent.Independent(
+          else ps.concat([sample_shape, dist_sample_shape], axis=0)))
+  return independent.Independent(
       nested_surrogate,
       reinterpreted_batch_ndims=ps.rank_from_shape(dist_sample_shape))
-  return surrogate, variables
 
 
 @_asvi_surrogate_rule(independent.Independent)
-def _asvi_surrogate_for_independent(
-    dist, build_nested_surrogate, variables=None, seed=None):
+def _asvi_surrogate_for_independent(dist, build_nested_surrogate):
   """Builds the surrogate for a `tfd.Independent`-wrapped distribution."""
-  nested_surrogate, variables = build_nested_surrogate(
-      dist.distribution, variables=variables, seed=seed)
+  nested_surrogate = yield from build_nested_surrogate(dist.distribution)
   return independent.Independent(
       nested_surrogate,
-      reinterpreted_batch_ndims=dist.reinterpreted_batch_ndims), variables
+      reinterpreted_batch_ndims=dist.reinterpreted_batch_ndims)
 
 
 @_asvi_surrogate_rule(lambda dist: hasattr(dist, '_model_coroutine'))
-def _asvi_surrogate_for_joint_distribution(
-    dist, build_nested_surrogate, variables=None, seed=None):
+def _asvi_surrogate_for_joint_distribution(dist, build_nested_surrogate):
   """Builds a structured joint surrogate posterior for a joint model."""
 
   # Probabilistic program for ASVI surrogate posterior.
-  flat_variables = dist._model_flatten(variables) if variables else None  # pylint: disable=protected-access
   prior_coroutine = dist._model_coroutine  # pylint: disable=protected-access
 
-  def posterior_generator(seed=seed):
+  def posterior_generator():
+    # Run the prior model coroutine and create a surrogate for each
+    # distribution in turn. This coroutine yields *both* the surrogate
+    # parameters and the surrogate distributions themselves. It can therefore
+    # run in a `trainable_state_util` context to define parameters (using
+    # the `_get_coroutine_parameters` wrapper to hide the yielded distributions)
+    # *and* as a JDCoroutine model (using the `_set_coroutine_parameters`
+    # wrapper to hide the yielded parameters).
     prior_gen = prior_coroutine()
     dist = next(prior_gen)
     i = 0
     try:
       while True:
-        was_root = isinstance(dist, Root)
-        if was_root:
-          dist = dist.distribution
-
-        seed, init_seed = samplers.split_seed(seed)
-        surrogate_posterior, variables = build_nested_surrogate(
-            dist,
-            variables=flat_variables[i] if flat_variables else None,
-            seed=init_seed)
-
-        if was_root:
+        surrogate_posterior = yield from build_nested_surrogate(
+            dist.distribution if isinstance(dist, Root) else dist)
+        if isinstance(dist, Root):
           surrogate_posterior = Root(surrogate_posterior)
-        # If variables were not given---i.e., we're creating new
-        # variables---then yield the new variables along with the surrogate
-        # posterior. This assumes an execution context such as
-        # `_extract_variables_from_coroutine_model` below that will capture and
-        # save the variables.
-        value_out = yield (surrogate_posterior if flat_variables
-                           else (surrogate_posterior, variables))
+        value_out = yield surrogate_posterior
         dist = prior_gen.send(value_out)
         i += 1
     except StopIteration:
       pass
 
-  if variables is None:
-    # Run the generator to create variables, then call ourselves again
-    # to construct the surrogate JD from these variables. Note that we can't
-    # just create a JDC from the current `posterior_generator`, because it will
-    # try to build new variables on every invocation; the recursive call will
-    # define a new `posterior_generator` that knows about the variables we're
-    # about to create.
-    return build_nested_surrogate(
-        dist=dist,
-        variables=dist._model_unflatten(  # pylint: disable=protected-access
-            _extract_variables_from_coroutine_model(
-                posterior_generator, seed=seed)))
-
+  parameters = yield from _get_coroutine_parameters(posterior_generator,
+                                                    seed=samplers.zeros_seed())
   surrogate_posterior = (
       joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched(
-          posterior_generator))
+          _set_coroutine_parameters(posterior_generator, parameters)))
 
   # Ensure that the surrogate posterior structure matches that of the prior.
   try:
@@ -307,58 +278,38 @@ def _asvi_surrogate_for_joint_distribution(
     )
     surrogate_posterior = restructure.Restructure(
         output_structure=tokenize(dist),
-        input_structure=tokenize(surrogate_posterior))(
-            surrogate_posterior)
-  return surrogate_posterior, variables
+        input_structure=tokenize(surrogate_posterior))(surrogate_posterior)
+  return surrogate_posterior
 
 
 @_asvi_surrogate_rule(markov_chain.MarkovChain)
-def _asvi_surrogate_for_markov_chain(dist,
-                                     build_nested_surrogate,
-                                     sample_shape=None,
-                                     variables=None,
-                                     seed=None):
+def _asvi_surrogate_for_markov_chain(dist, build_nested_surrogate):
   """Builds a structured surrogate posterior for a Markov chain."""
-  prior_seed, transition_seed = samplers.split_seed(seed, 2)
-  if variables is None:
-    prior_variables, transition_variables = None, None
-  else:
-    prior_variables, transition_variables = variables
+  surrogate_prior = yield from build_nested_surrogate(dist.initial_state_prior)
 
-  surrogate_prior, prior_variables = build_nested_surrogate(
-      dist.initial_state_prior,
-      variables=prior_variables,
-      seed=prior_seed)
+  (transition_all_steps_init_fn, _) = trainable_state_util.as_stateless_builder(
+      lambda: build_nested_surrogate(  # pylint: disable=g-long-lambda
+          dist.transition_fn(
+              tf.range(dist.num_steps - 1),
+              dist.initial_state_prior.sample(dist.num_steps - 1,
+                                              seed=samplers.zeros_seed()))))()
+  transition_params = yield trainable_state_util.Parameter(
+      transition_all_steps_init_fn,
+      name='markov_chain_transition_params')
 
-  if transition_variables is None:
-    # Construct variables for all chain steps in a single call. These will have
-    # an initial dimension of size `num_steps - 1`, which we can gather from
-    # as the chain runs.
-    all_steps = tf.range(dist.num_steps - 1)
-    batch_state = dist.initial_state_prior.sample(dist.num_steps - 1)
-    _, transition_variables = build_nested_surrogate(
-        dist.transition_fn(all_steps, batch_state),
-        variables=None,
-        sample_shape=sample_shape,
-        seed=transition_seed)
-
+  build_transition_one_step = trainable_state_util.as_stateless_builder(
+      lambda step, state: build_nested_surrogate(  # pylint: disable=g-long-lambda
+          dist.transition_fn(step, state)))
   def surrogate_transition_fn(step, state):
-    surrogate_new_dist, _ = build_nested_surrogate(
-        dist.transition_fn(step, state),
-        variables=tf.nest.map_structure(
-            # Gather parameters for this specific step of the chain.
-            lambda v: tf.gather(v, step, axis=0), transition_variables),
-        sample_shape=sample_shape,
-        seed=transition_seed)
-    return surrogate_new_dist
+    _, one_step_apply_fn = build_transition_one_step(step, state)
+    return one_step_apply_fn(tf.nest.map_structure(
+        # Gather parameters for this specific step of the chain.
+        lambda v: tf.gather(v, step, axis=0), transition_params))
 
-  chain_surrogate = markov_chain.MarkovChain(
-      initial_state_prior=surrogate_prior,
-      transition_fn=surrogate_transition_fn,
-      num_steps=dist.num_steps,
-      validate_args=dist.validate_args)
-
-  return chain_surrogate, [prior_variables, transition_variables]
+  return markov_chain.MarkovChain(initial_state_prior=surrogate_prior,
+                                  transition_fn=surrogate_transition_fn,
+                                  num_steps=dist.num_steps,
+                                  validate_args=dist.validate_args)
 
 
 # All surrogate registrations must occur above this line.
@@ -366,15 +317,10 @@ ASVI_DEFAULT_SURROGATE_RULES = tuple(_ASVI_DEFAULT_SURROGATE_RULES_MUTABLE)
 
 
 def _asvi_convex_update_for_base_distribution(dist,
-                                              mean_field,
-                                              initial_prior_weight,
-                                              sample_shape=None,
-                                              variables=None,
-                                              seed=None):
+                                              mean_field=False,
+                                              initial_prior_weight=0.5,
+                                              sample_shape=None):
   """Creates a trainable surrogate for a (non-meta, non-joint) distribution."""
-  if variables is None:
-    variables = {}
-
   posterior_batch_shape = dist.batch_shape_tensor()
   if sample_shape is not None:
     posterior_batch_shape = ps.concat([
@@ -382,12 +328,12 @@ def _asvi_convex_update_for_base_distribution(dist,
         distribution_util.expand_to_vector(sample_shape)
     ], axis=0)
 
-  # Create variables backing each parameter, if needed.
+  temp_params_dict = {'name': _get_name(dist)}
   all_parameter_properties = dist.parameter_properties(dtype=dist.dtype)
   for param, prior_value in dist.parameters.items():
-    if (param in variables
-        or param in (_NON_STATISTICAL_PARAMS + _NON_TRAINABLE_PARAMS)
+    if (param in (_NON_STATISTICAL_PARAMS + _NON_TRAINABLE_PARAMS)
         or prior_value is None):
+      temp_params_dict[param] = prior_value
       continue
 
     param_properties = all_parameter_properties[param]
@@ -402,57 +348,44 @@ def _asvi_convex_update_for_base_distribution(dist,
             ps.rank(prior_value) - param_properties.event_ndims:]
     ], axis=0)
 
-    prior_weight = (None if mean_field  # pylint: disable=g-long-ternary
-                    else tfp_util.TransformedVariable(
-                        initial_value=tf.fill(
-                            dims=param_shape,
-                            value=tf.cast(
-                                initial_prior_weight,
-                                tf.convert_to_tensor(prior_value).dtype)),
-                        bijector=sigmoid.Sigmoid(),
-                        name='prior_weight/{}/{}'.format(
-                            _get_name(dist), param)))
-
     # Initialize the mean-field parameter as a (constrained) standard
     # normal sample.
-    seed, param_seed = samplers.split_seed(seed)
-    variables[param] = ASVIParameters(
-        prior_weight=prior_weight,
-        mean_field_parameter=tfp_util.TransformedVariable(
-            initial_value=bijector.forward(
+    # pylint: disable=cell-var-from-loop
+    # Safe because the state utils guarantee to either call `init_fn`
+    # immediately upon yielding, or not at all.
+    mean_field_parameter = yield trainable_state_util.Parameter(
+        init_fn=lambda seed: (  # pylint: disable=g-long-lambda
+            bijector.forward(
                 samplers.normal(
                     shape=bijector.inverse_event_shape(param_shape),
-                    seed=param_seed)),
-            bijector=bijector,
-            name='mean_field_parameter/{}/{}'.format(
-                _get_name(dist), param)))
-
-  temp_params_dict = {'name': _get_name(dist)}
-  for param, prior_value in dist.parameters.items():
-    if param in (_NON_STATISTICAL_PARAMS +
-                 _NON_TRAINABLE_PARAMS) or prior_value is None:
-      temp_params_dict[param] = prior_value
+                    seed=seed))),
+        name='mean_field_parameter_{}_{}'.format(_get_name(dist), param),
+        constraining_bijector=bijector)
+    if mean_field:
+      temp_params_dict[param] = mean_field_parameter
     else:
-      if mean_field:
-        temp_params_dict[param] = variables[param].mean_field_parameter
-      else:
-        temp_params_dict[param] = (
-            variables[param].prior_weight * prior_value + (
-                (1. - variables[param].prior_weight) *
-                variables[param].mean_field_parameter))
-  return type(dist)(**temp_params_dict), variables
+      prior_weight = yield trainable_state_util.Parameter(
+          init_fn=lambda: tf.fill(  # pylint: disable=g-long-lambda
+              dims=param_shape,
+              value=tf.cast(initial_prior_weight,
+                            tf.convert_to_tensor(prior_value).dtype)),
+          name='prior_weight_{}_{}'.format(_get_name(dist), param),
+          constraining_bijector=sigmoid.Sigmoid())
+      temp_params_dict[param] = prior_weight * prior_value + (
+          (1. - prior_weight) * mean_field_parameter)
+  # pylint: enable=cell-var-from-loop
+
+  return type(dist)(**temp_params_dict)
 
 
-# TODO(kateslin): Add support for models with prior+likelihood written as
-# a single JointDistribution.
-def build_asvi_surrogate_posterior(prior,  # pylint: disable=dangerous-default-value
-                                   mean_field=False,
-                                   initial_prior_weight=0.5,
-                                   prior_substitution_rules=(
-                                       ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES),
-                                   surrogate_rules=ASVI_DEFAULT_SURROGATE_RULES,
-                                   seed=None,
-                                   name=None):
+def _build_asvi_surrogate_posterior(prior,
+                                    mean_field=False,
+                                    initial_prior_weight=0.5,
+                                    prior_substitution_rules=(
+                                        ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES),
+                                    surrogate_rules=(
+                                        ASVI_DEFAULT_SURROGATE_RULES),
+                                    name=None):
   """Builds a structured surrogate posterior inspired by conjugate updating.
 
   ASVI, or Automatic Structured Variational Inference, was proposed by
@@ -495,14 +428,15 @@ def build_asvi_surrogate_posterior(prior,  # pylint: disable=dangerous-default-v
       `surrogate_fn` is used. The `condition` may be either a class or a
       callable returning a boolean (for example, `tfd.Normal` or, equivalently,
       `lambda dist: isinstance(dist, tfd.Normal)`). The `surrogate_fn` should
-      have signature `surrogate_posterior, variables = surrogate_fn(dist,
-      build_nested_surrogate_fn, sample_shape=None, variables=None, seed=None)`.
-    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+      have signature `init_fn, apply_fn = surrogate_fn(dist,
+      build_nested_surrogate_fn, sample_shape=None)`.
     name: Optional string. Default value: `build_asvi_surrogate_posterior`.
-
-  Returns:
-    surrogate_posterior: A `tfd.JointDistributionCoroutineAutoBatched` instance
-    whose samples have shape and structure matching that of `prior`.
+  Yields:
+    *parameters: sequence of `trainable_state_util.Parameter` namedtuples.
+      These are intended to be consumed by
+      `trainable_state_util.as_stateful_builder` and
+      `trainable_state_util.as_stateless_builder` to define stateful and
+      stateless variants respectively.
 
   ### Examples
 
@@ -556,35 +490,63 @@ def build_asvi_surrogate_posterior(prior,  # pylint: disable=dangerous-default-v
 
   """
   with tf.name_scope(name or 'build_asvi_surrogate_posterior'):
-    surrogate_posterior, variables = _asvi_surrogate_for_distribution(
+    surrogate_posterior = yield from _asvi_surrogate_for_distribution(
         dist=prior,
         base_distribution_surrogate_fn=functools.partial(
             _asvi_convex_update_for_base_distribution,
             mean_field=mean_field,
             initial_prior_weight=initial_prior_weight),
         prior_substitution_rules=prior_substitution_rules,
-        surrogate_rules=surrogate_rules,
-        seed=seed)
-    surrogate_posterior.also_track = variables
+        surrogate_rules=surrogate_rules)
     return surrogate_posterior
 
 
-def _extract_variables_from_coroutine_model(model_fn, seed=None):
-  """Extracts variables from a generator that yields (dist, variables) pairs."""
-  gen = model_fn()
+build_asvi_surrogate_posterior = trainable_state_util.as_stateful_builder(
+    _build_asvi_surrogate_posterior)
+# TODO(davmre): replace stateful example code in the stateless docstring.
+build_asvi_surrogate_posterior_stateless = (
+    trainable_state_util.as_stateless_builder(_build_asvi_surrogate_posterior))
+
+
+def _get_coroutine_parameters(jdc_model, seed):
+  """Runs a coroutine and intercepts yielded dists, yielding params only."""
+  gen = jdc_model()
+  to_send = None
+  raw_parameters = []
   try:
-    dist, dist_variables = next(gen)
-    flat_variables = [dist_variables]
     while True:
-      seed, local_seed = samplers.split_seed(seed, n=2)
-      sampled_value = (dist.distribution.sample(seed=local_seed)
-                       if isinstance(dist, Root)
-                       else dist.sample(seed=local_seed))
-      dist, dist_variables = gen.send(sampled_value)
-      flat_variables.append(dist_variables)
+      val = gen.send(to_send)
+      if isinstance(val, trainable_state_util.Parameter):
+        to_send = yield val
+        raw_parameters.append(to_send)
+      else:  # Random variable.
+        seed, local_seed = samplers.split_seed(seed, n=2)
+        to_send = (val.distribution.sample(seed=local_seed)
+                   if isinstance(val, Root)
+                   else val.sample(seed=local_seed))
   except StopIteration:
     pass
-  return flat_variables
+  return raw_parameters
+
+
+def _set_coroutine_parameters(jdc_model, raw_parameters):
+  """Wraps a coroutine to intercept yielded params, yielding dists only."""
+  def handled_coroutine():
+    gen = jdc_model()
+    to_send = None
+    parameter_idx = 0
+    try:
+      while True:
+        val = gen.send(to_send)
+        if isinstance(val, trainable_state_util.Parameter):
+          to_send = raw_parameters[parameter_idx]
+          parameter_idx += 1
+        else:
+          to_send = yield val
+    except StopIteration:
+      pass
+
+  return handled_coroutine
 
 
 def _set_name(dist, name):

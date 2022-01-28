@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "inverse",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":core",
         ":custom_inverse",
@@ -36,7 +35,6 @@ py_library(
 py_library(
     name = "slice",
     srcs = ["slice.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/core:pytree",
@@ -47,7 +45,6 @@ py_library(
 py_library(
     name = "rules",
     srcs = ["rules.py"],
-    srcs_version = "PY3",
     deps = [
         ":core",
         ":custom_inverse",
@@ -62,7 +59,6 @@ py_library(
 py_library(
     name = "core",
     srcs = ["core.py"],
-    srcs_version = "PY3",
     deps = [
         ":slice",
         # jax dep,
@@ -77,7 +73,6 @@ py_library(
 py_library(
     name = "custom_inverse",
     srcs = ["custom_inverse.py"],
-    srcs_version = "PY3",
     deps = [
         ":core",
         ":slice",
@@ -91,7 +86,6 @@ py_library(
 py_test(
     name = "inverse_test",
     srcs = ["inverse_test.py"],
-    python_version = "PY3",
     deps = [
         ":core",
         ":rules",
@@ -108,8 +102,6 @@ py_test(
 py_test(
     name = "slice_test",
     srcs = ["slice_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":slice",
         # absl/testing:absltest dep,
@@ -122,8 +114,6 @@ py_test(
 py_test(
     name = "custom_inverse_test",
     srcs = ["custom_inverse_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":core",
         ":custom_inverse",

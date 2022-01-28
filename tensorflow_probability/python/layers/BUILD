@@ -26,7 +26,6 @@ licenses(["notice"])
 py_library(
     name = "layers",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":conv_variational",
         ":dense_variational",
@@ -44,7 +43,6 @@ py_library(
     srcs = [
         "conv_variational.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":util",
         # tensorflow dep,
@@ -61,8 +59,6 @@ py_test(
     name = "conv_variational_test",
     size = "medium",
     srcs = ["conv_variational_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -76,7 +72,6 @@ py_library(
     srcs = [
         "dense_variational.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":util",
         # tensorflow dep,
@@ -93,8 +88,6 @@ py_test(
     name = "dense_variational_test",
     size = "medium",
     srcs = ["dense_variational_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -108,7 +101,6 @@ py_library(
     srcs = [
         "dense_variational_v2.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:kullback_leibler",
@@ -120,8 +112,6 @@ py_test(
     name = "dense_variational_v2_test",
     size = "small",
     srcs = ["dense_variational_v2_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -133,7 +123,6 @@ py_test(
 py_library(
     name = "distribution_layer",
     srcs = ["distribution_layer.py"],
-    srcs_version = "PY3",
     deps = [
         # cloudpickle dep,
         # tensorflow dep,
@@ -160,9 +149,7 @@ py_test(
     name = "distribution_layer_test",
     size = "medium",
     srcs = ["distribution_layer_test.py"],
-    python_version = "PY3",
     shard_count = 5,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # six dep,
@@ -177,7 +164,6 @@ py_library(
     srcs = [
         "initializers.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -187,8 +173,6 @@ py_test(
     name = "initializers_test",
     size = "small",
     srcs = ["initializers_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -199,7 +183,6 @@ py_test(
 py_library(
     name = "masked_autoregressive",
     srcs = ["masked_autoregressive.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:masked_autoregressive",
@@ -211,8 +194,6 @@ py_test(
     name = "masked_autoregressive_test",
     size = "small",
     srcs = ["masked_autoregressive_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -226,7 +207,6 @@ py_library(
     srcs = [
         "util.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -241,7 +221,6 @@ py_library(
     srcs = [
         "variable_input.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -251,8 +230,6 @@ py_test(
     name = "variable_input_test",
     size = "small",
     srcs = ["variable_input_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
@@ -265,7 +242,6 @@ py_library(
     srcs = [
         "weight_norm.py",
     ],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],
@@ -275,8 +251,6 @@ py_test(
     name = "weight_norm_test",
     size = "medium",
     srcs = ["weight_norm_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

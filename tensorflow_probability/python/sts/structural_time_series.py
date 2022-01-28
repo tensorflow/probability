@@ -256,7 +256,7 @@ class StructuralTimeSeries(object):
   def joint_distribution(self,
                          observed_time_series=None,
                          num_timesteps=None,
-                         trajectories_shape=None,
+                         trajectories_shape=(),
                          initial_step=0,
                          mask=None,
                          experimental_parallelize=False):
@@ -275,11 +275,9 @@ class StructuralTimeSeries(object):
         `observed_time_series`.
         Default value: `0`.
       trajectories_shape: `int` `Tensor` shape of sampled trajectories
-        for each set of parameter values. If not specified (either directly
-        or by passing an `observed_time_series`), defaults to a
-        one-to-one correspondence between trajectories and parameter settings
-        (implicitly `trajectories_shape=()`).
-        Default value: `None`.
+        for each set of parameter values. Ignored if an `observed_time_series`
+        is passed.
+        Default value: `()`.
       initial_step: Optional scalar `int` `Tensor` specifying the starting
         timestep.
         Default value: `0`.
@@ -502,10 +500,10 @@ class StructuralTimeSeries(object):
         # adding `param_lp + observation_lp` would broadcast the param priors
         # over the sample shape, which incorrectly multi-counts the param
         # priors.
-        sample_ndims = tf.maximum(0,
-                                  tf.rank(observation_lp) - tf.rank(param_lp))
+        sample_ndims = ps.maximum(
+            0, ps.rank(observation_lp) - ps.rank(param_lp))
         observation_lp = tf.reduce_sum(
-            observation_lp, axis=tf.range(sample_ndims))
+            observation_lp, axis=ps.range(sample_ndims))
 
         return param_lp + observation_lp
 
@@ -526,7 +524,7 @@ def _assert_dict_contents_are_equal(
   for k in combined_keys - set(ignore):
     a_val = a.get(k, None)
     b_val = b.get(k, None)
-    if not _strict_equals(a_val, b_val):
+    if not equals_fn(a_val, b_val):
       raise ValueError(message +
                        ' `{}`: {} vs {}.'.format(k, a_val, b_val))
 

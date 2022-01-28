@@ -22,7 +22,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "experimental",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         "//oryx/experimental/matching",
         "//oryx/experimental/mcmc",

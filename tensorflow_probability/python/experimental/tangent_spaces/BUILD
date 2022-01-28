@@ -29,7 +29,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "tangent_spaces",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":spaces",
     ],
@@ -38,7 +37,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "spaces",
     srcs = ["spaces.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
     ],

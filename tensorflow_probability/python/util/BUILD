@@ -28,7 +28,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "util",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":deferred_tensor",
         ":seed_stream",
@@ -40,7 +39,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "deferred_tensor",
     srcs = ["deferred_tensor.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

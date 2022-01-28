@@ -2478,9 +2478,7 @@ py_test(
     size = "medium",
     srcs = ["binomial_test.py"],
     main = "binomial_test.py",
-    python_version = "PY3",
     shard_count = 3,
-    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         # numpy dep,
@@ -2783,9 +2781,7 @@ py_test(
     size = "large",
     srcs = ["gamma_test.py"],
     main = "gamma_test.py",
-    python_version = "PY3",
     shard_count = 2,
-    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         # numpy dep,
@@ -2973,8 +2969,6 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     jax_size = "medium",
     main = "independent_test.py",
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         # hypothesis dep,
@@ -3648,8 +3642,6 @@ py_test(
     size = "medium",
     srcs = ["poisson_test.py"],
     main = "poisson_test.py",
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         # numpy dep,
@@ -3769,8 +3761,6 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     jax_size = "medium",
     main = "sample_test.py",
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = ["requires-gpu-nvidia"],
     deps = [
         # absl/testing:parameterized dep,
@@ -4080,9 +4070,7 @@ py_test(
     name = "distribution_properties_test",
     size = "large",
     srcs = ["distribution_properties_test.py"],
-    python_version = "PY3",
     shard_count = 50,
-    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         ":distributions",
@@ -4106,9 +4094,7 @@ py_test(
     name = "numerical_properties_test",
     size = "large",
     srcs = ["numerical_properties_test.py"],
-    python_version = "PY3",
     shard_count = 50,
-    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         ":hypothesis_testlib",
@@ -4128,7 +4114,6 @@ py_test(
 py_library(
     name = "jax_transformation_testlib",
     testonly = 1,
-    srcs_version = "PY3",
     deps = [
         ":hypothesis_testlib.jax",
         # absl/testing:parameterized dep,
@@ -4148,9 +4133,7 @@ py_test(
     name = "jax_transformation_test",
     size = "large",
     srcs = ["jax_transformation_test.py"],
-    python_version = "PY3",
     shard_count = 40,
-    srcs_version = "PY3",
     tags = [
         "hypothesis",
         "notap",
@@ -4166,9 +4149,7 @@ py_test(
     srcs = ["jax_transformation_test.py"],
     args = ["--execute_only"],
     main = "jax_transformation_test.py",
-    python_version = "PY3",
     shard_count = 50,
-    srcs_version = "PY3",
     tags = [
         "hypothesis",
         "no-oss-ci",
@@ -4183,9 +4164,7 @@ py_test(
     name = "platform_compatibility_test",
     size = "large",
     srcs = ["platform_compatibility_test.py"],
-    python_version = "PY3",
     shard_count = 50,
-    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         ":distributions",
@@ -4206,9 +4185,7 @@ py_test(
     name = "stochastic_process_properties_test",
     size = "large",
     srcs = ["stochastic_process_properties_test.py"],
-    python_version = "PY3",
     shard_count = 10,
-    srcs_version = "PY3",
     tags = ["hypothesis"],
     deps = [
         "//tensorflow_probability",
@@ -4224,8 +4201,6 @@ py_binary(
     name = "untestable_distributions",
     testonly = 1,
     srcs = ["untestable_distributions.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl:app dep,
         # absl/logging dep,
@@ -4237,8 +4212,6 @@ multi_substrate_py_test(
     name = "batch_concat_test",
     srcs = ["batch_concat_test.py"],
     jax_size = "large",
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":batch_concat",
         ":distributions",
@@ -4250,7 +4223,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "batch_concat",
     srcs = ["batch_concat.py"],
-    srcs_version = "PY3",
     deps = [
         ":distribution",
         # numpy dep,

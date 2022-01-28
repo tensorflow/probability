@@ -19,6 +19,7 @@ import collections
 # Dependency imports
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.experimental.mcmc import step
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -82,12 +83,15 @@ class SampleDiscardingKernel(kernel_base.TransitionKernel):
     """Calculates how many samples to skip based on the call number."""
     # If `self.num_burnin_steps` is statically known to be 0,
     # `self.num_steps_between_results` will be returned outright.
-    num_burnin_steps_ = tf.get_static_value(self.num_burnin_steps)
+    num_burnin_steps = ps.convert_to_shape_tensor(
+        self.num_burnin_steps, dtype_hint=tf.int32)
+    num_burnin_steps_ = tf.get_static_value(num_burnin_steps)
     if num_burnin_steps_ == 0:
       return self.num_steps_between_results
     else:
-      return (tf.where(tf.equal(call_counter, 0), self.num_burnin_steps, 0) +
-              self.num_steps_between_results)
+      return (tf.where(tf.equal(call_counter, 0), num_burnin_steps, 0) +
+              tf.convert_to_tensor(
+                  self.num_steps_between_results, dtype_hint=tf.int32))
 
   def one_step(self, current_state, previous_kernel_results, seed=None):
     """Collects one non-discarded chain state.

@@ -26,8 +26,6 @@ package(
 py_binary(
     name = "gen_linear_operators",
     srcs = ["gen_linear_operators.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl:app dep,
         # tensorflow dep,
@@ -37,8 +35,6 @@ py_binary(
 py_binary(
     name = "gen_tensor_shape",
     srcs = ["gen_tensor_shape.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl:app dep,
         # tensorflow dep,

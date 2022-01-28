@@ -23,6 +23,8 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
 
+JAX_MODE = False
+
 
 class _ForecastTest(object):
 
@@ -51,9 +53,11 @@ class _ForecastTest(object):
 
     drift_scale = 0.1
     observation_noise_scale = 0.01
-    params = {'seasonal/_drift_scale': self._build_tensor([drift_scale]),
-              'observation_noise_scale': self._build_tensor(
-                  [observation_noise_scale])}
+    params = {
+        'seasonal_drift_scale' if JAX_MODE else 'seasonal/_drift_scale':
+            self._build_tensor([drift_scale]),
+        'observation_noise_scale': self._build_tensor(
+            [observation_noise_scale])}
 
     onestep_dist = tfp.sts.one_step_predictive(model, observed_time_series,
                                                timesteps_are_event_shape=False,
@@ -91,7 +95,8 @@ class _ForecastTest(object):
         *(batch_shape + [num_timesteps])))
     model = self._build_model(observed_time_series,
                               prior_batch_shape=batch_shape[1:])
-    prior_samples = [param.prior.sample(num_param_samples)
+    prior_samples = [param.prior.sample(num_param_samples,
+                                        seed=test_util.test_seed())
                      for param in model.parameters]
 
     onestep_dist = tfp.sts.one_step_predictive(model, observed_time_series,
@@ -115,9 +120,11 @@ class _ForecastTest(object):
 
     drift_scale = 0.1
     observation_noise_scale = 0.01
-    params = {'seasonal/_drift_scale': self._build_tensor([drift_scale]),
-              'observation_noise_scale': self._build_tensor(
-                  [observation_noise_scale])}
+    params = {
+        'seasonal_drift_scale' if JAX_MODE else 'seasonal/_drift_scale':
+            self._build_tensor([drift_scale]),
+        'observation_noise_scale': self._build_tensor(
+            [observation_noise_scale])}
 
     forecast_dist = tfp.sts.forecast(model, observed_time_series,
                                      parameter_samples=params,
@@ -159,7 +166,12 @@ class _ForecastTest(object):
     self.assertAllClose(forecast_mean, expected_forecast_mean)
     self.assertAllClose(forecast_scale, expected_forecast_scale)
 
+  @test_util.jax_disable_test_missing_functionality('fit_with_hmc')
   def test_forecast_from_hmc(self):
+    if not (tf1.control_flow_v2_enabled() or self.use_static_shape):
+      self.skipTest('test_forecast_from_hmc does not currently work with TF1 '
+                    'and dynamic shapes')
+
     # test that we can directly plug in the output of an HMC chain as
     # the input to `forecast`, as done in the example, with no `sess.run` call.
     num_results = 5
@@ -183,7 +195,8 @@ class _ForecastTest(object):
     forecast_scale = forecast_dist.stddev()[..., 0]
 
     sample_shape = [10]
-    forecast_samples = forecast_dist.sample(sample_shape)[..., 0]
+    forecast_samples = forecast_dist.sample(
+        sample_shape, seed=test_util.test_seed())[..., 0]
 
     self.evaluate(tf1.global_variables_initializer())
     forecast_mean_, forecast_scale_, forecast_samples_ = self.evaluate(
@@ -208,8 +221,9 @@ class _ForecastTest(object):
     # time series has batch shape.
     model = self._build_model(observed_time_series,
                               prior_batch_shape=batch_shape[1:])
-    prior_samples = [param.prior.sample(num_param_samples)
-                     for param in model.parameters]
+    prior_samples = [
+        param.prior.sample(num_param_samples, seed=test_util.test_seed())
+        for param in model.parameters]
 
     forecast_dist = tfp.sts.forecast(model, observed_time_series,
                                      parameter_samples=prior_samples,
@@ -235,8 +249,9 @@ class _ForecastTest(object):
         is_missing=self._build_tensor(is_missing_, dtype=np.bool_))
 
     model = self._build_model(observed_time_series)
-    prior_samples = [param.prior.sample(num_param_samples)
-                     for param in model.parameters]
+    prior_samples = [
+        param.prior.sample(num_param_samples, seed=test_util.test_seed())
+        for param in model.parameters]
 
     forecast_dist = tfp.sts.forecast(model, observed_time_series,
                                      parameter_samples=prior_samples,
@@ -276,8 +291,11 @@ class _ForecastTest(object):
     # compute the expected results analytically.
     drift_scale = 1.0
     noise_scale = 0.1
-    parameter_samples = {'observation_noise_scale': [noise_scale],
-                         'seasonal/_drift_scale': [drift_scale]}
+    parameter_samples = {
+        'seasonal_drift_scale' if JAX_MODE else 'seasonal/_drift_scale':
+            self._build_tensor([drift_scale]),
+        'observation_noise_scale': self._build_tensor(
+            [noise_scale])}
     imputed_series_dist = tfp.sts.impute_missing_values(
         model, observed_time_series, parameter_samples,
         timesteps_are_event_shape=False)
@@ -322,6 +340,8 @@ class _ForecastTest(object):
     """
 
     ndarray = np.asarray(ndarray).astype(self.dtype if dtype is None else dtype)
+    if JAX_MODE:
+      return ndarray
     return tf1.placeholder_with_default(
         ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
@@ -332,6 +352,7 @@ class ForecastTestStatic32(test_util.TestCase, _ForecastTest):
   use_static_shape = True
 
 
+@test_util.jax_disable_test_missing_functionality('dynamic shape')
 # Run in graph mode only to reduce test weight.
 class ForecastTestDynamic32(test_util.TestCase, _ForecastTest):
   dtype = np.float32

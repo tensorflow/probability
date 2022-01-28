@@ -849,12 +849,12 @@ class Seasonal(StructuralTimeSeries):
             effects_to_residuals)  # Use linop so that matmul broadcasts.
         initial_state_prior_loc = effects_to_residuals_linop.matvec(
             initial_state_prior.mean())
-        initial_state_prior_scale_linop = effects_to_residuals_linop.matmul(
+        scale_linop = effects_to_residuals_linop.matmul(
             initial_state_prior.scale)  # returns LinearOperator
-        initial_state_prior = tfd.MultivariateNormalFullCovariance(
+        initial_state_prior = tfd.MultivariateNormalTriL(
             loc=initial_state_prior_loc,
-            covariance_matrix=initial_state_prior_scale_linop.matmul(
-                initial_state_prior_scale_linop.to_dense(), adjoint_arg=True))
+            scale_tril=tf.linalg.cholesky(
+                scale_linop.matmul(scale_linop.to_dense(), adjoint_arg=True)))
 
       self._constrain_mean_effect_to_zero = constrain_mean_effect_to_zero
       self._initial_state_prior = initial_state_prior

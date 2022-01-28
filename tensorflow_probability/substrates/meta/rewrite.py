@@ -91,7 +91,7 @@ TF_REPLACEMENTS = {
 DISABLED_BY_PKG = {
     'experimental':
         ('auto_batching', 'composite_tensor', 'linalg',
-         'marginalize', 'nn', 'sequential', 'substrates', 'vi'),
+         'marginalize', 'nn', 'sequential', 'substrates'),
 }
 LIBS = ('bijectors', 'distributions', 'experimental', 'math', 'mcmc',
         'monte_carlo', 'optimizer', 'random', 'staging', 'stats', 'sts',
@@ -247,6 +247,8 @@ def main(argv):
     contents = contents.replace('tfp.substrates.numpy', 'tfp.substrates.jax')
     contents = contents.replace('substrates.numpy', 'substrates.jax')
     contents = contents.replace('backend.numpy', 'backend.jax')
+    contents = contents.replace('backend import numpy as tf',
+                                'backend import jax as tf')
 
     contents = contents.replace('def _call_jax', 'def __call__')
     contents = contents.replace('JAX_MODE = False', 'JAX_MODE = True')

@@ -32,7 +32,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "math",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":manual_special_functions",
     ],
@@ -41,7 +40,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "manual_special_functions",
     srcs = ["manual_special_functions.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -53,7 +51,6 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "manual_special_functions_test",
     srcs = ["manual_special_functions_test.py"],
-    srcs_version = "PY3",
     tags = [
         "tf1-broken",
     ],

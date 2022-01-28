@@ -34,6 +34,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 __all__ = [
     'Beta',
@@ -111,6 +112,11 @@ class Beta(distribution.AutoCompositeTensorDistribution):
   # Calculate the probability of each pair of samples under the corresponding
   # distribution in `dist`.
   dist.prob(x)         # Shape [2, 3]
+
+  # Define an equivalent Beta distribution parameterized by `mean` and
+  # `total_concentration`:
+  dist = tfd.Beta.experimental_from_mean_concentration(
+    mean=0.5, total_concentration=alpha+beta)
   ```
 
   ```python
@@ -190,6 +196,69 @@ class Beta(distribution.AutoCompositeTensorDistribution):
           reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def experimental_from_mean_concentration(
+      cls, mean, total_concentration, **kwargs):
+    """Constructs a Beta from its mean and total concentration.
+
+    **Experimental: Naming, location of this API may change.**
+
+    Total concentration, sometimes called "sample size", is the sum of the two
+    concentration parameters (`concentration1` and `concentration0` in
+    `__init__`).
+
+    Args:
+      mean: The mean of the constructed distribution.
+      total_concentration: The sum of the two concentration parameters. Must be
+        greater than 0.
+      **kwargs: Other keyword arguments passed directly to `__init__`, e.g.
+        `validate_args`.
+
+    Returns:
+      beta: A distribution with the given parameterization.
+    """
+    dtype = dtype_util.common_dtype(
+        [mean, total_concentration], dtype_hint=tf.float32)
+    total_concentration = tensor_util.convert_nonref_to_tensor(
+        total_concentration, dtype=dtype)
+    mean = tensor_util.convert_nonref_to_tensor(mean, dtype=dtype)
+
+    return cls(
+        concentration1=DeferredTensor(
+            mean, lambda mean: mean * total_concentration),
+        concentration0=DeferredTensor(
+            mean, lambda mean: (1. - mean) * total_concentration),
+        **kwargs)
+
+  @classmethod
+  def experimental_from_mean_variance(cls, mean, variance, **kwargs):
+    """Constructs a Beta from its mean and variance.
+
+    **Experimental: Naming, location of this API may change.**
+
+    Variance must be less than `mean * (1. - mean)`, and in particular less than
+    the maximal variance of 0.25, which occurs with `mean = 0.5`.
+
+    Args:
+      mean: The mean of the constructed distribution.
+      variance: The variance of the constructed distribution.
+      **kwargs: Other keyword arguments passed directly to `__init__`, e.g.
+        `validate_args`.
+
+    Returns:
+      beta: A distribution with the given parameterization.
+    """
+    dtype = dtype_util.common_dtype([mean, variance], dtype_hint=tf.float32)
+    variance = tensor_util.convert_nonref_to_tensor(variance, dtype=dtype)
+    mean = tensor_util.convert_nonref_to_tensor(mean, dtype=dtype)
+
+    total_concentration = DeferredTensor(
+        mean, lambda mean: mean * (1. - mean) / variance - 1.)
+    return cls.experimental_from_mean_concentration(
+        mean=mean,
+        total_concentration=total_concentration,
+        **kwargs)
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):

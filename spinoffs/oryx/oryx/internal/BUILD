@@ -22,7 +22,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "internal",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":test_util",
     ],
@@ -32,7 +31,6 @@ py_library(
 py_library(
     name = "test_util",
     srcs = ["test_util.py"],
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # jax dep,

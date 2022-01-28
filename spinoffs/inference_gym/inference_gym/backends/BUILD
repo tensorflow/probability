@@ -32,22 +32,18 @@ licenses(["notice"])
 py_library(
     name = "rewrite",
     srcs = ["rewrite.py"],
-    srcs_version = "PY3",
 )
 
 # pytype_strict
 py_library(
     name = "util",
     srcs = ["util.py"],
-    srcs_version = "PY3",
 )
 
 # py_strict
 py_test(
     name = "jax_integration_test",
     srcs = ["jax_integration_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl/testing:absltest dep,
         "//inference_gym:using_jax",
@@ -58,8 +54,6 @@ py_test(
 py_test(
     name = "numpy_integration_test",
     srcs = ["numpy_integration_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl/testing:absltest dep,
         "//inference_gym:using_numpy",
@@ -70,8 +64,6 @@ py_test(
 py_test(
     name = "tensorflow_integration_test",
     srcs = ["tensorflow_integration_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl/testing:absltest dep,
         # tensorflow dep,

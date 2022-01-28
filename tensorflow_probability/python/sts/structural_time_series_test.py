@@ -313,6 +313,10 @@ class _StsTestHarness(object):
         # float64 minimizes numeric inconsistencies between log-prob
         # implementations.
         observed_time_series=np.float64([1., 0., 1., 0.]))
+
+    jd_no_trajectory_shape = model.joint_distribution(num_timesteps=11)
+    self.assertLen(jd_no_trajectory_shape.dtype, len(model.parameters) + 1)
+
     jd = model.joint_distribution(trajectories_shape=[2], num_timesteps=11)
     self.assertLen(jd.dtype, len(model.parameters) + 1)
 

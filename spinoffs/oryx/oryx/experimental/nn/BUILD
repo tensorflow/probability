@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "nn",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         ":combinator",
@@ -40,7 +39,6 @@ py_library(
 py_library(
     name = "core",
     srcs = ["core.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         # jax dep,
@@ -54,7 +52,6 @@ py_library(
 py_library(
     name = "base",
     srcs = ["base.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         # jax:stax dep,
@@ -70,7 +67,6 @@ py_library(
 py_library(
     name = "combinator",
     srcs = ["combinator.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         # jax dep,
@@ -82,7 +78,6 @@ py_library(
 py_library(
     name = "convolution",
     srcs = ["convolution.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         # jax dep,
@@ -95,7 +90,6 @@ py_library(
 py_library(
     name = "normalization",
     srcs = ["normalization.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         # jax dep,
@@ -108,7 +102,6 @@ py_library(
 py_library(
     name = "pooling",
     srcs = ["pooling.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         # jax dep,
@@ -120,7 +113,6 @@ py_library(
 py_library(
     name = "reshape",
     srcs = ["reshape.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         # jax dep,
@@ -133,7 +125,6 @@ py_library(
 py_test(
     name = "base_test",
     srcs = ["base_test.py"],
-    python_version = "PY3",
     deps = [
         ":base",
         # absl/testing:absltest dep,
@@ -147,7 +138,6 @@ py_test(
 py_test(
     name = "core_test",
     srcs = ["core_test.py"],
-    python_version = "PY3",
     deps = [
         ":core",
         # absl/testing:absltest dep,
@@ -164,7 +154,6 @@ py_test(
 py_test(
     name = "combinator_test",
     srcs = ["combinator_test.py"],
-    python_version = "PY3",
     shard_count = 2,
     deps = [
         ":combinator",
@@ -185,7 +174,6 @@ py_test(
 py_test(
     name = "convolution_test",
     srcs = ["convolution_test.py"],
-    python_version = "PY3",
     deps = [
         ":convolution",
         # absl/testing:absltest dep,
@@ -200,7 +188,6 @@ py_test(
 py_test(
     name = "normalization_test",
     srcs = ["normalization_test.py"],
-    python_version = "PY3",
     deps = [
         ":normalization",
         # absl/testing:absltest dep,
@@ -216,7 +203,6 @@ py_test(
 py_test(
     name = "pooling_test",
     srcs = ["pooling_test.py"],
-    python_version = "PY3",
     deps = [
         ":pooling",
         # absl/testing:absltest dep,
@@ -232,7 +218,6 @@ py_test(
 py_test(
     name = "reshape_test",
     srcs = ["reshape_test.py"],
-    python_version = "PY3",
     deps = [
         ":reshape",
         # absl/testing:absltest dep,
@@ -246,7 +231,6 @@ py_test(
 py_library(
     name = "function",
     srcs = ["function.py"],
-    srcs_version = "PY3",
     deps = [
         ":base",
         # jax dep,
@@ -259,7 +243,6 @@ py_library(
 py_test(
     name = "function_test",
     srcs = ["function_test.py"],
-    python_version = "PY3",
     deps = [
         ":nn",
         # absl/testing:absltest dep,

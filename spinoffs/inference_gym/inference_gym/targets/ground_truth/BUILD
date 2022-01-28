@@ -30,7 +30,6 @@ licenses(["notice"])
 py_library(
     name = "brownian_motion_missing_middle_observations",
     srcs = ["brownian_motion_missing_middle_observations.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -40,7 +39,6 @@ py_library(
 py_library(
     name = "convection_lorenz_bridge",
     srcs = ["convection_lorenz_bridge.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -50,7 +48,6 @@ py_library(
 py_library(
     name = "convection_lorenz_bridge_unknown_scales",
     srcs = ["convection_lorenz_bridge_unknown_scales.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -60,7 +57,6 @@ py_library(
 py_library(
     name = "eight_schools",
     srcs = ["eight_schools.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -70,7 +66,6 @@ py_library(
 py_library(
     name = "german_credit_numeric_logistic_regression",
     srcs = ["german_credit_numeric_logistic_regression.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -80,7 +75,6 @@ py_library(
 py_library(
     name = "german_credit_numeric_probit_regression",
     srcs = ["german_credit_numeric_probit_regression.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -90,7 +84,6 @@ py_library(
 py_library(
     name = "german_credit_numeric_sparse_logistic_regression",
     srcs = ["german_credit_numeric_sparse_logistic_regression.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -100,7 +93,6 @@ py_library(
 py_library(
     name = "radon_contextual_effects_indiana",
     srcs = ["radon_contextual_effects_indiana.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -110,7 +102,6 @@ py_library(
 py_library(
     name = "radon_contextual_effects_indiana_halfnormal",
     srcs = ["radon_contextual_effects_indiana_halfnormal.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -120,7 +111,6 @@ py_library(
 py_library(
     name = "radon_contextual_effects_minnesota",
     srcs = ["radon_contextual_effects_minnesota.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -130,7 +120,6 @@ py_library(
 py_library(
     name = "radon_contextual_effects_minnesota_halfnormal",
     srcs = ["radon_contextual_effects_minnesota_halfnormal.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -140,7 +129,6 @@ py_library(
 py_library(
     name = "synthetic_item_response_theory",
     srcs = ["synthetic_item_response_theory.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -150,7 +138,6 @@ py_library(
 py_library(
     name = "synthetic_log_gaussian_cox_process",
     srcs = ["synthetic_log_gaussian_cox_process.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -160,7 +147,6 @@ py_library(
 py_library(
     name = "stochastic_volatility_log_sp500",
     srcs = ["stochastic_volatility_log_sp500.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -170,7 +156,6 @@ py_library(
 py_library(
     name = "stochastic_volatility_log_sp500_small",
     srcs = ["stochastic_volatility_log_sp500_small.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -180,7 +165,6 @@ py_library(
 py_library(
     name = "stochastic_volatility_sp500",
     srcs = ["stochastic_volatility_sp500.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -190,7 +174,6 @@ py_library(
 py_library(
     name = "stochastic_volatility_sp500_small",
     srcs = ["stochastic_volatility_sp500_small.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],
@@ -200,7 +183,6 @@ py_library(
 py_library(
     name = "brownian_motion_unknown_scales_missing_middle_observations",
     srcs = ["brownian_motion_unknown_scales_missing_middle_observations.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
     ],

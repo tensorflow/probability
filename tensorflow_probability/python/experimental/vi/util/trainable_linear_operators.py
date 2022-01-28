@@ -356,7 +356,7 @@ class _DefaultScaleDiagonal(bijector_lib.AutoCompositeTensorBijector):
 
   def _forward(self, x):
     dtype = dtype_util.base_dtype(x.dtype)
-    return tf.math.abs(x) + np.finfo(dtype.as_numpy_dtype).eps
+    return tf.math.abs(x) + dtype_util.eps(dtype)
 
   def _inverse(self, y):
     dtype = dtype_util.base_dtype(y.dtype)

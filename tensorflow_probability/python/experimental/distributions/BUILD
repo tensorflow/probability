@@ -31,7 +31,6 @@ licenses(["notice"])
 multi_substrate_py_library(
     name = "distributions",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":importance_resample",
         ":increment_log_prob",
@@ -45,7 +44,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "importance_resample",
     srcs = ["importance_resample.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -63,7 +61,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["importance_resample_test.py"],
     jax_size = "medium",
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -76,7 +73,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "increment_log_prob",
     srcs = ["increment_log_prob.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -92,7 +88,6 @@ multi_substrate_py_library(
 multi_substrate_py_test(
     name = "increment_log_prob_test",
     srcs = ["increment_log_prob_test.py"],
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -105,7 +100,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "joint_distribution_pinned",
     srcs = ["joint_distribution_pinned.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -118,7 +112,6 @@ multi_substrate_py_test(
     srcs = ["joint_distribution_pinned_test.py"],
     jax_size = "large",
     shard_count = 13,
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -130,7 +123,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "marginal_fns",
     srcs = ["marginal_fns.py"],
-    srcs_version = "PY3",
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:mvn_linear_operator",
@@ -141,7 +133,7 @@ multi_substrate_py_test(
     name = "marginal_fns_test",
     srcs = ["marginal_fns_test.py"],
     numpy_tags = ["notap"],
-    python_version = "PY3",
+    shard_count = 3,
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -153,7 +145,6 @@ multi_substrate_py_test(
 multi_substrate_py_library(
     name = "mvn_precision_factor_linop",
     srcs = ["mvn_precision_factor_linop.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

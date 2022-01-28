@@ -192,6 +192,12 @@ def make_distribution_bijector(distribution, name='make_distribution_bijector'):
           'Cannot transform distribution {} to a standard normal '
           'distribution.'.format(distribution))
 
+    # Recurse into DeferredModules.
+    if hasattr(distribution, '_build_module'):
+      return type(distribution)(
+          lambda d: make_distribution_bijector(d._build_module()),  # pylint: disable=protected-access
+          distribution)
+
     # Recurse over joint distributions.
     if isinstance(distribution, joint_distribution.JointDistribution):
       return joint_distribution._DefaultJointBijector(  # pylint: disable=protected-access

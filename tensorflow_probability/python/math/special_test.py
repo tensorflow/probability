@@ -539,6 +539,17 @@ class SpecialTest(test_util.TestCase):
     x_, y_, atan_diff_ = self.evaluate([x, y, tfp.math.atan_difference(x, y)])
     self.assertAllClose(np.arctan(x_) - np.arctan(y_), atan_diff_)
 
+  @parameterized.parameters(np.float32, np.float64)
+  def testErfcinvPreservesDtype(self, dtype):
+    x = self.evaluate(
+        tf.random.uniform(
+            shape=[int(1e5)],
+            minval=0.,
+            maxval=1.,
+            dtype=dtype,
+            seed=test_util.test_seed()))
+    self.assertEqual(x.dtype, tfp.math.erfcinv(x).dtype)
+
   def testErfcinv(self):
     x = self.evaluate(
         tf.random.uniform(

@@ -25,9 +25,11 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
-from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+
+
+JAX_MODE = False
 
 
 @test_util.test_all_tf_execution_regimes
@@ -36,11 +38,14 @@ class SampleFoldTest(test_util.TestCase):
   def test_simple_operation(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     reduction_rslt, last_sample, kr = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
-        reducer=fake_reducer)
+        reducer=fake_reducer,
+        seed=seed1)
     reduction_rslt, last_sample, kernel_results = self.evaluate([
         reduction_rslt, last_sample, kr])
     self.assertEqual(3, reduction_rslt)
@@ -54,7 +59,8 @@ class SampleFoldTest(test_util.TestCase):
         current_state=last_sample,
         kernel=fake_kernel,
         reducer=fake_reducer,
-        previous_kernel_results=kernel_results)
+        previous_kernel_results=kernel_results,
+        seed=seed2)
     reduction_rslt_2, last_sample_2, kernel_results_2 = self.evaluate([
         reduction_rslt_2, last_sample_2, kr_2])
     self.assertEqual(8, reduction_rslt_2)
@@ -65,12 +71,15 @@ class SampleFoldTest(test_util.TestCase):
   def test_reducer_warm_restart(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     red_res, last_sample, kr, red_states = tfp.experimental.mcmc.sample_fold(
         num_steps=5,
         current_state=0.,
         kernel=fake_kernel,
         reducer=fake_reducer,
-        return_final_reducer_states=True)
+        return_final_reducer_states=True,
+        seed=seed1)
     red_res, last_sample, kernel_results, red_states = self.evaluate([
         red_res, last_sample, kr, red_states])
     self.assertEqual(3, red_res)
@@ -85,7 +94,8 @@ class SampleFoldTest(test_util.TestCase):
         previous_kernel_results=kernel_results,
         kernel=fake_kernel,
         reducer=fake_reducer,
-        previous_reducer_state=red_states)
+        previous_reducer_state=red_states,
+        seed=seed2)
     reduction_rslt_2, last_sample_2, kernel_results_2 = self.evaluate([
         reduction_rslt_2, last_sample_2, kr_2])
     self.assertEqual(5.5, reduction_rslt_2)
@@ -101,7 +111,8 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=5,
         current_state=curr_state,
         kernel=fake_kernel,
-        reducer=fake_reducer)
+        reducer=fake_reducer,
+        seed=test_util.test_seed())
     reduction_rslt, last_sample, kernel_results = self.evaluate([
         reduction_rslt, last_sample, kr])
     self.assertEqual(
@@ -122,7 +133,8 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=5,
         current_state=0.,
         kernel=kernel,
-        reducer=reduction)
+        reducer=reduction,
+        seed=test_util.test_seed())
     reduction_rslt, last_sample, kernel_results = self.evaluate([
         reduction_rslt, last_sample, kr])
     self.assertEqual(np.mean(np.arange(2, 12, 2)), reduction_rslt)
@@ -140,7 +152,8 @@ class SampleFoldTest(test_util.TestCase):
         num_steps=3,
         current_state=0.,
         kernel=fake_kernel,
-        reducer=fake_reducers)
+        reducer=fake_reducers,
+        seed=test_util.test_seed())
     reduction_rslt, last_sample, kernel_results = self.evaluate([
         reduction_rslt, last_sample, kr])
     self.assertEqual(2, len(reduction_rslt))
@@ -154,7 +167,6 @@ class SampleFoldTest(test_util.TestCase):
     self.assertEqual(6, kernel_results.counter_2)
 
   def test_true_streaming_covariance(self):
-    seed = test_util.test_seed()
     fake_kernel = test_fixtures.TestTransitionKernel(())
     cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
     reduction_rslt, _, _ = tfp.experimental.mcmc.sample_fold(
@@ -162,7 +174,7 @@ class SampleFoldTest(test_util.TestCase):
         current_state=tf.convert_to_tensor([0., 0.]),
         kernel=fake_kernel,
         reducer=cov_reducer,
-        seed=seed,)
+        seed=test_util.test_seed())
     reduction_rslt = self.evaluate(reduction_rslt)
     self.assertAllClose(
         np.cov(np.column_stack((np.arange(20), np.arange(20))).T, ddof=0),
@@ -177,16 +189,17 @@ class SampleFoldTest(test_util.TestCase):
         current_state=tf.convert_to_tensor(
             [[0., 0., 0.], [0., 0., 0.]]),
         kernel=fake_kernel,
-        reducer=cov_reducer)
+        reducer=cov_reducer,
+        seed=test_util.test_seed())
     reduction_rslt = self.evaluate(reduction_rslt)
     self.assertEqual((2, 3, 3), reduction_rslt.shape)
     self.assertAllEqual(np.ones(reduction_rslt.shape) * 2, reduction_rslt)
     self.assertAllEqualNested(last_sample, [[5., 5., 5.], [5., 5., 5.]])
 
   def test_seed_reproducibility(self):
-    seed = samplers.sanitize_seed(test_util.test_seed())
     fake_kernel = test_fixtures.RandomTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
+    seed = test_util.test_seed(sampler_type='stateless')
     first_reduction_rslt, _, _ = tfp.experimental.mcmc.sample_fold(
         num_steps=3,
         current_state=0.,
@@ -212,7 +225,8 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=fake_reducer,
         num_burnin_steps=10,
-        num_steps_between_results=1)
+        num_steps_between_results=1,
+        seed=test_util.test_seed())
     reduction_rslt, last_sample, kernel_results = self.evaluate([
         reduction_rslt,
         last_sample,
@@ -233,7 +247,8 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=fake_reducer,
         num_burnin_steps=tf.convert_to_tensor(10),
-        num_steps_between_results=tf.convert_to_tensor(1))
+        num_steps_between_results=tf.convert_to_tensor(1),
+        seed=test_util.test_seed())
     reduction_rslt, last_sample, kernel_results = self.evaluate([
         reduction_rslt,
         last_sample,
@@ -253,7 +268,8 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=None,
         num_burnin_steps=10,
-        num_steps_between_results=1)
+        num_steps_between_results=1,
+        seed=test_util.test_seed())
     last_sample, kernel_results = self.evaluate([
         last_sample, kr])
     self.assertIsNone(reduction_rslt)
@@ -269,7 +285,8 @@ class SampleFoldTest(test_util.TestCase):
         kernel=fake_kernel,
         reducer=[],
         num_burnin_steps=10,
-        num_steps_between_results=1)
+        num_steps_between_results=1,
+        seed=test_util.test_seed())
     last_sample, kernel_results = self.evaluate([
         last_sample, kr])
     self.assertEqual([], reduction_rslt)
@@ -288,11 +305,13 @@ class SampleChainTest(test_util.TestCase):
 
   def test_basic_operation(self):
     kernel = test_fixtures.TestTransitionKernel()
+    seed1, seed2 = tfp.random.split_seed(
+        test_util.test_seed(sampler_type='stateless'))
     result = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=2,
         current_state=0.,
         kernel=kernel,
-        seed=test_util.test_seed())
+        seed=seed1)
     samples = result.trace
     kernel_results = result.final_kernel_results
     self.assertAllClose(
@@ -307,6 +326,7 @@ class SampleChainTest(test_util.TestCase):
     # restart.
     result_2 = tfp.experimental.mcmc.sample_chain_with_burnin(
         num_results=2,
+        seed=seed2,
         **result.resume_kwargs)
     samples_2, kernel_results_2 = self.evaluate(
         [result_2.trace, result_2.final_kernel_results])
@@ -384,6 +404,8 @@ class SampleChainTest(test_util.TestCase):
         any('supplied `TransitionKernel` is not calibrated.' in str(
             warning.message) for warning in triggered))
 
+  @test_util.jax_disable_test_missing_functionality('TF-only bug')
+  @test_util.numpy_disable_test_missing_functionality('TF-only bug')
   def test_reproduce_bug159550941(self):
     # Reproduction for b/159550941.
     input_signature = [tf.TensorSpec([], tf.int32)]
@@ -430,6 +452,7 @@ class SampleChainTest(test_util.TestCase):
 @test_util.test_graph_mode_only
 class SampleChainGraphTest(test_util.TestCase):
 
+  @test_util.numpy_disable_gradient_test
   def test_chain_works_correlated_multivariate(self):
     dtype = np.float32
     true_mean = dtype([0, 0])
@@ -459,7 +482,8 @@ class SampleChainGraphTest(test_util.TestCase):
         num_steps_between_results=1,
         seed=test_util.test_seed()).trace
 
-    self.assertAllEqual(dict(target_calls=1), counter)
+    # TODO(https://github.com/google/jax/issues/7155)
+    self.assertAllEqual(dict(target_calls=3 if JAX_MODE else 1), counter)
     states = tf.stack(states, axis=-1)
     self.assertEqual(num_results, tf.compat.dimension_value(states.shape[0]))
     sample_mean = tf.reduce_mean(states, axis=0)

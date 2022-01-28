@@ -79,6 +79,8 @@ class DefaultModelTests(test_util.TestCase):
         self._build_test_series(shape=[48, 3], freq=pd.DateOffset(hours=1)))
     self.assertAllEqual(model.batch_shape, [3])
 
+  @test_util.jax_disable_variable_test
+  @test_util.numpy_disable_variable_test
   def test_docstring_fitting_example(self):
     # Construct a series of eleven data points, covering a period of two weeks
     # with three missing days.
@@ -99,7 +101,7 @@ class DefaultModelTests(test_util.TestCase):
     # Fit the model using variational inference.
     surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(model)
     _ = tfp.vi.fit_surrogate_posterior(
-        target_log_prob_fn=model.joint_log_prob(series),
+        target_log_prob_fn=model.joint_distribution(series).log_prob,
         surrogate_posterior=surrogate_posterior,
         optimizer=tf.optimizers.Adam(0.1),
         num_steps=1000,

@@ -24,6 +24,8 @@ import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
 
+JAX_MODE = False
+
 
 class _VariationalInferenceTests(object):
 
@@ -38,6 +40,8 @@ class _VariationalInferenceTests(object):
     return tfp.sts.Sum(components=[day_of_week, local_linear_trend],
                        observed_time_series=observed_time_series)
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True, reason='No variables in JAX backend.')
   def test_basic_variational_fitting(self):
     batch_shape = [2, 3]
     num_timesteps = 5
@@ -50,7 +54,7 @@ class _VariationalInferenceTests(object):
     variational_posterior = tfp.sts.build_factored_surrogate_posterior(
         model, batch_shape=num_inits)
     loss_curve = tfp.vi.fit_surrogate_posterior(
-        model.joint_log_prob(observed_time_series),
+        model.joint_distribution(observed_time_series).log_prob,
         surrogate_posterior=variational_posterior,
         sample_size=3,
         num_steps=10,
@@ -61,6 +65,37 @@ class _VariationalInferenceTests(object):
     loss_curve_, _ = self.evaluate((loss_curve, posterior_samples))
     self.assertLess(np.mean(loss_curve_[-1]), np.mean(loss_curve_[0]))
 
+  def test_basic_variational_fitting_stateless(self):
+    if not JAX_MODE:
+      self.skipTest('Uses `optax` for stateless optimization')
+    import optax  # pylint: disable=g-import-not-at-top
+    batch_shape = [2, 3]
+    num_timesteps = 5
+    num_inits = 10
+    observed_time_series = self._build_tensor(np.random.randn(
+        *(batch_shape + [num_timesteps])))
+
+    model = self._build_model(observed_time_series)
+    seed = test_util.test_seed(sampler_type='stateless')
+    init_seed, fit_seed = tfp.random.split_seed(seed, n=2)
+
+    init_fn, build_surrogate_fn = (
+        tfp.sts.build_factored_surrogate_posterior_stateless(
+            model, batch_shape=num_inits))
+    jd = model.joint_distribution(observed_time_series=observed_time_series)
+    _, loss_curve = tfp.vi.fit_surrogate_posterior_stateless(
+        jd.log_prob,
+        build_surrogate_posterior_fn=build_surrogate_fn,
+        initial_parameters=init_fn(init_seed),
+        sample_size=3,
+        num_steps=10,
+        optimizer=optax.adam(1e-1),
+        jit_compile=True,
+        seed=fit_seed)
+    self.assertLess(np.mean(loss_curve[-1]), np.mean(loss_curve[0]))
+
+  @test_util.disable_test_for_backend(
+      disable_jax=True, reason='No variables in JAX backend.')
   def test_custom_eager_optimization_loop(self):
     if not tf.executing_eagerly():
       return
@@ -80,7 +115,7 @@ class _VariationalInferenceTests(object):
     @tf.function(autograph=False)  # Ensure the loss is computed efficiently
     def loss_fn(sample_size=3):
       return tfp.vi.monte_carlo_variational_loss(
-          model.joint_log_prob(observed_time_series),
+          model.joint_distribution(observed_time_series).log_prob,
           surrogate_posterior,
           sample_size=sample_size)
 
@@ -99,6 +134,8 @@ class _VariationalInferenceTests(object):
     self.assertAllEqual(final_loss.shape, batch_shape)
     self.assertLess(np.mean(final_loss), np.mean(initial_loss))
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True, reason='No variables in JAX backend.')
   def test_init_is_valid_for_large_observations(self):
     num_timesteps = 20
     observed_time_series = self._build_tensor(
@@ -107,7 +144,8 @@ class _VariationalInferenceTests(object):
     surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
         model=model)
     variational_loss = tfp.vi.monte_carlo_variational_loss(
-        target_log_prob_fn=model.joint_log_prob(observed_time_series),
+        target_log_prob_fn=model.joint_distribution(
+            observed_time_series).log_prob,
         surrogate_posterior=surrogate_posterior)
     self.evaluate(tf1.global_variables_initializer())
     loss_ = self.evaluate(variational_loss)
@@ -164,6 +202,8 @@ class _HMCTests(object):
     return tfp.sts.Sum(components=[day_of_week, local_linear_trend],
                        observed_time_series=observed_time_series)
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True, reason='No variables in JAX backend.')
   def test_basic_hmc_example(self):
     batch_shape = [2, 3]
     num_timesteps = 5
@@ -195,6 +235,8 @@ class _HMCTests(object):
                           self._batch_shape_as_list(parameter.prior) +
                           self._event_shape_as_list(parameter.prior))
 
+  @test_util.disable_test_for_backend(
+      disable_jax=True, reason='No variables in JAX backend.')
   def test_multiple_chains_example(self):
     batch_shape = [2, 3]
     num_timesteps = 5
@@ -287,6 +329,8 @@ class HMCTestsStatic32(test_util.TestCase, _HMCTests):
                             (3, [3]),
                             ([3], [3]),
                             ([5, 2], [5, 2]))
+  @test_util.disable_test_for_backend(
+      disable_jax=True, reason='No variables in JAX backend.')
   def test_chain_batch_shape(self, shape_in, expected_batch_shape_out):
     batch_shape = [2, 3]
     num_results = 1

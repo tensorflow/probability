@@ -26,7 +26,6 @@ package(
 py_library(
     name = "sts_gibbs",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":gibbs_sampler",
         ":spike_and_slab",
@@ -37,8 +36,6 @@ py_test(
     name = "benchmarks_test",
     size = "medium",
     srcs = ["benchmarks_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
@@ -54,7 +51,6 @@ py_test(
 py_library(
     name = "gibbs_sampler",
     srcs = ["gibbs_sampler.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -66,9 +62,7 @@ py_test(
     name = "gibbs_sampler_test",
     size = "medium",
     srcs = ["gibbs_sampler_test.py"],
-    python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -83,7 +77,6 @@ py_test(
 py_library(
     name = "spike_and_slab",
     srcs = ["spike_and_slab.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

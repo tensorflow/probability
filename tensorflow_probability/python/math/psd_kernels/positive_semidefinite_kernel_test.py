@@ -353,6 +353,12 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
              for k in sum_kernel.kernels]),
         self.evaluate(sum_kernel.matrix(x, y)))
 
+    self.assertAllEqual([2], sum_kernel[..., 1].batch_shape)
+    self.assertAllEqual(
+        sum([self.evaluate(k.matrix(x, y))
+             for k in sum_kernel[..., 1].kernels]),
+        self.evaluate(sum_kernel[..., 1].matrix(x, y)))
+
   def testDynamicShapesAndValuesOfSum(self):
     params_2_dynamic = tf1.placeholder_with_default(np.float32([1., 2.]),
                                                     shape=None)
@@ -370,6 +376,13 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
              for k in sum_kernel.kernels]),
         self.evaluate(sum_kernel.matrix(x, y)))
 
+    self.assertAllEqual(
+        [1, 2], self.evaluate(sum_kernel[:1].batch_shape_tensor()))
+    self.assertAllEqual(
+        sum([self.evaluate(k.matrix(x, y))
+             for k in sum_kernel[:1].kernels]),
+        self.evaluate(sum_kernel[:1].matrix(x, y)))
+
   def testStaticShapesAndValuesOfProduct(self):
     k0 = TestKernel(PARAMS_0)
     k1 = TestKernel(PARAMS_1)
@@ -386,6 +399,14 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
             [self.evaluate(k.matrix(x, y))
              for k in product_kernel.kernels]),
         self.evaluate(product_kernel.matrix(x, y)))
+
+    self.assertAllEqual([1], product_kernel[0, 1:].batch_shape)
+    self.assertAllEqual(
+        functools.reduce(
+            operator.mul,
+            [self.evaluate(k.matrix(x, y))
+             for k in product_kernel[0, 1:].kernels]),
+        self.evaluate(product_kernel[0, 1:].matrix(x, y)))
 
   def testDynamicShapesAndValuesOfProduct(self):
     params_2_dynamic = tf1.placeholder_with_default(np.float32([1., 2.]),
@@ -406,6 +427,15 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
             [self.evaluate(k.matrix(x, y))
              for k in product_kernel.kernels]),
         self.evaluate(product_kernel.matrix(x, y)))
+
+    self.assertAllEqual(
+        [2, 1], self.evaluate(product_kernel[:, :1].batch_shape_tensor()))
+    self.assertAllEqual(
+        functools.reduce(
+            operator.mul,
+            [self.evaluate(k.matrix(x, y))
+             for k in product_kernel[:, :1].kernels]),
+        self.evaluate(product_kernel[:, :1].matrix(x, y)))
 
   def testSumOfKernelsWithNoneDtypes(self):
     none_kernel = TestKernel()

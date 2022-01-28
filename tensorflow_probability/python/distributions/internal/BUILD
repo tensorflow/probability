@@ -32,13 +32,11 @@ package(
 multi_substrate_py_library(
     name = "init",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
 )
 
 multi_substrate_py_library(
     name = "statistical_testing",
     srcs = ["statistical_testing.py"],
-    srcs_version = "PY3",
     deps = [
         ":init",
         # tensorflow dep,
@@ -71,7 +69,6 @@ py_library(
     srcs = [
         "correlation_matrix_volumes_lib.py",
     ],
-    srcs_version = "PY3",
     deps = [
         ":init",
         # numpy dep,
@@ -87,8 +84,6 @@ py_binary(
     name = "correlation_matrix_volumes",
 #     testonly = 1,  # DisableOnExport
     srcs = ["correlation_matrix_volumes.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":correlation_matrix_volumes_lib",
         ":init",
@@ -101,9 +96,7 @@ py_test(
     name = "correlation_matrix_volumes_test",
     size = "small",
     srcs = ["correlation_matrix_volumes_test.py"],
-    python_version = "PY3",
     shard_count = 4,
-    srcs_version = "PY3",
     tags = [
         "no_pip",
         "optonly",

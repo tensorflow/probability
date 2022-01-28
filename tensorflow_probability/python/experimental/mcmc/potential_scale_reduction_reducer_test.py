@@ -67,6 +67,7 @@ class PotentialScaleReductionReducerTest(test_util.TestCase):
     self.assertAllEqual((4,), rhat.shape)
     self.assertAllGreater(rhat, 1.2)
 
+  @test_util.numpy_disable_gradient_test
   def test_with_hmc(self):
     target_dist = tfp.distributions.Normal(loc=0., scale=1.)
     hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
@@ -78,9 +79,10 @@ class PotentialScaleReductionReducerTest(test_util.TestCase):
         current_state=tf.zeros((2,)),
         kernel=hmc_kernel,
         reducer=[
-            tfp.experimental.mcmc.TracingReducer(),
+            tfp.experimental.mcmc.TracingReducer(size=50),
             tfp.experimental.mcmc.PotentialScaleReductionReducer()
-        ])
+        ],
+        seed=test_util.test_seed())
     rhat = reduced_stats[1]
     true_rhat = tfp.mcmc.potential_scale_reduction(
         chains_states=reduced_stats[0][0],

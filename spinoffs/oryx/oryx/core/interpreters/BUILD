@@ -23,7 +23,6 @@ package(default_visibility = ["//visibility:public"])
 py_library(
     name = "interpreters",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":harvest",
         ":log_prob",
@@ -37,7 +36,6 @@ py_library(
 py_library(
     name = "unzip",
     srcs = ["unzip.py"],
-    srcs_version = "PY3",
     deps = [
         ":harvest",
         # jax dep,
@@ -50,7 +48,6 @@ py_library(
 py_library(
     name = "propagate",
     srcs = ["propagate.py"],
-    srcs_version = "PY3",
     deps = [
         ":harvest",
         # jax dep,
@@ -62,7 +59,6 @@ py_library(
 py_library(
     name = "harvest",
     srcs = ["harvest.py"],
-    srcs_version = "PY3",
     deps = [
         # jax dep,
         "//oryx/core:primitive",
@@ -74,7 +70,6 @@ py_library(
 py_library(
     name = "log_prob",
     srcs = ["log_prob.py"],
-    srcs_version = "PY3",
     deps = [
         ":propagate",
         # jax dep,
@@ -87,8 +82,6 @@ py_library(
 py_test(
     name = "unzip_test",
     srcs = ["unzip_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":harvest",
         ":unzip",
@@ -105,8 +98,6 @@ py_test(
 py_test(
     name = "propagate_test",
     srcs = ["propagate_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":propagate",
         # absl/testing:absltest dep,
@@ -121,7 +112,6 @@ py_test(
 py_test(
     name = "harvest_test",
     srcs = ["harvest_test.py"],
-    python_version = "PY3",
     deps = [
         ":harvest",
         # absl/testing:absltest dep,
@@ -136,8 +126,6 @@ py_test(
 py_test(
     name = "log_prob_test",
     srcs = ["log_prob_test.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         ":log_prob",
         # absl/testing:absltest dep,

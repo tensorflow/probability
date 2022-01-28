@@ -26,7 +26,6 @@ package(
 py_library(
     name = "anomaly_detection",
     srcs = ["__init__.py"],
-    srcs_version = "PY3",
     deps = [
         ":anomaly_detection_lib",
     ],
@@ -35,7 +34,6 @@ py_library(
 py_library(
     name = "anomaly_detection_lib",
     srcs = ["anomaly_detection_lib.py"],
-    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -57,7 +55,6 @@ py_test(
     name = "anomaly_detection_test",
     size = "large",
     srcs = ["anomaly_detection_test.py"],
-    srcs_version = "PY3",
     deps = [
         # absl/testing:parameterized dep,
         # matplotlib dep,
