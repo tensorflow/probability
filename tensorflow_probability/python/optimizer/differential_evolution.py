@@ -122,7 +122,7 @@ def one_step(
     population,
     population_values=None,
     differential_weight=0.5,
-    crossover_prob=0.9,
+    crossover_prob=tf.Variable(0.9),
     seed=None,
     name=None):
   """Performs one step of the differential evolution algorithm.
