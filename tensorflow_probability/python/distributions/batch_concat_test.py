@@ -185,7 +185,7 @@ class _BatchConcatTest(object):
     self.assertAllEqual(self.evaluate(tf.shape(means)), [2, 6, 4, 2])
     self.assertAllEqual(means[:, :3],
                         tf.zeros([2, 3, 4, 2], dtype=tf.float32))
-    self.assertAllEqual(means[:, 3:5],
+    self.assertAllClose(means[:, 3:5],
                         tf.ones([2, 2, 4, 2], dtype=tf.float32) * 0.5)
 
   def test_incompatible_batch_shape(self):
