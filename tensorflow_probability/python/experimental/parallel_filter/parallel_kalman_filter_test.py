@@ -97,6 +97,56 @@ class _KalmanFilterTest(test_util.TestCase):
     approximants = fibonacci[::2] / fibonacci[1::2]
     self.assertAllClose(filtered_covs[..., 0, 0], approximants)
 
+  @test_util.disable_test_for_backend(disable_numpy=True, reason='Test compile')
+  def test_basic_example_time_dependent_compiled(self):
+    nsteps = 7
+    initial_mean = np.array([0.], dtype=self.dtype)
+    initial_cov = np.eye(1, dtype=self.dtype)
+    transition_matrix = np.array(nsteps * [[[1.]]], dtype=self.dtype)
+    transition_mean = np.array(nsteps * [[0.]], dtype=self.dtype)
+    transition_cov = np.array(nsteps * [[[1.]]], dtype=self.dtype)
+    observation_matrix = np.array(nsteps * [[[1.]]], dtype=self.dtype)
+    observation_mean = np.array(nsteps * [[0.]], dtype=self.dtype)
+    observation_cov = np.array(nsteps * [[[1.]]], dtype=self.dtype)
+    seed = test_util.test_seed()
+
+    def sample_walk():
+      _, y = parallel_kalman_filter_lib.sample_walk(
+          transition_matrix=transition_matrix,
+          transition_mean=transition_mean,
+          transition_scale_tril=tf.linalg.cholesky(transition_cov),
+          observation_matrix=observation_matrix,
+          observation_mean=observation_mean,
+          observation_scale_tril=tf.linalg.cholesky(observation_cov),
+          initial_mean=initial_mean,
+          initial_scale_tril=tf.linalg.cholesky(initial_cov),
+          seed=seed)
+      return y
+
+    def kalman_filter():
+      (_, _, filtered_covs, _, _, _, _) = (
+          parallel_kalman_filter_lib.kalman_filter(
+              transition_matrix=transition_matrix,
+              transition_mean=transition_mean,
+              transition_cov=transition_cov,
+              observation_matrix=observation_matrix,
+              observation_mean=observation_mean,
+              observation_cov=observation_cov,
+              initial_mean=initial_mean,
+              initial_cov=initial_cov,
+              y=y,
+              mask=None))
+      return filtered_covs
+
+    y = tf.function(sample_walk, jit_compile=True)()
+    filtered_covs = tf.function(kalman_filter, jit_compile=True)()
+
+    fibonacci = np.array(
+        [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610],
+        dtype=self.dtype)
+    approximants = fibonacci[::2] / fibonacci[1::2]
+    self.assertAllClose(filtered_covs[..., 0, 0], approximants)
+
   def test_basic_example_time_dependent_batched(self):
     batch_shape = (2, 3)
     ndim = 7  # Dimension of latent space

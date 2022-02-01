@@ -681,9 +681,11 @@ def _broadcast_to_full_batch_shape_helper(data,
   # Broadcast the data to have full batch shape. For example, given
   # `batch_shape==[3, 2]`, this would broadcast `data.shape==[S, 1, 2, E]` to
   # `[S, 3, 2, E]`.
-  new_shape = tf.concat([data_shape[:sample_ndims],
-                         batch_shape,
-                         data_shape[data_rank - event_ndims:]], axis=0)
+  new_shape = ps.concat([
+      data_shape[:sample_ndims], batch_shape,
+      data_shape[data_rank - event_ndims:]
+  ],
+                        axis=0)
   return tf.broadcast_to(data, new_shape)
 
 

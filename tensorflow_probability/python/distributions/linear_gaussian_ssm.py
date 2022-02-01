@@ -545,7 +545,7 @@ class LinearGaussianStateSpaceModel(
          [num_timesteps, latent_size]`.
       predicted_covs: Covariances of the per-timestep predictive
          distributions over latent states, p(z[t+1] | x[:t]), as a
-         Tensor of shape `sample_shape(x) batch_shape +
+         Tensor of shape `sample_shape(x) + batch_shape +
          [num_timesteps, latent_size, latent_size]`.
 
     Returns:
