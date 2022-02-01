@@ -34,6 +34,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 __all__ = [
     'Gamma',
@@ -105,6 +106,11 @@ class Gamma(distribution.AutoCompositeTensorDistribution):
 
   dist = tfd.Gamma(concentration=3.0, rate=2.0)
   dist2 = tfd.Gamma(concentration=[3.0, 4.0], rate=[2.0, 3.0])
+
+  # Build a Gamma distribution equivalent to `dist`, parameterized by mean and
+  # variance.
+  dist_from_mean_var = tfd.Gamma.experimental_from_mean_variance(
+    mean=1.5, variance=0.75)
   ```
 
   Compute the gradients of samples w.r.t. the parameters:
@@ -179,6 +185,31 @@ class Gamma(distribution.AutoCompositeTensorDistribution):
           reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           parameters=parameters,
           name=name)
+
+  @classmethod
+  def experimental_from_mean_variance(cls, mean, variance, **kwargs):
+    """Constructs a Gamma from its mean and variance.
+
+    **Experimental: Naming, location of this API may change.**
+
+    Args:
+      mean: The mean of the constructed distribution. Must be greater than 0.
+      variance: The variance of the distribution. Must be greater than 0.
+      **kwargs: Other keyword arguments passed directly to `__init__`, e.g.
+        `validate_args`.
+
+    Returns:
+      gamma: A distribution with the given parameterization.
+    """
+    dtype = dtype_util.common_dtype([mean, variance], dtype_hint=tf.float32)
+    mean = tensor_util.convert_nonref_to_tensor(mean, dtype=dtype)
+    variance = tensor_util.convert_nonref_to_tensor(variance, dtype=dtype)
+
+    rate = DeferredTensor(mean, lambda mean: mean / variance)
+    return cls(
+        concentration=DeferredTensor(mean, lambda mean: mean * rate),
+        rate=rate,
+        **kwargs)
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):

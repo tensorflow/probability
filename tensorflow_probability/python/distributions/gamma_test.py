@@ -614,6 +614,40 @@ class GammaTest(test_util.TestCase):
         ).inverse(x)
     self.assertAllNan(self.evaluate(bijector_inverse_x))
 
+  def testGammaFromMeanVariance(self):
+    concentration = 2.
+    rate = np.array([0.5, 1., 2.], dtype=np.float32)
+    scale = 1. / rate
+    x = np.array([0.1, 7., 4.], dtype=np.float32)
+    mean = sp_stats.gamma.mean(a=concentration, scale=scale)
+    var = sp_stats.gamma.var(a=concentration, scale=scale)
+    gamma_mean_var = tfd.Gamma.experimental_from_mean_variance(
+        mean, variance=var, validate_args=True)
+    expected_log_pdf = sp_stats.gamma.logpdf(x, a=concentration, scale=scale)
+    log_pdf = gamma_mean_var.log_prob(x)
+    self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf))
+
+  @test_util.jax_disable_test_missing_functionality('GradientTape')
+  @test_util.numpy_disable_gradient_test
+  def testGammaFromMeanVarianceTapeSafe(self):
+    concentration = 1.
+    rate = np.float32(3.)
+    scale = 1. / rate
+    x = np.array([0.4, 5., 3.], dtype=np.float32)
+
+    mean = tf.convert_to_tensor(
+        sp_stats.gamma.mean(a=concentration, scale=scale).astype(np.float32))
+    variance = tf.convert_to_tensor(
+        sp_stats.gamma.var(a=concentration, scale=scale).astype(np.float32))
+
+    dist = tfd.Gamma.experimental_from_mean_variance(
+        mean, variance, validate_args=True)
+    with tf.GradientTape() as tape:
+      tape.watch((mean, variance))
+      lp = dist.log_prob(x)
+    grads = tape.gradient(lp, (mean, variance))
+    self.assertAllNotNone(grads)
+
 
 @test_util.test_graph_and_eager_modes
 class GammaSamplingTest(test_util.TestCase):
