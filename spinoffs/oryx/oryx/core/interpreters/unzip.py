@@ -164,9 +164,10 @@ class UnzipTrace(jax_core.Trace):
     return UnzipTracer(self, pe.PartialVal.known(val), jax_core.unit, True)
 
   def new_instantiated_literal(self, val):
+    aval = trace_util.get_shaped_aval(val)
     return UnzipTracer(self,
-                       pe.PartialVal.unknown(trace_util.get_shaped_aval(val)),
-                       jax_core.Literal(val), True)
+                       pe.PartialVal.unknown(aval),
+                       jax_core.Literal(val, aval), True)
 
   def new_instantiated_const(self, val):
     return UnzipTracer(self,
