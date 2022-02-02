@@ -44,6 +44,7 @@ SPECIAL_KERNELS = [
 
 NON_INSTANTIABLE_SPECIAL_KERNELS = [
     'AutoCompositeTensorPsdKernel',
+    'ExponentialCurve',  # TODO(jburnim, srvasude): Enable this kernel.
     'FeatureTransformed',
     'PositiveSemidefiniteKernel',
 ]
