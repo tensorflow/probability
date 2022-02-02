@@ -357,7 +357,7 @@ class IgammainvTest(test_util.TestCase):
     self.assertLess(err, 2e-3)
 
 
-@test_util.test_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class OwensTTest(test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)

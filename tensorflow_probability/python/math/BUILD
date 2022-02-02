@@ -496,7 +496,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["special_test.py"],
     shard_count = 3,
-    tags = ["tf1-broken"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
