@@ -44,6 +44,7 @@ from tensorflow_probability.python.bijectors.glow import GlowDefaultExitNetwork
 from tensorflow_probability.python.bijectors.glow import GlowDefaultNetwork
 from tensorflow_probability.python.bijectors.gompertz_cdf import GompertzCDF
 from tensorflow_probability.python.bijectors.gumbel_cdf import GumbelCDF
+from tensorflow_probability.python.bijectors.householder import Householder
 from tensorflow_probability.python.bijectors.identity import Identity
 from tensorflow_probability.python.bijectors.inline import Inline
 from tensorflow_probability.python.bijectors.invert import Invert
@@ -127,6 +128,7 @@ __all__ = [
     "GompertzCDF",
     "GumbelCDF",
     "GeneralizedExtremeValueCDF",
+    "Householder",
     "Identity",
     "Inline",
     "Invert",

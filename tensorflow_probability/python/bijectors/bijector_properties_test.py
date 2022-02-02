@@ -51,6 +51,7 @@ NO_LDJ_GRADS_EXPECTED = {
     'FrechetCDF': dict(loc={ILDJ}),
     'GeneralizedExtremeValueCDF': dict(loc={ILDJ}),
     'GumbelCDF': dict(loc={ILDJ}),
+    'Householder': dict(reflection_axis={FLDJ, ILDJ}),
     'MoyalCDF': dict(loc={ILDJ}),
     'Shift': dict(shift={FLDJ, ILDJ}),
     'Softplus': dict(low={FLDJ}),
@@ -866,6 +867,8 @@ CONSTRAINTS = {
         # Restrict to positive since `Invert(Power(...))` tests the negation.
         tfp_hps.softplus_plus_eps(),
     'rate':
+        tfp_hps.softplus_plus_eps(),
+    'reflection_axis':
         tfp_hps.softplus_plus_eps(),
     'scale':
         tfp_hps.softplus_plus_eps(),
