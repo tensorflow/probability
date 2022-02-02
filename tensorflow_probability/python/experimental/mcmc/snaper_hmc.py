@@ -46,6 +46,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import unnest
+from tensorflow_probability.python.math import generic as math_generic
 from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -867,7 +868,10 @@ def _make_snaper_kernel(
   if dual_averaging_kwargs is None:
     dual_averaging_kwargs = {}
 
+  dual_averaging_kwargs = dict(dual_averaging_kwargs)
   dual_averaging_kwargs.setdefault('target_accept_prob', 0.8)
+  dual_averaging_kwargs.setdefault('reduce_fn',
+                                   math_generic.reduce_log_harmonic_mean_exp)
 
   kernel = SNAPERHamiltonianMonteCarlo(
       target_log_prob_fn=flat_target_log_prob_fn,
@@ -1006,7 +1010,8 @@ def default_snaper_trace_fn(state, is_burnin, kernel_results, reducer,
       'max_trajectory_length':
           unnest.get_innermost(kr, 'max_trajectory_length'),
       'variance_scaling':
-          unnest.get_innermost(kr, 'ema_variance'),
+          tf.nest.map_structure(lambda x: 1. / x,
+                                unnest.get_innermost(kr, 'ema_variance')),
       'diverging':
           has_divergence,
       'accept_ratio':
@@ -1080,7 +1085,7 @@ def sample_snaper_hmc(model,
     - tune: Bool `Tensor`. Whether this step is part of the burnin.
     - max_trajectory_length: Float `Tensor`. Maximum HMC trajectory length.
     - variance_scaling: List of float `Tensor`s. The diagonal variance of the
-      unconstrained state, used as the inverse mass matrix.
+      unconstrained state, used as the mass matrix.
     - diverging: Bool `Tensor`. Whether the sampler is divering.
     - accept_ratio: Float `Tensor`. Probability of acceptance of the proposal
       for this step.
