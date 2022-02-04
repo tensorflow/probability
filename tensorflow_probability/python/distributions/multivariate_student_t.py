@@ -103,7 +103,6 @@ class MultivariateStudentTLinearOperator(
   # Compute the pdf of an`R^3` observation; return a scalar.
   mvt.prob([-1., 0, 1])  # shape: []
   ```
-
   """
 
   def __init__(self,
