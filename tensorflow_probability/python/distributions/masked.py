@@ -89,7 +89,7 @@ def _fixed_sample(d):
   return d.sample(seed=samplers.zeros_seed())
 
 
-class Masked(distribution_lib.Distribution):
+class _Masked(distribution_lib.Distribution):
   """A distribution that masks invalid underlying distributions.
 
   Sometimes we may want a way of masking out a subset of distributions. Perhaps
@@ -212,7 +212,7 @@ class Masked(distribution_lib.Distribution):
       self._validity_mask = tensor_util.convert_nonref_to_tensor(
           validity_mask, dtype_hint=tf.bool)
       self._safe_sample_fn = safe_sample_fn
-      super(Masked, self).__init__(
+      super(_Masked, self).__init__(
           dtype=distribution.dtype,
           reparameterization_type=distribution.reparameterization_type,
           validate_args=validate_args,
@@ -298,7 +298,31 @@ class Masked(distribution_lib.Distribution):
     return _MaskedBijector(self, underlying_bijector)
 
 
-@kullback_leibler.RegisterKL(Masked, Masked)
+class Masked(_Masked, distribution_lib.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_Masked`."""
+
+    if cls is Masked:
+      if args:
+        distribution = args[0]
+      else:
+        distribution = kwargs.get('distribution')
+
+      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+        return _Masked(*args, **kwargs)
+    return super(Masked, cls).__new__(cls)
+
+
+Masked.__doc__ = _Masked.__doc__ + '\n' + (
+    'If `distribution` is a `CompositeTensor`, then the resulting `Masked` '
+    'instance is a `CompositeTensor` as well. Otherwise, a '
+    'non-`CompositeTensor` `_Masked` instance is created instead. Distribution '
+    'subclasses that inherit from `Masked` will also inherit from '
+    '`CompositeTensor`.')
+
+
+@kullback_leibler.RegisterKL(_Masked, _Masked)
 def _kl_masked_masked(a, b, name=None):
   """KL divergence between Masked distributions."""
   with tf.name_scope(name or 'kl_masked_masked'):
@@ -328,7 +352,7 @@ def _kl_masked_masked(a, b, name=None):
                                tf.zeros([], dtype), float('nan')))
 
 
-@log_prob_ratio.RegisterLogProbRatio(Masked)
+@log_prob_ratio.RegisterLogProbRatio(_Masked)
 def _masked_log_prob_ratio(p, x, q, y, name=None):
   """Computes log p(x) - log q(y) for Masked p, q."""
   with tf.name_scope(name or 'masked_log_prob_ratio'):
@@ -357,13 +381,13 @@ def _masked_log_prob_ratio(p, x, q, y, name=None):
                                float('nan')))
 
 
-class _MaskedBijector(bijector_lib.Bijector):
+class _NonCompositeTensorMaskedBijector(bijector_lib.Bijector):
   """Event space bijector for Masked distributions."""
 
   def __init__(self, masked, underlying_bijector):
     self._masked = masked
     self._bijector = underlying_bijector
-    super(_MaskedBijector, self).__init__(
+    super(_NonCompositeTensorMaskedBijector, self).__init__(
         validate_args=underlying_bijector.validate_args,
         dtype=underlying_bijector.dtype,
         forward_min_event_ndims=underlying_bijector.forward_min_event_ndims,
@@ -420,3 +444,26 @@ class _MaskedBijector(bijector_lib.Bijector):
     return tf.where(validity_mask,
                     self._bijector.inverse_log_det_jacobian(safe_y),
                     0.)
+
+
+class _MaskedBijector(_NonCompositeTensorMaskedBijector,
+                      bijector_lib.AutoCompositeTensorBijector):
+  """Event space bijector for Masked distributions."""
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a `_NonCompositeTensorMaskedBijector`."""
+
+    if cls is _MaskedBijector:
+      if args:
+        masked = args[0]
+      else:
+        masked = kwargs.get('masked')
+      if len(args) > 1:
+        bijector = args[1]
+      else:
+        bijector = kwargs.get('underlying_bijector')
+
+      if not (isinstance(masked, tf.__internal__.CompositeTensor)
+              and isinstance(bijector, tf.__internal__.CompositeTensor)):
+        return _NonCompositeTensorMaskedBijector(*args, **kwargs)
+    return super(_MaskedBijector, cls).__new__(cls)

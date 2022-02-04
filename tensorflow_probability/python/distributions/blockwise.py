@@ -37,7 +37,7 @@ def _is_iterable(x):
   return True
 
 
-class _Cast(distribution_lib.Distribution):
+class _NonCompositeTensorCast(distribution_lib.Distribution):
   """Utility distribution to cast inputs/outputs of another distribution."""
 
   def __init__(self, distribution, dtype):
@@ -46,7 +46,7 @@ class _Cast(distribution_lib.Distribution):
     with tf.name_scope(name) as name:
       self._distribution = distribution
       self._dtype = dtype
-      super(_Cast, self).__init__(
+      super(_NonCompositeTensorCast, self).__init__(
           dtype=dtype,
           validate_args=distribution.validate_args,
           allow_nan_stats=distribution.allow_nan_stats,
@@ -82,12 +82,30 @@ class _Cast(distribution_lib.Distribution):
                                  self._distribution.mean())
 
 
-@kullback_leibler.RegisterKL(_Cast, _Cast)
+class _Cast(_NonCompositeTensorCast,
+            distribution_lib.AutoCompositeTensorDistribution):
+  """Utility distribution to cast inputs/outputs of another distribution."""
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a `_NonCompositeTensorCast`."""
+
+    if cls is _Cast:
+      if args:
+        distribution = args[0]
+      else:
+        distribution = kwargs.get('distribution')
+
+      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+        return _NonCompositeTensorCast(*args, **kwargs)
+    return super(_Cast, cls).__new__(cls)
+
+
+@kullback_leibler.RegisterKL(_NonCompositeTensorCast, _NonCompositeTensorCast)
 def _kl_blockwise_cast(d0, d1, name=None):
   return d0._distribution.kl_divergence(d1._distribution, name=name)  # pylint: disable=protected-access
 
 
-class Blockwise(distribution_lib.Distribution):
+class _Blockwise(distribution_lib.Distribution):
   """Blockwise distribution.
 
   This distribution converts a distribution or list of distributions into a
@@ -160,7 +178,8 @@ class Blockwise(distribution_lib.Distribution):
 
     Args:
       distributions: Python `list` of `tfp.distributions.Distribution`
-        instances. All distribution instances must have the same `batch_shape`
+        instances or a single `tfp.distributions.JointDistribution` instance.
+        If `list`, all distribution instances must have the same `batch_shape`
         and all must have `event_ndims==1`, i.e., be vector-variate
         distributions.
       dtype_override: samples of `distributions` will be cast to this `dtype`.
@@ -216,7 +235,7 @@ class Blockwise(distribution_lib.Distribution):
           reparameterization_type.pop() if len(reparameterization_type) == 1
           else reparameterization.NOT_REPARAMETERIZED)
 
-      super(Blockwise, self).__init__(
+      super(_Blockwise, self).__init__(
           dtype=dtype,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
@@ -400,7 +419,32 @@ class Blockwise(distribution_lib.Distribution):
     return assertions
 
 
-@kullback_leibler.RegisterKL(Blockwise, Blockwise)
+class Blockwise(_Blockwise, distribution_lib.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_Blockwise`."""
+
+    if cls is Blockwise:
+      if args:
+        distributions = args[0]
+      else:
+        distributions = kwargs.get('distributions')
+
+      if not all(isinstance(d, tf.__internal__.CompositeTensor)
+                 for d in tf.nest.flatten(distributions)):
+        return _Blockwise(*args, **kwargs)
+    return super(Blockwise, cls).__new__(cls)
+
+
+Blockwise.__doc__ = _Blockwise.__doc__ + '\n' + (
+    'If all members of `distributions` are `CompositeTensor`s, then the '
+    'resulting `Blockwise` instance is a `CompositeTensor` as well. Otherwise, '
+    'a non-`CompositeTensor` `_Blockwise` instance is created instead. '
+    'Distribution subclasses that inherit from `Blockwise` will also inherit '
+    'from `CompositeTensor`.')
+
+
+@kullback_leibler.RegisterKL(_Blockwise, _Blockwise)
 def _kl_blockwise_blockwise(b0, b1, name=None):
   """Calculate the batched KL divergence KL(b0 || b1) with b0 and b1 Blockwise distributions.
 
