@@ -685,6 +685,7 @@ multi_substrate_py_library(
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal/backend/numpy",
         "//tensorflow_probability/python/util:seed_stream",
     ],

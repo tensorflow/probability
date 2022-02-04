@@ -29,6 +29,7 @@ import numpy as np
 import six
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -53,6 +54,8 @@ __all__ = [
     'test_seed_stream',
     'floats_near',
     'DiscreteScalarDistributionTestHelpers',
+    'NonCompositeTensorExp',
+    'NonCompositeTensorScale',
     'TestCase',
     'VectorDistributionTestHelpers',
 ]
@@ -1325,3 +1328,41 @@ def main(jax_mode=JAX_MODE):
     from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
     test_util.InstallStackTraceHandler()
     absltest.main(testLoader=_TestLoader())
+
+
+# TODO(b/182603117): Add other bijector methods for use in future tests.
+class NonCompositeTensorScale(bijector.Bijector):
+  """`Scale` bijector that is not a `CompositeTensor`."""
+
+  def __init__(self, scale):
+    parameters = dict(locals())
+    self.scale = scale
+    super(NonCompositeTensorScale, self).__init__(
+        validate_args=True,
+        forward_min_event_ndims=0.,
+        parameters=parameters,
+        name='non_composite_scale')
+
+  def _forward(self, x):
+    return x * self.scale
+
+  def _inverse(self, y):
+    return y / self.scale
+
+
+class NonCompositeTensorExp(bijector.Bijector):
+  """`Exp` bijector that is not a `CompositeTensor`."""
+
+  def __init__(self):
+    parameters = dict(locals())
+    super(NonCompositeTensorExp, self).__init__(
+        validate_args=True,
+        forward_min_event_ndims=0.,
+        parameters=parameters,
+        name='non_composite_exp')
+
+  def _forward(self, x):
+    return tf.math.exp(x)
+
+  def _inverse(self, y):
+    return tf.math.log(y)

@@ -24,22 +24,6 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
 
-class NonCompositeScale(tfb.Bijector):
-  """Bijector that is not a `CompositeTensor`."""
-
-  def __init__(self, scale):
-    parameters = dict(locals())
-    self.scale = scale
-    super(NonCompositeScale, self).__init__(
-        validate_args=True,
-        forward_min_event_ndims=0.,
-        parameters=parameters,
-        name='non_composite_scale')
-
-  def _inverse(self, y):
-    return y / self.scale
-
-
 @test_util.test_all_tf_execution_regimes
 class InvertBijectorTest(test_util.TestCase):
   """Tests the correctness of the Y = Invert(bij) transformation."""
@@ -128,7 +112,7 @@ class InvertBijectorTest(test_util.TestCase):
 
   def testNonCompositeTensorBijectorTfFunction(self):
     scale = tf.Variable(5.)
-    b = NonCompositeScale(scale)
+    b = test_util.NonCompositeTensorScale(scale)
     inv_b = tfb.Invert(b)
     x = tf.constant([3.])
 
@@ -148,7 +132,7 @@ class InvertBijectorTest(test_util.TestCase):
       def __init__(self, bijector):
         self.bijector = bijector
 
-    b = NonCompositeScale(tf.Variable(3.))
+    b = test_util.NonCompositeTensorScale(tf.Variable(3.))
     inv_b = tfb.Invert(b)
     bc = BijectorContainer(inv_b)
 

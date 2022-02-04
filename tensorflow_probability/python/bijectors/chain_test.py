@@ -437,27 +437,8 @@ class ChainBijectorTest(test_util.TestCase):
     self.assertEqual(chain._type_spec, dec)
 
   def testNonCompositeTensor(self):
-
-    class NonCompositeScale(tfb.Bijector):
-      """Bijector that is not a `CompositeTensor`."""
-
-      def __init__(self, scale):
-        parameters = dict(locals())
-        self.scale = scale
-        super(NonCompositeScale, self).__init__(
-            validate_args=True,
-            forward_min_event_ndims=0.,
-            parameters=parameters,
-            name="non_composite_scale")
-
-      def _forward(self, x):
-        return x * self.scale
-
-      def _inverse(self, y):
-        return y / self.scale
-
     exp = tfb.Exp()
-    scale = NonCompositeScale(scale=tf.constant(3.))
+    scale = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
     chain = tfb.Chain(bijectors=[exp, scale])
     self.assertNotIsInstance(chain, tf.__internal__.CompositeTensor)
     self.assertAllClose(chain.forward([1.]), exp.forward(scale.forward([1.])))
