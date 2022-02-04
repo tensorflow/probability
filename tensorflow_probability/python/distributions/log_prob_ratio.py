@@ -18,6 +18,8 @@ import inspect
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import distribution
+
 
 __all__ = [
     'log_prob_ratio',
@@ -26,6 +28,11 @@ __all__ = [
 
 
 _log_prob_ratio_registry = {}
+
+
+def _is_composite_tensor_equivalent(p, q):
+  return ((p.__bases__ == (q, distribution.AutoCompositeTensorDistribution))
+          or (q.__bases__ == (p, distribution.AutoCompositeTensorDistribution)))
 
 
 def log_prob_ratio(p, x, q, y, name=None, **kwargs):
@@ -44,7 +51,7 @@ def log_prob_ratio(p, x, q, y, name=None, **kwargs):
       this will be computed with better than naive numerical precision, e.g. by
       moving the difference inside of a sum reduction.
   """
-  assert type(p) == type(q)  # pylint: disable=unidiomatic-typecheck
+  assert type(p) == type(q) or _is_composite_tensor_equivalent(type(p), type(q))  # pylint: disable=unidiomatic-typecheck
   for cls in inspect.getmro(type(p)):
     if cls in _log_prob_ratio_registry:
       return _log_prob_ratio_registry[cls](p, x, q, y, name=name, **kwargs)
