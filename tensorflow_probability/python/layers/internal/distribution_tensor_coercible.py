@@ -38,6 +38,8 @@ class _DistributionAndTensorCoercibleMeta(type(tfd.Distribution),
   pass
 
 
+# TODO(b/182603117): Convert _TensorCoercible to AutoCompositeTensor, or decide
+# not to.
 @six.add_metaclass(_DistributionAndTensorCoercibleMeta)
 class _TensorCoercible(tfd.Distribution):
   """Docstring."""

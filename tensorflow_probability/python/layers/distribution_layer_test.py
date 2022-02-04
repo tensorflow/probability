@@ -24,6 +24,7 @@ import tensorflow_probability as tfp
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import layers as tfpl
+from tensorflow_probability.python.distributions import mixture_same_family
 from tensorflow_probability.python.internal import test_util
 
 tfk = tf.keras
@@ -695,7 +696,8 @@ class OneHotCategoricalTest(test_util.TestCase):
 class CategoricalMixtureOfOneHotCategoricalTest(test_util.TestCase):
 
   def _check_distribution(self, t, x):
-    self.assertIsInstance(_unwrap_tensor_coercible(x), tfd.MixtureSameFamily)
+    self.assertIsInstance(_unwrap_tensor_coercible(x),
+                          mixture_same_family._MixtureSameFamily)  # pylint:disable=protected-access
     self.assertIsInstance(_unwrap_tensor_coercible(x.mixture_distribution),
                           tfd.Categorical)
     self.assertIsInstance(_unwrap_tensor_coercible(x.components_distribution),
@@ -773,7 +775,8 @@ class CategoricalMixtureOfOneHotCategoricalTest(test_util.TestCase):
               shuffle=True)
 
     yhat = model(x)
-    self.assertIsInstance(_unwrap_tensor_coercible(yhat), tfd.MixtureSameFamily)
+    self.assertIsInstance(_unwrap_tensor_coercible(yhat),
+                          mixture_same_family._MixtureSameFamily)
     self.assertIsInstance(
         _unwrap_tensor_coercible(yhat.mixture_distribution), tfd.Categorical)
     self.assertIsInstance(
@@ -1172,7 +1175,8 @@ class _MixtureLayerTest(object):
         ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
-    self.assertIsInstance(_unwrap_tensor_coercible(x), tfd.MixtureSameFamily)
+    self.assertIsInstance(_unwrap_tensor_coercible(x),
+                          mixture_same_family._MixtureSameFamily)  # pylint: disable=protected-access
     self.assertIsInstance(
         _unwrap_tensor_coercible(x.mixture_distribution), tfd.Categorical)
     self.assertIsInstance(
@@ -1425,7 +1429,8 @@ class _MixtureSameFamilyTest(object):
         ndarray, shape=ndarray.shape if self.use_static_shape else None)
 
   def _check_distribution(self, t, x, batch_shape):
-    self.assertIsInstance(_unwrap_tensor_coercible(x), tfd.MixtureSameFamily)
+    self.assertIsInstance(_unwrap_tensor_coercible(x),
+                          mixture_same_family._MixtureSameFamily)  # pylint:disable=protected-access
     self.assertIsInstance(
         _unwrap_tensor_coercible(x.mixture_distribution), tfd.Categorical)
     self.assertIsInstance(

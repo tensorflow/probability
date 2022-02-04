@@ -40,7 +40,7 @@ warnings.filterwarnings('always',
                         append=True)  # Don't override user-set filters.
 
 
-class MixtureSameFamily(distribution.Distribution):
+class _MixtureSameFamily(distribution.Distribution):
   """Mixture (same-family) distribution.
 
   The `MixtureSameFamily` distribution implements a (batch of) mixture
@@ -180,7 +180,7 @@ class MixtureSameFamily(distribution.Distribution):
       else:
         reparameterization_type = reparameterization.NOT_REPARAMETERIZED
 
-      super(MixtureSameFamily, self).__init__(
+      super(_MixtureSameFamily, self).__init__(
           dtype=self._components_distribution.dtype,
           reparameterization_type=reparameterization_type,
           validate_args=validate_args,
@@ -644,6 +644,41 @@ class MixtureSameFamily(distribution.Distribution):
       ]
 
     return assertions
+
+
+# TODO(b/182603117): Add a `ct_util.args_are_all_composite_tensor` method, or a
+# similar class decorator that takes a mapping between arg positions and kwarg
+# names and builds the CT or non-CT version of the distribution.
+class MixtureSameFamily(
+    _MixtureSameFamily, distribution.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_MixtureSameFamily`."""
+
+    if cls is MixtureSameFamily:
+      if args:
+        mixture_distribution = args[0]
+      else:
+        mixture_distribution = kwargs.get('mixture_distribution')
+      if len(args) > 1:
+        components_distribution = args[1]
+      else:
+        components_distribution = kwargs.get('components_distribution')
+
+      if not (isinstance(mixture_distribution, tf.__internal__.CompositeTensor)
+              and isinstance(
+                  components_distribution, tf.__internal__.CompositeTensor)):
+        return _MixtureSameFamily(*args, **kwargs)
+    return super(MixtureSameFamily, cls).__new__(cls)
+
+
+MixtureSameFamily.__doc__ = _MixtureSameFamily.__doc__ + '\n' + (
+    'If `mixture_distribution` and `components_distribution` are both '
+    '`CompositeTensor`s, then the resulting `MixtureSameFamily` instance is a '
+    '`CompositeTensor` as well. Otherwise, a non-`CompositeTensor` '
+    '`_MixtureSameFamily` instance is created instead. Distribution subclasses '
+    'that inherit from `MixtureSameFamily` will also inherit from '
+    '`CompositeTensor`.')
 
 
 def _outer_squared_difference(x, y):
