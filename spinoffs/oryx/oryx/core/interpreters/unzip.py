@@ -504,7 +504,7 @@ def unzip_to_init_apply_subjaxprs(master, settings, keys, pvals):
       success = True
     finally:
       # Restore the old recipes if it fails
-      for t, old_recipe in safe_zip(variable_tracers, old_recipes):
+      for t, old_recipe in safe_zip(variable_tracers, old_recipes):  # pytype: disable=name-error  # py39-upgrade
         t.recipe = old_recipe
   else:
     success = False
