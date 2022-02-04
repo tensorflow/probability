@@ -44,7 +44,7 @@ def _make_bcast_fn(fn_name, n_event_shapes):
   return fn
 
 
-class BatchBroadcast(distribution_lib.Distribution):
+class _BatchBroadcast(distribution_lib.Distribution):
   """A distribution that broadcasts an underlying distribution's batch shape.
 
   This meta-distribution can be useful when we desire to implicitly broadcast
@@ -162,7 +162,7 @@ class BatchBroadcast(distribution_lib.Distribution):
         to_shape, dtype_hint=tf.int32, as_shape_tensor=True,
         name='to_shape')
     with tf.name_scope(name or f'BatchBroadcast{distribution.name}') as name:
-      super(BatchBroadcast, self).__init__(
+      super(_BatchBroadcast, self).__init__(
           dtype=distribution.dtype,
           reparameterization_type=distribution.reparameterization_type,
           validate_args=validate_args,
@@ -373,14 +373,39 @@ class BatchBroadcast(distribution_lib.Distribution):
     return self.distribution._sample_control_dependencies(value, **kwargs)  # pylint: disable=protected-access
 
 
-class _BroadcastingBijector(bijector_lib.Bijector):
+class BatchBroadcast(
+    _BatchBroadcast, distribution_lib.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_BatchBroadcast`."""
+
+    if cls is BatchBroadcast:
+      if args:
+        distribution = args[0]
+      else:
+        distribution = kwargs.get('distribution')
+
+      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+        return _BatchBroadcast(*args, **kwargs)
+    return super(BatchBroadcast, cls).__new__(cls)
+
+
+BatchBroadcast.__doc__ = _BatchBroadcast.__doc__ + '\n' + (
+    'If `distribution` is a `CompositeTensor`, then the resulting '
+    '`BatchBroadcast` instance is a `CompositeTensor` as well. Otherwise, a '
+    'non-`CompositeTensor` `_BatchBroadcast` instance is created instead. '
+    'Distribution subclasses that inherit from `BatchBroadcast` will also '
+    'inherit from `CompositeTensor`.')
+
+
+class _NonCompositeTensorBroadcastingBijector(bijector_lib.Bijector):
   """Event space bijector for BatchBroadcast."""
 
   def __init__(self, bcast_dist, bijector):
     parameters = dict(locals())
     self.bcast_dist = bcast_dist
     self.bijector = bijector
-    super(_BroadcastingBijector, self).__init__(
+    super(_NonCompositeTensorBroadcastingBijector, self).__init__(
         validate_args=bcast_dist.validate_args,
         dtype=bijector.dtype,
         forward_min_event_ndims=bijector.forward_min_event_ndims,
@@ -429,3 +454,26 @@ class _BroadcastingBijector(bijector_lib.Bijector):
 
   def _inverse_log_det_jacobian(self, y):
     return self.bijector.inverse_log_det_jacobian(self._bcast_y(y))
+
+
+class _BroadcastingBijector(_NonCompositeTensorBroadcastingBijector,
+                            bijector_lib.AutoCompositeTensorBijector):
+  """Event space bijector for BatchBroadcast."""
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a `_NonCompositeTensorBatchBroadcast`."""
+
+    if cls is _BroadcastingBijector:
+      if args:
+        bcast_dist = args[0]
+      else:
+        bcast_dist = kwargs.get('bcast_dist')
+      if len(args) > 1:
+        bijector = args[1]
+      else:
+        bijector = kwargs.get('bijector')
+
+      if not (isinstance(bcast_dist, tf.__internal__.CompositeTensor)
+              and isinstance(bijector, tf.__internal__.CompositeTensor)):
+        return _NonCompositeTensorBroadcastingBijector(*args, **kwargs)
+    return super(_BroadcastingBijector, cls).__new__(cls)

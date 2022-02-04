@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-class BatchReshape(distribution_lib.Distribution):
+class _BatchReshape(distribution_lib.Distribution):
   """The Batch-Reshaping distribution.
 
   This "meta-distribution" reshapes the batch dimensions of another
@@ -112,7 +112,7 @@ class BatchReshape(distribution_lib.Distribution):
       self._distribution = distribution
       self._batch_shape_static = tensorshape_util.constant_value_as_shape(
           self._batch_shape_unexpanded)
-      super(BatchReshape, self).__init__(
+      super(_BatchReshape, self).__init__(
           dtype=distribution.dtype,
           reparameterization_type=distribution.reparameterization_type,
           validate_args=validate_args,
@@ -474,6 +474,31 @@ class BatchReshape(distribution_lib.Distribution):
     return assertions
 
 
+class BatchReshape(
+    _BatchReshape, distribution_lib.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_BatchReshape`."""
+
+    if cls is BatchReshape:
+      if args:
+        distribution = args[0]
+      else:
+        distribution = kwargs.get('distribution')
+
+      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+        return _BatchReshape(*args, **kwargs)
+    return super(BatchReshape, cls).__new__(cls)
+
+
+BatchReshape.__doc__ = _BatchReshape.__doc__ + '\n' + (
+    'If `distribution` is a `CompositeTensor`, then the resulting '
+    '`BatchReshape` instance is a `CompositeTensor` as well. Otherwise, a '
+    'non-`CompositeTensor` `_BatchReshape` instance is created instead. '
+    'Distribution subclasses that inherit from `BatchReshape` will also '
+    'inherit from `CompositeTensor`.')
+
+
 def validate_init_args_statically(distribution, batch_shape):
   """Helper to __init__ which makes or raises assertions."""
   if tensorshape_util.rank(batch_shape.shape) is not None:
@@ -500,7 +525,7 @@ def validate_init_args_statically(distribution, batch_shape):
       raise ValueError('`batch_shape` elements must be >=-1.')
 
 
-class _BatchReshapeBijector(bijector_lib.Bijector):
+class _NonCompositeTensorBatchReshapeBijector(bijector_lib.Bijector):
   """The `default_event_space_bijector` for `tfd.BatchReshape`."""
 
   def __init__(
@@ -528,7 +553,7 @@ class _BatchReshapeBijector(bijector_lib.Bijector):
         if static_inverse_event_shape is not None else
         base_bijector.forward_event_shape_tensor(inverse_event_shape_tensor))
 
-    super(_BatchReshapeBijector, self).__init__(
+    super(_NonCompositeTensorBatchReshapeBijector, self).__init__(
         is_constant_jacobian=base_bijector.is_constant_jacobian,
         validate_args=base_bijector.validate_args,
         dtype=base_bijector.dtype,
@@ -585,3 +610,21 @@ class _BatchReshapeBijector(bijector_lib.Bijector):
 
   def _inverse_event_shape(self, output_shape):
     return self._base_bijector.inverse_event_shape(output_shape)
+
+
+class _BatchReshapeBijector(_NonCompositeTensorBatchReshapeBijector,
+                            bijector_lib.AutoCompositeTensorBijector):
+  """The `default_event_space_bijector` for `tfd.BatchReshape`."""
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a `_NonCompositeTensorBatchReshapeBijector`."""
+
+    if cls is _BatchReshapeBijector:
+      if args:
+        base_bijector = args[0]
+      else:
+        base_bijector = kwargs.get('base_bijector')
+
+      if not isinstance(base_bijector, tf.__internal__.CompositeTensor):
+        return _NonCompositeTensorBatchReshapeBijector(*args, **kwargs)
+    return super(_BatchReshapeBijector, cls).__new__(cls)

@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 
-class BatchConcat(distribution_lib.Distribution):
+class _BatchConcat(distribution_lib.Distribution):
   r"""The Batch-Concatenating distribution.
 
   This distribution concatenates a list of distributions
@@ -162,7 +162,7 @@ class BatchConcat(distribution_lib.Distribution):
                                  if reparameterizable
                                  else reparameterization.NOT_REPARAMETERIZED)
 
-      super(BatchConcat, self).__init__(
+      super(_BatchConcat, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization_type,
           validate_args=validate_args,
@@ -483,3 +483,29 @@ class BatchConcat(distribution_lib.Distribution):
 
   def _covariance(self, **kwargs):
     return self._call_concat('covariance')
+
+
+class BatchConcat(
+    _BatchConcat, distribution_lib.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_BatchConcat`."""
+
+    if cls is BatchConcat:
+      if args:
+        distributions = args[0]
+      else:
+        distributions = kwargs.get('distributions')
+
+      if not all(isinstance(d, tf.__internal__.CompositeTensor)
+                 for d in distributions):
+        return _BatchConcat(*args, **kwargs)
+    return super(BatchConcat, cls).__new__(cls)
+
+
+BatchConcat.__doc__ = _BatchConcat.__doc__ + '\n' + (
+    'If all elements of `distributions` are `CompositeTensor`s, then the '
+    'resulting `BatchConcat` instance is a `CompositeTensor` as well. '
+    'Otherwise, a non-`CompositeTensor` `_BatchConcat` instance is created '
+    'instead. Distribution subclasses that inherit from `BatchConcat` will '
+    'also inherit from `CompositeTensor`.')
