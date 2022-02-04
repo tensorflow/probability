@@ -351,9 +351,10 @@ def forecast(model,
             parameter_samples[param.name],
             0, -(1 + _prefer_static_event_ndims(param.prior)))
         for param in model.parameters}
-    forecast_prior = tfd.MultivariateNormalFullCovariance(
+    forecast_prior = tfd.MultivariateNormalTriL(
         loc=dist_util.move_dimension(predictive_mean, 0, -2),
-        covariance_matrix=dist_util.move_dimension(predictive_cov, 0, -3))
+        scale_tril=tf.linalg.cholesky(
+            dist_util.move_dimension(predictive_cov, 0, -3)))
 
     # Ugly hack: because we moved `num_posterior_draws` to the trailing (rather
     # than leading) dimension of parameters, the parameter batch shapes no
