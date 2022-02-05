@@ -320,6 +320,21 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
             bijector=[tfb.Softplus(), tfb.Softplus()]))
     self._test_fitting(model, surrogate_posterior)
 
+  def test_can_jit_creation_of_stateless_surrogate_posterior(self):
+    seed = test_util.test_seed(sampler_type='stateless')
+    if not JAX_MODE:
+      self.skipTest('Test is specific to JAX.')
+    import jax  # pylint: disable=g-import-not-at-top
+
+    @jax.jit
+    def init(seed):
+      model = tfd.Normal(0., 1.)
+      init_fn, _ = (
+          tfp.experimental.vi.build_factored_surrogate_posterior_stateless(
+              event_shape=model.event_shape))
+      return init_fn(seed)
+    init(seed)
+
   def test_multipart_bijector(self):
     dist = tfd.JointDistributionNamed({
         'a': tfd.Exponential(1.),

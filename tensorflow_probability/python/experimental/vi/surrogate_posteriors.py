@@ -184,7 +184,8 @@ def _factored_surrogate_posterior(  # pylint: disable=dangerous-default-value
     # Convert event shapes to Tensors.
     shallow_structure = _get_event_shape_shallow_structure(event_shape)
     event_shape = nest.map_structure_up_to(
-        shallow_structure, lambda s: tf.convert_to_tensor(s, dtype=tf.int32),
+        shallow_structure,
+        lambda s: ps.convert_to_shape_tensor(s, dtype=tf.int32),
         event_shape)
 
     if nest.is_nested(bijector):

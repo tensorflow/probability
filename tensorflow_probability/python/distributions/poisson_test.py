@@ -463,7 +463,7 @@ class PoissonSamplingTest(test_util.TestCase):
       # Also test the low-level sampler and verify the XLA-friendly variant.
       _, runtime = self.evaluate(
           tf.function(poisson_lib.random_poisson, jit_compile=True)(
-              shape=tf.constant([], dtype=tf.int32),
+              shape=[],
               rates=tf.constant(10.),
               seed=test_util.test_seed()))
       self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)

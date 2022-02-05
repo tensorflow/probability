@@ -482,7 +482,7 @@ class BinomialSamplingTest(test_util.TestCase):
     # Also test the low-level sampler and verify the XLA-friendly variant.
     _, runtime = self.evaluate(
         tf.function(binomial_lib._random_binomial, jit_compile=True)(
-            shape=tf.constant([], dtype=tf.int32),
+            shape=[],
             counts=tf.constant(10.), probs=tf.constant(.5),
             seed=test_util.test_seed()))
     self.assertEqual(implementation_selection._RUNTIME_DEFAULT, runtime)
