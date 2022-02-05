@@ -32,7 +32,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
-class Independent(distribution_lib.Distribution):
+class _Independent(distribution_lib.Distribution):
   """Independent distribution from batch of distributions.
 
   This distribution is useful for regarding a collection of independent,
@@ -159,7 +159,7 @@ class Independent(distribution_lib.Distribution):
         self._static_reinterpreted_batch_ndims = (
             None if static_val is None else int(static_val))
 
-      super(Independent, self).__init__(
+      super(_Independent, self).__init__(
           dtype=self._distribution.dtype,
           reparameterization_type=self._distribution.reparameterization_type,
           validate_args=validate_args,
@@ -198,8 +198,8 @@ class Independent(distribution_lib.Distribution):
   def __getitem__(self, slices):
     # Because slicing is parameterization-dependent, we only implement slicing
     # for instances of Independent, not subclasses thereof.
-    if type(self) is not Independent:  # pylint: disable=unidiomatic-typecheck
-      return super(Independent, self).__getitem__(slices)
+    if type(self) not in (_Independent, Independent):  # pylint: disable=unidiomatic-typecheck
+      return super(_Independent, self).__getitem__(slices)
 
     if self._static_reinterpreted_batch_ndims is None:
       raise NotImplementedError(
@@ -353,7 +353,32 @@ class Independent(distribution_lib.Distribution):
     return op(stat, axis=-axis)
 
 
-@kullback_leibler.RegisterKL(Independent, Independent)
+class Independent(
+    _Independent, distribution_lib.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_Independent`."""
+
+    if cls is Independent:
+      if args:
+        distribution = args[0]
+      else:
+        distribution = kwargs.get('distribution')
+
+      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+        return _Independent(*args, **kwargs)
+    return super(Independent, cls).__new__(cls)
+
+
+Independent.__doc__ = _Independent.__doc__ + '\n' + (
+    'If `distribution` is a `CompositeTensor`, then the resulting '
+    '`Independent` instance is a `CompositeTensor` as well. Otherwise, a '
+    'non-`CompositeTensor` `_Independent` instance is created instead. '
+    'Distribution subclasses that inherit from `Independent` will also inherit '
+    'from `CompositeTensor`.')
+
+
+@kullback_leibler.RegisterKL(_Independent, _Independent)
 def _kl_independent(a, b, name='kl_independent'):
   """Batched KL divergence `KL(a || b)` for Independent distributions.
 
@@ -423,7 +448,7 @@ def _kl_independent(a, b, name='kl_independent'):
           kullback_leibler.kl_divergence(p, q, name=name), axis=reduce_dims)
 
 
-@log_prob_ratio.RegisterLogProbRatio(Independent)
+@log_prob_ratio.RegisterLogProbRatio(_Independent)
 def _independent_log_prob_ratio(p, x, q, y, name=None):
   """Sum-of-diffs log(p(x)/q(y)) for `Independent`s."""
   with tf.name_scope(name or 'independent_log_prob_ratio'):

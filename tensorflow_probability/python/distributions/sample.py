@@ -55,7 +55,7 @@ def _make_summary_statistic(attr):
   return _fn
 
 
-class Sample(distribution_lib.Distribution):
+class _Sample(distribution_lib.Distribution):
   """Distribution over IID samples of a given shape.
 
   Given random variable `X`, one may make a new random variable by concatenating
@@ -156,7 +156,7 @@ class Sample(distribution_lib.Distribution):
       self._sample_shape = tensor_util.convert_nonref_to_tensor(
           sample_shape, dtype_hint=tf.int32, name='sample_shape',
           as_shape_tensor=True)
-      super(Sample, self).__init__(
+      super(_Sample, self).__init__(
           dtype=self._distribution.dtype,
           reparameterization_type=self._distribution.reparameterization_type,
           validate_args=validate_args,
@@ -355,7 +355,31 @@ class Sample(distribution_lib.Distribution):
     return assertions
 
 
-class _DefaultSampleBijector(bijector_lib.Bijector):
+class Sample(_Sample, distribution_lib.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_Sample`."""
+
+    if cls is Sample:
+      if args:
+        distribution = args[0]
+      else:
+        distribution = kwargs.get('distribution')
+
+      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+        return _Sample(*args, **kwargs)
+    return super(Sample, cls).__new__(cls)
+
+
+Sample.__doc__ = _Sample.__doc__ + '\n' + (
+    'If `distribution` is a `CompositeTensor`, then the resulting `Sample` '
+    'instance is a `CompositeTensor` as well. Otherwise, a '
+    'non-`CompositeTensor` `_Sample` instance is created instead. Distribution '
+    'subclasses that inherit from `Sample` will also inherit from '
+    '`CompositeTensor`.')
+
+
+class _NonCompositeTensorDefaultSampleBijector(bijector_lib.Bijector):
   """Since tfd.Sample uses transposes, it requires a custom event bijector."""
 
   def __init__(self, distribution, sample_shape, sum_fn, bijector=None):
@@ -367,7 +391,7 @@ class _DefaultSampleBijector(bijector_lib.Bijector):
     self.sample_shape = sample_shape
     self._sum_fn = sum_fn
     sample_ndims = ps.rank_from_shape(self.sample_shape)
-    super(_DefaultSampleBijector, self).__init__(
+    super(_NonCompositeTensorDefaultSampleBijector, self).__init__(
         forward_min_event_ndims=(
             self.bijector.forward_min_event_ndims + sample_ndims),
         inverse_min_event_ndims=(
@@ -516,7 +540,30 @@ class _DefaultSampleBijector(bijector_lib.Bijector):
     return self._bcast_and_reduce_logdet(underlying_ldj)
 
 
-@kullback_leibler.RegisterKL(Sample, Sample)
+class _DefaultSampleBijector(_NonCompositeTensorDefaultSampleBijector,
+                             bijector_lib.AutoCompositeTensorBijector):
+  """Since tfd.Sample uses transposes, it requires a custom event bijector."""
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a `_NonCompositeTensorDefaultSampleBijector`."""
+
+    if cls is _DefaultSampleBijector:
+      if args:
+        distribution = args[0]
+      else:
+        distribution = kwargs.get('distribution')
+      if len(args) > 3:
+        bijector = args[3]
+      else:
+        bijector = kwargs.get('bijector')
+
+      if not (isinstance(distribution, tf.__internal__.CompositeTensor)
+              and isinstance(bijector, tf.__internal__.CompositeTensor)):
+        return _NonCompositeTensorDefaultSampleBijector(*args, **kwargs)
+    return super(_DefaultSampleBijector, cls).__new__(cls)
+
+
+@kullback_leibler.RegisterKL(_Sample, _Sample)
 def _kl_sample(a, b, name='kl_sample'):
   """Batched KL divergence `KL(a || b)` for Sample distributions.
 
@@ -557,7 +604,7 @@ def _kl_sample(a, b, name='kl_sample'):
     return tf.cast(x=n, dtype=kl.dtype) * kl
 
 
-@log_prob_ratio.RegisterLogProbRatio(Sample)
+@log_prob_ratio.RegisterLogProbRatio(_Sample)
 def _sample_log_prob_ratio(p, x, q, y, name=None):
   """Implements `log_prob_ratio` for tfd.Sample."""
   with tf.name_scope(name or 'sample_log_prob_ratio'):
