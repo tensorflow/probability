@@ -1366,3 +1366,7 @@ class NonCompositeTensorExp(bijector.Bijector):
 
   def _inverse(self, y):
     return tf.math.log(y)
+
+  @classmethod
+  def _parameter_properties(cls, dtype):
+    return dict()

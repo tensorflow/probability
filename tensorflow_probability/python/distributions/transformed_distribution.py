@@ -36,7 +36,7 @@ def _default_kwargs_split_fn(kwargs):
           kwargs.get('bijector_kwargs', {}))
 
 
-class TransformedDistribution(distribution_lib.Distribution):
+class _TransformedDistribution(distribution_lib.Distribution):
   """A Transformed Distribution.
 
   A `TransformedDistribution` models `p(y)` given a base distribution `p(x)`,
@@ -238,7 +238,7 @@ class TransformedDistribution(distribution_lib.Distribution):
       dtype = self.bijector.forward_dtype(self.distribution.dtype)
       self._is_joint = tf.nest.is_nested(dtype)
 
-      super(TransformedDistribution, self).__init__(
+      super(_TransformedDistribution, self).__init__(
           dtype=dtype,
           reparameterization_type=self._distribution.reparameterization_type,
           validate_args=validate_args,
@@ -597,7 +597,38 @@ class TransformedDistribution(distribution_lib.Distribution):
   # pylint: enable=not-callable
 
 
-@kullback_leibler.RegisterKL(TransformedDistribution, TransformedDistribution)
+class TransformedDistribution(
+    _TransformedDistribution, distribution_lib.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_TransformedDistribution`."""
+
+    if cls is TransformedDistribution:
+      if args:
+        distribution = args[0]
+      else:
+        distribution = kwargs.get('distribution')
+      if len(args) > 1:
+        bijector = args[1]
+      else:
+        bijector = kwargs.get('bijector')
+
+      if not (isinstance(distribution, tf.__internal__.CompositeTensor)
+              and isinstance(bijector, tf.__internal__.CompositeTensor)):
+        return _TransformedDistribution(*args, **kwargs)
+    return super(TransformedDistribution, cls).__new__(cls)
+
+
+TransformedDistribution.__doc__ = _TransformedDistribution.__doc__ + '\n' + (
+    'If both `distribution` and `bijector` are `CompositeTensor`s, then the '
+    'resulting `TransformedDistribution` instance is a `CompositeTensor` as '
+    'well. Otherwise, a non-`CompositeTensor` `_TransformedDistribution` '
+    'instance is created instead. Distribution subclasses that inherit from '
+    '`TransformedDistribution` will also inherit from `CompositeTensor`.')
+
+
+@kullback_leibler.RegisterKL(
+    _TransformedDistribution, _TransformedDistribution)
 def _kl_transformed_transformed(a, b, name=None):
   """Calculate the batched KL divergence KL(a || b) with a and b Transformed.
 

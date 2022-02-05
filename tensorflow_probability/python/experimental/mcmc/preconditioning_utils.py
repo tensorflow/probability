@@ -152,7 +152,7 @@ def update_momentum_distribution(momentum_distribution,
     if isinstance(td, sharded.Sharded):
       is_sharded, shard_axes = True, td.experimental_shard_axis_names
       td = td.distribution
-    if not isinstance(td, transformed_distribution.TransformedDistribution):
+    if not isinstance(td, transformed_distribution._TransformedDistribution):  # pylint:disable=protected-access
       raise ValueError(f'Inner dist is not a TransformedDistribution: {td}')
     mvnpfl = td.distribution
     if not isinstance(

@@ -26,6 +26,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import test_util
 
 tfb = tfp.bijectors
@@ -439,13 +440,16 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
   def test_sample_distributions_not_composite_tensor_raises_error(self):
     def coroutine_model():
       yield tfd.TransformedDistribution(tfd.Normal(0., 1.),
-                                        tfb.Exp(),
+                                        test_util.NonCompositeTensorExp(),
                                         name='td')
     joint = tfd.JointDistributionCoroutineAutoBatched(coroutine_model)
 
     # Sampling with trivial sample shape avoids the vmap codepath.
     ds, _ = joint.sample_distributions([], seed=test_util.test_seed())
-    self.assertIsInstance(ds[0], tfd.TransformedDistribution)
+    self.assertIsInstance(
+        ds[0],
+        # Non-CompositeTensor version of TransformedDistribution.
+        transformed_distribution._TransformedDistribution)
 
     with self.assertRaisesRegex(
         TypeError, r'Some component distribution\(s\) cannot be returned'):
