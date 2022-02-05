@@ -35,6 +35,7 @@ multi_substrate_py_library(
         ":importance_resample",
         ":increment_log_prob",
         ":joint_distribution_pinned",
+        ":laplace_approximation",
         ":marginal_fns",
         ":mvn_precision_factor_linop",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
@@ -134,6 +135,38 @@ multi_substrate_py_test(
     srcs = ["marginal_fns_test.py"],
     numpy_tags = ["notap"],
     shard_count = 3,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "laplace_approximation",
+    srcs = ["laplace_approximation.py"],
+    srcs_version = "PY3",
+    deps = [
+        "//tensorflow_probability/python/bijectors:chain",
+        "//tensorflow_probability/python/bijectors:joint_map",
+        "//tensorflow_probability/python/bijectors:reshape",
+        "//tensorflow_probability/python/bijectors:split",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/optimizer:bfgs",
+        "//tensorflow_probability/python/optimizer:bfgs_utils",
+        # numpy dep,
+        # tensorflow dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "laplace_approximation_test",
+    size = "large",
+    srcs = ["laplace_approximation_test.py"],
+    srcs_version = "PY3",
     deps = [
         # numpy dep,
         # tensorflow dep,

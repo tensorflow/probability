@@ -19,10 +19,12 @@ from tensorflow_probability.python.experimental.distributions import marginal_fn
 from tensorflow_probability.python.experimental.distributions.importance_resample import ImportanceResample
 from tensorflow_probability.python.experimental.distributions.increment_log_prob import IncrementLogProb
 from tensorflow_probability.python.experimental.distributions.joint_distribution_pinned import JointDistributionPinned
+from tensorflow_probability.python.experimental.distributions.laplace_approximation import laplace_approximation
 from tensorflow_probability.python.experimental.distributions.mvn_precision_factor_linop import MultivariateNormalPrecisionFactorLinearOperator
 
 
 __all__ = [
+    'laplace_approximation',
     'log_prob_ratio',
     'IncrementLogProb',
     'JointDistributionPinned',
