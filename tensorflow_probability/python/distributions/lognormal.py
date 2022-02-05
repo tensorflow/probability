@@ -18,7 +18,6 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
-from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -31,10 +30,7 @@ __all__ = [
 ]
 
 
-# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
-# `TransformedDistribution` is converted to `CompositeTensor`.
-class LogNormal(transformed_distribution.TransformedDistribution,
-                distribution.AutoCompositeTensorDistribution):
+class LogNormal(transformed_distribution.TransformedDistribution):
   """The log-normal distribution."""
 
   def __init__(self,

@@ -21,7 +21,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import gev_cdf as gev_cdf_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
-from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import dtype_util
@@ -30,10 +29,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 
 
-# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
-# `TransformedDistribution` is converted to `CompositeTensor`.
-class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution,
-                              distribution.AutoCompositeTensorDistribution):
+class GeneralizedExtremeValue(transformed_distribution.TransformedDistribution):
   """The scalar GeneralizedExtremeValue distribution.
 
   This distribution is a common choice for modeling the maximum value of a

@@ -21,7 +21,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
-from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal as normal_lib
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -35,10 +34,7 @@ __all__ = [
 ]
 
 
-# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
-# `TransformedDistribution` is converted to `CompositeTensor`.
-class LogitNormal(transformed_distribution.TransformedDistribution,
-                  distribution.AutoCompositeTensorDistribution):
+class LogitNormal(transformed_distribution.TransformedDistribution):
   """The logit-normal distribution."""
 
   def __init__(self,

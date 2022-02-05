@@ -382,7 +382,6 @@ multi_substrate_py_library(
     srcs = ["chi.py"],
     deps = [
         ":chi2",
-        ":distribution",
         ":kullback_leibler",
         ":transformed_distribution",
         # numpy dep,
@@ -812,7 +811,6 @@ multi_substrate_py_library(
     name = "gumbel",
     srcs = ["gumbel.py"],
     deps = [
-        ":distribution",
         ":kullback_leibler",
         ":transformed_distribution",
         ":uniform",
@@ -833,7 +831,6 @@ multi_substrate_py_library(
     name = "gev",
     srcs = ["gev.py"],
     deps = [
-        ":distribution",
         ":kullback_leibler",
         ":transformed_distribution",
         ":uniform",
@@ -1003,7 +1000,6 @@ multi_substrate_py_library(
     name = "johnson_su",
     srcs = ["johnson_su.py"],
     deps = [
-        ":distribution",
         ":normal",
         ":transformed_distribution",
         # tensorflow dep,
@@ -1116,7 +1112,6 @@ multi_substrate_py_library(
     name = "kumaraswamy",
     srcs = ["kumaraswamy.py"],
     deps = [
-        ":distribution",
         ":transformed_distribution",
         ":uniform",
         # numpy dep,
@@ -1249,7 +1244,6 @@ multi_substrate_py_library(
     name = "loglogistic",
     srcs = ["loglogistic.py"],
     deps = [
-        ":distribution",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:exp",
@@ -1265,7 +1259,6 @@ multi_substrate_py_library(
     name = "lognormal",
     srcs = ["lognormal.py"],
     deps = [
-        ":distribution",
         ":normal",
         ":transformed_distribution",
         # numpy dep,
@@ -1282,7 +1275,6 @@ multi_substrate_py_library(
     name = "logitnormal",
     srcs = ["logitnormal.py"],
     deps = [
-        ":distribution",
         ":normal",
         ":transformed_distribution",
         # numpy dep,
@@ -1416,7 +1408,6 @@ multi_substrate_py_library(
     name = "moyal",
     srcs = ["moyal.py"],
     deps = [
-        ":distribution",
         ":kullback_leibler",
         ":transformed_distribution",
         ":uniform",
@@ -1492,7 +1483,6 @@ multi_substrate_py_library(
     name = "mvn_linear_operator",
     srcs = ["mvn_linear_operator.py"],
     deps = [
-        ":distribution",
         ":kullback_leibler",
         ":normal",
         ":sample",
@@ -2220,7 +2210,6 @@ multi_substrate_py_library(
     name = "vector_exponential_linear_operator",
     srcs = ["vector_exponential_linear_operator.py"],
     deps = [
-        ":distribution",
         ":exponential",
         ":sample",
         ":transformed_distribution",
@@ -2289,7 +2278,6 @@ multi_substrate_py_library(
     name = "weibull",
     srcs = ["weibull.py"],
     deps = [
-        ":distribution",
         ":transformed_distribution",
         # numpy dep,
         # tensorflow dep,

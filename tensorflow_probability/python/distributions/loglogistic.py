@@ -19,7 +19,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
-from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import logistic
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
@@ -31,10 +30,7 @@ __all__ = [
 ]
 
 
-# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
-# `TransformedDistribution` is converted to `CompositeTensor`.
-class LogLogistic(transformed_distribution.TransformedDistribution,
-                  distribution.AutoCompositeTensorDistribution):
+class LogLogistic(transformed_distribution.TransformedDistribution):
   """The log-logistic distribution."""
 
   def __init__(self,
