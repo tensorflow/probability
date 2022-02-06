@@ -13,9 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """Tests for convolutional variational layers."""
-
+# pylint: disable=g-import-not-at-top
 # Dependency imports
-from keras import testing_utils
+try:
+  from keras.testing_infra import test_utils as keras_test_utils
+except ImportError:
+  keras_test_utils = None
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -215,7 +218,7 @@ class ConvVariational(object):
         # TODO(scottzhu): reenable the test when the repo switch change reach
         # the TF PIP package.
         self.skipTest('Skip the test until the TF and Keras has a new PIP.')
-        testing_utils.layer_test(
+        keras_test_utils.layer_test(
             layer_class,
             kwargs={'filters': 2,
                     'kernel_size': 3,

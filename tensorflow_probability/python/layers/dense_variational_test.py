@@ -13,9 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """Tests for dense variational layers."""
-
+# pylint: disable=g-import-not-at-top
 # Dependency imports
-from keras import testing_utils
+try:
+  from keras.testing_infra import test_utils as keras_test_utils
+except ImportError:
+  keras_test_utils = None
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -122,11 +125,11 @@ class DenseVariational(test_util.TestCase):
       # the TF PIP package.
       self.skipTest('Skip the test until the TF and Keras has a new PIP.')
       with self.cached_session():
-        testing_utils.layer_test(
+        keras_test_utils.layer_test(
             layer_class,
             kwargs=kwargs,
             input_shape=(3, 2))
-        testing_utils.layer_test(
+        keras_test_utils.layer_test(
             layer_class,
             kwargs=kwargs,
             input_shape=(None, None, 2))

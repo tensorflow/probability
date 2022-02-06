@@ -60,6 +60,7 @@ py_test(
     size = "medium",
     srcs = ["conv_variational_test.py"],
     deps = [
+        # keras/testing_infra:test_utils dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
@@ -89,6 +90,7 @@ py_test(
     size = "medium",
     srcs = ["dense_variational_test.py"],
     deps = [
+        # keras/testing_infra:test_utils dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
