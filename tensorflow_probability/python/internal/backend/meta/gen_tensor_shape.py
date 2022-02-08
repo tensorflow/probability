@@ -30,6 +30,7 @@ COMMENT_OUT = [
     'from tensorflow.python.eager import monitoring',
     ('from tensorflow.python.platform '
      'import tf_logging as logging'),
+    'from tensorflow.python.types import trace',
     'from tensorflow.python.util.tf_export import tf_export',
 ]
 
@@ -41,6 +42,11 @@ class Monitoring(object):
   def __getattr__(self, name):
     return lambda *args, **kwargs: ()
 monitoring = Monitoring()
+
+class Trace(object):
+  TraceType = object
+trace = Trace()
+
 def tf_export(*args, **kwargs):
   return lambda f: f
 """
