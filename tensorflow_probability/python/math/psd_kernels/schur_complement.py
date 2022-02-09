@@ -18,7 +18,6 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
@@ -56,32 +55,6 @@ def _compute_divisor_matrix(
     divisor_matrix = _add_diagonal_shift(
         divisor_matrix, diag_shift[..., tf.newaxis])
   return divisor_matrix
-
-
-def _mask_matrix(x, mask=None):
-  """Copies a matrix, replacing masked-out rows/cols from the identity matrix.
-
-  Args:
-    x: A Tensor of shape `[..., n, n]`, representing a batch of n-by-n matrices.
-    mask: A boolean Tensor of shape `[..., n]`, representing a batch of masks.
-      If `mask` is None, `x` is returned.
-  Returns:
-    A Tensor of shape `[..., n, n]`, representing a batch of n-by-n matrices.
-    For each batch member `r`, element `r[i, j]` equals `eye(n)[i, j]` if
-    dimension `i` or `j` is False in the corresponding input mask.  Otherwise,
-    `r[i, j]` equals the corresponding element from `x`.
-  """
-  if mask is None:
-    return x
-
-  x = tf.convert_to_tensor(x)
-  mask = tf.convert_to_tensor(mask, dtype=tf.bool)
-
-  n = ps.dimension_size(x, -1)
-
-  return tf.where(~mask[..., tf.newaxis] | ~mask[..., tf.newaxis, :],
-                  tf.eye(n, dtype=x.dtype),
-                  x)
 
 
 class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
@@ -363,7 +336,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
 
     # TODO(b/196219597): Add a check to ensure that we have a `base_kernel`
     # that is explicitly concretized.
-    divisor_matrix_cholesky = cholesky_fn(_mask_matrix(
+    divisor_matrix_cholesky = cholesky_fn(util.mask_matrix(
         _compute_divisor_matrix(base_kernel,
                                 diag_shift=diag_shift,
                                 fixed_inputs=fixed_inputs),
@@ -529,7 +502,7 @@ class SchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
     # NOTE: Replacing masked-out rows/columns of the divisor matrix with
     # rows/columns from the identity matrix is equivalent to using a divisor
     # matrix in which those rows and columns have been dropped.
-    return _mask_matrix(
+    return util.mask_matrix(
         _compute_divisor_matrix(self._base_kernel,
                                 diag_shift=self._diag_shift,
                                 fixed_inputs=fixed_inputs),

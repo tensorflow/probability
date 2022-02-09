@@ -330,6 +330,77 @@ class _GaussianProcessTest(object):
         self.evaluate(expected_gprm.log_prob(samples)),
         self.evaluate(actual_gprm.log_prob(samples)))
 
+  def testLogProbWithIsMissing(self):
+    index_points = tf.Variable(
+        [[-1.0, 0.0], [-0.5, -0.5], [1.5, 0.0], [1.6, 1.5]],
+        shape=None if self.is_static else tf.TensorShape(None))
+    self.evaluate(index_points.initializer)
+    amplitude = tf.convert_to_tensor(1.1)
+    length_scale = tf.convert_to_tensor(0.9)
+
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(
+            amplitude, length_scale),
+        index_points=index_points,
+        mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
+        observation_noise_variance=.05,
+        jitter=0.0)
+
+    x = gp.sample(5, seed=test_util.test_seed())
+
+    is_missing = np.array([
+        [False, True, False, False],
+        [False, False, False, False],
+        [True, False, True, True],
+        [True, False, False, True],
+        [False, False, True, True],
+    ])
+
+    lp = gp.log_prob(tf.where(is_missing, np.nan, x), is_missing=is_missing)
+
+    # For each batch member, check that the log_prob is the same as for a
+    # GaussianProcess without the missing index points.
+    for i in range(5):
+      gp_i = tfd.GaussianProcess(
+          kernel=psd_kernels.ExponentiatedQuadratic(
+              amplitude, length_scale),
+          index_points=tf.gather(index_points, (~is_missing[i]).nonzero()[0]),
+          mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
+          observation_noise_variance=.05,
+          jitter=0.0)
+      lp_i = gp_i.log_prob(tf.gather(x[i], (~is_missing[i]).nonzero()[0]))
+      # NOTE: This reshape is necessary because lp_i has shape [1] when
+      # gp_i.index_points contains a single index point.
+      self.assertAllClose(tf.reshape(lp_i, []), lp[i])
+
+    # The log_prob should be zero when all points are missing out.
+    self.assertAllClose(tf.zeros((3, 2)),
+                        gp.log_prob(tf.ones((3, 1, 4)) * np.nan,
+                                    is_missing=tf.constant(True, shape=(2, 4))))
+
+  def testUnivariateLogProbWithIsMissing(self):
+    index_points = tf.convert_to_tensor([[[0.0, 0.0]], [[0.5, 1.0]]])
+    amplitude = tf.convert_to_tensor(1.1)
+    length_scale = tf.convert_to_tensor(0.9)
+
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(
+            amplitude, length_scale),
+        index_points=index_points,
+        mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
+        observation_noise_variance=.05,
+        jitter=0.0)
+
+    x = gp.sample(3, seed=test_util.test_seed())
+    lp = gp.log_prob(x)
+
+    self.assertAllClose(lp, gp.log_prob(x, is_missing=[False, False]))
+    self.assertAllClose(tf.convert_to_tensor([np.zeros((3, 2)), lp]),
+                        gp.log_prob(x, is_missing=[[[True]], [[False]]]))
+    self.assertAllClose(
+        tf.convert_to_tensor([[lp[0, 0], 0.0], [0.0, 0.0], [0., lp[2, 1]]]),
+        gp.log_prob(x, is_missing=[[False, True], [True, True], [True, False]]))
+
 
 @test_util.test_all_tf_execution_regimes
 class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):

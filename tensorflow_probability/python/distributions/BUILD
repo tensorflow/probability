@@ -724,6 +724,7 @@ multi_substrate_py_library(
         ":kullback_leibler",
         ":mvn_linear_operator",
         ":normal",
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/internal:distribution_util",
@@ -732,6 +733,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
 

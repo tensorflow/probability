@@ -17,6 +17,7 @@
 import warnings
 
 # Dependency imports
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
@@ -33,6 +34,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.psd_kernels.internal import util as psd_kernels_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -425,30 +427,44 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
         points, respectively.
     """
     with self._name_and_control_scope('get_marginal_distribution'):
-      # TODO(cgs): consider caching the result here, keyed on `index_points`.
-      index_points = self._get_index_points(index_points)
-      covariance = self._compute_covariance(index_points)
-      loc = self._mean_fn(index_points)
-      # If we're sure the number of index points is 1, we can just construct a
-      # scalar Normal. This has computational benefits and supports things like
-      # CDF that aren't otherwise straightforward to provide.
-      if self._is_univariate_marginal(index_points):
-        scale = tf.sqrt(covariance)
-        # `loc` has a trailing 1 in the shape; squeeze it.
-        loc = tf.squeeze(loc, axis=-1)
-        return normal.Normal(
-            loc=loc,
-            scale=scale,
-            validate_args=self._validate_args,
-            allow_nan_stats=self._allow_nan_stats,
-            name='marginal_distribution')
+      return self._get_marginal_distribution(index_points=index_points)
+
+  def _get_marginal_distribution(self, index_points=None, is_missing=None):
+    # TODO(cgs): consider caching the result here, keyed on `index_points`.
+    index_points = self._get_index_points(index_points)
+    covariance = self._compute_covariance(index_points)
+    is_univariate_marginal = self._is_univariate_marginal(index_points)
+
+    loc = self._mean_fn(index_points)
+    if is_univariate_marginal:
+      # `loc` has a trailing 1 in the shape; squeeze it.
+      loc = tf.squeeze(loc, axis=-1)
+
+    if is_missing is not None:
+      loc = tf.where(is_missing, 0., loc)
+      if is_univariate_marginal:
+        covariance = tf.where(is_missing, 1., covariance)
       else:
-        return self._marginal_fn(
-            loc=loc,
-            covariance=covariance,
-            validate_args=self._validate_args,
-            allow_nan_stats=self._allow_nan_stats,
-            name='marginal_distribution')
+        covariance = psd_kernels_util.mask_matrix(covariance, ~is_missing)  # pylint:disable=invalid-unary-operand-type
+
+    # If we're sure the number of index points is 1, we can just construct a
+    # scalar Normal. This has computational benefits and supports things like
+    # CDF that aren't otherwise straightforward to provide.
+    if is_univariate_marginal:
+      scale = tf.sqrt(covariance)
+      return normal.Normal(
+          loc=loc,
+          scale=scale,
+          validate_args=self._validate_args,
+          allow_nan_stats=self._allow_nan_stats,
+          name='marginal_distribution')
+    else:
+      return self._marginal_fn(
+          loc=loc,
+          covariance=covariance,
+          validate_args=self._validate_args,
+          allow_nan_stats=self._allow_nan_stats,
+          name='marginal_distribution')
 
   @property
   def mean_fn(self):
@@ -524,8 +540,47 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
     return tf.convert_to_tensor(
         index_points if index_points is not None else  self._index_points)
 
-  def _log_prob(self, value, index_points=None):
-    return self.get_marginal_distribution(index_points).log_prob(value)
+  @distribution_util.AppendDocstring(kwargs_dict={
+      'index_points':
+          'optional `float` `Tensor` representing a finite (batch of) of '
+          'points in the index set over which this GP is defined.  The shape '
+          'has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the '
+          'number of feature dimensions and must equal '
+          '`self.kernel.feature_ndims` and `e` is the number of index points '
+          'in each batch.  Ultimately, this distribution  corresponds to an '
+          '`e`-dimensional multivariate normal. The batch shape must be '
+          'broadcastable with `kernel.batch_shape` and any batch dims yielded '
+          'by `mean_fn`.  If not specified, `self.index_points` is used.  '
+          'Default value: `None`.',
+      'is_missing':
+          'optional `bool` `Tensor` of shape `[..., e]`, where `e` is the '
+          'number of index points in each batch.  Represents a batch of '
+          'Boolean masks.  When `is_missing` is not `None`, the returned '
+          'log-prob is for the *marginal* distribution, in which all '
+          'dimensions for which `is_missing` is `True` have been marginalized '
+          'out.  The batch dimensions of `is_missing` must broadcast with the '
+          'sample and batch dimensions of `value` and of this `Distribution`. '
+          'Default value: `None`.'
+  })
+  def _log_prob(self, value, index_points=None, is_missing=None):
+    if is_missing is not None:
+      is_missing = tf.convert_to_tensor(is_missing)
+    index_points = self._get_index_points(index_points)
+    mvn = self._get_marginal_distribution(index_points, is_missing=is_missing)
+    if is_missing is None:
+      return mvn.log_prob(value)
+
+    # Subtract out the Normal distribution's log normalizer for each dimension
+    # that is masked out.
+    lp = mvn.log_prob(tf.where(is_missing, 0., value))
+    num_masked_dims = tf.cast(is_missing, mvn.dtype)
+    if not self._is_univariate_marginal(index_points):
+      event_shape = self._event_shape_tensor(index_points=index_points)
+      num_masked_dims = tf.reduce_sum(
+          num_masked_dims * tf.ones(event_shape, dtype=mvn.dtype),
+          axis=-1)
+    correction = num_masked_dims * -0.5 * np.log(2. * np.pi)
+    return lp - correction
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
