@@ -57,6 +57,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/experimental/nn",
         "//tensorflow_probability/python/experimental/parallel_filter",
+        "//tensorflow_probability/python/experimental/psd_kernels",
         "//tensorflow_probability/python/experimental/sequential",
         "//tensorflow_probability/python/experimental/stats",
         "//tensorflow_probability/python/experimental/sts_gibbs",

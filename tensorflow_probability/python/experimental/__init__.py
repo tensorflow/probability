@@ -38,6 +38,7 @@ from tensorflow_probability.python.experimental import math
 from tensorflow_probability.python.experimental import mcmc
 from tensorflow_probability.python.experimental import nn
 from tensorflow_probability.python.experimental import parallel_filter
+from tensorflow_probability.python.experimental import psd_kernels
 from tensorflow_probability.python.experimental import sequential
 from tensorflow_probability.python.experimental import stats
 from tensorflow_probability.python.experimental import substrates
@@ -66,6 +67,7 @@ _allowed_symbols = [
     'mcmc',
     'nn',
     'parallel_filter',
+    'psd_kernels',
     'register_composite',
     'sequential',
     'stats',
