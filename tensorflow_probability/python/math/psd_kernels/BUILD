@@ -47,6 +47,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         ":rational_quadratic",
         ":schur_complement",
+        ":spectral_mixture",
         "//tensorflow_probability/python/internal:all_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/math/psd_kernels/internal",
@@ -295,6 +296,37 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # scipy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "spectral_mixture",
+    srcs = ["spectral_mixture.py"],
+    deps = [
+        ":positive_semidefinite_kernel",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "spectral_mixture_test",
+    size = "small",
+    srcs = ["spectral_mixture_test.py"],
+    jax_size = "medium",
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",

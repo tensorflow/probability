@@ -35,6 +35,7 @@ from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel
 from tensorflow_probability.python.math.psd_kernels.positive_semidefinite_kernel import PositiveSemidefiniteKernel
 from tensorflow_probability.python.math.psd_kernels.rational_quadratic import RationalQuadratic
 from tensorflow_probability.python.math.psd_kernels.schur_complement import SchurComplement
+from tensorflow_probability.python.math.psd_kernels.spectral_mixture import SpectralMixture
 
 _allowed_symbols = [
     'AutoCompositeTensorPsdKernel',
@@ -57,6 +58,7 @@ _allowed_symbols = [
     'PositiveSemidefiniteKernel',
     'RationalQuadratic',
     'SchurComplement',
+    'SpectralMixture',
 ]
 
 all_util.remove_undocumented(__name__, _allowed_symbols)
