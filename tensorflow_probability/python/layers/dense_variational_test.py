@@ -140,17 +140,13 @@ class DenseVariational(test_util.TestCase):
       inputs = tf.random.uniform([2, 3], seed=1)
 
       # No keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 0)
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 1)
       self.assertEqual(layer.losses[0].shape, ())
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
   def _testKLPenaltyBoth(self, layer_class):
     with self.cached_session():
@@ -161,18 +157,14 @@ class DenseVariational(test_util.TestCase):
       inputs = tf.random.uniform([2, 3], seed=1)
 
       # No keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 0)
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 2)
       self.assertEqual(layer.losses[0].shape, ())
       self.assertEqual(layer.losses[1].shape, ())
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
   def _testDenseSetUp(self, layer_class, batch_size, in_size, out_size,
                       **kwargs):
@@ -215,7 +207,7 @@ class DenseVariational(test_util.TestCase):
 
     outputs = layer(inputs)
 
-    kl_penalty = layer.get_losses_for(inputs=None)
+    kl_penalty = layer.losses
     return (kernel_posterior, kernel_prior, kernel_divergence,
             bias_posterior, bias_prior, bias_divergence,
             layer, inputs, outputs, kl_penalty)
