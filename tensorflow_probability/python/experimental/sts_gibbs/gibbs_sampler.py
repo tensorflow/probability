@@ -179,7 +179,7 @@ def build_model_for_gibbs_fitting(observed_time_series,
   To support Gibbs sampling, a model must have have conjugate priors on all
   scale and weight parameters, and must be constructed so that
   `model.parameters` matches the parameters and ordering specified by the
-  the `GibbsSamplerState` namedtuple. Currently, this includes (only) models
+  `GibbsSamplerState` namedtuple. Currently, this includes (only) models
   consisting of the sum of a LocalLevel or LocalLinearTrend component with
   a LinearRegression or SpikeAndSlabSparseLinearRegression component.
 
