@@ -387,7 +387,8 @@ class StructuralTimeSeries(object):
                 # Likelihood.
                 [('observed_time_series', state_space_model_likelihood)]),
             use_vectorized_map=False,
-            batch_ndims=batch_ndims))
+            batch_ndims=batch_ndims,
+            name=self.name))
 
     if observed_time_series is not None:
       return joint_distribution.experimental_pin(
