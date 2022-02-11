@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow_probability.python.experimental.psd_kernels.additive_kernel import AdditiveKernel
 from tensorflow_probability.python.experimental.psd_kernels.multitask_kernel import Independent
 from tensorflow_probability.python.experimental.psd_kernels.multitask_kernel import MultiTaskKernel
 from tensorflow_probability.python.experimental.psd_kernels.multitask_kernel import Separable
@@ -25,6 +26,7 @@ from tensorflow_probability.python.internal import all_util
 
 
 _allowed_symbols = [
+    'AdditiveKernel',
     'Independent',
     'MultiTaskKernel',
     'Separable',

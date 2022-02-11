@@ -32,7 +32,42 @@ multi_substrate_py_library(
     name = "psd_kernels",
     srcs = ["__init__.py"],
     deps = [
+        ":additive_kernel",
         ":multitask_kernel",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "additive_kernel",
+    srcs = ["additive_kernel.py"],
+    deps = [
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/math/psd_kernels:feature_transformed",
+        "//tensorflow_probability/python/math/psd_kernels:matern",
+        "//tensorflow_probability/python/math/psd_kernels:positive_semidefinite_kernel",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "additive_kernel_test",
+    size = "medium",
+    srcs = ["additive_kernel_test.py"],
+    jax_tags = ["notap"],
+    numpy_tags = ["notap"],
+    shard_count = 4,
+    tags = ["tf1-broken"],
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 
