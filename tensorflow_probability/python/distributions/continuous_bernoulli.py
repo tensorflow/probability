@@ -59,7 +59,7 @@ def _log_xexp_ratio(x):
 
     x_squared = tf.math.square(x)
 
-    result = (dtype(np.log(2.)) + x_squared / 112. -
+    result = (dtype(np.log(2.)) + x_squared / 12. -
               7 * tf.math.square(x_squared) / 1440.)
     middle_region = (x > small_cutoff) & (x < large_cutoff)
     safe_x_medium = tf.where(middle_region, x, dtype(1.))
@@ -200,9 +200,9 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
     # The normalizer is 2 * atanh(1 - 2 * probs) / (1 - 2 * probs), with the
     # removable singularity at probs = 0.5 removed (and replaced with 2).
     # We do this computation in logit space to be more numerically stable.
-    # Note that 2 * atanh(1 - 2 / (1 + exp(-logits))) = logits.
+    # Note that 2 * atanh(1 - 2 / (1 + exp(-logits))) = -logits.
     # Thus we end up with
-    # logits / (1 - 2 / (1 + exp(-logits))) =
+    # -logits / (1 - 2 / (1 + exp(-logits))) =
     # logits / ((-exp(-logits) + 1) / (exp(-logits) + 1)) =
     # (exp(-logits) + 1) * logits / (-exp(-logits) + 1) =
     # (1 + exp(logits)) * logits / (exp(logits) - 1)
@@ -312,7 +312,7 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
     # 1 / (1 + exp(-logits)) / (2 / (1 + exp(-logits)) - 1) =
     # 1 / (2 - 1 - exp(-logits)) =
     # 1 / (1 - exp(-logits))
-    # The second term becomes 1 / logits.
+    # The second term becomes - 1 / logits.
     # Thus we have mean = 1 / (1 - exp(-logits)) - 1 / logits.
 
     # When logits is close to zero, we can compute the Laurent series for the
