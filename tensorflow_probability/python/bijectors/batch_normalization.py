@@ -207,7 +207,7 @@ class BatchNormalization(bijector.Bijector):
     return _broadcast
 
   def _normalize(self, y):
-    return self.batchnorm.apply(y, training=self._training)
+    return self.batchnorm(y, training=self._training)
 
   def _de_normalize(self, x):
     # Uses the saved statistics.
