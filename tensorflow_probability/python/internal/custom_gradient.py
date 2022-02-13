@@ -88,7 +88,7 @@ def custom_gradient(vjp_fwd=None, vjp_bwd=None, jvp_fn=None,
               args = args[1:]
           val, aux = vjp_fwd(*reconstruct_args, **kwargs)
 
-          def vjp_bwd_wrapped(*g, **kwargs):
+          def vjp_bwd_wrapped(*g):
             # We don't want to use an explicit `variables` arg, because TF will
             # complain if the wrapped function doesn't actually have variables
             # in it. TF will only specify this arg if there are variables.
