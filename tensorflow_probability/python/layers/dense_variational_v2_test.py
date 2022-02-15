@@ -72,25 +72,29 @@ negloglik = lambda y, rv_y: -rv_y.log_prob(y)
 @test_util.test_all_tf_execution_regimes
 class DenseVariationalLayerTest(test_util.TestCase):
 
-  def test_end_to_end(self):
-    # Get dataset.
-    y, x, x_tst = create_dataset()
+    def test_end_to_end(self):
+        # Get dataset.
+        y, x, x_tst = create_dataset()
 
-    # Build model.
-    model = tf.keras.Sequential([
-        tfp.layers.DenseVariational(1, posterior_mean_field, prior_trainable),
-        tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t, scale=1)),
-    ])
+        layer = tfp.layers.DenseVariational(1, posterior_mean_field, prior_trainable)
 
-    # Do inference.
-    model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.05),
-                  loss=negloglik)
-    model.fit(x, y, epochs=2, verbose=False)
+        model = tf.keras.Sequential([
+            layer,
+            tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t, scale=1))
+        ])
 
-    # Profit.
-    yhat = model(x_tst)
-    assert isinstance(yhat, tfd.Distribution)
+        # Do inference.
+        model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.05),
+                      loss=negloglik)
+        model.fit(x, y, epochs=2, verbose=False)
 
+        # Check the output_shape.
+        expected_output_shape = layer.compute_output_shape((None, x.shape[-1]))
+        self.assertAllEqual(expected_output_shape, (None, 1))
+
+        # Profit.
+        yhat = model(x_tst)
+        assert isinstance(yhat, tfd.Distribution)
 
 if __name__ == '__main__':
   test_util.main()
