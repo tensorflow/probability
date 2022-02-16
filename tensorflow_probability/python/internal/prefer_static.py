@@ -335,6 +335,34 @@ def dimension_size(x, idx):
   return x_shape[idx]
 
 
+def shape_slice(x, slice_):
+  """Equivalent to `shape(x)[slice_]`, but robust to partially-known shapes."""
+  x_shape = x.shape
+
+  def _static(val):
+    if val is None:
+      # slice components are very commonly None, which indicates a static choice
+      # of the, e.g., slice end point.
+      return val, True
+    else:
+      val = tf.get_static_value(val)
+      return val, val is not None
+
+  static_start, start_is_static = _static(slice_.start)
+  static_stop, stop_is_static = _static(slice_.stop)
+  static_step, step_is_static = _static(slice_.step)
+
+  if all([start_is_static, stop_is_static, step_is_static]):
+    slice_ = _slice(static_start, static_stop, static_step)
+    res = x_shape[slice_]
+    if tensorshape_util.is_fully_defined(res):
+      return tensorshape_util.as_list(res)
+    x_shape = _shape(x)
+  else:
+    x_shape = convert_to_shape_tensor(_shape(x))
+  return x_shape[slice_]
+
+
 def _ones_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin
   s = _shape(input)
   s_ = tf.get_static_value(s)
@@ -438,6 +466,9 @@ def non_negative_axis(axis, rank, name=None):  # pylint:disable=redefined-outer-
 def is_numpy(x):
   """Returns true if `x` is a numpy object."""
   return isinstance(x, (np.ndarray, np.generic))
+
+
+_slice = slice  # pylint: disable=invalid-name
 
 
 # The following functions only work in numpy if the inputs' *values are known
