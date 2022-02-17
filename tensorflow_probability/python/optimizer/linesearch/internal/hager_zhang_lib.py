@@ -642,7 +642,7 @@ def _bisect(value_and_gradients_function, initial_args, f_lim):
     # left/right points are so close to it that we can't distinguish them any
     # more.
     failed = (curr.failed |
-              (~finished &
+              (~finished & ~curr.stopped &
                (_bad_nan(mid) |
                 tf.equal(mid.x, curr.left.x) |
                 tf.equal(mid.x, curr.right.x))))
