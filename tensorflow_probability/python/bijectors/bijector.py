@@ -1370,7 +1370,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
   @classmethod
   def _is_increasing(cls, **kwargs):
     """Subclass implementation for `is_increasing` public function."""
-    raise NotImplementedError('`_is_increasing` not implemented.')
+    raise NotImplementedError(f'`_is_increasing` not implemented in {cls}.')
 
   def _call_is_increasing(self, name, **kwargs):
     """Wraps call to _is_increasing, allowing extra shared logic."""
