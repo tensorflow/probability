@@ -350,6 +350,22 @@ class AutoCompositeTensorTest(test_util.TestCase):
 
     self.assertAllClose(tf.function(lambda t: t.call())(t2), 3.)
 
+  def test_dict_arg(self):
+
+    @tfp.experimental.auto_composite_tensor
+    class Test(tfp.experimental.AutoCompositeTensor):
+
+      def __init__(self, var):
+        self._var = var
+
+      @property
+      def var(self):
+        return self._var
+
+    self.assertAllClose(
+        1.,
+        tf.function(lambda: Test(var={'a': tf.constant(1.)}))().var['a'])
+
   def test_different_names_type_specs_equal(self):
 
     dist_1 = AutoNormal([0., 2.], scale=1., name='FirstNormal')
