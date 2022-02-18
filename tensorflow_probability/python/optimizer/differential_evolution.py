@@ -144,7 +144,7 @@ def one_step(
       population is a `Tensor` of shape [n]. If the population is a python
       list of `Tensor`s then each `Tensor` in the list should have the first
       axis of a common size, say `n` and `objective_function(*population)`
-      should return a `Tensor of shape [n]. The population must have at least
+      should return a `Tensor` of shape [n]. The population must have at least
       4 members for the algorithm to work correctly.
     population_values: A `Tensor` of rank 1 and real dtype. The result of
       applying `objective_function` to the `population`. If not supplied it is
