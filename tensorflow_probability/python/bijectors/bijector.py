@@ -1684,7 +1684,8 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
   def experimental_compute_density_correction(self,
                                               x,
                                               tangent_space,
-                                              backward_compat=False):
+                                              backward_compat=False,
+                                              **kwargs):
     """Density correction for this transformation wrt the tangent space, at x.
 
     Subclasses of Bijector may call the most specific applicable
@@ -1699,6 +1700,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
         the support manifold at `x`.
       backward_compat: `bool` specifying whether to assume that the Bijector
         is dimension-preserving.
+      **kwargs: Optional keyword arguments forwarded to tangent space methods.
 
     Returns:
       density_correction: `Tensor` representing the density correction---in log
@@ -1710,7 +1712,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
 
     """
     if backward_compat:
-      return tangent_space.transform_dimension_preserving(x, self)
+      return tangent_space.transform_dimension_preserving(x, self, **kwargs)
     else:
       raise TypeError(
           'Please call the `TangentSpace` method applicable to this Bijector.')
