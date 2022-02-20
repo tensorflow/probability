@@ -145,17 +145,18 @@ def _extract_type_spec_recursively(value):
         value.shape, dtype=value.dtype, trainable=value.trainable)
   if tf.is_tensor(value):
     return tf.TensorSpec(value.shape, value.dtype)
-  if isinstance(value, (list, tuple)):
-    specs = [_extract_type_spec_recursively(v) for v in value]
-    was_tensor = list([a is not b for a, b in zip(value, specs)])
+  if tf.nest.is_nested(value):
+    specs = tf.nest.map_structure(_extract_type_spec_recursively, value)
+    was_tensor = tf.nest.flatten(
+        tf.nest.map_structure(lambda a, b: a is not b, value, specs))
     has_tensors = any(was_tensor)
     has_only_tensors = all(was_tensor)
     if has_tensors:
       if has_tensors != has_only_tensors:
         raise NotImplementedError(
-            'Found `{}` with both Tensor and non-Tensor parts: {}'
-            .format(type(value), value))
-      return type(value)(specs)
+            'Found `{}` with both Tensor and non-Tensor parts: {}'.format(
+                type(value), value))
+      return specs
   return value
 
 
@@ -454,9 +455,9 @@ def auto_composite_tensor(
   The contract of `auto_composite_tensor` is that all __init__ args and kwargs
   must have corresponding public or private attributes (or properties). Each of
   these attributes is inspected (recursively) to determine whether it is (or
-  contains) `Tensor`s or non-`Tensor` metadata. `list` and `tuple` attributes
-  are supported, but must either contain *only* `Tensor`s (or lists, etc,
-  thereof), or *no* `Tensor`s. E.g.,
+  contains) `Tensor`s or non-`Tensor` metadata. Nested (`list`, `tuple`, `dict`,
+  etc) attributes are supported, but must either contain *only* `Tensor`s (or
+  lists, etc, thereof), or *no* `Tensor`s. E.g.,
     - object.attribute = [1., 2., 'abc']                        # valid
     - object.attribute = [tf.constant(1.), [tf.constant(2.)]]   # valid
     - object.attribute = ['abc', tf.constant(1.)]               # invalid

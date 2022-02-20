@@ -49,7 +49,7 @@ class TangentSpace(object):
 
   """
 
-  def transform_general(self, x, f):
+  def transform_general(self, x, f, **kwargs):
     """Returns the density correction, in log space, corresponding to f at x.
 
     Also returns a new `TangentSpace` representing the tangent to fM at f(x).
@@ -58,6 +58,7 @@ class TangentSpace(object):
       x: `Tensor` (structure). The point at which to calculate the density.
       f: `Bijector` or one of its subclasses. The transformation that requires a
         density correction based on this tangent space.
+      **kwargs: Optional keyword arguments as part of the Bijector.
 
     Returns:
       log_density: A `Tensor` representing the log density correction of f at x
@@ -69,7 +70,7 @@ class TangentSpace(object):
     """
     raise NotImplementedError
 
-  def transform_dimension_preserving(self, x, f):
+  def transform_dimension_preserving(self, x, f, **kwargs):
     """Same as `transform_general`, assuming f goes from R^n to R^n.
 
     Default falls back to `transform_general`, which may be overridden
@@ -78,6 +79,7 @@ class TangentSpace(object):
     Args:
       x: same as in `transform_general`.
       f: same as in `transform_general`.
+      **kwargs: same as in `transform_general`.
 
     Returns:
       log_density: A `Tensor` representing the log density correction of f at x
@@ -88,9 +90,9 @@ class TangentSpace(object):
         `transform_general`.
 
     """
-    return self.transform_general(x, f)
+    return self.transform_general(x, f, **kwargs)
 
-  def transform_projection(self, x, f):
+  def transform_projection(self, x, f, **kwargs):
     """Same as `transform_general`, with f a projection (or its inverse).
 
     Default falls back to `transform_general`, which may be overridden
@@ -99,6 +101,7 @@ class TangentSpace(object):
     Args:
       x: same as in `transform_general`.
       f: same as in `transform_general`.
+      **kwargs: same as in `transform_general`.
 
     Returns:
       log_density: A `Tensor` representing the log density correction of f at x
@@ -108,9 +111,9 @@ class TangentSpace(object):
       NotImplementedError: if the `TangentSpace` subclass does not implement
         `transform_general`.
     """
-    return self.transform_general(x, f)
+    return self.transform_general(x, f, **kwargs)
 
-  def transform_coordinatewise(self, x, f):
+  def transform_coordinatewise(self, x, f, **kwargs):
     """Same as `transform_dimension_preserving`, for a coordinatewise f.
 
     Default falls back to `transform_dimension_preserving`, which may
@@ -119,6 +122,7 @@ class TangentSpace(object):
     Args:
       x: same as in `transform_dimension_preserving`.
       f: same as in `transform_dimension_preserving`.
+      **kwargs: same as in `transform_dimension_preserving`.
 
     Returns:
       log_density: A `Tensor` representing the log density correction of f at x
@@ -129,7 +133,7 @@ class TangentSpace(object):
         `transform_dimension_preserving`.
 
     """
-    return self.transform_dimension_preserving(x, f)
+    return self.transform_dimension_preserving(x, f, **kwargs)
 
 
 def unit_basis():
@@ -161,16 +165,17 @@ class AxisAlignedSpace(TangentSpace):
     """
     self.axis_mask = axis_mask
 
-  def transform_general(self, x, f):
+  def transform_general(self, x, f, **kwargs):
     as_general_space = GeneralSpace(unit_basis_on(self.axis_mask), 1)
-    return as_general_space.transform_general(x, f)
+    return as_general_space.transform_general(x, f, **kwargs)
 
-  def transform_projection(self, x, f):
+  def transform_projection(self, x, f, **kwargs):
     if not hasattr(f, 'experimental_update_live_dimensions'):
       msg = ('When calling `transform_projection` the Bijector must implement '
              'the `experimental_update_live_dimensions` method.')
       raise NotImplementedError(msg)
-    new_live_dimensions = f.experimental_update_live_dimensions(self.axis_mask)
+    new_live_dimensions = f.experimental_update_live_dimensions(
+        self.axis_mask, **kwargs)
     if all(tf.get_static_value(new_live_dimensions)):
       # Special-case a bijector (direction) that knows that the result
       # of the projection will be a full space
@@ -178,14 +183,14 @@ class AxisAlignedSpace(TangentSpace):
     else:
       return 0, AxisAlignedSpace(new_live_dimensions)
 
-  def transform_coordinatewise(self, x, f):
+  def transform_coordinatewise(self, x, f, **kwargs):
     # TODO(pravnar): compute the derivative of f along x along the
     # live dimensions.
     raise NotImplementedError
 
 
-def jacobian_determinant(x, f):
-  return f.forward_log_det_jacobian(x)
+def jacobian_determinant(x, f, **kwargs):
+  return f.forward_log_det_jacobian(x, **kwargs)
 
 
 class FullSpace(TangentSpace):
@@ -197,16 +202,17 @@ class FullSpace(TangentSpace):
   at all.
   """
 
-  def transform_general(self, x, f):
+  def transform_general(self, x, f, **kwargs):
     """If the bijector is weird, fall back to the general case."""
     as_general_space = GeneralSpace(unit_basis(), 1)
-    return as_general_space.transform_general(x, f)
+    return as_general_space.transform_general(x, f, **kwargs)
 
-  def transform_dimension_preserving(self, x, f):
-    return jacobian_determinant(x, f), FullSpace()
+  def transform_dimension_preserving(self, x, f, **kwargs):
+    return jacobian_determinant(x, f, **kwargs), FullSpace()
 
-  def transform_projection(self, x, f):
-    return AxisAlignedSpace(tf.ones_like(x)).transform_projection(x, f)
+  def transform_projection(self, x, f, **kwargs):
+    return AxisAlignedSpace(tf.ones_like(x)).transform_projection(
+        x, f, **kwargs)
 
 
 def volume_coefficient(basis):
@@ -223,7 +229,7 @@ class GeneralSpace(TangentSpace):
       computed_volume = volume_coefficient(basis)
     self.volume = computed_volume
 
-  def transform_general(self, x, f):
+  def transform_general(self, x, f, **kwargs):
     raise NotImplementedError
 
 
@@ -236,7 +242,7 @@ class ZeroSpace(TangentSpace):
 
   """
 
-  def transform_general(self, x, f):
+  def transform_general(self, x, f, **kwargs):
     del x, f
     return 0, ZeroSpace()
 

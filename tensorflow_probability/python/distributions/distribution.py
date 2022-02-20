@@ -1926,7 +1926,7 @@ class Distribution(_BaseDistribution):
     """
     log_prob = self.log_prob(value, **kwargs)
     tangent_space = None
-    if getattr(self, '_experimental_tangent_space'):
+    if hasattr(self, '_experimental_tangent_space'):
       tangent_space = self._experimental_tangent_space
     elif backward_compat:
       # Import here rather than top-level to avoid circular import.

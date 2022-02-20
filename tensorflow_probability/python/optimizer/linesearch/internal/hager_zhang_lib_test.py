@@ -154,7 +154,7 @@ class HagerZhangLibTest(test_util.TestCase):
   def test_update_batching(self):
     """Tests that update function works in batching mode."""
     wolfe_threshold = 1e-6
-    # We build an example function with 4 batches, each for one of the
+    # We build an example function with 5 batches, each for one of the
     # following cases:
     # - a) Trial point has positive slope, so works as right end point.
     # - b) Trial point has negative slope and value is not too large,
@@ -162,31 +162,38 @@ class HagerZhangLibTest(test_util.TestCase):
     # - c) Trial point has negative slope but the value is too high,
     #      bisect is used to squeeze the interval.
     # - d) Trial point is outside of the (a, b) interval.
+    # - e) Left, right, and trial are all the same, and this batch member is
+    #      not active.  (This is how hager_zhang._line_search_inner_bisection
+    #      passes already-converged points to `update`.)
     x = np.array([0.0, 0.6, 1.0])
     y = np.array([[1.0, 1.2, 1.1],
                   [1.0, 0.9, 1.2],
                   [1.0, 1.1, 1.2],
-                  [1.0, 1.1, 1.2]])
+                  [1.0, 1.1, 1.2],
+                  [1.0, 0.9, 1.2]])
     dy = np.array([[-0.8, 0.6, 0.6],
+                   [-0.8, -0.7, 0.6],
                    [-0.8, -0.7, 0.6],
                    [-0.8, -0.7, 0.6],
                    [-0.8, -0.7, 0.6]])
     fun = _test_function_x_y_dy(x, y, dy)
 
-    val_a = fun(0.0)  # Values at zero.
-    val_b = fun(1.0)  # Values at initial step.
-    val_trial = fun([0.6, 0.6, 0.6, 1.5])
+    val_a = fun([0.0] * 5)  # Values at zero.
+    val_b = fun([1.0] * 4 + [0.0])  # Values at initial step.
+    val_trial = fun([0.6, 0.6, 0.6, 1.5, 0.0])
+    active = np.array([True] * 4 + [False])
     f_lim = val_a.f + (wolfe_threshold * tf.abs(val_a.f))
 
-    expected_left = np.array([0.0, 0.6, 0.0, 0.0])
-    expected_right = np.array([0.6, 1.0, 0.3, 1.0])
+    expected_left = np.array([0.0, 0.6, 0.0, 0.0, 0.0])
+    expected_right = np.array([0.6, 1.0, 0.3, 1.0, 0.0])
 
-    result = self.evaluate(hzl.update(fun, val_a, val_b, val_trial, f_lim))
+    result = self.evaluate(
+        hzl.update(fun, val_a, val_b, val_trial, f_lim, active=active))
     self.assertEqual(result.num_evals, 1)  # Had to do bisect once.
     self.assertTrue(np.all(result.stopped))
     self.assertTrue(np.all(~result.failed))
-    self.assertTrue(np.all(result.left.df < 0))  # Opposite slopes.
-    self.assertTrue(np.all(result.right.df >= 0))
+    self.assertTrue(np.all(result.left.df[:-1] < 0))  # Opposite slopes.
+    self.assertTrue(np.all(result.right.df[:-1] >= 0))
     self.assertArrayNear(result.left.x, expected_left, 1e-5)
     self.assertArrayNear(result.right.x, expected_right, 1e-5)
 

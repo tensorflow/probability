@@ -934,6 +934,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability",
         "//tensorflow_probability/python/bijectors:hypothesis_testlib",
+        "//tensorflow_probability/python/experimental/distributions",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensorshape_util",
     ],

@@ -19,9 +19,10 @@ import collections
 import tensorflow.compat.v2 as tf
 
 __all__ = [
-    'BIJECTOR_NOT_IMPLEMENTED',
     'BatchedComponentProperties',
+    'BIJECTOR_NOT_IMPLEMENTED',
     'ParameterProperties',
+    'SHAPE_FN_NOT_IMPLEMENTED',
 ]
 
 
@@ -56,9 +57,14 @@ class ParameterProperties(
   Elements:
     event_ndims: Python `int`, structure of `int`s, or `callable`, specifying
       the minimum effective Tensor rank of this parameter. See description
-      below. May also be `None`, indicating that this parameter does not follow
-      a batch-shape-vs-event-shape distinction (for example, if the parameter
-      cannot have batch dimensions, or if its value itself specifies a shape).
+      below. May also be `None` or NO_EVENT_NDIMS, indicating that this
+      parameter does not follow a batch-shape-vs-event-shape distinction (for
+      example, if the parameter cannot have batch dimensions, or if its value
+      itself specifies a shape). When `event_ndims` is callable, it should
+      return `None` to indicate that the instance-dependent event_ndims value is
+      unknown. Alternatively, it should return NO_EVENT_NDIMS to indicate that
+      this parameter does not participate in batch semantics in an
+      instance-dependent manner.
       Default value: `0`.
     event_ndims_tensor: optional value like `event_ndims`, except that callables
       are allowed to perform Tensor operations. Defaults to `event_ndims` if not
@@ -284,6 +290,8 @@ class ParameterProperties(
   """
 
   __slots__ = ()
+
+  NO_EVENT_NDIMS = object()
 
   # Specify default properties.
   def __new__(cls,

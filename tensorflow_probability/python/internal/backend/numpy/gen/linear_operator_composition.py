@@ -32,8 +32,6 @@
 # ==============================================================================
 """Composes one or more `LinearOperators`."""
 
-import warnings
-
 from tensorflow_probability.python.internal.backend.numpy import ops as common_shapes
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -194,15 +192,9 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
 
     # Initialization.
 
-    graph_parents = []
-    with warnings.catch_warnings():
-      warnings.simplefilter("ignore")
-      for operator in operators:
-        graph_parents.extend(operator.graph_parents)
-
     if name is None:
       name = "_o_".join(operator.name for operator in operators)
-    with ops.name_scope(name, values=graph_parents):
+    with ops.name_scope(name):
       super(LinearOperatorComposition, self).__init__(
           dtype=dtype,
           is_non_singular=is_non_singular,
@@ -211,8 +203,6 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
           is_square=is_square,
           parameters=parameters,
           name=name)
-    # TODO(b/143910018) Remove graph_parents in V3.
-    self._set_graph_parents(graph_parents)
 
   @property
   def operators(self):
