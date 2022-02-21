@@ -76,7 +76,7 @@ def make_kernel_bias(
     kernel: ...
     bias: ...
 
-  #### Recomendations:
+  #### Recommendations:
 
   ```python
   #   tf.nn.relu    ==> tf.initializers.he_*
