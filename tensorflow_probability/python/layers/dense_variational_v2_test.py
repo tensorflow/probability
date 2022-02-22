@@ -87,9 +87,18 @@ class DenseVariationalLayerTest(test_util.TestCase):
                   loss=negloglik)
     model.fit(x, y, epochs=2, verbose=False)
 
+    self.assertLen(model.layers, 2)
+    self.assertLen(model.layers[0].variables, 2)
+    self.assertEmpty(model.layers[1].variables)
+
+    posterior, prior = model.layers[0].variables
+    self.assertNotEqual(prior.name, posterior.name)
+    self.assertContainsSubsequence(posterior.name, '/posterior/')
+    self.assertContainsSubsequence(prior.name, '/prior/')
+
     # Profit.
     yhat = model(x_tst)
-    assert isinstance(yhat, tfd.Distribution)
+    self.assertIsInstance(yhat, tfd.Distribution)
 
 
 if __name__ == '__main__':
