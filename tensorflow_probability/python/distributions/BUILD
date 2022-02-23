@@ -2634,6 +2634,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "distribution_test",
+    size = "medium",
     srcs = ["distribution_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
