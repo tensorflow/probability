@@ -117,6 +117,7 @@ from tensorflow_probability.python.distributions.sample import Sample
 from tensorflow_probability.python.distributions.sigmoid_beta import SigmoidBeta
 from tensorflow_probability.python.distributions.sinh_arcsinh import SinhArcsinh
 from tensorflow_probability.python.distributions.skellam import Skellam
+from tensorflow_probability.python.distributions.skew_normal import SkewNormal
 from tensorflow_probability.python.distributions.spherical_uniform import SphericalUniform
 from tensorflow_probability.python.distributions.stopping_ratio_logistic import StoppingRatioLogistic
 from tensorflow_probability.python.distributions.student_t import StudentT
@@ -270,6 +271,7 @@ __all__ = [
     'SigmoidBeta',
     'SinhArcsinh',
     'Skellam',
+    'SkewNormal',
     'SphericalUniform',
     'StoppingRatioLogistic',
     'StudentT',
