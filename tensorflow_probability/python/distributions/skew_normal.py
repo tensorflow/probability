@@ -106,9 +106,8 @@ def quantile(value, loc, scale, skewness):
 
   # Here we use the following fact:
   # X ~ Normal(loc=0, scale=1) => 2 * X**2 ~ Gamma(alpha=0.5, beta=1)
-  rsquared_skewness = tf.math.reciprocal(squared_skewness)
   probs = (one - value * (one + squared_skewness)) * tf.where(
-      cond, x=one, y=-rsquared_skewness)
+      cond, x=one, y=-tf.math.reciprocal(squared_skewness))
   gamma_quantile = tfp_math.igammainv(half, p=probs)
 
   abs_skewness = tf.math.abs(skewness)
