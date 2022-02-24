@@ -37,6 +37,7 @@ multi_substrate_py_library(
         ":joint_distribution_pinned",
         ":marginal_fns",
         ":multitask_gaussian_process",
+        ":multitask_gaussian_process_regression_model",
         ":mvn_precision_factor_linop",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
     ],
@@ -159,6 +160,33 @@ multi_substrate_py_test(
     name = "multitask_gaussian_process_test",
     size = "medium",
     srcs = ["multitask_gaussian_process_test.py"],
+    shard_count = 2,
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "multitask_gaussian_process_regression_model",
+    srcs = ["multitask_gaussian_process_regression_model.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:cholesky_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/math/psd_kernels/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "multitask_gaussian_process_regression_model_test",
+    size = "medium",
+    srcs = ["multitask_gaussian_process_regression_model_test.py"],
     shard_count = 2,
     deps = [
         # absl/testing:parameterized dep,
