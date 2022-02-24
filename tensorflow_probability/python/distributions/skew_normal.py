@@ -111,9 +111,8 @@ def quantile(value, loc, scale, skewness):
   gamma_quantile = tfp_math.igammainv(half, p=probs)
 
   abs_skewness = tf.math.abs(skewness)
-  adj_skewness = tf.where(
+  adj_scale = tf.math.abs(scale) * tf.where(
       cond, x=-tf.math.reciprocal(abs_skewness), y=abs_skewness)
-  adj_scale = tf.math.abs(scale) * adj_skewness
 
   return loc + adj_scale * tf.cast(
       tf.math.sqrt(two * gamma_quantile), dtype=loc.dtype)
