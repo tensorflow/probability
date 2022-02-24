@@ -356,6 +356,13 @@ class ContinuousBernoulliTest(test_util.TestCase):
     self.assertFalse(np.any(np.isinf(mean_)))
     self.assertFalse(np.any(np.isnan(mean_)))
 
+  @test_util.numpy_disable_gradient_test
+  def testMeanGradsAreNotNaN(self):
+    logits = np.linspace(-100, 100, 20)[..., np.newaxis].astype(np.float32)
+    _, grad_logits = tfp.math.value_and_gradient(
+        lambda x: tfd.ContinuousBernoulli(logits=x).mean(), logits)
+    self.assertAllNotNan(self.evaluate(grad_logits))
+
   def testVarianceAndStd(self):
     prob = [[0.2, 0.7], [0.8, 0.4]]
     dist = tfd.ContinuousBernoulli(probs=prob, validate_args=True)
