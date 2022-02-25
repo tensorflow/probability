@@ -590,8 +590,24 @@ class _DeferredTensorSpecBase(object):
   def transform_or_spec(self):
     return self._transform_or_spec
 
+  def most_specific_common_supertype(self, others):
+    """Returns the most specific supertype of `self` and `others`.
+
+    Args:
+      others: A Sequence of `TypeSpec`.
+
+    Returns `None` if a supertype does not exist.
+    """
+    try:
+      return functools.reduce(lambda a, b: a.most_specific_compatible_type(b),
+                              others, self)
+    except (TypeError, ValueError):
+      return None
+
   def most_specific_compatible_type(self, other):
     """Returns the most specific TypeSpec compatible with `self` and `other`.
+
+    Deprecated.
 
     Args:
       other: A `TypeSpec`.
