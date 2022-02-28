@@ -104,7 +104,7 @@ class ExtendedKalmanFilterTest(test_util.TestCase):
 
     if tf.executing_eagerly():
       for result, nested_result in zip(results, nested_results):
-        self.assertAllEqualNested(
+        self.assertAllCloseNested(
             tf.nest.map_structure(lambda _: result, observations_struct),  # pylint: disable=cell-var-from-loop
             nested_result)
 
