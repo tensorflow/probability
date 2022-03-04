@@ -191,10 +191,14 @@ def _minimize_common(num_steps,
           loop_traced_values)
       return final_step_traceable_values.parameters, traced_values
 
-    final_parameters, traced_values = ps.cond(
-        num_steps > 1,
-        run_optimization_loop,
-        lambda: (initial_parameters, initial_traced_values))
+    # When variables are involved, we want to make sure the initial trace is
+    # sequenced before the rest of the optimization loop. Otherwise, it's
+    # possible for the loop to *complete* before initial_trace_values are
+    # executed, causing nonsensical traces.
+    with tf.control_dependencies(tf.nest.flatten(initial_traced_values)):
+      final_parameters, traced_values = ps.cond(
+          num_steps > 1, run_optimization_loop,
+          lambda: (initial_parameters, initial_traced_values))
 
     if not return_full_length_trace:
       traced_values = _truncate_at_has_converged(traced_values)
@@ -619,5 +623,3 @@ def minimize(loss_fn,
       seed=seed,
       name=name)
   return traced_values
-
-
