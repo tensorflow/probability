@@ -53,7 +53,7 @@ def standardize(value, loc, scale, skewness):
     A tensor with shape broadcast according to the arguments.
   """
   return (value - loc) / tf.math.abs(scale) * tf.math.abs(
-      tf.where(value < loc, x=skewness, y=tf.math.reciprocal(skewness)))
+      tf.where(value < loc, skewness, tf.math.reciprocal(skewness)))
 
 
 def cdf(value, loc, scale, skewness):
@@ -79,8 +79,8 @@ def cdf(value, loc, scale, skewness):
   squared_skewness = tf.math.square(skewness)
   return tf.math.reciprocal(one + squared_skewness) * tf.where(
       z < 0.,
-      x=two * normal_cdf,
-      y=one - squared_skewness + two * squared_skewness * normal_cdf)
+      two * normal_cdf,
+      one - squared_skewness + two * squared_skewness * normal_cdf)
 
 
 def quantile(value, loc, scale, skewness):
@@ -107,12 +107,12 @@ def quantile(value, loc, scale, skewness):
   # Here we use the following fact:
   # X ~ Normal(loc=0, scale=1) => 2 * X**2 ~ Gamma(alpha=0.5, beta=1)
   probs = (one - value * (one + squared_skewness)) * tf.where(
-      cond, x=one, y=-tf.math.reciprocal(squared_skewness))
+      cond, one, -tf.math.reciprocal(squared_skewness))
   gamma_quantile = tfp_math.igammainv(half, p=probs)
 
   abs_skewness = tf.math.abs(skewness)
   adj_scale = tf.math.abs(scale) * tf.where(
-      cond, x=-tf.math.reciprocal(abs_skewness), y=abs_skewness)
+      cond, -tf.math.reciprocal(abs_skewness), abs_skewness)
 
   return loc + adj_scale * tf.cast(
       tf.math.sqrt(two * gamma_quantile), dtype=loc.dtype)
@@ -297,7 +297,6 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
-    # pylint: disable=g-long-lambda
     return dict(
         loc=parameter_properties.ParameterProperties(),
         scale=parameter_properties.ParameterProperties(
@@ -306,7 +305,6 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
         skewness=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
-    # pylint: enable=g-long-lambda
 
   @property
   def loc(self):
@@ -346,8 +344,8 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
 
     sample = tf.abs(normal_sample) * tf.where(
         uniform_sample < tf.math.reciprocal(1. + skewness**2),
-        x=-tf.math.reciprocal(skewness),
-        y=skewness)
+        -tf.math.reciprocal(skewness),
+        skewness)
 
     return loc + scale * sample
 
