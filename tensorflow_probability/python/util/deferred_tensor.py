@@ -590,6 +590,39 @@ class _DeferredTensorSpecBase(object):
   def transform_or_spec(self):
     return self._transform_or_spec
 
+  def is_subtype_of(self, other):
+    """Returns True if `self` is subtype of `other`.
+
+    Args:
+      other: A `TypeSpec`.
+    """
+    if type(self) is not type(other):
+      return False
+
+    if (not self._transform_is_composite and
+        self.transform_or_spec != other.transform_or_spec):
+      return False
+
+    # pylint: disable=protected-access
+    try:
+      tf.nest.assert_same_structure((self._specs, self._unique_id_params),
+                                    (other._specs, other._unique_id_params))
+    except (TypeError, ValueError):
+      return False
+
+    self_elements = tf.nest.flatten((self._specs, self._unique_id_params))
+    other_elements = tf.nest.flatten((other._specs, other._unique_id_params))
+
+    def is_subtype_or_equal(a, b):
+      try:
+        return a.is_subtype_of(b)
+      except AttributeError:
+        return a == b
+
+    return all(
+        is_subtype_or_equal(self_element, other_element)
+        for (self_element, other_element) in zip(self_elements, other_elements))
+
   def most_specific_common_supertype(self, others):
     """Returns the most specific supertype of `self` and `others`.
 
@@ -598,16 +631,52 @@ class _DeferredTensorSpecBase(object):
 
     Returns `None` if a supertype does not exist.
     """
+    # pylint: disable=protected-access
+    if not all(type(self) is type(other) for other in others):
+      return None
+
     try:
-      return functools.reduce(lambda a, b: a.most_specific_compatible_type(b),
-                              others, self)
+      for other in others:
+        tf.nest.assert_same_structure((self._specs, self._unique_id_params),
+                                      (other._specs, other._unique_id_params))
     except (TypeError, ValueError):
       return None
 
+    self_elements = tf.nest.flatten((self._specs, self._unique_id_params))
+    others_elements = [
+        tf.nest.flatten((other._specs, other._unique_id_params))
+        for other in others
+    ]
+
+    def common_supertype_or_equal(a, bs):
+      try:
+        return a.most_specific_common_supertype(bs)
+      except AttributeError:
+        return a if all(a == b for b in bs) else None
+
+    common_elements = [None] * len(self_elements)
+    for i, self_element in enumerate(self_elements):
+      common_elements[i] = common_supertype_or_equal(
+          self_element,
+          [other_elements[i] for other_elements in others_elements])
+      if self_element is not None and common_elements[i] is None:
+        return None
+    specs, params = tf.nest.pack_sequence_as(
+        (self._specs, self._unique_id_params), common_elements)
+
+    kwargs = dict(specs, **params)
+    if not self._transform_is_composite:
+      if not all(self.transform_or_spec == other.transform_or_spec
+                 for other in others):
+        return None
+      kwargs['transform_or_spec'] = self.transform_or_spec
+    return type(self)(**kwargs, name=None)
+
+  # TODO(b/221472813): Delete this once default is deprecated.
   def most_specific_compatible_type(self, other):
     """Returns the most specific TypeSpec compatible with `self` and `other`.
 
-    Deprecated.
+    Deprecated. Use most_specific_common_supertype instead.
 
     Args:
       other: A `TypeSpec`.
@@ -676,6 +745,30 @@ class _DeferredTensorSpecBase(object):
                  transform_or_spec=transform_or_spec,
                  **self._unique_id_params,
                  name=self.name)))
+
+  def _without_tensor_names(self):
+    """Returns a TypeSpec compatible with `self`, with tensor names removed.
+
+    Returns:
+      A `TypeSpec` that is compatible with `self`, where the name of any
+      `TensorSpec` is set to `None`.
+    """
+    def rename(value):
+      if isinstance(value, tf.TypeSpec):
+        return value._without_tensor_names()  # pylint: disable=protected-access
+      else:
+        return value
+
+    specs = self._specs.copy()
+    transform_or_spec = specs.pop(
+        'transform_or_spec', self.transform_or_spec)
+    return type(self)(
+        **tf.nest.map_structure(
+            rename,
+            dict(specs,
+                 transform_or_spec=transform_or_spec,
+                 **self._unique_id_params,
+                 name=None)))
 
   def _get_batched_input_spec(self, batch_size):
     """Returns the batched `input_spec` for the given `batch_size`."""

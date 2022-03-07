@@ -295,6 +295,36 @@ class _AutoCompositeTensorTypeSpec(type_spec.BatchableTypeSpec):
                        f' but got {version}.')
     return cls(*encoded[1:])
 
+  def is_subtype_of(self, other):
+    """Returns True if `self` is subtype of `other`.
+
+    Args:
+      other: A `TypeSpec`.
+    """
+    # pylint: disable=protected-access
+    if type(self) is not type(
+        other) or self._callable_params != other._callable_params:
+      return False
+
+    try:
+      tf.nest.assert_same_structure(self._comparable[:-1],
+                                    other._comparable[:-1])
+    except (TypeError, ValueError):
+      return False
+
+    self_elements = tf.nest.flatten(self._comparable[:-1])
+    other_elements = tf.nest.flatten(other._comparable[:-1])
+
+    def is_subtype_or_equal(a, b):
+      try:
+        return a.is_subtype_of(b)
+      except AttributeError:
+        return a == b
+
+    return all(
+        is_subtype_or_equal(self_element, other_element)
+        for (self_element, other_element) in zip(self_elements, other_elements))
+
   def most_specific_common_supertype(self, others):
     """Returns the most specific supertype of `self` and `others`.
 
@@ -303,16 +333,47 @@ class _AutoCompositeTensorTypeSpec(type_spec.BatchableTypeSpec):
 
     Returns `None` if a supertype does not exist.
     """
+    # pylint: disable=protected-access
+    if not all(
+        type(self) is type(other) and
+        self._callable_params == other._callable_params for other in others):
+      return None
+
     try:
-      return functools.reduce(lambda a, b: a.most_specific_compatible_type(b),
-                              others, self)
+      for other in others:
+        tf.nest.assert_same_structure(self._comparable[:-1],
+                                      other._comparable[:-1])
     except (TypeError, ValueError):
       return None
 
+    self_elements = tf.nest.flatten(self._comparable[:-1])
+    others_elements = [
+        tf.nest.flatten(other._comparable[:-1]) for other in others
+    ]
+
+    def common_supertype_or_equal(a, bs):
+      try:
+        return a.most_specific_common_supertype(bs)
+      except AttributeError:
+        return a if all(a == b for b in bs) else None
+
+    common_elements = [None] * len(self_elements)
+    for i, self_element in enumerate(self_elements):
+      common_elements[i] = common_supertype_or_equal(
+          self_element,
+          [other_elements[i] for other_elements in others_elements])
+      if self_element is not None and common_elements[i] is None:
+        return None
+    common_comparable = tf.nest.pack_sequence_as(self._comparable[:-1],
+                                                 common_elements)
+
+    return type(self)(*common_comparable[1:], self._callable_params)
+
+  # TODO(b/221472813): Delete this once default is deprecated.
   def most_specific_compatible_type(self, other):
     """Returns the most specific TypeSpec compatible with `self` and `other`.
 
-    Deprecated.
+    Deprecated. Use most_specific_common_supertype instead.
 
     Args:
       other: A `TypeSpec`.
@@ -373,6 +434,21 @@ class _AutoCompositeTensorTypeSpec(type_spec.BatchableTypeSpec):
         return value
     return self._copy(
         param_specs=tf.nest.map_structure(relax, self._param_specs))
+
+  def _without_tensor_names(self):
+    """Returns a TypeSpec compatible with `self`, with tensor names removed.
+
+    Returns:
+      A `TypeSpec` that is compatible with `self`, where the name of any
+      `TensorSpec` is set to `None`.
+    """
+    def rename(value):
+      if isinstance(value, tf.TypeSpec):
+        return value._without_tensor_names()  # pylint: disable=protected-access
+      else:
+        return value
+    return self._copy(
+        param_specs=tf.nest.map_structure(rename, self._param_specs))
 
   def __get_cmp_key(self):
     return (type(self), self._TypeSpec__make_cmp_key(self._comparable))
