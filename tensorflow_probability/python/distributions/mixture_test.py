@@ -323,7 +323,7 @@ class MixtureTest(test_util.TestCase):
       # Broadcast cat probs over event dimensions.
       for _ in range(len(event_shape_res)):
         cat_probs_values = np.expand_dims(cat_probs_values, len(batch_shape))
-      cat_probs_values = cat_probs_values + np.zeros_like(stacked_dev_res)  # pylint: disable=g-no-augmented-assignment
+      cat_probs_values = cat_probs_values + np.zeros_like(stacked_dev_res)
 
       # Perform stddev computation on a flattened batch.
       flat_batch_manual_dev = _mixture_stddev_np(
@@ -364,7 +364,7 @@ class MixtureTest(test_util.TestCase):
       # Broadcast cat probs over event dimensions.
       for _ in range(len(event_shape_res)):
         cat_probs_values = np.expand_dims(cat_probs_values, len(batch_shape))
-      cat_probs_values = cat_probs_values + np.zeros_like(stacked_dev_res)  # pylint: disable=g-no-augmented-assignment
+      cat_probs_values = cat_probs_values + np.zeros_like(stacked_dev_res)
 
       # Perform stddev computation on a flattened batch.
       flat_batch_manual_dev = _mixture_stddev_np(
