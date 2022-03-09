@@ -139,7 +139,6 @@ multi_substrate_py_library(
         ":sigmoid_beta",
         ":sinh_arcsinh",
         ":skellam",
-        ":skew_normal",
         ":spherical_uniform",
         ":stopping_ratio_logistic",
         ":student_t",
@@ -149,6 +148,7 @@ multi_substrate_py_library(
         ":triangular",
         ":truncated_cauchy",
         ":truncated_normal",
+        ":two_piece_normal",
         ":uniform",
         ":variational_gaussian_process",
         ":von_mises",
@@ -1981,28 +1981,6 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
-    name = "skew_normal",
-    srcs = ["skew_normal.py"],
-    deps = [
-        ":distribution",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability/python/bijectors:identity",
-        "//tensorflow_probability/python/bijectors:softplus",
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:parameter_properties",
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:reparameterization",
-        "//tensorflow_probability/python/internal:samplers",
-        "//tensorflow_probability/python/internal:special_math",
-        "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/math",
-        "//tensorflow_probability/python/math:numeric",
-    ],
-)
-
-multi_substrate_py_library(
     name = "stopping_ratio_logistic",
     srcs = ["stopping_ratio_logistic.py"],
     deps = [
@@ -2174,6 +2152,28 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/math:numeric",
         "//tensorflow_probability/python/math:special",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "two_piece_normal",
+    srcs = ["two_piece_normal.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/math:numeric",
     ],
 )
 
@@ -3814,17 +3814,6 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
-    name = "skew_normal_test",
-    srcs = ["skew_normal_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
     name = "stopping_ratio_logistic_test",
     srcs = ["stopping_ratio_logistic_test.py"],
     deps = [
@@ -3953,6 +3942,17 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "two_piece_normal_test",
+    srcs = ["two_piece_normal_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

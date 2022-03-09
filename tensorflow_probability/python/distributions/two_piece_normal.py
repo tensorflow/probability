@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""The Skew Normal distribution class."""
+"""The Two-Piece Normal distribution class."""
 
 # Dependency imports
 import numpy as np
@@ -34,7 +34,7 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.numeric import log1psquare
 
 __all__ = [
-    'SkewNormal',
+    'TwoPieceNormal',
 ]
 
 
@@ -57,7 +57,7 @@ def standardize(value, loc, scale, skewness):
 
 
 def cdf(value, loc, scale, skewness):
-  """Compute cumulative distribution function of Skew Normal distribution.
+  """Compute cumulative distribution function of Two-Piece Normal distribution.
 
   Note that scale and skewness can be negative.
 
@@ -84,7 +84,7 @@ def cdf(value, loc, scale, skewness):
 
 
 def quantile(value, loc, scale, skewness):
-  """Compute quantile function (inverse cdf) of Skew Normal distribution.
+  """Compute quantile function (inverse cdf) of Two-Piece Normal distribution.
 
   Note that scale and skewness can be negative.
 
@@ -118,15 +118,23 @@ def quantile(value, loc, scale, skewness):
       tf.math.sqrt(two * gamma_quantile), dtype=loc.dtype)
 
 
-class SkewNormal(distribution.AutoCompositeTensorDistribution):
-  """The Skew Normal distribution.
+class TwoPieceNormal(distribution.AutoCompositeTensorDistribution):
+  """The Two-Piece Normal distribution.
 
-  The Skew Normal generalizes the Normal distribution with an additional shape
-  parameter. It is parameterized by location `loc`, scale `scale`, and shape
-  `skewness`. If the skewness is above one, the distribution becomes positively
-  skewed (or right-skewed). If the skewness is greater than zero and less than
-  one, the distribution becomes negatively skewed (or left-skewed). A skewness
-  equal to one results in a Normal distribution.
+  The Two-Piece Normal generalizes the Normal distribution with an additional
+  shape parameter. Under the general formulation proposed by [Fernández and
+  Steel (1998)][2], it is parameterized by location `loc`, scale `scale`, and
+  shape `skewness`. If `skewness` is above one, the distribution becomes right-
+  skewed (or positively skewed). If `skewness` is greater than zero and less
+  than one, the distribution becomes left-skewed (or negatively skewed). The
+  Normal distribution is retrieved when `skewness` is equal to one.
+
+  This distribution is also called the Fernández-Steel Skew Normal distribution
+  [(Castillo et al., 2011)][1], the Skew Normal Type 2 distribution [(Rigby et
+  al., 2019, Section 18.3.5, p380)][3], and the [Split Normal distribution](
+  https://en.wikipedia.org/wiki/Split_normal_distribution). The Fernández and
+  Steel's formulation is mathematically equivalent to the main parameterization
+  discussed in the last reference.
 
   #### Mathematical details
 
@@ -165,13 +173,13 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
 
   ```none
   quantile(p; loc, scale, skewness) =
-      loc + s0 * normal_quantile(q0) when p <= 1 / (1 + skewness**2), and
-      loc + s1 * normal_quantile(q1) when p > 1 / (1 + skewness**2)
+      loc + s0 * normal_quantile(x0) when p <= 1 / (1 + skewness**2), and
+      loc + s1 * normal_quantile(x1) when p > 1 / (1 + skewness**2)
   where
       s0 = scale / skewness
       s1 = scale * skewness
-      q0 = (p * (1 + skewness**2)) / 2
-      q1 = (p * (1 + skewness**2) - 1 + skewness**2) / (2 * skewness**2)
+      x0 = (p * (1 + skewness**2)) / 2
+      x1 = (p * (1 + skewness**2) - 1 + skewness**2) / (2 * skewness**2)
       y = (x - loc) / scale
   ```
 
@@ -188,9 +196,9 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
       E(Y) = sqrt(2) / sqrt(pi) * (skewness - 1 / skewness)
   ```
 
-  The Skew Normal distribution is a member of the [location-scale family](
-  https://en.wikipedia.org/wiki/Location-scale_family), i.e., it can be
-  constructed as,
+  The Two-Piece Normal distribution is a member of the [location-scale family](
+  https://en.wikipedia.org/wiki/Location-scale_family): it can be constructed
+  as,
 
   ```none
   Z ~ Normal(loc=0, scale=1)
@@ -207,8 +215,8 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
   import tensorflow_probability as tfp
   tfd = tfp.distributions
 
-  # Define a single scalar Skew Normal distribution.
-  dist = tfd.SkewNormal(loc=3., scale=10., skewness=0.75)
+  # Define a single scalar Two-Piece Normal distribution.
+  dist = tfd.TwoPieceNormal(loc=3., scale=10., skewness=0.75)
 
   # Evaluate the cdf at 1, returning a scalar.
   dist.cdf(1.)
@@ -218,9 +226,9 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
   broadcast when possible.
 
   ```python
-  # Define a batch of three scalar valued Skew Normals.
+  # Define a batch of three scalar valued Two-Piece Normals.
   # They have mean 3, scale 10, but different skewnesses.
-  dist = tfd.SkewNormal(loc=3., scale=10., skewness=[0.75, 1., 1.33])
+  dist = tfd.TwoPieceNormal(loc=3., scale=10., skewness=[0.75, 1., 1.33])
 
   # Get 2 samples, returning a 2 x 3 tensor.
   value = dist.sample(2)
@@ -251,11 +259,11 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
                skewness,
                validate_args=False,
                allow_nan_stats=True,
-               name='SkewNormal'):
-    """Construct Skew Normal distributions.
+               name='TwoPieceNormal'):
+    """Construct Two-Piece Normal distributions.
 
-    The Skew Normal is parametrized with location `loc`, scale `scale`, and
-    shape parameter `skewness`. The parameters must be shaped in a way that
+    The Two-Piece Normal is parametrized with location `loc`, scale `scale`,
+    and shape parameter `skewness`. The parameters must be shaped in a way that
     supports broadcasting (e.g. `loc + scale` is a valid operation).
 
     Args:
@@ -287,7 +295,7 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
           scale, dtype=dtype, name='scale')
       self._skewness = tensor_util.convert_nonref_to_tensor(
           skewness, dtype=dtype, name='skewness')
-      super(SkewNormal, self).__init__(
+      super(TwoPieceNormal, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
@@ -336,7 +344,8 @@ class SkewNormal(distribution.AutoCompositeTensorDistribution):
         loc=loc, scale=scale, skewness=skewness)
     sample_shape = ps.concat([[n], batch_shape], axis=0)
 
-    uniform_seed, normal_seed = samplers.split_seed(seed, salt='skew_normal')
+    uniform_seed, normal_seed = samplers.split_seed(
+        seed, salt='two_piece_normal')
     uniform_sample = samplers.uniform(
         sample_shape, maxval=1., dtype=self.dtype, seed=uniform_seed)
     normal_sample = samplers.normal(

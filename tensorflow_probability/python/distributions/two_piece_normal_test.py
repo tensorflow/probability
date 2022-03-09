@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Tests for Skew Normal distribution."""
+"""Tests for Two-Piece Normal distribution."""
 
 # Dependency imports
 import numpy as np
@@ -27,15 +27,15 @@ tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
-class _SkewNormalTest(object):
+class _TwoPieceNormalTest(object):
 
-  def make_skew_normal(self):
+  def make_two_piece_normal(self):
     if self.dtype is np.float32:
       # Raw Python literals should always be interpreted as float32.
-      dist = tfd.SkewNormal(
+      dist = tfd.TwoPieceNormal(
           loc=3., scale=10., skewness=0.75, validate_args=True)
     elif self.dtype is np.float64:
-      dist = tfd.SkewNormal(
+      dist = tfd.TwoPieceNormal(
           loc=tf.constant(3., dtype=self.dtype),
           scale=tf.constant(10., dtype=self.dtype),
           skewness=tf.constant(0.75, dtype=self.dtype),
@@ -43,13 +43,13 @@ class _SkewNormalTest(object):
 
     return dist
 
-  def make_skew_normals(self):
+  def make_two_piece_normals(self):
     if self.dtype is np.float32:
       # Raw Python literals should always be interpreted as float32.
-      dist = tfd.SkewNormal(
+      dist = tfd.TwoPieceNormal(
           loc=3., scale=10., skewness=[0.75, 1., 1.33], validate_args=True)
     elif self.dtype is np.float64:
-      dist = tfd.SkewNormal(
+      dist = tfd.TwoPieceNormal(
           loc=tf.constant(3., dtype=self.dtype),
           scale=tf.constant(10., dtype=self.dtype),
           skewness=tf.constant([0.75, 1., 1.33], dtype=self.dtype),
@@ -58,7 +58,7 @@ class _SkewNormalTest(object):
     return dist
 
   def helper_param_shapes(self, sample_shape, expected):
-    param_shapes = tfd.SkewNormal.param_shapes(sample_shape)
+    param_shapes = tfd.TwoPieceNormal.param_shapes(sample_shape)
     mu_shape = param_shapes['loc']
     sigma_shape = param_shapes['scale']
     skewness_shape = param_shapes['skewness']
@@ -71,13 +71,13 @@ class _SkewNormalTest(object):
     sigma = tf.ones(sigma_shape)
     skewness = tf.ones(skewness_shape)
     seed = test_util.test_seed()
-    samples = tfd.SkewNormal(
+    samples = tfd.TwoPieceNormal(
         mu, sigma, skewness, validate_args=True).sample(seed=seed)
 
     self.assertAllEqual(expected, self.evaluate(tf.shape(samples)))
 
   def helper_param_static_shapes(self, sample_shape, expected):
-    param_shapes = tfd.SkewNormal.param_static_shapes(sample_shape)
+    param_shapes = tfd.TwoPieceNormal.param_static_shapes(sample_shape)
     mu_shape = param_shapes['loc']
     sigma_shape = param_shapes['scale']
     skewness_shape = param_shapes['skewness']
@@ -98,7 +98,7 @@ class _SkewNormalTest(object):
         tf.TensorShape(sample_shape), sample_shape)
 
   def testSampleLikeArgsGetDistDType(self):
-    dist = self.make_skew_normal()
+    dist = self.make_two_piece_normal()
 
     self.assertEqual(self.dtype, dist.dtype)
 
@@ -113,7 +113,7 @@ class _SkewNormalTest(object):
       self.assertEqual(self.dtype, getattr(dist, method)().dtype)
 
   def testShape(self):
-    for dist in (self.make_skew_normal(), self.make_skew_normals()):
+    for dist in (self.make_two_piece_normal(), self.make_two_piece_normals()):
       expected_batch_shape = dist.skewness.shape
       self.assertEqual(
           list(self.evaluate(dist.batch_shape_tensor())),
@@ -154,7 +154,7 @@ class _SkewNormalTest(object):
         self.assertAllEqual(dist.batch_shape, self.evaluate(result).shape)
 
   def testSample(self):
-    dist = self.make_skew_normals()
+    dist = self.make_two_piece_normals()
 
     seed_stream = test_util.test_seed_stream()
 
@@ -166,7 +166,7 @@ class _SkewNormalTest(object):
     uniform_sample = tf.random.uniform(
         sample.shape, maxval=1., dtype=self.dtype, seed=seed_stream())
     sign = tf.where(uniform_sample < 0.5, -one, one)
-    normal_sample = self.evaluate(sign * tfd.skew_normal.standardize(
+    normal_sample = self.evaluate(sign * tfd.two_piece_normal.standardize(
         sample, loc=dist.loc, scale=dist.scale, skewness=dist.skewness))
 
     # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
@@ -178,7 +178,7 @@ class _SkewNormalTest(object):
     self.assertAllClose(np.std(normal_sample), 1.0, atol=0.1)
 
   def testLogPDF(self):
-    dist = self.make_skew_normals()
+    dist = self.make_two_piece_normals()
 
     x = np.array([[-35.], [3.], [20.]], dtype=self.dtype)
 
@@ -195,7 +195,7 @@ class _SkewNormalTest(object):
     self.assertAllClose(log_pdf, expected_log_pdf)
 
   def testCDF(self):
-    dist = self.make_skew_normals()
+    dist = self.make_two_piece_normals()
 
     x = np.array([[-35.], [3.], [20.]], dtype=self.dtype)
 
@@ -212,7 +212,7 @@ class _SkewNormalTest(object):
     self.assertAllClose(cdf, expected_cdf)
 
   def testSurvivalFunction(self):
-    dist = self.make_skew_normals()
+    dist = self.make_two_piece_normals()
 
     x = np.array([[-35.], [3.], [20.]], dtype=self.dtype)
 
@@ -229,7 +229,7 @@ class _SkewNormalTest(object):
     self.assertAllClose(sf, expected_sf)
 
   def testQuantile(self):
-    dist = self.make_skew_normals()
+    dist = self.make_two_piece_normals()
 
     x = np.array([[0.000001], [0.5], [0.999999]], dtype=self.dtype)
 
@@ -249,7 +249,7 @@ class _SkewNormalTest(object):
         rtol=1e-03 if self.dtype == np.float32 else 1e-06)
 
   def testMean(self):
-    dist = self.make_skew_normals()
+    dist = self.make_two_piece_normals()
 
     mean = self.evaluate(dist.mean())
     expected_mean = np.array([-1.6543264, 3., 7.612733], dtype=self.dtype)
@@ -258,7 +258,7 @@ class _SkewNormalTest(object):
     self.assertAllClose(mean, expected_mean)
 
   def testVariance(self):
-    dist = self.make_skew_normals()
+    dist = self.make_two_piece_normals()
 
     variance = self.evaluate(dist.variance())
     expected_variance = np.array(
@@ -268,7 +268,7 @@ class _SkewNormalTest(object):
     self.assertAllClose(variance, expected_variance)
 
   def testMode(self):
-    dist = self.make_skew_normals()
+    dist = self.make_two_piece_normals()
 
     mode = self.evaluate(dist.mode())
     expected_mode = np.array([3., 3., 3.], dtype=self.dtype)
@@ -281,7 +281,8 @@ class _SkewNormalTest(object):
     def make_fn(attr):
       x = np.array([-100, -20, -5., 0., 5., 20, 100]).astype(self.dtype)
       return lambda m, s, g: getattr(  # pylint: disable=g-long-lambda
-          tfd.SkewNormal(m, scale=s, skewness=g, validate_args=True), attr)(x)
+          tfd.TwoPieceNormal(m, scale=s, skewness=g, validate_args=True),
+          attr)(x)
 
     loc = tf.constant(0., self.dtype)
     scale = tf.constant(1., self.dtype)
@@ -310,7 +311,7 @@ class _SkewNormalTest(object):
   @test_util.numpy_disable_gradient_test
   def testQuantileFiniteGradientAtDifficultPoints(self):
     def quantile(loc, scale, skewness, probs):
-      dist = tfd.SkewNormal(
+      dist = tfd.TwoPieceNormal(
           loc, scale=scale, skewness=skewness, validate_args=True)
       return dist.quantile(probs)
 
@@ -334,7 +335,7 @@ class _SkewNormalTest(object):
   def testFullyReparameterized(self):
     n = 100
     def sampler(loc, scale, skewness):
-      dist = tfd.SkewNormal(
+      dist = tfd.TwoPieceNormal(
           loc, scale=scale, skewness=skewness, validate_args=True)
       return dist.sample(n, seed=test_util.test_seed())
 
@@ -350,12 +351,12 @@ class _SkewNormalTest(object):
 
   def testNegativeScaleSkewnessFails(self):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      dist = tfd.SkewNormal(
+      dist = tfd.TwoPieceNormal(
           loc=[0.], scale=[-1.], skewness=[1.], validate_args=True)
       self.evaluate(dist.mean())
 
     with self.assertRaisesOpError('Argument `skewness` must be positive.'):
-      dist = tfd.SkewNormal(
+      dist = tfd.TwoPieceNormal(
           loc=[0.], scale=[1.], skewness=[-1.], validate_args=True)
       self.evaluate(dist.mean())
 
@@ -368,7 +369,7 @@ class _SkewNormalTest(object):
     skewness = tf.Variable(
         self.dtype([[0.75, 1.33]]).T, shape=tf.TensorShape(None))
     self.evaluate([loc.initializer, scale.initializer, skewness.initializer])
-    dist = tfd.SkewNormal(
+    dist = tfd.TwoPieceNormal(
         loc=loc, scale=scale, skewness=skewness, validate_args=True)
 
     # get_batch_shape should return an '<unknown>' tensor (graph mode only).
@@ -381,7 +382,7 @@ class _SkewNormalTest(object):
     loc = tf.constant(0., self.dtype)
     scale = tf.constant(1., self.dtype)
     skewness = tf.Variable(1., dtype=self.dtype)
-    dist = tfd.SkewNormal(
+    dist = tfd.TwoPieceNormal(
         loc=loc, scale=scale, skewness=skewness, validate_args=True)
 
     self.evaluate([v.initializer for v in dist.variables])
@@ -398,7 +399,7 @@ class _SkewNormalTest(object):
     self.evaluate(skewness.initializer)
 
     with self.assertRaisesRegexp(Exception, r'compatible shapes'):
-      dist = tfd.SkewNormal(
+      dist = tfd.TwoPieceNormal(
           loc=tf.zeros([4, 1], dtype=self.dtype),
           scale=tf.ones([4, 1], dtype=self.dtype),
           skewness=skewness,
@@ -406,11 +407,11 @@ class _SkewNormalTest(object):
       self.evaluate(dist.mean())
 
 
-class SkewNormalEagerGCTest(test_util.TestCase):
+class TwoPieceNormalEagerGCTest(test_util.TestCase):
 
   @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testMeanAndMode(self):
-    dist = tfd.SkewNormal(
+    dist = tfd.TwoPieceNormal(
         loc=3., scale=10., skewness=[0.75, 1., 1.33], validate_args=True)
 
     self.assertAllEqual((3,), dist.mean().shape)
@@ -423,25 +424,29 @@ class SkewNormalEagerGCTest(test_util.TestCase):
 
 
 @test_util.test_all_tf_execution_regimes
-class SkewNormalTestStaticShapeFloat32(test_util.TestCase, _SkewNormalTest):
+class TwoPieceNormalTestStaticShapeFloat32(test_util.TestCase,
+                                           _TwoPieceNormalTest):
   dtype = np.float32
   use_static_shape = True
 
 
 @test_util.test_all_tf_execution_regimes
-class SkewNormalTestDynamicShapeFloat32(test_util.TestCase, _SkewNormalTest):
+class TwoPieceNormalTestDynamicShapeFloat32(test_util.TestCase,
+                                            _TwoPieceNormalTest):
   dtype = np.float32
   use_static_shape = False
 
 
 @test_util.test_all_tf_execution_regimes
-class SkewNormalTestStaticShapeFloat64(test_util.TestCase, _SkewNormalTest):
+class TwoPieceNormalTestStaticShapeFloat64(test_util.TestCase,
+                                           _TwoPieceNormalTest):
   dtype = np.float64
   use_static_shape = True
 
 
 @test_util.test_all_tf_execution_regimes
-class SkewNormalTestDynamicShapeFloat64(test_util.TestCase, _SkewNormalTest):
+class TwoPieceNormalTestDynamicShapeFloat64(test_util.TestCase,
+                                            _TwoPieceNormalTest):
   dtype = np.float64
   use_static_shape = False
 
