@@ -773,7 +773,7 @@ class IteratedFilter(object):
     Args:
       observations: observed `Tensor` value(s) on which to condition the
         parameter estimate.
-      num_iterations: `int `Tensor` number of filtering iterations to run.
+      num_iterations: int `Tensor` number of filtering iterations to run.
       num_particles: scalar int `Tensor` number of particles to use.
       initial_perturbation_scale: scalar float `Tensor`, or any structure of
         float `Tensor`s broadcasting to the same shape as the (unconstrained)
