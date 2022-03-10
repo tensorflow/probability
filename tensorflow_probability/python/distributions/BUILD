@@ -3274,6 +3274,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "masked_test",
+    size = "medium",
     srcs = ["masked_test.py"],
     deps = [
         # numpy dep,
