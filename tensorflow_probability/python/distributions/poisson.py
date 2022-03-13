@@ -166,6 +166,7 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
                log_rate=None,
                force_probs_to_zero_outside_support=None,
                interpolate_nondiscrete=True,
+               dtype=tf.int32,
                validate_args=False,
                allow_nan_stats=True,
                name='Poisson'):
@@ -194,6 +195,7 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
         matches the Poisson pmf at integer arguments `k` (note that this
         function is not itself a normalized probability log-density).
         Default value: `True`.
+      dtype: The type of the event samples. Default: `int32`.
       validate_args: Python `bool`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
