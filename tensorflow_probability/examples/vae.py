@@ -79,7 +79,7 @@ two-fold:
     new_mu[p] := 0
     new_Sigma[p] := eye(d)
     new_mu[q] := inv(chol(Sigma[p])) @ (mu[p] - mu[q])
-    new_Sigma[q] := inv(Sigma[q]) @ Sigma[p]
+    new_Sigma[q] :=  I -  inv(Sigma[q])
 
     A bit of algebra on the KL divergence term `KL[q(Z|x) || p(Z)]` reveals that
     it is also invariant to the prior parameters as long as Sigma[p] and
