@@ -367,6 +367,8 @@ CONSTRAINTS = {
         fix_finite_discrete,
     'GeneralizedNormal.power':
         tfp_hps.softplus_plus_eps(),
+    'TwoPieceNormal.skewness':
+        tfp_hps.softplus_plus_eps(),
 }
 
 

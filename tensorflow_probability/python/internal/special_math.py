@@ -140,13 +140,17 @@ def _ndtr(x):
   """Implements ndtr core logic."""
   half_sqrt_2 = tf.constant(
       0.5 * np.sqrt(2.), dtype=x.dtype, name="half_sqrt_2")
+  half = tf.constant(0.5, x.dtype)
+  one = tf.constant(1., x.dtype)
+  two = tf.constant(2., x.dtype)
   w = x * half_sqrt_2
   z = tf.abs(w)
   y = tf.where(
       z < half_sqrt_2,
-      1. + tf.math.erf(w),
-      tf.where(w > 0., 2. - tf.math.erfc(z), tf.math.erfc(z)))
-  return 0.5 * y
+      one + tf.math.erf(w),
+      tf.where(w > 0.,
+               two - tf.math.erfc(z), tf.math.erfc(z)))
+  return half * y
 
 
 def log_ndtr(x, series_order=3, name="log_ndtr"):
