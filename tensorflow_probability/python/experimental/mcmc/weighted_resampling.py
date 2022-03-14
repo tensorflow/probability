@@ -249,7 +249,8 @@ def resample_systematic(log_probs, event_size, sample_shape,
   The value returned from this function is similar to sampling with
   ```python
   expanded_sample_shape = tf.concat([[event_size], sample_shape]), axis=-1)
-  tfd.Categorical(logits=log_probs).sample(expanded_sample_shape)`
+  logits = dist_util.move_dimension(log_probs, source_idx=0, dest_idx=-1)
+  tfd.Categorical(logits=logits).sample(expanded_sample_shape)
   ```
   but with values sorted along the first axis. It can be considered to be
   sampling events made up of a length-`event_size` vector of draws from
@@ -267,6 +268,9 @@ def resample_systematic(log_probs, event_size, sample_shape,
 
   Args:
     log_probs: A tensor-valued batch of discrete log probability distributions.
+      It is expected that those log probabilities are normalized along the
+      first dimension (such that ``sum(exp(log_probs), axis=0) == 1``).
+      The remaining dimensions are batch dimensions.
     event_size: the dimension of the vector considered a single draw.
     sample_shape: the `sample_shape` determining the number of draws.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
