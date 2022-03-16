@@ -216,7 +216,7 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
         observation_covariance = tf.linalg.LinearOperatorFullMatrix(
             psd_kernels_util.mask_matrix(
                 observation_covariance.to_dense(),
-                mask=~vec_observations_is_missing),
+                is_missing=vec_observations_is_missing),
             is_non_singular=True,
             is_positive_definite=True)
 

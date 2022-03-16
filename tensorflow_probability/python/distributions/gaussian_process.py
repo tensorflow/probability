@@ -454,7 +454,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       if is_univariate_marginal:
         covariance = tf.where(is_missing, 1., covariance)
       else:
-        covariance = psd_kernels_util.mask_matrix(covariance, ~is_missing)  # pylint:disable=invalid-unary-operand-type
+        covariance = psd_kernels_util.mask_matrix(covariance, is_missing)  # pylint:disable=invalid-unary-operand-type
 
     # If we're sure the number of index points is 1, we can just construct a
     # scalar Normal. This has computational benefits and supports things like

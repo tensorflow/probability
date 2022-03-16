@@ -287,27 +287,27 @@ def pairwise_square_distance_tensor(
       tf.shape(pairwise)[:-2], x1_example_shape, x2_example_shape], axis=0))
 
 
-def mask_matrix(x, mask=None):
+def mask_matrix(x, is_missing=None):
   """Copies a matrix, replacing masked-out rows/cols from the identity matrix.
 
   Args:
     x: A Tensor of shape `[..., n, n]`, representing a batch of n-by-n matrices.
-    mask: A boolean Tensor of shape `[..., n]`, representing a batch of masks.
-      If `mask` is None, `x` is returned.
+    is_missing: A boolean Tensor of shape `[..., n]`, representing a batch of
+      masks. If `is_missing` is None, `x` is returned.
   Returns:
     A Tensor of shape `[..., n, n]`, representing a batch of n-by-n matrices.
     For each batch member `r`, element `r[i, j]` equals `eye(n)[i, j]` if
-    dimension `i` or `j` is False in the corresponding input mask.  Otherwise,
+    dimension `i` or `j` is True in the corresponding input mask.  Otherwise,
     `r[i, j]` equals the corresponding element from `x`.
   """
-  if mask is None:
+  if is_missing is None:
     return x
 
   x = tf.convert_to_tensor(x)
-  mask = tf.convert_to_tensor(mask, dtype=tf.bool)
+  is_missing = tf.convert_to_tensor(is_missing, dtype=tf.bool)
 
   n = ps.dimension_size(x, -1)
 
-  return tf.where(~mask[..., tf.newaxis] | ~mask[..., tf.newaxis, :],
+  return tf.where(is_missing[..., tf.newaxis] | is_missing[..., tf.newaxis, :],
                   tf.eye(n, dtype=x.dtype),
                   x)
