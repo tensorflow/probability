@@ -354,6 +354,13 @@ class _TransformedDistribution(distribution_lib.Distribution):
                tf.cast(fldj, base_distribution_log_prob.dtype))
 
   def _log_prob(self, y, **kwargs):
+    if self.bijector._is_injective:  # pylint: disable=protected-access
+      log_prob, _ = self.experimental_local_measure(
+          y, backward_compat=True, **kwargs)
+      return log_prob
+
+    # TODO(pravnar, axch): Support base measure handling for non-injective
+    # bijectors.
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
 
     # For caching to work, it is imperative that the bijector is the first to
@@ -366,9 +373,6 @@ class _TransformedDistribution(distribution_lib.Distribution):
 
     ildj = self.bijector.inverse_log_det_jacobian(
         y, event_ndims=event_ndims, **bijector_kwargs)
-    if self.bijector._is_injective:  # pylint: disable=protected-access
-      base_log_prob = self.distribution.log_prob(x, **distribution_kwargs)
-      return base_log_prob + tf.cast(ildj, base_log_prob.dtype)
 
     # Compute log_prob on each element of the inverse image.
     lp_on_fibers = []
@@ -596,6 +600,32 @@ class _TransformedDistribution(distribution_lib.Distribution):
         self.distribution.experimental_default_event_space_bijector())
   # pylint: enable=not-callable
 
+  def experimental_local_measure(self, y, backward_compat=False, **kwargs):
+    distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
+
+    # For caching to work, it is imperative that the bijector is the first to
+    # modify the input.
+    x = self.bijector.inverse(y, **bijector_kwargs)
+    event_ndims = self.bijector.inverse_event_ndims(
+        tf.nest.map_structure(ps.rank_from_shape, self._event_shape_tensor(),
+                              self.event_shape), **bijector_kwargs)
+
+    if self.bijector._is_injective:  # pylint: disable=protected-access
+      local_measure_fn = self.distribution.experimental_local_measure
+      density_corr_fn = self.bijector.experimental_compute_density_correction
+      base_log_prob, tangent_space = local_measure_fn(
+          x, backward_compat=backward_compat, **distribution_kwargs)
+      correction, new_tangent_space = density_corr_fn(
+          x,
+          tangent_space,
+          backward_compat=backward_compat,
+          event_ndims=event_ndims,
+          **bijector_kwargs)
+      log_prob = base_log_prob - tf.cast(correction, base_log_prob.dtype)
+      return log_prob, new_tangent_space
+    else:
+      raise NotImplementedError
+
 
 class TransformedDistribution(
     _TransformedDistribution, distribution_lib.AutoCompositeTensorDistribution):
@@ -671,4 +701,3 @@ def _transformed_log_prob_ratio(p, x, q, y, name=None):
     ildj_ratio = ldj_ratio.inverse_log_det_jacobian_ratio(
         p.bijector, x, q.bijector, y, event_ndims)
     return base_log_prob_ratio + tf.cast(ildj_ratio, base_log_prob_ratio.dtype)
-

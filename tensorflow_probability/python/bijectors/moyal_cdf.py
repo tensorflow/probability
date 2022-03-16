@@ -109,14 +109,15 @@ class MoyalCDF(bijector.AutoCompositeTensorBijector):
 
   def _inverse(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
+      np_dtype = dtype_util.as_numpy_dtype(y.dtype)
       return (self.loc - self.scale *
-              (np.log(2.) + 2. * tf.math.log(tfp_math.erfcinv(y))))
+              (np.log(np_dtype(2.)) + 2. * tf.math.log(tfp_math.erfcinv(y))))
 
   def _inverse_log_det_jacobian(self, y):
     with tf.control_dependencies(self._maybe_assert_valid_y(y)):
-      return (tf.math.square(tfp_math.erfcinv(y)) +
-              tf.math.log(self.scale) + 0.5 * np.log(np.pi) -
-              tf.math.log(tfp_math.erfcinv(y)))
+      np_dtype = dtype_util.as_numpy_dtype(y.dtype)
+      return (tf.math.square(tfp_math.erfcinv(y)) + tf.math.log(self.scale) +
+              0.5 * np.log(np_dtype(np.pi)) - tf.math.log(tfp_math.erfcinv(y)))
 
   def _forward_log_det_jacobian(self, x):
     scale = tf.convert_to_tensor(self.scale)
