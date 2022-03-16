@@ -390,6 +390,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
                mean_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
+               always_yield_multivariate_normal=False,
                validate_args=False,
                allow_nan_stats=False,
                name='GaussianProcessRegressionModel',
@@ -456,6 +457,10 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
         matrix to ensure positive definiteness of the covariance matrix.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
+      always_yield_multivariate_normal: If `False` (the default), we produce a
+        scalar `Normal` distribution when the number of `index_points` is
+        statically known to be `1`. If `True`, we avoid this behavior, ensuring
+        that the event shape will retain the `1` from `index_points`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -571,6 +576,7 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
             index_points=index_points,
             cholesky_fn=cholesky_fn,
             jitter=jitter,
+            always_yield_multivariate_normal=always_yield_multivariate_normal,
             # What the GP super class calls "observation noise variance" we call
             # here the "predictive noise variance". We use the observation noise
             # variance for the fit/solve process above, and predictive for

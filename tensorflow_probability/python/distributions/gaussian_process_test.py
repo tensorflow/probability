@@ -401,6 +401,23 @@ class _GaussianProcessTest(object):
         tf.convert_to_tensor([[lp[0, 0], 0.0], [0.0, 0.0], [0., lp[2, 1]]]),
         gp.log_prob(x, is_missing=[[False, True], [True, True], [True, False]]))
 
+  def testAlwaysYieldMultivariateNormal(self):
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=tf.ones([5, 1, 2]),
+        always_yield_multivariate_normal=False,
+    )
+    self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
+    self.assertAllEqual([], self.evaluate(gp.event_shape_tensor()))
+
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=tf.ones([5, 1, 2]),
+        always_yield_multivariate_normal=True,
+    )
+    self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
+    self.assertAllEqual([1], self.evaluate(gp.event_shape_tensor()))
+
 
 @test_util.test_all_tf_execution_regimes
 class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):

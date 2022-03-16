@@ -250,6 +250,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
                marginal_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
+               always_yield_multivariate_normal=False,
                validate_args=False,
                allow_nan_stats=False,
                parameters=None,
@@ -294,6 +295,10 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
         `marginal_fn` and `cholesky_fn` is None.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
+      always_yield_multivariate_normal: If `False` (the default), we produce a
+        scalar `Normal` distribution when the number of `index_points` is
+        statically known to be `1`. If `True`, we avoid this behavior, ensuring
+        that the event shape will retain the `1` from `index_points`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -353,6 +358,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       else:
         self._marginal_fn = marginal_fn
 
+      self._always_yield_multivariate_normal = always_yield_multivariate_normal
       with tf.name_scope('init'):
         super(GaussianProcess, self).__init__(
             dtype=dtype,
@@ -375,6 +381,9 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       multivariate. In the case of dynamic shape in the number of index points,
       defaults to "multivariate" since that's the best we can do.
     """
+    if self._always_yield_multivariate_normal:
+      return False
+
     num_index_points = tf.compat.dimension_value(
         index_points.shape[-(self.kernel.feature_ndims + 1)])
     if num_index_points is None:
