@@ -36,7 +36,6 @@ DEFAULT_METHODS_EXCLUDED_FROM_JIT = (
     'dtype',
     'kl_divergence',  # Wrapping applied explicitly in `_traced_kl_divergence`.
     'experimental_default_event_space_bijector',
-    'experimental_local_measure',
     # tfb.Bijector
     # TODO(davmre): Test wrapping bijectors.
     'forward_event_shape',
@@ -46,8 +45,7 @@ DEFAULT_METHODS_EXCLUDED_FROM_JIT = (
     'forward_dtype',
     'inverse_dtype',
     'forward_event_ndims',
-    'inverse_event_ndims',
-    'experimental_compute_density_correction',
+    'inverse_event_ndims'
 )
 
 if NUMPY_MODE:
