@@ -108,7 +108,7 @@ class LogisticRegressionTest(test_util.InferenceGymTestCase,
         model,
         num_chains=4,
         num_steps=4000,
-        num_leapfrog_steps=15,
+        num_leapfrog_steps=5,
         step_size=0.03,
     )
 
