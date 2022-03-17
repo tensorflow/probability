@@ -270,8 +270,8 @@ def nest(f, *, scope: str):
 
   Harvested values live in one dynamic name scope (for a particular tag),
   and in strict mode, values with the same name cannot be collected or injected
-  more than once. nest(f, scope=<name>) will take all tagged values in `f` and
-  put them into a nested dictionary with key <name>. This enables having
+  more than once. `nest(f, scope=[name])` will take all tagged values in `f` and
+  put them into a nested dictionary with key `[name]`. This enables having
   duplicate names in one namespace provided they are in different scopes. This
   is different from using a separate tag to namespace, as it enables creating
   nested/hierarchical structure within a single tag's namespace.
