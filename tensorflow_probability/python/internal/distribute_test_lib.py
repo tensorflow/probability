@@ -47,8 +47,11 @@ class DistributedTest(test_util.TestCase):
   def per_replica_to_tensor(self, value, axis=0):
     if JAX_MODE:
       # JAX, by default, stacks outputs along the first axis.
-      return tf.nest.map_structure(
-          lambda v: distribution_util.move_dimension(v, 0, axis), value)
+      if axis == 0:
+        return value
+      else:
+        return tf.nest.map_structure(
+            lambda v: distribution_util.move_dimension(v, 0, axis), value)
     return tf.nest.map_structure(
         lambda per_replica: tf.stack(per_replica.values, axis=axis), value)
 

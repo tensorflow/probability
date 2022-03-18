@@ -31,6 +31,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.util.seed_stream import SeedStream
@@ -171,6 +172,22 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
             type(exception).__name__, exception)
       # Drop the final two newlines.
       raise AssertionError(final_msg[:-2])
+
+  def assertSeedsEqual(self, x, y, msg=None):
+    """Asserts that two PRNG seeds are equal."""
+    self.assertAllEqual(
+        tf.nest.flatten(x, expand_composites=True),
+        tf.nest.flatten(y, expand_composites=True),
+        msg=msg)
+
+  def assertSeedsNotEqual(self, x, y, msg=None):
+    """Asserts that two PRNG seeds are not equal."""
+    self.assertFalse(
+        np.all(
+            np.equal(
+                tf.nest.flatten(x, expand_composites=True),
+                tf.nest.flatten(y, expand_composites=True))),
+        msg=msg)
 
   def assertAllEqualNested(self, a, b, check_types=False, shallow=None):
     """Assert that analogous entries in two nested structures are equivalent.
@@ -797,8 +814,9 @@ def test_seed(hardcoded_seed=None,
     set_eager_seed: Python bool.  If true (default), invoke `tf.random.set_seed`
       in Eager mode to get more reproducibility.  Should become unnecessary
       once b/68017812 is resolved.
-    sampler_type: 'stateful' or 'stateless'. 'stateless' means we return a seed
-      pair.
+    sampler_type: 'stateful', 'stateless' or 'integer'. 'stateless'
+      returns a seed suitable to pass to stateful PRNGs. 'integer' is returns a
+      seed suitable for PRNGs which expect single-integer seeds (e.g. numpy).
 
   Returns:
     seed: 17, unless otherwise specified by arguments or command line flags.
@@ -816,19 +834,25 @@ def test_seed(hardcoded_seed=None,
     logging.warning('Using seed %s', answer)
   elif hardcoded_seed is not None:
     answer = hardcoded_seed
-    if JAX_MODE and np.shape(answer) == (2,):
+    if JAX_MODE and not isinstance(answer, int):
       # Workaround for test_seed(hardcoded_seed=test_seed()), which can happen
       # e.g. with the run_test_sample_consistent_log_prob methods above.
-      answer = answer[-1]
+      answer = samplers.get_integer_seed(answer)
   else:
     answer = 17
   if sampler_type == 'stateless' or JAX_MODE:
-    answer = tf.constant([0, answer % (2**32 - 1)], dtype=tf.uint32)
-    if not JAX_MODE:
+    answer = answer % (2**32 - 1)
+    if JAX_MODE:
+      import jax  # pylint: disable=g-import-not-at-top
+      answer = jax.random.PRNGKey(answer)
+    else:
+      answer = tf.constant([0, answer], dtype=tf.uint32)
       answer = tf.bitcast(answer, tf.int32)
   # TODO(b/68017812): Remove this clause once eager correctly supports seeding.
   elif tf.executing_eagerly() and set_eager_seed:
     tf.random.set_seed(answer)
+  if sampler_type == 'integer':
+    answer = samplers.get_integer_seed(answer)
   return answer
 
 
@@ -900,10 +924,8 @@ def test_np_rng(hardcoded_seed=None):
     rng: A `np.random.RandomState` instance seeded with 17, unless otherwise
       specified by arguments or command line flags.
   """
-  raw_seed = test_seed(hardcoded_seed=hardcoded_seed)
-  # Jax backend doesn't have the random module; but it shouldn't be needed,
-  # because this helper should only be used to generate test data.
-  return np.random.RandomState(seed=raw_seed % 2**32)
+  raw_seed = test_seed(hardcoded_seed=hardcoded_seed, sampler_type='integer')
+  return np.random.RandomState(seed=raw_seed)
 
 
 def floats_near(target, how_many, dtype=np.float32):

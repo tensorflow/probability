@@ -20,6 +20,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 
 
@@ -287,7 +288,7 @@ def _get_permutations(num_results, dims, seed=None):
     permutations: A `Tensor` of shape `[num_results, sum(dims)]` and the same
     dtype as `dims`.
   """
-  seeds = samplers.split_seed(seed, n=tf.size(dims))
+  seeds = samplers.split_seed(seed, n=ps.size(dims))
 
   def generate_one(dim, seed):
     return tf.argsort(samplers.uniform([num_results, dim], seed=seed), axis=-1)

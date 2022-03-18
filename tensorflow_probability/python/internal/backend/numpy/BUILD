@@ -385,6 +385,7 @@ py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
     deps = [
+        ":nest",
         # absl/logging dep,
         # absl/testing:absltest dep,
         # numpy dep,

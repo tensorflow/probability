@@ -56,31 +56,29 @@ class SeedSettingTest(test_util.TestCase):
 
   def testSameness(self):
     with flagsaver.flagsaver(vary_seed=False):
-      self.assertAllEqual(test_util.test_seed(), test_util.test_seed())
-      self.assertAllEqual(test_util.test_seed_stream()(),
-                          test_util.test_seed_stream()())
+      self.assertSeedsEqual(test_util.test_seed(), test_util.test_seed())
+      self.assertSeedsEqual(test_util.test_seed_stream()(),
+                            test_util.test_seed_stream()())
       with flagsaver.flagsaver(fixed_seed=None):
         x = 47
         expected = _maybe_jax(x)
-        self.assertAllEqual(expected, test_util.test_seed(hardcoded_seed=x))
+        self.assertSeedsEqual(expected, test_util.test_seed(hardcoded_seed=x))
 
   def testVariation(self):
     with flagsaver.flagsaver(vary_seed=True, fixed_seed=None):
-      self.assertFalse(
-          np.all(test_util.test_seed() == test_util.test_seed()))
-      self.assertFalse(
-          np.all(test_util.test_seed_stream()() ==
-                 test_util.test_seed_stream()()))
+      self.assertSeedsNotEqual(test_util.test_seed(), test_util.test_seed())
+      self.assertSeedsNotEqual(test_util.test_seed_stream()(),
+                               test_util.test_seed_stream()())
       x = 47
       expect_not = _maybe_jax(x)
-      self.assertFalse(
-          np.all(expect_not == test_util.test_seed(hardcoded_seed=x)))
+      self.assertSeedsNotEqual(expect_not,
+                               test_util.test_seed(hardcoded_seed=x))
 
   def testFixing(self):
     expected = _maybe_jax(58)
     with flagsaver.flagsaver(fixed_seed=58):
-      self.assertAllEqual(expected, test_util.test_seed())
-      self.assertAllEqual(expected, test_util.test_seed(hardcoded_seed=47))
+      self.assertSeedsEqual(expected, test_util.test_seed())
+      self.assertSeedsEqual(expected, test_util.test_seed(hardcoded_seed=47))
 
 
 class _TestCaseTest(object):

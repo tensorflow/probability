@@ -566,7 +566,7 @@ class IteratedFilter(object):
       # auto-vectorization enabled in `joint_prior_on_parameters_and_state`.
 
       num_particles_canary = 13
-      canary_seed = samplers.sanitize_seed([0, 1])
+      canary_seed = samplers.zeros_seed()
       def _get_shape_1(x):
         if hasattr(x, 'state'):
           x = x.state

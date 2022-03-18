@@ -502,6 +502,24 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_test(
+    name = "samplers_rbg_test",
+    size = "small",
+    srcs = ["samplers_test.py"],
+    args = ["--test_tfp_jax_prng=rbg"],
+    disabled_substrates = [
+        "tf",
+        "numpy",
+    ],
+    main = "samplers_test.py",
+    deps = [
+        ":samplers",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 multi_substrate_py_library(
     name = "special_math",
     srcs = ["special_math.py"],
@@ -679,6 +697,7 @@ multi_substrate_py_library(
     srcs = ["test_util.py"],
     deps = [
         ":dtype_util",
+        ":samplers",
         ":test_combinations",
         # absl/flags dep,
         # hypothesis dep,

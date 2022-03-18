@@ -21,6 +21,7 @@ import re
 from absl import logging
 from absl.testing import absltest
 import numpy as onp  # Avoid JAX rewrite.  # pylint: disable=reimported
+from tensorflow_probability.python.internal.backend.numpy import nest
 
 try:
   # If TF is not imported, we return dummy `TestCase` and `Benchmark` classes
@@ -57,7 +58,7 @@ if have_tf:
         if x is None:
           return x
         return onp.array(x)
-      return tf.nest.map_structure(_evaluate, x)
+      return nest.map_structure(_evaluate, x, expand_composites=True)
 
     def _GetNdArray(self, a):
       return onp.array(a)
