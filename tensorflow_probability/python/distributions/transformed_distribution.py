@@ -475,8 +475,8 @@ class _TransformedDistribution(distribution_lib.Distribution):
 
   def _mean_mode_impl(self, attr, kwargs):
     if not self.bijector.is_constant_jacobian:
-      raise NotImplementedError('`mean` is not implemented for non-affine '
-                                '`bijectors`.')
+      raise NotImplementedError(
+          f'`{attr}` is not implemented for non-affine `bijectors`.')
 
     distribution_kwargs, bijector_kwargs = self._kwargs_split_fn(kwargs)
     x = getattr(self.distribution, attr)(**distribution_kwargs)
