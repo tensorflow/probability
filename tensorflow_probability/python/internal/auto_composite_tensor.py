@@ -369,33 +369,6 @@ class _AutoCompositeTensorTypeSpec(type_spec.BatchableTypeSpec):
 
     return type(self)(*common_comparable[1:], self._callable_params)
 
-  # TODO(b/221472813): Delete this once default is deprecated.
-  def most_specific_compatible_type(self, other):
-    """Returns the most specific TypeSpec compatible with `self` and `other`.
-
-    Deprecated. Use most_specific_common_supertype instead.
-
-    Args:
-      other: A `TypeSpec`.
-
-    Raises:
-      ValueError: If there is no TypeSpec that is compatible with both `self`
-        and `other`.
-      ValueError: If the `_callable_params` attributes of `self` and `other` are
-        not equal.
-    """
-    if type(self) is not type(other):
-      raise ValueError(
-          f'No TypeSpec is compatible with both {self} and {other}.')
-    # pylint: disable=protected-access
-    if self._callable_params != other._callable_params:
-      raise ValueError(f'Callable parameters must be identical. Saw '
-                       f'{self._callable_params} and {other._callable_params}.')
-    merged = self._TypeSpec__most_specific_compatible_type_serialization(
-        self._comparable[:-1], other._comparable[:-1])
-    # pylint: enable=protected-access
-    return type(self)(*merged[1:], self._callable_params)
-
   def is_compatible_with(self, spec_or_value):
     """Returns true if `spec_or_value` is compatible with this TypeSpec."""
     if not isinstance(spec_or_value, tf.TypeSpec):

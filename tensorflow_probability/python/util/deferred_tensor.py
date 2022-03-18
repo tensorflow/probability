@@ -672,39 +672,6 @@ class _DeferredTensorSpecBase(object):
       kwargs['transform_or_spec'] = self.transform_or_spec
     return type(self)(**kwargs, name=None)
 
-  # TODO(b/221472813): Delete this once default is deprecated.
-  def most_specific_compatible_type(self, other):
-    """Returns the most specific TypeSpec compatible with `self` and `other`.
-
-    Deprecated. Use most_specific_common_supertype instead.
-
-    Args:
-      other: A `TypeSpec`.
-
-    Returns:
-      compatible_spec: The `TypeSpec` most compatible with `self` and `other`.
-
-    Raises:
-      ValueError: If there is no TypeSpec that is compatible with both `self`
-        and `other`.
-      ValueError: If `self._transform_fn` is not a `CompositeTensor` and not
-        equal to `other._transform_fn`.
-    """
-    if type(self) is not type(other):
-      raise ValueError(
-          f'No TypeSpec is compatible with both {self} and {other}.')
-    specs, params = self._TypeSpec__most_specific_compatible_type_serialization(
-        (self._specs, self._unique_id_params),
-        (other._specs, other._unique_id_params))  # pylint: disable=protected-access
-    kwargs = dict(specs, **params)
-    if not self._transform_is_composite:
-      if self.transform_or_spec != other.transform_or_spec:
-        raise ValueError(
-            f'{self.transform_or_spec} and {other.transform_or_spec} must be '
-            f'identical.')
-      kwargs['transform_or_spec'] = self.transform_or_spec
-    return type(self)(**kwargs, name=None)
-
   def is_compatible_with(self, spec_or_value):
     """Returns True if `spec_or_value` is compatible with this TypeSpec."""
     if not isinstance(spec_or_value, tf.TypeSpec):
