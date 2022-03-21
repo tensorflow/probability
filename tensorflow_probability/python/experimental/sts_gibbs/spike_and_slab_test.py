@@ -83,7 +83,30 @@ class SpikeAndSlabTest(test_util.TestCase):
                    batch_shape + [num_outputs], seed=noise_seed))
     return design_matrix, weights, targets
 
-  def test_posterior_on_nonzero_subset_matches_bayesian_regression(self):
+  def test_sampler_respects_pseudo_observations(self):
+    design_matrix = self.evaluate(
+        samplers.uniform([2, 20, 5], seed=test_util.test_seed()))
+    first_obs = 2.
+    second_obs = 10.
+    first_sampler = spike_and_slab.SpikeSlabSampler(
+        design_matrix,
+        default_pseudo_observations=first_obs)
+    second_sampler = spike_and_slab.SpikeSlabSampler(
+        design_matrix,
+        default_pseudo_observations=second_obs)
+
+    self.assertNotAllClose(
+        first_sampler.weights_prior_precision,
+        second_sampler.weights_prior_precision)
+    self.assertAllClose(
+        first_sampler.weights_prior_precision / first_obs,
+        second_sampler.weights_prior_precision / second_obs)
+
+  @parameterized.named_parameters(
+      ('default_precision', 1.),
+      ('ten_pseudo_obs', 10.))
+  def test_posterior_on_nonzero_subset_matches_bayesian_regression(
+      self, default_pseudo_observations):
     # Generate a synthetic regression task.
     design_matrix, _, targets = self.evaluate(
         self._random_regression_task(
@@ -100,7 +123,9 @@ class SpikeAndSlabTest(test_util.TestCase):
         axis=ps.rank(x) - 1)
 
     # Compute the weight posterior mean and precision for these nonzeros.
-    sampler = spike_and_slab.SpikeSlabSampler(design_matrix)
+    sampler = spike_and_slab.SpikeSlabSampler(
+        design_matrix,
+        default_pseudo_observations=default_pseudo_observations)
     initial_state = sampler._initialize_sampler_state(
         targets=targets, nonzeros=nonzeros)
 
@@ -125,7 +150,7 @@ class SpikeAndSlabTest(test_util.TestCase):
         restricted_weights_posterior_mean)
     self.assertAllClose(
         nonzero_submatrix(initial_state.conditional_posterior_precision_chol),
-        tf.linalg.cholesky(restricted_weights_posterior_prec.to_dense()))
+        tf.linalg.cholesky(restricted_weights_posterior_prec).to_dense())
 
   def test_noise_variance_posterior_matches_expected(self):
     # Generate a synthetic regression task.

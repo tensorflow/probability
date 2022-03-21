@@ -213,6 +213,7 @@ class SpikeSlabSampler(object):
                design_matrix,
                nonzero_prior_prob=0.5,
                weights_prior_precision=None,
+               default_pseudo_observations=1.,
                observation_noise_variance_prior_concentration=0.005,
                observation_noise_variance_prior_scale=0.0025,
                observation_noise_variance_upper_bound=None):
@@ -229,10 +230,15 @@ class SpikeSlabSampler(object):
         precision matrix(s) over the weights, of shape
         `[num_features, num_features]`. If not specified, defaults to the
         Zellner g-prior specified in `[1]` as
-        `Omega^{-1} = (X'X + diag(X'X)) / (2 * num_outputs)`,
-        in which we've plugged in the suggested defaults of `kappa = 1` and
-        `w = 0.5`.
+        `Omega^{-1} = kappa * (X'X + diag(X'X)) / (2 * num_outputs)`,
+        in which we've plugged in the suggested default of `w = 0.5`. The
+        parameter `kappa` is controlled by the `default_pseudo_observations`
+        argument.
         Default value: `None`.
+      default_pseudo_observations: scalar float `Tensor`
+        Controls the number of pseudo-observations for the prior precision
+        matrix over the weights. Corresponds to `kappa` in [1]. See also
+        `weights_prior_precision`.
       observation_noise_variance_prior_concentration: scalar float `Tensor`
         concentration parameter of the inverse gamma prior on the noise
         variance. Corresponds to `nu / 2` in [1].
@@ -270,8 +276,8 @@ class SpikeSlabSampler(object):
       if weights_prior_precision is None:
         # Default prior: 'Zellner’s g−prior' from section 3.2.1 of [1]:
         #   `omega^{-1} = kappa * (w X'X + (1 − w) diag(X'X))/n`
-        # with defaults `kappa = 1` and `w = 0.5`.
-        weights_prior_precision = tf.linalg.set_diag(
+        # with default `w = 0.5`.
+        weights_prior_precision = default_pseudo_observations * tf.linalg.set_diag(
             0.5 * x_transpose_x,
             tf.linalg.diag_part(x_transpose_x)) / num_outputs
 
