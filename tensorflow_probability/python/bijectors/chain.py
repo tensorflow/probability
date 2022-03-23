@@ -27,7 +27,7 @@ __all__ = [
 
 
 class _Chain(composition.Composition):
-  """Bijector which applies a sequence of bijectors.
+  """Bijector which applies a composition of bijectors.
 
   Example Use:
 
@@ -83,7 +83,8 @@ class _Chain(composition.Composition):
 
     Args:
       bijectors: Python `list` of bijector instances. An empty list makes this
-        bijector equivalent to the `Identity` bijector.
+        bijector equivalent to the `Identity` bijector. The bijectors are
+        applied in sequence starting from the end of the list.
       validate_args: Python `bool` indicating whether arguments should be
         checked for correctness.
       validate_event_size: Checks that bijectors are not applied to inputs with
