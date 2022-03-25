@@ -121,46 +121,6 @@ py_test(
 )
 
 py_binary(
-    name = "latent_dirichlet_allocation_distributions",
-    srcs = ["latent_dirichlet_allocation_distributions.py"],
-    deps = [
-        ":latent_dirichlet_allocation_distributions_lib",
-    ],
-)
-
-py_library(
-    name = "latent_dirichlet_allocation_distributions_lib",
-    srcs = ["latent_dirichlet_allocation_distributions.py"],
-    deps = [
-        # absl/flags dep,
-        # absl/logging dep,
-        # numpy dep,
-        # scipy dep,
-        # six dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/distributions",
-    ],
-)
-
-py_test(
-    name = "latent_dirichlet_allocation_distributions_test",
-    size = "small",
-    srcs = ["latent_dirichlet_allocation_distributions.py"],
-    args = [
-        "--fake_data",
-        "--max_steps=5",
-        "--delete_existing",
-        "--viz_steps=5",
-        "--learning_rate=1e-7",
-    ],
-    main = "latent_dirichlet_allocation_distributions.py",
-    deps = [
-        ":latent_dirichlet_allocation_distributions_lib",
-    ],
-)
-
-py_binary(
     name = "logistic_regression",
     srcs = ["logistic_regression.py"],
     deps = [
@@ -204,44 +164,6 @@ py_library(
         # absl/flags dep,
         # six dep,
         # tensorflow dep,
-    ],
-)
-
-py_binary(
-    name = "vae",
-    srcs = ["vae.py"],
-    deps = [
-        ":vae_lib",
-    ],
-)
-
-py_library(
-    name = "vae_lib",
-    srcs = ["vae.py"],
-    deps = [
-        # absl/flags dep,
-        # numpy dep,
-        # six dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/distributions",
-    ],
-)
-
-py_test(
-    name = "vae_test",
-    size = "medium",
-    srcs = ["vae.py"],
-    args = [
-        "--fake_data",
-        "--max_steps=5",
-        "--delete_existing",
-        "--viz_steps=5",
-        "--learning_rate=1e-7",
-    ],
-    main = "vae.py",
-    deps = [
-        ":vae_lib",
     ],
 )
 
