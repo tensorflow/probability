@@ -24,6 +24,7 @@ from tensorflow_probability.python.bijectors import identity as identity_bijecto
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
+from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -269,19 +270,10 @@ class TwoPieceNormal(distribution.AutoCompositeTensorDistribution):
         loc=loc, scale=scale, skewness=skewness)
     sample_shape = ps.concat([[n], batch_shape], axis=0)
 
-    uniform_seed, normal_seed = samplers.split_seed(
-        seed, salt='two_piece_normal')
-    uniform_sample = samplers.uniform(
-        sample_shape, maxval=1., dtype=self.dtype, seed=uniform_seed)
-    normal_sample = samplers.normal(
-        sample_shape, dtype=self.dtype, seed=normal_seed)
+    samples = random_two_piece_normal(
+        sample_shape, skewness=skewness, seed=seed)
 
-    sample = tf.abs(normal_sample) * tf.where(
-        uniform_sample < tf.math.reciprocal(1. + skewness**2),
-        -tf.math.reciprocal(skewness),
-        skewness)
-
-    return loc + scale * sample
+    return loc + scale * samples
 
   def _log_prob(self, value):
     value = tf.convert_to_tensor(value, dtype_hint=self.dtype)
@@ -490,3 +482,197 @@ def quantile(value, loc, scale, skewness):
       cond, -tf.math.reciprocal(abs_skewness), abs_skewness)
 
   return loc + adj_scale * tf.math.sqrt(two * gamma_quantile)
+
+
+def _two_piece_normal_sample_no_gradient(shape, skewness, seed):
+  """Generate samples from Two-Piece Normal distribution.
+
+  The distribution is the Two-Piece Normal distribution with location zero,
+  scale one, and skewness `skewness`. To change the location and scale, use:
+
+  ```none
+  loc + scale * samples
+  ```
+
+  Args:
+    shape: 0D or 1D int32 Tensor. Shape of the generated samples.
+    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+
+  Returns:
+    A tensor with prepended dimensions `shape`.
+  """
+  uniform_seed, normal_seed = samplers.split_seed(
+      seed, salt='two_piece_normal_split')
+  uniform_samples = samplers.uniform(
+      shape, maxval=1., dtype=skewness.dtype, seed=uniform_seed)
+  normal_samples = samplers.normal(
+      shape, dtype=skewness.dtype, seed=normal_seed)
+
+  return tf.abs(normal_samples) * tf.where(
+      uniform_samples < tf.math.reciprocal(1. + skewness**2),
+      -tf.math.reciprocal(skewness),
+      skewness)
+
+
+def _two_piece_normal_sample_gradient(skewness, samples):
+  """Compute the gradients of Two-Piece Normal samples w.r.t. skewness.
+
+  This function computes the implicit reparameterization gradients [1]:
+
+  ```none
+  dz / dskewness = -(dF(z; skewness) / dskewness) / p(z; skewness)
+  ```
+
+  where `F(z; skewness)` and `p(z; skewness)` are the cdf and the pdf of the
+  Two-Piece Normal distribution with location zero, scale one, and skewness
+  `skewness`.
+
+  Args:
+    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
+    samples: Floating-point tensor; the samples of the distribution(s).
+
+  Returns:
+    A tensor with shape broadcast according to the arguments.
+
+  Reference:
+    [1]: Michael Figurnov, Shakir Mohamed, and Andriy Mnih.
+         Implicit Reparameterization Gradients. In _Advances in Neural
+         Information Processing Systems_, 31, 2018.
+         https://arxiv.org/abs/1805.08498
+  """
+  one = tf.constant(1., dtype=skewness.dtype)
+  two = tf.constant(2., dtype=skewness.dtype)
+  pi = tf.constant(np.pi, dtype=skewness.dtype)
+  four = tf.constant(4., dtype=skewness.dtype)
+
+  left_piece = samples < 0.
+  z = samples * tf.where(left_piece, skewness, tf.math.reciprocal(skewness))
+
+  double_skewness = two * skewness
+  squared_skewness = tf.math.square(skewness)
+  scale = tf.math.reciprocal(one + squared_skewness)
+  squared_scale = tf.math.square(scale)
+
+  ndtr_term = four * skewness * _numpy_cast(
+      special_math.ndtr(z), skewness.dtype)
+  exp_term = scale * tf.math.sqrt(two / pi) * tf.math.exp(
+      -tf.math.square(z) / two)
+  samples_term = samples * exp_term
+
+  grad_left_piece = samples_term - squared_scale * ndtr_term
+  grad_right_piece0 = scale * (ndtr_term - double_skewness) - samples_term
+  grad_right_piece1 = squared_scale * (double_skewness + squared_skewness * (
+      ndtr_term - double_skewness))
+  grad_right_piece = grad_right_piece0 - grad_right_piece1
+
+  cdf_grad = tf.where(left_piece, grad_left_piece, grad_right_piece)
+  prob = skewness * exp_term
+
+  return -cdf_grad / prob
+
+
+def _two_piece_normal_sample_fwd(shape, skewness, seed):
+  """Compute output, aux (collaborates with _two_piece_normal_sample_bwd)."""
+  samples = _two_piece_normal_sample_no_gradient(shape, skewness, seed)
+  return samples, (skewness, samples)
+
+
+def _two_piece_normal_sample_bwd(_, aux, dy):
+  """The gradients of Two Piece Normal samples w.r.t. skewness."""
+  skewness, samples = aux
+  broadcast_skewness = tf.broadcast_to(skewness, ps.shape(samples))
+
+  grad = dy * _two_piece_normal_sample_gradient(broadcast_skewness, samples)
+  # Sum over the sample dimensions. Assume that they are always the first
+  # ones.
+  num_sample_dimensions = (tf.rank(broadcast_skewness) -
+                           tf.rank(skewness))
+
+  # None gradients for seed
+  return tf.reduce_sum(grad, axis=tf.range(num_sample_dimensions)), None
+
+
+def _two_piece_normal_sample_jvp(shape, primals, tangents):
+  """Compute primals and tangents using implicit derivative."""
+  skewness, seed = primals
+  dskewness, dseed = tangents
+  del dseed
+
+  broadcast_skewness = tf.broadcast_to(skewness, shape)
+  broadcast_dskewness = tf.broadcast_to(dskewness, shape)
+
+  samples = _two_piece_normal_sample_no_gradient(shape, skewness, seed)
+  dsamples = broadcast_dskewness * _two_piece_normal_sample_gradient(
+      broadcast_skewness, samples)
+
+  return samples, dsamples
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_two_piece_normal_sample_fwd,
+    vjp_bwd=_two_piece_normal_sample_bwd,
+    jvp_fn=_two_piece_normal_sample_jvp,
+    nondiff_argnums=(0,))
+def _two_piece_normal_sample_with_gradient(shape, skewness, seed):
+  """Generate samples from Two-Piece Normal distribution.
+
+  The distribution is the Two-Piece Normal distribution with location zero,
+  scale one, and skewness `skewness`. To change the location and scale, use:
+
+  ```none
+  loc + scale * samples
+  ```
+
+  The samples are pathwise differentiable using the approach of [1].
+
+  Args:
+    shape: 0D or 1D int32 Tensor. Shape of the generated samples.
+    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+
+  Returns:
+    A tensor with prepended dimensions `shape`.
+
+  References:
+    [1]: Michael Figurnov, Shakir Mohamed, and Andriy Mnih.
+         Implicit Reparameterization Gradients. In _Advances in Neural
+         Information Processing Systems_, 31, 2018.
+         https://arxiv.org/abs/1805.08498
+  """
+  return _two_piece_normal_sample_no_gradient(shape, skewness, seed)
+
+
+def random_two_piece_normal(shape, skewness, seed=None):
+  """Generate samples from Two-Piece Normal distribution.
+
+  The distribution is the Two-Piece Normal distribution with location zero,
+  scale one, and skewness `skewness`. To change the location and scale, use:
+
+  ```none
+  loc + scale * samples
+  ```
+
+  The samples are pathwise differentiable using the approach of [1].
+
+  Note that skewness can be negative.
+
+  Args:
+    shape: The output sample shape.
+    skewness: The skewness(es) of the distribution(s).
+    seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+
+  Returns:
+    A tensor with prepended dimensions `shape`.
+
+  References:
+    [1]: Michael Figurnov, Shakir Mohamed, and Andriy Mnih.
+         Implicit Reparameterization Gradients. In _Advances in Neural
+         Information Processing Systems_, 31, 2018.
+         https://arxiv.org/abs/1805.08498
+  """
+  shape = ps.convert_to_shape_tensor(shape, dtype_hint=tf.int32)
+  skewness = tf.convert_to_tensor(skewness)
+  seed = samplers.sanitize_seed(seed, salt='two_piece_normal')
+
+  return _two_piece_normal_sample_with_gradient(shape, tf.abs(skewness), seed)
