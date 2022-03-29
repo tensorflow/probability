@@ -40,93 +40,6 @@ __all__ = [
 NUMPY_MODE = False
 
 
-def _numpy_cast(x, dtype):
-  # TODO(b/223684173): Many special math routines don't respect the input dtype.
-  if NUMPY_MODE:
-    return tf.cast(x, dtype)
-  else:
-    return x
-
-
-def standardize(value, loc, scale, skewness):
-  """Apply mean-variance-skewness standardization to input `value`.
-
-  Note that scale and skewness can be negative.
-
-  Args:
-    value: Floating-point tensor; the value(s) to be standardized.
-    loc: Floating-point tensor; the location(s) of the distribution(s).
-    scale: Floating-point tensor; the scale(s) of the distribution(s).
-    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
-
-  Returns:
-    A tensor with shape broadcast according to the arguments.
-  """
-  return (value - loc) / tf.math.abs(scale) * tf.math.abs(
-      tf.where(value < loc, skewness, tf.math.reciprocal(skewness)))
-
-
-def cdf(value, loc, scale, skewness):
-  """Compute cumulative distribution function of Two-Piece Normal distribution.
-
-  Note that scale and skewness can be negative.
-
-  Args:
-    value: Floating-point tensor; where to compute the cdf.
-    loc: Floating-point tensor; the location(s) of the distribution(s).
-    scale: Floating-point tensor; the scale(s) of the distribution(s).
-    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
-
-  Returns:
-    A tensor with shape broadcast according to the arguments.
-  """
-  one = tf.constant(1., dtype=loc.dtype)
-  two = tf.constant(2., dtype=loc.dtype)
-
-  z = standardize(value, loc=loc, scale=scale, skewness=skewness)
-  normal_cdf = _numpy_cast(special_math.ndtr(z), loc.dtype)
-
-  squared_skewness = tf.math.square(skewness)
-  return tf.math.reciprocal(one + squared_skewness) * tf.where(
-      z < 0.,
-      two * normal_cdf,
-      one - squared_skewness + two * squared_skewness * normal_cdf)
-
-
-def quantile(value, loc, scale, skewness):
-  """Compute quantile function (inverse cdf) of Two-Piece Normal distribution.
-
-  Note that scale and skewness can be negative.
-
-  Args:
-    value: Floating-point tensor; where to compute the quantile function.
-    loc: Floating-point tensor; the location(s) of the distribution(s).
-    scale: Floating-point tensor; the scale(s) of the distribution(s).
-    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
-
-  Returns:
-    A tensor with shape broadcast according to the arguments.
-  """
-  half = tf.constant(0.5, dtype=loc.dtype)
-  one = tf.constant(1., dtype=loc.dtype)
-  two = tf.constant(2., dtype=loc.dtype)
-
-  squared_skewness = tf.math.square(skewness)
-  cond = value < tf.math.reciprocal(one + squared_skewness)
-
-  # Here we use the following fact:
-  # X ~ Normal(loc=0, scale=1) => 2 * X**2 ~ Gamma(alpha=0.5, beta=1)
-  probs = (one - value * (one + squared_skewness)) * tf.where(
-      cond, one, -tf.math.reciprocal(squared_skewness))
-  gamma_quantile = _numpy_cast(tfp_math.igammainv(half, p=probs), loc.dtype)
-
-  abs_skewness = tf.math.abs(skewness)
-  adj_scale = tf.math.abs(scale) * tf.where(
-      cond, -tf.math.reciprocal(abs_skewness), abs_skewness)
-
-  return loc + adj_scale * tf.math.sqrt(two * gamma_quantile)
-
-
 class TwoPieceNormal(distribution.AutoCompositeTensorDistribution):
   """The Two-Piece Normal distribution.
 
@@ -490,3 +403,90 @@ class TwoPieceNormal(distribution.AutoCompositeTensorDistribution):
               self.skewness, message='Argument `skewness` must be positive.'))
 
     return assertions
+
+
+def _numpy_cast(x, dtype):
+  # TODO(b/223684173): Many special math routines don't respect the input dtype.
+  if NUMPY_MODE:
+    return tf.cast(x, dtype)
+  else:
+    return x
+
+
+def standardize(value, loc, scale, skewness):
+  """Apply mean-variance-skewness standardization to input `value`.
+
+  Note that scale and skewness can be negative.
+
+  Args:
+    value: Floating-point tensor; the value(s) to be standardized.
+    loc: Floating-point tensor; the location(s) of the distribution(s).
+    scale: Floating-point tensor; the scale(s) of the distribution(s).
+    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
+
+  Returns:
+    A tensor with shape broadcast according to the arguments.
+  """
+  return (value - loc) / tf.math.abs(scale) * tf.math.abs(
+      tf.where(value < loc, skewness, tf.math.reciprocal(skewness)))
+
+
+def cdf(value, loc, scale, skewness):
+  """Compute cumulative distribution function of Two-Piece Normal distribution.
+
+  Note that scale and skewness can be negative.
+
+  Args:
+    value: Floating-point tensor; where to compute the cdf.
+    loc: Floating-point tensor; the location(s) of the distribution(s).
+    scale: Floating-point tensor; the scale(s) of the distribution(s).
+    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
+
+  Returns:
+    A tensor with shape broadcast according to the arguments.
+  """
+  one = tf.constant(1., dtype=loc.dtype)
+  two = tf.constant(2., dtype=loc.dtype)
+
+  z = standardize(value, loc=loc, scale=scale, skewness=skewness)
+  normal_cdf = _numpy_cast(special_math.ndtr(z), loc.dtype)
+
+  squared_skewness = tf.math.square(skewness)
+  return tf.math.reciprocal(one + squared_skewness) * tf.where(
+      z < 0.,
+      two * normal_cdf,
+      one - squared_skewness + two * squared_skewness * normal_cdf)
+
+
+def quantile(value, loc, scale, skewness):
+  """Compute quantile function (inverse cdf) of Two-Piece Normal distribution.
+
+  Note that scale and skewness can be negative.
+
+  Args:
+    value: Floating-point tensor; where to compute the quantile function.
+    loc: Floating-point tensor; the location(s) of the distribution(s).
+    scale: Floating-point tensor; the scale(s) of the distribution(s).
+    skewness: Floating-point tensor; the skewness(es) of the distribution(s).
+
+  Returns:
+    A tensor with shape broadcast according to the arguments.
+  """
+  half = tf.constant(0.5, dtype=loc.dtype)
+  one = tf.constant(1., dtype=loc.dtype)
+  two = tf.constant(2., dtype=loc.dtype)
+
+  squared_skewness = tf.math.square(skewness)
+  cond = value < tf.math.reciprocal(one + squared_skewness)
+
+  # Here we use the following fact:
+  # X ~ Normal(loc=0, scale=1) => 2 * X**2 ~ Gamma(alpha=0.5, beta=1)
+  probs = (one - value * (one + squared_skewness)) * tf.where(
+      cond, one, -tf.math.reciprocal(squared_skewness))
+  gamma_quantile = _numpy_cast(tfp_math.igammainv(half, p=probs), loc.dtype)
+
+  abs_skewness = tf.math.abs(skewness)
+  adj_scale = tf.math.abs(scale) * tf.where(
+      cond, -tf.math.reciprocal(abs_skewness), abs_skewness)
+
+  return loc + adj_scale * tf.math.sqrt(two * gamma_quantile)
