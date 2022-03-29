@@ -419,6 +419,11 @@ def standardize(value, loc, scale, skewness):
   Returns:
     A tensor with shape broadcast according to the arguments.
   """
+  value = tf.convert_to_tensor(value)
+  loc = tf.convert_to_tensor(loc)
+  scale = tf.convert_to_tensor(scale)
+  skewness = tf.convert_to_tensor(skewness)
+
   return (value - loc) / tf.math.abs(scale) * tf.math.abs(
       tf.where(value < loc, skewness, tf.math.reciprocal(skewness)))
 
@@ -437,11 +442,17 @@ def cdf(value, loc, scale, skewness):
   Returns:
     A tensor with shape broadcast according to the arguments.
   """
-  one = tf.constant(1., dtype=loc.dtype)
-  two = tf.constant(2., dtype=loc.dtype)
+  value = tf.convert_to_tensor(value)
+  loc = tf.convert_to_tensor(loc)
+  scale = tf.convert_to_tensor(scale)
+  skewness = tf.convert_to_tensor(skewness)
+  dtype = value.dtype
+
+  one = tf.constant(1., dtype=dtype)
+  two = tf.constant(2., dtype=dtype)
 
   z = standardize(value, loc=loc, scale=scale, skewness=skewness)
-  normal_cdf = _numpy_cast(special_math.ndtr(z), loc.dtype)
+  normal_cdf = _numpy_cast(special_math.ndtr(z), dtype)
 
   squared_skewness = tf.math.square(skewness)
   return tf.math.reciprocal(one + squared_skewness) * tf.where(
@@ -464,9 +475,15 @@ def quantile(value, loc, scale, skewness):
   Returns:
     A tensor with shape broadcast according to the arguments.
   """
-  half = tf.constant(0.5, dtype=loc.dtype)
-  one = tf.constant(1., dtype=loc.dtype)
-  two = tf.constant(2., dtype=loc.dtype)
+  value = tf.convert_to_tensor(value)
+  loc = tf.convert_to_tensor(loc)
+  scale = tf.convert_to_tensor(scale)
+  skewness = tf.convert_to_tensor(skewness)
+  dtype = value.dtype
+
+  half = tf.constant(0.5, dtype=dtype)
+  one = tf.constant(1., dtype=dtype)
+  two = tf.constant(2., dtype=dtype)
 
   squared_skewness = tf.math.square(skewness)
   cond = value < tf.math.reciprocal(one + squared_skewness)
@@ -475,7 +492,7 @@ def quantile(value, loc, scale, skewness):
   # X ~ Normal(loc=0, scale=1) => 2 * X**2 ~ Gamma(alpha=0.5, beta=1)
   probs = (one - value * (one + squared_skewness)) * tf.where(
       cond, one, -tf.math.reciprocal(squared_skewness))
-  gamma_quantile = _numpy_cast(tfp_math.igammainv(half, p=probs), loc.dtype)
+  gamma_quantile = _numpy_cast(tfp_math.igammainv(half, p=probs), dtype)
 
   abs_skewness = tf.math.abs(skewness)
   adj_scale = tf.math.abs(scale) * tf.where(
