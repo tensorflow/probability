@@ -705,6 +705,7 @@ multi_substrate_py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/internal:empirical_statistical_testing",
         "//tensorflow_probability/python/internal/backend/numpy",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -724,16 +725,23 @@ multi_substrate_py_test(
     ],
 )
 
-# Not part of test_util to segregate the scipy dependency.  Though,
-# maybe that segregation is futile, since TF (apparently) depends on
-# scipy anyway (through Keras).
 multi_substrate_py_library(
-    name = "test_util_scipy",
+    name = "empirical_statistical_testing",
 #     testonly = 1,  # DisableOnExport
-    srcs = ["test_util_scipy.py"],
+    srcs = ["empirical_statistical_testing.py"],
     deps = [
         # numpy dep,
         # scipy dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "empirical_statistical_testing_test",
+    srcs = ["empirical_statistical_testing_test.py"],
+    deps = [
+        ":empirical_statistical_testing",
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

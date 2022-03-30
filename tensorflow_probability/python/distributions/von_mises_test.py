@@ -258,8 +258,7 @@ class _VonMisesTest(object):
 
     kl_actual = tfd.kl_divergence(d1, d2)
     x = d1.sample(int(1e5), seed=test_util.test_seed(hardcoded_seed=0))
-    kl_sample = tf.reduce_mean(
-        d1.log_prob(x) - d2.log_prob(x), axis=0)
+    kl_sample = d1.log_prob(x) - d2.log_prob(x)
     kl_same = tfd.kl_divergence(d1, d1)
 
     [kl_actual_val, kl_sample_val,
@@ -269,7 +268,8 @@ class _VonMisesTest(object):
     kl_expected = np.array([[0.15402061, 0.02212654, 0.00282222],
                             [0.15402061, 0.02212654, 0.00671171]])
     self.assertAllClose(kl_actual_val, kl_expected)
-    self.assertAllClose(kl_actual_val, kl_sample_val, atol=0., rtol=1e-1)
+    self.assertAllMeansClose(
+        kl_sample_val, kl_actual_val, axis=0, atol=0., rtol=1e-1)
     self.assertAllClose(kl_same_val, np.zeros((1, 3)))
 
   def testVonMisesSampleMoments(self):

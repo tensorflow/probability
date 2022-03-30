@@ -31,6 +31,7 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import empirical_statistical_testing
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -78,10 +79,16 @@ flags.DEFINE_bool('vary_seed', False,
 
 flags.DEFINE_string('fixed_seed', None,
                     ('PRNG seed to initialize every test with.  '
-                     'Takes precedence over --vary-seed when both appear.'),
+                     'Takes precedence over --vary_seed when both appear.'),
                     allow_override=True,
                     allow_override_cpp=False,
                     allow_hide_cpp=True)
+
+flags.DEFINE_enum('analyze_calibration', 'none',
+                  ['none', 'brief', 'full'],
+                  ('If set, auto-fails assertAllMeansClose and prints '
+                   'a report of how failure-prone the test is.'),
+                  allow_override=True)
 
 FLAGS = flags.FLAGS
 
@@ -337,6 +344,119 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         'For each element expected `a is b` but found `not is` in positions {}'
         .format([i for i, x in enumerate(each_is) if not x]))
     raise AssertionError(msg)
+
+  def assertAllMeansClose(
+      self, to_reduce, expected, axis, atol=1e-6, rtol=1e-6, msg=None):
+    """Assert means of `to_reduce` along `axis` as `expected`, with diagnostics.
+
+    Operationally, this is equivalent to
+
+    ```
+    means = tf.reduce_mean(to_reduce, axis)
+    assertAllClose(means, expected, atol, rtol, msg)
+    ```
+
+    except that by intercepting samples before the reduction is
+    carried out, `assertAllMeansClose` can diagnose the statistical
+    significance of failures.
+
+    Specifically, `to_reduce` is assumed to be sampled IID along
+    `axis`.  Based on this, it's possible to estimate the probability
+    of `assertAllMeansClose` failing as the upstream PRNG seed is
+    varied, and suggest parameter changes to control that probability.
+    To assess a particular test statistically, run it with
+
+    ```
+    --test_arg=--vary_seed --test_arg=--analyze_calibration=brief
+    ```
+
+    or
+
+    ```
+    --test_arg=--vary_seed --test_arg=--analyze_calibration=full
+    ```
+
+    To avoid bias in the reported diagnostics, either value of
+    `--analyze_calibration` force-fails the assertion; diagnostics are
+    reported independently of whether the current sample's mean is
+    close to `expected` or not.
+
+    Caveats:
+
+    - `--vary_seed` is important to prevent bias: if
+      `--analyze_calibration` is not passed, `assertAllMeansClose`
+      only fails if the mean of `to_reduce` is far from `expected`.  A
+      seed that is brought to your attention by this happening is by
+      construction unlucky, and diagnostics reported from it (e.g., by
+      passing `--analyze_calibration` but not `--vary_seed`) will be
+      overly pessimistic.
+
+    - The report produced by `assertAllMeansClose` only assesses
+      significance; i.e., assuming the test and the code under test
+      are correct, how should the parameters of the test be set to
+      control accidental failures.  Sometimes, a bug will manifest as
+      absurd suggestions for making the test pass---it's up to the
+      user to notice this happening.
+
+    - The report makes assumptions it does not test:
+
+      - that the elements of `to_reduce` actually are IID along `axis`;
+
+      - that there are enough of them that the empirical distribution
+        observed by one call to `assertAllMeansClose` is a good
+        approximation to the true generating distribution; and
+
+      - in the case of the Gaussian extrapolation, that there are
+        enough samples that the distribution on means is approximately
+        Gaussian.
+
+    - The suggestions in the report are extrapolations based on a
+      random sample.  They may vary across runs and are not guaranteed
+      to be accurate.  In particular, if increasing the number of
+      samples a test draws, it's reasonable to rerun the diagnostics,
+      because they now have more information to work with.
+
+    Args:
+      to_reduce: Tensor of samples, presumed IID along `axis`.
+        Other dimensions are taken to be batch dimensions.
+      expected: Tensor of expected mean values.  Must broadcast
+        with the reduction of `to_reduce` along `axis`.
+      axis: Python `int` giving the reduction axis.
+      atol: Tensor of absolute tolerances for the means.  Must
+        broadcast with the reduction of `to_reduce` along `axis`.
+      rtol: Tensor of relative tolerances for the means.  Must
+        broadcast with the reduction of `to_reduce` along `axis`.
+      msg: Optional string to insert into the failure message,
+        if any.
+
+    """
+    mean = tf.reduce_mean(to_reduce, axis=axis)
+    if FLAGS.analyze_calibration == 'none':
+      msg = (msg or '') + '\nTo assess statistically, run with'
+      msg += '\n  --test_arg=--vary_seed --test_arg=--analyze_calibration=brief'
+      msg += '\nor'
+      msg += '\n  --test_arg=--vary_seed --test_arg=--analyze_calibration=full'
+      self.assertAllClose(mean, expected, atol=atol, rtol=rtol, msg=msg)
+    else:
+      to_reduce = self._GetNdArray(to_reduce)
+      expected = self._GetNdArray(expected)
+      if msg is None:
+        msg = ''
+      else:
+        msg += '\n'
+      if FLAGS.analyze_calibration == 'brief':
+        msg += empirical_statistical_testing.brief_report(
+            to_reduce, expected, axis, atol, rtol)
+        msg += ('\nFor more information, run with '
+                '--test_arg=--analyze_calibration=full.')
+      else:
+        msg += empirical_statistical_testing.full_report(
+            to_reduce, expected, axis, atol, rtol)
+      if not FLAGS.vary_seed and FLAGS.fixed_seed is None:
+        msg += '\nWARNING: Above report may be biased as --vary_seed='
+        msg += 'False and --fixed_seed is not set.  '
+        msg += 'See docstring of `assertAllMeansClose`.'
+      raise AssertionError(msg)
 
   def evaluate_dict(self, dictionary):
     """Invokes `self.evaluate` on the `Tensor`s in `dictionary`.
