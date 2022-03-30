@@ -350,6 +350,22 @@ class _TwoPieceNormalTest(object):
       self.assertIsNotNone(grads[1])  # d/d scale
       self.assertIsNotNone(grads[2])  # d/d skewness
 
+  @test_util.numpy_disable_gradient_test
+  def testDifferentiableSampleNumerically(self):
+    def sampler(loc, scale, skewness):
+      dist = tfd.TwoPieceNormal(
+          loc, scale=scale, skewness=skewness, validate_args=True)
+      n = int(2e5)
+      return tf.reduce_mean(dist.sample(n, seed=test_util.test_seed()))
+
+    loc = tf.constant(0.1, self.dtype)
+    scale = tf.constant(1.1, self.dtype)
+
+    for skewness in [0.75, 1., 1.33]:
+      err = self.compute_max_gradient_error(
+        sampler, [loc, scale, tf.constant(skewness, self.dtype)], delta=0.1)
+      self.assertLess(err, 0.05)
+
   def testNegativeScaleSkewnessFails(self):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       dist = tfd.TwoPieceNormal(
