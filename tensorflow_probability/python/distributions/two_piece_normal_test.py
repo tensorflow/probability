@@ -15,6 +15,7 @@
 """Tests for Two-Piece Normal distribution."""
 
 # Dependency imports
+import itertools
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -154,28 +155,29 @@ class _TwoPieceNormalTest(object):
         self.assertAllEqual(dist.batch_shape, self.evaluate(result).shape)
 
   def testSample(self):
-    dist = self.make_two_piece_normals()
-
+    one = tf.constant(1., dtype=self.dtype)
     seed_stream = test_util.test_seed_stream()
 
-    n = 100_000
-    one = tf.constant(1., dtype=self.dtype)
+    dists = (self.make_two_piece_normal(), self.make_two_piece_normals())
+    n = int(3e2)
+    sample_shapes = ([n, n], [n * n])
 
-    sample = dist.sample(n, seed=seed_stream())
+    for dist, sample_shape in itertools.product(dists, sample_shapes):
+      sample = dist.sample(sample_shape, seed=seed_stream())
 
-    uniform_sample = tf.random.uniform(
-        sample.shape, maxval=1., dtype=self.dtype, seed=seed_stream())
-    sign = tf.where(uniform_sample < 0.5, -one, one)
-    normal_sample = self.evaluate(sign * tfd.two_piece_normal.standardize(
-        sample, loc=dist.loc, scale=dist.scale, skewness=dist.skewness))
+      uniform_sample = tf.random.uniform(
+          sample.shape, maxval=1., dtype=self.dtype, seed=seed_stream())
+      sign = tf.where(uniform_sample < 0.5, -one, one)
+      normal_sample = self.evaluate(sign * tfd.two_piece_normal.standardize(
+          sample, loc=dist.loc, scale=dist.scale, skewness=dist.skewness))
 
-    # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
-    # The sample variance similarly is dependent on scale and n.
-    # Thus, the tolerances below are very sensitive to number of samples
-    # as well as the variances chosen.
-    self.assertAllEqual(normal_sample.shape, [n] + dist.batch_shape)
-    self.assertAllClose(np.mean(normal_sample), 0.0, atol=0.1)
-    self.assertAllClose(np.std(normal_sample), 1.0, atol=0.1)
+      # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
+      # The sample variance similarly is dependent on scale and n.
+      # Thus, the tolerances below are very sensitive to number of samples
+      # as well as the variances chosen.
+      self.assertAllEqual(normal_sample.shape, sample_shape + dist.batch_shape)
+      self.assertAllClose(np.mean(normal_sample), 0.0, atol=0.1)
+      self.assertAllClose(np.std(normal_sample), 1.0, atol=0.1)
 
   def testLogPDF(self):
     dist = self.make_two_piece_normals()
