@@ -261,10 +261,10 @@ class DirichletTest(test_util.TestCase):
     d1 = tfd.Dirichlet(conc1)
     d2 = tfd.Dirichlet(conc2)
     x = d1.sample(int(1e4), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(d1.log_prob(x) - d2.log_prob(x), axis=0)
+    kl_samples = d1.log_prob(x) - d2.log_prob(x)
     kl_actual = tfd.kl_divergence(d1, d2)
 
-    kl_sample_val = self.evaluate(kl_sample)
+    kl_samples_ = self.evaluate(kl_samples)
     kl_actual_val = self.evaluate(kl_actual)
 
     self.assertEqual(conc1.shape[:-1], kl_actual.shape)
@@ -278,7 +278,8 @@ class DirichletTest(test_util.TestCase):
                                         np.sum(conc1, -1, keepdims=True))), -1))
 
     self.assertAllClose(kl_expected, kl_actual_val, atol=0., rtol=1e-5)
-    self.assertAllClose(kl_sample_val, kl_actual_val, atol=0., rtol=1e-1)
+    self.assertAllMeansClose(
+        kl_samples_, kl_actual_val, axis=0, atol=0., rtol=1e-1)
 
     # Make sure KL(d1||d1) is 0
     kl_same = self.evaluate(tfd.kl_divergence(d1, d1))

@@ -271,7 +271,7 @@ class MultinomialTest(test_util.TestCase):
     sample_var = tf.linalg.diag_part(sample_cov)
     sample_stddev = tf.sqrt(sample_var)
     [
-        sample_mean_,
+        x_,
         sample_cov_,
         sample_var_,
         sample_stddev_,
@@ -280,7 +280,7 @@ class MultinomialTest(test_util.TestCase):
         analytic_var,
         analytic_stddev,
     ] = self.evaluate([
-        sample_mean,
+        x,
         sample_cov,
         sample_var,
         sample_stddev,
@@ -289,7 +289,7 @@ class MultinomialTest(test_util.TestCase):
         dist.variance(),
         dist.stddev(),
     ])
-    self.assertAllClose(sample_mean_, analytic_mean, atol=0.1, rtol=0.1)
+    self.assertAllMeansClose(x_, analytic_mean, axis=0, atol=0.1, rtol=0.1)
     self.assertAllClose(sample_cov_, analytic_cov, atol=0.1, rtol=0.1)
     self.assertAllClose(sample_var_, analytic_var, atol=0.1, rtol=0.1)
     self.assertAllClose(sample_stddev_, analytic_stddev, atol=0.1, rtol=0.1)
@@ -307,18 +307,18 @@ class MultinomialTest(test_util.TestCase):
     sample_covariance = tf.matmul(
         x_centered, x_centered, adjoint_b=True) / n
     [
-        sample_mean_,
+        x_,
         sample_covariance_,
         actual_mean_,
         actual_covariance_,
     ] = self.evaluate([
-        sample_mean,
+        x,
         sample_covariance,
         dist.mean(),
         dist.covariance(),
     ])
     self.assertAllEqual([4, 3, 2], sample_mean.shape)
-    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.10)
+    self.assertAllMeansClose(x_, actual_mean_, axis=0, atol=0., rtol=0.10)
     self.assertAllEqual([4, 3, 2, 2], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
@@ -335,18 +335,18 @@ class MultinomialTest(test_util.TestCase):
     sample_covariance = tf.matmul(
         x_centered, x_centered, adjoint_a=True) / n
     [
-        sample_mean_,
+        x_,
         sample_covariance_,
         actual_mean_,
         actual_covariance_,
     ] = self.evaluate([
-        sample_mean,
+        x,
         sample_covariance,
         dist.mean(),
         dist.covariance(),
     ])
     self.assertAllEqual([4], sample_mean.shape)
-    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.10)
+    self.assertAllMeansClose(x_, actual_mean_, axis=0, atol=0., rtol=0.10)
     self.assertAllEqual([4, 4], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)

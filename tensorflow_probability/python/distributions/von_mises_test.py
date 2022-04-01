@@ -291,17 +291,20 @@ class _VonMisesTest(object):
 
     expected_variance = von_mises.variance()
     standardized_samples = samples - tf.expand_dims(von_mises.mean(), 0)
-    actual_variance = 1. - tf.reduce_mean(
-        tf.cos(standardized_samples), axis=0)
+    variance_samples = 1. - tf.cos(standardized_samples)
 
     [
         expected_mean_val, expected_variance_val, actual_mean_val,
-        actual_variance_val
+        variance_samples_
     ] = self.evaluate(
-        [expected_mean, expected_variance, actual_mean, actual_variance])
+        [expected_mean, expected_variance, actual_mean, variance_samples])
 
-    self.assertAllClose(expected_mean_val, actual_mean_val, rtol=0.1)
-    self.assertAllClose(expected_variance_val, actual_variance_val, rtol=0.1)
+    # TODO(axch, cgs): atan2(means) is not mean(atan2), but maybe there
+    # is a formulation of what this is testing that does use IID samples
+    # and is amenable to assertAllMeansClose?
+    self.assertAllClose(actual_mean_val, expected_mean_val, rtol=0.1)
+    self.assertAllMeansClose(
+        variance_samples_, expected_variance_val, axis=0, rtol=0.1)
 
   def testVonMisesSampleVarianceUniform(self):
     von_mises = tfd.VonMises(
@@ -314,11 +317,10 @@ class _VonMisesTest(object):
     # so only checking the variance.
     expected_variance = 1.
     standardized_samples = samples - tf.expand_dims(von_mises.mean(), 0)
-    actual_variance = 1. - tf.reduce_mean(
-        tf.cos(standardized_samples), axis=0)
+    variance_samples = 1. - tf.cos(standardized_samples)
 
-    self.assertAllClose(
-        expected_variance, self.evaluate(actual_variance), rtol=0.1)
+    self.assertAllMeansClose(
+        self.evaluate(variance_samples), expected_variance, axis=0, rtol=0.1)
 
   def testVonMisesSampleKsTest(self):
     concentrations_v = np.logspace(-3, 3, 50)

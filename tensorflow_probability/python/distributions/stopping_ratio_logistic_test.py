@@ -121,11 +121,10 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     b = tfd.StoppingRatioLogistic(cutpoints=b_cutpoints, loc=loc)
 
     samples = a.sample(int(1e5), seed=test_util.test_seed())
-    sampled_kl = self.evaluate(
-        tf.reduce_mean(a.log_prob(samples) - b.log_prob(samples)))
+    kl_samples = self.evaluate(a.log_prob(samples) - b.log_prob(samples))
     kl = self.evaluate(tfd.kl_divergence(a, b))
 
-    self.assertAllClose(sampled_kl, kl, atol=2e-2)
+    self.assertAllMeansClose(kl_samples, kl, axis=0, atol=2e-2)
 
   def testUnorderedCutpointsFails(self):
     with self.assertRaisesRegexp(

@@ -337,11 +337,11 @@ class LaplaceTest(test_util.TestCase):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e4), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_samples = a.log_prob(x) - b.log_prob(x)
 
-    true_kl_, kl_, kl_sample_ = self.evaluate([true_kl, kl, kl_sample])
-    self.assertAllClose(true_kl_, kl_, atol=1e-5, rtol=1e-5)
-    self.assertAllClose(true_kl_, kl_sample_, atol=0., rtol=1e-1)
+    true_kl_, kl_, kl_samples_ = self.evaluate([true_kl, kl, kl_samples])
+    self.assertAllClose(kl_, true_kl_, atol=1e-5, rtol=1e-5)
+    self.assertAllMeansClose(kl_samples_, true_kl_, axis=0, atol=0., rtol=1e-1)
 
     zero_kl = tfd.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl), zero_kl])

@@ -102,14 +102,14 @@ class LogNormalTest(test_util.TestCase):
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
     x = ln_a.sample(int(2e5), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(ln_a.log_prob(x) - ln_b.log_prob(x), axis=0)
-    kl_sample_ = self.evaluate(kl_sample)
+    kl_samples = ln_a.log_prob(x) - ln_b.log_prob(x)
+    kl_samples_ = self.evaluate(kl_samples)
 
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected_from_normal)
     self.assertAllClose(kl_val, kl_expected_from_formula)
-    self.assertAllClose(
-        kl_expected_from_formula, kl_sample_, atol=0.0, rtol=1e-2)
+    self.assertAllMeansClose(
+        kl_samples_, kl_expected_from_formula, axis=0, atol=0.0, rtol=1e-2)
 
   # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
   # def testPdfAtBoundary(self):

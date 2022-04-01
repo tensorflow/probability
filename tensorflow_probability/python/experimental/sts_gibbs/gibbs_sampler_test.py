@@ -370,6 +370,9 @@ class GibbsSamplerTests(test_util.TestCase):
          tfp.stats.covariance(latents_samples,
                               sample_axis=0,
                               event_axis=-1)))
+    # TODO(axch, cgs): Can we use assertAllMeansClose here?  The
+    # latents_samples are presumably not IID across axis=0, so the
+    # statistical assumptions are not satisfied.
     self.assertAllClose(latents_means_,
                         posterior_means_, atol=0.1)
     self.assertAllClose(latents_covs_,
@@ -490,6 +493,9 @@ class GibbsSamplerTests(test_util.TestCase):
         axis=-2)
     # Increasing `num_timesteps` relative to `num_features` would give more
     # precise weight estimates, at the cost of longer test runtime.
+    # TODO(axch, cgs): Can we use assertAllMeansClose here too?  The
+    # samples are presumably not IID across axis=0, so the
+    # statistical assumptions are not satisfied.
     self.assertAllClose(mean_weights, true_weights, atol=0.3)
     self.assertAllClose(nonzero_probs, [0., 0., 1., 0., 1.], atol=0.2)
 
