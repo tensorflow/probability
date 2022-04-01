@@ -29,7 +29,7 @@ tfb = tfp.bijectors
 class StoppingRatioLogisticTest(test_util.TestCase):
 
   def _random_cutpoints(self, shape):
-    return self._ordered.inverse(self._rng.randn(*shape))
+    return self._ascending.forward(self._rng.randn(*shape))
 
   def _random_location(self, shape):
     return self._rng.randn(*shape)
@@ -38,7 +38,7 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     return self._rng.multinomial(1, *shape)
 
   def setUp(self):
-    self._ordered = tfb.Ordered()
+    self._ascending = tfb.Ascending()
     self._rng = test_util.test_np_rng()
     super(StoppingRatioLogisticTest, self).setUp()
 

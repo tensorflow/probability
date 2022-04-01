@@ -59,7 +59,6 @@ from tensorflow_probability.python.bijectors.masked_autoregressive import Masked
 from tensorflow_probability.python.bijectors.matrix_inverse_tril import MatrixInverseTriL
 from tensorflow_probability.python.bijectors.moyal_cdf import MoyalCDF
 from tensorflow_probability.python.bijectors.normal_cdf import NormalCDF
-from tensorflow_probability.python.bijectors.ordered import Ordered
 from tensorflow_probability.python.bijectors.pad import Pad
 from tensorflow_probability.python.bijectors.permute import Permute
 from tensorflow_probability.python.bijectors.power import Power
@@ -143,7 +142,6 @@ __all__ = [
     "MatvecLU",
     "MoyalCDF",
     "NormalCDF",
-    "Ordered",
     "Pad",
     "Permute",
     "Power",
