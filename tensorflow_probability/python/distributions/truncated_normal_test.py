@@ -302,6 +302,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
       expected_mode = loc
     self.assertAlmostEqual(mode, expected_mode)
 
+  @test_util.numpy_disable_gradient_test
   @parameterized.parameters((np.float32), (np.float64))
   def testReparametrizable(self, dtype=np.float32):
     loc = dtype(0.1)
@@ -322,6 +323,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     # These gradients are noisy due to sampling.
     self.assertLess(err, 0.05)
 
+  @test_util.numpy_disable_gradient_test
   def testReparametrizableBatch(self):
     def samples_sum(loc):
       dist = tfp.distributions.TruncatedNormal(
@@ -332,6 +334,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     _, dy_loc = self.evaluate(tfp.math.value_and_gradient(samples_sum, loc))
     self.assertAllGreaterEqual(dy_loc, 0.)
 
+  @test_util.numpy_disable_gradient_test
   @parameterized.parameters(
       itertools.product((np.float32, np.float64),
                         ('prob', 'log_prob', 'cdf', 'log_cdf',
@@ -355,6 +358,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
     err = self.compute_max_gradient_error(f, [loc, scale])
     self.assertLess(err, 1e-2)
 
+  @test_util.numpy_disable_gradient_test
   @parameterized.parameters(
       itertools.product((np.float32, np.float64),
                         ('entropy', 'mean', 'variance', 'mode'))
@@ -405,6 +409,8 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
 @test_util.test_graph_mode_only
 class TruncatedNormalTestGraphMode(_TruncatedNormalTestCase):
 
+  @test_util.numpy_disable_test_missing_functionality(
+      'This is a regression test for TF-graph mode.')
   @parameterized.named_parameters(
       {'testcase_name': '_float32', 'dtype': tf.float32},
       {'testcase_name': '_float64', 'dtype': tf.float64})
@@ -420,8 +426,10 @@ class TruncatedNormalTestGraphMode(_TruncatedNormalTestCase):
     batch_lp = dist.log_prob(sample)
     pfor_lp = tf.vectorized_map(dist.log_prob, sample)
     batch_lp_, pfor_lp_ = self.evaluate((batch_lp, pfor_lp))
-    self.assertAllClose(batch_lp_, pfor_lp_, atol=1e-6)
+    self.assertAllClose(batch_lp_, pfor_lp_, atol=2e-6)
 
+  @test_util.numpy_disable_test_missing_functionality(
+      'This is a regression test for TF-graph mode.')
   @parameterized.named_parameters(
       {'testcase_name': '_float32', 'dtype': tf.float32},
       {'testcase_name': '_float64', 'dtype': tf.float64})

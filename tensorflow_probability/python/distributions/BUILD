@@ -3935,7 +3935,6 @@ multi_substrate_py_test(
     name = "truncated_normal_test",
     srcs = ["truncated_normal_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     shard_count = 10,
     deps = [
         # absl/testing:parameterized dep,
