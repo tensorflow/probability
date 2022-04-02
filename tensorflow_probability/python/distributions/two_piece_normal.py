@@ -221,9 +221,7 @@ class TwoPieceNormal(distribution.AutoCompositeTensorDistribution):
           skewness, dtype=dtype, name='skewness')
       super().__init__(
           dtype=dtype,
-          # skewness contributes to a discrete choice. The other two variables
-          # are fine.
-          reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
+          reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
           validate_args=validate_args,
           allow_nan_stats=allow_nan_stats,
           parameters=parameters,
