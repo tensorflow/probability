@@ -352,19 +352,52 @@ class _TwoPieceNormalTest(object):
 
   @test_util.numpy_disable_gradient_test
   def testDifferentiableSampleNumerically(self):
-    def sampler(loc, scale, skewness):
+    """Test the gradients of the samples w.r.t. skewness."""
+    sample_shape = [int(2e5)]
+    seed = test_util.test_seed()
+
+    def sampler(skewness):
+      loc = tf.constant(0., self.dtype)
+      scale = tf.constant(1., self.dtype)
       dist = tfd.TwoPieceNormal(
           loc, scale=scale, skewness=skewness, validate_args=True)
-      n = int(2e5)
-      return tf.reduce_mean(dist.sample(n, seed=test_util.test_seed()))
-
-    loc = tf.constant(0.1, self.dtype)
-    scale = tf.constant(1.1, self.dtype)
+      return tf.reduce_mean(dist.sample(sample_shape, seed=seed))
 
     for skewness in [0.75, 1., 1.33]:
       err = self.compute_max_gradient_error(
-        sampler, [loc, scale, tf.constant(skewness, self.dtype)], delta=0.1)
+          sampler, [tf.constant(skewness, self.dtype)], delta=0.1)
       self.assertLess(err, 0.05)
+
+  @test_util.numpy_disable_gradient_test
+  def testDifferentiableSampleAnalytically(self):
+    """Test the gradients of the samples w.r.t. loc and scale."""
+    n = 100
+    sample_shape = [n, n]
+    n_samples = np.prod(sample_shape)
+
+    n_params = 20
+    loc = tf.constant(
+        np.linspace(-3., stop=3., num=n_params), dtype=self.dtype)
+    scale = tf.constant(
+        np.linspace(0.1, stop=10., num=n_params), dtype=self.dtype)
+    skewness = tf.constant(
+        np.linspace(0.75, stop=1.33, num=n_params), dtype=self.dtype)
+
+    seed = test_util.test_seed()
+
+    def sampler(loc, scale):
+      dist = tfd.TwoPieceNormal(
+          loc=loc, scale=scale, skewness=skewness, validate_args=True)
+      return dist.sample(sample_shape, seed=seed)
+
+    samples, dsamples = tfp.math.value_and_gradient(sampler, [loc, scale])
+    dloc_auto, dscale_auto = [grad / n_samples for grad in dsamples]
+
+    dloc_calc = tf.ones([n_params], dtype=self.dtype)
+    dscale_calc = tf.reduce_mean((samples - loc) / scale, axis=[0, 1])
+
+    self.assertAllClose(dloc_auto, dloc_calc)
+    self.assertAllClose(dscale_auto, dscale_calc)
 
   def testNegativeScaleSkewnessFails(self):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
