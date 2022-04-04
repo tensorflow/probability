@@ -770,8 +770,11 @@ def _build_sampler_loop_body(model,
         observation_noise_variance_prior_scale=(
             observation_noise_variance_prior.scale),
         observation_noise_variance_upper_bound=(
-            observation_noise_variance_prior.upper_bound if hasattr(
-                observation_noise_variance_prior, 'upper_bound') else None),
+            # The given bound is for the scale, so it must be squared to get the
+            # upper bound for the variance.
+            tf.math.square(observation_noise_variance_prior.upper_bound)
+            if hasattr(observation_noise_variance_prior, 'upper_bound')
+            else None),
         **({
             'default_pseudo_observations': default_pseudo_observations
         } if default_pseudo_observations is not None else {}))
