@@ -51,6 +51,7 @@ __all__ = [
     'is_tensor',
     'name_scope',
     'newaxis',
+    'recompute_grad',
     'register_tensor_conversion_function',
     'stop_gradient',
     'GradientTape',
@@ -531,6 +532,14 @@ class name_scope(object):  # pylint: disable=invalid-name
 
 
 newaxis = np.newaxis
+
+if JAX_MODE:
+  from jax import remat  # pylint: disable=g-import-not-at-top
+  recompute_grad = utils.copy_docstring(
+      'tf.recompute_grad',
+      remat)
+else:
+  recompute_grad = lambda x: x
 
 if JAX_MODE:
   from jax import lax  # pylint: disable=g-import-not-at-top

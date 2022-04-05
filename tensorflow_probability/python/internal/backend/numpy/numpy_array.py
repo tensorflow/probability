@@ -387,6 +387,12 @@ def _unstack(value, num=None, axis=0, name='unstack'):
       for x in np.split(value, value.shape[axis] if num is None else num, axis))
 
 
+def _where(condition, x=None, y=None, name='where'):  # pylint: disable=unused-argument
+  if x is None and y is None:
+    return np.stack(np.asarray(condition).nonzero(), axis=-1)
+  return np.where(condition, x, y)
+
+
 def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
   return np.zeros_like(input, dtype=utils.numpy_dtype(dtype))
 
@@ -510,7 +516,7 @@ unstack = utils.copy_docstring(
 
 where = utils.copy_docstring(
     'tf.where',
-    lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
+    _where)
 
 zeros = utils.copy_docstring(
     'tf.zeros',
