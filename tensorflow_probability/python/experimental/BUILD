@@ -37,7 +37,6 @@ multi_substrate_py_library(
     ],
     substrates_omit_deps = [
         "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
         "//tensorflow_probability/python/experimental/nn",
         "//tensorflow_probability/python/experimental/sts_gibbs",

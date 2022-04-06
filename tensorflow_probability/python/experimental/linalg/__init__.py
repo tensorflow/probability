@@ -15,6 +15,7 @@
 """Experimental tools for linear algebra."""
 
 from tensorflow_probability.python.experimental.linalg.linear_operator_psd_kernel import LinearOperatorPSDKernel
+from tensorflow_probability.python.experimental.linalg.linear_operator_unitary import LinearOperatorUnitary
 from tensorflow_probability.python.experimental.linalg.no_pivot_ldl import no_pivot_ldl
 from tensorflow_probability.python.experimental.linalg.no_pivot_ldl import simple_robustified_cholesky
 from tensorflow_probability.python.internal import all_util
@@ -22,6 +23,7 @@ from tensorflow_probability.python.internal import all_util
 
 _allowed_symbols = [
     'LinearOperatorPSDKernel',
+    'LinearOperatorUnitary',
     'no_pivot_ldl',
     'simple_robustified_cholesky',
 ]

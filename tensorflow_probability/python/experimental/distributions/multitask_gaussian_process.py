@@ -24,6 +24,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.experimental.linalg import linear_operator_unitary
 from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -192,13 +193,81 @@ class MultiTaskGaussianProcess(distribution.Distribution):
         [ps.shape(index_points)[-(self.kernel.feature_ndims + 1)]],
         [self.kernel.num_tasks]], axis=0)
 
-  def _compute_flattened_covariance(self, index_points=None):
+  def _compute_flattened_scale(self, index_points=None):
     # This is of shape KN x KN, where K is the number of outputs
     index_points = self._get_index_points(index_points)
     kernel_matrix = self.kernel.matrix_over_all_tasks(
         index_points, index_points)
     if self.observation_noise_variance is None:
-      return kernel_matrix
+      return cholesky_util.cholesky_from_fn(kernel_matrix, self._cholesky_fn)
+
+    # We can add the observation noise to each block.
+    if isinstance(self.kernel, multitask_kernel.Independent):
+      # The Independent kernel matrix is realized as a kronecker product of the
+      # kernel over inputs, and an identity matrix per task (representing
+      # independent tasks). Update the diagonal of the first matrix and take the
+      # cholesky of it (since the cholesky of the second matrix will remain the
+      # identity matrix.)
+      base_kernel_matrix = kernel_matrix.operators[0].to_dense()
+
+      broadcast_shape = distribution_util.get_broadcast_shape(
+          base_kernel_matrix,
+          self.observation_noise_variance[..., tf.newaxis, tf.newaxis])
+      base_kernel_matrix = tf.broadcast_to(base_kernel_matrix, broadcast_shape)
+      base_kernel_matrix = tf.linalg.set_diag(
+          base_kernel_matrix,
+          tf.linalg.diag_part(base_kernel_matrix) +
+          self.observation_noise_variance[..., tf.newaxis])
+      base_kernel_matrix = tf.linalg.LinearOperatorFullMatrix(
+          base_kernel_matrix)
+      kernel_matrix = tf.linalg.LinearOperatorKronecker(
+          operators=[base_kernel_matrix] + kernel_matrix.operators[1:])
+      return cholesky_util.cholesky_from_fn(kernel_matrix, self._cholesky_fn)
+
+    if isinstance(self.kernel, multitask_kernel.Separable):
+      # When `kernel_matrix` is a kronecker product, we can compute
+      # an eigenvalue decomposition to get a matrix square-root, which will
+      # be faster than densifying the kronecker product.
+
+      # Let K = A X B. Let A (and B) have an eigenvalue decomposition of
+      # U @ D @ U^T, where U is an orthogonal matrix. Then,
+      # K = (U_A @ D_A @ U_A^T) X (U_B @ D_B @ U_B^T) =
+      # (U_A X U_B) @ (D_A X D_B) @ (U_A X U_B)^T
+      # Thus, a matrix square root of K would be
+      # (U_A X U_B) @ (sqrt(D_A) X sqrt(D_B)) which offers
+      # efficient matmul and solves.
+
+      # Now, if we update the diagonal by `v * I`, we have
+      # (U_A X U_B) @ (sqrt((D_A X D_B + vI)) @ (U_A X U_B)^T
+      # which still admits an efficient matmul and solve.
+
+      kronecker_diags = []
+      kronecker_orths = []
+      for block in kernel_matrix.operators:
+        diag, orth = tf.linalg.eigh(block.to_dense())
+        kronecker_diags.append(tf.linalg.LinearOperatorDiag(diag))
+        kronecker_orths.append(
+            linear_operator_unitary.LinearOperatorUnitary(orth))
+
+      full_diag = tf.linalg.LinearOperatorKronecker(kronecker_diags).diag_part()
+      full_diag = full_diag + self.observation_noise_variance[..., tf.newaxis]
+      scale_diag = tf.math.sqrt(full_diag)
+      diag_operator = tf.linalg.LinearOperatorDiag(
+          scale_diag,
+          is_square=True,
+          is_non_singular=True,
+          is_positive_definite=True)
+
+      orthogonal_operator = tf.linalg.LinearOperatorKronecker(
+          kronecker_orths, is_square=True, is_non_singular=True)
+      # This is efficient as a scale matrix. When used for matmuls, we take
+      # advantage of the kronecker product and diagonal operator. When used for
+      # solves, we take advantage of the orthogonal and diagonal structure,
+      # which essentially reduces to the matmul case.
+      return orthogonal_operator.matmul(diag_operator)
+
+    # By default densify the kernel matrix and add noise.
+
     kernel_matrix = kernel_matrix.to_dense()
     broadcast_shape = distribution_util.get_broadcast_shape(
         kernel_matrix,
@@ -208,26 +277,21 @@ class MultiTaskGaussianProcess(distribution.Distribution):
         kernel_matrix,
         tf.linalg.diag_part(kernel_matrix) +
         self.observation_noise_variance[..., tf.newaxis])
-    kernel_matrix = tf.linalg.LinearOperatorFullMatrix(
-        kernel_matrix,
-        is_non_singular=True,
-        is_positive_definite=True)
-    return kernel_matrix
+    kernel_matrix = tf.linalg.LinearOperatorFullMatrix(kernel_matrix)
+    kernel_cholesky = cholesky_util.cholesky_from_fn(
+        kernel_matrix, self._cholesky_fn)
+    return kernel_cholesky
 
   def _get_flattened_marginal_distribution(self, index_points=None):
     # This returns a MVN of event size [N * E], where N is the number of tasks
     # and E is the number of index points.
     with self._name_and_control_scope('get_flattened_marginal_distribution'):
       index_points = self._get_index_points(index_points)
-      covariance = self._compute_flattened_covariance(index_points)
+      scale = self._compute_flattened_scale(index_points)
 
       batch_shape = self._batch_shape_tensor(index_points=index_points)
       event_shape = self._event_shape_tensor(index_points=index_points)
 
-      # Now take the cholesky but specialize to cases where we have block-diag
-      # and kronecker.
-      covariance_cholesky = cholesky_util.cholesky_from_fn(
-          covariance, self._cholesky_fn)
       loc = self._mean_fn(index_points)
       # Ensure that we broadcast the mean function result to ensure we support
       # constant mean functions (constant over all tasks, and a constant
@@ -237,7 +301,7 @@ class MultiTaskGaussianProcess(distribution.Distribution):
       loc = _vec(loc)
       return mvn_linear_operator.MultivariateNormalLinearOperator(
           loc=loc,
-          scale=covariance_cholesky,
+          scale=scale,
           validate_args=self._validate_args,
           allow_nan_stats=self._allow_nan_stats,
           name='marginal_distribution')

@@ -26,10 +26,63 @@ import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
 from tensorflow_probability.python import experimental as tfe
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 tfk = tfp.math.psd_kernels
+
+
+class InefficientSeparable(tfe.psd_kernels.MultiTaskKernel):
+  """A version of the Separable kernel that's inefficient."""
+
+  def __init__(self,
+               num_tasks,
+               base_kernel,
+               task_kernel_matrix_linop,
+               name='InefficientSeparable',
+               validate_args=False):
+
+    parameters = dict(locals())
+    with tf.name_scope(name):
+      dtype = dtype_util.common_dtype(
+          [task_kernel_matrix_linop, base_kernel], tf.float32)
+      self._base_kernel = base_kernel
+      self._task_kernel_matrix_linop = tensor_util.convert_nonref_to_tensor(
+          task_kernel_matrix_linop, dtype, name='task_kernel_matrix_linop')
+      super(InefficientSeparable, self).__init__(
+          num_tasks=num_tasks,
+          dtype=dtype,
+          feature_ndims=base_kernel.feature_ndims,
+          name=name,
+          validate_args=validate_args,
+          parameters=parameters)
+
+  @property
+  def base_kernel(self):
+    return self._base_kernel
+
+  @property
+  def task_kernel_matrix_linop(self):
+    return self._task_kernel_matrix_linop
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        base_kernel=parameter_properties.BatchedComponentProperties(),
+        task_kernel_matrix_linop=(
+            parameter_properties.BatchedComponentProperties()))
+
+  def _matrix_over_all_tasks(self, x1, x2):
+    # Because the kernel computations are independent of task,
+    # we can use a Kronecker product of an identity matrix.
+    base_kernel_matrix = tf.linalg.LinearOperatorFullMatrix(
+        self.base_kernel.matrix(x1, x2))
+    operator = tf.linalg.LinearOperatorKronecker(
+        [base_kernel_matrix, self._task_kernel_matrix_linop])
+    return tf.linalg.LinearOperatorFullMatrix(operator.to_dense())
 
 
 @test_util.test_all_tf_execution_regimes
@@ -253,10 +306,58 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     self.assertAllEqual(log_prob_no_noise(observations).shape, [2, 4, 1, 6])
     self.assertAllEqual(sample_no_noise().shape, [2, 4, 1, 6, 25, 3])
 
+  def testMultiTaskBlockSeparable(self):
+    # Check that the naive implementation matches any optimizations for a
+    # Separable Kernel.
+
+    # 5x5 grid of index points in R^2 and flatten to 25x2
+    index_points = np.linspace(-10., 10., 5, dtype=np.float64)
+    index_points = np.stack(np.meshgrid(index_points, index_points), axis=-1)
+    index_points = np.reshape(index_points, [-1, 2])
+    # ==> shape = [25, 2]
+
+    # Kernel with batch_shape [2, 4, 3, 1]
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1, 1, 1])
+    length_scale = np.array([1., 2., 3., 4.], np.float64).reshape([1, 4, 1, 1])
+    observation_noise_variance = np.array(
+        [1e-3, 1e-2, 1e-1], np.float64).reshape([1, 1, 3, 1])
+    batched_index_points = np.stack([index_points]*6)
+    # ==> shape = [6, 25, 2]
+    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
+    # Ensure Symmetric + Strictly Diagonally Dominant -> Positive Definite.
+    task_kernel_matrix = np.array([[6., 2., 3.],
+                                   [2., 7., 4.],
+                                   [3., 4., 8.]],
+                                  dtype=np.float64)
+    task_kernel_matrix_linop = tf.linalg.LinearOperatorFullMatrix(
+        task_kernel_matrix)
+    multi_task_kernel = tfe.psd_kernels.Separable(
+        num_tasks=3, task_kernel_matrix_linop=task_kernel_matrix_linop,
+        base_kernel=kernel)
+    multitask_gp = tfe.distributions.MultiTaskGaussianProcess(
+        multi_task_kernel,
+        batched_index_points,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+    naive_multi_task_kernel = InefficientSeparable(
+        num_tasks=3, task_kernel_matrix_linop=task_kernel_matrix_linop,
+        base_kernel=kernel)
+    actual_multitask_gp = tfe.distributions.MultiTaskGaussianProcess(
+        naive_multi_task_kernel,
+        batched_index_points,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=False)
+
+    observations = np.linspace(-20., 20., 75).reshape(25, 3).astype(np.float64)
+    multitask_log_prob = multitask_gp.log_prob(observations)
+    actual_multitask_log_prob = actual_multitask_gp.log_prob(observations)
+    self.assertAllClose(
+        self.evaluate(actual_multitask_log_prob),
+        self.evaluate(multitask_log_prob), rtol=4e-3)
+
   def testLogProbMatchesGP(self):
     # Check that the independent kernel parameterization matches using a
     # single-task GP.
-
     # 5x5 grid of index points in R^2 and flatten to 25x2
     index_points = np.linspace(-4., 4., 5, dtype=np.float32)
     index_points = np.stack(np.meshgrid(index_points, index_points), axis=-1)
