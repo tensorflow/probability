@@ -605,7 +605,6 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       mean_fn=None,
       cholesky_fn=None,
       jitter=1e-6,
-      always_yield_multivariate_normal=False,
       validate_args=False,
       allow_nan_stats=False,
       name='PrecomputedGaussianProcessRegressionModel'):
@@ -700,10 +699,6 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
-      always_yield_multivariate_normal: If `False` (the default), we produce a
-        scalar `Normal` distribution when the number of `index_points` is
-        statically known to be `1`. If `True`, we avoid this behavior, ensuring
-        that the event shape will retain the `1` from `index_points`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -790,7 +785,6 @@ class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
           predictive_noise_variance=predictive_noise_variance,
           cholesky_fn=cholesky_fn,
           jitter=jitter,
-          always_yield_multivariate_normal=always_yield_multivariate_normal,
           _conditional_kernel=conditional_kernel,
           _conditional_mean_fn=conditional_mean_fn,
           validate_args=validate_args,

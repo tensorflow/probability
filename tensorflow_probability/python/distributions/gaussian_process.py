@@ -736,9 +736,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
         'mean_fn': self.mean_fn,
         'jitter': self.jitter,
         'validate_args': self.validate_args,
-        'allow_nan_stats': self.allow_nan_stats,
-        'always_yield_multivariate_normal':
-            self._always_yield_multivariate_normal
+        'allow_nan_stats': self.allow_nan_stats
     }
     argument_dict.update(**kwargs)
 
