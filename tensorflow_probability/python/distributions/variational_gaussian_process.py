@@ -20,6 +20,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -303,7 +304,8 @@ def _solve_cholesky_factored_system_vec(cholesky_factor, rhs, name=None):
     return lin_op.solvevec(lin_op.solvevec(rhs), adjoint=True)
 
 
-class VariationalGaussianProcess(gaussian_process.GaussianProcess):
+class VariationalGaussianProcess(gaussian_process.GaussianProcess,
+                                 distribution.AutoCompositeTensorDistribution):
   """Posterior predictive of a variational Gaussian process.
 
   This distribution implements the variational Gaussian process (VGP), as

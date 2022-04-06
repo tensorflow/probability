@@ -21,6 +21,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import cholesky_util
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import dtype_util
@@ -103,7 +104,9 @@ def _validate_observation_data(
               index_point_count, observation_count))
 
 
-class GaussianProcessRegressionModel(gaussian_process.GaussianProcess):
+class GaussianProcessRegressionModel(
+    gaussian_process.GaussianProcess,
+    distribution.AutoCompositeTensorDistribution):
   """Posterior predictive distribution in a conjugate GP regression model.
 
   This class represents the distribution over function values at a set of points

@@ -27,6 +27,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -84,7 +85,8 @@ def make_cholesky_factored_marginal_fn(cholesky_fn):
   return marginal_fn
 
 
-class GaussianProcess(distribution.AutoCompositeTensorDistribution):
+class GaussianProcess(
+    distribution.Distribution, tf.__internal__.CompositeTensor):
   """Marginal distribution of a Gaussian process at finitely many points.
 
   A Gaussian process (GP) is an indexed collection of random variables, any
@@ -237,6 +239,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
   ```
 
   """
+  # pylint:disable=invalid-name
 
   @deprecation.deprecated_args(
       '2021-05-10',
@@ -254,7 +257,8 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
                validate_args=False,
                allow_nan_stats=False,
                parameters=None,
-               name='GaussianProcess'):
+               name='GaussianProcess',
+               _check_marginal_cholesky_fn=True):
     """Instantiate a GaussianProcess Distribution.
 
     Args:
@@ -312,6 +316,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       parameters: For subclasses, a dict of constructor arguments.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: "GaussianProcess".
+      _check_marginal_cholesky_fn: Internal parameter -- do not use.
 
     Raises:
       ValueError: if `mean_fn` is not `None` and is not callable.
@@ -347,7 +352,8 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       self._jitter = jitter
       self._cholesky_fn = cholesky_fn
 
-      if marginal_fn is not None and cholesky_fn is not None:
+      if (_check_marginal_cholesky_fn and
+          marginal_fn is not None and cholesky_fn is not None):
         raise ValueError(
             'At most one of `marginal_fn` and `cholesky_fn` should be set.')
       if marginal_fn is None:
@@ -367,6 +373,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
             allow_nan_stats=allow_nan_stats,
             parameters=parameters,
             name=name)
+    # pylint:enable=invalid-name
 
   def _is_univariate_marginal(self, index_points):
     """True if the given index_points would yield a univariate marginal.
@@ -742,6 +749,30 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
 
     return gprm.GaussianProcessRegressionModel.precompute_regression_model(
         **argument_dict)
+
+  @property
+  def _type_spec(self):
+    return _GaussianProcessTypeSpec.from_instance(
+        self,
+        omit_kwargs=('parameters', '_check_marginal_cholesky_fn'),
+        non_identifying_kwargs=('name',))
+
+
+@auto_composite_tensor.type_spec_register(
+    'tfp.distributions.GaussianProcess_ACTTypeSpec')
+class _GaussianProcessTypeSpec(
+    auto_composite_tensor._AutoCompositeTensorTypeSpec):  # pylint: disable=protected-access
+  """TypeSpec for GaussianProcess."""
+
+  @property
+  def value_type(self):
+    return GaussianProcess
+
+  def _from_components(self, components):
+    # Disable the check that at most one of `marginal_fn` and `cholesky_fn` is
+    # passed to the constructor, since both may have been set internally.
+    components['_check_marginal_cholesky_fn'] = False
+    return super(_GaussianProcessTypeSpec, self)._from_components(components)
 
 
 def _assert_kl_compatible(marginal, other):

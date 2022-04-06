@@ -728,6 +728,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -743,6 +744,7 @@ multi_substrate_py_library(
     srcs = ["gaussian_process_regression_model.py"],
     deps = [
         ":cholesky_util",
+        ":distribution",
         ":gaussian_process",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
@@ -2219,6 +2221,7 @@ multi_substrate_py_library(
     name = "variational_gaussian_process",
     srcs = ["variational_gaussian_process.py"],
     deps = [
+        ":distribution",
         ":gaussian_process",
         ":independent",
         ":kullback_leibler",
