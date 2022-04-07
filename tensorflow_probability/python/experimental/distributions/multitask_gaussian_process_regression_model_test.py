@@ -95,6 +95,8 @@ class MultiTaskGaussianProcessRegressionModelTest(
 
     samples = gp.sample(sample_shape, seed=test_util.test_seed())
 
+    self.assertAllEqual(gp.batch_shape, batch_shape)
+    self.assertAllEqual(gp.event_shape, event_shape)
     self.assertAllEqual(self.evaluate(gp.batch_shape_tensor()), batch_shape)
     self.assertAllEqual(self.evaluate(gp.event_shape_tensor()), event_shape)
     self.assertAllEqual(

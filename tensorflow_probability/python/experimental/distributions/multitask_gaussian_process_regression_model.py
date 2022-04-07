@@ -18,17 +18,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import functools
-
 # Dependency imports
 
 import tensorflow.compat.v2 as tf
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
+from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
@@ -316,6 +317,36 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
   def cholesky_fn(self):
     return self._cholesky_fn
 
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
+        observations=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED),
+        observation_index_points=parameter_properties.ParameterProperties(
+            event_ndims=lambda self: self.kernel.feature_ndims + 1,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
+        observations_is_missing=parameter_properties.ParameterProperties(
+            event_ndims=2,
+            shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
+        ),
+        kernel=parameter_properties.BatchedComponentProperties(),
+        observation_noise_variance=parameter_properties.ParameterProperties(
+            event_ndims=0,
+            shape_fn=lambda sample_shape: sample_shape[:-1],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        predictive_noise_variance=parameter_properties.ParameterProperties(
+            event_ndims=0,
+            shape_fn=lambda sample_shape: sample_shape[:-1],
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+
   def _event_shape(self):
     # The examples index is one position to the left of the feature dims.
     index_points = self.index_points
@@ -332,23 +363,24 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
           [self.kernel.num_tasks])
     return shape
 
-  def _batch_shape_tensor(self, index_points=None):
-    index_points = self._get_index_points(index_points)
-    return functools.reduce(ps.broadcast_shape, [
-        ps.shape(
-            self.observation_index_points)[:-(self.kernel.feature_ndims + 1)],
-        ps.shape(index_points)[:-(self.kernel.feature_ndims + 1)],
-        self.kernel.batch_shape_tensor(),
-        ps.shape(self.observations)[:-2],
-        ps.shape(self.observation_noise_variance)
-    ])
-
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
     return tf.concat(
         [[tf.shape(index_points)[-(self.kernel.feature_ndims + 1)]],
          [self.kernel.num_tasks]],
         axis=0)
+
+  def _batch_shape(self, index_points=None):
+    kwargs = {}
+    if index_points is not None:
+      kwargs = {'index_points': index_points}
+    return batch_shape_lib.inferred_batch_shape(self, **kwargs)
+
+  def _batch_shape_tensor(self, index_points=None):
+    kwargs = {}
+    if index_points is not None:
+      kwargs = {'index_points': index_points}
+    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)
 
   def _compute_flattened_covariance(self, index_points=None):
     # This is of shape KN x KN, where K is the number of outputs

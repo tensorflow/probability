@@ -28,6 +28,7 @@ from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -619,6 +620,18 @@ class GaussianProcess(
       if tensorshape_util.rank(shape) is None:
         return tf.TensorShape([None])
       return shape
+
+  def _batch_shape(self, index_points=None):
+    kwargs = {}
+    if index_points is not None:
+      kwargs = {'index_points': index_points}
+    return batch_shape_lib.inferred_batch_shape(self, **kwargs)
+
+  def _batch_shape_tensor(self, index_points=None):
+    kwargs = {}
+    if index_points is not None:
+      kwargs = {'index_points': index_points}
+    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)
 
   def _sample_n(self, n, seed=None, index_points=None):
     return self.get_marginal_distribution(index_points).sample(n, seed=seed)

@@ -14,8 +14,6 @@
 # ============================================================================
 """The GaussianProcessRegressionModel distribution class."""
 
-import functools
-
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
@@ -23,7 +21,6 @@ from tensorflow_probability.python.bijectors import softplus as softplus_bijecto
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gaussian_process
-from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
@@ -837,25 +834,3 @@ class GaussianProcessRegressionModel(
             shape_fn=lambda sample_shape: sample_shape[:-1],
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
-
-  def _batch_shape_tensor(self, index_points=None):
-    kwargs = {}
-    if index_points is not None:
-      kwargs = {'index_points': index_points}
-    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)
-
-  def _batch_shape(self, index_points=None):
-    index_points = (
-        index_points if index_points is not None else self._index_points)
-    batch_shapes_of_components = [
-        index_points.shape[:-(self.kernel.feature_ndims + 1)],
-        self.kernel.batch_shape, self.observation_noise_variance.shape
-    ]
-    if self.observations is not None:
-      num_obs = tf.compat.dimension_value(self.observations.shape[-1])
-      # We only need to add observations, since observation_index_points
-      # is used in the SchurComplement kernel.
-      if num_obs is None or num_obs != 0:
-        batch_shapes_of_components.append(self.observations.shape[:-1])
-    return functools.reduce(
-        tf.broadcast_static_shape, batch_shapes_of_components)
