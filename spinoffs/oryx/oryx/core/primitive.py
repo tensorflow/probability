@@ -25,6 +25,7 @@ from jax import tree_util
 from jax import util as jax_util
 from jax.interpreters import ad
 from jax.interpreters import batching
+from jax.interpreters import mlir
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 from jax.lib import xla_client as xc
@@ -160,6 +161,12 @@ class FlatPrimitive(jax_core.Primitive):
       return translation(c, *xla_args, **params)
 
     xla.translations[self] = _xla
+
+    def _mlir(c, *mlir_args, **params):
+      lowering = mlir.lower_fun(self.impl, multiple_results=True)
+      return lowering(c, *mlir_args, **params)
+
+    mlir.register_lowering(self, _mlir)
 
 
 def call_bind(prim, **params):
