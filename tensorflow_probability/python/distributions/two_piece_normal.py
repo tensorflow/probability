@@ -601,11 +601,11 @@ def _two_piece_normal_sample_bwd(_, aux, dy):
   grad = dy * _two_piece_normal_sample_gradient(broadcast_skewness, samples)
   # Sum over the sample dimensions. Assume that they are always the first
   # ones.
-  num_sample_dimensions = (tf.rank(broadcast_skewness) -
-                           tf.rank(skewness))
+  num_sample_dimensions = (ps.rank(broadcast_skewness) -
+                           ps.rank(skewness))
 
   # None gradients for seed
-  return tf.reduce_sum(grad, axis=tf.range(num_sample_dimensions)), None
+  return tf.reduce_sum(grad, axis=ps.range(num_sample_dimensions)), None
 
 
 def _two_piece_normal_sample_jvp(shape, primals, tangents):
