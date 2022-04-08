@@ -551,9 +551,11 @@ class SpikeSlabSampler(object):
           # Note that the posterior precision varies inversely with the
           # noise variance: in worlds with high noise we're also
           # more uncertain about the values of the weights.
+          # TODO(colcarroll): Tests pass even without a square root on the
+          # observation_noise_variance. Should add a test that would fail.
           precision_factor=tf.linalg.LinearOperatorLowerTriangular(
               sampler_state.conditional_posterior_precision_chol /
-              observation_noise_variance[..., tf.newaxis, tf.newaxis]),
+              tf.sqrt(observation_noise_variance[..., tf.newaxis, tf.newaxis])),
           nonzeros=sampler_state.nonzeros,
           name='weights')
 
