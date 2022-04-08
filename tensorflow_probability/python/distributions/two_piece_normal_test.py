@@ -356,16 +356,16 @@ class _TwoPieceNormalTest(object):
     sample_shape = [int(2e5)]
     seed = test_util.test_seed()
 
-    def sampler(skewness):
+    def get_abs_sample_mean(skewness):
       loc = tf.constant(0., self.dtype)
       scale = tf.constant(1., self.dtype)
       dist = tfd.TwoPieceNormal(
           loc, scale=scale, skewness=skewness, validate_args=True)
-      return tf.reduce_mean(dist.sample(sample_shape, seed=seed))
+      return tf.reduce_mean(tf.abs(dist.sample(sample_shape, seed=seed)))
 
     for skewness in [0.75, 1., 1.33]:
       err = self.compute_max_gradient_error(
-          sampler, [tf.constant(skewness, self.dtype)], delta=0.1)
+          get_abs_sample_mean, [tf.constant(skewness, self.dtype)], delta=0.1)
       self.assertLess(err, 0.05)
 
   @test_util.numpy_disable_gradient_test
@@ -385,16 +385,18 @@ class _TwoPieceNormalTest(object):
 
     seed = test_util.test_seed()
 
-    def sampler(loc, scale):
+    def get_exp_samples(loc, scale):
       dist = tfd.TwoPieceNormal(
           loc=loc, scale=scale, skewness=skewness, validate_args=True)
-      return dist.sample(sample_shape, seed=seed)
+      return tf.math.exp(dist.sample(sample_shape, seed=seed))
 
-    samples, dsamples = tfp.math.value_and_gradient(sampler, [loc, scale])
+    exp_samples, dsamples = tfp.math.value_and_gradient(
+        get_exp_samples, [loc, scale])
     dloc_auto, dscale_auto = [grad / n_samples for grad in dsamples]
 
-    dloc_calc = tf.ones([n_params], dtype=self.dtype)
-    dscale_calc = tf.reduce_mean((samples - loc) / scale, axis=[0, 1])
+    dloc_calc = tf.reduce_mean(exp_samples, axis=[0, 1])
+    dscale_calc = tf.reduce_mean(
+        (tf.math.log(exp_samples) - loc) / scale * exp_samples, axis=[0, 1])
 
     self.assertAllClose(dloc_auto, dloc_calc)
     self.assertAllClose(dscale_auto, dscale_calc)
