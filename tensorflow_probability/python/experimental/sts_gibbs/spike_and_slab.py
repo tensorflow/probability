@@ -646,6 +646,7 @@ def _symmetric_update_chol(chol, idx, value):
   """Sets the value of a row and column in a Cholesky-factorized matrix."""
   # TODO(davmre): is a more efficient direct implementation possible?
   old_value = tf.reduce_sum(chol * chol[..., idx : idx + 1, :], axis=-1)
+  old_value = tf.ensure_shape(old_value, value.shape)
   return _symmetric_increment_chol(chol, idx, increment=value - old_value)
 
 
