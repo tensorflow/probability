@@ -281,6 +281,12 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
         )
         dist = tfd.Empirical(samples=input_ph, validate_args=True)
         self.assertAllClose(self.evaluate(dist.quantile(q)), q_val)
+    
+    invalid_value = 1.5
+    with self.assertRaises(ValueError):
+      dist = tfd.Empirical(
+        samples=sample, validate_args=True
+      ).quantile(invalid_value)
 
 
 @test_util.test_all_tf_execution_regimes
