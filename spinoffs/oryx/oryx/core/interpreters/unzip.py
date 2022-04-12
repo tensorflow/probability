@@ -85,6 +85,7 @@ class UnzipCustomRules:
           recipe = out_tracer.recipe
           out_tracer.recipe = pe.new_eqn_recipe(recipe.invars, out_tracers,
                                                 recipe.primitive, recipe.params,
+                                                recipe.effects,
                                                 recipe.source_info)  # pytype: disable=wrong-arg-types
         return out_tracers
 
@@ -217,7 +218,7 @@ class UnzipTrace(jax_core.Trace):
       assert False
     key = all(t.is_key() for t in tracers)
     avals = [t.aval for t in tracers]
-    ans = primitive.abstract_eval(*avals, **params)
+    ans, effects = primitive.abstract_eval(*avals, **params)
     if not primitive.multiple_results:
       ans = [ans]
     out_tracers = [
@@ -226,7 +227,7 @@ class UnzipTrace(jax_core.Trace):
     ]
     # Passing in UnzipTracer, which pytype does not recognize as JaxprTracer
     eqn = pe.new_eqn_recipe(tracers, out_tracers, primitive, params,
-                            source_info_util.current())  # pytype: disable=wrong-arg-types
+                            effects, source_info_util.current())  # pytype: disable=wrong-arg-types
     for t in out_tracers:
       t.recipe = eqn
 
@@ -384,7 +385,7 @@ class UnzipTrace(jax_core.Trace):
       del new_params['out_axes_thunk']
     eqn = pe.new_eqn_recipe(
         tuple(const_tracers + env_tracers + in_tracers), out_tracers, primitive,
-        new_params, source_info_util.current())  # pytype: disable=wrong-arg-types
+        new_params, lifted_jaxpr.effects, source_info_util.current())  # pytype: disable=wrong-arg-types
     for t in out_tracers:
       t.recipe = eqn
     return out_tracers
@@ -662,12 +663,14 @@ def _tracers_to_jaxpr(in_tracers, out_tracers):
     return var
 
   processed_eqn_ids = set()
+  effects = set()
   for t in sorted_tracers:
     recipe = t.recipe
     if isinstance(recipe, pe.JaxprEqnRecipe):
       if recipe.eqn_id not in processed_eqn_ids:
         eqns.append(pe.recipe_to_eqn(getvar, recipe))
         processed_eqn_ids.add(recipe.eqn_id)
+        effects.update(recipe.effects)
     elif isinstance(recipe, pe.LambdaBinding):
       if not any(t is in_tracer for in_tracer in in_tracers):
         raise VariableError(f'Found unknown input tracer: {t}')
@@ -688,7 +691,7 @@ def _tracers_to_jaxpr(in_tracers, out_tracers):
   const_vars, const_vals = jax_util.unzip2(consts.items())
   # The env_vars are pre-pended to the invars
   jaxpr = jax_core.Jaxpr(const_vars, list(it.chain(env_vars, invars)),
-                         safe_map(getvar, out_tracers), eqns)
+                         safe_map(getvar, out_tracers), eqns, effects)
   return jaxpr, const_vals, env_vals
 
 
