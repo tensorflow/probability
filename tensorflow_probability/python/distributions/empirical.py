@@ -25,7 +25,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-
+from tensorflow_probability.python.stats import percentile
 
 __all__ = [
     'Empirical'
@@ -217,6 +217,18 @@ class Empirical(distribution.AutoCompositeTensorDistribution):
     r = samples - tf.expand_dims(self._mean(samples), axis=axis)
     var = tf.reduce_mean(tf.square(r), axis=axis)
     return tf.sqrt(var)
+  
+  def _quantile(self, value, samples=None, **kwargs):
+    if value > 1 or value < 0:
+      raise ValueError(
+        "Quantile values in tensorflow_probability."
+        "distributions.Empirical.quantile must be between 0 and 1."
+      )
+
+    if samples is None:
+      samples = tf.convert_to_tensor(self._samples)
+
+    return percentile(x=samples, q=value * 100, axis=self._samples_axis, **kwargs)
 
   def _sample_n(self, n, seed=None):
     samples = tf.convert_to_tensor(self._samples)
