@@ -106,13 +106,26 @@ def hop_translation_rule(prim):
     new_params = dict(name=name, backend=backend, call_jaxpr=call_jaxpr)
     new_params['donated_invars'] = params.get('donated_invars',
                                               (False,) * len(args))
-    return xla._xla_call_translation_rule(*args, **new_params)  # pylint: disable=protected-access
+    return xla._xla_call_translation_rule(*args, **new_params)  # pylint: disable=protected-access  # type: ignore
 
   xla.call_translations[prim] = rule
   return rule
 
+if hasattr(xla, '_xla_call_translation_rule'):
+  register_hop_transformation_rule('translation', hop_translation_rule)
 
-register_hop_transformation_rule('translation', hop_translation_rule)
+
+def hop_lowering(prim):
+
+  def rule(ctx, *args, backend, name, call_jaxpr, **_params):
+    return mlir._call_lowering(  # pylint: disable=protected-access
+        name, name, call_jaxpr, backend,
+        ctx.module_context, ctx.avals_in, ctx.avals_out, *args)
+
+  mlir.register_lowering(prim, rule)
+  return rule
+
+register_hop_transformation_rule('mlir', hop_lowering)
 
 
 def batch_fun(fun: lu.WrappedFun, in_dims):
