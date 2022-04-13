@@ -27,6 +27,8 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
+from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+
 
 def _naive_symmetric_increment(m, idx, increment):
   m = m.copy()
@@ -209,31 +211,50 @@ class SpikeAndSlabTest(test_util.TestCase):
             ).observation_noise_variance_posterior_scale,
         naive_posterior.scale)
 
-  def test_updated_state_matches_initial_computation(self):
-    design_matrix, _, targets = self._random_regression_task(
-        num_outputs=2, num_features=3, batch_shape=[],
-        seed=test_util.test_seed())
+  @parameterized.parameters(
+      (2, 3, 1, [], False),
+      (2, 3, 1, [3, 2], True),
+      (100, 20, 10, [4], False),
+      (100, 20, 10, [], True),
+      (40, 20, 12, [3], True))
+  def test_updated_state_matches_initial_computation(
+      self, num_outputs, num_features, num_flips, batch_shape, use_xla):
 
+    rng = test_util.test_np_rng()
+    initial_nonzeros = rng.randint(
+        low=0, high=2, size=batch_shape + [num_features]).astype(np.bool)
+    flip_idxs = rng.choice(
+        num_features, size=num_flips, replace=False).astype(np.int32)
+    if batch_shape:
+      should_flip = rng.randint(
+          low=0, high=2, size=[num_flips] + batch_shape).astype(np.bool)
+    else:
+      should_flip = np.array([True] * num_flips)
+
+    nonzeros = initial_nonzeros.copy()
+    for i in range(num_flips):
+      nonzeros[..., flip_idxs[i]] = (
+          nonzeros[..., flip_idxs[i]] != should_flip[i])
+
+    design_matrix, _, targets = self._random_regression_task(
+        num_outputs=num_outputs, num_features=num_features,
+        batch_shape=batch_shape, seed=test_util.test_seed())
     sampler = spike_and_slab.SpikeSlabSampler(design_matrix=design_matrix,
                                               nonzero_prior_prob=0.3)
 
-    all_nonzero_sampler_state = sampler._initialize_sampler_state(
-        targets=targets, nonzeros=tf.convert_to_tensor([True, True, True]))
+    @tf.function(autograph=False, jit_compile=use_xla)
+    def _do_flips():
+      state = sampler._initialize_sampler_state(
+          targets=targets, nonzeros=initial_nonzeros)
+      def _do_flip(state, i):
+        new_state = sampler._flip_feature(state, tf.gather(flip_idxs, i))
+        return mcmc_util.choose(tf.gather(should_flip, i), new_state, state)
+      return tf.foldl(_do_flip, elems=tf.range(num_flips), initializer=state)
 
-    # Flipping a weight from nonzero to zero (slab to spike) should result in
-    # the same state as if we'd initialized with that sparsity pattern.
-    flipped_state_from_update = sampler._flip_feature(
-        all_nonzero_sampler_state, idx=0)
-    flipped_state_from_scratch = sampler._initialize_sampler_state(
-        targets=targets, nonzeros=tf.convert_to_tensor([False, True, True]))
-    self.assertAllCloseNested(flipped_state_from_update,
-                              flipped_state_from_scratch)
-
-    # Reverse direction (spike to slab).
-    double_flipped_state_from_update = sampler._flip_feature(
-        flipped_state_from_update, idx=0)
-    self.assertAllCloseNested(double_flipped_state_from_update,
-                              all_nonzero_sampler_state, atol=1e-4)
+    self.assertAllCloseNested(
+        sampler._initialize_sampler_state(targets, nonzeros),
+        _do_flips(),
+        atol=num_outputs * 2e-4, rtol=num_outputs * 2e-4)
 
   def test_sanity_check_sweep_over_features(self):
     num_outputs = 100

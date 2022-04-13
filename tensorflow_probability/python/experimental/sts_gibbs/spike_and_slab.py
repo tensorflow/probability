@@ -425,12 +425,14 @@ class SpikeSlabSampler(object):
           chol=sampler_state.conditional_prior_precision_chol,
           idx=idx,
           psd_matrix=self.weights_prior_precision,
-          new_nonzeros=new_nonzeros)
+          new_nonzeros=new_nonzeros,
+          previous_nonzeros=sampler_state.nonzeros)
       new_conditional_posterior_precision_chol = _update_nonzero_block_chol(
           chol=sampler_state.conditional_posterior_precision_chol,
           idx=idx,
           psd_matrix=self.weights_posterior_precision,
-          new_nonzeros=new_nonzeros)
+          new_nonzeros=new_nonzeros,
+          previous_nonzeros=sampler_state.nonzeros)
       new_conditional_weights_mean = tf.where(
           new_nonzeros,
           tf.linalg.cholesky_solve(
@@ -603,7 +605,8 @@ def _select_nonzero_block(matrix, nonzeros):
                             tf.where(nonzeros, tf.linalg.diag_part(masked), 1.))
 
 
-def _update_nonzero_block_chol(chol, idx, psd_matrix, new_nonzeros):
+def _update_nonzero_block_chol(
+    chol, idx, psd_matrix, new_nonzeros, previous_nonzeros):
   """Efficient update to the cholesky factor of the 'slab' (nonzero) submatrix.
 
   This performs an efficient update when `nonzeros` changes by a single entry.
@@ -626,28 +629,25 @@ def _update_nonzero_block_chol(chol, idx, psd_matrix, new_nonzeros):
     psd_matrix: (batch of) float Tensor positive semidefinite matrix(s) of shape
       `[num_features, num_features]`.
     new_nonzeros: (batch of) boolean Tensor vectors of shape `[num_features]`.
+    previous_nonzeros: (batch of) boolean Tensor vectors of shape
+      `[num_features]`.
   Returns:
     updated_chol: (batch of) float Tensor lower-triangular Cholesky factor(s) of
       `select_nonzero_block(psd_matrix, new_nonzeros)`.
   """
-  row_with_new_nonzeros = tf.where(new_nonzeros, psd_matrix[..., idx, :], 0.)
-  eye_row = _set_vector_index(tf.zeros_like(row_with_new_nonzeros), idx, 1.)
-  return _symmetric_update_chol(
+  psd_row = tf.where(new_nonzeros, psd_matrix[..., idx, :], 0.)
+  eye_row = _set_vector_index(tf.zeros_like(psd_row), idx, 1.)
+  new_row = tf.where(new_nonzeros[..., idx, tf.newaxis], psd_row, eye_row)
+  # NOTE: We could also compute `old_row` from `chol`, but we believe it is
+  # more numerically accurate to use `psd_matrix`, as `chol` may have
+  # accumulated errors over multiple calls to `_update_nonzero_block_chol`.
+  old_row = _select_nonzero_block(psd_matrix, previous_nonzeros)[..., idx, :]
+  return _symmetric_increment_chol(
       chol,
       idx=idx,
       # Set the `idx`th row/col to its target value if the `idx`th feature is
       # now nonzero; otherwise set it to the identity.
-      value=tf.where(new_nonzeros[..., idx, tf.newaxis],
-                     row_with_new_nonzeros,
-                     eye_row))
-
-
-def _symmetric_update_chol(chol, idx, value):
-  """Sets the value of a row and column in a Cholesky-factorized matrix."""
-  # TODO(davmre): is a more efficient direct implementation possible?
-  old_value = tf.reduce_sum(chol * chol[..., idx : idx + 1, :], axis=-1)
-  old_value = tf.ensure_shape(old_value, value.shape)
-  return _symmetric_increment_chol(chol, idx, increment=value - old_value)
+      increment=new_row - old_row)
 
 
 def _symmetric_increment_chol(chol, idx, increment):
@@ -697,6 +697,8 @@ def _symmetric_increment_chol(chol, idx, increment):
       given row and column of `M`.
   """
   with tf.name_scope('symmetric_increment_chol'):
+    # TODO(jburnim): Can we make this more numerically accurate by doing all
+    # three rank-1 Cholesky updates in a single pass?
     chol = tf.convert_to_tensor(chol, name='chol')
     increment = tf.convert_to_tensor(increment, name='increment')
     # Rank-1 update to increment the `idx`th row and column, with side
