@@ -14,6 +14,8 @@
 # ============================================================================
 """Tests for Two-Piece Normal distribution."""
 
+import itertools
+
 # Dependency imports
 import numpy as np
 
@@ -154,28 +156,29 @@ class _TwoPieceNormalTest(object):
         self.assertAllEqual(dist.batch_shape, self.evaluate(result).shape)
 
   def testSample(self):
-    dist = self.make_two_piece_normals()
-
+    one = tf.constant(1., dtype=self.dtype)
     seed_stream = test_util.test_seed_stream()
 
-    n = 100_000
-    one = tf.constant(1., dtype=self.dtype)
+    dists = (self.make_two_piece_normal(), self.make_two_piece_normals())
+    n = int(3e2)
+    sample_shapes = ([n, n], [n * n])
 
-    sample = dist.sample(n, seed=seed_stream())
+    for dist, sample_shape in itertools.product(dists, sample_shapes):
+      sample = dist.sample(sample_shape, seed=seed_stream())
 
-    uniform_sample = tf.random.uniform(
-        sample.shape, maxval=1., dtype=self.dtype, seed=seed_stream())
-    sign = tf.where(uniform_sample < 0.5, -one, one)
-    normal_sample = self.evaluate(sign * tfd.two_piece_normal.standardize(
-        sample, loc=dist.loc, scale=dist.scale, skewness=dist.skewness))
+      uniform_sample = tf.random.uniform(
+          sample.shape, maxval=1., dtype=self.dtype, seed=seed_stream())
+      sign = tf.where(uniform_sample < 0.5, -one, one)
+      normal_sample = self.evaluate(sign * tfd.two_piece_normal.standardize(
+          sample, loc=dist.loc, scale=dist.scale, skewness=dist.skewness))
 
-    # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
-    # The sample variance similarly is dependent on scale and n.
-    # Thus, the tolerances below are very sensitive to number of samples
-    # as well as the variances chosen.
-    self.assertAllEqual(normal_sample.shape, [n] + dist.batch_shape)
-    self.assertAllClose(np.mean(normal_sample), 0.0, atol=0.1)
-    self.assertAllClose(np.std(normal_sample), 1.0, atol=0.1)
+      # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
+      # The sample variance similarly is dependent on scale and n.
+      # Thus, the tolerances below are very sensitive to number of samples
+      # as well as the variances chosen.
+      self.assertAllEqual(normal_sample.shape, sample_shape + dist.batch_shape)
+      self.assertAllClose(np.mean(normal_sample), 0.0, atol=0.1)
+      self.assertAllClose(np.std(normal_sample), 1.0, atol=0.1)
 
   def testLogPDF(self):
     dist = self.make_two_piece_normals()
@@ -347,6 +350,57 @@ class _TwoPieceNormalTest(object):
       self.assertIsNotNone(grads[0])  # d/d loc
       self.assertIsNotNone(grads[1])  # d/d scale
       self.assertIsNotNone(grads[2])  # d/d skewness
+
+  @test_util.numpy_disable_gradient_test
+  def testDifferentiableSampleNumerically(self):
+    """Test the gradients of the samples w.r.t. skewness."""
+    sample_shape = [int(2e5)]
+    seed = test_util.test_seed()
+
+    def get_abs_sample_mean(skewness):
+      loc = tf.constant(0., self.dtype)
+      scale = tf.constant(1., self.dtype)
+      dist = tfd.TwoPieceNormal(
+          loc, scale=scale, skewness=skewness, validate_args=True)
+      return tf.reduce_mean(tf.abs(dist.sample(sample_shape, seed=seed)))
+
+    for skewness in [0.75, 1., 1.33]:
+      err = self.compute_max_gradient_error(
+          get_abs_sample_mean, [tf.constant(skewness, self.dtype)], delta=0.1)
+      self.assertLess(err, 0.05)
+
+  @test_util.numpy_disable_gradient_test
+  def testDifferentiableSampleAnalytically(self):
+    """Test the gradients of the samples w.r.t. loc and scale."""
+    n = 100
+    sample_shape = [n, n]
+    n_samples = np.prod(sample_shape)
+
+    n_params = 20
+    loc = tf.constant(
+        np.linspace(-3., stop=3., num=n_params), dtype=self.dtype)
+    scale = tf.constant(
+        np.linspace(0.1, stop=10., num=n_params), dtype=self.dtype)
+    skewness = tf.constant(
+        np.linspace(0.75, stop=1.33, num=n_params), dtype=self.dtype)
+
+    seed = test_util.test_seed()
+
+    def get_exp_samples(loc, scale):
+      dist = tfd.TwoPieceNormal(
+          loc=loc, scale=scale, skewness=skewness, validate_args=True)
+      return tf.math.exp(dist.sample(sample_shape, seed=seed))
+
+    exp_samples, dsamples = tfp.math.value_and_gradient(
+        get_exp_samples, [loc, scale])
+    dloc_auto, dscale_auto = [grad / n_samples for grad in dsamples]
+
+    dloc_calc = tf.reduce_mean(exp_samples, axis=[0, 1])
+    dscale_calc = tf.reduce_mean(
+        (tf.math.log(exp_samples) - loc) / scale * exp_samples, axis=[0, 1])
+
+    self.assertAllClose(dloc_auto, dloc_calc)
+    self.assertAllClose(dscale_auto, dscale_calc)
 
   def testNegativeScaleSkewnessFails(self):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
