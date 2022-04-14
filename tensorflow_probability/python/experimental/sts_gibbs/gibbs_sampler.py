@@ -235,7 +235,7 @@ def build_model_for_gibbs_fitting(observed_time_series,
     if isinstance(design_matrix, tf.linalg.LinearOperator):
       num_features = design_matrix.shape_tensor()[-1]
     else:
-      num_features = tf.shape(design_matrix)[-1]
+      num_features = prefer_static.dimension_size(design_matrix, -1)
     weights_prior = _tile_normal_to_mvn_diag(weights_prior, num_features)
   elif weights_prior is not None and not _is_multivariate_normal(weights_prior):
     raise ValueError('Weights prior must be a normal distribution or `None`.')
@@ -677,9 +677,10 @@ def _resample_scale(prior, observed_residuals, is_missing=None, seed=None):
   Returns:
     sampled_scale: A `Tensor` sample from the posterior `p(scale | x)`.
   """
+  dtype = observed_residuals.dtype
+
   if is_missing is not None:
-    num_missing = tf.reduce_sum(
-        tf.cast(is_missing, observed_residuals.dtype), axis=-1)
+    num_missing = tf.reduce_sum(tf.cast(is_missing, dtype), axis=-1)
   num_observations = prefer_static.shape(observed_residuals)[-1]
   if is_missing is not None:
     observed_residuals = tf.where(is_missing, tf.zeros_like(observed_residuals),
@@ -687,7 +688,7 @@ def _resample_scale(prior, observed_residuals, is_missing=None, seed=None):
     num_observations -= num_missing
 
   variance_posterior = type(prior)(
-      concentration=prior.concentration + num_observations / 2.,
+      concentration=prior.concentration + tf.cast(num_observations / 2., dtype),
       scale=prior.scale +
       tf.reduce_sum(tf.square(observed_residuals), axis=-1) / 2.)
   new_scale = tf.sqrt(variance_posterior.sample(seed=seed))

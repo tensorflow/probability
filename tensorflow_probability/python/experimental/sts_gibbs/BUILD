@@ -15,6 +15,12 @@
 # Description:
 #   Gibbs sampling for Bayesian structural time series models
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 licenses(["notice"])
 
 package(
@@ -23,7 +29,7 @@ package(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "sts_gibbs",
     srcs = ["__init__.py"],
     deps = [
@@ -32,10 +38,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "benchmarks_test",
     size = "medium",
     srcs = ["benchmarks_test.py"],
+    disabled_substrates = ["numpy"],
     tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
@@ -48,7 +55,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "gibbs_sampler",
     srcs = ["gibbs_sampler.py"],
     deps = [
@@ -58,10 +65,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "gibbs_sampler_test",
     size = "medium",
     srcs = ["gibbs_sampler_test.py"],
+    disabled_substrates = ["numpy"],
     shard_count = 4,
     deps = [
         # absl/testing:parameterized dep,
@@ -74,7 +82,7 @@ py_test(
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "spike_and_slab",
     srcs = ["spike_and_slab.py"],
     deps = [
@@ -93,10 +101,11 @@ py_library(
     ],
 )
 
-py_test(
+multi_substrate_py_test(
     name = "spike_and_slab_test",
     size = "medium",
     srcs = ["spike_and_slab_test.py"],
+    disabled_substrates = ["numpy"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

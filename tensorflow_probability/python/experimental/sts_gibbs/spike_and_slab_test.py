@@ -20,14 +20,13 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability import distributions as tfd
+import tensorflow_probability as tfp
 from tensorflow_probability.python.experimental.sts_gibbs import spike_and_slab
-
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
+
+tfd = tfp.distributions
 
 
 def _naive_symmetric_increment(m, idx, increment):
@@ -116,13 +115,10 @@ class SpikeAndSlabTest(test_util.TestCase):
             seed=test_util.test_seed()))
 
     # Utilities to extract values for nonzero-weight features.
-    nonzeros = tf.convert_to_tensor([True, False, True, False, True])
-    nonzero_subvector = (
-        lambda x: tf.boolean_mask(x, nonzeros, axis=ps.rank(x) - 1))
-    nonzero_submatrix = lambda x: tf.boolean_mask(  # pylint: disable=g-long-lambda
-        tf.boolean_mask(x, nonzeros, axis=ps.rank(x) - 2),
-        nonzeros,
-        axis=ps.rank(x) - 1)
+    nonzeros = np.array([True, False, True, False, True])
+    nonzero_subvector = lambda x: x[..., nonzeros]
+    nonzero_submatrix = (
+        lambda x: self.evaluate(x)[..., nonzeros][..., nonzeros, :])
 
     # Compute the weight posterior mean and precision for these nonzeros.
     sampler = spike_and_slab.SpikeSlabSampler(
@@ -148,11 +144,12 @@ class SpikeAndSlabTest(test_util.TestCase):
     # The sampler's posterior should match the posterior from the restricted
     # problem.
     self.assertAllClose(
-        nonzero_subvector(initial_state.conditional_weights_mean),
+        nonzero_subvector(self.evaluate(
+            initial_state.conditional_weights_mean)),
         restricted_weights_posterior_mean)
     self.assertAllClose(
         nonzero_submatrix(initial_state.conditional_posterior_precision_chol),
-        tf.linalg.cholesky(restricted_weights_posterior_prec).to_dense())
+        tf.linalg.cholesky(restricted_weights_posterior_prec.to_dense()))
 
   def test_noise_variance_posterior_matches_expected(self):
     # Generate a synthetic regression task.
@@ -270,7 +267,10 @@ class SpikeAndSlabTest(test_util.TestCase):
                                           [0., 0., 0.5]]),
             seed=test_util.test_seed()))
 
-    sampler = spike_and_slab.SpikeSlabSampler(design_matrix)
+    sampler = spike_and_slab.SpikeSlabSampler(
+        design_matrix,
+        # Ensure the probability of keeping an irrelevant feature is tiny.
+        nonzero_prior_prob=1e-6)
     initial_state = sampler._initialize_sampler_state(
         targets=targets, nonzeros=tf.convert_to_tensor([True, True, True]))
     final_state = self.evaluate(

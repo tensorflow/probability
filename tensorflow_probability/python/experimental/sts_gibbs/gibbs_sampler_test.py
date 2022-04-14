@@ -21,16 +21,11 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability import distributions as tfd
-
-
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 from tensorflow_probability.python.experimental.sts_gibbs import gibbs_sampler
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.sts.internal import util as sts_util
-
-from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
 
 
 tfd = tfp.distributions
@@ -323,12 +318,14 @@ class GibbsSamplerTests(test_util.TestCase):
         observed_time_series=observed_time_series)
 
     with self.assertRaisesRegexp(ValueError, 'does not support Gibbs sampling'):
-      gibbs_sampler.fit_with_gibbs_sampling(bad_model, observed_time_series)
+      gibbs_sampler.fit_with_gibbs_sampling(
+          bad_model, observed_time_series, seed=test_util.test_seed())
 
     bad_model.supports_gibbs_sampling = True
     with self.assertRaisesRegexp(
         ValueError, 'Expected the first model component to be an instance of'):
-      gibbs_sampler.fit_with_gibbs_sampling(bad_model, observed_time_series)
+      gibbs_sampler.fit_with_gibbs_sampling(
+          bad_model, observed_time_series, seed=test_util.test_seed())
 
     bad_model_with_correct_params = tfp.sts.Sum([
         # A seasonal model with no drift has no parameters, so adding it
@@ -344,7 +341,8 @@ class GibbsSamplerTests(test_util.TestCase):
                                  'Expected the first model component to be an '
                                  'instance of `tfp.sts.LocalLevel`'):
       gibbs_sampler.fit_with_gibbs_sampling(bad_model_with_correct_params,
-                                            observed_time_series)
+                                            observed_time_series,
+                                            seed=test_util.test_seed())
 
   @parameterized.named_parameters(
       {'testcase_name': 'LocalLinearTrend', 'use_slope': True},
@@ -423,12 +421,13 @@ class GibbsSamplerTests(test_util.TestCase):
 
     # Check that posterior variance samples have the moments of the correct
     # InverseGamma distribution.
-    posterior_scale_samples = parallel_for.pfor(
-        lambda i: gibbs_sampler._resample_scale(  # pylint: disable=g-long-lambda
+    posterior_scale_samples = tf.vectorized_map(
+        lambda seed: gibbs_sampler._resample_scale(  # pylint: disable=g-long-lambda
             prior=prior,
             observed_residuals=observed_samples,
             is_missing=is_missing,
-            seed=strm()), 10000)
+            seed=seed),
+        tfp.random.split_seed(strm(), tf.constant(10000)))
 
     concentration = prior.concentration + tf.reduce_sum(
         1 - tf.cast(is_missing, tf.float32), axis=-1)/2.
@@ -450,20 +449,19 @@ class GibbsSamplerTests(test_util.TestCase):
     num_timesteps = 10
     num_features = 2
     batch_shape = [3, 1]
-    design_matrix = samplers.normal(
-        batch_shape + [num_timesteps, num_features], seed=design_seed)
-    true_weights = samplers.normal(
-        batch_shape + [num_features, 1], seed=true_weights_seed) * 10.0
-    targets = tf.matmul(design_matrix, true_weights)
-    is_missing = tf.convert_to_tensor([False, False, False, True, True,
-                                       False, False, True, False, False],
-                                      dtype=tf.bool)
+    design_matrix = self.evaluate(samplers.normal(
+        batch_shape + [num_timesteps, num_features], seed=design_seed))
+    true_weights = self.evaluate(samplers.normal(
+        batch_shape + [num_features, 1], seed=true_weights_seed) * 10.0)
+    targets = np.matmul(design_matrix, true_weights)
+    is_missing = np.array([False, False, False, True, True,
+                           False, False, True, False, False])
     prior_scale = tf.convert_to_tensor(5.)
     likelihood_scale = tf.convert_to_tensor(0.1)
 
     # Analytically compute the true posterior distribution on weights.
-    valid_design_matrix = tf.boolean_mask(design_matrix, ~is_missing, axis=-2)
-    valid_targets = tf.boolean_mask(targets, ~is_missing, axis=-2)
+    valid_design_matrix = design_matrix[..., ~is_missing, :]
+    valid_targets = targets[..., ~is_missing, :]
     num_valid_observations = tf.shape(valid_design_matrix)[-2]
     weights_posterior_mean, weights_posterior_cov, _ = linear_gaussian_update(
         prior_mean=tf.zeros([num_features, 1]),
@@ -475,8 +473,8 @@ class GibbsSamplerTests(test_util.TestCase):
         x_observed=valid_targets)
 
     # Check that the empirical moments of sampled weights match the true values.
-    sampled_weights = parallel_for.pfor(
-        lambda i: gibbs_sampler._resample_weights(  # pylint: disable=g-long-lambda
+    sampled_weights = tf.vectorized_map(
+        lambda seed: gibbs_sampler._resample_weights(  # pylint: disable=g-long-lambda
             design_matrix=tf.where(is_missing[..., tf.newaxis],
                                    tf.zeros_like(design_matrix),
                                    design_matrix),
@@ -484,8 +482,8 @@ class GibbsSamplerTests(test_util.TestCase):
             observation_noise_scale=likelihood_scale,
             weights_prior_scale=tf.linalg.LinearOperatorScaledIdentity(
                 num_features, prior_scale),
-            seed=sampled_weights_seed),
-        10000)
+            seed=seed),
+        tfp.random.split_seed(sampled_weights_seed, tf.constant(10000)))
     sampled_weights_mean = tf.reduce_mean(sampled_weights, axis=0)
     centered_weights = sampled_weights - weights_posterior_mean[..., 0]
     sampled_weights_cov = tf.reduce_mean(centered_weights[..., :, tf.newaxis] *

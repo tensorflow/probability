@@ -267,6 +267,9 @@ class SpikeSlabSampler(object):
           observation_noise_variance_prior_concentration, dtype=dtype)
       observation_noise_variance_prior_scale = tf.convert_to_tensor(
           observation_noise_variance_prior_scale, dtype=dtype)
+      if observation_noise_variance_upper_bound is not None:
+        observation_noise_variance_upper_bound = tf.convert_to_tensor(
+            observation_noise_variance_upper_bound, dtype=dtype)
 
       design_shape = ps.shape(design_matrix)
       num_outputs = design_shape[-2]
@@ -283,7 +286,8 @@ class SpikeSlabSampler(object):
 
       weights_posterior_precision = x_transpose_x + weights_prior_precision
       observation_noise_variance_posterior_concentration = (
-          observation_noise_variance_prior_concentration + (num_outputs / 2.))
+          observation_noise_variance_prior_concentration
+          + tf.convert_to_tensor(num_outputs / 2., dtype=dtype))
 
       self.num_outputs = num_outputs
       self.num_features = num_features
@@ -701,6 +705,8 @@ def _symmetric_increment_chol(chol, idx, increment):
     # three rank-1 Cholesky updates in a single pass?
     chol = tf.convert_to_tensor(chol, name='chol')
     increment = tf.convert_to_tensor(increment, name='increment')
+    orig_chol = chol
+
     # Rank-1 update to increment the `idx`th row and column, with side
     # effects elsewhere in the matrix.
     chol = tfp_math.cholesky_update(
@@ -715,10 +721,18 @@ def _symmetric_increment_chol(chol, idx, increment):
         multiplier=tf.sign(diagonal_correction))
     # Final update to revert the side effects from the first step without
     # touching the (newly incremented) `idx`th row/col.
-    return tfp_math.cholesky_update(
+    chol = tfp_math.cholesky_update(
         chol,
         update_vector=_set_vector_index(increment, idx, 0.),
         multiplier=-1)
+
+    # There Cholesky decomposition should be unchanged in rows/cols before idx.
+    #
+    # TODO(b/229298550): Investigate whether this is really necessary, or if the
+    # test failures we see without this line are due to an underlying bug.
+    return tf.where((tf.range(chol.shape[-1]) < idx)[..., tf.newaxis],
+                    orig_chol,
+                    chol)
 
 
 def _set_vector_index_unbatched(v, idx, x):
