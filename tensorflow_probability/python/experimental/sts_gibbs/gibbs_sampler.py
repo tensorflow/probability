@@ -174,6 +174,7 @@ def build_model_for_gibbs_fitting(observed_time_series,
                                   level_variance_prior,
                                   observation_noise_variance_prior,
                                   slope_variance_prior=None,
+                                  initial_level_prior=None,
                                   sparse_weights_nonzero_prob=None):
   """Builds a StructuralTimeSeries model instance that supports Gibbs sampling.
 
@@ -215,6 +216,10 @@ def build_model_for_gibbs_fitting(observed_time_series,
       `observed_time_series`. If specified, a local linear trend model is used
       rather than a local level model.
       Default value: `None`.
+    initial_level_prior: optional `tfd.Distribution` instance specifying a
+      prior on the initial level. If `None`, a heuristic default prior is
+      constructed based on the provided `observed_time_series`.
+      Default value: `None`.
     sparse_weights_nonzero_prob: Optional scalar float `Tensor` prior
       probability that any given feature has nonzero weight. If specified, this
       triggers a sparse regression with a spike-and-slab prior, where
@@ -254,11 +259,13 @@ def build_model_for_gibbs_fitting(observed_time_series,
         observed_time_series=observed_time_series,
         level_scale_prior=sqrt(level_variance_prior),
         slope_scale_prior=sqrt(slope_variance_prior),
+        initial_level_prior=initial_level_prior,
         name='local_linear_trend')
   else:
     local_variation = sts.LocalLevel(
         observed_time_series=observed_time_series,
         level_scale_prior=sqrt(level_variance_prior),
+        initial_level_prior=initial_level_prior,
         name='local_level')
 
   # Regression component.
