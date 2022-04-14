@@ -356,7 +356,7 @@ class JointDistributionPinnedTest(test_util.TestCase):
     bij = jd.experimental_default_event_space_bijector(a=-.5, b=1.)
     test_input = (0.5,)
     self.assertIs(type(jd.dtype), type(bij.inverse(test_input)))
-    self.assertAllClose((2/3,), tf.math.sigmoid(bij.inverse(test_input)))
+    self.assertAllClose(2/3, tf.math.sigmoid(bij.inverse(test_input)[0]))
 
     @tfd.JointDistributionCoroutine
     def model():
