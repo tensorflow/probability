@@ -25,6 +25,7 @@ from tensorflow_probability.python.bijectors import softplus as softplus_bijecto
 from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.experimental.distributions import multitask_gaussian_process as mtgp
 from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
 from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
@@ -54,8 +55,89 @@ def _add_diagonal_shift(m, c):
   return tf.linalg.set_diag(m, tf.linalg.diag_part(m) + c[..., tf.newaxis])
 
 
-class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
+def _flattened_conditional_mean_fn_helper(
+    x,
+    kernel,
+    observations,
+    observation_index_points,
+    observations_is_missing,
+    observation_scale,
+    mean_fn,
+    solve_on_observations=None):
+  """Flattened Conditional mean helper."""
+  observations = tf.convert_to_tensor(observations)
+  observation_index_points = tf.convert_to_tensor(
+      observation_index_points)
+
+  k_x_obs_linop = kernel.matrix_over_all_tasks(x, observation_index_points)
+  if solve_on_observations is None:
+    vec_diff = _vec(observations - mean_fn(observation_index_points))
+
+  if observations_is_missing is not None:
+    k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
+        tf.where(_vec(observations_is_missing)[..., tf.newaxis, :],
+                 tf.zeros([], dtype=k_x_obs_linop.dtype),
+                 k_x_obs_linop.to_dense()))
+    if solve_on_observations is None:
+      vec_diff = tf.where(_vec(observations_is_missing),
+                          tf.zeros([], dtype=vec_diff.dtype),
+                          vec_diff)
+  if solve_on_observations is None:
+    solve_on_observations = observation_scale.solvevec(
+        observation_scale.solvevec(vec_diff), adjoint=True)
+
+  flattened_mean = k_x_obs_linop.matvec(solve_on_observations)
+  return _vec(mean_fn(x) + _unvec(
+      flattened_mean, [-1, kernel.num_tasks]))
+
+
+def _compute_observation_scale(
+    kernel,
+    observation_index_points,
+    cholesky_fn,
+    observation_noise_variance=None,
+    observations_is_missing=None):
+  """Compute matrix square root of the kernel on observation index points."""
+  if observations_is_missing is not None:
+    observations_is_missing = tf.convert_to_tensor(observations_is_missing)
+    # If observations are missing, there's nothing we can do to preserve the
+    # operator structure, so densify.
+
+    observation_covariance = kernel.matrix_over_all_tasks(
+        observation_index_points, observation_index_points).to_dense()
+
+    if observation_noise_variance is not None:
+      broadcast_shape = distribution_util.get_broadcast_shape(
+          observation_covariance,
+          observation_noise_variance[..., tf.newaxis, tf.newaxis])
+      observation_covariance = tf.broadcast_to(
+          observation_covariance, broadcast_shape)
+      observation_covariance = _add_diagonal_shift(
+          observation_covariance, observation_noise_variance)
+    vec_observations_is_missing = _vec(observations_is_missing)
+    observation_covariance = tf.linalg.LinearOperatorFullMatrix(
+        psd_kernels_util.mask_matrix(
+            observation_covariance,
+            is_missing=vec_observations_is_missing),
+        is_non_singular=True,
+        is_positive_definite=True)
+    observation_scale = cholesky_util.cholesky_from_fn(
+        observation_covariance, cholesky_fn)
+  else:
+    observation_scale = mtgp._compute_flattened_scale(  # pylint:disable=protected-access
+        kernel=kernel,
+        index_points=observation_index_points,
+        cholesky_fn=cholesky_fn,
+        observation_noise_variance=observation_noise_variance)
+
+  return observation_scale
+
+
+class MultiTaskGaussianProcessRegressionModel(
+    distribution.AutoCompositeTensorDistribution):
   """Posterior predictive in a conjugate Multi-task GP regression model."""
+
+  # pylint:disable=invalid-name
 
   def __init__(self,
                kernel,
@@ -69,12 +151,10 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
                cholesky_fn=None,
                validate_args=False,
                allow_nan_stats=False,
-               name='MultiTaskGaussianProcessRegressionModelWithCholesky'):
+               name='MultiTaskGaussianProcessRegressionModelWithCholesky',
+               _flattened_conditional_mean_fn=None,
+               _observation_scale=None):
     """Construct a MultiTaskGaussianProcessRegressionModelWithCholesky instance.
-
-    WARNING: This method assumes `index_points` is the only varying parameter
-    (i.e. is a `Variable` / changes after initialization) and hence is not
-    tape-safe.
 
     Args:
       kernel: `MultiTaskKernel`-like instance representing the GP's covariance
@@ -140,6 +220,8 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
         Default value: `False`.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: 'MultiTaskGaussianProcessRegressionModel'.
+      _flattened_conditional_mean_fn: Internal parameter -- do not use.
+      _observation_scale: Internal parameter -- do not use.
     """
     parameters = dict(locals())
     with tf.name_scope(name) as name:
@@ -153,17 +235,17 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
       ], tf.float32)
       index_points = tensor_util.convert_nonref_to_tensor(
           index_points, dtype=dtype, name='index_points')
-      observation_index_points = tf.convert_to_tensor(
+      observation_index_points = tensor_util.convert_nonref_to_tensor(
           observation_index_points,
           dtype=dtype,
           name='observation_index_points')
-      observations = tf.convert_to_tensor(
+      observations = tensor_util.convert_nonref_to_tensor(
           observations, dtype=dtype, name='observations')
       if observations_is_missing is not None:
-        observations_is_missing = tf.convert_to_tensor(
+        observations_is_missing = tensor_util.convert_nonref_to_tensor(
             observations_is_missing, dtype=tf.bool)
       if observation_noise_variance is not None:
-        observation_noise_variance = tf.convert_to_tensor(
+        observation_noise_variance = tensor_util.convert_nonref_to_tensor(
             observation_noise_variance,
             dtype=dtype,
             name='observation_noise_variance')
@@ -184,7 +266,16 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
       self._index_points = index_points
 
       # Scalar or vector the size of the number of tasks.
-      if mean_fn is not None:
+      if mean_fn is None:
+        def _mean_fn(x):
+          # Shape B1 + [E, N], where E is the number of index points, and N is
+          # the number of tasks.
+          return tf.zeros(
+              tf.concat([
+                  tf.shape(x)[:-self.kernel.feature_ndims],
+                  [self.kernel.num_tasks]], axis=0), dtype=self.dtype)
+        mean_fn = _mean_fn
+      else:
         if not callable(mean_fn):
           raise ValueError('`mean_fn` must be a Python callable')
       self._mean_fn = mean_fn
@@ -195,49 +286,31 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
       self._observations = observations
       self._observations_is_missing = observations_is_missing
 
-      observation_covariance = self.kernel.matrix_over_all_tasks(
-          observation_index_points, observation_index_points)
+      if _flattened_conditional_mean_fn is None:
 
-      if observation_noise_variance is not None:
-        observation_covariance = observation_covariance.to_dense()
-        broadcast_shape = distribution_util.get_broadcast_shape(
-            observation_covariance, observation_noise_variance[..., tf.newaxis,
-                                                               tf.newaxis])
-        observation_covariance = tf.broadcast_to(observation_covariance,
-                                                 broadcast_shape)
-        observation_covariance = _add_diagonal_shift(observation_covariance,
-                                                     observation_noise_variance)
-        observation_covariance = tf.linalg.LinearOperatorFullMatrix(
-            observation_covariance,
-            is_non_singular=True,
-            is_positive_definite=True)
+        def flattened_conditional_mean_fn(x):
+          """Flattened Conditional mean."""
+          observation_scale = _compute_observation_scale(
+              kernel,
+              observation_index_points,
+              self._cholesky_fn,
+              observation_noise_variance=self.observation_noise_variance,
+              observations_is_missing=observations_is_missing)
 
-      if observations_is_missing is not None:
-        vec_observations_is_missing = _vec(observations_is_missing)
-        observation_covariance = tf.linalg.LinearOperatorFullMatrix(
-            psd_kernels_util.mask_matrix(
-                observation_covariance.to_dense(),
-                is_missing=vec_observations_is_missing),
-            is_non_singular=True,
-            is_positive_definite=True)
+          return _flattened_conditional_mean_fn_helper(
+              x,
+              self.kernel,
+              self._observations,
+              self._observation_index_points,
+              observations_is_missing,
+              observation_scale,
+              mean_fn)
 
-      self._observation_cholesky = cholesky_util.cholesky_from_fn(
-          observation_covariance, self._cholesky_fn)
+        _flattened_conditional_mean_fn = flattened_conditional_mean_fn
 
-      # Note that the conditional mean is
-      # k(x, o) @ (k(o, o) + sigma**2)^-1 obs. We can precompute the latter
-      # term since it won't change per iteration.
-      if mean_fn:
-        vec_observations = _vec(observations -
-                                mean_fn(observation_index_points))
-      else:
-        vec_observations = _vec(observations)
-      if observations_is_missing is not None:
-        vec_observations = tf.where(~vec_observations_is_missing,
-                                    vec_observations,
-                                    tf.zeros([], dtype=vec_observations.dtype))
-      self._solve_on_obs = self._observation_cholesky.solvevec(
-          self._observation_cholesky.solvevec(vec_observations), adjoint=True)
+      self._flattened_conditional_mean_fn = _flattened_conditional_mean_fn
+      self._observation_scale = _observation_scale
+
       super(MultiTaskGaussianProcessRegressionModel, self).__init__(
           dtype=dtype,
           reparameterization_type=(reparameterization.FULLY_REPARAMETERIZED),
@@ -246,44 +319,224 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
           parameters=parameters,
           name=name)
 
+  @staticmethod
+  def precompute_regression_model(
+      kernel,
+      observation_index_points,
+      observations,
+      observations_is_missing=None,
+      index_points=None,
+      observation_noise_variance=None,
+      predictive_noise_variance=None,
+      mean_fn=None,
+      cholesky_fn=None,
+      validate_args=False,
+      allow_nan_stats=False,
+      name='PrecomputedMultiTaskGaussianProcessRegressionModel'):
+    """Returns a MTGaussianProcessRegressionModel with precomputed quantities.
+
+    This differs from the constructor by precomputing quantities associated with
+    observations in a non-tape safe way. `index_points` is the only parameter
+    that is allowed to vary (i.e. is a `Variable` / changes after
+    initialization).
+
+    Specifically:
+
+    * We make `observation_index_points` and `observations` mandatory
+      parameters.
+    * We precompute `kernel(observation_index_points, observation_index_points)`
+      along with any other associated quantities relating to the `kernel`,
+      `observations` and `observation_index_points`.
+
+    A typical usecase would be optimizing kernel hyperparameters for a
+    `MultiTaskGaussianProcess`, and computing the posterior predictive with
+    respect to those optimized hyperparameters and observation / index-points
+    pairs.
+
+    WARNING: This method assumes `index_points` is the only varying parameter
+    (i.e. is a `Variable` / changes after initialization) and hence is not
+    tape-safe.
+
+    Args:
+      kernel: `PositiveSemidefiniteKernel`-like instance representing the
+        GP's covariance function.
+      observation_index_points: `float` `Tensor` representing finite collection,
+        or batch of collections, of points in the index set for which some data
+        has been observed. Shape has the form `[b1, ..., bB, e, f1, ..., fF]`
+        where `F` is the number of feature dimensions and must equal
+        `kernel.feature_ndims`, and `e` is the number (size) of index points in
+        each batch. `[b1, ..., bB, e]` must be broadcastable with the shape of
+        `observations`, and `[b1, ..., bB]` must be broadcastable with the
+        shapes of all other batched parameters (`kernel.batch_shape`,
+        `index_points`, etc). The default value is `None`, which corresponds to
+        the empty set of observations, and simply results in the prior
+        predictive model (a GP with noise of variance
+        `predictive_noise_variance`).
+      observations: `float` `Tensor` representing collection, or batch of
+        collections, of observations corresponding to
+        `observation_index_points`. Shape has the form `[b1, ..., bB, e, t]`
+        The batch shape `[b1, ..., bB]` must be
+        broadcastable with the shapes of all other batched parameters
+        (`kernel.batch_shape`, `index_points`, etc.). The default value is
+        `None`, which corresponds to the empty set of observations, and simply
+        results in the prior predictive model (a GP with noise of variance
+        `predictive_noise_variance`).
+      observations_is_missing:  `bool` `Tensor` of shape `[..., e]`,
+        representing a batch of boolean masks.  When `observations_is_missing`
+        is not `None`, the returned distribution is conditioned only on the
+        observations for which the corresponding elements of
+        `observations_is_missing` are `True`.
+      index_points: `float` `Tensor` representing finite collection, or batch of
+        collections, of points in the index set over which the GP is defined.
+        Shape has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the
+        number of feature dimensions and must equal `kernel.feature_ndims` and
+        `e` is the number (size) of index points in each batch. Ultimately this
+        distribution corresponds to an `e`-dimensional multivariate normal. The
+        batch shape must be broadcastable with `kernel.batch_shape` and any
+        batch dims yielded by `mean_fn`.
+      observation_noise_variance: `float` `Tensor` representing the variance
+        of the noise in the Normal likelihood distribution of the model. May be
+        batched, in which case the batch shape must be broadcastable with the
+        shapes of all other batched parameters (`kernel.batch_shape`,
+        `index_points`, etc.).
+        Default value: `None`
+      predictive_noise_variance: `float` `Tensor` representing the variance in
+        the posterior predictive model. If `None`, we simply re-use
+        `observation_noise_variance` for the posterior predictive noise. If set
+        explicitly, however, we use this value. This allows us, for example, to
+        omit predictive noise variance (by setting this to zero) to obtain
+        noiseless posterior predictions of function values, conditioned on noisy
+        observations.
+      mean_fn: Python `callable` that acts on `index_points` to produce a
+        collection, or batch of collections, of mean values at `index_points`.
+        Takes a `Tensor` of shape `[b1, ..., bB, f1, ..., fF]` and returns a
+        `Tensor` whose shape is broadcastable with `[b1, ..., bB, t]`.
+        Default value: `None` implies the constant zero function.
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.  Default value: `None`,
+        in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
+        parameter.
+      validate_args: Python `bool`, default `False`. When `True` distribution
+        parameters are checked for validity despite possibly degrading runtime
+        performance. When `False` invalid inputs may silently render incorrect
+        outputs.
+        Default value: `False`.
+      allow_nan_stats: Python `bool`, default `True`. When `True`,
+        statistics (e.g., mean, mode, variance) use the value `NaN` to
+        indicate the result is undefined. When `False`, an exception is raised
+        if one or more of the statistic's batch members are undefined.
+        Default value: `False`.
+      name: Python `str` name prefixed to Ops created by this class.
+        Default value: 'PrecomputedGaussianProcessRegressionModel'.
+    Returns
+      An instance of `MultiTaskGaussianProcessRegressionModel` with precomputed
+      quantities associated with observations.
+    """
+
+    with tf.name_scope(name) as name:
+      dtype = dtype_util.common_dtype([
+          index_points, observation_index_points, observations,
+          observation_noise_variance, predictive_noise_variance,
+      ], tf.float32)
+
+      # Convert-to-tensor arguments that are expected to not be Variables / not
+      # going to change.
+      observation_index_points = tf.convert_to_tensor(
+          observation_index_points, dtype=dtype)
+      if observation_noise_variance is not None:
+        observation_noise_variance = tf.convert_to_tensor(
+            observation_noise_variance, dtype=dtype)
+      observations = tf.convert_to_tensor(observations, dtype=dtype)
+
+      if observations_is_missing is not None:
+        observations_is_missing = tf.convert_to_tensor(observations_is_missing)
+
+      if cholesky_fn is None:
+        cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn()
+      else:
+        if not callable(cholesky_fn):
+          raise ValueError('`cholesky_fn` must be a Python callable')
+
+      if mean_fn is None:
+        mean_fn = lambda x: tf.zeros([1], dtype=dtype)
+      else:
+        if not callable(mean_fn):
+          raise ValueError('`mean_fn` must be a Python callable')
+
+      if observations_is_missing is not None:
+        # If observations are missing, there's nothing we can do to preserve the
+        # operator structure, so densify.
+
+        observation_covariance = kernel.matrix_over_all_tasks(
+            observation_index_points, observation_index_points).to_dense()
+
+        if observation_noise_variance is not None:
+          broadcast_shape = distribution_util.get_broadcast_shape(
+              observation_covariance, observation_noise_variance[
+                  ..., tf.newaxis, tf.newaxis])
+          observation_covariance = tf.broadcast_to(observation_covariance,
+                                                   broadcast_shape)
+          observation_covariance = _add_diagonal_shift(
+              observation_covariance, observation_noise_variance)
+        vec_observations_is_missing = _vec(observations_is_missing)
+        observation_covariance = tf.linalg.LinearOperatorFullMatrix(
+            psd_kernels_util.mask_matrix(
+                observation_covariance,
+                is_missing=vec_observations_is_missing),
+            is_non_singular=True,
+            is_positive_definite=True)
+        observation_scale = cholesky_util.cholesky_from_fn(
+            observation_covariance, cholesky_fn)
+      else:
+        observation_scale = mtgp._compute_flattened_scale(  # pylint:disable=protected-access
+            kernel=kernel,
+            index_points=observation_index_points,
+            cholesky_fn=cholesky_fn,
+            observation_noise_variance=observation_noise_variance)
+
+      # Note that the conditional mean is
+      # k(x, o) @ (k(o, o) + sigma**2)^-1 obs. We can precompute the latter
+      # term since it won't change per iteration.
+      vec_diff = _vec(observations - mean_fn(observation_index_points))
+
+      if observations_is_missing is not None:
+        vec_diff = tf.where(vec_observations_is_missing,
+                            tf.zeros([], dtype=vec_diff.dtype),
+                            vec_diff)
+      solve_on_observations = observation_scale.solvevec(
+          observation_scale.solvevec(vec_diff), adjoint=True)
+
+      def flattened_conditional_mean_fn(x):
+
+        return _flattened_conditional_mean_fn_helper(
+            x,
+            kernel,
+            observations,
+            observation_index_points,
+            observations_is_missing,
+            observation_scale,
+            mean_fn,
+            solve_on_observations=solve_on_observations)
+
+      mtgprm = MultiTaskGaussianProcessRegressionModel(
+          kernel=kernel,
+          observation_index_points=observation_index_points,
+          observations=observations,
+          index_points=index_points,
+          observation_noise_variance=observation_noise_variance,
+          predictive_noise_variance=predictive_noise_variance,
+          cholesky_fn=cholesky_fn,
+          _flattened_conditional_mean_fn=flattened_conditional_mean_fn,
+          _observation_scale=observation_scale,
+          validate_args=validate_args,
+          allow_nan_stats=allow_nan_stats,
+          name=name)
+
+    return mtgprm
+
   @property
   def mean_fn(self):
-    # Default to a constant zero function, borrowing the dtype from
-    # the class for consisency.
-    if self._mean_fn is not None:
-      return self._mean_fn
-
-    def _mean_fn(x):
-      # Shape B1 + [E, N], where E is the number of index points, and N is the
-      # number of tasks.
-      res = tf.zeros(
-          tf.concat([
-              tf.shape(x)[:-self.kernel.feature_ndims], [self.kernel.num_tasks]
-          ],
-                    axis=0),
-          dtype=self.dtype)
-      return res
-
-    return _mean_fn
-
-  def _conditional_mean_fn(self, x):
-    """Conditional mean."""
-    k_x_obs_linop = self.kernel.matrix_over_all_tasks(
-        x, self._observation_index_points)
-    if self._observations_is_missing is not None:
-      k_x_obs_linop = tf.linalg.LinearOperatorFullMatrix(
-          tf.where(_vec(tf.math.logical_not(
-              self._observations_is_missing))[..., tf.newaxis, :],
-                   k_x_obs_linop.to_dense(),
-                   tf.zeros([], dtype=k_x_obs_linop.dtype)))
-
-    mean_x = self.mean_fn(x)  # pylint:disable=not-callable
-    batch_shape = self._batch_shape_tensor(index_points=x)
-    event_shape = self._event_shape_tensor(index_points=x)
-    mean_x = ps.broadcast_to(mean_x,
-                             ps.concat([batch_shape, event_shape], axis=0))
-    mean_x = _vec(mean_x)
-    return mean_x + k_x_obs_linop.matvec(self._solve_on_obs)
+    return self._mean_fn
 
   @property
   def kernel(self):
@@ -294,12 +547,16 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
     return self._observation_index_points
 
   @property
-  def observation_cholesky(self):
-    return self._observation_cholesky
+  def observation_scale(self):
+    return self._observation_scale
 
   @property
   def observations(self):
     return self._observations
+
+  @property
+  def observations_is_missing(self):
+    return self._observations_is_missing
 
   @property
   def index_points(self):
@@ -345,7 +602,8 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
             event_ndims=0,
             shape_fn=lambda sample_shape: sample_shape[:-1],
             default_constraining_bijector_fn=(
-                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        _observation_scale=parameter_properties.BatchedComponentProperties())
 
   def _event_shape(self):
     # The examples index is one position to the left of the feature dims.
@@ -394,11 +652,20 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
     kxz = self.kernel.matrix_over_all_tasks(
         index_points, self.observation_index_points).to_dense()
     if self._observations_is_missing is not None:
-      kxz = tf.where(_vec(tf.math.logical_not(
-          self._observations_is_missing))[..., tf.newaxis, :],
-                     kxz,
-                     tf.zeros([], dtype=kxz.dtype))
-    cholinv_kzx = self.observation_cholesky.solve(kxz, adjoint_arg=True)
+      kxz = tf.where(_vec(self._observations_is_missing)[..., tf.newaxis, :],
+                     tf.zeros([], dtype=kxz.dtype),
+                     kxz)
+    if self._observation_scale is not None:
+      observation_scale = self._observation_scale
+    else:
+      observation_scale = _compute_observation_scale(
+          self.kernel,
+          self.observation_index_points,
+          self.cholesky_fn,
+          observation_noise_variance=self.observation_noise_variance,
+          observations_is_missing=self.observations_is_missing)
+
+    cholinv_kzx = observation_scale.solve(kxz, adjoint_arg=True)
     kxz_kzzinv_kzx = tf.linalg.matmul(
         cholinv_kzx, cholinv_kzx, transpose_a=True)
 
@@ -419,7 +686,7 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
     with self._name_and_control_scope('get_flattened_marginal_distribution'):
       index_points = self._get_index_points(index_points)
       covariance = self._compute_flattened_covariance(index_points)
-      loc = self._conditional_mean_fn(index_points)
+      loc = self._flattened_conditional_mean_fn(index_points)
       scale = tf.linalg.LinearOperatorLowerTriangular(
           self._cholesky_fn(covariance),
           is_non_singular=True,
@@ -441,6 +708,48 @@ class MultiTaskGaussianProcessRegressionModel(distribution.Distribution):
     return _unvec(
         self._get_flattened_marginal_distribution(
             index_points=index_points).mean(), [-1, self.kernel.num_tasks])
+
+  def _variance(self, index_points=None):
+    # This is of shape KN x KN, where K is the number of outputs
+    # Compute this explicitly via the Schur Complement of the vector kernel.
+    # The reason this is written explicitly as opposed to using a GPRM
+    # internally for reshaping is there is potential for efficiency gains when
+    # `observation_noise_variance = 0.`.
+    index_points = self._get_index_points(index_points)
+    kxx_diag = self.kernel.matrix_over_all_tasks(
+        index_points, index_points).diag_part()
+
+    kxz = self.kernel.matrix_over_all_tasks(
+        index_points, self.observation_index_points).to_dense()
+    if self.observations_is_missing is not None:
+      kxz = tf.where(_vec(self.observations_is_missing)[..., tf.newaxis, :],
+                     tf.zeros([], dtype=kxz.dtype), kxz)
+    if self._observation_scale is not None:
+      observation_scale = self._observation_scale
+    else:
+      observation_scale = _compute_observation_scale(
+          self.kernel,
+          self.observation_index_points,
+          self._cholesky_fn,
+          observations_is_missing=self.observations_is_missing)
+
+    cholinv_kzx = observation_scale.solve(kxz, adjoint_arg=True)
+    kxz_kzzinv_kzx_diag = tf.linalg.diag_part(tf.linalg.matmul(
+        cholinv_kzx, cholinv_kzx, transpose_a=True))
+
+    flattened_variance = kxx_diag - kxz_kzzinv_kzx_diag
+    if self.predictive_noise_variance is not None:
+      flattened_variance = (
+          flattened_variance + self.predictive_noise_variance[..., tf.newaxis])
+
+    variance = _unvec(flattened_variance, [-1, self.kernel.num_tasks])
+
+    # Finally broadcast with batch shape.
+    batch_shape = self._batch_shape_tensor(index_points=index_points)
+    event_shape = self._event_shape_tensor(index_points=index_points)
+
+    return tf.broadcast_to(
+        variance, ps.concat([batch_shape, event_shape], axis=0))
 
   def _sample_n(self, n, seed=None, index_points=None):
     # Samples is of shape [n] + B1 + [E, N], where E is the number of index

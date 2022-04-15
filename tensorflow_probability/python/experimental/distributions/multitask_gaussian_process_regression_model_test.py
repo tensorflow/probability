@@ -31,6 +31,7 @@ from tensorflow_probability.python.internal import test_util
 
 tfd = tfp.distributions
 tfk = tfp.math.psd_kernels
+tfed = tfp.experimental.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -47,7 +48,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
     multi_task_kernel = tfe.psd_kernels.Independent(
         num_tasks=3, base_kernel=kernel)
     mean = tf.Variable(np.random.random((3,)), dtype=np.float32)
-    gp = tfe.distributions.MultiTaskGaussianProcessRegressionModel(
+    gp = tfed.MultiTaskGaussianProcessRegressionModel(
         multi_task_kernel,
         observation_index_points=observation_index_points,
         observations=observations,
@@ -80,7 +81,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
     kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
     multi_task_kernel = tfe.psd_kernels.Independent(
         num_tasks=num_tasks, base_kernel=kernel)
-    gp = tfe.distributions.MultiTaskGaussianProcessRegressionModel(
+    gp = tfed.MultiTaskGaussianProcessRegressionModel(
         multi_task_kernel,
         observation_index_points=batched_index_points,
         observations=observations,
@@ -125,7 +126,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
     multi_task_kernel = tfe.psd_kernels.Independent(
         num_tasks=num_tasks, base_kernel=kernel)
     observation_noise_variance = np.float64(1e-2)
-    mtgp = tfe.distributions.MultiTaskGaussianProcessRegressionModel(
+    mtgp = tfed.MultiTaskGaussianProcessRegressionModel(
         kernel=multi_task_kernel,
         observation_index_points=observation_index_points,
         observations=observations,
@@ -186,7 +187,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
     test_observations = np.random.uniform(
         -20., 20., [10, num_tasks]).astype(np.float32)
 
-    mtgp = tfe.distributions.MultiTaskGaussianProcessRegressionModel(
+    mtgp = tfed.MultiTaskGaussianProcessRegressionModel(
         multi_task_kernel,
         observation_index_points=index_points,
         index_points=test_points,
@@ -243,7 +244,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
     test_observations = np.random.uniform(
         -20., 20., [10, num_tasks]).astype(np.float32)
 
-    mtgp = tfe.distributions.MultiTaskGaussianProcessRegressionModel(
+    mtgp = tfed.MultiTaskGaussianProcessRegressionModel(
         multi_task_kernel,
         observation_index_points=index_points,
         index_points=test_points,
@@ -305,7 +306,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
     # Constant mean per task.
     mean_fn = lambda x: tf.linspace(1., 3., num_tasks)
 
-    mtgp = tfe.distributions.MultiTaskGaussianProcessRegressionModel(
+    mtgp = tfed.MultiTaskGaussianProcessRegressionModel(
         multi_task_kernel,
         observation_index_points=index_points,
         index_points=test_points,
@@ -368,7 +369,7 @@ class MultiTaskGaussianProcessRegressionModelTest(
       return (tf.math.reduce_sum(x, axis=[-1, -2])[..., tf.newaxis]
               * tf.convert_to_tensor([-0.5, 2.0]))
 
-    mtgp = tfe.distributions.MultiTaskGaussianProcessRegressionModel(
+    mtgp = tfed.MultiTaskGaussianProcessRegressionModel(
         kernel,
         observation_index_points=index_points,
         observations=observations,
@@ -398,6 +399,121 @@ class MultiTaskGaussianProcessRegressionModelTest(
 
     self.assertAllNotNan(mtgp.mean())
     self.assertAllClose(tf.linalg.matrix_transpose(gp.mean()), mtgp.mean())
+
+  def testMeanVarianceAndCovariancePrecomputed(self):
+    num_tasks = 3
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
+    length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
+    observation_noise_variance = np.array([1e-9], np.float64)
+
+    observation_index_points = (
+        np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
+    observations = np.linspace(
+        -20., 20., 7 * num_tasks).reshape(7, num_tasks).astype(np.float64)
+
+    index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
+
+    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
+    multi_task_kernel = tfe.psd_kernels.Independent(
+        num_tasks=num_tasks, base_kernel=kernel)
+    mtgprm = tfed.MultiTaskGaussianProcessRegressionModel(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+
+    precomputed_mtgprm = tfed.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+
+    self.assertAllClose(self.evaluate(precomputed_mtgprm.variance()),
+                        self.evaluate(mtgprm.variance()))
+    self.assertAllClose(self.evaluate(precomputed_mtgprm.mean()),
+                        self.evaluate(mtgprm.mean()))
+
+  def testPrecomputedWithMasking(self):
+    num_tasks = 2
+    amplitude = np.array([1., 2., 3., 4.], np.float64)
+    length_scale = np.array([[.1], [.2], [.3]], np.float64)
+    observation_noise_variance = np.array([[1e-2], [1e-4], [1e-6]], np.float64)
+
+    rng = test_util.test_np_rng()
+    # [4, 3, num_tasks]
+    observations_is_missing = np.array([
+        [[True, False], [False, True], [True, False]],
+        [[False, True], [False, True], [False, True]],
+        [[False, False], [False, True], [True, False]],
+        [[True, False], [False, True], [False, False]]
+    ])
+    observations = np.linspace(
+        -20., 20., 3 * num_tasks).reshape(3, num_tasks).astype(np.float64)
+    observations = tf.where(~observations_is_missing, observations, np.nan)
+
+    index_points = np.linspace(1., 4., 25).reshape(5, 5).astype(np.float64)
+
+    observation_index_points = rng.uniform(
+        -1., 1., (3, 1, 3, 5)).astype(np.float64)
+
+    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
+    multi_task_kernel = tfe.psd_kernels.Independent(
+        num_tasks=num_tasks, base_kernel=kernel)
+    mtgprm = tfed.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observations_is_missing=observations_is_missing,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+
+    self.assertAllNotNan(mtgprm.mean())
+    self.assertAllNotNan(mtgprm.variance())
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX have no notion of CompositeTensor/saved_model')
+  def testPrecomputedCompositeTensor(self):
+    num_tasks = 3
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
+    length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
+    observation_noise_variance = np.array([1e-9], np.float64)
+
+    observation_index_points = (
+        np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
+    observations = np.random.uniform(
+        -1., 1., (1, 1, 7, num_tasks)).astype(np.float64)
+
+    index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
+
+    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
+    multi_task_kernel = tfe.psd_kernels.Independent(
+        num_tasks=num_tasks, base_kernel=kernel)
+
+    precomputed_mtgprm = tfed.MultiTaskGaussianProcessRegressionModel.precompute_regression_model(
+        kernel=multi_task_kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+
+    flat = tf.nest.flatten(precomputed_mtgprm, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        precomputed_mtgprm, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfed.MultiTaskGaussianProcessRegressionModel)
+    self.assertIsInstance(unflat, tf.__internal__.CompositeTensor)
+    # Check that we don't recompute the scale matrix on flattening /
+    # unflattening. In this case it's a kronecker product of a lower triangular
+    # and an identity, so we only check the first factor.
+    self.assertIs(precomputed_mtgprm._observation_scale.operators[0]._tril,  # pylint:disable=protected-access
+                  unflat._observation_scale.operators[0]._tril)  # pylint:disable=protected-access
+
 
 if __name__ == '__main__':
   test_util.main()

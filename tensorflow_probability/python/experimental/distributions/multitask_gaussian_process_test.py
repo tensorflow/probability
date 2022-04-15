@@ -127,6 +127,9 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     self.assertAllEqual(
         self.evaluate(tf.shape(gp.mean())), batch_shape + event_shape)
 
+    self.assertAllEqual(
+        self.evaluate(tf.shape(gp.variance())), batch_shape + event_shape)
+
   def testBindingIndexPoints(self):
     amplitude = np.float64(0.5)
     length_scale = np.float64(2.)
@@ -165,6 +168,12 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     for i in range(3):
       self.assertAllClose(
           single_task_mean_, multi_task_mean_[..., i], rtol=1e-3)
+
+    multi_task_var_ = self.evaluate(mtgp.variance(index_points=index_points))
+    single_task_var_ = self.evaluate(gp.variance(index_points=index_points))
+    for i in range(3):
+      self.assertAllClose(
+          single_task_var_, multi_task_var_[..., i], rtol=1e-3)
 
   def testConstantMeanFunction(self):
     # 5x5 grid of index points in R^2 and flatten to 25x2
@@ -354,6 +363,18 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     self.assertAllClose(
         self.evaluate(actual_multitask_log_prob),
         self.evaluate(multitask_log_prob), rtol=4e-3)
+
+    multitask_mean = multitask_gp.mean()
+    actual_multitask_mean = actual_multitask_gp.mean()
+    self.assertAllClose(
+        self.evaluate(actual_multitask_mean),
+        self.evaluate(multitask_mean), rtol=4e-3)
+
+    multitask_var = multitask_gp.variance()
+    actual_multitask_var = actual_multitask_gp.variance()
+    self.assertAllClose(
+        self.evaluate(actual_multitask_var),
+        self.evaluate(multitask_var), rtol=4e-3)
 
   def testLogProbMatchesGP(self):
     # Check that the independent kernel parameterization matches using a
