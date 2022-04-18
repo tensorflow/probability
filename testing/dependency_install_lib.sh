@@ -67,7 +67,9 @@ install_tensorflow() {
 install_jax() {
   # For the JAX backend.
   PIP_FLAGS=${1-}
-  python -m pip install $PIP_FLAGS jax jaxlib
+  JAX_VERSION='0.3.5'
+  python -m pip install \
+    $PIP_FLAGS "jax==${JAX_VERSION}" "jaxlib==${JAX_VERSION}"
 }
 
 install_common_packages() {
