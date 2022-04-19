@@ -703,6 +703,15 @@ class SpecialTest(test_util.TestCase):
     self.assertAllNotNan(logerfcx_)
     self.assertAllNotNan(grad_logerfcx_)
 
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testLogErfcxAtZero(self, dtype):
+    x = tf.constant(0., dtype=dtype)
+    logerfcx_, logerfc_ = self.evaluate([
+        tfp.math.logerfcx(x),
+        tfp.math.logerfc(x)])
+    self.assertAllClose(np.log(scipy_special.erfc(0.)), logerfc_)
+    self.assertAllClose(np.log(scipy_special.erfcx(0.)), logerfcx_)
+
   # See https://en.wikipedia.org/wiki/Lambert_W_function#Special_values
   # for a list of special values and known identities.
   @parameterized.named_parameters(
