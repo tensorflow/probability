@@ -235,18 +235,6 @@ def _nest_impl(f, *args, **_):
 nest_p.def_impl(_nest_impl)
 
 
-if hasattr(xla, '_xla_call_translation_rule'):
-
-  def _nest_translation_rule(*args, name, call_jaxpr, scope, **_):
-    return xla._xla_call_translation_rule(  # pylint: disable=protected-access  # type: ignore
-        *args,
-        name=jax_util.wrap_name(name, f'nest[{scope}]'),
-        call_jaxpr=call_jaxpr,
-        donated_invars=(False,) * len(args))
-
-  xla.register_translation(nest_p, _nest_translation_rule)
-
-
 def _nest_lowering(ctx, *args, name, call_jaxpr, scope, **_):
   return mlir._xla_call_lower(  # pylint: disable=protected-access
       ctx,
