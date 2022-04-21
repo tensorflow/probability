@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Registers custom rules for neural networks in the stateful function API.
 
 The Oryx state API enables having a custom unzip rules when `init`-ing a

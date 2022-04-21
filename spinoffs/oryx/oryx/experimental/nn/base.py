@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Contains the `Template` and `Layer` API for Oryx.
 
 `Module`s are an abstraction provided by Oryx that enable encapsulating both
