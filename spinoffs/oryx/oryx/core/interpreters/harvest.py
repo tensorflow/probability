@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for the harvest transformation.
 
 This module contains a general-purpose set of tools for transforming

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for the propagate custom Jaxpr interpreter.
 
 The propagate Jaxpr interpreter converts a Jaxpr to a directed graph where
