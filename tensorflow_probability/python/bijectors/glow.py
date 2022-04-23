@@ -708,9 +708,10 @@ class OneByOneConv(bijector.Bijector):
   of the bijector.
   """
 
-  def __init__(self, event_size, seed=None, dtype=tf.float32, **kwargs):
+  def __init__(self, event_size, seed=None, dtype=tf.float32,
+               name='OneByOneConv', **kwargs):
     parameters = dict(locals())
-    with tf.name_scope('OneByOneConv') as name:
+    with tf.name_scope(name) as bijector_name:
       lower_upper, permutation = self.trainable_lu_factorization(
           event_size, seed=seed, dtype=dtype)
       self._bijector = scale_matvec_lu.ScaleMatvecLU(
@@ -720,7 +721,7 @@ class OneByOneConv(bijector.Bijector):
           is_constant_jacobian=True,
           forward_min_event_ndims=1,
           parameters=parameters,
-          name=name)
+          name=bijector_name)
 
   def forward(self, x):
     return self._bijector.forward(x)
