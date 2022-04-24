@@ -15,6 +15,7 @@
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
 # pylint: disable=trailing-whitespace
+# pylint: disable=g-inconsistent-quotes
 
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
@@ -237,6 +238,10 @@ class LinearOperatorLowerTriangular(linear_operator.LinearOperator):
   @property
   def _composite_tensor_fields(self):
     return ("tril",)
+
+  @property
+  def _experimental_parameter_ndims_to_matrix_ndims(self):
+    return {"tril": 2}
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg

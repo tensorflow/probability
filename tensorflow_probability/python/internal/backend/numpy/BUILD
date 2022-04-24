@@ -548,6 +548,7 @@ LINOP_FILES = [
     "linear_operator_zeros",
     "matmul_registrations",
     "registrations_util",
+    "slicing",
     "solve_registrations",
 ]
 

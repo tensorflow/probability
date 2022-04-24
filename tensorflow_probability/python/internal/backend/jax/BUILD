@@ -96,6 +96,7 @@ GEN_FILENAMES = [
     "gen/linear_operator_zeros",
     "gen/matmul_registrations",
     "gen/registrations_util",
+    "gen/slicing",
     "gen/solve_registrations",
 ]
 

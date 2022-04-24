@@ -15,6 +15,7 @@
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
 # pylint: disable=trailing-whitespace
+# pylint: disable=g-inconsistent-quotes
 
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
@@ -42,7 +43,7 @@ from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import tensor_spec
-# from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy import type_spec
 from tensorflow_probability.python.internal.backend.numpy import ops as module
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
@@ -54,6 +55,7 @@ from tensorflow_probability.python.internal.backend.numpy import variables
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as linalg
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_algebra
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_util
+from tensorflow_probability.python.internal.backend.numpy.gen import slicing
 from absl import logging as logging
 from tensorflow_probability.python.internal.backend.numpy import data_structures
 from tensorflow_probability.python.internal.backend.numpy import deprecation
@@ -1208,6 +1210,25 @@ class LinearOperator(
     # class `CompositeTensor` can be constructed and passed to the
     # `@make_composite_tensor` decorator.
     pass
+
+  def __getitem__(self, slices):
+    return slicing.batch_slice(self, params_overrides={}, slices=slices)
+
+  @property
+  def _experimental_parameter_ndims_to_matrix_ndims(self):
+    """A dict of names to number of dimensions contributing to an operator.
+
+    This is a dictionary of parameter names to `int`s specifying the
+    number of right-most dimensions contributing to the **matrix** shape of the
+    densified operator.
+    If the parameter is a `Tensor`, this is mapped to an `int`.
+    If the parameter is a `LinearOperator` (called `A`), this specifies the
+    number of batch dimensions of `A` contributing to this `LinearOperator`s
+    matrix shape.
+    If the parameter is a structure, this is a structure of the same type of
+    `int`s.
+    """
+    return ()
 
 
 class _LinearOperatorSpec(type_spec.BatchableTypeSpec):
