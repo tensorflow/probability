@@ -48,7 +48,8 @@ class GibbsSamplerTests(test_util.TestCase):
                         weights_prior_scale=10.,
                         sparse_weights_nonzero_prob=None,
                         time_series_shift=0.,
-                        dtype=tf.float32):
+                        dtype=tf.float32,
+                        design_matrix_is_none=False):
     seed = test_util.test_seed(sampler_type='stateless')
     (design_seed,
      weights_seed,
@@ -57,12 +58,17 @@ class GibbsSamplerTests(test_util.TestCase):
      slope_seed,
      is_missing_seed) = samplers.split_seed(seed, 6, salt='_build_test_model')
 
-    design_matrix = samplers.normal(
-        [num_timesteps, num_features], dtype=dtype, seed=design_seed)
     if weights is None:
       weights = samplers.normal(
           list(batch_shape) + [num_features], dtype=dtype, seed=weights_seed)
-    regression = tf.linalg.matvec(design_matrix, weights)
+    if design_matrix_is_none:
+      design_matrix = None
+      regression = tf.zeros(num_timesteps, dtype)
+    else:
+      design_matrix = samplers.normal([num_timesteps, num_features],
+                                      dtype=dtype,
+                                      seed=design_seed)
+      regression = tf.linalg.matvec(design_matrix, weights)
     noise = samplers.normal(
         list(batch_shape) + [num_timesteps],
         dtype=dtype, seed=noise_seed) * true_noise_scale
@@ -283,6 +289,35 @@ class GibbsSamplerTests(test_util.TestCase):
     self.assertAllEqual(predictive_mean_, predictive_mean2_)
     self.assertAllEqual(predictive_stddev_, predictive_stddev2_)
 
+  def test_no_covariates_support(self):
+    if not tf.executing_eagerly():
+      return
+    seed = test_util.test_seed(sampler_type='stateless')
+    dtype = tf.float32
+    model, observed_time_series, is_missing = self._build_test_model(
+        num_timesteps=5,
+        batch_shape=[3],
+        prior_class=gibbs_sampler.XLACompilableInverseGamma,
+        dtype=dtype,
+        design_matrix_is_none=True,
+        weights_prior_scale=None)
+
+    @tf.function(jit_compile=True)
+    def do_sampling(observed_time_series, is_missing):
+      return gibbs_sampler.fit_with_gibbs_sampling(
+          model,
+          tfp.sts.MaskedTimeSeries(observed_time_series, is_missing),
+          num_results=4,
+          num_warmup_steps=1,
+          seed=seed)
+
+    # This simply ensures we can get samples without throwing an error.
+    # TODO(kloveless): Add tests that compare the results with either another
+    # method of inference, or to a model with covariates, but all covariates
+    # are zero.
+    samples = do_sampling(observed_time_series[..., tf.newaxis], is_missing)
+    gibbs_sampler.one_step_predictive(model, samples, thin_every=1)
+
   def test_invalid_model_spec_raises_error(self):
     observed_time_series = tf.ones([2])
     design_matrix = tf.eye(2)
@@ -309,6 +344,30 @@ class GibbsSamplerTests(test_util.TestCase):
           weights_prior=tfd.Normal(loc=0., scale=1.),
           level_variance_prior=tfd.InverseGamma(0.01, 0.01),
           observation_noise_variance_prior=tfd.LogNormal(0., 3.))
+
+  def test_invalid_optons_with_none_design_matrix_raises_error(self):
+    observed_time_series = tf.ones([2])
+    with self.assertRaisesRegex(
+        ValueError,
+        'Design matrix is None thus sparse_weights_nonzero_prob should '
+        'not be defined'):
+      gibbs_sampler.build_model_for_gibbs_fitting(
+          observed_time_series,
+          design_matrix=None,
+          weights_prior=None,
+          sparse_weights_nonzero_prob=0.4,
+          level_variance_prior=tfd.InverseGamma(0.01, 0.01),
+          observation_noise_variance_prior=tfd.InverseGamma(0.01, 0.01))
+
+    with self.assertRaisesRegex(
+        ValueError,
+        'Design matrix is None thus weights_prior should not be defined'):
+      gibbs_sampler.build_model_for_gibbs_fitting(
+          observed_time_series,
+          design_matrix=None,
+          weights_prior=tfd.Normal(loc=0., scale=1.),
+          level_variance_prior=tfd.InverseGamma(0.01, 0.01),
+          observation_noise_variance_prior=tfd.InverseGamma(0.01, 0.01))
 
   def test_invalid_model_raises_error(self):
     observed_time_series = tf.convert_to_tensor([1., 0., -1., 2.])
