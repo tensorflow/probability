@@ -19,12 +19,14 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import sample as sample_dist
 from tensorflow_probability.python.experimental.distributions import MultivariateNormalPrecisionFactorLinearOperator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import vectorization_util
@@ -44,6 +46,19 @@ class InverseGammaWithSampleUpperBound(inverse_gamma.InverseGamma):
     super().__init__(concentration=concentration,
                      scale=scale,
                      **kwargs)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        upper_bound=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   def _sample_n(self, n, seed=None):
     xs = super()._sample_n(n, seed=seed)
@@ -70,6 +85,14 @@ class MVNPrecisionFactorHardZeros(
 
   def _log_prob(self, *args, **kwargs):
     raise NotImplementedError('Log prob is not currently implemented.')
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        precision_factor=parameter_properties.BatchedComponentProperties(),
+        precision=parameter_properties.BatchedComponentProperties(),
+        nonzeros=parameter_properties.BatchedComponentProperties(event_ndims=1))
 
 
 class SpikeSlabSamplerState(collections.namedtuple(
