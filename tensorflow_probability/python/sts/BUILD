@@ -144,6 +144,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/sts/internal",
     ],
 )
