@@ -345,7 +345,7 @@ class GibbsSamplerTests(test_util.TestCase):
           level_variance_prior=tfd.InverseGamma(0.01, 0.01),
           observation_noise_variance_prior=tfd.LogNormal(0., 3.))
 
-  def test_invalid_optons_with_none_design_matrix_raises_error(self):
+  def test_invalid_options_with_none_design_matrix_raises_error(self):
     observed_time_series = tf.ones([2])
     with self.assertRaisesRegex(
         ValueError,
@@ -557,6 +557,39 @@ class GibbsSamplerTests(test_util.TestCase):
                         atol=0.01, rtol=0.05)
     self.assertAllClose(sampled_weights_cov_, weights_posterior_cov_,
                         atol=0.01, rtol=0.05)
+
+  def test_sparse_weights_nonzero_prob_of_one_works(self):
+    true_weights = tf.constant([0., 0., 2., 0., -2.])
+    model, observed_time_series, _ = self._build_test_model(
+        num_timesteps=20,
+        num_features=5,
+        missing_prob=0.,
+        true_noise_scale=0.1,
+        weights=true_weights,
+        weights_prior_scale=None,  # Default g-prior.
+        sparse_weights_nonzero_prob=1.)
+
+    @tf.function(autograph=False)
+    def do_sampling():
+      return gibbs_sampler.fit_with_gibbs_sampling(
+          model,
+          observed_time_series,
+          num_results=100,
+          num_warmup_steps=100,
+          seed=test_util.test_seed(sampler_type='stateless'))
+
+    samples = self.evaluate(do_sampling())
+    mean_weights = tf.reduce_mean(samples.weights, axis=-2)
+    nonzero_probs = tf.reduce_mean(
+        tf.cast(tf.not_equal(samples.weights, 0.), tf.float32),
+        axis=-2)
+    # Increasing `num_timesteps` relative to `num_features` would give more
+    # precise weight estimates, at the cost of longer test runtime.
+    # TODO(axch, cgs): Can we use assertAllMeansClose here too?  The
+    # samples are presumably not IID across axis=0, so the
+    # statistical assumptions are not satisfied.
+    self.assertAllClose(mean_weights, true_weights, atol=0.3)
+    self.assertAllClose(nonzero_probs, [1., 1., 1., 1., 1.])
 
   def test_sparse_regression_recovers_plausible_weights(self):
     true_weights = tf.constant([0., 0., 2., 0., -2.])

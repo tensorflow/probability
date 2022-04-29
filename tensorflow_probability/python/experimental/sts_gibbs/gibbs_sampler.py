@@ -828,6 +828,14 @@ def _build_sampler_loop_body(model,
           **({
               'default_pseudo_observations': default_pseudo_observations
           } if default_pseudo_observations is not None else {}))
+      # In case the nonzero probability is exactly one, any proposal with any
+      # zero weights will have log prob of -infinity, so we will pin the
+      # proposals to one.
+      # TODO(colcarroll): Can we short-circuit the feature selection loop in
+      # case this is `True`?
+      pin_to_nonzero = tf.greater_equal(
+          regression_component._sparse_weights_nonzero_prob, 1.)  # pylint: disable=protected-access
+
     else:
       weights_prior_scale = (regression_component.parameters[0].prior.scale)
 
@@ -852,10 +860,12 @@ def _build_sampler_loop_body(model,
       if model_has_spike_slab_regression:
         (observation_noise_variance,
          weights) = spike_and_slab_sampler.sample_noise_variance_and_weights(
-             initial_nonzeros=tf.not_equal(previous_sample.weights, 0.),
+             initial_nonzeros=tf.math.logical_or(
+                 tf.not_equal(previous_sample.weights, 0.), pin_to_nonzero),
              targets=observed_time_series - previous_sample.level,
              seed=weights_seed)
         observation_noise_scale = tf.sqrt(observation_noise_variance)
+
       else:
         weights = _resample_weights(
             design_matrix=design_matrix,
