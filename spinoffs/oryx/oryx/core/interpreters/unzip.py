@@ -425,7 +425,7 @@ class UnzipTracer(jax_core.Tracer):
   @property
   def parents(self):
     if isinstance(self.recipe, pe.JaxprEqnRecipe):
-      return self.recipe.invars
+      return self.recipe.in_tracers
     else:
       return []
 
