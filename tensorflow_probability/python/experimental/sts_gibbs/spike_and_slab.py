@@ -690,7 +690,8 @@ def _symmetric_increment_chol(chol, idx, increment):
   M[idx, idx] -= increment[idx]
   ```
 
-  in Cholesky space, where `increment` is a vector of length `m`.
+  in Cholesky space, but in an optimized form as 2 steps, where `increment` is
+  a vector of length `m`.
 
   That is, this function adds `increment` to the `idx`th row, and
   (by symmetry) also to the `idx`th column. For example:
@@ -708,7 +709,7 @@ def _symmetric_increment_chol(chol, idx, increment):
   #      [0., -0.3, 2.]]
   ```
 
-  This is implemented efficiently as three consecutive rank-1 updates of
+  This is implemented efficiently as two consecutive rank-1 updates of
   `chol(M)`.
 
   Args:
@@ -724,30 +725,39 @@ def _symmetric_increment_chol(chol, idx, increment):
       given row and column of `M`.
   """
   with tf.name_scope('symmetric_increment_chol'):
-    # TODO(jburnim): Can we make this more numerically accurate by doing all
-    # three rank-1 Cholesky updates in a single pass?
+    # TODO(jburnim): Can we make this more numerically accurate by doing both
+    # rank-1 Cholesky updates in a single pass?
     chol = tf.convert_to_tensor(chol, name='chol')
     increment = tf.convert_to_tensor(increment, name='increment')
     orig_chol = chol
 
-    # Rank-1 update to increment the `idx`th row and column, with side
-    # effects elsewhere in the matrix.
+    # This does an update of the row and column in 2 rank-1 updates.
+    # Consider an example update vector of v = [x, y, z]. Thus v @ v.T is:
+    # [[x^2, xy, xz],
+    #  [xy, y^2, yz],
+    #  [xz, yz, z^2]]
+    # cholesky_update will compute the return the updated cholesky given
+    # this being added to the original matrix.
+    #
+    # Say we want update row and column 1, then the needed offset matrix is:
+    # [[0, x, 0],
+    #  [x, y, z],
+    #  [0, z, 0]]
+    # which is rank 2 and will require at least two rank 1 operations.
+    #
+    # If we do two updates, by adding v1 and subtracting v2, where
+    #  v1 = [x, (y + 1)/2, z]
+    #  v2 = [x, (y - 1)/2, z]
+    # this accomplishes the goal, since:
+    # [[0, x, 0],
+    #  [x, y, z],   = v1 @ v1.T - v2 @ v2.T
+    #  [0, z, 0]]
+    a = (increment[..., idx] + 1.) / 2.
+    b = (increment[..., idx] - 1.) / 2.
     chol = tfp_math.cholesky_update(
-        chol, update_vector=_set_vector_index(increment, idx, 1.), multiplier=1)
-    # Second update to correct the diagonal entry `M[idx, idx]`.
-    diagonal_correction = increment[..., idx] - 1.
+        chol, update_vector=_set_vector_index(increment, idx, a), multiplier=1)
     chol = tfp_math.cholesky_update(
-        chol,
-        update_vector=_set_vector_index(tf.zeros_like(increment),
-                                        idx,
-                                        tf.sqrt(tf.abs(diagonal_correction))),
-        multiplier=tf.sign(diagonal_correction))
-    # Final update to revert the side effects from the first step without
-    # touching the (newly incremented) `idx`th row/col.
-    chol = tfp_math.cholesky_update(
-        chol,
-        update_vector=_set_vector_index(increment, idx, 0.),
-        multiplier=-1)
+        chol, update_vector=_set_vector_index(increment, idx, b), multiplier=-1)
 
     # There Cholesky decomposition should be unchanged in rows/cols before idx.
     #
