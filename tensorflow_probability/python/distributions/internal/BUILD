@@ -74,8 +74,8 @@ py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:uniform",
+        "//tensorflow_probability/python/internal:empirical_statistical_testing",
         "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/internal:test_util_scipy",
         "//tensorflow_probability/python/math:linalg",
     ],
 )

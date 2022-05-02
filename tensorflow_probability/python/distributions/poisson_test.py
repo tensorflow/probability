@@ -495,9 +495,10 @@ class PoissonSamplingTest(test_util.TestCase):
             st.left_continuous_cdf_discrete_distribution(poisson),
             false_fail_rate=1e-9))
 
-    self.assertAllClose(
-        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+    self.assertAllMeansClose(
+        self.evaluate(samples),
         stats.poisson.mean(rate),
+        axis=0,
         rtol=0.01)
     self.assertAllClose(
         self.evaluate(tf.math.reduce_variance(samples, axis=0)),
@@ -529,9 +530,10 @@ class PoissonSamplingTest(test_util.TestCase):
             st.left_continuous_cdf_discrete_distribution(poisson),
             false_fail_rate=1e-9))
 
-    self.assertAllClose(
-        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+    self.assertAllMeansClose(
+        self.evaluate(samples),
         stats.poisson.mean(rate),
+        axis=0,
         rtol=0.01)
     self.assertAllClose(
         self.evaluate(tf.math.reduce_variance(samples, axis=0)),
@@ -571,9 +573,10 @@ class PoissonSamplingTest(test_util.TestCase):
             log_rates=log_rate,
             output_dtype=tf.float64,
             seed=test_util.test_seed()))
-    self.assertAllClose(
-        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+    self.assertAllMeansClose(
+        samples,
         stats.poisson.mean(rate),
+        axis=0,
         rtol=0.01)
     self.assertAllClose(
         self.evaluate(tf.math.reduce_variance(samples, axis=0)),

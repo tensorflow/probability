@@ -19,7 +19,6 @@ import time
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability import distributions as tfd
 from tensorflow_probability.python.experimental.sts_gibbs import gibbs_sampler
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import
@@ -73,22 +72,29 @@ class XLABenchmarkTests(tfp_test_util.TestCase):
     if not tf.executing_eagerly():
       return
     seed = tfp_test_util.test_seed()
-    model, observed_time_series, is_missing = self._build_test_model(
-        num_timesteps=336, batch_shape=[])
+
+    @tf.function(autograph=False, jit_compile=True)
+    def _run():
+      model, observed_time_series, is_missing = self._build_test_model(
+          num_timesteps=336, batch_shape=[])
+      return gibbs_sampler.fit_with_gibbs_sampling(
+          model,
+          tfp.sts.MaskedTimeSeries(observed_time_series[..., tf.newaxis],
+                                   is_missing),
+          num_results=500,
+          num_warmup_steps=100,
+          seed=seed)
 
     t0 = time.time()
-    samples = tf.function(
-        gibbs_sampler.fit_with_gibbs_sampling,
-        autograph=False,
-        jit_compile=True)(
-            model,
-            tfp.sts.MaskedTimeSeries(observed_time_series[..., tf.newaxis],
-                                     is_missing),
-            num_results=500,
-            num_warmup_steps=100,
-            seed=seed)
+    samples = _run()
+    t1 = time.time()
+    print('Drew (100+500) samples (with JIT compilation) in time', t1-t0)
+
+    t0 = time.time()
+    samples = _run()
     t1 = time.time()
     print('Drew (100+500) samples in time', t1-t0)
+
     print('Results:', samples)
 
 

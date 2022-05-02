@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -102,7 +103,7 @@ class MultivariateStudentTLinearOperator(
 
   # Compute the pdf of an`R^3` observation; return a scalar.
   mvt.prob([-1., 0, 1])  # shape: []
-
+  ```
   """
 
   def __init__(self,
@@ -228,7 +229,7 @@ class MultivariateStudentTLinearOperator(
     return self.scale.range_dimension
 
   def _sample_shape(self):
-    return tf.concat([self.batch_shape_tensor(), self.event_shape_tensor()], -1)
+    return ps.concat([self.batch_shape_tensor(), self.event_shape_tensor()], -1)
 
   def _sample_n(self, n, seed=None):
     # Like with the univariate Student's t, sampling can be implemented as a

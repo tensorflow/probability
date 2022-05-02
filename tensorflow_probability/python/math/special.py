@@ -399,7 +399,7 @@ def logerfc(x, name=None):
   with tf.name_scope(name or 'logerfc'):
     dtype = dtype_util.common_dtype([x], tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype)
-    safe_positive_x = tf.where(x > 0., x, 1.)
+    safe_positive_x = tf.where(x >= 0., x, 1.)
     safe_negative_x = tf.where(x < 0., x, -1.)
     return tf.where(
         x < 0.,
@@ -425,7 +425,7 @@ def logerfcx(x, name=None):
   with tf.name_scope(name or 'logerfc'):
     dtype = dtype_util.common_dtype([x], tf.float32)
     x = tf.convert_to_tensor(x, dtype=dtype)
-    safe_positive_x = tf.where(x > 0., x, 1.)
+    safe_positive_x = tf.where(x >= 0., x, 1.)
     safe_negative_x = tf.where(x < 0., x, -1.)
     return tf.where(
         x < 0.,

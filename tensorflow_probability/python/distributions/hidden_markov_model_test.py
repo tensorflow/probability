@@ -358,11 +358,12 @@ class _HiddenMarkovModelTest(
         num_steps=num_steps,
         validate_args=True)
 
-    examples = [tf.zeros(5, dtype=tf.int32), tf.ones(5, dtype=tf.int32)]
+    examples = tf.stack(
+        [tf.zeros(5, dtype=tf.int32), tf.ones(5, dtype=tf.int32)], axis=0)
     examples = tf.broadcast_to(examples, [7, 3, 2, 5])
     computed_log_prob = model.log_prob(examples)
 
-    expected_log_prob = tf.broadcast_to([np.log(.5**5)], [7, 3, 2])
+    expected_log_prob = tf.broadcast_to(tf.constant([np.log(.5**5)]), [7, 3, 2])
     self.assertAllClose(computed_log_prob, expected_log_prob,
                         rtol=1e-4, atol=0.0)
 
@@ -483,7 +484,7 @@ class _HiddenMarkovModelTest(
         num_steps=num_steps,
         validate_args=True)
 
-    observations = [0, 1, 1, 1, 1, 1, 2]
+    observations = tf.constant([0, 1, 1, 1, 1, 1, 2])
 
     probs = self.evaluate(
         model.posterior_marginals(observations).probs_parameter())
@@ -973,7 +974,7 @@ class _HiddenMarkovModelTest(
 
     inferred_marginals = self.evaluate(
         model.posterior_marginals(
-            observations=[[[0]], [[1]]],
+            observations=tf.constant([[[0]], [[1]]]),
             mask=[[[[True]]], [[[False]]]]).probs_parameter())
 
     # Result is a [2,2,2] batch of sequences of length 1 of

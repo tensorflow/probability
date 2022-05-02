@@ -469,14 +469,15 @@ class CauchyTest(test_util.TestCase):
     reverse_kl_val = self.evaluate(reverse_kl)
 
     x = c_a.sample(int(1e5), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(c_a.log_prob(x) - c_b.log_prob(x), axis=0)
-    kl_sample_val = self.evaluate(kl_sample)
+    kl_samples = c_a.log_prob(x) - c_b.log_prob(x)
+    kl_samples_ = self.evaluate(kl_samples)
 
     self.assertEqual(kl.shape, (batch_size,))
 
     # The Cauchy KL is symmetric
-    self.assertAllClose(kl_val, kl_sample_val, atol=0.0, rtol=1e-2)
-    self.assertAllClose(reverse_kl_val, kl_sample_val, atol=0.0, rtol=1e-2)
+    self.assertAllMeansClose(kl_samples_, kl_val, axis=0, atol=0.0, rtol=1e-2)
+    self.assertAllMeansClose(
+        kl_samples_, reverse_kl_val, axis=0, atol=0.0, rtol=1e-2)
 
 if __name__ == '__main__':
   test_util.main()

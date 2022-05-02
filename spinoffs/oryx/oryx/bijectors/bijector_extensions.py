@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Wraps TFP bijectors for use with Jax."""
 from jax import tree_util
 from jax import util as jax_util

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Contains highest-level abstractions for the stateful function API."""
 import abc
 from typing import Any, Dict, Tuple

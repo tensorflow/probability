@@ -658,6 +658,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "with_reductions_test",
+    size = "medium",
     srcs = ["with_reductions_test.py"],
     shard_count = 2,
     deps = [

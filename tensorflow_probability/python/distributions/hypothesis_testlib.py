@@ -29,6 +29,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.experimental import distributions as tfed
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 
@@ -366,6 +367,8 @@ CONSTRAINTS = {
         fix_finite_discrete,
     'GeneralizedNormal.power':
         tfp_hps.softplus_plus_eps(),
+    'TwoPieceNormal.skewness':
+        tfp_hps.softplus_plus_eps(),
 }
 
 
@@ -448,6 +451,10 @@ def _instantiable_base_dists():
       functools.partial(tfd.Empirical, event_ndims=1), dict(samples=2))
   result['Empirical|event_ndims=2'] = DistInfo(  #
       functools.partial(tfd.Empirical, event_ndims=2), dict(samples=3))
+
+  # We use a special strategy for instantiating this, so event_dims is set to a
+  # dummy value.
+  result['IncrementLogProb'] = DistInfo(tfed.IncrementLogProb, None)
   return result
 
 
@@ -680,6 +687,12 @@ def base_distributions(draw,
     return draw(spherical_uniforms(
         batch_shape=batch_shape, event_dim=event_dim,
         validate_args=validate_args))
+  elif dist_name == 'IncrementLogProb':
+    return draw(
+        increment_log_probs(
+            batch_shape=batch_shape,
+            enable_vars=enable_vars,
+            validate_args=validate_args))
 
   if params is None:
     params_unconstrained, batch_shape = draw(
@@ -736,6 +749,45 @@ def spherical_uniforms(
   result_dist = tfd.SphericalUniform(
       dimension=event_dim, batch_shape=batch_shape, validate_args=validate_args)
   return result_dist
+
+
+@hps.composite
+def increment_log_probs(draw,
+                        batch_shape=None,
+                        enable_vars=False,
+                        validate_args=True):
+  """Strategy for drawing `IncrementLogProb` distributions.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      `IncrementLogProb` distribution.
+    enable_vars: TODO(b/181859346): Make this `True` all the time and put
+      variable initialization in slicing_test.  If `False`, the returned
+      parameters are all `tf.Tensor`s and not {`tf.Variable`,
+      `tfp.util.DeferredTensor` `tfp.util.TransformedVariable`}
+    validate_args: Python `bool`; whether to enable runtime assertions.
+
+  Returns:
+    dists: A strategy for drawing `IncrementLogProb` distributions with the
+      specified `batch_shape` (or an arbitrary one if omitted).
+  """
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes(min_ndims=0, max_side=4))
+
+  log_prob_value = draw(
+      tfp_hps.maybe_variable(
+          tfp_hps.constrained_tensors(tfp_hps.identity_fn,
+                                      tensorshape_util.as_list(batch_shape)),
+          enable_vars=enable_vars))
+
+  if draw(hps.booleans()):
+    return tfed.IncrementLogProb(log_prob_value, validate_args=validate_args)
+  else:
+    return tfed.IncrementLogProb(
+        lambda v: v,
+        validate_args=validate_args,
+        log_prob_increment_kwargs={'v': log_prob_value})
 
 
 @hps.composite

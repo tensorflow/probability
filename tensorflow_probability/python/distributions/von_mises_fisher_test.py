@@ -280,13 +280,11 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
 
     x = vmf.sample(int(5e4), seed=test_util.test_seed())
 
-    kl_sample = tf.reduce_mean(vmf.log_prob(x) - su.log_prob(x), axis=0)
+    kl_samples = vmf.log_prob(x) - su.log_prob(x)
     true_kl = tfp.distributions.kl_divergence(vmf, su)
-    vmf_entropy = vmf.entropy()
-    su_entropy = su.entropy()
-    print(self.evaluate([vmf_entropy, su_entropy]))
-    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
-    self.assertAllClose(true_kl_, kl_sample_, atol=5e-8, rtol=1e-1)
+    true_kl_, kl_samples_ = self.evaluate([true_kl, kl_samples])
+    self.assertAllMeansClose(
+        kl_samples_, true_kl_, axis=0, atol=5e-8, rtol=1e-1)
     self.assertAllClose(true_kl_, np.zeros_like(true_kl_), atol=1e-4)
 
   def VerifyVonMisesFisherUniformKL(self, dim):
@@ -311,10 +309,11 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
 
     x = vmf.sample(int(5e4), seed=test_util.test_seed())
 
-    kl_sample = tf.reduce_mean(vmf.log_prob(x) - su.log_prob(x), axis=0)
+    kl_samples = vmf.log_prob(x) - su.log_prob(x)
     true_kl = tfp.distributions.kl_divergence(vmf, su)
-    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
-    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=0.3)
+    true_kl_, kl_samples_ = self.evaluate([true_kl, kl_samples])
+    self.assertAllMeansClose(
+        kl_samples_, true_kl_, axis=0, atol=0.0, rtol=0.3)
 
   @parameterized.parameters(2, 3, 5, 10, 20)
   def testKLVonMisesFisherSphericalUniformDim(self, dim):
@@ -341,10 +340,10 @@ class VonMisesFisherTest(test_util.VectorDistributionTestHelpers,
         validate_args=True,
         allow_nan_stats=False)
     samples = vmf.sample(int(3e4), seed=test_util.test_seed())
-    sample_entropy = -tf.reduce_mean(vmf.log_prob(samples), axis=0)
-    true_entropy, sample_entropy = self.evaluate([
-        vmf.entropy(), sample_entropy])
-    self.assertAllClose(sample_entropy, true_entropy, rtol=3e-2)
+    entropy_samples = -vmf.log_prob(samples)
+    true_entropy, entropy_samples = self.evaluate([
+        vmf.entropy(), entropy_samples])
+    self.assertAllMeansClose(entropy_samples, true_entropy, axis=0, rtol=3e-2)
 
   @parameterized.parameters(2, 3, 5, 10, 20)
   def testEntropyDim(self, dim):

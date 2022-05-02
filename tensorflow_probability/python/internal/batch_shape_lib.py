@@ -333,7 +333,8 @@ def map_fn_over_parameters_with_event_ndims(batch_object,
 
     # Ndims of base shape used for a *minimal* event.
     properties = parameter_properties[param_name]
-    if properties.event_ndims is None:
+    if (properties.event_ndims is None or
+        properties.event_ndims is properties.NO_EVENT_NDIMS):
       continue
     if bijector_x_event_ndims is not None:
       param_event_ndims = properties.bijector_instance_event_ndims(
@@ -344,6 +345,9 @@ def map_fn_over_parameters_with_event_ndims(batch_object,
       param_event_ndims = properties.instance_event_ndims(
           batch_object,
           require_static=require_static)
+
+    if param_event_ndims is properties.NO_EVENT_NDIMS:
+      continue
 
     if param_name not in parameter_kwargs:
       # Values from `batch_object.parameters` have not been converted to

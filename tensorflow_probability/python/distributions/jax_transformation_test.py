@@ -82,6 +82,7 @@ JVP_SAMPLE_BLOCKLIST = ()
 JVP_LOGPROB_SAMPLE_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
+    'IncrementLogProb',  # Sample and log prob are independent.
     'NegativeBinomial',  # Too slow: http://b/170871051
 )
 JVP_LOGPROB_PARAM_BLOCKLIST = (
@@ -95,6 +96,7 @@ VJP_SAMPLE_BLOCKLIST = (
 VJP_LOGPROB_SAMPLE_BLOCKLIST = (
     'BetaQuotient',  # https://b/178552958
     'GeneralizedExtremeValue',  # http://b/175654800
+    'IncrementLogProb',  # Sample and log prob are independent.
     'NegativeBinomial',  # Too slow: http://b/170871051
 )
 VJP_LOGPROB_PARAM_BLOCKLIST = (

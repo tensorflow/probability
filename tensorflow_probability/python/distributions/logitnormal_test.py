@@ -69,24 +69,21 @@ class LogitNormalTest(test_util.TestCase):
     loc, scale = [-1.5, 0., 1.5], 0.4
     dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
     x = dist.sample(int(10e3), seed=test_util.test_seed())
-    mean_sample = tf.reduce_mean(x, axis=0)
-    [mean_sample_, mean_approx_] = self.evaluate([
-        mean_sample, dist.mean_approx()])
-    self.assertAllClose(mean_sample_, mean_approx_, atol=1e-4, rtol=0.01)
+    [x_, mean_approx_] = self.evaluate([x, dist.mean_approx()])
+    self.assertAllMeansClose(x_, mean_approx_, axis=0, atol=1e-4, rtol=0.01)
 
   def testLogitNormalMeanLogProbApprox(self):
     loc, scale = [-1.5, 0., 1.5], 0.4
     dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
     x = dist.sample(int(10e3), seed=test_util.test_seed())
     y = tf.constant([0., 0.1, 0.5, 1.], dist.dtype)[:, tf.newaxis]
-    mean_sample = tf.reduce_mean(
-        tfd.Bernoulli(probs=x).log_prob(y[..., tf.newaxis]),
-        axis=1)
-    [mean_sample_, mean_approx_, mean_approx_default_] = self.evaluate([
-        mean_sample, dist.mean_log_prob_approx(y), dist.mean_log_prob_approx()])
-    self.assertAllClose(mean_sample_, mean_approx_, atol=1e-4, rtol=0.02)
-    self.assertAllClose(mean_sample_[-1], mean_approx_default_,
-                        atol=1e-4, rtol=0.02)
+    samples = tfd.Bernoulli(probs=x).log_prob(y[..., tf.newaxis])
+    [samples_, mean_approx_, mean_approx_default_] = self.evaluate([
+        samples, dist.mean_log_prob_approx(y), dist.mean_log_prob_approx()])
+    self.assertAllMeansClose(
+        samples_, mean_approx_, axis=1, atol=1e-4, rtol=0.02)
+    self.assertAllMeansClose(
+        samples_[-1, :], mean_approx_default_, axis=0, atol=1e-4, rtol=0.02)
 
   def testLogitNormalVarianceApprox(self):
     seed_stream = test_util.test_seed_stream()
@@ -150,14 +147,14 @@ class LogitNormalTest(test_util.TestCase):
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
     x = ln_a.sample(int(1e5), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(ln_a.log_prob(x) - ln_b.log_prob(x), axis=0)
-    kl_sample_ = self.evaluate(kl_sample)
+    kl_samples = ln_a.log_prob(x) - ln_b.log_prob(x)
+    kl_samples_ = self.evaluate(kl_samples)
 
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected_from_normal)
     self.assertAllClose(kl_val, kl_expected_from_formula)
-    self.assertAllClose(
-        kl_expected_from_formula, kl_sample_, atol=0.0, rtol=1e-2)
+    self.assertAllMeansClose(
+        kl_samples_, kl_expected_from_formula, axis=0, atol=0.0, rtol=1e-2)
 
     # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
 #   def testPdfAtBoundary(self):

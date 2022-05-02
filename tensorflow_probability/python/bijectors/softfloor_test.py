@@ -47,7 +47,7 @@ class _SoftFloorBijectorBase(object):
   def testBijectorApproximatesFloorLowTemperature(self):
     # Let's make this look floor.
     floor = tfb.Softfloor(self.dtype(1e-4))
-    # We chose a high temperature, and truncated range so that
+    # We chose a low temperature, and truncated range so that
     # we are likely to be retrieving 2.
     pos_values = np.linspace(2.01, 2.99, 100).astype(self.dtype)
     neg_values = np.linspace(-2.99, -2.01, 100).astype(self.dtype)
@@ -57,6 +57,21 @@ class _SoftFloorBijectorBase(object):
     self.assertAllClose(
         self.evaluate(floor.forward(neg_values)),
         np.floor(neg_values))
+
+  def testBijectorApproximatesIdentityHighTemperature(self):
+    # Let's make this look like the identity.
+    floor = tfb.Softfloor(self.dtype(1e4))
+    pos_values = np.linspace(2.01, 2.99, 100).astype(self.dtype)
+    neg_values = np.linspace(-2.99, -2.01, 100).astype(self.dtype)
+    self.assertAllClose(
+        self.evaluate(floor.forward(pos_values)), pos_values, rtol=1e-5)
+    self.assertAllClose(
+        self.evaluate(floor.forward(neg_values)), neg_values, rtol=1e-5)
+
+    self.assertAllClose(
+        self.evaluate(floor.inverse(pos_values)), pos_values, rtol=5e-4)
+    self.assertAllClose(
+        self.evaluate(floor.inverse(neg_values)), neg_values, rtol=5e-4)
 
   def testBijectorEndpointsAtLimit(self):
     # Check that we don't get NaN at half-integer and the floor matches.

@@ -193,7 +193,7 @@ class GradientTest(test_util.TestCase):
     if not tf.executing_eagerly():
       self.skipTest('Gradients get None values in graph mode.')
     d = tfd.MultivariateNormalTriL(scale_tril=tf.eye(2))
-    x = d.sample(seed=(0, 0))
+    x = d.sample(seed=test_util.test_seed())
     fn_result, grads = util.maybe_call_fn_and_grads(d.log_prob, x)
     self.assertAllEqual(False, fn_result is None)
     self.assertAllEqual([False], [g is None for g in grads])

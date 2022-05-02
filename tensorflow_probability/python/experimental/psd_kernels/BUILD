@@ -58,8 +58,6 @@ multi_substrate_py_test(
     name = "additive_kernel_test",
     size = "medium",
     srcs = ["additive_kernel_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
     shard_count = 4,
     tags = ["tf1-broken"],
     deps = [

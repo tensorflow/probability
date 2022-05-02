@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for JAX tracing utility functions."""
 import contextlib
 import threading

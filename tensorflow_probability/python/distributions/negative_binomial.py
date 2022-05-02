@@ -18,6 +18,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -145,8 +146,8 @@ class NegativeBinomial(distribution.AutoCompositeTensorDistribution):
   def _parameter_properties(cls, dtype, num_classes=None):
     return dict(
         total_count=parameter_properties.ParameterProperties(
-            default_constraining_bijector_fn=parameter_properties
-            .BIJECTOR_NOT_IMPLEMENTED),
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
         logits=parameter_properties.ParameterProperties(),
         probs=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=sigmoid_bijector.Sigmoid,

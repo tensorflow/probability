@@ -15,6 +15,7 @@
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
 # pylint: disable=trailing-whitespace
+# pylint: disable=g-inconsistent-quotes
 
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #

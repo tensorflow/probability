@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for experimental Oryx libraries."""
 from oryx.experimental import matching
 from oryx.experimental import mcmc

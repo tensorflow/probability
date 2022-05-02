@@ -135,20 +135,22 @@ class ImportanceResampleTest(test_util.TestCase):
                         resampled.log_prob(xs, seed=seed),
                         atol=0.1)
 
-  @test_util.numpy_disable_test_missing_functionality('vectorized_map')
   def test_supports_joint_events(self):
+    root = tfd.JointDistributionCoroutine.Root
 
-    @tfd.JointDistributionCoroutineAutoBatched
+    @tfd.JointDistributionCoroutine
     def target():
-      x = yield tfd.Normal(-1., 1.0, name='x')
-      yield tfd.MultivariateNormalTriL(loc=[x + 2],
+      x = yield root(tfd.Normal(-1., 1.0, name='x'))
+      yield tfd.MultivariateNormalTriL(loc=(x + 2)[..., tf.newaxis],
                                        scale_tril=[[0.5]],
                                        name='y')
 
-    @tfd.JointDistributionCoroutineAutoBatched
+    @tfd.JointDistributionCoroutine
     def proposal():
-      yield tfd.StudentT(df=2, loc=0., scale=2., name='x')
-      yield tfd.StudentT(df=2, loc=[0.], scale=[2.], name='y')
+      yield root(tfd.StudentT(df=2, loc=0., scale=2., name='x'))
+      yield root(
+          tfd.Independent(
+              tfd.StudentT(df=2, loc=[0.], scale=[2.]), 1, name='y'))
 
     resampled = tfed.ImportanceResample(
         proposal,

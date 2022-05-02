@@ -58,7 +58,8 @@ STATISTIC_CONSISTENT_SHAPES_TEST_BLOCK_LIST = (
 INSTANTIABLE_BUT_NOT_SLICABLE = (
     'BatchBroadcast',
     'BatchReshape',
-    'Sample'  # TODO(b/204210361)
+    'IncrementLogProb',
+    'Sample',  # TODO(b/204210361)
 )
 
 
@@ -350,6 +351,7 @@ class ParameterPropertiesTest(test_util.TestCase):
                                     'TruncatedNormal', 'Uniform')
     not_annotated_dists = ('Empirical|event_ndims=0', 'Empirical|event_ndims=1',
                            'Empirical|event_ndims=2', 'FiniteDiscrete',
+                           'IncrementLogProb',
                            # cov_perturb_factor is not annotated since its shape
                            # could be a vector or a matrix.
                            'MultivariateNormalDiagPlusLowRankCovariance',

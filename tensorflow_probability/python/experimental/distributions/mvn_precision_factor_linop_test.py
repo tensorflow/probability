@@ -124,14 +124,15 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
         'stddev': tf.sqrt(cov.diag_part()),
         'var': cov.diag_part(),
         'cov': cov.to_dense(),
-        'sample_mean': tf.reduce_mean(samples, axis=0),
+        'samples': samples,
         'sample_var': tfp.stats.variance(samples, sample_axis=0),
         'sample_cov': tfp.stats.covariance(samples, sample_axis=0),
     })
 
-    self.assertAllClose(
-        arrs['sample_mean'],
+    self.assertAllMeansClose(
+        arrs['samples'],
         loc if loc is not None else np.zeros_like(arrs['cov'][..., 0]),
+        axis=0,
         atol=5 * np.max(arrs['stddev']) / np.sqrt(n_samples))
     self.assertAllClose(
         arrs['sample_var'],

@@ -19,12 +19,14 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import bernoulli
 from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import sample as sample_dist
 from tensorflow_probability.python.experimental.distributions import MultivariateNormalPrecisionFactorLinearOperator
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import vectorization_util
@@ -44,6 +46,19 @@ class InverseGammaWithSampleUpperBound(inverse_gamma.InverseGamma):
     super().__init__(concentration=concentration,
                      scale=scale,
                      **kwargs)
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        concentration=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        scale=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
+        upper_bound=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   def _sample_n(self, n, seed=None):
     xs = super()._sample_n(n, seed=seed)
@@ -70,6 +85,14 @@ class MVNPrecisionFactorHardZeros(
 
   def _log_prob(self, *args, **kwargs):
     raise NotImplementedError('Log prob is not currently implemented.')
+
+  @classmethod
+  def _parameter_properties(cls, dtype, num_classes=None):
+    return dict(
+        loc=parameter_properties.ParameterProperties(event_ndims=1),
+        precision_factor=parameter_properties.BatchedComponentProperties(),
+        precision=parameter_properties.BatchedComponentProperties(),
+        nonzeros=parameter_properties.BatchedComponentProperties(event_ndims=1))
 
 
 class SpikeSlabSamplerState(collections.namedtuple(
@@ -213,6 +236,7 @@ class SpikeSlabSampler(object):
                design_matrix,
                nonzero_prior_prob=0.5,
                weights_prior_precision=None,
+               default_pseudo_observations=1.,
                observation_noise_variance_prior_concentration=0.005,
                observation_noise_variance_prior_scale=0.0025,
                observation_noise_variance_upper_bound=None):
@@ -229,10 +253,15 @@ class SpikeSlabSampler(object):
         precision matrix(s) over the weights, of shape
         `[num_features, num_features]`. If not specified, defaults to the
         Zellner g-prior specified in `[1]` as
-        `Omega^{-1} = (X'X + diag(X'X)) / (2 * num_outputs)`,
-        in which we've plugged in the suggested defaults of `kappa = 1` and
-        `w = 0.5`.
+        `Omega^{-1} = kappa * (X'X + diag(X'X)) / (2 * num_outputs)`,
+        in which we've plugged in the suggested default of `w = 0.5`. The
+        parameter `kappa` is controlled by the `default_pseudo_observations`
+        argument.
         Default value: `None`.
+      default_pseudo_observations: scalar float `Tensor`
+        Controls the number of pseudo-observations for the prior precision
+        matrix over the weights. Corresponds to `kappa` in [1]. See also
+        `weights_prior_precision`.
       observation_noise_variance_prior_concentration: scalar float `Tensor`
         concentration parameter of the inverse gamma prior on the noise
         variance. Corresponds to `nu / 2` in [1].
@@ -261,6 +290,9 @@ class SpikeSlabSampler(object):
           observation_noise_variance_prior_concentration, dtype=dtype)
       observation_noise_variance_prior_scale = tf.convert_to_tensor(
           observation_noise_variance_prior_scale, dtype=dtype)
+      if observation_noise_variance_upper_bound is not None:
+        observation_noise_variance_upper_bound = tf.convert_to_tensor(
+            observation_noise_variance_upper_bound, dtype=dtype)
 
       design_shape = ps.shape(design_matrix)
       num_outputs = design_shape[-2]
@@ -270,14 +302,15 @@ class SpikeSlabSampler(object):
       if weights_prior_precision is None:
         # Default prior: 'Zellner’s g−prior' from section 3.2.1 of [1]:
         #   `omega^{-1} = kappa * (w X'X + (1 − w) diag(X'X))/n`
-        # with defaults `kappa = 1` and `w = 0.5`.
-        weights_prior_precision = tf.linalg.set_diag(
+        # with default `w = 0.5`.
+        weights_prior_precision = default_pseudo_observations * tf.linalg.set_diag(
             0.5 * x_transpose_x,
             tf.linalg.diag_part(x_transpose_x)) / num_outputs
 
       weights_posterior_precision = x_transpose_x + weights_prior_precision
       observation_noise_variance_posterior_concentration = (
-          observation_noise_variance_prior_concentration + (num_outputs / 2.))
+          observation_noise_variance_prior_concentration
+          + tf.convert_to_tensor(num_outputs / 2., dtype=dtype))
 
       self.num_outputs = num_outputs
       self.num_features = num_features
@@ -419,12 +452,14 @@ class SpikeSlabSampler(object):
           chol=sampler_state.conditional_prior_precision_chol,
           idx=idx,
           psd_matrix=self.weights_prior_precision,
-          new_nonzeros=new_nonzeros)
+          new_nonzeros=new_nonzeros,
+          previous_nonzeros=sampler_state.nonzeros)
       new_conditional_posterior_precision_chol = _update_nonzero_block_chol(
           chol=sampler_state.conditional_posterior_precision_chol,
           idx=idx,
           psd_matrix=self.weights_posterior_precision,
-          new_nonzeros=new_nonzeros)
+          new_nonzeros=new_nonzeros,
+          previous_nonzeros=sampler_state.nonzeros)
       new_conditional_weights_mean = tf.where(
           new_nonzeros,
           tf.linalg.cholesky_solve(
@@ -545,9 +580,11 @@ class SpikeSlabSampler(object):
           # Note that the posterior precision varies inversely with the
           # noise variance: in worlds with high noise we're also
           # more uncertain about the values of the weights.
+          # TODO(colcarroll): Tests pass even without a square root on the
+          # observation_noise_variance. Should add a test that would fail.
           precision_factor=tf.linalg.LinearOperatorLowerTriangular(
               sampler_state.conditional_posterior_precision_chol /
-              observation_noise_variance[..., tf.newaxis, tf.newaxis]),
+              tf.sqrt(observation_noise_variance[..., tf.newaxis, tf.newaxis])),
           nonzeros=sampler_state.nonzeros,
           name='weights')
 
@@ -595,7 +632,8 @@ def _select_nonzero_block(matrix, nonzeros):
                             tf.where(nonzeros, tf.linalg.diag_part(masked), 1.))
 
 
-def _update_nonzero_block_chol(chol, idx, psd_matrix, new_nonzeros):
+def _update_nonzero_block_chol(
+    chol, idx, psd_matrix, new_nonzeros, previous_nonzeros):
   """Efficient update to the cholesky factor of the 'slab' (nonzero) submatrix.
 
   This performs an efficient update when `nonzeros` changes by a single entry.
@@ -618,27 +656,25 @@ def _update_nonzero_block_chol(chol, idx, psd_matrix, new_nonzeros):
     psd_matrix: (batch of) float Tensor positive semidefinite matrix(s) of shape
       `[num_features, num_features]`.
     new_nonzeros: (batch of) boolean Tensor vectors of shape `[num_features]`.
+    previous_nonzeros: (batch of) boolean Tensor vectors of shape
+      `[num_features]`.
   Returns:
     updated_chol: (batch of) float Tensor lower-triangular Cholesky factor(s) of
       `select_nonzero_block(psd_matrix, new_nonzeros)`.
   """
-  row_with_new_nonzeros = tf.where(new_nonzeros, psd_matrix[..., idx, :], 0.)
-  eye_row = _set_vector_index(tf.zeros_like(row_with_new_nonzeros), idx, 1.)
-  return _symmetric_update_chol(
+  psd_row = tf.where(new_nonzeros, psd_matrix[..., idx, :], 0.)
+  eye_row = _set_vector_index(tf.zeros_like(psd_row), idx, 1.)
+  new_row = tf.where(new_nonzeros[..., idx, tf.newaxis], psd_row, eye_row)
+  # NOTE: We could also compute `old_row` from `chol`, but we believe it is
+  # more numerically accurate to use `psd_matrix`, as `chol` may have
+  # accumulated errors over multiple calls to `_update_nonzero_block_chol`.
+  old_row = _select_nonzero_block(psd_matrix, previous_nonzeros)[..., idx, :]
+  return _symmetric_increment_chol(
       chol,
       idx=idx,
       # Set the `idx`th row/col to its target value if the `idx`th feature is
       # now nonzero; otherwise set it to the identity.
-      value=tf.where(new_nonzeros[..., idx, tf.newaxis],
-                     row_with_new_nonzeros,
-                     eye_row))
-
-
-def _symmetric_update_chol(chol, idx, value):
-  """Sets the value of a row and column in a Cholesky-factorized matrix."""
-  # TODO(davmre): is a more efficient direct implementation possible?
-  old_value = tf.reduce_sum(chol * chol[..., idx : idx + 1, :], axis=-1)
-  return _symmetric_increment_chol(chol, idx, increment=value - old_value)
+      increment=new_row - old_row)
 
 
 def _symmetric_increment_chol(chol, idx, increment):
@@ -654,7 +690,8 @@ def _symmetric_increment_chol(chol, idx, increment):
   M[idx, idx] -= increment[idx]
   ```
 
-  in Cholesky space, where `increment` is a vector of length `m`.
+  in Cholesky space, but in an optimized form as 2 steps, where `increment` is
+  a vector of length `m`.
 
   That is, this function adds `increment` to the `idx`th row, and
   (by symmetry) also to the `idx`th column. For example:
@@ -672,7 +709,7 @@ def _symmetric_increment_chol(chol, idx, increment):
   #      [0., -0.3, 2.]]
   ```
 
-  This is implemented efficiently as three consecutive rank-1 updates of
+  This is implemented efficiently as two consecutive rank-1 updates of
   `chol(M)`.
 
   Args:
@@ -688,26 +725,47 @@ def _symmetric_increment_chol(chol, idx, increment):
       given row and column of `M`.
   """
   with tf.name_scope('symmetric_increment_chol'):
+    # TODO(jburnim): Can we make this more numerically accurate by doing both
+    # rank-1 Cholesky updates in a single pass?
     chol = tf.convert_to_tensor(chol, name='chol')
     increment = tf.convert_to_tensor(increment, name='increment')
-    # Rank-1 update to increment the `idx`th row and column, with side
-    # effects elsewhere in the matrix.
+    orig_chol = chol
+
+    # This does an update of the row and column in 2 rank-1 updates.
+    # Consider an example update vector of v = [x, y, z]. Thus v @ v.T is:
+    # [[x^2, xy, xz],
+    #  [xy, y^2, yz],
+    #  [xz, yz, z^2]]
+    # cholesky_update will compute the return the updated cholesky given
+    # this being added to the original matrix.
+    #
+    # Say we want update row and column 1, then the needed offset matrix is:
+    # [[0, x, 0],
+    #  [x, y, z],
+    #  [0, z, 0]]
+    # which is rank 2 and will require at least two rank 1 operations.
+    #
+    # If we do two updates, by adding v1 and subtracting v2, where
+    #  v1 = [x, (y + 1)/2, z]
+    #  v2 = [x, (y - 1)/2, z]
+    # this accomplishes the goal, since:
+    # [[0, x, 0],
+    #  [x, y, z],   = v1 @ v1.T - v2 @ v2.T
+    #  [0, z, 0]]
+    a = (increment[..., idx] + 1.) / 2.
+    b = (increment[..., idx] - 1.) / 2.
     chol = tfp_math.cholesky_update(
-        chol, update_vector=_set_vector_index(increment, idx, 1.), multiplier=1)
-    # Second update to correct the diagonal entry `M[idx, idx]`.
-    diagonal_correction = increment[..., idx] - 1.
+        chol, update_vector=_set_vector_index(increment, idx, a), multiplier=1)
     chol = tfp_math.cholesky_update(
-        chol,
-        update_vector=_set_vector_index(tf.zeros_like(increment),
-                                        idx,
-                                        tf.sqrt(tf.abs(diagonal_correction))),
-        multiplier=tf.sign(diagonal_correction))
-    # Final update to revert the side effects from the first step without
-    # touching the (newly incremented) `idx`th row/col.
-    return tfp_math.cholesky_update(
-        chol,
-        update_vector=_set_vector_index(increment, idx, 0.),
-        multiplier=-1)
+        chol, update_vector=_set_vector_index(increment, idx, b), multiplier=-1)
+
+    # There Cholesky decomposition should be unchanged in rows/cols before idx.
+    #
+    # TODO(b/229298550): Investigate whether this is really necessary, or if the
+    # test failures we see without this line are due to an underlying bug.
+    return tf.where((tf.range(chol.shape[-1]) < idx)[..., tf.newaxis],
+                    orig_chol,
+                    chol)
 
 
 def _set_vector_index_unbatched(v, idx, x):

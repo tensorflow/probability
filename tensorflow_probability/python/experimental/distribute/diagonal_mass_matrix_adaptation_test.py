@@ -86,7 +86,8 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
               num_samples=10., mean=tf.zeros(3), variance=tf.ones(3)))
       pkr = kernel.bootstrap_results(state)
 
-      def body(draw_pkr, seed):
+      def body(draw_pkr, i):
+        seed = tf.gather(seeds, i)
         _, pkr = draw_pkr
         draw_seed, step_seed = samplers.split_seed(seed)
         draw = dist.sample(seed=draw_seed)
@@ -95,7 +96,8 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
 
       (_, pkr), draws = loop_util.trace_scan(body,
                                              (tf.zeros(dist.event_shape), pkr),
-                                             seeds, lambda v: v[0])
+                                             tf.range(len(seeds)),
+                                             lambda v: v[0])
 
       return draws, pkr
 
@@ -124,7 +126,8 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
           tfp.experimental.stats.RunningVariance.from_stats(
               num_samples=10., mean=tf.zeros(3), variance=tf.ones(3)))
       pkr = kernel.bootstrap_results(state)
-      def body(draw_pkr, seed):
+      def body(draw_pkr, i):
+        seed = tf.gather(seeds, i)
         _, pkr = draw_pkr
         draw_seed, step_seed = samplers.split_seed(seed)
         draw = dist.sample(seed=draw_seed)
@@ -133,7 +136,8 @@ class DiagonalAdaptationTest(test_lib.DistributedTest):
 
       (_, pkr), draws = loop_util.trace_scan(body,
                                              (tf.zeros(dist.event_shape), pkr),
-                                             seeds, lambda v: v[0])
+                                             tf.range(len(seeds)),
+                                             lambda v: v[0])
       return draws, pkr
 
     draws, pkr = self.strategy_run(run, (self.key,), in_axes=None)

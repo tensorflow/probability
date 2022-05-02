@@ -15,6 +15,7 @@
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
 # pylint: disable=trailing-whitespace
+# pylint: disable=g-inconsistent-quotes
 
 # Copyright 2020 The TensorFlow Authors. All Rights Reserved.
 #
@@ -44,6 +45,7 @@ from tensorflow_probability.python.internal.backend.numpy import linalg_impl as 
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_algebra
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator_util
+from tensorflow_probability.python.internal.backend.numpy import nest
 # from tensorflow.python.util.tf_export import tf_export
 
 __all__ = ["LinearOperatorBlockLowerTriangular"]
@@ -899,6 +901,11 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
   @property
   def _composite_tensor_fields(self):
     return ("operators",)
+
+  @property
+  def _experimental_parameter_ndims_to_matrix_ndims(self):
+    # None of the operators contribute to the matrix shape.
+    return {"operators": nest.map_structure(lambda _: 0, self.operators)}
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg

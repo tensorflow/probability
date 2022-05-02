@@ -51,6 +51,7 @@ __all__ = [
     'is_tensor',
     'name_scope',
     'newaxis',
+    'recompute_grad',
     'register_tensor_conversion_function',
     'stop_gradient',
     'GradientTape',
@@ -212,6 +213,14 @@ def _is_int64(value):
 
 def _default_convert_to_tensor(value, dtype=None):
   """Default tensor conversion function for array, bool, int, float, and complex."""
+  if JAX_MODE:
+    # TODO(b/223267515): We shouldn't need to specialize here.
+    if 'PRNGKeyArray' in str(type(value)):
+      return value
+    if isinstance(value, (list, tuple)) and value:
+      if 'PRNGKeyArray' in str(type(value[0])):
+        return np.stack(value, axis=0)
+
   inferred_dtype = _infer_dtype(value, np.float32)
   # When a dtype is provided, we can go ahead and try converting to the dtype
   # and force overflow/underflow if an int64 is converted to an int32.
@@ -523,6 +532,14 @@ class name_scope(object):  # pylint: disable=invalid-name
 
 
 newaxis = np.newaxis
+
+if JAX_MODE:
+  from jax import remat  # pylint: disable=g-import-not-at-top
+  recompute_grad = utils.copy_docstring(
+      'tf.recompute_grad',
+      remat)
+else:
+  recompute_grad = lambda x: x
 
 if JAX_MODE:
   from jax import lax  # pylint: disable=g-import-not-at-top

@@ -502,6 +502,24 @@ multi_substrate_py_test(
     ],
 )
 
+multi_substrate_py_test(
+    name = "samplers_rbg_test",
+    size = "small",
+    srcs = ["samplers_test.py"],
+    args = ["--test_tfp_jax_prng=rbg"],
+    disabled_substrates = [
+        "tf",
+        "numpy",
+    ],
+    main = "samplers_test.py",
+    deps = [
+        ":samplers",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
 multi_substrate_py_library(
     name = "special_math",
     srcs = ["special_math.py"],
@@ -679,6 +697,7 @@ multi_substrate_py_library(
     srcs = ["test_util.py"],
     deps = [
         ":dtype_util",
+        ":samplers",
         ":test_combinations",
         # absl/flags dep,
         # hypothesis dep,
@@ -686,6 +705,7 @@ multi_substrate_py_library(
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/internal:empirical_statistical_testing",
         "//tensorflow_probability/python/internal/backend/numpy",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -705,16 +725,23 @@ multi_substrate_py_test(
     ],
 )
 
-# Not part of test_util to segregate the scipy dependency.  Though,
-# maybe that segregation is futile, since TF (apparently) depends on
-# scipy anyway (through Keras).
 multi_substrate_py_library(
-    name = "test_util_scipy",
+    name = "empirical_statistical_testing",
 #     testonly = 1,  # DisableOnExport
-    srcs = ["test_util_scipy.py"],
+    srcs = ["empirical_statistical_testing.py"],
     deps = [
         # numpy dep,
         # scipy dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "empirical_statistical_testing_test",
+    srcs = ["empirical_statistical_testing_test.py"],
+    deps = [
+        ":empirical_statistical_testing",
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

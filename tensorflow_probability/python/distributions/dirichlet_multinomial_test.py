@@ -209,7 +209,7 @@ class DirichletMultinomialTest(test_util.TestCase):
     sample_var = tf.linalg.diag_part(sample_cov)
     sample_stddev = tf.sqrt(sample_var)
     [
-        sample_mean_,
+        x_,
         sample_cov_,
         sample_var_,
         sample_stddev_,
@@ -218,7 +218,7 @@ class DirichletMultinomialTest(test_util.TestCase):
         analytic_var,
         analytic_stddev,
     ] = self.evaluate([
-        sample_mean,
+        x,
         sample_cov,
         sample_var,
         sample_stddev,
@@ -233,7 +233,7 @@ class DirichletMultinomialTest(test_util.TestCase):
     # If the sampled quantities are normally distributed, a 5% failure rate
     # corresponds to a z-score of about 2; doubling this should give a z-score
     # of 4, which corresponds to a failure rate of 6.4e-5
-    self.assertAllClose(sample_mean_, analytic_mean, rtol=0.1)
+    self.assertAllMeansClose(x_, analytic_mean, axis=0, rtol=0.1)
     self.assertAllClose(sample_cov_, analytic_cov, rtol=0.3)
     self.assertAllClose(sample_var_, analytic_var, rtol=0.2)
     self.assertAllClose(sample_stddev_, analytic_stddev, rtol=0.1)
@@ -408,18 +408,18 @@ class DirichletMultinomialTest(test_util.TestCase):
     sample_covariance = tf.matmul(
         x_centered, x_centered, adjoint_b=True) / n
     [
-        sample_mean_,
+        x_,
         sample_covariance_,
         actual_mean_,
         actual_covariance_,
     ] = self.evaluate([
-        sample_mean,
+        x,
         sample_covariance,
         dist.mean(),
         dist.covariance(),
     ])
     self.assertAllEqual([4, 3, 2], sample_mean.shape)
-    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.20)
+    self.assertAllMeansClose(x_, actual_mean_, axis=0, atol=0., rtol=0.20)
     self.assertAllEqual([4, 3, 2, 2], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.20)
@@ -439,18 +439,18 @@ class DirichletMultinomialTest(test_util.TestCase):
     sample_covariance = tf.linalg.matmul(
         x_centered, x_centered, adjoint_a=True) / n
     [
-        sample_mean_,
+        x_,
         sample_covariance_,
         actual_mean_,
         actual_covariance_,
     ] = self.evaluate([
-        sample_mean,
+        x,
         sample_covariance,
         dist.mean(),
         dist.covariance(),
     ])
     self.assertAllEqual([4], sample_mean.shape)
-    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.25)
+    self.assertAllMeansClose(x_, actual_mean_, axis=0, atol=0., rtol=0.25)
     self.assertAllEqual([4, 4], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.25)

@@ -46,7 +46,7 @@ def _sample_posterior(target_log_prob_unconstrained,
                       parallel_iterations=10,
                       jit_compile=True,
                       use_input_signature=False,
-                      experimental_relax_shapes=False):
+                      reduce_retracing=False):
   """MCMC sampling with HMC/NUTS using an expanding epoch tuning scheme."""
 
   seed_stream = tfp.util.SeedStream(seed, 'window_tune_nuts_sampling')
@@ -117,7 +117,7 @@ def _sample_posterior(target_log_prob_unconstrained,
       input_signature=input_signature,
       autograph=False,
       jit_compile=jit_compile,
-      experimental_relax_shapes=experimental_relax_shapes)
+      reduce_retracing=reduce_retracing)
   def fast_adaptation_interval(num_steps, previous_state):
     """Step size only adaptation interval.
 
@@ -179,7 +179,7 @@ def _sample_posterior(target_log_prob_unconstrained,
       input_signature=input_signature,
       autograph=False,
       jit_compile=jit_compile,
-      experimental_relax_shapes=experimental_relax_shapes)
+      reduce_retracing=reduce_retracing)
   def slow_adaptation_interval(num_steps, previous_n, previous_state,
                                previous_mean, previous_cov):
     """Interval that tunes the mass matrix and step size simultaneously.
@@ -328,7 +328,7 @@ def window_tune_nuts_sampling(target_log_prob,
                               parallel_iterations=10,
                               jit_compile=True,
                               use_input_signature=True,
-                              experimental_relax_shapes=False):
+                              reduce_retracing=False):
   """Sample from a density with NUTS and an expanding window tuning scheme.
 
   This function implements a turnkey MCMC sampling routine using NUTS and an
@@ -347,7 +347,7 @@ def window_tune_nuts_sampling(target_log_prob,
   of the tuning epoch (window 1, 2, and 3 in Stan [1]) run with two @tf.function
   compiled functions. The user can control the compilation options using the
   kwargs `jit_compile`, `use_input_signature`, and
-  `experimental_relax_shapes`.  Setting all to True would compile to XLA and
+  `reduce_retracing`.  Setting all to True would compile to XLA and
   potentially avoid the small overhead of function recompilation (note that it
   is not yet the case in XLA right now). It is not yet clear whether doing it
   this way is better than just wrapping the full inference routine in
@@ -403,7 +403,7 @@ def window_tune_nuts_sampling(target_log_prob,
       function is always compiled by XLA.
     use_input_signature: If True, generate an input_signature kwarg to pass to
       tf.function decorator.
-    experimental_relax_shapes: kwarg pass to tf.function decorator. When True,
+    reduce_retracing: kwarg pass to tf.function decorator. When True,
       tf.function may generate fewer, graphs that are less specialized on input
       shapes.
 
@@ -564,6 +564,6 @@ def window_tune_nuts_sampling(target_log_prob,
       parallel_iterations=parallel_iterations,
       jit_compile=jit_compile,
       use_input_signature=use_input_signature,
-      experimental_relax_shapes=experimental_relax_shapes)
+      reduce_retracing=reduce_retracing)
   return forward_transform(
       split_and_reshape(nuts_samples)), diagnostic, conditioning_bijector

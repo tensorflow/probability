@@ -27,7 +27,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import prefer_static as ps
 
 
-# ** See PRNGS.md for more detailed discussion about this packge. **
+# ** See PRNGS.md for more detailed discussion about this package. **
 
 __all__ = [
     'categorical',
@@ -49,6 +49,9 @@ SEED_DTYPE = np.uint32 if JAX_MODE else np.int32
 
 
 def zeros_seed():
+  if JAX_MODE:
+    import jax  # pylint: disable=g-import-not-at-top
+    return jax.random.PRNGKey(0)
   return tf.constant([0, 0], dtype=SEED_DTYPE)
 
 
@@ -64,12 +67,15 @@ def sanitize_seed(seed, salt=None, name=None):
   for details.
 
   Operationally, `sanitize_seed` maps any seed flavor to a
-  "stateless-compatible" seed, namely a `int32[2]` Tensor.  To wit:
+  "stateless-compatible" seed.  Under TensorFlow and NumPy this means:
   - If the `seed` argument is an `int` or `None`, we use `tf.random.uniform`
     to _statefully_ draw a pair of unbounded `int32`s and wrap them into a
     Tensor.
   - If the `seed` argument is a stateless-compatible seed already, we
     just cast it to an `int32[2]` Tensor.
+
+  Under JAX, this function only accepts outputs from `jax.random.PRNGKey`, being
+  a no-op except for the salting behavior described below.
 
   This, any function that accepts a `seed` argument can be written in
   stateless-seed style internally, and acquires TFP's
@@ -136,6 +142,28 @@ def sanitize_seed(seed, salt=None, name=None):
     return tf.convert_to_tensor(seed, dtype=SEED_DTYPE, name='seed')
 
 
+def get_integer_seed(seed):
+  """Returns an integer seed in [0, 2**31).
+
+  Args:
+    seed: A seed suitable to be passed to `sanitize_seed`.
+
+  Returns:
+    integer_seed: A Python integer (if seed was a Python integer or we're in
+    JAX) or an integer Tensor.
+  """
+  if isinstance(seed, six.integer_types):
+    return seed % (2**31)
+  seed = sanitize_seed(seed)
+  integer_seed = tf.random.stateless_uniform(
+      shape=[], seed=seed, minval=0, maxval=2**31, dtype=tf.int32)
+  if JAX_MODE:
+    # This function isn't ever used in a jit context, so we can eagerly convert
+    # it to an integer to simplify caller's code.
+    integer_seed = int(integer_seed)
+  return integer_seed
+
+
 def fold_in(seed, salt):
   """Folds salt into seed to form a new seed."""
   if JAX_MODE:
@@ -181,7 +209,7 @@ def split_seed(seed, n=2, salt=None, name=None):
     seed = sanitize_seed(seed, salt=salt)
     if JAX_MODE:
       from jax import random as jaxrand  # pylint: disable=g-import-not-at-top
-      return jaxrand.split(seed, n)
+      return jaxrand.split(seed, int(n))
     seeds = tf.random.stateless_uniform(
         [n, 2], seed=seed, minval=None, maxval=None, dtype=SEED_DTYPE)
     if isinstance(n, six.integer_types):

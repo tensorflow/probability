@@ -356,7 +356,7 @@ class JointDistributionPinnedTest(test_util.TestCase):
     bij = jd.experimental_default_event_space_bijector(a=-.5, b=1.)
     test_input = (0.5,)
     self.assertIs(type(jd.dtype), type(bij.inverse(test_input)))
-    self.assertAllClose((2/3,), tf.math.sigmoid(bij.inverse(test_input)))
+    self.assertAllClose(2/3, tf.math.sigmoid(bij.inverse(test_input)[0]))
 
     @tfd.JointDistributionCoroutine
     def model():
@@ -486,7 +486,7 @@ class JointDistributionPinnedTest(test_util.TestCase):
       x = yield root(tfd.Normal(0., 1., name='x'))
       yield tfde.IncrementLogProb(tfd.Normal(x, 2.).log_prob(0.), name='y')
 
-    p = model.experimental_pin(y=tf.zeros([1, 0]))
+    p = model.experimental_pin(y=tf.zeros([0]))
 
     parts = p.unnormalized_log_prob_parts(x=2.)
     self.assertAllCloseNested(tfd.Normal(0., 1.).log_prob(2.), parts.unpinned.x)

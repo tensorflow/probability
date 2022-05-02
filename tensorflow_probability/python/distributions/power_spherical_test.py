@@ -327,10 +327,10 @@ class _PowerSphericalTest(object):
         validate_args=True,
         allow_nan_stats=False)
     samples = ps.sample(int(3e4), seed=test_util.test_seed())
-    sample_entropy = -tf.reduce_mean(ps.log_prob(samples), axis=0)
-    true_entropy, sample_entropy = self.evaluate([
-        ps.entropy(), sample_entropy])
-    self.assertAllClose(sample_entropy, true_entropy, rtol=3e-2)
+    entropy_samples = -ps.log_prob(samples)
+    true_entropy, entropy_samples = self.evaluate([
+        ps.entropy(), entropy_samples])
+    self.assertAllMeansClose(entropy_samples, true_entropy, axis=0, rtol=3e-2)
 
   def testEntropyDim2(self):
     self.VerifyEntropy(dim=2)
@@ -498,10 +498,10 @@ class _PowerSphericalTest(object):
 
     x = ps.sample(int(5e4), seed=test_util.test_seed())
 
-    kl_sample = tf.reduce_mean(ps.log_prob(x) - su.log_prob(x), axis=0)
+    kl_samples = ps.log_prob(x) - su.log_prob(x)
     true_kl = tfp.distributions.kl_divergence(ps, su)
-    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
-    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=7e-2)
+    true_kl_, kl_samples_ = self.evaluate([true_kl, kl_samples])
+    self.assertAllMeansClose(kl_samples_, true_kl_, axis=0, atol=0.0, rtol=7e-2)
 
   def testKLPowerSphericalSphericalUniformDim2(self):
     self.VerifyPowerSphericaUniformZeroKL(dim=2)
@@ -611,10 +611,10 @@ class _PowerSphericalTest(object):
         concentration=concentration2)
     x = ps.sample(int(6e4), seed=test_util.test_seed())
 
-    kl_sample = tf.reduce_mean(ps.log_prob(x) - vmf.log_prob(x), axis=0)
+    kl_samples = ps.log_prob(x) - vmf.log_prob(x)
     true_kl = tfp.distributions.kl_divergence(ps, vmf)
-    true_kl_, kl_sample_ = self.evaluate([true_kl, kl_sample])
-    self.assertAllClose(true_kl_, kl_sample_, atol=0.0, rtol=7e-2)
+    true_kl_, kl_samples_ = self.evaluate([true_kl, kl_samples])
+    self.assertAllMeansClose(kl_samples_, true_kl_, axis=0, atol=0.0, rtol=7e-2)
 
   def testKLPowerSphericalVonMisesFisherDim2(self):
     self.VerifyPowerSphericalVonMisesFisherZeroKL(dim=2)

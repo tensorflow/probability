@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for transforming functions into FunctionModules.
 
 In order to `init` functions, we need to define a `Module` subclass for them,
@@ -121,7 +120,7 @@ def eval_jaxpr_with_kwargs(jaxpr: jax_core.Jaxpr, consts: Iterable[Any], *args,
     if subjaxpr:
       subfuns = [
           lu.wrap_init(
-              jax_core.partial(eval_jaxpr_with_kwargs, subjaxpr, (), **kwargs))
+              functools.partial(eval_jaxpr_with_kwargs, subjaxpr, (), **kwargs))
       ]
     else:
       subfuns = []
