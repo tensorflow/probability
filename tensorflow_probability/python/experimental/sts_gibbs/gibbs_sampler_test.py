@@ -49,8 +49,10 @@ class GibbsSamplerTests(test_util.TestCase):
                         sparse_weights_nonzero_prob=None,
                         time_series_shift=0.,
                         dtype=tf.float32,
-                        design_matrix_is_none=False):
-    seed = test_util.test_seed(sampler_type='stateless')
+                        design_matrix=False,
+                        seed=None):
+    if seed is None:
+      seed = test_util.test_seed(sampler_type='stateless')
     (design_seed,
      weights_seed,
      noise_seed,
@@ -61,13 +63,13 @@ class GibbsSamplerTests(test_util.TestCase):
     if weights is None:
       weights = samplers.normal(
           list(batch_shape) + [num_features], dtype=dtype, seed=weights_seed)
-    if design_matrix_is_none:
-      design_matrix = None
+    if design_matrix is None:
       regression = tf.zeros(num_timesteps, dtype)
     else:
-      design_matrix = samplers.normal([num_timesteps, num_features],
-                                      dtype=dtype,
-                                      seed=design_seed)
+      if isinstance(design_matrix, bool) and not design_matrix:
+        design_matrix = samplers.normal([num_timesteps, num_features],
+                                        dtype=dtype,
+                                        seed=design_seed)
       regression = tf.linalg.matvec(design_matrix, weights)
     noise = samplers.normal(
         list(batch_shape) + [num_timesteps],
@@ -289,34 +291,71 @@ class GibbsSamplerTests(test_util.TestCase):
     self.assertAllEqual(predictive_mean_, predictive_mean2_)
     self.assertAllEqual(predictive_stddev_, predictive_stddev2_)
 
-  def test_no_covariates_support(self):
+  def test_no_covariates_is_similar_to_zero_design_matrix(self):
     if not tf.executing_eagerly():
       return
     seed = test_util.test_seed(sampler_type='stateless')
+    build_model_seed, sample_seed = samplers.split_seed(seed)
     dtype = tf.float32
+    num_timesteps = 5
+    num_features = 2
+    seed = test_util.test_seed(sampler_type='stateless')
     model, observed_time_series, is_missing = self._build_test_model(
-        num_timesteps=5,
+        num_timesteps=num_timesteps,
+        num_features=num_features,
         batch_shape=[3],
         prior_class=gibbs_sampler.XLACompilableInverseGamma,
+        time_series_shift=10.,
         dtype=dtype,
-        design_matrix_is_none=True,
-        weights_prior_scale=None)
+        design_matrix=None,
+        weights_prior_scale=None,
+        seed=build_model_seed)
 
     @tf.function(jit_compile=True)
     def do_sampling(observed_time_series, is_missing):
       return gibbs_sampler.fit_with_gibbs_sampling(
           model,
           tfp.sts.MaskedTimeSeries(observed_time_series, is_missing),
-          num_results=4,
-          num_warmup_steps=1,
-          seed=seed)
+          num_results=30,
+          num_warmup_steps=10,
+          seed=sample_seed)
 
-    # This simply ensures we can get samples without throwing an error.
-    # TODO(kloveless): Add tests that compare the results with either another
-    # method of inference, or to a model with covariates, but all covariates
-    # are zero.
     samples = do_sampling(observed_time_series[..., tf.newaxis], is_missing)
-    gibbs_sampler.one_step_predictive(model, samples, thin_every=1)
+
+    dummy_model, observed_time_series, is_missing = self._build_test_model(
+        num_timesteps=num_timesteps,
+        num_features=num_features,
+        batch_shape=[3],
+        prior_class=gibbs_sampler.XLACompilableInverseGamma,
+        dtype=dtype,
+        time_series_shift=10.,
+        design_matrix=tf.zeros([num_timesteps, num_features]),
+        weights_prior_scale=None,
+        sparse_weights_nonzero_prob=0.5,
+        seed=build_model_seed)  # reuse seed!
+
+    @tf.function(jit_compile=True)
+    def do_sampling_again(observed_time_series, is_missing):
+      return gibbs_sampler.fit_with_gibbs_sampling(
+          dummy_model,
+          tfp.sts.MaskedTimeSeries(observed_time_series, is_missing),
+          num_results=30,
+          num_warmup_steps=10,
+          seed=sample_seed)
+
+    new_samples = do_sampling_again(observed_time_series[..., tf.newaxis],
+                                    is_missing)
+    for key in ('observation_noise_scale', 'level_scale', 'level',
+                'slope_scale', 'slope'):
+      first_mean = tf.reduce_mean(getattr(samples, key), axis=0)
+      second_mean = tf.reduce_mean(getattr(new_samples, key), axis=0)
+      self.assertAllClose(first_mean, second_mean, atol=0.15,
+                          msg=f'{key} mean differ')
+
+      first_std = tf.math.reduce_std(getattr(samples, key), axis=0)
+      second_std = tf.math.reduce_std(getattr(new_samples, key), axis=0)
+      self.assertAllClose(first_std, second_std, atol=0.2,
+                          msg=f'{key} stddev differ')
 
   def test_invalid_model_spec_raises_error(self):
     observed_time_series = tf.ones([2])

@@ -912,7 +912,7 @@ def _build_sampler_loop_body(model,
           observed_residuals=slope_residuals,
           is_missing=None,
           seed=slope_scale_seed)
-    if regression_component and not model_has_spike_slab_regression:
+    if not (regression_component and model_has_spike_slab_regression):
       # Estimate noise scale from the residuals.
       observation_noise_scale = _resample_scale(
           prior=observation_noise_variance_prior,
