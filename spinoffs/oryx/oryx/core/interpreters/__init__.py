@@ -17,4 +17,3 @@ from oryx.core.interpreters import harvest
 from oryx.core.interpreters import inverse
 from oryx.core.interpreters import log_prob
 from oryx.core.interpreters import propagate
-from oryx.core.interpreters import unzip

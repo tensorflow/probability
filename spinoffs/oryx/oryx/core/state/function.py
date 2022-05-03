@@ -60,7 +60,6 @@ safe_map = jax_util.safe_map
 safe_zip = jax_util.safe_zip
 Key = Any
 
-custom_unzip_rules = {}
 kwargs_rules = {}
 
 
