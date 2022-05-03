@@ -430,7 +430,8 @@ def one_step_predictive(model,
                         num_forecast_steps=0,
                         original_mean=0.,
                         original_scale=1.,
-                        thin_every=10):
+                        thin_every=10,
+                        use_zero_step_prediction=False):
   """Constructs a one-step-ahead predictive distribution at every timestep.
 
   Unlike the generic `tfp.sts.one_step_predictive`, this method uses the
@@ -465,6 +466,9 @@ def one_step_predictive(model,
       samples, to reduce complexity of the predictive distribution. For example,
       if `thin_every=10`, every `10`th sample will be used.
       Default value: `10`.
+    use_zero_step_prediction: If true, instead of using the local level
+      and trend from the timestep before, just use the local level from the
+      same timestep.
 
   Returns:
     predictive_dist: A `tfd.MixtureSameFamily` instance of event shape
@@ -489,11 +493,11 @@ def one_step_predictive(model,
         slope=tf.zeros_like(thinned_samples.level),
         slope_scale=tf.zeros_like(thinned_samples.level_scale))
 
-  num_steps_from_last_observation = tf.concat([
-      tf.ones([num_observed_steps], dtype=dtype),
-      tf.range(1, num_forecast_steps + 1, dtype=dtype)
-  ],
-                                              axis=0)
+  num_steps_from_last_observation = tf.concat(
+      [(tf.zeros([num_observed_steps], dtype=dtype) if use_zero_step_prediction
+        else tf.ones([num_observed_steps], dtype=dtype)),
+       tf.range(1, num_forecast_steps + 1, dtype=dtype)],
+      axis=0)
 
   # The local linear trend model expects that the level at step t + 1 is equal
   # to the level at step t, plus the slope at time t - 1,
@@ -514,11 +518,12 @@ def one_step_predictive(model,
         tf.range(1., num_forecast_steps + 1., dtype=forecast_level.dtype))
 
   level_pred = tf.concat(
-      [
+      ([thinned_samples.level] if use_zero_step_prediction else [
           thinned_samples.level[..., :1],  # t == 0
           (thinned_samples.level[..., :-1] + thinned_samples.slope[..., :-1]
-          )  # 1 <= t < T
-      ] + ([forecast_level] if num_forecast_steps > 0 else []),
+          )  # 1 <= t < T. Constructs the next level from previous level
+          # and previous slope.
+      ]) + ([forecast_level] if num_forecast_steps > 0 else []),
       axis=-1)
 
   design_matrix = _get_design_matrix(model)

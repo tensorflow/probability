@@ -140,6 +140,12 @@ class GibbsSamplerTests(test_util.TestCase):
           'num_chains': (),
           'time_series_shift': 0.
       }, {
+          'testcase_name': 'LocalLevel_ZeroStepPrediction',
+          'use_slope': False,
+          'num_chains': (),
+          'time_series_shift': 0.,
+          'use_zero_step_prediction': True,
+      }, {
           'testcase_name': 'LocalLevel_4chains',
           'use_slope': False,
           'num_chains': 4,
@@ -155,8 +161,11 @@ class GibbsSamplerTests(test_util.TestCase):
           'num_chains': (),
           'time_series_shift': 100.
       })
-  def test_forecasts_match_reference(
-      self, use_slope, num_chains, time_series_shift):
+  def test_forecasts_match_reference(self,
+                                     use_slope,
+                                     num_chains,
+                                     time_series_shift,
+                                     use_zero_step_prediction=False):
     seed = test_util.test_seed()
     num_observed_steps = 5
     num_forecast_steps = 4
@@ -196,8 +205,11 @@ class GibbsSamplerTests(test_util.TestCase):
       samples = tf.nest.map_structure(reshape_chain_and_sample, samples)
 
     predictive_dist = gibbs_sampler.one_step_predictive(
-        model, samples, num_forecast_steps=num_forecast_steps,
-        thin_every=1)
+        model,
+        samples,
+        num_forecast_steps=num_forecast_steps,
+        thin_every=1,
+        use_zero_step_prediction=use_zero_step_prediction)
     predictive_mean, predictive_stddev = self.evaluate((
         predictive_dist.mean(), predictive_dist.stddev()))
     self.assertAllEqual(predictive_mean.shape,
