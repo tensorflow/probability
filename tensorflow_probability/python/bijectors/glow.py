@@ -856,11 +856,6 @@ class GlowDefaultNetwork(tfk.Sequential):
     """Default network for glow bijector."""
     # Default is scale and shift, so 2c outputs.
     this_nchan = input_shape[-1] * 2
-    conv = functools.partial(
-        tfkl.Conv2D,
-        padding='same',
-        kernel_initializer=tf.initializers.he_normal(),
-        activation='relu')
     conv_last = functools.partial(
         tfkl.Conv2D,
         padding='same',
@@ -868,8 +863,12 @@ class GlowDefaultNetwork(tfk.Sequential):
         bias_initializer=tf.initializers.zeros())
     super(GlowDefaultNetwork, self).__init__([
         tfkl.Input(shape=input_shape),
-        conv(num_hidden, kernel_shape),
-        conv(num_hidden, 1),
+        tfkl.Conv2D(num_hidden, kernel_shape, padding='same',
+                    kernel_initializer=tf.initializers.he_normal(),
+                    activation='relu'),
+        tfkl.Conv2D(num_hidden, 1, padding='same',
+                    kernel_initializer=tf.initializers.he_normal(),
+                    activation='relu'),
         conv_last(this_nchan, kernel_shape)
     ])
 
