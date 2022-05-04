@@ -140,7 +140,7 @@ class Environment:
   """
 
   def __init__(self):
-    self.env = {jax_core.unitvar: jax_core.unit}
+    self.env = {}
 
   def read(self, var: VarOrLiteral) -> Value:
     """Reads a value from an environment."""
@@ -187,7 +187,8 @@ def eval_jaxpr_with_state(jaxpr: jax_core.Jaxpr, rules: Rules,
 
   for eqn in jaxpr.eqns:
     invals = jax_util.safe_map(env.read, eqn.invars)
-    call_jaxpr, params = jax_core.extract_call_jaxpr(eqn.primitive, eqn.params)
+    call_jaxpr, params = trace_util.extract_call_jaxpr(
+        eqn.primitive, eqn.params)
     if call_jaxpr:
       call_rule = _effect_handler_call_rules.get(
           eqn.primitive,

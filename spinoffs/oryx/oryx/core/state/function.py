@@ -110,12 +110,11 @@ def eval_jaxpr_with_kwargs(jaxpr: jax_core.Jaxpr, consts: Iterable[Any], *args,
     env[v] = val
 
   env = {}
-  write(jax_core.unitvar, jax_core.unit)
   safe_map(write, jaxpr.constvars, consts)
   safe_map(write, jaxpr.invars, args)
   for eqn in jaxpr.eqns:
     in_vals = safe_map(read, eqn.invars)
-    subjaxpr, params = jax_core.extract_call_jaxpr(eqn.primitive, eqn.params)
+    subjaxpr, params = trace_util.extract_call_jaxpr(eqn.primitive, eqn.params)
     if subjaxpr:
       subfuns = [
           lu.wrap_init(

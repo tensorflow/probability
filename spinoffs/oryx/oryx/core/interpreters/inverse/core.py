@@ -75,8 +75,6 @@ class InverseAndILDJ(Cell):
     """
     if len(self.slices) != 1:
       return False
-    if self.aval == jax_core.abstract_unit:
-      return True
     return list(self.slices)[0].value.shape == self.aval.shape
 
   def bottom(self) -> bool:
@@ -142,8 +140,6 @@ class InverseAndILDJ(Cell):
 
   @classmethod
   def new(cls, val):
-    if val is jax_core.unit:
-      return InverseAndILDJ.unknown(jax_core.abstract_unit)
     val = np.array(val)
     aval = jax_core.get_aval(val)
     aval = abstract_arrays.raise_to_shaped(aval)

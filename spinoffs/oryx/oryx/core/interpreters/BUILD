@@ -39,6 +39,7 @@ py_library(
         ":harvest",
         # jax dep,
         "//oryx/core:pytree",
+        "//oryx/core:trace_util",
     ],
 )
 
