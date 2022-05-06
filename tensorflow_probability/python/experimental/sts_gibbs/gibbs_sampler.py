@@ -109,9 +109,9 @@ class XLACompilableInverseGamma(tfd.InverseGamma):
 class DummySpikeAndSlabPrior(tfd.Distribution):
   """Dummy prior on sparse regression weights."""
 
-  def __init__(self):
+  def __init__(self, dtype=tf.float32):
     super().__init__(
-        dtype=tf.float32,
+        dtype=dtype,
         reparameterization_type=tfd.FULLY_REPARAMETERIZED,
         validate_args=False,
         allow_nan_stats=True,
@@ -152,7 +152,8 @@ class SpikeAndSlabSparseLinearRegression(sts_components.LinearRegression):
     self._sparse_weights_nonzero_prob = sparse_weights_nonzero_prob
     super().__init__(
         design_matrix=design_matrix,
-        weights_prior=DummySpikeAndSlabPrior(),
+        weights_prior=DummySpikeAndSlabPrior(
+            dtype=dtype_util.common_dtype([design_matrix])),
         name=name)
 
 
