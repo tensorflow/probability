@@ -219,12 +219,6 @@ class Empirical(distribution.AutoCompositeTensorDistribution):
     return tf.sqrt(var)
   
   def _quantile(self, value, samples=None, **kwargs):
-    if value > 1 or value < 0:
-      raise ValueError(
-        "Quantile values in tensorflow_probability."
-        "distributions.Empirical.quantile must be between 0 and 1."
-      )
-
     if samples is None:
       samples = tf.convert_to_tensor(self._samples)
 
