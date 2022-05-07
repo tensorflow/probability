@@ -25,7 +25,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.stats import percentile
+from tensorflow_probability.python import stats
 
 __all__ = [
     'Empirical'
@@ -228,7 +228,7 @@ class Empirical(distribution.AutoCompositeTensorDistribution):
     if samples is None:
       samples = tf.convert_to_tensor(self._samples)
 
-    return percentile(x=samples, q=value * 100, axis=self._samples_axis, **kwargs)
+    return stats.percentile(x=samples, q=value * 100, axis=self._samples_axis, **kwargs)
 
   def _sample_n(self, n, seed=None):
     samples = tf.convert_to_tensor(self._samples)
