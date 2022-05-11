@@ -31,6 +31,8 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 tfd = tfp.distributions
 tfl = tf.linalg
 
+JAX_MODE = False
+
 
 @test_util.test_graph_and_eager_modes
 class GibbsSamplerTests(test_util.TestCase):
@@ -642,7 +644,16 @@ class GibbsSamplerTests(test_util.TestCase):
     self.assertAllClose(mean_weights, true_weights, atol=0.3)
     self.assertAllClose(nonzero_probs, [1., 1., 1., 1., 1.])
 
-  def test_sparse_regression_recovers_plausible_weights(self):
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'Rank1Updates',
+          'use_dyanamic_cholesky': False,
+      }, {
+          'testcase_name': 'DynamicCholesky',
+          'use_dyanamic_cholesky': True,
+      })
+  def test_sparse_regression_recovers_plausible_weights(
+      self, use_dyanamic_cholesky):
     true_weights = tf.constant([0., 0., 2., 0., -2.])
     model, observed_time_series, _ = self._build_test_model(
         num_timesteps=20,
@@ -660,9 +671,15 @@ class GibbsSamplerTests(test_util.TestCase):
           observed_time_series,
           num_results=100,
           num_warmup_steps=100,
-          seed=test_util.test_seed(sampler_type='stateless'))
+          seed=test_util.test_seed(sampler_type='stateless'),
+          experimental_use_dynamic_cholesky=use_dyanamic_cholesky)
 
-    samples = self.evaluate(do_sampling())
+    if JAX_MODE and use_dyanamic_cholesky:
+      with self.assertRaises(ValueError):
+        self.evaluate(do_sampling())
+      return
+    else:
+      samples = self.evaluate(do_sampling())
     mean_weights = tf.reduce_mean(samples.weights, axis=-2)
     nonzero_probs = tf.reduce_mean(
         tf.cast(tf.not_equal(samples.weights, 0.), tf.float32),

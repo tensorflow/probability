@@ -67,6 +67,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import sts
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
 from tensorflow_probability.python.experimental import distributions as tfde
+from tensorflow_probability.python.experimental.sts_gibbs import dynamic_spike_and_slab
 from tensorflow_probability.python.experimental.sts_gibbs import spike_and_slab
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
@@ -74,6 +75,8 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.sts import components as sts_components
 from tensorflow_probability.python.sts.internal import util as sts_util
+
+JAX_MODE = False
 
 # The sampler state stores current values for each model parameter,
 # and auxiliary quantities such as the latent level. It should have the property
@@ -341,7 +344,8 @@ def fit_with_gibbs_sampling(model,
                             num_warmup_steps=200,
                             initial_state=None,
                             seed=None,
-                            default_pseudo_observations=None):
+                            default_pseudo_observations=None,
+                            experimental_use_dynamic_cholesky=False):
   """Fits parameters for an STS model using Gibbs sampling.
 
   Args:
@@ -362,6 +366,13 @@ def fit_with_gibbs_sampling(model,
     default_pseudo_observations: Optional scalar float `Tensor` Controls the
       number of pseudo-observations for the prior precision matrix over the
       weights.
+    experimental_use_dynamic_cholesky: Optional bool - in case of spike and slab
+      sampling, will dynamically select the subset of the design matrix with
+      active features to perform the Cholesky decomposition. This may provide
+      a speedup when the number of true features is small compared to the size
+      of the design matrix. *Note*: If this is true, neither batch shape nor
+      `jit_compile` is supported.
+
 
   Returns:
     model: A `GibbsSamplerState` structure of posterior samples.
@@ -417,9 +428,9 @@ def fit_with_gibbs_sampling(model,
   initial_state = initial_state._replace(
       seed=samplers.sanitize_seed(seed, salt='initial_GibbsSamplerState'))
 
-  sampler_loop_body = _build_sampler_loop_body(model, observed_time_series,
-                                               is_missing,
-                                               default_pseudo_observations)
+  sampler_loop_body = _build_sampler_loop_body(
+      model, observed_time_series, is_missing, default_pseudo_observations,
+      experimental_use_dynamic_cholesky)
 
   samples = tf.scan(sampler_loop_body,
                     np.arange(num_warmup_steps + num_results), initial_state)
@@ -741,7 +752,8 @@ def _resample_scale(prior, observed_residuals, is_missing=None, seed=None):
 def _build_sampler_loop_body(model,
                              observed_time_series,
                              is_missing=None,
-                             default_pseudo_observations=None):
+                             default_pseudo_observations=None,
+                             experimental_use_dynamic_cholesky=False):
   """Builds a Gibbs sampler for the given model and observed data.
 
   Args:
@@ -754,6 +766,11 @@ def _build_sampler_loop_body(model,
     default_pseudo_observations: Optional scalar float `Tensor` Controls the
       number of pseudo-observations for the prior precision matrix over the
       weights.
+    experimental_use_dynamic_cholesky: Optional bool - in case of spike and slab
+      sampling, will dynamically select the subset of the design matrix with
+      active features to perform the Cholesky decomposition. This may provide
+      a speedup when the number of true features is small compared to the size
+      of the design matrix.
 
   Returns:
     sampler_loop_body: Python callable that performs a single cycle of Gibbs
@@ -761,6 +778,8 @@ def _build_sampler_loop_body(model,
       new `GibbsSamplerState`. The second argument (passed by `tf.scan`) is
       ignored.
   """
+  if JAX_MODE and experimental_use_dynamic_cholesky:
+    raise ValueError('Dynamic Cholesky decomposition not supported in JAX')
   level_component = model.components[0]
   if not (isinstance(level_component, sts.LocalLevel) or
           isinstance(level_component, sts.LocalLinearTrend)):
@@ -817,7 +836,12 @@ def _build_sampler_loop_body(model,
 
   if regression_component:
     if model_has_spike_slab_regression:
-      spike_and_slab_sampler = spike_and_slab.SpikeSlabSampler(
+      if experimental_use_dynamic_cholesky:
+        sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler
+      else:
+        sampler = spike_and_slab.SpikeSlabSampler
+
+      spike_and_slab_sampler = sampler(
           design_matrix,
           weights_prior_precision=regression_component._weights_prior_precision,  # pylint: disable=protected-access
           nonzero_prior_prob=regression_component._sparse_weights_nonzero_prob,  # pylint: disable=protected-access

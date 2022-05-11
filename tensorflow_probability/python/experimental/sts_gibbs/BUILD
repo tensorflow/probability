@@ -33,6 +33,7 @@ multi_substrate_py_library(
     name = "sts_gibbs",
     srcs = ["__init__.py"],
     deps = [
+        ":dynamic_spike_and_slab",
         ":gibbs_sampler",
         ":spike_and_slab",
     ],
@@ -67,10 +68,50 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "gibbs_sampler_test",
-    size = "medium",
+    size = "large",
     srcs = ["gibbs_sampler_test.py"],
     disabled_substrates = ["numpy"],
     shard_count = 4,
+    deps = [
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/sts_gibbs",
+        "//tensorflow_probability/python/internal:test_util",
+#         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
+    ],
+)
+
+multi_substrate_py_library(
+    name = "dynamic_spike_and_slab",
+    srcs = ["dynamic_spike_and_slab.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
+        "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/experimental/distributions:mvn_precision_factor_linop",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:vectorization_util",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/mcmc/internal:util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "dynamic_spike_and_slab_test",
+    size = "medium",
+    srcs = ["dynamic_spike_and_slab_test.py"],
+    disabled_substrates = [
+        "numpy",
+        "jax",
+    ],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
