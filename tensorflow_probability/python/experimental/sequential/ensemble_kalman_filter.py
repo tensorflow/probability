@@ -104,6 +104,7 @@ def ensemble_kalman_filter_predict(
       particles, and scale up the sample covariance.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'ensemble_kalman_filter_predict'`).
+
   Returns:
     next_state: `EnsembleKalmanFilterState` representing particles after
       applying `transition_fn`.
@@ -148,8 +149,9 @@ def ensemble_kalman_filter_update(
   version of the traditional Kalman Filter.
 
   This method is the 'update' equation associated with the Ensemble
-  Kalman Filter. In expectation, the ensemble covariance will match that
-  of the true posterior (under a Linear Gaussian State Space Model).
+  Kalman Filter. As the ensemble size goes to infinity, the EnKF sample mean and
+  covariance match that of the true posterior (under a Linear Gaussian State
+  Space Model).
 
   Args:
     state: Instance of `EnsembleKalmanFilterState`.
@@ -162,12 +164,22 @@ def ensemble_kalman_filter_update(
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'ensemble_kalman_filter_update'`).
+
   Returns:
     next_state: `EnsembleKalmanFilterState` representing particles at next
       timestep, after applying Kalman update equations.
   """
 
   with tf.name_scope(name or 'ensemble_kalman_filter_update'):
+    # In the example below, we let
+    #  Y be the real observations, so Y.shape = [observation_size]
+    #  X be an ensemble particles with X.shape = [ensemble_size, state_size]
+    #  G be the observation function,
+    #   so G(X).shape = [ensemble_size, state_size].
+    # In practice, batch dims may appear between the ensemble and state dims.
+
+    # In the traditional EnKF, observation_particles_dist ~ N(G(X), Γ).
+    # However, our API would allow any Gaussian.
     observation_particles_dist, extra = observation_fn(
         state.step, state.particles, state.extra)
 
@@ -182,14 +194,29 @@ def ensemble_kalman_filter_update(
       raise ValueError('Expected `observation_fn` to return an instance of '
                        '`MultivariateNormalLinearOperator`')
 
-    observation_particles = observation_particles_dist.sample(seed=seed)
-    observation_particles_covariance = _covariance(observation_particles)
+    # predicted_observation_particles = G(X) + E[η],
+    # and is shape [ensemble_size] + [observation_size].
+    # Note that .mean() is the distribution mean, and the distribution is
+    # centered at the predicted observations. This is *not* the ensemble mean.
+    predicted_observation_particles = observation_particles_dist.mean()
 
+    # With μ the ensemble average operator. For V a batch of column vectors,
+    # let Vᵀ be a batch of row vectors.
+    # Cov(G(X)) = (G(X) - μ(G(X))) (G(X) - μ(G(X)))ᵀ
+    observation_particles_covariance = _covariance(
+        predicted_observation_particles)
+
+    # covariance_between_state_and_predicted_observations
+    # Cov(X, G(X))  = (X - μ(X))(G(X) - μ(G(X)))ᵀ
     covariance_between_state_and_predicted_observations = tf.nest.map_structure(
-        lambda x: _covariance(x, observation_particles), state.particles)
+        lambda x: _covariance(x, predicted_observation_particles),
+        state.particles)
 
-    observation_particles_diff = observation - observation_particles
+    # observation_particles_diff = Y - G(X) - η
+    observation_particles_diff = (
+        observation - observation_particles_dist.sample(seed=seed))
 
+    # = Cov(G(X)) + Γ
     observation_particles_covariance = (
         observation_particles_covariance +
         observation_particles_dist.covariance())
@@ -212,15 +239,22 @@ def ensemble_kalman_filter_update(
       # observations is large. We can use the Sherman-Woodbury-Morrison
       # identity in this case.
 
+      # added_term = [Cov(G(X)) + Γ]⁻¹ [Y - G(X) - η]
       observation_particles_cholesky = tf.linalg.cholesky(
           observation_particles_covariance)
       added_term = tf.squeeze(tf.linalg.cholesky_solve(
           observation_particles_cholesky,
           observation_particles_diff[..., tf.newaxis]), axis=-1)
 
+      # added_term
+      #  = covariance_between_state_and_predicted_observations @ added_term
+      #  = Cov(X, G(X)) [Cov(G(X)) + Γ]⁻¹ [Y - G(X) - η]
+      #  = (X - μ(X))(G(X) - μ(G(X)))ᵀ [Cov(G(X)) + Γ]⁻¹ [Y - G(X) - η]
       added_term = tf.nest.map_structure(
           lambda x: tf.linalg.matvec(x, added_term),
           covariance_between_state_and_predicted_observations)
+
+      # new_particles = X + damping * added_term
       new_particles = tf.nest.map_structure(
           lambda x, a: x + damping * a, state.particles, added_term)
 
