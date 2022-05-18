@@ -81,15 +81,24 @@ def ensemble_kalman_filter_predict(
     seed=None,
     inflate_fn=None,
     name=None):
-  """Ensemble Kalman Filter Prediction.
+  """Ensemble Kalman filter prediction step.
 
   The [Ensemble Kalman Filter](
   https://en.wikipedia.org/wiki/Ensemble_Kalman_filter) is a Monte Carlo
-  version of the traditional Kalman Filter.
+  version of the traditional Kalman Filter. See also [2]. It assumes the model
 
-  This method is the 'prediction' equation associated with the Ensemble
-  Kalman Filter. This takes in an optional `inflate_fn` to perform covariance
-  inflation on the ensemble [2].
+  ```
+  X[t] ~ transition_fn(X[t-1])
+  Y[t] ~ observation_fn(X[t])
+  ```
+
+  Given the ensemble `state.particles` sampled from `P(X[t-1] | Y[t-1])`, this
+  function produces the predicted (a.k.a. forecast or background) ensemble
+  sampled from `P(X[t] | Y[t-1])`. This is the predicted next state *before*
+  assimilating the observation `Y[t]`.
+
+  Typically, with `F` some deterministic mapping, `transition_fn(X)` returns a
+  normal distribution centered at `F(X)`.
 
   Args:
     state: Instance of `EnsembleKalmanFilterState`.
@@ -98,10 +107,10 @@ def ensemble_kalman_filter_predict(
       Each component should be an instance of
       `MultivariateNormalLinearOperator`.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
-    inflate_fn: Function that takes in the `particles` and returns a
-      new set of `particles`. Used for inflating the covariance of points.
-      Note this function should try to preserve the sample mean of the
-      particles, and scale up the sample covariance.
+    inflate_fn: Function that takes in the `particles` and returns a new set of
+      `particles`. Used for inflating the covariance of points. Note this
+      function should try to preserve the sample mean of the particles, and
+      scale up the sample covariance [3].
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'ensemble_kalman_filter_predict'`).
 
@@ -115,7 +124,11 @@ def ensemble_kalman_filter_predict(
       quasi-geostrophic model using Monte Carlo methods to forecast error
       statistics. Journal of Geophysical Research, 1994.
 
-  [2] Jeffrey L. Anderson and Stephen L. Anderson. A Monte Carlo Implementation
+  [2] Matthias Katzfuss, Jonathan R. Stroud & Christopher K. Wikle
+      Understanding the Ensemble Kalman Filter.
+      The Americal Statistician, 2016.
+
+  [3] Jeffrey L. Anderson and Stephen L. Anderson. A Monte Carlo Implementation
       of the Nonlinear Filtering Problem to Produce Ensemble Assimilations and
       Forecasts. Monthly Weather Review, 1999.
 
@@ -142,16 +155,23 @@ def ensemble_kalman_filter_update(
     damping=1.,
     seed=None,
     name=None):
-  """Ensemble Kalman Filter Update.
+  """Ensemble Kalman filter update step.
 
   The [Ensemble Kalman Filter](
   https://en.wikipedia.org/wiki/Ensemble_Kalman_filter) is a Monte Carlo
-  version of the traditional Kalman Filter.
+  version of the traditional Kalman Filter. See also [2]. It assumes the model
 
-  This method is the 'update' equation associated with the Ensemble
-  Kalman Filter. As the ensemble size goes to infinity, the EnKF sample mean and
-  covariance match that of the true posterior (under a Linear Gaussian State
-  Space Model).
+  ```
+  X[t] ~ transition_fn(X[t-1])
+  Y[t] ~ observation_fn(X[t])
+  ```
+
+  Given the ensemble `state.particles` sampled from `P(X[t] | Y[t-1])`, this
+  function assimilates obervation `Y[t]` to produce the updated ensemble sampled
+  from `P(X[t] | Y[t])`.
+
+  Typically, with `G` some deterministic observation mapping,
+  `observation_fn(X)` returns a normal distribution centered at `G(X)`.
 
   Args:
     state: Instance of `EnsembleKalmanFilterState`.
@@ -168,6 +188,16 @@ def ensemble_kalman_filter_update(
   Returns:
     next_state: `EnsembleKalmanFilterState` representing particles at next
       timestep, after applying Kalman update equations.
+
+  #### References
+
+  [1] Geir Evensen. Sequential data assimilation with a nonlinear
+      quasi-geostrophic model using Monte Carlo methods to forecast error
+      statistics. Journal of Geophysical Research, 1994.
+
+  [2] Matthias Katzfuss, Jonathan R. Stroud & Christopher K. Wikle
+      Understanding the Ensemble Kalman Filter.
+      The Americal Statistician, 2016.
   """
 
   with tf.name_scope(name or 'ensemble_kalman_filter_update'):
@@ -195,7 +225,7 @@ def ensemble_kalman_filter_update(
                        '`MultivariateNormalLinearOperator`')
 
     # predicted_observation_particles = G(X) + E[η],
-    # and is shape [ensemble_size] + [observation_size].
+    # and is shape [n_ensemble] + [observation_size]
     # Note that .mean() is the distribution mean, and the distribution is
     # centered at the predicted observations. This is *not* the ensemble mean.
     predicted_observation_particles = observation_particles_dist.mean()
@@ -268,17 +298,23 @@ def ensemble_kalman_filter_log_marginal_likelihood(
     observation_fn,
     seed=None,
     name=None):
-  """Ensemble Kalman Filter Log Marginal Likelihood.
+  """Ensemble Kalman filter log marginal likelihood.
 
   The [Ensemble Kalman Filter](
   https://en.wikipedia.org/wiki/Ensemble_Kalman_filter) is a Monte Carlo
-  version of the traditional Kalman Filter.
+  version of the traditional Kalman Filter. See also [2]. It assumes the model
+
+  ```
+  X[t] ~ transition_fn(X[t-1])
+  Y[t] ~ observation_fn(X[t])
+  ```
 
   This method estimates (logarithm of) the marginal likelihood of the
-  observation at step `k`, `Y_k`, given previous observations from steps
-  `1` to `k-1`, `Y_{1:k}`. In other words, `Log[p(Y_k | Y_{1:k})]`.
-  This function's approximation to `p(Y_k | Y_{1:k})` is correct under a
-  Linear Gaussian state space model assumption, as ensemble size --> infinity.
+  observation at step `t`, `Y[t]`, given `state`. Typically, `state` is the
+  predictive ensemble at time `t`. In that case, this function approximates
+   `Log[p(Y[t] | Y[t-1], Y[t-2],...)]`
+  The approximation is correct under a Linear Gaussian state space model
+  assumption, as ensemble size --> infinity.
 
   Args:
     state: Instance of `EnsembleKalmanFilterState` at step `k`,
@@ -295,6 +331,16 @@ def ensemble_kalman_filter_log_marginal_likelihood(
 
   Returns:
     log_marginal_likelihood: `Tensor` with same dtype as `state`.
+
+  #### References
+
+  [1] Geir Evensen. Sequential data assimilation with a nonlinear
+      quasi-geostrophic model using Monte Carlo methods to forecast error
+      statistics. Journal of Geophysical Research, 1994.
+
+  [2] Matthias Katzfuss, Jonathan R. Stroud & Christopher K. Wikle
+      Understanding the Ensemble Kalman Filter.
+      The Americal Statistician, 2016.
   """
 
   with tf.name_scope(name or 'ensemble_kalman_filter_log_marginal_likelihood'):
