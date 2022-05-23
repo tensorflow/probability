@@ -20,6 +20,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
+from tensorflow_probability.python.distributions import cholesky_util
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gaussian_process
 from tensorflow_probability.python.distributions import independent
@@ -88,6 +89,7 @@ class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
                base_kernel,
                inducing_index_points,
                variational_scale,
+               cholesky_fn=None,
                jitter=1e-6,
                name='VariationalKernel'):
     """Construct a _VariationalKernel instance.
@@ -107,8 +109,13 @@ class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
         number of examples in `inducing_index_points`. Batch dimensions must be
         broadcast-compatible with the batch shape of `base_kernel` and
         `inducing_index_points`.
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.  Default value: `None`,
+        in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
+        parameter.
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
+        This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
       name: Python `str` name prefixed to `Op`A created by this class.
         Default value: `"VariationalKernel"`
@@ -124,12 +131,16 @@ class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
           inducing_index_points, dtype=dtype, name='inducing_index_points')
       self._variational_scale = tensor_util.convert_nonref_to_tensor(
           variational_scale, dtype=dtype, name='variational_scale')
+      self._cholesky_fn = cholesky_fn
+
+      if cholesky_fn is None:
+        self._cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(jitter)
       self._jitter = tensor_util.convert_nonref_to_tensor(
           jitter, dtype=dtype, name='jitter')
 
       def _compute_chol_kzz(z):
         kzz = base_kernel.matrix(z, z)
-        result = tf.linalg.cholesky(_add_diagonal_shift(kzz, self._jitter))
+        result = self._cholesky_fn(kzz)
         return result
 
       # Somewhat confusingly, but for the sake of brevity, we use `var` to refer
@@ -193,13 +204,15 @@ class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
     # Shape: bc(Bk, B1, B2) + bc(E1, E2)
     k12 = self._base_kernel.apply(x1, x2, example_ndims)
 
+    inducing_index_points = tf.convert_to_tensor(self._inducing_index_points)
+
     # Shape: bc(Bk, B1, Bz) + E1 + [ez]
-    k1z = self._base_kernel.tensor(x1, self._inducing_index_points,
+    k1z = self._base_kernel.tensor(x1, inducing_index_points,
                                    x1_example_ndims=example_ndims,
                                    x2_example_ndims=1)
 
     # Shape: bc(Bk, B2, Bz) + E2 + [ez]
-    k2z = self._base_kernel.tensor(x2, self._inducing_index_points,
+    k2z = self._base_kernel.tensor(x2, inducing_index_points,
                                    x1_example_ndims=example_ndims,
                                    x2_example_ndims=1)
 
@@ -207,19 +220,20 @@ class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
         self._chol_kzz, example_ndims - 1, -3)
     kzzchol_linop = tf.linalg.LinearOperatorLowerTriangular(chol_kzz)
 
-    # Shape: bc(Bz, Bk, B2) + E2 + [ez]
-    kzzinv_kz2 = tf.linalg.matrix_transpose(
-        # Shape: bc(Bz, Bk, B2) + E2[:-1] + [ez] + E2[-1]
-        kzzchol_linop.solve(
-            # Shape: bc(Bz, Bk, B2) + E2[:-1] + [ez] + E2[-1]
-            kzzchol_linop.solve(k2z, adjoint_arg=True),
-            adjoint=True))
+    # Write out both solves explicitly. This is so that in the case x1 == x2,
+    # CSE can ensure that only one solve / kernel computation is done.
+    kzz_chol_inv_kz2 = kzzchol_linop.solve(k2z, adjoint_arg=True)
+    kzz_chol_inv_kz1 = kzzchol_linop.solve(k1z, adjoint_arg=True)
+
+    # Note: example_ndims will be 1 since this is only used in the
+    # `VariationalGaussianProcess` for stddev computations, hence
+    # we can explicitly use `axis=-2`.
 
     # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2)
     k1z_kzzinv_kz2 = tf.reduce_sum(
-        # Shape: bc(Bz, Bk, B1, B2) + bc(E1, E2) + [ez]
-        input_tensor=k1z * kzzinv_kz2,
-        axis=-1)
+        # Shape: bc(Bz, Bk, B1, B2) + [ez] + bc(E1, E2)
+        input_tensor=kzz_chol_inv_kz2 * kzz_chol_inv_kz1,
+        axis=-(example_ndims + 1))
 
     # Do this c2t only once
     kzzinv_var_kzzinv = tf.convert_to_tensor(self._kzzinv_var_kzzinv)
@@ -250,6 +264,32 @@ class _VariationalKernel(psd_kernel.AutoCompositeTensorPsdKernel):
 
     return result
 
+  def _matrix(self, x1, x2):
+    k12 = self.base_kernel.matrix(x1, x2)
+
+    inducing_index_points = tf.convert_to_tensor(self._inducing_index_points)
+
+    k1z = self._base_kernel.matrix(x1, inducing_index_points)
+    k2z = self._base_kernel.matrix(x2, inducing_index_points)
+
+    chol_kzz = self._chol_kzz
+    kzzchol_linop = tf.linalg.LinearOperatorLowerTriangular(chol_kzz)
+
+    kzz_chol_inv_kz2 = kzzchol_linop.solve(k2z, adjoint_arg=True)
+    kzz_chol_inv_kz1 = kzzchol_linop.solve(k1z, adjoint_arg=True)
+
+    k1z_kzzinv_kz2 = tf.linalg.matmul(
+        kzz_chol_inv_kz1, kzz_chol_inv_kz2, transpose_a=True)
+
+    kzzinv_var_kzzinv = tf.convert_to_tensor(self._kzzinv_var_kzzinv)
+
+    kzzinv_var_kzzinv_kz2 = tf.linalg.matmul(
+        kzzinv_var_kzzinv, k2z, adjoint_b=True)
+
+    k1z_kzzinv_var_kzzinv_kz2 = tf.linalg.matmul(k1z, kzzinv_var_kzzinv_kz2)
+
+    return k12 - k1z_kzzinv_kz2 + k1z_kzzinv_var_kzzinv_kz2
+
 
 def _make_posterior_predictive_mean_fn(
     kernel,
@@ -261,24 +301,19 @@ def _make_posterior_predictive_mean_fn(
 
   def _post_pred_mean_fn(index_points):
     """The variatioanl posterior predictive mean function."""
+    z = tf.convert_to_tensor(inducing_index_points)
     kzt = tf.linalg.LinearOperatorFullMatrix(
-        kernel.matrix(inducing_index_points, index_points))
+        kernel.matrix(z, index_points))
 
     kzzinv_varloc = _solve_cholesky_factored_system_vec(
         chol_kzz_fn(),
-        (variational_inducing_observations_loc -
-         mean_fn(inducing_index_points)),
+        (variational_inducing_observations_loc - mean_fn(z)),
         name='kzzinv_varloc')
 
     return (mean_fn(index_points) +
             kzt.matvec(kzzinv_varloc, adjoint=True))
 
   return _post_pred_mean_fn
-
-
-def _add_diagonal_shift(matrix, shift):
-  return tf.linalg.set_diag(
-      matrix, tf.linalg.diag_part(matrix) + shift, name='add_diagonal_shift')
 
 
 def _solve_cholesky_factored_system(
@@ -732,6 +767,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
                mean_fn=None,
                observation_noise_variance=None,
                predictive_noise_variance=None,
+               cholesky_fn=None,
                jitter=1e-6,
                validate_args=False,
                allow_nan_stats=False,
@@ -784,6 +820,10 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
         example, to omit predictive noise variance (by setting this to zero) to
         obtain noiseless posterior predictions of function values, conditioned
         on noisy observations.
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.  Default value: `None`,
+        in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
+        parameter.
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
@@ -838,8 +878,6 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
           name='predictive_noise_variance')
       if predictive_noise_variance is None:
         predictive_noise_variance = observation_noise_variance
-      jitter = tensor_util.convert_nonref_to_tensor(
-          jitter, dtype=dtype, name='jitter')
 
       self._kernel = kernel
       self._index_points = index_points
@@ -880,6 +918,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
           kernel,
           inducing_index_points,
           variational_inducing_observations_scale,
+          cholesky_fn=cholesky_fn,
           jitter=jitter)
 
       posterior_predictive_mean_fn = _make_posterior_predictive_mean_fn(
@@ -894,6 +933,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
           kernel=variational_kernel,
           mean_fn=posterior_predictive_mean_fn,
           index_points=index_points,
+          cholesky_fn=cholesky_fn,
           jitter=jitter,
           # What the GP super class calls "observation noise variance" we call
           # here the "predictive noise variance". We use the observation noise
@@ -1198,6 +1238,7 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
       observations,
       observation_noise_variance,
       mean_fn=None,
+      cholesky_fn=None,
       jitter=1e-6,
       name=None):
     """Model selection for optimal variational hyperparameters.
@@ -1239,6 +1280,10 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
         shape `[b1, ..., bB, f1, ..., fF]` and returns a `Tensor` whose shape is
         (broadcastable with) `[b1, ..., bB]`. Default value: `None` implies
         constant zero function.
+      cholesky_fn: Callable which takes a single (batch) matrix argument and
+        returns a Cholesky-like lower triangular factor.  Default value: `None`,
+        in which case `make_cholesky_with_jitter_fn` is used with the `jitter`
+        parameter.
       jitter: `float` scalar `Tensor` added to the diagonal of the covariance
         matrix to ensure positive definiteness of the covariance matrix.
         Default value: `1e-6`.
@@ -1277,6 +1322,8 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
           dtype=dtype,
           name='observation_noise_variance')
       jitter = tf.convert_to_tensor(jitter, dtype=dtype, name='jitter')
+      if cholesky_fn is None:
+        cholesky_fn = cholesky_util.make_cholesky_with_jitter_fn(jitter)
 
       # Default to a constant zero function.
       if mean_fn is None:
@@ -1291,11 +1338,9 @@ class VariationalGaussianProcess(gaussian_process.GaussianProcess,
 
       noise_var_inv = tf.math.reciprocal(observation_noise_variance)
 
-      sigma_inv = _add_diagonal_shift(
-          kzz + noise_var_inv * tf.matmul(kzx, kzx, adjoint_b=True),
-          jitter)
+      sigma_inv = kzz + noise_var_inv * tf.matmul(kzx, kzx, adjoint_b=True)
 
-      chol_sigma_inv = tf.linalg.cholesky(sigma_inv)
+      chol_sigma_inv = cholesky_fn(sigma_inv)
 
       kzx_lin_op = tf.linalg.LinearOperatorFullMatrix(kzx)
       kzx_obs = kzx_lin_op.matvec(
