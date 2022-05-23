@@ -249,7 +249,15 @@ def ensemble_kalman_filter_update(
     # = Cov(G(X)) + Γ
     observation_particles_covariance = (
         observation_particles_covariance +
-        observation_particles_dist.covariance())
+        # Calling _linop_covariance(...).to_dense() rather than
+        # observation_particles_dist.covariance() means the shape is
+        # [observation_size, observation_size] rather than
+        # [ensemble_size] + [observation_size, observation_size].
+        # Both work, since this matrix is used to do mat-vecs with ensembles
+        # of vectors...however, doing things this way ensures we do an
+        # efficient batch-matmul and (more importantly) don't have to do a
+        # separate Cholesky for every ensemble member!
+        _linop_covariance(observation_particles_dist).to_dense())
 
     # We specialize the univariate case.
     # TODO(srvasude): Refactor linear_gaussian_ssm, normal_conjugate_posteriors
@@ -363,3 +371,20 @@ def ensemble_kalman_filter_log_marginal_likelihood(
         scale_tril=tf.linalg.cholesky(_covariance(observation_particles)))
 
     return observation_dist.log_prob(observation)
+
+
+def _linop_covariance(dist):
+  """LinearOperator backing Cov(dist), without unnecessary broadcasting."""
+  # This helps, even if we immediately call .to_dense(). Why?
+  # Simply calling dist.covariance() would broadcast up to the full batch shape.
+  # Instead, we want the shape to be that of the linear operator only.
+  # This (i) saves memory and (ii) allows operations done with this operator
+  # to be more efficient.
+  if hasattr(dist, 'cov_operator'):
+    cov = dist.cov_operator
+  else:
+    cov = dist.scale.matmul(dist.scale.H)
+  # TODO(b/132466537) composition doesn't preserve SPD so we have to hard-set.
+  cov._is_positive_definite = True  # pylint: disable=protected-access
+  cov._is_self_adjoint = True  # pylint: disable=protected-access
+  return cov
