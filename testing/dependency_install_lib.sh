@@ -80,7 +80,8 @@ install_common_packages() {
 install_test_only_packages() {
   # The following unofficial dependencies are used only by tests.
   PIP_FLAGS=${1-}
-  python -m pip install $PIP_FLAGS hypothesis matplotlib mock mpmath scipy pandas optax
+  # TODO(b/233927309): Unpin hypothesis version.
+  python -m pip install $PIP_FLAGS hypothesis==6.46.7 matplotlib mock mpmath scipy pandas optax
 }
 
 dump_versions() {
