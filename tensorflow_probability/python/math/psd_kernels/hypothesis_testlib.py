@@ -38,12 +38,14 @@ SPECIAL_KERNELS = [
     'FeatureScaled',
     'KumaraswamyTransformed',
     'PointwiseExponential',
-    'SchurComplement'
+    'SchurComplement',
+    'SpectralMixture',
 ]
 
 
 NON_INSTANTIABLE_SPECIAL_KERNELS = [
     'AutoCompositeTensorPsdKernel',
+    'ExponentialCurve',  # TODO(jburnim, srvasude): Enable this kernel.
     'FeatureTransformed',
     'PositiveSemidefiniteKernel',
 ]
@@ -750,6 +752,7 @@ def schur_complements(
       'fixed_inputs': fixed_inputs,
       'diag_shift': diag_shift
   }
+
   for param_name in schur_complement_params:
     if enable_vars and draw(hps.booleans()):
       kernel_variable_names.append(param_name)
@@ -763,6 +766,96 @@ def schur_complements(
       fixed_inputs=schur_complement_params['fixed_inputs'],
       diag_shift=schur_complement_params['diag_shift'],
       cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
+      validate_args=True)
+  return result_kernel, kernel_variable_names
+
+
+@hps.composite
+def spectral_mixtures(
+    draw,
+    batch_shape=None,
+    event_dim=None,
+    feature_dim=None,
+    feature_ndims=None,
+    enable_vars=None,
+    depth=None):
+  """Strategy for drawing `SpectralMixture` kernels.
+
+  The underlying kernel is drawn from the `kernels` strategy.
+
+  Args:
+    draw: Hypothesis strategy sampler supplied by `@hps.composite`.
+    batch_shape: An optional `TensorShape`.  The batch shape of the resulting
+      Kernel.  Hypothesis will pick a batch shape if omitted.
+    event_dim: Optional Python int giving the size of each of the
+      kernel's parameters' event dimensions.  This is shared across all
+      parameters, permitting square event matrices, compatible location and
+      scale Tensors, etc. If omitted, Hypothesis will choose one.
+    feature_dim: Optional Python int giving the size of each feature dimension.
+      If omitted, Hypothesis will choose one.
+    feature_ndims: Optional Python int stating the number of feature dimensions
+      inputs will have. If omitted, Hypothesis will choose one.
+    enable_vars: TODO(bjp): Make this `True` all the time and put variable
+      initialization in slicing_test.  If `False`, the returned parameters are
+      all Tensors, never Variables or DeferredTensor.
+    depth: Python `int` giving maximum nesting depth of compound kernel.
+
+  Returns:
+    kernels: A strategy for drawing `SchurComplement` kernels with the specified
+      `batch_shape` (or an arbitrary one if omitted).
+  """
+  if depth is None:
+    depth = draw(depths())
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes())
+  if event_dim is None:
+    event_dim = draw(hps.integers(min_value=2, max_value=6))
+  if feature_dim is None:
+    feature_dim = draw(hps.integers(min_value=2, max_value=6))
+  if feature_ndims is None:
+    feature_ndims = draw(hps.integers(min_value=2, max_value=6))
+
+  num_mixtures = draw(hps.integers(min_value=2, max_value=5))
+
+  logits = draw(kernel_input(
+      batch_shape=batch_shape,
+      example_ndims=0,
+      feature_dim=num_mixtures,
+      feature_ndims=1))
+
+  locs = draw(kernel_input(
+      batch_shape=batch_shape,
+      example_ndims=1,
+      example_dim=num_mixtures,
+      feature_dim=feature_dim,
+      feature_ndims=feature_ndims))
+
+  scales = tfp_hps.softplus_plus_eps()(draw(kernel_input(
+      batch_shape=batch_shape,
+      example_ndims=1,
+      example_dim=num_mixtures,
+      feature_dim=feature_dim,
+      feature_ndims=feature_ndims)))
+
+  hp.note(f'Forming SpectralMixture kernel with logits: {logits} '
+          f'locs: {locs} and scales: {scales}')
+
+  spectral_mixture_params = {'locs': locs, 'logits': logits, 'scales': scales}
+
+  kernel_variable_names = []
+  for param_name in spectral_mixture_params:
+    if enable_vars and draw(hps.booleans()):
+      kernel_variable_names.append(param_name)
+      spectral_mixture_params[param_name] = tf.Variable(
+          spectral_mixture_params[param_name], name=param_name)
+      if draw(hps.booleans()):
+        spectral_mixture_params[param_name] = tfp_hps.defer_and_count_usage(
+            spectral_mixture_params[param_name])
+  result_kernel = tfpk.SpectralMixture(
+      logits=spectral_mixture_params['logits'],
+      locs=spectral_mixture_params['locs'],
+      scales=spectral_mixture_params['scales'],
+      feature_ndims=feature_ndims,
       validate_args=True)
   return result_kernel, kernel_variable_names
 
@@ -931,6 +1024,14 @@ def kernels(
         feature_ndims=feature_ndims,
         enable_vars=enable_vars,
         depth=depth))
+  elif kernel_name == 'SpectralMixture':
+    return draw(spectral_mixtures(
+        batch_shape=batch_shape,
+        event_dim=event_dim,
+        feature_dim=feature_dim,
+        feature_ndims=feature_ndims,
+        enable_vars=enable_vars,
+        depth=depth))
 
   raise ValueError('Kernel name {} not found.'.format(kernel_name))
 
@@ -951,6 +1052,7 @@ CONSTRAINTS = {
     'concentration0': constrain_to_range(1., 2.),
     'concentration1': constrain_to_range(1., 2.),
     'df': constrain_to_range(2., 5.),
+    'scales': constrain_to_range(1., 2.),
     'slope_variance': constrain_to_range(0.1, 0.5),
     'exponent': lambda x: tf.math.floor(constrain_to_range(1, 4.)(x)),
     'length_scale': constrain_to_range(1., 6.),

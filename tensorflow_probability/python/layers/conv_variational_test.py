@@ -13,9 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """Tests for convolutional variational layers."""
-
+# pylint: disable=g-import-not-at-top
 # Dependency imports
-from keras import testing_utils
+try:
+  from keras.testing_infra import test_utils as keras_test_utils
+except ImportError:
+  keras_test_utils = None
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -215,7 +218,7 @@ class ConvVariational(object):
         # TODO(scottzhu): reenable the test when the repo switch change reach
         # the TF PIP package.
         self.skipTest('Skip the test until the TF and Keras has a new PIP.')
-        testing_utils.layer_test(
+        keras_test_utils.layer_test(
             layer_class,
             kwargs={'filters': 2,
                     'kernel_size': 3,
@@ -242,14 +245,14 @@ class ConvVariational(object):
       inputs = self.maybe_transpose_tensor(inputs)
 
       # No keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
+      input_dependent_losses = layer.losses
       self.assertEqual(len(layer.losses), 0)
       self.assertListEqual(layer.losses, input_dependent_losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
+      input_dependent_losses = layer.losses
       self.assertEqual(len(layer.losses), 1)
       self.assertEqual(layer.losses[0].shape, ())
       self.assertListEqual(layer.losses, input_dependent_losses)
@@ -274,18 +277,14 @@ class ConvVariational(object):
       inputs = self.maybe_transpose_tensor(inputs)
 
       # No keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 0)
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 2)
       self.assertEqual(layer.losses[0].shape, ())
       self.assertEqual(layer.losses[1].shape, ())
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
   def _testConvSetUp(self, layer_class, batch_size, depth=None,
                      height=None, width=None, channels=None, filters=None,
@@ -347,7 +346,7 @@ class ConvVariational(object):
 
     outputs = layer(inputs)
 
-    kl_penalty = layer.get_losses_for(inputs=None)
+    kl_penalty = layer.losses
     return (kernel_posterior, kernel_prior, kernel_divergence,
             bias_posterior, bias_prior, bias_divergence,
             layer, inputs, outputs, kl_penalty, kernel_shape)

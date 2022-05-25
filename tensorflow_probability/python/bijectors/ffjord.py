@@ -356,7 +356,7 @@ class FFJORD(bijector.Bijector):
   def _augmented_forward(self, x, **condition_kwargs):
     """Computes forward and forward_log_det_jacobian transformations."""
     augmented_ode_fn = self._trace_augmentation_fn(
-        self._state_time_derivative_fn, x.shape, x.dtype)
+        self._state_time_derivative_fn, prefer_static.shape(x), x.dtype)
     augmented_x = (x, tf.zeros_like(x))
     if condition_kwargs:
       y, fldj = self._solve_ode(augmented_ode_fn, augmented_x,
@@ -368,7 +368,7 @@ class FFJORD(bijector.Bijector):
   def _augmented_inverse(self, y, **condition_kwargs):
     """Computes inverse and inverse_log_det_jacobian transformations."""
     augmented_inv_ode_fn = self._trace_augmentation_fn(
-        self._inv_state_time_derivative_fn, y.shape, y.dtype)
+        self._inv_state_time_derivative_fn, prefer_static.shape(y), y.dtype)
     augmented_y = (y, tf.zeros_like(y))
     if condition_kwargs:
       x, ildj = self._solve_ode(augmented_inv_ode_fn, augmented_y,

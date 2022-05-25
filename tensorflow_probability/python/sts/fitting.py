@@ -19,7 +19,6 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import mcmc
-from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python import vi
 from tensorflow_probability.python.experimental import vi as experimental_vi
 from tensorflow_probability.python.internal import distribution_util
@@ -447,7 +446,10 @@ def fit_with_hmc(model,
 
   """
   with tf.name_scope(name or 'fit_with_hmc') as name:
-    seed = tfp_util.SeedStream(seed, salt='StructuralTimeSeries_fit_with_hmc')
+    init_seed, vi_seed, hmc_seed = samplers.split_seed(
+        seed=seed,
+        n=3,
+        salt='StructuralTimeSeries_fit_with_hmc')
 
     observed_time_series = sts_util.pad_batch_dimension_for_multiple_chains(
         observed_time_series, model, chain_batch_shape=chain_batch_shape)
@@ -457,7 +459,7 @@ def fit_with_hmc(model,
     # specified.
     if initial_step_size is None or initial_state is None:
       variational_posterior = build_factored_surrogate_posterior(
-          model, batch_shape=chain_batch_shape, seed=seed())
+          model, batch_shape=chain_batch_shape, seed=init_seed)
 
       if variational_optimizer is None:
         variational_optimizer = tf1.train.AdamOptimizer(
@@ -468,7 +470,7 @@ def fit_with_hmc(model,
           sample_size=variational_sample_size,
           num_steps=num_variational_steps,
           optimizer=variational_optimizer,
-          seed=seed())
+          seed=vi_seed)
 
       with tf.control_dependencies([loss_curve]):
         if initial_state is None:
@@ -499,7 +501,7 @@ def fit_with_hmc(model,
                       state_gradients_are_stopped=True),
                   bijector=[param.bijector for param in model.parameters]),
               num_adaptation_steps=int(num_warmup_steps * 0.8)),
-          seed=seed())
+          seed=hmc_seed)
     samples, kernel_results = run_hmc()
 
     return samples, kernel_results

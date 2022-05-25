@@ -118,7 +118,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/sts/internal",
-        "//tensorflow_probability/python/util",
     ],
 )
 
@@ -145,6 +144,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/experimental/util",
+        "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/sts/internal",
     ],
 )

@@ -57,7 +57,6 @@ def skip_assert_for_tracers(f):
     if (isinstance(np.zeros([0]), jax_core.Tracer) or  # omnistaging
         any(isinstance(arg, jax_core.Tracer)
             for arg in args + tuple(kwargs.values()))):
-      print('skip assert ' + f.__name__)
       return None
     return f(*args, **kwargs)
   return wrapped

@@ -13,9 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """Tests for dense variational layers."""
-
+# pylint: disable=g-import-not-at-top
 # Dependency imports
-from keras import testing_utils
+try:
+  from keras.testing_infra import test_utils as keras_test_utils
+except ImportError:
+  keras_test_utils = None
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -122,11 +125,11 @@ class DenseVariational(test_util.TestCase):
       # the TF PIP package.
       self.skipTest('Skip the test until the TF and Keras has a new PIP.')
       with self.cached_session():
-        testing_utils.layer_test(
+        keras_test_utils.layer_test(
             layer_class,
             kwargs=kwargs,
             input_shape=(3, 2))
-        testing_utils.layer_test(
+        keras_test_utils.layer_test(
             layer_class,
             kwargs=kwargs,
             input_shape=(None, None, 2))
@@ -137,17 +140,13 @@ class DenseVariational(test_util.TestCase):
       inputs = tf.random.uniform([2, 3], seed=1)
 
       # No keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 0)
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 1)
       self.assertEqual(layer.losses[0].shape, ())
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
   def _testKLPenaltyBoth(self, layer_class):
     with self.cached_session():
@@ -158,18 +157,14 @@ class DenseVariational(test_util.TestCase):
       inputs = tf.random.uniform([2, 3], seed=1)
 
       # No keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 0)
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
       _ = layer(inputs)
 
       # Yes keys.
-      input_dependent_losses = layer.get_losses_for(inputs=None)
       self.assertEqual(len(layer.losses), 2)
       self.assertEqual(layer.losses[0].shape, ())
       self.assertEqual(layer.losses[1].shape, ())
-      self.assertListEqual(layer.losses, input_dependent_losses)
 
   def _testDenseSetUp(self, layer_class, batch_size, in_size, out_size,
                       **kwargs):
@@ -212,7 +207,7 @@ class DenseVariational(test_util.TestCase):
 
     outputs = layer(inputs)
 
-    kl_penalty = layer.get_losses_for(inputs=None)
+    kl_penalty = layer.losses
     return (kernel_posterior, kernel_prior, kernel_divergence,
             bias_posterior, bias_prior, bias_divergence,
             layer, inputs, outputs, kl_penalty)

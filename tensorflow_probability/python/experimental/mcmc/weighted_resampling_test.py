@@ -143,19 +143,19 @@ class _SMCResamplersTest(test_util.TestCase):
     # TODO(dpiponi): reimplement this test in vectorized form rather than with
     # loops.
     for i in range(num_distributions):
-      histogram = tf.reduce_mean(
-          _scatter_nd_batch(resampled[:, i, :, tf.newaxis],
-                            tf.ones((num_samples, num_particles),
-                                    dtype=self.dtype),
-                            (num_samples, num_probs),
-                            batch_dims=1),
-          axis=0)
-      means = histogram / num_particles
-      means_, probs_ = self.evaluate([means, probs[i]])
+      samples = _scatter_nd_batch(
+          resampled[:, i, :, tf.newaxis],
+          tf.ones((num_samples, num_particles),
+                  dtype=self.dtype),
+          (num_samples, num_probs),
+          batch_dims=1)
+      # N.B.: _scatter_nd_batch returns numpy arrays in Eager mode
+      wsamples = tf.convert_to_tensor(samples) / num_particles
+      wsamples_, probs_ = self.evaluate([wsamples, probs[i]])
 
       # TODO(dpiponi): it should be possible to compute the exact distribution
       # of these means and choose `atol` in a more principled way.
-      self.assertAllClose(means_, probs_, atol=0.01)
+      self.assertAllMeansClose(wsamples_, probs_, axis=0, atol=0.01)
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
   def test_minimum_error_resampler_means(self):
@@ -187,16 +187,17 @@ class _SMCResamplersTest(test_util.TestCase):
     # TODO(dpiponi): reimplement this test in vectorized form rather than with
     # loops.
     for i in range(num_distributions):
-      histogram = tf.reduce_mean(
-          _scatter_nd_batch(resampled[:, i, :, tf.newaxis],
-                            tf.ones((num_samples, num_particles)),
-                            (num_samples, num_probs),
-                            batch_dims=1),
-          axis=0)
-      means = histogram / num_particles
-      means_, probs_ = self.evaluate([means, probs[i]])
+      samples = _scatter_nd_batch(
+          resampled[:, i, :, tf.newaxis],
+          tf.ones((num_samples, num_particles)),
+          (num_samples, num_probs),
+          batch_dims=1)
+      # N.B.: _scatter_nd_batch returns numpy arrays in Eager mode
+      wsamples = tf.convert_to_tensor(samples) / num_particles
+      wsamples_, probs_ = self.evaluate([wsamples, probs[i]])
 
-      self.assertAllClose(means_, probs_, atol=1.0 / num_particles)
+      self.assertAllMeansClose(
+          wsamples_, probs_, axis=0, atol=1.0 / num_particles)
 
   # TODO(b/153689734): rewrite so as not to use `move_dimension`.
   def test_stratified_resampler_means(self):
@@ -228,16 +229,16 @@ class _SMCResamplersTest(test_util.TestCase):
     # TODO(dpiponi): reimplement this test in vectorized form rather than with
     # loops.
     for i in range(num_distributions):
-      histogram = tf.reduce_mean(
-          _scatter_nd_batch(resampled[:, i, :, tf.newaxis],
-                            tf.ones((num_samples, num_particles)),
-                            (num_samples, num_probs),
-                            batch_dims=1),
-          axis=0)
-      means = histogram / num_particles
-      means_, probs_ = self.evaluate([means, probs[i]])
+      samples = _scatter_nd_batch(
+          resampled[:, i, :, tf.newaxis],
+          tf.ones((num_samples, num_particles)),
+          (num_samples, num_probs),
+          batch_dims=1)
+      # N.B.: _scatter_nd_batch returns numpy arrays in Eager mode
+      wsamples = tf.convert_to_tensor(samples) / num_particles
+      wsamples_, probs_ = self.evaluate([wsamples, probs[i]])
 
-      self.assertAllClose(means_, probs_, atol=0.1)
+      self.assertAllMeansClose(wsamples_, probs_, axis=0, atol=0.1)
 
   def test_resample_using_extremal_log_points(self):
     if self.use_xla and tf.executing_eagerly():
@@ -281,7 +282,7 @@ class _SMCResamplersTest(test_util.TestCase):
         particles, log_weights,
         resample_fn=resample_systematic,
         seed=test_util.test_seed(sampler_type='stateless'))
-    self.assertAllClose(tf.reduce_mean(new_particles), 20., atol=1e-2)
+    self.assertAllMeansClose(new_particles, 20., axis=0, atol=1e-2)
     self.assertAllClose(
         tf.reduce_sum(tf.nn.softmax(new_log_weights) * new_particles),
         20.,
@@ -293,7 +294,7 @@ class _SMCResamplersTest(test_util.TestCase):
         resample_fn=resample_systematic,
         target_log_weights=tfd.Poisson(30).log_prob(particles),
         seed=test_util.test_seed(sampler_type='stateless'))
-    self.assertAllClose(tf.reduce_mean(new_particles), 20., atol=1e-2)
+    self.assertAllMeansClose(new_particles, 20., axis=0, atol=1e-2)
     self.assertAllClose(
         tf.reduce_sum(tf.nn.softmax(new_log_weights) * new_particles),
         30., atol=1.)

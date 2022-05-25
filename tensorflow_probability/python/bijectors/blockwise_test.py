@@ -319,24 +319,8 @@ class BlockwiseBijectorTest(test_util.TestCase):
     self.assertEqual(blockwise._type_spec, dec)
 
   def testNonCompositeTensor(self):
-
-    class NonCompositeScale(tfb.Bijector):
-      """Bijector that is not a `CompositeTensor`."""
-
-      def __init__(self, scale):
-        parameters = dict(locals())
-        self.scale = scale
-        super(NonCompositeScale, self).__init__(
-            validate_args=True,
-            forward_min_event_ndims=0.,
-            parameters=parameters,
-            name='non_composite_scale')
-
-      def _forward(self, x):
-        return x * self.scale
-
     exp = tfb.Exp()
-    scale = NonCompositeScale(scale=tf.constant(3.))
+    scale = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
     blockwise = tfb.Blockwise(bijectors=[exp, scale])
     self.assertNotIsInstance(blockwise, tf.__internal__.CompositeTensor)
     self.assertAllClose(

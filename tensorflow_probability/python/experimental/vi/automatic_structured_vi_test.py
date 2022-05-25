@@ -19,6 +19,7 @@
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.experimental.vi import automatic_structured_vi
 from tensorflow_probability.python.internal import custom_gradient
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -410,7 +411,7 @@ class TestASVISubstitutionAndSurrogateRules(test_util.TestCase):
 
     surrogate_dists, _ = surrogate.sample_distributions(
         seed=test_util.test_seed(sampler_type='stateless'))
-    self.assertIsInstance(surrogate_dists.a, tfd.Independent)
+    self.assertIsInstance(surrogate_dists.a, independent._Independent)
     self.assertIsInstance(surrogate_dists.a.distribution,
                           tfd.TransformedDistribution)
     self.assertIsInstance(surrogate_dists.a.distribution.distribution,

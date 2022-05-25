@@ -278,6 +278,9 @@ def bijector_supports():
           BijectorSupport(Support.SCALAR_POSITIVE, Support.SCALAR_IN_0_1),
       'GumbelCDF':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED, Support.SCALAR_IN_0_1),
+      'Householder':
+          BijectorSupport(Support.VECTOR_UNCONSTRAINED,
+                          Support.VECTOR_UNCONSTRAINED),
       'Identity':
           BijectorSupport(Support.SCALAR_UNCONSTRAINED,
                           Support.SCALAR_UNCONSTRAINED),

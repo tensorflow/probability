@@ -17,8 +17,7 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python.bijectors import invert as invert_bijector
-from tensorflow_probability.python.bijectors import ordered as ordered_bijector
+from tensorflow_probability.python.bijectors import ascending
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import categorical
@@ -149,8 +148,7 @@ class FiniteDiscrete(distribution.AutoCompositeTensorDistribution):
         outcomes=parameter_properties.ParameterProperties(
             event_ndims=None,
             shape_fn=lambda sample_shape: [num_classes],
-            default_constraining_bijector_fn=invert_bijector.Invert(
-                ordered_bijector.Ordered())),
+            default_constraining_bijector_fn=ascending.Ascending()),
         logits=parameter_properties.ParameterProperties(
             event_ndims=1,
             shape_fn=lambda sample_shape: ps.concat(

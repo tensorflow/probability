@@ -64,6 +64,7 @@ multi_substrate_py_library(
         ":glow",
         ":gompertz_cdf",
         ":gumbel_cdf",
+        ":householder",
         ":identity",
         ":inline",
         ":invert",
@@ -75,7 +76,6 @@ multi_substrate_py_library(
         ":matrix_inverse_tril",
         ":moyal_cdf",
         ":normal_cdf",
-        ":ordered",
         ":pad",
         ":permute",
         ":power",
@@ -509,6 +509,19 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "householder",
+    srcs = ["householder.py"],
+    deps = [
+        ":bijector",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_library(
     name = "identity",
     srcs = ["identity.py"],
     deps = [
@@ -637,17 +650,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "ascending",
     srcs = ["ascending.py"],
-    deps = [
-        ":bijector",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:distribution_util",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "ordered",
-    srcs = ["ordered.py"],
     deps = [
         ":bijector",
         # tensorflow dep,
@@ -1426,6 +1428,18 @@ multi_substrate_py_test(
 )
 
 multi_substrate_py_test(
+    name = "householder_test",
+    size = "small",
+    srcs = ["householder_test.py"],
+    deps = [
+        ":bijectors",
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
     name = "identity_test",
     size = "small",
     srcs = ["identity_test.py"],
@@ -1596,20 +1610,6 @@ multi_substrate_py_test(
     name = "ascending_test",
     size = "small",
     srcs = ["ascending_test.py"],
-    deps = [
-        ":bijector_test_util",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "ordered_test",
-    size = "small",
-    srcs = ["ordered_test.py"],
     deps = [
         ":bijector_test_util",
         # numpy dep,

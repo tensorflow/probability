@@ -281,11 +281,12 @@ class _WeibullTest(object):
          np.exp(np.math.lgamma(b_concentration / a_concentration + 1.))) - 1.)
 
     x = a.sample(int(1e5), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
-    kl_sample_val = self.evaluate(kl_sample)
+    kl_samples = a.log_prob(x) - b.log_prob(x)
+    kl_samples_ = self.evaluate(kl_samples)
 
-    self.assertAllClose(expected_kl, kl_sample_val, atol=0.0, rtol=1e-2)
-    self.assertAllClose(expected_kl, self.evaluate(kl))
+    self.assertAllMeansClose(
+        kl_samples_, expected_kl, axis=0, atol=0.0, rtol=1e-2)
+    self.assertAllClose(self.evaluate(kl), expected_kl)
 
   def testWeibullGammaKL(self):
     a_concentration = np.array([3.])
@@ -301,10 +302,11 @@ class _WeibullTest(object):
     kl = tfd.kl_divergence(a, b)
 
     x = a.sample(int(1e5), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
-    kl_sample_val = self.evaluate(kl_sample)
+    kl_samples = a.log_prob(x) - b.log_prob(x)
+    kl_samples_ = self.evaluate(kl_samples)
 
-    self.assertAllClose(kl_sample_val, self.evaluate(kl), atol=0.0, rtol=1e-2)
+    self.assertAllMeansClose(
+        kl_samples_, self.evaluate(kl), axis=0, atol=0.0, rtol=1e-2)
 
   def testWeibullGammaKLAgreeWeibullWeibull(self):
     a_concentration = np.array([3.])

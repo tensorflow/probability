@@ -736,7 +736,8 @@ def jaxpr_to_expressions(jaxpr: jax_core.Jaxpr) -> Tuple[Expr]:
   for eqn in jaxpr.eqns:
     operands = tuple(jax_util.safe_map(read_env, eqn.invars))
 
-    call_jaxpr, params = jax_core.extract_call_jaxpr(eqn.primitive, eqn.params)
+    call_jaxpr, params = trace_util.extract_call_jaxpr(
+        eqn.primitive, eqn.params)
     if call_jaxpr:
       call_expression = BoundExpression(jaxpr_to_expressions(call_jaxpr), {})
       variable_names = tuple(map(str, call_jaxpr.invars))

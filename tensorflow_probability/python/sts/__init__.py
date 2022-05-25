@@ -31,6 +31,7 @@ from tensorflow_probability.python.sts.forecast import forecast
 from tensorflow_probability.python.sts.forecast import impute_missing_values
 from tensorflow_probability.python.sts.forecast import one_step_predictive
 from tensorflow_probability.python.sts.internal.missing_values_util import MaskedTimeSeries
+from tensorflow_probability.python.sts.internal.missing_values_util import moments_of_masked_time_series
 from tensorflow_probability.python.sts.regularization import MissingValuesTolerance
 from tensorflow_probability.python.sts.regularization import regularize_series
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
@@ -53,6 +54,7 @@ _allowed_symbols = [
     'LocalLinearTrendStateSpaceModel',
     'MaskedTimeSeries',
     'MissingValuesTolerance',
+    'moments_of_masked_time_series',
     'Seasonal',
     'SeasonalStateSpaceModel',
     'SemiLocalLinearTrend',

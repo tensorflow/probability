@@ -14,7 +14,10 @@
 # limitations under the License.
 # ============================================================================
 
-import tensorflow as tf
+import functools
+
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.internal import assert_util
@@ -310,7 +313,13 @@ class ImportanceResample(distribution_lib.Distribution):
                'the proposal is not producing independent samples for some '
                'batch dimension(s) expected by `self.target_log_prob_fn`.')
     sample_and_batch_shape = ps.concat(
-        [sample_shape, self.proposal_distribution.batch_shape_tensor()], axis=0)
+        [
+            sample_shape,
+            _get_joint_batch_shape(
+                self.proposal_distribution.batch_shape_tensor())
+        ],
+        axis=0,
+    )
     sample_and_batch_shape_ = tf.get_static_value(sample_and_batch_shape)
     if (sample_and_batch_shape_ is not None and not
         tensorshape_util.is_compatible_with(log_weights.shape,
@@ -410,8 +419,9 @@ would recover the true (log-)density.""",
       # other values that were *not* chosen during resampling.
       # Estimate the total weight of these discarded proposals using
       # `sample_size` Monte Carlo draws.
-      x_sample_ndims = (ps.rank(x_log_weight) -
-                        ps.rank_from_shape(self.batch_shape_tensor()))
+      x_sample_ndims = (
+          ps.rank(x_log_weight) -
+          ps.rank_from_shape(_get_joint_batch_shape(self.batch_shape_tensor())))
       _, log_weights_of_proposals_not_chosen = self._propose_with_log_weights(
           sample_shape=ps.concat(
               [
@@ -642,3 +652,11 @@ def _make_weighted_reduce_sum(weights):
     return tf.reduce_sum(aligned_weights * tf.cast(x, weights.dtype), axis=axis)
 
   return weighted_reduce_sum
+
+
+def _get_joint_batch_shape(batch_shape_tensor):
+  if tf.nest.is_nested(batch_shape_tensor):
+    return functools.reduce(ps.broadcast_shape,
+                            tf.nest.flatten(batch_shape_tensor))
+  else:
+    return batch_shape_tensor

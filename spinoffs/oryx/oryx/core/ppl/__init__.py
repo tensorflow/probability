@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for probabilistic programming features."""
 from oryx.core.ppl.effect_handler import make_effect_handler
 from oryx.core.ppl.transformations import block

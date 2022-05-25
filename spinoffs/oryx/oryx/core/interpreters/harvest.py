@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for the harvest transformation.
 
 This module contains a general-purpose set of tools for transforming
@@ -235,17 +234,6 @@ def _nest_impl(f, *args, **_):
 nest_p.def_impl(_nest_impl)
 
 
-def _nest_translation_rule(*args, name, call_jaxpr, scope, **_):
-  return xla._xla_call_translation_rule(  # pylint: disable=protected-access
-      *args,
-      name=jax_util.wrap_name(name, f'nest[{scope}]'),
-      call_jaxpr=call_jaxpr,
-      donated_invars=(False,) * len(args))
-
-
-xla.register_translation(nest_p, _nest_translation_rule)
-
-
 def _nest_lowering(ctx, *args, name, call_jaxpr, scope, **_):
   return mlir._xla_call_lower(  # pylint: disable=protected-access
       ctx,
@@ -270,8 +258,8 @@ def nest(f, *, scope: str):
 
   Harvested values live in one dynamic name scope (for a particular tag),
   and in strict mode, values with the same name cannot be collected or injected
-  more than once. nest(f, scope=<name>) will take all tagged values in `f` and
-  put them into a nested dictionary with key <name>. This enables having
+  more than once. `nest(f, scope=[name])` will take all tagged values in `f` and
+  put them into a nested dictionary with key `[name]`. This enables having
   duplicate names in one namespace provided they are in different scopes. This
   is different from using a separate tag to namespace, as it enables creating
   nested/hierarchical structure within a single tag's namespace.

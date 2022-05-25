@@ -87,6 +87,11 @@ def _get_ldj_ratio_fn(cls, registry):
   return ldj_ratio_fn
 
 
+def _is_composite_tensor_equivalent(p, q):
+  return ((p.__bases__ == (q, bijector_lib.AutoCompositeTensorBijector))
+          or (q.__bases__ == (p, bijector_lib.AutoCompositeTensorBijector)))
+
+
 def forward_log_det_jacobian_ratio(
     p,
     x,
@@ -119,7 +124,7 @@ def forward_log_det_jacobian_ratio(
       this will be computed with better than naive numerical precision, e.g. by
       moving differences inside of a sum reduction.
   """
-  assert type(p) == type(q)  # pylint: disable=unidiomatic-typecheck
+  assert type(p) == type(q) or _is_composite_tensor_equivalent(p, q)  # pylint: disable=unidiomatic-typecheck
   if p_kwargs is None:
     p_kwargs = {}
   if q_kwargs is None:
@@ -174,7 +179,7 @@ def inverse_log_det_jacobian_ratio(
       this will be computed with better than naive numerical precision, e.g. by
       moving differences inside of a sum reduction.
   """
-  assert type(p) == type(q)  # pylint: disable=unidiomatic-typecheck
+  assert type(p) == type(q) or _is_composite_tensor_equivalent(p, q)  # pylint: disable=unidiomatic-typecheck
   if p_kwargs is None:
     p_kwargs = {}
   if q_kwargs is None:

@@ -18,7 +18,6 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import jax
 from jax import random
-from jax import test_util as jtu
 import numpy as np
 
 from oryx.core import state
@@ -72,7 +71,7 @@ class PoolingTest(test_util.TestCase):
     super().setUp()
     self._seed = random.PRNGKey(0)
 
-  @parameterized.named_parameters(jtu.cases_from_list(shape4d_parameters()))
+  @parameterized.named_parameters(shape4d_parameters())
   def test_shapes4d(self, window_shape, padding, strides, in_shape, pool_class):
     net_init = pool_class(window_shape, strides, padding)
     net_rng, data_rng = random.split(self._seed)
@@ -82,7 +81,7 @@ class PoolingTest(test_util.TestCase):
     result = layer(x)
     self.assertEqual(result.shape, out_shape)
 
-  @parameterized.named_parameters(jtu.cases_from_list(shape3d_parameters()))
+  @parameterized.named_parameters(shape3d_parameters())
   def test_shapes3d(self, window_shape, padding, strides, in_shape, pool_class):
     net_init = pool_class(window_shape, strides, padding)
     net_rng, data_rng = random.split(self._seed)

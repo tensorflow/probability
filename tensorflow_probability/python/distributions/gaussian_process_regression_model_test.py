@@ -227,19 +227,19 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     observation_noise_variance = np.array([[1e-2], [1e-4], [1e-6]], np.float64)
 
     rng = test_util.test_np_rng()
-    observations_mask = np.array([
+    observations_is_missing = np.array([
         [False, True, False, True, False, True],
-        [True, True, True, True, True, True],
+        [False, False, False, False, False, False],
         [True, True, False, False, True, True],
     ]).reshape((3, 1, 6))
     observation_index_points = np.where(
-        observations_mask[..., np.newaxis],
-        rng.uniform(-1., 1., (3, 1, 6, 2)).astype(np.float64),
-        np.nan)
+        observations_is_missing[..., np.newaxis],
+        np.nan,
+        rng.uniform(-1., 1., (3, 1, 6, 2)).astype(np.float64))
     observations = np.where(
-        observations_mask,
-        rng.uniform(-1., 1., (3, 1, 6)).astype(np.float64),
-        np.nan)
+        observations_is_missing,
+        np.nan,
+        rng.uniform(-1., 1., (3, 1, 6)).astype(np.float64))
 
     index_points = rng.uniform(-1., 1., (5, 2)).astype(np.float64)
 
@@ -249,7 +249,7 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
         index_points=index_points,
         observation_index_points=observation_index_points,
         observations=observations,
-        observations_mask=observations_mask,
+        observations_is_missing=observations_is_missing,
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
@@ -263,9 +263,10 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     x = gprm.sample(seed=test_util.test_seed())
     for i in range(3):
       observation_index_points_i = tf.gather(
-          observation_index_points[i, 0], observations_mask[i, 0].nonzero()[0])
+          observation_index_points[i, 0],
+          (~observations_is_missing[i, 0]).nonzero()[0])
       observations_i = tf.gather(
-          observations[i, 0], observations_mask[i, 0].nonzero()[0])
+          observations[i, 0], (~observations_is_missing[i, 0]).nonzero()[0])
       gprm_i = tfd.GaussianProcessRegressionModel.precompute_regression_model(
           kernel=kernel[i],
           index_points=index_points,

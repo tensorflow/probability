@@ -107,9 +107,7 @@ class _SphericalUniformTest(object):
         validate_args=True,
         allow_nan_stats=False)
     samples = uniform.sample(num_samples, seed=test_util.test_seed())
-    sample_mean = tf.reduce_mean(samples, axis=0)
-    true_mean, sample_mean = self.evaluate([
-        uniform.mean(), sample_mean])
+    true_mean = self.evaluate(uniform.mean())
     check1 = st.assert_true_mean_equal_by_dkwm(
         samples=samples, low=-(1. + 1e-7), high=1. + 1e-7,
         expected=true_mean, false_fail_rate=1e-6)
@@ -174,10 +172,11 @@ class _SphericalUniformTest(object):
         validate_args=True,
         allow_nan_stats=False)
     samples = uniform.sample(int(1e3), seed=test_util.test_seed())
-    sample_entropy = -tf.reduce_mean(uniform.log_prob(samples), axis=0)
-    true_entropy, sample_entropy = self.evaluate([
-        uniform.entropy(), sample_entropy])
-    self.assertAllClose(sample_entropy, true_entropy, rtol=1e-5)
+    entropy_samples = -uniform.log_prob(samples)
+    true_entropy, entropy_samples = self.evaluate([
+        uniform.entropy(), entropy_samples])
+    self.assertAllMeansClose(
+        entropy_samples, true_entropy, axis=0, rtol=1e-5)
 
   def testEntropyDim1(self):
     self.VerifyEntropy(dim=1)

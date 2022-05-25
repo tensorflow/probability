@@ -493,7 +493,9 @@ def batch_interp_regular_nd_grid(x,
   """Multi-linear interpolation on a regular (constant spacing) grid.
 
   Given [a batch of] reference values, this function computes a multi-linear
-  interpolant and evaluates it on [a batch of] of new `x` values.
+  interpolant and evaluates it on [a batch of] of new `x` values. This is a
+  multi-dimensional generalization of [Bilinear Interpolation](
+  https://en.wikipedia.org/wiki/Bilinear_interpolation).
 
   The interpolant is built from reference values indexed by `nd` dimensions
   of `y_ref`, starting at `axis`.
@@ -635,10 +637,10 @@ def batch_interp_regular_nd_grid(x,
             'dimensions of `x_ref_min` to be {}.'.format(
                 axis_, y_ref_rank_, nd))
 
-    x_batch_shape = ps.shape(x)[:-2]
-    x_ref_min_batch_shape = ps.shape(x_ref_min)[:-1]
-    x_ref_max_batch_shape = ps.shape(x_ref_max)[:-1]
-    y_ref_batch_shape = ps.shape(y_ref)[:axis]
+    x_batch_shape = ps.shape_slice(x, np.s_[:-2])
+    x_ref_min_batch_shape = ps.shape_slice(x_ref_min, np.s_[:-1])
+    x_ref_max_batch_shape = ps.shape_slice(x_ref_max, np.s_[:-1])
+    y_ref_batch_shape = ps.shape_slice(y_ref, np.s_[:axis])
 
     # Do a brute-force broadcast of batch dims (add zeros).
     batch_shape = y_ref_batch_shape
@@ -687,7 +689,8 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
   #  and x_ref_max have shapes [A1, ..., An, nd].
 
   # ny[k] is number of y reference points in interp dim k.
-  ny = tf.cast(tf.shape(y_ref)[batch_dims:batch_dims + nd], dtype)
+  ny = tf.cast(
+      ps.shape_slice(y_ref, np.s_[batch_dims:batch_dims + nd]), dtype)
 
   # Map [x_ref_min, x_ref_max] to [0, ny - 1].
   # This is the (fractional) index of x.
@@ -738,11 +741,15 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
   # (using tf.where) the output y.  This requires appending singletons.
   def _expand_x_fn(tensor):
     # Reshape tensor to tensor.shape + [1] * M.
-    extended_shape = ps.concat([
-        ps.shape(tensor),
-        ps.ones_like(ps.shape(y_ref)[batch_dims + nd:])
-    ],
-                               axis=0)
+    extended_shape = ps.concat(
+        [
+            ps.shape(tensor),
+            ps.ones_like(
+                ps.convert_to_shape_tensor(
+                    ps.shape_slice(y_ref, np.s_[batch_dims + nd:])))
+        ],
+        axis=0,
+    )
     return tf.reshape(tensor, extended_shape)
 
   # Now, t.shape = [A1, ..., An, D, nd] + [1] * (rank(y_ref) - nd - batch_dims)
@@ -892,19 +899,21 @@ def _make_expand_x_fn_for_batch_interpolation(y_ref, axis):
 
   def expand_right_dims(x, broadcast=False):
     """Expand x so it can bcast w/ tensors of output shape."""
+    x_shape_left = ps.shape_slice(x, np.s_[:-1])
+    x_shape_right = ps.shape_slice(x, np.s_[-1:])
     expanded_shape_left = ps.broadcast_shape(
-        ps.shape(x)[:-1],
+        x_shape_left,
         ps.ones([ps.size(y_ref_shape_left)], dtype=tf.int32))
     expanded_shape = ps.concat(
-        (expanded_shape_left, ps.shape(x)[-1:],
+        (expanded_shape_left, x_shape_right,
          ps.ones([ps.size(y_ref_shape_right)], dtype=tf.int32)),
         axis=0)
     x_expanded = tf.reshape(x, expanded_shape)
     if broadcast:
       broadcast_shape_left = ps.broadcast_shape(
-          ps.shape(x)[:-1], y_ref_shape_left)
+          x_shape_left, y_ref_shape_left)
       broadcast_shape = ps.concat(
-          (broadcast_shape_left, ps.shape(x)[-1:], y_ref_shape_right),
+          (broadcast_shape_left, x_shape_right, y_ref_shape_right),
           axis=0)
       x_expanded = _broadcast_with(x_expanded, broadcast_shape)
     return x_expanded
@@ -928,12 +937,15 @@ def _batch_gather_with_broadcast(params, indices, axis):
 
   # leading_bcast_shape is the broadcast of [A1,...,AN] and [a1,...,aN].
   leading_bcast_shape = ps.broadcast_shape(
-      ps.shape(params)[:axis],
-      ps.shape(indices)[:-1])
+      ps.shape_slice(params, np.s_[:axis]), ps.shape_slice(indices, np.s_[:-1]))
   params = _broadcast_with(
-      params, ps.concat((leading_bcast_shape, ps.shape(params)[axis:]), axis=0))
+      params,
+      ps.concat((leading_bcast_shape, ps.shape_slice(params, np.s_[axis:])),
+                axis=0))
   indices = _broadcast_with(
-      indices, ps.concat((leading_bcast_shape, ps.shape(indices)[-1:]), axis=0))
+      indices,
+      ps.concat((leading_bcast_shape, ps.shape_slice(indices, np.s_[-1:])),
+                axis=0))
   return tf.gather(
       params, indices, batch_dims=tensorshape_util.rank(indices.shape) - 1)
 
@@ -945,4 +957,12 @@ def _binary_count(n):
 
 def _broadcast_with(tensor, shape):
   """Like broadcast_to, but allows singletons in the destination shape."""
-  return tf.broadcast_to(tensor, ps.broadcast_shape(ps.shape(tensor), shape))
+  res = tf.broadcast_to(
+      tensor, ps.broadcast_shape(ps.shape(tensor), shape))
+  # We need this done explicitly because ps.broadcast_shape cannot deal with
+  # partially specified shapes.
+  tensorshape_util.set_shape(
+      res,
+      tf.broadcast_static_shape(tensor.shape,
+                                tf.TensorShape(tf.get_static_value(shape))))
+  return res

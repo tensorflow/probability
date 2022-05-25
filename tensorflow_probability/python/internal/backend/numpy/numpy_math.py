@@ -15,6 +15,7 @@
 """Numpy implementations of TensorFlow functions."""
 
 import collections
+import functools
 import numpy as np
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
@@ -114,7 +115,7 @@ __all__ = [
     'reciprocal_no_nan',
     'reduce_all',
     'reduce_any',
-    # 'reduce_euclidean_norm',
+    'reduce_euclidean_norm',
     'reduce_logsumexp',
     'reduce_max',
     'reduce_mean',
@@ -826,10 +827,9 @@ reduce_any = utils.copy_docstring(
     'tf.math.reduce_any',
     utils.partial(_apply_reduction, np.any))
 
-# reduce_euclidean_norm = utils.copy_docstring(
-#     'tf.math.reduce_euclidean_norm',
-#     lambda input_tensor, axis=None, keepdims=False, name=None: (
-#         np.reduce_euclidean_norm))
+reduce_euclidean_norm = utils.copy_docstring(
+    'tf.math.reduce_euclidean_norm',
+    utils.partial(_apply_reduction, functools.partial(np.linalg.norm, ord=2)))
 
 reduce_logsumexp = utils.copy_docstring(
     'tf.math.reduce_logsumexp',

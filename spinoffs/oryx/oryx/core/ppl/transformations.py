@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for probabilistic programming transformations.
 
 ## Probabilistic programs
@@ -53,7 +52,7 @@ already registered. By default, it will tag a value with a name and will only
 work on JAX types (e.g. DeviceArrays and  tracers). We also register an
 implementation for function types, where it returns the original function but
 when provided the name, tags the output of the function. The registry enables
-objects such as TensorFlow Probability distributions to register as as random
+objects such as TensorFlow Probability distributions to register as a random
 variable-like with Oryx.
 
 Tagging a value in a probabilistic program as a random variable enables it to
@@ -200,7 +199,7 @@ def f(key):
   return z + random_variable(random.normal, name='x')(k2)
 conditional(f, ['z'])(random.PRNGKey(0), 0.)  # => -1.25153887
 conditional(f, ['z'])(random.PRNGKey(0), 1.)  # => -0.25153887
-conditional(f, ['z'. 'x'])(random.PRNGKey(0), 1., 2.)  # => 3.
+conditional(f, ['z', 'x'])(random.PRNGKey(0), 1., 2.)  # => 3.
 ```
 
 
@@ -272,8 +271,8 @@ def random_variable(obj,
 
   Args:
     obj: A JAX type to be tagged.
-    name (str): A string name to tag input value, cannot be `None`.
-    plate (str): A string named axis for this random variable's plate.
+    name: A string name to tag input value, cannot be `None`.
+    plate: A string named axis for this random variable's plate.
 
   Returns:
     The input value.
@@ -312,7 +311,8 @@ def plate(f: Optional[Program] = None, name: Optional[str] = None):
   except NameError:
     print('No named axis present!')
   # If we vmap with a named axis, we produce independent samples.
-  vmap(model, axis_name='foo')(random.split(random.PRNGKey(0), 3)) #
+  vmap(model, axis_name='foo')(random.split(random.PRNGKey(0), 3))
+  # ==> [0.58776844, -0.4009751, 0.01193586]
   ```
 
   Args:

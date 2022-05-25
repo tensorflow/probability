@@ -357,7 +357,7 @@ class IgammainvTest(test_util.TestCase):
     self.assertLess(err, 2e-3)
 
 
-@test_util.test_graph_and_eager_modes
+@test_util.test_all_tf_execution_regimes
 class OwensTTest(test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)
@@ -702,6 +702,15 @@ class SpecialTest(test_util.TestCase):
         tfp.math.value_and_gradient(tfp.math.logerfcx, -x))
     self.assertAllNotNan(logerfcx_)
     self.assertAllNotNan(grad_logerfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testLogErfcxAtZero(self, dtype):
+    x = tf.constant(0., dtype=dtype)
+    logerfcx_, logerfc_ = self.evaluate([
+        tfp.math.logerfcx(x),
+        tfp.math.logerfc(x)])
+    self.assertAllClose(np.log(scipy_special.erfc(0.)), logerfc_)
+    self.assertAllClose(np.log(scipy_special.erfcx(0.)), logerfcx_)
 
   # See https://en.wikipedia.org/wiki/Lambert_W_function#Special_values
   # for a list of special values and known identities.

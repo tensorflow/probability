@@ -19,7 +19,6 @@ from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import scale_matvec_linear_operator
 from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
-from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -48,7 +47,6 @@ or
 
 
 class VectorExponentialLinearOperator(
-    distribution.AutoCompositeTensorDistribution,
     transformed_distribution.TransformedDistribution):
   """The vectorization of the Exponential distribution on `R^k`.
 

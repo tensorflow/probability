@@ -116,23 +116,23 @@ class IndependentDistributionTest(test_util.TestCase):
     sample_var = tf.reduce_mean(
         tf.math.squared_difference(x, sample_mean), axis=0)
     sample_std = tf.sqrt(sample_var)
-    sample_entropy = -tf.reduce_mean(ind.log_prob(x), axis=0)
+    entropy_samples = -ind.log_prob(x)
 
     [
-        sample_mean_,
+        samples_,
         sample_var_,
         sample_std_,
-        sample_entropy_,
+        entropy_samples_,
         actual_mean_,
         actual_var_,
         actual_std_,
         actual_entropy_,
         actual_mode_,
     ] = self.evaluate([
-        sample_mean,
+        x,
         sample_var,
         sample_std,
-        sample_entropy,
+        entropy_samples,
         ind.mean(),
         ind.variance(),
         ind.stddev(),
@@ -142,11 +142,13 @@ class IndependentDistributionTest(test_util.TestCase):
 
     # Bounds chosen so that the probability of each sample mean/variance/stddev
     # differing by more than the given tolerance is roughly 1e-6.
-    self.assertAllClose(sample_mean_, actual_mean_, rtol=0.049, atol=0.)
+    self.assertAllMeansClose(
+        samples_, actual_mean_, axis=0, rtol=0.049, atol=0.)
     self.assertAllClose(sample_var_, actual_var_, rtol=0.07, atol=0.)
     self.assertAllClose(sample_std_, actual_std_, rtol=0.035, atol=0.)
 
-    self.assertAllClose(sample_entropy_, actual_entropy_, rtol=0.015, atol=0.)
+    self.assertAllMeansClose(
+        entropy_samples_, actual_entropy_, axis=0, rtol=0.015, atol=0.)
     self.assertAllClose(loc, actual_mode_, rtol=1e-6, atol=0.)
 
   def testEventNdimsIsStaticWhenPossible(self):

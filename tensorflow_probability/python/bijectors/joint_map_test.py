@@ -155,25 +155,8 @@ class JointMapBijectorTest(test_util.TestCase):
     self.assertEqual(bij._type_spec, dec)
 
   def testNonCompositeTensor(self):
-
-    # TODO(b/182603117): Move NonComposite* into test_util.
-    class NonCompositeScale(tfb.Bijector):
-      """Bijector that is not a `CompositeTensor`."""
-
-      def __init__(self, scale):
-        parameters = dict(locals())
-        self.scale = scale
-        super(NonCompositeScale, self).__init__(
-            validate_args=True,
-            forward_min_event_ndims=0.,
-            parameters=parameters,
-            name='non_composite_scale')
-
-      def _forward(self, x):
-        return x * self.scale
-
     exp = tfb.Exp()
-    scale = NonCompositeScale(scale=tf.constant(3.))
+    scale = test_util.NonCompositeTensorScale(scale=tf.constant(3.))
     bij = tfb.JointMap(bijectors=[exp, scale])
     self.assertNotIsInstance(bij, tf.__internal__.CompositeTensor)
     self.assertAllCloseNested(

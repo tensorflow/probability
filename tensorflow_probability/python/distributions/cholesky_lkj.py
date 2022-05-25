@@ -107,6 +107,10 @@ class CholeskyLKJ(distribution.AutoCompositeTensorDistribution):
     if dimension < 0:
       raise ValueError(
           'There are no negative-dimension correlation matrices.')
+    if dimension > 65536:
+      raise ValueError(
+          ('Given dimension ({}) is greater than 65536, and will overflow '
+           'int32 array sizes.').format(dimension))
     parameters = dict(locals())
     with tf.name_scope(name):
       dtype = dtype_util.common_dtype([concentration], tf.float32)

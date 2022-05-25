@@ -21,7 +21,6 @@ from tensorflow_probability.python.bijectors import scale as scale_bijector
 from tensorflow_probability.python.bijectors import shift as shift_bijector
 from tensorflow_probability.python.bijectors import sinh as sinh_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
-from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
@@ -35,10 +34,7 @@ __all__ = [
 ]
 
 
-# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
-# `TransformedDistribution` is converted to `CompositeTensor`.
-class JohnsonSU(transformed_distribution.TransformedDistribution,
-                distribution.AutoCompositeTensorDistribution):
+class JohnsonSU(transformed_distribution.TransformedDistribution):
   """Johnson's SU-distribution.
 
   This distribution has parameters: shape parameters `skewness` and

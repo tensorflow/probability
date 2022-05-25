@@ -34,13 +34,12 @@ multi_substrate_py_library(
     numpy_omit_deps = [
         "//tensorflow_probability/python/experimental/distribute",
         "//tensorflow_probability/python/experimental/stats",
+        "//tensorflow_probability/python/experimental/sts_gibbs",
     ],
     substrates_omit_deps = [
         "//tensorflow_probability/python/experimental/auto_batching",
-        "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/experimental/marginalize",
         "//tensorflow_probability/python/experimental/nn",
-        "//tensorflow_probability/python/experimental/sts_gibbs",
         "//tensorflow_probability/python/experimental/substrates",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/experimental/util:composite_tensor",
@@ -57,6 +56,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/experimental/mcmc",
         "//tensorflow_probability/python/experimental/nn",
         "//tensorflow_probability/python/experimental/parallel_filter",
+        "//tensorflow_probability/python/experimental/psd_kernels",
         "//tensorflow_probability/python/experimental/sequential",
         "//tensorflow_probability/python/experimental/stats",
         "//tensorflow_probability/python/experimental/sts_gibbs",

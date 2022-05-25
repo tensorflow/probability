@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Contains logic for defining custom inverses for functions.
 
 Automatic inversion works for only a certain class of functions (see

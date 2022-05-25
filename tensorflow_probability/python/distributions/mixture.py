@@ -40,7 +40,24 @@ warnings.filterwarnings('always',
                         append=True)  # Don't override user-set filters.
 
 
-class Mixture(distribution.Distribution):
+def _validate_cat_and_components(cat, components):
+  """Basic checks on `cat` and `components` constructor args."""
+
+  if not isinstance(cat, categorical.Categorical):
+    raise TypeError('cat must be a Categorical distribution, but saw: %s' %
+                    cat)
+  if not components:
+    raise ValueError('components must be a non-empty list or tuple')
+  if not isinstance(components, (list, tuple)):
+    raise TypeError('components must be a list or tuple, but saw: %s' %
+                    components)
+  if not all(isinstance(c, distribution.Distribution) for c in components):
+    raise TypeError(
+        'all entries in components must be Distribution instances'
+        ' but saw: %s' % components)
+
+
+class _Mixture(distribution.Distribution):
   """Mixture distribution.
 
   The `Mixture` object implements batched mixture distributions.
@@ -127,19 +144,6 @@ class Mixture(distribution.Distribution):
     parameters = dict(locals())
     with tf.name_scope(name) as name:
 
-      if not isinstance(cat, categorical.Categorical):
-        raise TypeError('cat must be a Categorical distribution, but saw: %s' %
-                        cat)
-      if not components:
-        raise ValueError('components must be a non-empty list or tuple')
-      if not isinstance(components, (list, tuple)):
-        raise TypeError('components must be a list or tuple, but saw: %s' %
-                        components)
-      if not all(isinstance(c, distribution.Distribution) for c in components):
-        raise TypeError(
-            'all entries in components must be Distribution instances'
-            ' but saw: %s' % components)
-
       dtype = components[0].dtype
       if not all(d.dtype == dtype for d in components):
         raise TypeError('All components must have the same dtype, but saw '
@@ -188,7 +192,7 @@ class Mixture(distribution.Distribution):
       self._static_event_shape = static_event_shape
       self._static_batch_shape = static_batch_shape
 
-      super(Mixture, self).__init__(
+      super(_Mixture, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
@@ -441,3 +445,34 @@ class Mixture(distribution.Distribution):
           batch_shapes[i], cat_batch_shape, message=check_message.format(i)))
 
     return assertions
+
+
+class Mixture(_Mixture, distribution.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_Mixture`."""
+
+    if cls is Mixture:
+      if args:
+        cat = args[0]
+      else:
+        cat = kwargs.get('cat')
+      if len(args) > 1:
+        components = args[1]
+      else:
+        components = kwargs.get('components')
+
+      _validate_cat_and_components(cat, components)
+      if not (isinstance(cat, tf.__internal__.CompositeTensor)
+              and all(isinstance(d, tf.__internal__.CompositeTensor)
+                      for d in components)):
+        return _Mixture(*args, **kwargs)
+    return super(Mixture, cls).__new__(cls)
+
+
+Mixture.__doc__ = _Mixture.__doc__ + '\n' + (
+    'If `cat` and all of `components` are `CompositeTensor`s, then the '
+    'resulting `Mixture` instance is a `CompositeTensor` as well. Otherwise, a '
+    'non-`CompositeTensor` `_Mixture` instance is created instead. '
+    'Distribution subclasses that inherit from `Mixture` will also inherit '
+    'from `CompositeTensor`.')

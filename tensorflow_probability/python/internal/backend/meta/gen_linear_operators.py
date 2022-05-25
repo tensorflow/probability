@@ -36,6 +36,7 @@ MODULE_MAPPINGS = {
     'framework import ops': 'ops',
     'framework import common_shapes': 'ops as common_shapes',
     'framework import tensor_shape': 'tensor_shape',
+    'framework import tensor_util': 'ops',
     'module import module': 'ops as module',
     'ops import array_ops': 'numpy_array as array_ops',
     'ops import check_ops': 'debugging as check_ops',
@@ -90,7 +91,7 @@ DISABLED_LINTS = ('g-import-not-at-top', 'g-direct-tensorflow-import',
                   'reimported', 'g-bool-id-comparison',
                   'g-statement-before-imports', 'bad-continuation',
                   'useless-import-alias', 'property-with-parameters',
-                  'trailing-whitespace')
+                  'trailing-whitespace', 'g-inconsistent-quotes')
 
 
 def gen_module(module_name):

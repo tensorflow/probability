@@ -393,8 +393,7 @@ class ExpRelaxedOneHotCategorical(distribution.AutoCompositeTensorDistribution):
 
 
 class RelaxedOneHotCategorical(
-    transformed_distribution.TransformedDistribution,
-    distribution.AutoCompositeTensorDistribution):
+    transformed_distribution.TransformedDistribution):
   """RelaxedOneHotCategorical distribution with temperature and logits.
 
   The RelaxedOneHotCategorical is a distribution over random probability

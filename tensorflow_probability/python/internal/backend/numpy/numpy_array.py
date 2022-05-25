@@ -89,6 +89,7 @@ def _gather(  # pylint: disable=unused-argument
     batch_dims=0,
     name=None):
   """gather."""
+  params = ops.convert_to_tensor(params)
   indices = ops.convert_to_tensor(indices, dtype_hint=np.int32)
   if validate_indices is not None:
     raise NotImplementedError(
@@ -103,8 +104,8 @@ def _gather(  # pylint: disable=unused-argument
   # ndarray and use in-place updates.  For the Jax backend, this function
   # vmaps `np.take`.
   if JAX_MODE:
-    params = np.asarray(params)
-    indices = np.asarray(indices)
+    if batch_dims == 0 and axis == 0:
+      return params[indices]
     take = lambda params, indices: np.take(params, indices,  # pylint: disable=g-long-lambda
                                            axis=axis - batch_dims)
     take = functools.reduce(
@@ -360,6 +361,17 @@ def _split(value, num_or_size_splits, axis=0, num=None, name='split'):  # pylint
   return np.split(value, indices_or_sections, axis)
 
 
+def _stack(values, axis=0, name='stack'):
+  del name
+  values = [ops.convert_to_tensor(x) for x in values]
+  if values:
+    return np.stack(values, axis=axis)
+  else:
+    if axis != 0:
+      raise IndexError(f'Axis {axis} is out of range.')
+    return np.zeros([0], np.float32)
+
+
 def _transpose(a, perm=None, conjugate=False, name='transpose'):  # pylint: disable=unused-argument
   x = np.transpose(ops.convert_to_tensor(a), perm)
   return np.conjugate(x) if conjugate else x
@@ -367,10 +379,18 @@ def _transpose(a, perm=None, conjugate=False, name='transpose'):  # pylint: disa
 
 def _unstack(value, num=None, axis=0, name='unstack'):
   del name
-  value = np.array(value)
+  value = ops.convert_to_tensor(value)
+  if axis == 0:
+    return list(value)
   return list(
       np.squeeze(x, axis=axis)
       for x in np.split(value, value.shape[axis] if num is None else num, axis))
+
+
+def _where(condition, x=None, y=None, name='where'):  # pylint: disable=unused-argument
+  if x is None and y is None:
+    return np.stack(np.asarray(condition).nonzero(), axis=-1)
+  return np.where(condition, x, y)
 
 
 def _zeros_like(input, dtype=None, name=None):  # pylint: disable=redefined-builtin,unused-argument
@@ -480,8 +500,7 @@ squeeze = utils.copy_docstring(
     lambda input, axis=None, name=None: np.squeeze(input, _astuple(axis)))
 
 stack = utils.copy_docstring(
-    'tf.stack', lambda values, axis=0, name='stack': np.moveaxis(  # pylint: disable=g-long-lambda
-        ops.convert_to_tensor(values), 0, axis))
+    'tf.stack', _stack)
 
 tile = utils.copy_docstring(
     'tf.tile',
@@ -497,7 +516,7 @@ unstack = utils.copy_docstring(
 
 where = utils.copy_docstring(
     'tf.where',
-    lambda condition, x=None, y=None, name=None: np.where(condition, x, y))
+    _where)
 
 zeros = utils.copy_docstring(
     'tf.zeros',

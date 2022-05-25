@@ -22,7 +22,6 @@ from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.bijectors import square as square_bijector
 from tensorflow_probability.python.distributions import chi2
-from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
@@ -31,10 +30,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 
 
-# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
-# `TransformedDistribution` is converted to `CompositeTensor`.
-class Chi(transformed_distribution.TransformedDistribution,
-          distribution.AutoCompositeTensorDistribution):
+class Chi(transformed_distribution.TransformedDistribution):
   """Chi distribution.
 
   The Chi distribution is defined over nonnegative real numbers and uses a

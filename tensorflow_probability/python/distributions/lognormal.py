@@ -18,23 +18,22 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
-from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
+from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
+
 
 __all__ = [
     'LogNormal',
 ]
 
 
-# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
-# `TransformedDistribution` is converted to `CompositeTensor`.
-class LogNormal(transformed_distribution.TransformedDistribution,
-                distribution.AutoCompositeTensorDistribution):
+class LogNormal(transformed_distribution.TransformedDistribution):
   """The log-normal distribution."""
 
   def __init__(self,
@@ -94,6 +93,31 @@ class LogNormal(transformed_distribution.TransformedDistribution,
     return self.distribution.scale
 
   experimental_is_sharded = False
+
+  @classmethod
+  def experimental_from_mean_variance(cls, mean, variance, **kwargs):
+    """Constructs a LogNormal from its mean and variance.
+
+    **Experimental: Naming, location of this API may change.**
+
+    Args:
+      mean: The mean of the constructed distribution. Must be greater than 0.
+      variance: The variance of the distribution. Must be greater than 0.
+      **kwargs: Other keyword arguments passed directly to `__init__`, e.g.
+        `validate_args`.
+
+    Returns:
+      lognormal: A distribution with the given parameterization.
+    """
+    dtype = dtype_util.common_dtype([mean, variance], dtype_hint=tf.float32)
+    mean = tensor_util.convert_nonref_to_tensor(mean, dtype=dtype)
+    variance = tensor_util.convert_nonref_to_tensor(variance, dtype=dtype)
+
+    scale = DeferredTensor(
+        mean, lambda mean: tf.sqrt(tf.math.log1p(variance / mean ** 2)))
+    loc = DeferredTensor(
+        mean, lambda mean: tf.math.log(mean) - scale ** 2 / 2.)
+    return cls(loc=loc, scale=scale, **kwargs)
 
   def _log_prob(self, x):
     answer = super(LogNormal, self)._log_prob(x)

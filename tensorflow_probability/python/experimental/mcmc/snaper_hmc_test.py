@@ -282,7 +282,7 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
         run(test_util.test_seed(sampler_type='stateless')))
 
     self.assertEqual(self.dtype, chain.dtype)
-    self.assertAllClose(1.75, trace['step_size'][-1], rtol=0.2)
+    self.assertAllClose(1.4, trace['step_size'][-1], rtol=0.2)
     self.assertAllClose(8., trace['max_trajectory_length'][-1], atol=2.)
     self.assertAllClose(chain.var((0, 1)), np.diag(covariance), rtol=0.2)
     self.assertAllClose(
@@ -472,7 +472,7 @@ class DistributedSampleSNAPERHMCTest(distribute_test_lib.DistributedTest):
             )))
 
     # Adaptation results.
-    self.assertAllClose(1.75, trace['step_size'][0, -1], rtol=0.2)
+    self.assertAllClose(1.4, trace['step_size'][0, -1], rtol=0.2)
     self.assertAllClose(chain.var((0, 1, 2)), np.diag(covariance), rtol=0.2)
 
     # Shard consistency.

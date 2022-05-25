@@ -108,7 +108,7 @@ The base distribution's `log_cdf` method must be defined on `y - 1`.
 """
 
 
-class QuantizedDistribution(distributions.Distribution):
+class _QuantizedDistribution(distributions.Distribution):
   """Distribution representing the quantization `Y = ceiling(X)`.
 
   #### Definition in Terms of Sampling
@@ -256,7 +256,7 @@ class QuantizedDistribution(distributions.Distribution):
           low, name='low', dtype=dtype)
       self._high = tensor_util.convert_nonref_to_tensor(
           high, name='high', dtype=dtype)
-      super(QuantizedDistribution, self).__init__(
+      super(_QuantizedDistribution, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
           validate_args=validate_args,
@@ -570,6 +570,31 @@ class QuantizedDistribution(distributions.Distribution):
     assertions.append(distribution_util.assert_integer_form(
         x, message='Sample has non-integer components.'))
     return assertions
+
+
+class QuantizedDistribution(
+    _QuantizedDistribution, distributions.AutoCompositeTensorDistribution):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe return a non-`CompositeTensor` `_QuantizedDistribution`."""
+
+    if cls is QuantizedDistribution:
+      if args:
+        distribution = args[0]
+      else:
+        distribution = kwargs.get('distribution')
+
+      if not isinstance(distribution, tf.__internal__.CompositeTensor):
+        return _QuantizedDistribution(*args, **kwargs)
+    return super(QuantizedDistribution, cls).__new__(cls)
+
+
+QuantizedDistribution.__doc__ = _QuantizedDistribution.__doc__ + '\n' + (
+    'If `distribution` is a `CompositeTensor`, then the resulting '
+    '`QuantizedDistribution` instance is a `CompositeTensor` as well. '
+    'Otherwise, a non-`CompositeTensor` `_QuantizedDistribution` instance is '
+    'created instead. Distribution subclasses that inherit from '
+    '`QuantizedDistribution` will also inherit from `CompositeTensor`.')
 
 
 def _logsum_expbig_minus_expsmall(big, small):

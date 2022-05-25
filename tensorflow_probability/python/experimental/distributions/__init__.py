@@ -19,6 +19,8 @@ from tensorflow_probability.python.experimental.distributions import marginal_fn
 from tensorflow_probability.python.experimental.distributions.importance_resample import ImportanceResample
 from tensorflow_probability.python.experimental.distributions.increment_log_prob import IncrementLogProb
 from tensorflow_probability.python.experimental.distributions.joint_distribution_pinned import JointDistributionPinned
+from tensorflow_probability.python.experimental.distributions.multitask_gaussian_process import MultiTaskGaussianProcess
+from tensorflow_probability.python.experimental.distributions.multitask_gaussian_process_regression_model import MultiTaskGaussianProcessRegressionModel
 from tensorflow_probability.python.experimental.distributions.mvn_precision_factor_linop import MultivariateNormalPrecisionFactorLinearOperator
 
 
@@ -27,5 +29,7 @@ __all__ = [
     'IncrementLogProb',
     'JointDistributionPinned',
     'marginal_fns',
+    'MultiTaskGaussianProcess',
+    'MultiTaskGaussianProcessRegressionModel',
     'MultivariateNormalPrecisionFactorLinearOperator',
 ]

@@ -22,6 +22,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 __all__ = [
+    'mask_matrix',
     'maybe_get_common_dtype',
     'pad_shape_with_ones',
     'pairwise_square_distance_matrix',
@@ -284,3 +285,29 @@ def pairwise_square_distance_tensor(
   # Now we need to undo the transformation.
   return tf.reshape(pairwise, tf.concat([
       tf.shape(pairwise)[:-2], x1_example_shape, x2_example_shape], axis=0))
+
+
+def mask_matrix(x, is_missing=None):
+  """Copies a matrix, replacing masked-out rows/cols from the identity matrix.
+
+  Args:
+    x: A Tensor of shape `[..., n, n]`, representing a batch of n-by-n matrices.
+    is_missing: A boolean Tensor of shape `[..., n]`, representing a batch of
+      masks. If `is_missing` is None, `x` is returned.
+  Returns:
+    A Tensor of shape `[..., n, n]`, representing a batch of n-by-n matrices.
+    For each batch member `r`, element `r[i, j]` equals `eye(n)[i, j]` if
+    dimension `i` or `j` is True in the corresponding input mask.  Otherwise,
+    `r[i, j]` equals the corresponding element from `x`.
+  """
+  if is_missing is None:
+    return x
+
+  x = tf.convert_to_tensor(x)
+  is_missing = tf.convert_to_tensor(is_missing, dtype=tf.bool)
+
+  n = ps.dimension_size(x, -1)
+
+  return tf.where(is_missing[..., tf.newaxis] | is_missing[..., tf.newaxis, :],
+                  tf.eye(n, dtype=x.dtype),
+                  x)

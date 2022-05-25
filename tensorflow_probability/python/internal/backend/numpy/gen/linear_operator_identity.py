@@ -15,6 +15,7 @@
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
 # pylint: disable=trailing-whitespace
+# pylint: disable=g-inconsistent-quotes
 
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
@@ -37,7 +38,7 @@ import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
-# from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
 from tensorflow_probability.python.internal.backend.numpy import control_flow as control_flow_ops
@@ -505,6 +506,14 @@ class LinearOperatorIdentity(BaseLinearOperatorIdentity):
   def _composite_tensor_fields(self):
     return ("num_rows", "batch_shape", "dtype", "assert_proper_shapes")
 
+  def __getitem__(self, slices):
+    # Slice the batch shape and return a new LinearOperatorIdentity.
+    # Use a proxy shape and slice it. Use this as the new batch shape
+    new_batch_shape = prefer_static.shape(
+        array_ops.ones(self._batch_shape_arg)[slices])
+    parameters = dict(self.parameters, batch_shape=new_batch_shape)
+    return LinearOperatorIdentity(**parameters)
+
 
 # @tf_export("linalg.LinearOperatorScaledIdentity")
 # @linear_operator.make_composite_tensor
@@ -800,6 +809,10 @@ class LinearOperatorScaledIdentity(BaseLinearOperatorIdentity):
   @property
   def _composite_tensor_fields(self):
     return ("num_rows", "multiplier", "assert_proper_shapes")
+
+  @property
+  def _experimental_parameter_ndims_to_matrix_ndims(self):
+    return {"multiplier": 0}
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg

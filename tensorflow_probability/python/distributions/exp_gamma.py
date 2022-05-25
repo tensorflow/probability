@@ -281,10 +281,7 @@ class ExpGamma(distribution.AutoCompositeTensorDistribution):
 kullback_leibler.RegisterKL(ExpGamma, ExpGamma)(gamma_lib.kl_gamma_gamma)
 
 
-# TODO(b/182603117): Remove `AutoCompositeTensor` subclass when
-# `TransformedDistribution` is converted to `CompositeTensor`.
-class ExpInverseGamma(transformed_distribution.TransformedDistribution,
-                      distribution.AutoCompositeTensorDistribution):
+class ExpInverseGamma(transformed_distribution.TransformedDistribution):
   """ExpInverseGamma distribution.
 
   The `ExpInverseGamma` distribution is defined over the real numbers such that

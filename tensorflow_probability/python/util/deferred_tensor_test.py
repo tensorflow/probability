@@ -31,24 +31,6 @@ tfd = tfp.distributions
 JAX_MODE = False
 
 
-class NonCompositeTensorExp(object):
-
-  name = 'non_composite_exp'
-  dtype = tf.float32
-
-  def forward(self, x):
-    return tf.math.exp(x)
-
-  def inverse(self, y):
-    return tf.math.log(y)
-
-  def forward_event_shape(self, shape):
-    return shape
-
-  def inverse_event_shape(self, shape):
-    return shape
-
-
 @test_util.test_all_tf_execution_regimes
 class DeferredTensorTest(test_util.TestCase):
 
@@ -169,7 +151,7 @@ class DeferredTensorTest(test_util.TestCase):
       reason='JAX and Numpy do not have `CompositeTensor`.')
   @parameterized.named_parameters(
       ('transform_fn_is_bijector', tfb.Exp),
-      ('transform_fn_is_bijector_like', NonCompositeTensorExp),
+      ('transform_fn_is_bijector_like', test_util.NonCompositeTensorExp),
       ('transform_fn_is_callable', lambda: tf.math.exp))
   def test_composite_tensor(self, make_transform_fn):
     initial_value = [0.2, 3.]
@@ -344,7 +326,7 @@ class TransformedVariableTest(test_util.TestCase):
       reason='JAX and Numpy do not have `CompositeTensor`.')
   @parameterized.named_parameters(
       ('composite_bijector', tfb.Softplus),
-      ('non_composite_bijector', NonCompositeTensorExp))
+      ('non_composite_bijector', test_util.NonCompositeTensorExp))
   def test_composite_tensor(self, make_bijector):
     x = tfp.util.TransformedVariable(5., make_bijector())
     add_val = 10.
@@ -718,6 +700,7 @@ class DeferredTensorSpecTest(test_util.TestCase):
   def testIsCompatibleWith(self, v1, v2):
     self.assertTrue(v1.is_compatible_with(v2))
     self.assertTrue(v2.is_compatible_with(v1))
+    self.assertTrue(v1.is_subtype_of(v2))
 
   @parameterized.named_parameters(
       ('IncompatibleInputSpecs',
@@ -766,6 +749,8 @@ class DeferredTensorSpecTest(test_util.TestCase):
   def testIsNotCompatibleWith(self, v1, v2):
     self.assertFalse(v1.is_compatible_with(v2))
     self.assertFalse(v2.is_compatible_with(v1))
+    self.assertFalse(v1.is_subtype_of(v2))
+    self.assertFalse(v2.is_subtype_of(v1))
 
   @parameterized.named_parameters(
       ('DeferredTensor',
@@ -803,9 +788,9 @@ class DeferredTensorSpecTest(test_util.TestCase):
            input_spec=resource_variable_ops.VariableSpec(None, tf.float32),
            transform_or_spec=tf.math.sigmoid))
       )
-  def testMostSpecificCompatibleType(self, v1, v2, expected):
-    self.assertEqual(v1.most_specific_compatible_type(v2), expected)
-    self.assertEqual(v2.most_specific_compatible_type(v1), expected)
+  def testMostSpecificCommonSupertype(self, v1, v2, expected):
+    self.assertEqual(v1.most_specific_common_supertype([v2]), expected)
+    self.assertEqual(v2.most_specific_common_supertype([v1]), expected)
 
   @parameterized.named_parameters(
       ('IncompatibleInputSpecs',
@@ -842,11 +827,9 @@ class DeferredTensorSpecTest(test_util.TestCase):
            dtype=tf.float64,
            name='two')),
       )
-  def testMostSpecificCompatibleTypeException(self, v1, v2):
-    with self.assertRaises(ValueError):
-      v1.most_specific_compatible_type(v2)
-    with self.assertRaises(ValueError):
-      v2.most_specific_compatible_type(v1)
+  def testMostSpecificCommonSupertypeNone(self, v1, v2):
+    self.assertIsNone(v1.most_specific_common_supertype([v2]))
+    self.assertIsNone(v2.most_specific_common_supertype([v1]))
 
   @parameterized.named_parameters(
       ('DeferredTensor',

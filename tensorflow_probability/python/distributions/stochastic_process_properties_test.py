@@ -45,7 +45,7 @@ MUTEX_PARAMS = set()
 MAX_CONVERSIONS_BY_CLASS = dict(
     GaussianProcessRegressionModel=4,
     StudentTProcessRegressionModel=4,
-    VariationalGaussianProcess=9)
+    VariationalGaussianProcess=10)
 
 
 def _stochastic_process_specific_hp_settings(test_method):

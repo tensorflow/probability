@@ -29,7 +29,7 @@ tfb = tfp.bijectors
 class StoppingRatioLogisticTest(test_util.TestCase):
 
   def _random_cutpoints(self, shape):
-    return self._ordered.inverse(self._rng.randn(*shape))
+    return self._ascending.forward(self._rng.randn(*shape))
 
   def _random_location(self, shape):
     return self._rng.randn(*shape)
@@ -38,7 +38,7 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     return self._rng.multinomial(1, *shape)
 
   def setUp(self):
-    self._ordered = tfb.Ordered()
+    self._ascending = tfb.Ascending()
     self._rng = test_util.test_np_rng()
     super(StoppingRatioLogisticTest, self).setUp()
 
@@ -121,11 +121,10 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     b = tfd.StoppingRatioLogistic(cutpoints=b_cutpoints, loc=loc)
 
     samples = a.sample(int(1e5), seed=test_util.test_seed())
-    sampled_kl = self.evaluate(
-        tf.reduce_mean(a.log_prob(samples) - b.log_prob(samples)))
+    kl_samples = self.evaluate(a.log_prob(samples) - b.log_prob(samples))
     kl = self.evaluate(tfd.kl_divergence(a, b))
 
-    self.assertAllClose(sampled_kl, kl, atol=2e-2)
+    self.assertAllMeansClose(kl_samples, kl, axis=0, atol=2e-2)
 
   def testUnorderedCutpointsFails(self):
     with self.assertRaisesRegexp(

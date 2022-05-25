@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Contains Oryx utility functions."""
 from oryx.util.summary import get_summaries
 from oryx.util.summary import summary

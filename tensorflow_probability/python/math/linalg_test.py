@@ -168,6 +168,7 @@ class _CholeskyUpdate(test_util.TestCase):
         mat + tf.linalg.matmul(u, u, transpose_b=True))
     new_chol = cholesky_update_fun(chol, tf.squeeze(u, axis=-1))
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+    self.assertAllEqual(tf.linalg.band_part(new_chol, -1, 0), new_chol)
 
   def testCholeskyUpdateBatches(self):
     rng = test_util.test_np_rng()
@@ -189,6 +190,7 @@ class _CholeskyUpdate(test_util.TestCase):
     new_chol = tfp.math.cholesky_update(
         chol, tf.squeeze(u, axis=-1), multiplier=multiplier)
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+    self.assertAllEqual(tf.linalg.band_part(new_chol, -1, 0), new_chol)
 
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
@@ -232,6 +234,7 @@ class _CholeskyUpdate(test_util.TestCase):
 
     new_chol = tfp.math.cholesky_update(chol, u, multiplier=multiplier)
     self.assertAllClose(new_chol_expected, new_chol, rtol=1e-5, atol=2e-5)
+    self.assertAllEqual(tf.linalg.band_part(new_chol, -1, 0), new_chol)
 
 
 @test_util.test_all_tf_execution_regimes

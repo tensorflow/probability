@@ -294,11 +294,11 @@ class UniformTest(test_util.TestCase):
     # This is essentially an approximated integral from the direct definition
     # of KL divergence.
     x = a.sample(int(1e4), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
+    kl_samples = a.log_prob(x) - b.log_prob(x)
 
-    kl_, kl_sample_ = self.evaluate([kl, kl_sample])
-    self.assertAllClose(true_kl, kl_, atol=2e-15)
-    self.assertAllClose(true_kl, kl_sample_, atol=0.0, rtol=1e-1)
+    kl_, kl_samples_ = self.evaluate([kl, kl_samples])
+    self.assertAllClose(kl_, true_kl, atol=2e-15)
+    self.assertAllMeansClose(kl_samples_, true_kl, axis=0, atol=0.0, rtol=1e-1)
 
     zero_kl = tfd.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl), zero_kl])

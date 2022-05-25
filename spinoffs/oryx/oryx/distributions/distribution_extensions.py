@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Wraps TFP distributions for use with Jax."""
 import itertools as it
 
@@ -28,7 +27,6 @@ from oryx.core import trace_util
 from oryx.core.interpreters import harvest
 from oryx.core.interpreters import inverse
 from oryx.core.interpreters import log_prob
-from oryx.core.interpreters import unzip
 from tensorflow_probability.substrates import jax as tfp
 
 tfd = tfp.distributions
@@ -37,7 +35,6 @@ tfed = tfp.experimental.distribute
 InverseAndILDJ = inverse.core.InverseAndILDJ
 
 random_variable_p = primitive.InitialStylePrimitive('random_variable')
-unzip.block_registry.add(random_variable_p)
 
 
 def random_variable_log_prob_rule(flat_incells, flat_outcells, *, num_consts,

@@ -122,38 +122,35 @@ def _scan(  # pylint: disable=unused-argument
     elems = nest.map_structure(lambda x: x[::-1], elems)
 
   if initializer is None:
-    if nest.is_nested(elems):
-      raise NotImplementedError
-    initializer = elems[0]
-    elems = elems[1:]
-    prepend = [[initializer]]
+    initializer = nest.map_structure(
+        lambda x: x[0], elems, expand_composites=True)
+    elems = nest.map_structure(lambda x: x[1:], elems, expand_composites=True)
+    prepend = initializer
   else:
     prepend = None
 
-  def func(arg, x):
-    return nest.flatten(fn(nest.pack_sequence_as(initializer, arg),
-                           nest.pack_sequence_as(elems, x)))
-
-  arg = nest.flatten(initializer)
   if JAX_MODE:
     from jax import lax  # pylint: disable=g-import-not-at-top
     def scan_body(arg, x):
-      arg = func(arg, x)
+      arg = fn(arg, x)
       return arg, arg
-    _, out = lax.scan(scan_body, arg, nest.flatten(elems))
+
+    _, out = lax.scan(scan_body, initializer, elems)
   else:
-    out = [[] for _ in range(len(arg))]
-    for x in zip(*nest.flatten(elems)):
-      arg = func(arg, x)
-      for i, z in enumerate(arg):
-        out[i].append(z)
+    length = len(nest.flatten(elems)[0])
+    arg = initializer
+    out = []
+    for i in range(length):
+      arg = fn(arg, nest.map_structure(lambda x: x[i], elems))  # pylint: disable=cell-var-from-loop
+      out.append(arg)
+    out = nest.map_structure(lambda *x: np.stack(x, axis=0), *out)
 
   if prepend is not None:
-    out = [pre + list(o) for (pre, o) in zip(prepend, out)]
+    out = nest.map_structure(
+        lambda p, o: np.concatenate([p[np.newaxis], o], axis=0), prepend, out)
 
   ordering = (lambda x: x[::-1]) if reverse else (lambda x: x)
-  return nest.pack_sequence_as(
-      initializer, [ordering(np.array(o)) for o in out])
+  return nest.map_structure(ordering, out, expand_composites=True)
 
 
 # --- Begin Public Functions --------------------------------------------------
@@ -185,4 +182,3 @@ def pfor(fn, n):
 scan = utils.copy_docstring(
     'tf.scan',
     _scan)
-

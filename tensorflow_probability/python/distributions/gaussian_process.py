@@ -17,6 +17,7 @@
 import warnings
 
 # Dependency imports
+import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import identity as identity_bijector
@@ -26,6 +27,8 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.internal import auto_composite_tensor
+from tensorflow_probability.python.internal import batch_shape_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
@@ -33,6 +36,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math.psd_kernels.internal import util as psd_kernels_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
@@ -82,7 +86,8 @@ def make_cholesky_factored_marginal_fn(cholesky_fn):
   return marginal_fn
 
 
-class GaussianProcess(distribution.AutoCompositeTensorDistribution):
+class GaussianProcess(
+    distribution.Distribution, tf.__internal__.CompositeTensor):
   """Marginal distribution of a Gaussian process at finitely many points.
 
   A Gaussian process (GP) is an indexed collection of random variables, any
@@ -235,6 +240,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
   ```
 
   """
+  # pylint:disable=invalid-name
 
   @deprecation.deprecated_args(
       '2021-05-10',
@@ -248,10 +254,12 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
                marginal_fn=None,
                cholesky_fn=None,
                jitter=1e-6,
+               always_yield_multivariate_normal=False,
                validate_args=False,
                allow_nan_stats=False,
                parameters=None,
-               name='GaussianProcess'):
+               name='GaussianProcess',
+               _check_marginal_cholesky_fn=True):
     """Instantiate a GaussianProcess Distribution.
 
     Args:
@@ -292,6 +300,10 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
         `marginal_fn` and `cholesky_fn` is None.
         This argument is ignored if `cholesky_fn` is set.
         Default value: `1e-6`.
+      always_yield_multivariate_normal: If `False` (the default), we produce a
+        scalar `Normal` distribution when the number of `index_points` is
+        statically known to be `1`. If `True`, we avoid this behavior, ensuring
+        that the event shape will retain the `1` from `index_points`.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -305,6 +317,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       parameters: For subclasses, a dict of constructor arguments.
       name: Python `str` name prefixed to Ops created by this class.
         Default value: "GaussianProcess".
+      _check_marginal_cholesky_fn: Internal parameter -- do not use.
 
     Raises:
       ValueError: if `mean_fn` is not `None` and is not callable.
@@ -340,7 +353,8 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       self._jitter = jitter
       self._cholesky_fn = cholesky_fn
 
-      if marginal_fn is not None and cholesky_fn is not None:
+      if (_check_marginal_cholesky_fn and
+          marginal_fn is not None and cholesky_fn is not None):
         raise ValueError(
             'At most one of `marginal_fn` and `cholesky_fn` should be set.')
       if marginal_fn is None:
@@ -351,6 +365,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       else:
         self._marginal_fn = marginal_fn
 
+      self._always_yield_multivariate_normal = always_yield_multivariate_normal
       with tf.name_scope('init'):
         super(GaussianProcess, self).__init__(
             dtype=dtype,
@@ -359,6 +374,7 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
             allow_nan_stats=allow_nan_stats,
             parameters=parameters,
             name=name)
+    # pylint:enable=invalid-name
 
   def _is_univariate_marginal(self, index_points):
     """True if the given index_points would yield a univariate marginal.
@@ -373,6 +389,9 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       multivariate. In the case of dynamic shape in the number of index points,
       defaults to "multivariate" since that's the best we can do.
     """
+    if self._always_yield_multivariate_normal:
+      return False
+
     num_index_points = tf.compat.dimension_value(
         index_points.shape[-(self.kernel.feature_ndims + 1)])
     if num_index_points is None:
@@ -425,30 +444,44 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
         points, respectively.
     """
     with self._name_and_control_scope('get_marginal_distribution'):
-      # TODO(cgs): consider caching the result here, keyed on `index_points`.
-      index_points = self._get_index_points(index_points)
-      covariance = self._compute_covariance(index_points)
-      loc = self._mean_fn(index_points)
-      # If we're sure the number of index points is 1, we can just construct a
-      # scalar Normal. This has computational benefits and supports things like
-      # CDF that aren't otherwise straightforward to provide.
-      if self._is_univariate_marginal(index_points):
-        scale = tf.sqrt(covariance)
-        # `loc` has a trailing 1 in the shape; squeeze it.
-        loc = tf.squeeze(loc, axis=-1)
-        return normal.Normal(
-            loc=loc,
-            scale=scale,
-            validate_args=self._validate_args,
-            allow_nan_stats=self._allow_nan_stats,
-            name='marginal_distribution')
+      return self._get_marginal_distribution(index_points=index_points)
+
+  def _get_marginal_distribution(self, index_points=None, is_missing=None):
+    # TODO(cgs): consider caching the result here, keyed on `index_points`.
+    index_points = self._get_index_points(index_points)
+    covariance = self._compute_covariance(index_points)
+    is_univariate_marginal = self._is_univariate_marginal(index_points)
+
+    loc = self._mean_fn(index_points)
+    if is_univariate_marginal:
+      # `loc` has a trailing 1 in the shape; squeeze it.
+      loc = tf.squeeze(loc, axis=-1)
+
+    if is_missing is not None:
+      loc = tf.where(is_missing, 0., loc)
+      if is_univariate_marginal:
+        covariance = tf.where(is_missing, 1., covariance)
       else:
-        return self._marginal_fn(
-            loc=loc,
-            covariance=covariance,
-            validate_args=self._validate_args,
-            allow_nan_stats=self._allow_nan_stats,
-            name='marginal_distribution')
+        covariance = psd_kernels_util.mask_matrix(covariance, is_missing)  # pylint:disable=invalid-unary-operand-type
+
+    # If we're sure the number of index points is 1, we can just construct a
+    # scalar Normal. This has computational benefits and supports things like
+    # CDF that aren't otherwise straightforward to provide.
+    if is_univariate_marginal:
+      scale = tf.sqrt(covariance)
+      return normal.Normal(
+          loc=loc,
+          scale=scale,
+          validate_args=self._validate_args,
+          allow_nan_stats=self._allow_nan_stats,
+          name='marginal_distribution')
+    else:
+      return self._marginal_fn(
+          loc=loc,
+          covariance=covariance,
+          validate_args=self._validate_args,
+          allow_nan_stats=self._allow_nan_stats,
+          name='marginal_distribution')
 
   @property
   def mean_fn(self):
@@ -524,13 +557,52 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
     return tf.convert_to_tensor(
         index_points if index_points is not None else  self._index_points)
 
-  def _log_prob(self, value, index_points=None):
-    return self.get_marginal_distribution(index_points).log_prob(value)
+  @distribution_util.AppendDocstring(kwargs_dict={
+      'index_points':
+          'optional `float` `Tensor` representing a finite (batch of) of '
+          'points in the index set over which this GP is defined.  The shape '
+          'has the form `[b1, ..., bB, e, f1, ..., fF]` where `F` is the '
+          'number of feature dimensions and must equal '
+          '`self.kernel.feature_ndims` and `e` is the number of index points '
+          'in each batch.  Ultimately, this distribution  corresponds to an '
+          '`e`-dimensional multivariate normal. The batch shape must be '
+          'broadcastable with `kernel.batch_shape` and any batch dims yielded '
+          'by `mean_fn`.  If not specified, `self.index_points` is used.  '
+          'Default value: `None`.',
+      'is_missing':
+          'optional `bool` `Tensor` of shape `[..., e]`, where `e` is the '
+          'number of index points in each batch.  Represents a batch of '
+          'Boolean masks.  When `is_missing` is not `None`, the returned '
+          'log-prob is for the *marginal* distribution, in which all '
+          'dimensions for which `is_missing` is `True` have been marginalized '
+          'out.  The batch dimensions of `is_missing` must broadcast with the '
+          'sample and batch dimensions of `value` and of this `Distribution`. '
+          'Default value: `None`.'
+  })
+  def _log_prob(self, value, index_points=None, is_missing=None):
+    if is_missing is not None:
+      is_missing = tf.convert_to_tensor(is_missing)
+    index_points = self._get_index_points(index_points)
+    mvn = self._get_marginal_distribution(index_points, is_missing=is_missing)
+    if is_missing is None:
+      return mvn.log_prob(value)
+
+    # Subtract out the Normal distribution's log normalizer for each dimension
+    # that is masked out.
+    lp = mvn.log_prob(tf.where(is_missing, 0., value))
+    num_masked_dims = tf.cast(is_missing, mvn.dtype)
+    if not self._is_univariate_marginal(index_points):
+      event_shape = self._event_shape_tensor(index_points=index_points)
+      num_masked_dims = tf.reduce_sum(
+          num_masked_dims * tf.ones(event_shape, dtype=mvn.dtype),
+          axis=-1)
+    correction = num_masked_dims * -0.5 * np.log(2. * np.pi)
+    return lp - correction
 
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
     if self._is_univariate_marginal(index_points):
-      return tf.constant([], dtype=tf.int32)
+      return ps.constant([], dtype=tf.int32)
     else:
       # The examples index is one position to the left of the feature dims.
       examples_index = -(self.kernel.feature_ndims + 1)
@@ -548,6 +620,18 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
       if tensorshape_util.rank(shape) is None:
         return tf.TensorShape([None])
       return shape
+
+  def _batch_shape(self, index_points=None):
+    kwargs = {}
+    if index_points is not None:
+      kwargs = {'index_points': index_points}
+    return batch_shape_lib.inferred_batch_shape(self, **kwargs)
+
+  def _batch_shape_tensor(self, index_points=None):
+    kwargs = {}
+    if index_points is not None:
+      kwargs = {'index_points': index_points}
+    return batch_shape_lib.inferred_batch_shape_tensor(self, **kwargs)
 
   def _sample_n(self, n, seed=None, index_points=None):
     return self.get_marginal_distribution(index_points).sample(n, seed=seed)
@@ -587,9 +671,6 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
 
   def _quantile(self, value, index_points=None):
     return self.get_marginal_distribution(index_points).quantile(value)
-
-  def _stddev(self, index_points=None):
-    return tf.sqrt(self._variance(index_points=index_points))
 
   def _variance(self, index_points=None):
     index_points = self._get_index_points(index_points)
@@ -678,6 +759,30 @@ class GaussianProcess(distribution.AutoCompositeTensorDistribution):
 
     return gprm.GaussianProcessRegressionModel.precompute_regression_model(
         **argument_dict)
+
+  @property
+  def _type_spec(self):
+    return _GaussianProcessTypeSpec.from_instance(
+        self,
+        omit_kwargs=('parameters', '_check_marginal_cholesky_fn'),
+        non_identifying_kwargs=('name',))
+
+
+@auto_composite_tensor.type_spec_register(
+    'tfp.distributions.GaussianProcess_ACTTypeSpec')
+class _GaussianProcessTypeSpec(
+    auto_composite_tensor._AutoCompositeTensorTypeSpec):  # pylint: disable=protected-access
+  """TypeSpec for GaussianProcess."""
+
+  @property
+  def value_type(self):
+    return GaussianProcess
+
+  def _from_components(self, components):
+    # Disable the check that at most one of `marginal_fn` and `cholesky_fn` is
+    # passed to the constructor, since both may have been set internally.
+    components['_check_marginal_cholesky_fn'] = False
+    return super(_GaussianProcessTypeSpec, self)._from_components(components)
 
 
 def _assert_kl_compatible(marginal, other):

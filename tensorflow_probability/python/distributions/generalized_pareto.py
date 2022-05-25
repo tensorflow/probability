@@ -175,9 +175,7 @@ class GeneralizedPareto(distribution.AutoCompositeTensorDistribution):
         scale=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))),
-        concentration=parameter_properties.ParameterProperties(
-            default_constraining_bijector_fn=(
-                lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
+        concentration=parameter_properties.ParameterProperties())
     # pylint: enable=g-long-lambda
 
   @property

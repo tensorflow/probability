@@ -37,8 +37,8 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.internal import empirical_statistical_testing
 from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.internal import test_util_scipy
 from tensorflow_probability.python.math.linalg import fill_triangular
 
 __all__ = [
@@ -254,7 +254,7 @@ def _clopper_pearson_confidence_interval(samples, error_rate):
     msg = ("Purportedly Bernoulli distribution had distinct samples"
            " {}, {}, and {}".format(uniques[0], uniques[1], uniques[2]))
     raise ValueError(msg)
-  low_p, high_p = test_util_scipy.binomial_confidence_interval(
+  low_p, high_p = empirical_statistical_testing.binomial_confidence_interval(
       successes, n, error_rate)
   low_interval = low + (high - low) * low_p
   high_interval = low + (high - low) * high_p

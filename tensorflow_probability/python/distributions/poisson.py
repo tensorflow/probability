@@ -28,7 +28,6 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -155,17 +154,10 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
 
   """
 
-  @deprecation.deprecated_args(
-      '2021-02-01',
-      ('The `interpolate_nondiscrete` flag is deprecated; instead use '
-       '`force_probs_to_zero_outside_support` (with the opposite sense).'),
-      'interpolate_nondiscrete',
-      warn_once=True)
   def __init__(self,
                rate=None,
                log_rate=None,
-               force_probs_to_zero_outside_support=None,
-               interpolate_nondiscrete=True,
+               force_probs_to_zero_outside_support=False,
                validate_args=False,
                allow_nan_stats=True,
                name='Poisson'):
@@ -186,14 +178,6 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
         continuous function `k * log_rate - lgamma(k+1) - rate`.  Note that this
         function is not itself a normalized probability log-density.
         Default value: `False`.
-      interpolate_nondiscrete: Deprecated.  Use
-        `force_probs_to_zero_outside_support` (with the opposite sense) instead.
-        Python `bool`. When `False`, `log_prob` returns `-inf` (and `prob`
-        returns `0`) for non-integer inputs. When `True`, `log_prob` evaluates
-        the continuous function `k * log_rate - lgamma(k+1) - rate`, which
-        matches the Poisson pmf at integer arguments `k` (note that this
-        function is not itself a normalized probability log-density).
-        Default value: `True`.
       validate_args: Python `bool`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
@@ -223,20 +207,8 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
           rate, name='rate', dtype=dtype)
       self._log_rate = tensor_util.convert_nonref_to_tensor(
           log_rate, name='log_rate', dtype=dtype)
+      self._force_probs_to_zero_outside_support = force_probs_to_zero_outside_support
 
-      self._interpolate_nondiscrete = interpolate_nondiscrete
-      if force_probs_to_zero_outside_support is not None:
-        # `force_probs_to_zero_outside_support` was explicitly set, so it
-        # controls.
-        self._force_probs_to_zero_outside_support = (
-            force_probs_to_zero_outside_support)
-      elif not self._interpolate_nondiscrete:
-        # `interpolate_nondiscrete` was explicitly set by the caller, so it
-        # should control until it is removed.
-        self._force_probs_to_zero_outside_support = True
-      else:
-        # Default.
-        self._force_probs_to_zero_outside_support = False
       super(Poisson, self).__init__(
           dtype=dtype,
           reparameterization_type=reparameterization.NOT_REPARAMETERIZED,
@@ -265,16 +237,6 @@ class Poisson(distribution.AutoCompositeTensorDistribution):
   def log_rate(self):
     """Log rate parameter."""
     return self._log_rate
-
-  @property
-  @deprecation.deprecated(
-      '2021-02-01',
-      ('The `interpolate_nondiscrete` property is deprecated; instead use '
-       '`force_probs_to_zero_outside_support` (with the opposite sense).'),
-      warn_once=True)
-  def interpolate_nondiscrete(self):
-    """Interpolate (log) probs on non-integer inputs."""
-    return self._interpolate_nondiscrete
 
   @property
   def force_probs_to_zero_outside_support(self):

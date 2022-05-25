@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for higher order primitives."""
 import itertools as it
 from typing import Callable
@@ -25,6 +24,7 @@ from jax import tree_util
 from jax import util as jax_util
 from jax.interpreters import ad
 from jax.interpreters import batching
+from jax.interpreters import mlir
 from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 from jax.lib import xla_client as xc
@@ -99,19 +99,17 @@ def hop_transpose_rule(prim):
 register_hop_transformation_rule('transpose', hop_transpose_rule)
 
 
-def hop_translation_rule(prim):
+def hop_lowering(prim):
 
-  def rule(*args, backend, name, call_jaxpr, **params):
-    new_params = dict(name=name, backend=backend, call_jaxpr=call_jaxpr)
-    new_params['donated_invars'] = params.get('donated_invars',
-                                              (False,) * len(args))
-    return xla._xla_call_translation_rule(*args, **new_params)  # pylint: disable=protected-access
+  def rule(ctx, *args, backend, name, call_jaxpr, **_params):
+    return mlir._call_lowering(  # pylint: disable=protected-access
+        name, name, call_jaxpr, backend,
+        ctx.module_context, ctx.avals_in, ctx.avals_out, *args)
 
-  xla.call_translations[prim] = rule
+  mlir.register_lowering(prim, rule)
   return rule
 
-
-register_hop_transformation_rule('translation', hop_translation_rule)
+register_hop_transformation_rule('mlir', hop_lowering)
 
 
 def batch_fun(fun: lu.WrappedFun, in_dims):
@@ -160,6 +158,12 @@ class FlatPrimitive(jax_core.Primitive):
       return translation(c, *xla_args, **params)
 
     xla.translations[self] = _xla
+
+    def _mlir(c, *mlir_args, **params):
+      lowering = mlir.lower_fun(self.impl, multiple_results=True)
+      return lowering(c, *mlir_args, **params)
+
+    mlir.register_lowering(self, _mlir)
 
 
 def call_bind(prim, **params):

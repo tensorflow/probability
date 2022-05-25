@@ -658,6 +658,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "with_reductions_test",
+    size = "medium",
     srcs = ["with_reductions_test.py"],
     shard_count = 2,
     deps = [
@@ -927,6 +928,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:unnest",
+        "//tensorflow_probability/python/math:generic",
         "//tensorflow_probability/python/mcmc:dual_averaging_step_size_adaptation",
         "//tensorflow_probability/python/mcmc:kernel",
         "//tensorflow_probability/python/mcmc/internal:util",

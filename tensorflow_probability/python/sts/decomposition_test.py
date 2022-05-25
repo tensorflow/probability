@@ -37,10 +37,9 @@ class _DecompositionTest(test_util.TestCase):
                               param_batch_shape,
                               num_posterior_draws=10):
     seed = test_util.test_seed_stream()
-    np.random.seed(seed() % (2**32))
+    rng = test_util.test_np_rng(seed())
     observed_time_series = self._build_tensor(
-        np.random.randn(*(param_batch_shape +
-                          [num_timesteps])))
+        rng.randn(*(param_batch_shape + [num_timesteps])))
 
     # Build an STS model with multiple components
     day_of_week = tfp.sts.Seasonal(

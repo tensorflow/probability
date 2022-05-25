@@ -174,7 +174,7 @@ def random_walk_uniform_fn(scale=1., name=None):
           samplers.uniform(  # pylint: disable=g-complex-comprehension
               minval=state_part - scale_part,
               maxval=state_part + scale_part,
-              shape=tf.shape(state_part),
+              shape=ps.shape(state_part),
               dtype=dtype_util.base_dtype(state_part.dtype),
               seed=seed_part)
           for scale_part, state_part, seed_part

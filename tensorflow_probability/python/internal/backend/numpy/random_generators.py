@@ -15,6 +15,7 @@
 """Numpy implementations of TensorFlow functions."""
 
 import numpy as np
+import numpy as onp  # pylint: disable=reimported
 
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
 from tensorflow_probability.python.internal.backend.numpy import ops
@@ -48,11 +49,11 @@ JAX_MODE = False
 
 def _ensure_shape_tuple(t):
   try:
-    return tuple(int(x) for x in t)
+    return tuple(int(x) for x in onp.array(t))
   except TypeError:
     pass
   try:
-    return (int(t),)
+    return (int(onp.array(t)),)
   except TypeError:
     pass
   raise TypeError('Non-shape-like value: {} (type {})'.format(t, type(t)))

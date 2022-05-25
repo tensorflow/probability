@@ -16,6 +16,7 @@
 import numpy as np
 from scipy import interpolate as scipy_interpolate
 
+import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
@@ -932,6 +933,15 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     # Test x at the upper left grid point.
     self.assertEqual(y.dtype, tf.float64)
     self.assertAllClose([0.0], self.evaluate(y))
+
+  def test_unknown_shape(self):
+    # https://github.com/tensorflow/probability/issues/1516
+    if tf.executing_eagerly():
+      self.skipTest('Graph-mode only')
+    x = tf1.placeholder_with_default(tf.zeros((3, 1)), shape=[None, 1])
+    y_ref = tf.ones(10)
+    tfp.math.batch_interp_regular_nd_grid(
+        x=x, x_ref_min=[0.], x_ref_max=[1.], y_ref=y_ref, axis=0)
 
 if __name__ == '__main__':
   test_util.main()

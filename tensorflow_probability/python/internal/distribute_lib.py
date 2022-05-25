@@ -35,7 +35,7 @@ def canonicalize_named_axis(named_axes):
   if named_axes is None:
     return []
   if (isinstance(named_axes, str) or
-      not isinstance(named_axes, collections.Iterable)):
+      not isinstance(named_axes, collections.abc.Iterable)):
     named_axes = [named_axes]
   if len(named_axes) > 1 and not JAX_MODE:
     raise ValueError(

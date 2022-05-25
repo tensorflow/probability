@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for the propagate custom Jaxpr interpreter.
 
 The propagate Jaxpr interpreter converts a Jaxpr to a directed graph where
@@ -39,6 +38,7 @@ from jax.interpreters import partial_eval as pe
 from jax.interpreters import xla
 
 from oryx.core import pytree
+from oryx.core import trace_util
 from oryx.core.interpreters import harvest
 
 __all__ = [
@@ -282,7 +282,8 @@ def propagate(cell_type: Type[Cell],
     incells = safe_map(env.read, eqn.invars)
     outcells = safe_map(env.read, eqn.outvars)
 
-    call_jaxpr, params = jax_core.extract_call_jaxpr(eqn.primitive, eqn.params)
+    call_jaxpr, params = trace_util.extract_call_jaxpr(
+        eqn.primitive, eqn.params)
     if call_jaxpr:
       subfuns = [
           lu.wrap_init(

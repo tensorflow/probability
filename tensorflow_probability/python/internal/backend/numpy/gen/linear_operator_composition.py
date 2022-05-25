@@ -15,6 +15,7 @@
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
 # pylint: disable=trailing-whitespace
+# pylint: disable=g-inconsistent-quotes
 
 # Copyright 2016 The TensorFlow Authors. All Rights Reserved.
 #
@@ -32,14 +33,13 @@
 # ==============================================================================
 """Composes one or more `LinearOperators`."""
 
-import warnings
-
 from tensorflow_probability.python.internal.backend.numpy import ops as common_shapes
 from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
+from tensorflow_probability.python.internal.backend.numpy import control_flow as control_flow_ops
 from tensorflow_probability.python.internal.backend.numpy.gen import linear_operator
 # from tensorflow.python.util.tf_export import tf_export
 
@@ -187,22 +187,16 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
 
     # Auto-set and check hints.
     if all(operator.is_non_singular for operator in operators):
-      if is_non_singular is False:
+      if is_non_singular is False:  # pylint:disable=g-bool-id-comparison
         raise ValueError(
             "The composition of non-singular operators is always non-singular.")
       is_non_singular = True
 
     # Initialization.
 
-    graph_parents = []
-    with warnings.catch_warnings():
-      warnings.simplefilter("ignore")
-      for operator in operators:
-        graph_parents.extend(operator.graph_parents)
-
     if name is None:
       name = "_o_".join(operator.name for operator in operators)
-    with ops.name_scope(name, values=graph_parents):
+    with ops.name_scope(name):
       super(LinearOperatorComposition, self).__init__(
           dtype=dtype,
           is_non_singular=is_non_singular,
@@ -211,8 +205,6 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
           is_square=is_square,
           parameters=parameters,
           name=name)
-    # TODO(b/143910018) Remove graph_parents in V3.
-    self._set_graph_parents(graph_parents)
 
   @property
   def operators(self):
@@ -306,9 +298,19 @@ class LinearOperatorComposition(linear_operator.LinearOperator):
       solution = operator.solve(solution, adjoint=adjoint)
     return solution
 
+  def _assert_non_singular(self):
+    if all(operator.is_square for operator in self.operators):
+      asserts = [operator.assert_non_singular() for operator in self.operators]
+      return control_flow_ops.group(asserts)
+    return super(LinearOperatorComposition, self)._assert_non_singular()
+
   @property
   def _composite_tensor_fields(self):
     return ("operators",)
+
+  @property
+  def _experimental_parameter_ndims_to_matrix_ndims(self):
+    return {"operators": [0] * len(self.operators)}
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg

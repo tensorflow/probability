@@ -781,7 +781,7 @@ class AutoregressiveNetworkTest(test_util.TestCase):
         bijector_kwargs={"conditional_input": cond * np.ones((n_samples, 1))},
         seed=seed())
     # Assert mean is close to conditional mean
-    self.assertAllClose(tf.reduce_mean(samples), mean_1, atol=1.)
+    self.assertAllMeansClose(samples[..., 0], mean_1, axis=0, atol=1.)
 
   def test_doc_string_images_case_1(self):
     # Generate fake images.

@@ -566,7 +566,7 @@ class IteratedFilter(object):
       # auto-vectorization enabled in `joint_prior_on_parameters_and_state`.
 
       num_particles_canary = 13
-      canary_seed = samplers.sanitize_seed([0, 1])
+      canary_seed = samplers.zeros_seed()
       def _get_shape_1(x):
         if hasattr(x, 'state'):
           x = x.state
@@ -773,7 +773,7 @@ class IteratedFilter(object):
     Args:
       observations: observed `Tensor` value(s) on which to condition the
         parameter estimate.
-      num_iterations: `int `Tensor` number of filtering iterations to run.
+      num_iterations: int `Tensor` number of filtering iterations to run.
       num_particles: scalar int `Tensor` number of particles to use.
       initial_perturbation_scale: scalar float `Tensor`, or any structure of
         float `Tensor`s broadcasting to the same shape as the (unconstrained)

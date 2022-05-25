@@ -223,6 +223,7 @@ multi_substrate_py_library(
 
 multi_substrate_py_test(
     name = "kendalls_tau_test",
+    size = "medium",
     srcs = ["kendalls_tau_test.py"],
     jax_tags = ["notap"],
     deps = [

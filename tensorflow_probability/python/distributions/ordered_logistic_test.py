@@ -150,9 +150,9 @@ class OrderedLogisticTest(test_util.TestCase):
     loc = self._random_location([])
     dist = tfd.OrderedLogistic(cutpoints=cutpoints, loc=loc)
     samples = dist.sample(int(1e5), seed=test_util.test_seed())
-    sampled_entropy = self.evaluate(-tf.reduce_mean(dist.log_prob(samples)))
+    entropy_samples = self.evaluate(-dist.log_prob(samples))
     entropy = self.evaluate(dist.entropy())
-    self.assertAllClose(sampled_entropy, entropy, atol=0.01)
+    self.assertAllMeansClose(entropy_samples, entropy, axis=0, atol=0.01)
 
   @parameterized.parameters(1, 10, 25)
   def testKLAgainstCategoricalDistribution(self, batch_size):
@@ -188,11 +188,10 @@ class OrderedLogisticTest(test_util.TestCase):
     b = tfd.OrderedLogistic(cutpoints=b_cutpoints, loc=loc)
 
     samples = a.sample(int(1e5), seed=test_util.test_seed())
-    sampled_kl = self.evaluate(
-        tf.reduce_mean(a.log_prob(samples) - b.log_prob(samples)))
+    kl_samples = self.evaluate(a.log_prob(samples) - b.log_prob(samples))
     kl = self.evaluate(tfd.kl_divergence(a, b))
 
-    self.assertAllClose(sampled_kl, kl, atol=2e-2)
+    self.assertAllMeansClose(kl_samples, kl, axis=0, atol=2e-2)
 
   def testLatentLogistic(self):
     loc = self._random_location([2])

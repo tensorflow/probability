@@ -59,10 +59,15 @@ class _ForecastTest(object):
         'observation_noise_scale': self._build_tensor(
             [observation_noise_scale])}
 
-    onestep_dist = tfp.sts.one_step_predictive(model, observed_time_series,
-                                               timesteps_are_event_shape=False,
-                                               parameter_samples=params)
-    onestep_mean, onestep_scale = onestep_dist.mean(), onestep_dist.stddev()
+    @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
+    def _run():
+      onestep_dist = tfp.sts.one_step_predictive(
+          model,
+          observed_time_series,
+          timesteps_are_event_shape=False,
+          parameter_samples=params)
+      return onestep_dist.mean(), onestep_dist.stddev()
+    onestep_mean, onestep_scale = _run()
 
     # Since Seasonal is just a set of interleaved random walks, it's
     # straightforward to compute the forecast analytically.
@@ -99,16 +104,22 @@ class _ForecastTest(object):
                                         seed=test_util.test_seed())
                      for param in model.parameters]
 
-    onestep_dist = tfp.sts.one_step_predictive(model, observed_time_series,
-                                               timesteps_are_event_shape=False,
-                                               parameter_samples=prior_samples)
+    @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
+    def _run():
+      d = tfp.sts.one_step_predictive(
+          model,
+          observed_time_series,
+          timesteps_are_event_shape=False,
+          parameter_samples=prior_samples)
+      d_mean = d.mean()
+      return d, d_mean, d.log_prob(d_mean)
+    onestep_dist, onestep_mean, onestep_mean_log_prob = _run()
 
     self.evaluate(tf1.global_variables_initializer())
     self.assertAllEqual(onestep_dist.batch_shape_tensor(),
                         batch_shape + [num_timesteps])
-    onestep_mean = onestep_dist.mean()
     self.assertAllEqual(tf.shape(onestep_mean), batch_shape + [num_timesteps])
-    self.assertAllEqual(tf.shape(onestep_dist.log_prob(onestep_mean)),
+    self.assertAllEqual(tf.shape(onestep_mean_log_prob),
                         batch_shape + [num_timesteps])
 
   def test_forecast_correctness(self):
@@ -126,12 +137,14 @@ class _ForecastTest(object):
         'observation_noise_scale': self._build_tensor(
             [observation_noise_scale])}
 
-    forecast_dist = tfp.sts.forecast(model, observed_time_series,
-                                     parameter_samples=params,
-                                     num_steps_forecast=8,
-                                     include_observation_noise=True)
-    forecast_mean = forecast_dist.mean()[..., 0]
-    forecast_scale = forecast_dist.stddev()[..., 0]
+    @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
+    def _run():
+      forecast_dist = tfp.sts.forecast(model, observed_time_series,
+                                       parameter_samples=params,
+                                       num_steps_forecast=8,
+                                       include_observation_noise=True)
+      return forecast_dist.mean()[..., 0], forecast_dist.stddev()[..., 0]
+    forecast_mean, forecast_scale = _run()
 
     # Since Seasonal is just a set of interleaved random walks, it's
     # straightforward to compute the forecast analytically.
@@ -225,14 +238,22 @@ class _ForecastTest(object):
         param.prior.sample(num_param_samples, seed=test_util.test_seed())
         for param in model.parameters]
 
-    forecast_dist = tfp.sts.forecast(model, observed_time_series,
-                                     parameter_samples=prior_samples,
-                                     num_steps_forecast=num_steps_forecast)
+    @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
+    def _run():
+      d = tfp.sts.forecast(model, observed_time_series,
+                           parameter_samples=prior_samples,
+                           num_steps_forecast=num_steps_forecast)
+      d_mean = d.mean()
+      # NOTE: `d` is wrapped by `JitPublicMethods`, and thus cannot currently
+      # be returned from a `tf.function`-ed function.
+      return d.batch_shape_tensor(), d_mean, d.log_prob(d_mean)
+    forecast_batch_shape, forecast_mean, forecast_mean_log_prob = _run()
 
     self.evaluate(tf1.global_variables_initializer())
-    self.assertAllEqual(forecast_dist.batch_shape_tensor(), batch_shape)
-    self.assertAllEqual(tf.shape(forecast_dist.mean()),
+    self.assertAllEqual(forecast_batch_shape, batch_shape)
+    self.assertAllEqual(tf.shape(forecast_mean),
                         batch_shape + [num_steps_forecast, 1])
+    self.assertAllEqual(tf.shape(forecast_mean_log_prob), batch_shape)
 
   def test_methods_handle_masked_inputs(self):
     num_param_samples = 5
@@ -296,20 +317,26 @@ class _ForecastTest(object):
             self._build_tensor([drift_scale]),
         'observation_noise_scale': self._build_tensor(
             [noise_scale])}
-    imputed_series_dist = tfp.sts.impute_missing_values(
-        model, observed_time_series, parameter_samples,
-        timesteps_are_event_shape=False)
-    imputed_noisy_series_dist = tfp.sts.impute_missing_values(
-        model, observed_time_series, parameter_samples,
-        timesteps_are_event_shape=False,
-        include_observation_noise=True)
+
+    @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
+    def _run():
+      imputed_series_dist = tfp.sts.impute_missing_values(
+          model, observed_time_series, parameter_samples,
+          timesteps_are_event_shape=False)
+      imputed_noisy_series_dist = tfp.sts.impute_missing_values(
+          model, observed_time_series, parameter_samples,
+          timesteps_are_event_shape=False,
+          include_observation_noise=True)
+      mean, stddev = imputed_series_dist.mean(), imputed_series_dist.stddev()
+      noisy_mean, noisy_stddev = [imputed_noisy_series_dist.mean(),
+                                  imputed_noisy_series_dist.stddev()]
+      return (imputed_noisy_series_dist, mean, stddev, noisy_mean, noisy_stddev)
+    (imputed_noisy_series_dist, mean, stddev, noisy_mean, noisy_stddev) = _run()
+
     self.assertAllEqual(imputed_noisy_series_dist.batch_shape_tensor(),
                         [num_timesteps])
 
     # Compare imputed mean to expected mean.
-    mean, stddev = imputed_series_dist.mean(), imputed_series_dist.stddev()
-    noisy_mean, noisy_stddev = [imputed_noisy_series_dist.mean(),
-                                imputed_noisy_series_dist.stddev()]
     self.assertAllClose(mean, [-1., 1., 2., 2.4, -1., 1., 2.], atol=1e-2)
     self.assertAllClose(mean, noisy_mean, atol=1e-2)
 

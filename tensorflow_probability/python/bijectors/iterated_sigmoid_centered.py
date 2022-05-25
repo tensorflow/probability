@@ -93,15 +93,15 @@ class IteratedSigmoidCentered(bijector.AutoCompositeTensorBijector):
   def _inverse_event_shape(self, output_shape):
     if not output_shape[-1:].is_fully_defined():
       return output_shape
-    if output_shape[-1] <= 1:
-      raise ValueError('output_shape[-1] = %d <= 1' % output_shape[-1])
+    if output_shape[-1] < 1:
+      raise ValueError('output_shape[-1] = %d < 1' % output_shape[-1])
     return output_shape[:-1].concatenate(output_shape[-1] - 1)
 
   def _inverse_event_shape_tensor(self, output_shape):
     if self.validate_args:
-      # It is not possible for a negative shape so we need only check <= 1.
+      # It is not possible for a negative shape so we need only check < 1.
       dependencies = [assert_util.assert_greater(
-          output_shape[-1], 1, message='Need last dimension greater than 1.')]
+          output_shape[-1], 0, message='Need last dimension greater than 0.')]
     else:
       dependencies = []
     with tf.control_dependencies(dependencies):

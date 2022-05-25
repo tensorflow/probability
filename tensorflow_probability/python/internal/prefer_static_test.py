@@ -307,6 +307,48 @@ class ShapeTest(test_util.TestCase):
     self.assertAllEqual(ps.dimension_size(zeros_partial_pl, idx_pl),
                         shape[idx])
 
+  def test_shape_slice(self):
+    shape = [3, 2, 1]
+    slice_ = slice(1, 2)
+    slice_tensor = slice(tf.constant(1), tf.constant(2))
+
+    # case: numpy input.
+    self.assertEqual(ps.shape_slice(np.zeros(shape), slice_), shape[slice_])
+    self.assertEqual(
+        ps.shape_slice(np.zeros(shape), slice_tensor), shape[slice_])
+
+    # case: static-shape Tensor input.
+    self.assertEqual(ps.shape_slice(tf.zeros(shape), slice_), shape[slice_])
+    self.assertNotIsInstance(
+        ps.shape_slice(tf.zeros(shape), slice_), tf.TensorShape)
+    self.assertEqual(
+        ps.shape_slice(tf.zeros(shape), slice_tensor), shape[slice_])
+    self.assertNotIsInstance(
+        ps.shape_slice(tf.zeros(shape), slice_tensor), tf1.Dimension)
+
+    if tf.executing_eagerly():
+      return
+
+    # Case: input is Tensor with fully unknown shape.
+    zeros_pl = tf1.placeholder_with_default(tf.zeros(shape), shape=None)
+    slice_pl = slice(
+        tf1.placeholder_with_default(1, shape=[]),
+        tf1.placeholder_with_default(2, shape=[]))
+    self.assertAllEqual(ps.shape_slice(zeros_pl, slice_), shape[slice_])
+    self.assertAllEqual(
+        ps.shape_slice(zeros_pl, slice_tensor), shape[slice_])
+    self.assertAllEqual(ps.shape_slice(zeros_pl, slice_pl), shape[slice_])
+
+    # Case: input is Tensor with partially known shape.
+    # The result should be static if slice_ is.
+    zeros_partial_pl = tf1.placeholder_with_default(
+        tf.zeros(shape), shape=tf.TensorShape([None, 2, 1]))
+    self.assertEqual(ps.shape_slice(zeros_partial_pl, slice_), shape[slice_])
+    self.assertEqual(
+        ps.shape_slice(zeros_partial_pl, slice_tensor), shape[slice_])
+    self.assertAllEqual(
+        ps.shape_slice(zeros_partial_pl, slice_pl), shape[slice_])
+
   def test_rank_from_shape(self):
     shape = [2, 4, 3]
     expected_rank = len(shape)

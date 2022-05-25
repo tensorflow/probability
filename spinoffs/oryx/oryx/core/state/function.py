@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for transforming functions into FunctionModules.
 
 In order to `init` functions, we need to define a `Module` subclass for them,
@@ -61,7 +60,6 @@ safe_map = jax_util.safe_map
 safe_zip = jax_util.safe_zip
 Key = Any
 
-custom_unzip_rules = {}
 kwargs_rules = {}
 
 
@@ -112,16 +110,15 @@ def eval_jaxpr_with_kwargs(jaxpr: jax_core.Jaxpr, consts: Iterable[Any], *args,
     env[v] = val
 
   env = {}
-  write(jax_core.unitvar, jax_core.unit)
   safe_map(write, jaxpr.constvars, consts)
   safe_map(write, jaxpr.invars, args)
   for eqn in jaxpr.eqns:
     in_vals = safe_map(read, eqn.invars)
-    subjaxpr, params = jax_core.extract_call_jaxpr(eqn.primitive, eqn.params)
+    subjaxpr, params = trace_util.extract_call_jaxpr(eqn.primitive, eqn.params)
     if subjaxpr:
       subfuns = [
           lu.wrap_init(
-              jax_core.partial(eval_jaxpr_with_kwargs, subjaxpr, (), **kwargs))
+              functools.partial(eval_jaxpr_with_kwargs, subjaxpr, (), **kwargs))
       ]
     else:
       subfuns = []

@@ -217,15 +217,15 @@ class OneHotCategoricalTest(test_util.TestCase):
         x = p.sample(int(2e4), seed=test_util.test_seed())
         x = tf.cast(x, dtype=tf.float32)
         # Compute empirical KL(p||q).
-        kl_sample = tf.reduce_mean(
-            p.log_prob(x) - q.log_prob(x), axis=0)
+        kl_samples = p.log_prob(x) - q.log_prob(x)
 
-        [kl_sample_, kl_actual_,
-         kl_same_] = self.evaluate([kl_sample, kl_actual, kl_same])
+        [kl_samples_, kl_actual_,
+         kl_same_] = self.evaluate([kl_samples, kl_actual, kl_same])
         self.assertEqual(kl_actual.shape, (batch_size,))
         self.assertAllClose(kl_same_, np.zeros_like(kl_expected))
         self.assertAllClose(kl_actual_, kl_expected, atol=0., rtol=1e-4)
-        self.assertAllClose(kl_sample_, kl_expected, atol=1e-2, rtol=0.)
+        self.assertAllMeansClose(
+            kl_samples_, kl_expected, axis=0, atol=1e-2, rtol=0.)
 
   def testSampleUnbiasedNonScalarBatch(self):
     logits = self._rng.rand(4, 3, 2).astype(np.float32)
@@ -237,18 +237,18 @@ class OneHotCategoricalTest(test_util.TestCase):
     x_centered = tf.transpose(a=x - sample_mean, perm=[1, 2, 3, 0])
     sample_covariance = tf.matmul(x_centered, x_centered, adjoint_b=True) / n
     [
-        sample_mean_,
+        x_,
         sample_covariance_,
         actual_mean_,
         actual_covariance_,
     ] = self.evaluate([
-        sample_mean,
+        x,
         sample_covariance,
         dist.mean(),
         dist.covariance(),
     ])
     self.assertAllEqual([4, 3, 2], sample_mean.shape)
-    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.07)
+    self.assertAllMeansClose(x_, actual_mean_, axis=0, atol=0., rtol=0.07)
     self.assertAllEqual([4, 3, 2, 2], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.10)
@@ -263,18 +263,18 @@ class OneHotCategoricalTest(test_util.TestCase):
     x_centered = x - sample_mean
     sample_covariance = tf.matmul(x_centered, x_centered, adjoint_a=True) / n
     [
-        sample_mean_,
+        x_,
         sample_covariance_,
         actual_mean_,
         actual_covariance_,
     ] = self.evaluate([
-        sample_mean,
+        x,
         sample_covariance,
         dist.probs_parameter(),
         dist.covariance(),
     ])
     self.assertAllEqual([3], sample_mean.shape)
-    self.assertAllClose(actual_mean_, sample_mean_, atol=0., rtol=0.1)
+    self.assertAllMeansClose(x_, actual_mean_, axis=0, atol=0., rtol=0.1)
     self.assertAllEqual([3, 3], sample_covariance.shape)
     self.assertAllClose(
         actual_covariance_, sample_covariance_, atol=0., rtol=0.1)

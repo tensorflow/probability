@@ -126,7 +126,8 @@ class _BatchBroadcastTest(object):
     d = tfd.BatchBroadcast(tfd.Independent(tfd.Normal([0., 1, 2], .5),
                                            reinterpreted_batch_ndims=1),
                            [2])
-    self.assertAllEqual(tf.broadcast_to([0., 1, 2], [2, 3]), d.mean())
+    expected = tf.broadcast_to(tf.constant([0., 1, 2]), [2, 3])
+    self.assertAllEqual(expected, d.mean())
 
   def test_stddev(self):
     self.assertAllEqual(tf.fill([2, 3], .5),
@@ -140,19 +141,21 @@ class _BatchBroadcastTest(object):
 
   def test_var(self):
     d = tfd.BatchBroadcast(tfd.Normal(0., [[.5], [1.]]), [2, 3])
-    self.assertAllEqual(tf.broadcast_to([[.25], [1.]], [2, 3]), d.variance())
+    expected = tf.broadcast_to(tf.constant([[.25], [1.]]), [2, 3])
+    self.assertAllEqual(expected, d.variance())
 
   def test_cov(self):
     d = tfd.BatchBroadcast(tfd.MultivariateNormalDiag(tf.zeros(2), [.5, 1.]),
                            [5, 3])
-    self.assertAllEqual(tf.broadcast_to([[.25, 0], [0, 1]], [5, 3, 2, 2]),
-                        d.covariance())
+    expected = tf.broadcast_to(tf.constant([[.25, 0], [0, 1]]), [5, 3, 2, 2])
+    self.assertAllEqual(expected, d.covariance())
 
   def test_quantile(self):
     d = tfd.BatchBroadcast(tfd.Normal(loc=[0., 1, 2], scale=.5), [2, 1])
-    self.assertAllEqual(tf.broadcast_to([0., 1, 2], [2, 3]), d.quantile(.5))
+    expected = tf.broadcast_to(tf.constant([0., 1, 2]), [2, 3])
+    self.assertAllEqual(expected, d.quantile(.5))
     x = d.quantile([[.45], [.55]])
-    self.assertAllEqual(tf.broadcast_to([0., 1, 2], [2, 3]), tf.round(x))
+    self.assertAllEqual(expected, tf.round(x))
     self.assertAllTrue(x[0] < x[1])
 
   def test_bug170030378(self):

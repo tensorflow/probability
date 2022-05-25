@@ -489,7 +489,7 @@ class StatisticalTestingTest(test_util.TestCase):
   @parameterized.parameters(np.float32, np.float64)
   def test_random_projections(self, dtype):
     strm = test_util.test_seed_stream()
-    rng = np.random.RandomState(seed=strm() % 2**31)
+    rng = test_util.test_np_rng(strm())
     num_samples = 57000
 
     # Validate experiment design
