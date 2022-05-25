@@ -305,49 +305,6 @@ class _GeneralizedGammaTest(object):
     self.assertAllClose(expected_kl, kl_sample_val, atol=0.0, rtol=1e-2)
     self.assertAllClose(expected_kl, self.evaluate(kl))
 
-  def testGeneralizedGammaGammaKL(self):
-    a_concentration = np.array([3.])
-    a_scale = np.array([2.])
-    a_exponent = np.array([3.])
-    b_concentration = np.array([6.])
-    b_rate = np.array([0.25])
-
-    a = tfd.GeneralizedGamma(
-        concentration=a_concentration, scale=a_scale, exponent=a_exponent, validate_args=True)
-    b = tfd.Gamma(
-        concentration=b_concentration, rate=b_rate, validate_args=True)
-
-    kl = tfd.kl_divergence(a, b)
-
-    x = a.sample(int(1e5), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
-    kl_sample_val = self.evaluate(kl_sample)
-
-    self.assertAllClose(kl_sample_val, self.evaluate(kl), atol=0.0, rtol=1e-2)
-
-  def testGeneralizedGammaGammaKLAgreeGeneralizedGammaGeneralizedGamma(self):
-    a_concentration = np.array([3.])
-    a_scale = np.array([2.])
-    a_exponent = np.array([3.])
-    b_concentration = np.array([1.])
-    b_rate = np.array([0.25])
-    b_exponent = np.array([1.])
-
-    a = tfd.GeneralizedGamma(
-        concentration=a_concentration, scale=a_scale, exponent=a_exponent, validate_args=True)
-    b = tfd.Gamma(
-        concentration=b_concentration, rate=b_rate, validate_args=True)
-    c = tfd.GeneralizedGamma(
-        concentration=b_concentration, scale=1 / b_rate, exponent=b_exponent, validate_args=True)
-
-    kl_generalizedgamma_generalizedgamma = tfd.kl_divergence(a, c)
-    kl_generalizedgamma_gamma = tfd.kl_divergence(a, b)
-
-    self.assertAllClose(
-        self.evaluate(kl_generalizedgamma_gamma),
-        self.evaluate(kl_generalizedgamma_generalizedgamma),
-        atol=0.0,
-        rtol=1e-6)
 
 
 @test_util.test_all_tf_execution_regimes
