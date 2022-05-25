@@ -42,12 +42,12 @@ PRECONDITIONING_FAILS_DISTS = (
     'LambertWNormal',  # CDF gradient incorrect at 0.
     'SigmoidBeta',  # inverse CDF numerical precision issues for large x
     'StudentT',  # CDF gradient incorrect at 0 (and unstable near zero).
-    )
+)
 
 if JAX_MODE:
   PRECONDITIONING_FAILS_DISTS = (
       'VonMises',  # Abstract eval for 'von_mises_cdf_jvp' not implemented.
-      ) + PRECONDITIONING_FAILS_DISTS
+  ) + PRECONDITIONING_FAILS_DISTS
 
 
 def _constrained_zeros_fn(shape, dtype, constraint_fn):
@@ -60,15 +60,18 @@ class DistributionBijectorsTest(test_util.TestCase):
 
   def assertDistributionIsApproximatelyStandardNormal(self,
                                                       dist,
+                                                      rtol=1e-6,
                                                       logprob_atol=1e-2,
                                                       grad_atol=1e-2):
     """Verifies that dist's lps and gradients match those of Normal(0., 1.)."""
     batch_shape = dist.batch_shape_tensor()
+
     def make_reference_values(event_shape):
       dist_shape = ps.concat([batch_shape, event_shape], axis=0)
       x = tf.reshape([-4., -2., 0., 2., 4.],
                      ps.concat([[5], ps.ones_like(dist_shape)], axis=0))
       return tf.broadcast_to(x, ps.concat([[5], dist_shape], axis=0))
+
     flat_event_shape = tf.nest.flatten(dist.event_shape_tensor())
     zs = [make_reference_values(s) for s in flat_event_shape]
     lp_dist, grad_dist = tfp.math.value_and_gradient(
@@ -83,11 +86,14 @@ class DistributionBijectorsTest(test_util.TestCase):
     reference_vals_and_grads = [
         reference_value_and_gradient(z, event_shape)
         for (z, event_shape) in zip(zs, flat_event_shape)]
+
     lps_reference = [lp for lp, grad in reference_vals_and_grads]
-    self.assertAllClose(sum(lps_reference), lp_dist, atol=logprob_atol)
+    self.assertAllClose(
+        sum(lps_reference), lp_dist, rtol=rtol, atol=logprob_atol)
 
     grads_reference = [grad for lp, grad in reference_vals_and_grads]
-    self.assertAllCloseNested(grads_reference, grad_dist, atol=grad_atol)
+    self.assertAllCloseNested(
+        grads_reference, grad_dist, rtol=rtol, atol=grad_atol)
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
@@ -101,10 +107,11 @@ class DistributionBijectorsTest(test_util.TestCase):
     if dist_name in PRECONDITIONING_FAILS_DISTS:
       self.skipTest('Known failure.')
 
-    dist = data.draw(dhps.base_distributions(
-        dist_name=dist_name,
-        enable_vars=False,
-        param_strategy_fn=_constrained_zeros_fn))
+    dist = data.draw(
+        dhps.base_distributions(
+            dist_name=dist_name,
+            enable_vars=False,
+            param_strategy_fn=_constrained_zeros_fn))
     try:
       b = tfp.experimental.bijectors.make_distribution_bijector(dist)
     except NotImplementedError:
@@ -114,22 +121,20 @@ class DistributionBijectorsTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def test_multivariate_normal(self):
-    d = tfd.MultivariateNormalFullCovariance(loc=[4., 8.],
-                                             covariance_matrix=[[11., 0.099],
-                                                                [0.099, 0.1]])
+    d = tfd.MultivariateNormalFullCovariance(
+        loc=[4., 8.], covariance_matrix=[[11., 0.099], [0.099, 0.1]])
     b = tfp.experimental.bijectors.make_distribution_bijector(d)
-    self.assertDistributionIsApproximatelyStandardNormal(
-        tfb.Invert(b)(d))
+    self.assertDistributionIsApproximatelyStandardNormal(tfb.Invert(b)(d))
 
   @test_util.numpy_disable_gradient_test
   def test_markov_chain(self):
     d = tfd.MarkovChain(
         initial_state_prior=tfd.Uniform(low=0., high=1.),
         transition_fn=lambda _, x: tfd.Uniform(low=0., high=tf.nn.softplus(x)),
-        num_steps=10)
+        num_steps=3)
     b = tfp.experimental.bijectors.make_distribution_bijector(d)
     self.assertDistributionIsApproximatelyStandardNormal(
-        tfb.Invert(b)(d))
+        tfb.Invert(b)(d), rtol=1e-4)
 
   @test_util.numpy_disable_gradient_test
   def test_markov_chain_joint(self):
@@ -145,7 +150,7 @@ class DistributionBijectorsTest(test_util.TestCase):
         num_steps=10)
     b = tfp.experimental.bijectors.make_distribution_bijector(d)
     self.assertDistributionIsApproximatelyStandardNormal(
-        tfb.Invert(b)(d))
+        tfb.Invert(b)(d), rtol=1e-4)
 
   @test_util.numpy_disable_gradient_test
   def test_nested_joint_distribution(self):
@@ -153,13 +158,14 @@ class DistributionBijectorsTest(test_util.TestCase):
     def model():
       x = yield tfd.Normal(loc=-2., scale=1.)
       yield tfd.JointDistributionSequentialAutoBatched([
-          tfd.Uniform(low=1. + tf.exp(x),
-                      high=1 + tf.exp(x) + tf.nn.softplus(x)),
+          tfd.Uniform(low=1. - tf.exp(x),
+                      high=2. + tf.exp(x) + tf.nn.softplus(x)),
           lambda v: tfd.Exponential(v)])  # pylint: disable=unnecessary-lambda
+
     dist = tfd.JointDistributionCoroutineAutoBatched(model)
     b = tfp.experimental.bijectors.make_distribution_bijector(dist)
     self.assertDistributionIsApproximatelyStandardNormal(
-        tfb.Invert(b)(dist))
+        tfb.Invert(b)(dist), rtol=1e-4)
 
   @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
@@ -171,6 +177,7 @@ class DistributionBijectorsTest(test_util.TestCase):
       z = yield tfd.Normal(loc=-1., scale=2., name='z')
       x = yield tfd.Normal(loc=[0.], scale=tf.exp(z), name='x')
       yield tfd.Poisson(log_rate=x, name='y')
+
     pinned_model = model_with_funnel.experimental_pin(y=[1])
     surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
         pinned_model)
@@ -191,15 +198,16 @@ class DistributionBijectorsTest(test_util.TestCase):
           kernel=tfp.mcmc.DualAveragingStepSizeAdaptation(
               tfp.mcmc.TransformedTransitionKernel(
                   tfp.mcmc.NoUTurnSampler(
-                      pinned_model.unnormalized_log_prob,
-                      step_size=0.1),
+                      pinned_model.unnormalized_log_prob, step_size=0.1),
                   bijector=bijector),
               num_adaptation_steps=5),
           current_state=surrogate_posterior.sample(),
           num_burnin_steps=5,
           trace_fn=lambda _0, _1: [],
           num_results=10)
+
     do_sample()
+
 
 if __name__ == '__main__':
   test_util.main()
