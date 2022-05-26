@@ -22,6 +22,7 @@ PYTHON_PARSE_PACKAGE_JSON="
 import sys
 import json
 import argparse
+import pkg_resources
 import sysconfig
 
 
@@ -46,7 +47,7 @@ for release, release_info in package_data['releases'].items():
              for wheel_info in release_info):
     continue
   releases.append(release)
-print(sorted(releases)[-1])
+print(sorted(releases, key=pkg_resources.parse_version)[-1])
 "
 
 find_good_tf_nightly_version_str() {
