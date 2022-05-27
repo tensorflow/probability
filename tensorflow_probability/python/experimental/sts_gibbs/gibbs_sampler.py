@@ -140,13 +140,16 @@ class SpikeAndSlabSparseLinearRegression(sts_components.LinearRegression):
 
   def __init__(self,
                design_matrix,
-               weights_prior=None,
+               weights_prior,
                sparse_weights_nonzero_prob=0.5,
                name=None):
     # Extract precision matrix from a multivariate normal prior.
     weights_prior_precision = None
     if hasattr(weights_prior, 'precision'):
-      weights_prior_precision = weights_prior.precision()
+      if isinstance(weights_prior.precision, tf.linalg.LinearOperator):
+        weights_prior_precision = weights_prior.precision.to_dense()
+      else:
+        weights_prior_precision = weights_prior.precision()
     elif weights_prior is not None:
       inverse_scale = weights_prior.scale.inverse()
       weights_prior_precision = inverse_scale.matmul(
@@ -840,7 +843,6 @@ def _build_sampler_loop_body(model,
         sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler
       else:
         sampler = spike_and_slab.SpikeSlabSampler
-
       spike_and_slab_sampler = sampler(
           design_matrix,
           weights_prior_precision=regression_component._weights_prior_precision,  # pylint: disable=protected-access

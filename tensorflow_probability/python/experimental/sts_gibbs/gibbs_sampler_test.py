@@ -29,6 +29,7 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 
 
 tfd = tfp.distributions
+tfde = tfp.experimental.distributions
 tfl = tf.linalg
 
 JAX_MODE = False
@@ -397,6 +398,18 @@ class GibbsSamplerTests(test_util.TestCase):
           weights_prior=tfd.Normal(loc=0., scale=1.),
           level_variance_prior=tfd.InverseGamma(0.01, 0.01),
           observation_noise_variance_prior=tfd.LogNormal(0., 3.))
+
+  def test_model_with_linop_precision_works(self):
+    observed_time_series = tf.ones([2])
+    design_matrix = tf.eye(2)
+    sampler = gibbs_sampler.build_model_for_gibbs_fitting(
+        observed_time_series,
+        design_matrix=design_matrix,
+        weights_prior=tfde.MultivariateNormalPrecisionFactorLinearOperator(
+            precision_factor=tf.linalg.LinearOperatorDiag(tf.ones(2))),
+        level_variance_prior=tfd.InverseGamma(0.01, 0.01),
+        observation_noise_variance_prior=tfd.InverseGamma(0.01, 0.01))
+    self.assertIsNotNone(sampler)
 
   def test_invalid_options_with_none_design_matrix_raises_error(self):
     observed_time_series = tf.ones([2])
