@@ -269,6 +269,7 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
       self.assertAllEqual(particles_shape[1:-1], log_ml.shape)
       self.assertIn('observation_count', state.extra)
       self.assertEqual(3 * i + 1, state.extra['observation_count'])
+      self.assertFalse(np.any(np.isnan(self.evaluate(log_ml))))
 
       log_ml_krazy_obs = tfs.ensemble_kalman_filter_log_marginal_likelihood(
           state,
@@ -292,6 +293,38 @@ class EnsembleKalmanFilterTest(test_util.TestCase):
         [[9., 18.]] * 3,
         self.evaluate(tf.reduce_mean(state.particles['x'], axis=0)),
         rtol=0.05)
+
+  def test_log_marginal_likelihood_with_small_ensemble_no_perturb_obs(self):
+    # With perturbed_observations=False, we should be able to handle the small
+    # ensemble without NaN.
+
+    # Initialize an ensemble with that is smaller than the event size.
+    seed_stream = test_util.test_seed_stream()
+    n_ensemble = 3
+    event_size = 5
+    self.assertLess(n_ensemble, event_size)
+    particles_shape = (n_ensemble, event_size)
+
+    particles = {
+        'x':
+            self.evaluate(
+                tf.random.normal(shape=particles_shape, seed=seed_stream())),
+    }
+
+    def observation_fn(_, particles, extra):
+      return tfd.MultivariateNormalDiag(
+          loc=particles['x'], scale_diag=[1e-2] * event_size), extra
+
+    # Marginal likelihood.
+    log_ml = tfs.ensemble_kalman_filter_log_marginal_likelihood(
+        state=tfs.EnsembleKalmanFilterState(
+            step=0, particles=particles, extra={}),
+        observation=tf.random.normal(shape=(event_size,), seed=seed_stream()),
+        observation_fn=observation_fn,
+        perturbed_observations=False,
+        seed=test_util.test_seed())
+    self.assertAllEqual(particles_shape[1:-1], log_ml.shape)
+    self.assertFalse(np.any(np.isnan(self.evaluate(log_ml))))
 
 
 # Parameters defining a linear/Gaussian state space model.
@@ -484,8 +517,15 @@ class KalmanFilterVersusEnKFTest(test_util.TestCase):
           noise_level=[0.001, 0.1, 1.0],
           n_states=[2, 5],
           n_observations=[2, 5],
+          perturbed_observations=[False, True],
       ))
-  def test_same_solution(self, noise_level, n_states, n_observations):
+  def test_same_solution(
+      self,
+      noise_level,
+      n_states,
+      n_observations,
+      perturbed_observations,
+  ):
     """Check that the KF and EnKF solutions are the same."""
     # Tests pass with n_ensemble = 1e7. The KF vs. EnKF tolerance is
     # proportional to 1 / sqrt(n_ensemble), so this shows good agreement.
@@ -496,7 +536,9 @@ class KalmanFilterVersusEnKFTest(test_util.TestCase):
     dtype = tf.float64
     predict_kwargs = {}
     update_kwargs = {}
-    log_marginal_likelihood_kwargs = {}
+    log_marginal_likelihood_kwargs = {
+        'perturbed_observations': perturbed_observations
+    }
 
     linear_model_params = self._get_linear_model_params(
         noise_level=noise_level,

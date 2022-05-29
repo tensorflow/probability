@@ -29,6 +29,10 @@ __all__ = [
 ]
 
 
+class InsufficientEnsembleSizeError(Exception):
+  """Raise when the ensemble size is insufficient for a function."""
+
+
 # Sample covariance. Handles differing shapes.
 def _covariance(x, y=None):
   """Sample covariance, assuming samples are the leftmost axis."""
@@ -304,6 +308,7 @@ def ensemble_kalman_filter_log_marginal_likelihood(
     state,
     observation,
     observation_fn,
+    perturbed_observations=True,
     seed=None,
     name=None):
   """Ensemble Kalman filter log marginal likelihood.
@@ -332,6 +337,11 @@ def ensemble_kalman_filter_log_marginal_likelihood(
     observation_fn: callable returning an instance of
       `tfd.MultivariateNormalLinearOperator` along with an extra information
       to be returned in the `EnsembleKalmanFilterState`.
+    perturbed_observations: Whether the marginal distribution `p(Y[t] | ...)`
+      is estimated using samples from the `observation_fn`'s distribution. If
+      `False`, the distribution's covariance matrix is used directly. This
+      latter choice is less common in the literature, but works even if the
+      ensemble size is smaller than the number of observations.
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
       Default value: `None`
@@ -339,6 +349,10 @@ def ensemble_kalman_filter_log_marginal_likelihood(
 
   Returns:
     log_marginal_likelihood: `Tensor` with same dtype as `state`.
+
+  Raises:
+    InsufficientEnsembleSizeError: If `perturbed_observations=True` and the
+      ensemble size is not at least one greater than the number of observations.
 
   #### References
 
@@ -360,16 +374,37 @@ def ensemble_kalman_filter_log_marginal_likelihood(
 
     observation = tf.convert_to_tensor(observation, dtype=common_dtype)
 
-    if not isinstance(observation_particles_dist,
-                      distributions.MultivariateNormalLinearOperator):
-      raise ValueError('Expected `observation_fn` to return an instance of '
-                       '`MultivariateNormalLinearOperator`')
+    if perturbed_observations:
+      # With G the observation operator and B the batch shape,
+      # observation_particles = G(X) + η, where η ~ Normal(0, Γ).
+      # Both are shape [n_ensemble] + B + [n_observations]
+      observation_particles = observation_particles_dist.sample(seed=seed)
+      n_observations = observation_particles_dist.event_shape[0]
+      n_ensemble = observation_particles_dist.batch_shape[0]
+      if (n_ensemble is not None and n_observations is not None and
+          n_ensemble < n_observations + 1):
+        raise InsufficientEnsembleSizeError(
+            f'When `perturbed_observations=True`, ensemble size ({n_ensemble}) '
+            'must be at least one greater than the number of observations '
+            f'({n_observations}), but it was not.')
+      observation_dist = distributions.MultivariateNormalTriL(
+          loc=tf.reduce_mean(observation_particles, axis=0),
+          # Cholesky(Cov(G(X) + η)), where Cov(..) is the ensemble covariance.
+          scale_tril=tf.linalg.cholesky(_covariance(observation_particles)))
+    else:
+      # predicted_observation = G(X),
+      # and is shape [n_ensemble] + B.
+      predicted_observation = observation_particles_dist.mean()
+      observation_dist = distributions.MultivariateNormalTriL(
+          loc=tf.reduce_mean(predicted_observation, axis=0),  # ensemble mean
+          # Cholesky(Cov(G(X)) + Γ), where Cov(..) is the ensemble covariance.
+          scale_tril=tf.linalg.cholesky(
+              _covariance(predicted_observation) +
+              _linop_covariance(observation_particles_dist).to_dense()))
 
-    observation_particles = observation_particles_dist.sample(seed=seed)
-    observation_dist = distributions.MultivariateNormalTriL(
-        loc=tf.reduce_mean(observation_particles, axis=0),
-        scale_tril=tf.linalg.cholesky(_covariance(observation_particles)))
-
+    # Above we computed observation_dist, the distribution of observations given
+    # the predictive distribution of states (e.g. states from previous time).
+    # Here we evaluate the log_prob on the actual observations.
     return observation_dist.log_prob(observation)
 
 
