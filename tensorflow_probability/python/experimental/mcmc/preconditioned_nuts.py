@@ -731,7 +731,7 @@ class PreconditionedNoUTurnSampler(TransitionKernel):
                       name=None):
     with tf.name_scope('build_sub_tree'):
       batch_shape = ps.shape(current_step_meta_info.init_energy)
-      # We never want to select the inital state
+      # We never want to select the initial state
       if MULTINOMIAL_SAMPLE:
         init_weight = tf.fill(
             batch_shape,

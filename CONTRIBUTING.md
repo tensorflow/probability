@@ -87,7 +87,7 @@ example invocation (presumed to run from the root of the TFP repo:
 
 To run the unit tests, you'll need several packages installed (again, we
 strongly recommend you work in a virtualenv). We include a script to do this for
-you, which also does some sanity checks on the environtment:
+you, which also does some sanity checks on the environment:
 
 ```shell
 ./testing/install_test_dependencies.sh
