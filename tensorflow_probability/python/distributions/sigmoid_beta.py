@@ -14,8 +14,6 @@
 # ============================================================================
 """The SigmoidBeta distribution class."""
 
-import functools
-
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
@@ -27,7 +25,6 @@ from tensorflow_probability.python.distributions import gamma as gamma_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -245,15 +242,7 @@ class SigmoidBeta(distribution.AutoCompositeTensorDistribution):
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
     sig_x = tf.math.sigmoid(x)
-    shape = functools.reduce(ps.broadcast_shape, [
-        ps.shape(concentration1),
-        ps.shape(concentration0),
-        ps.shape(sig_x)
-    ])
-    concentration1 = tf.broadcast_to(concentration1, shape)
-    concentration0 = tf.broadcast_to(concentration0, shape)
-    sig_x = tf.broadcast_to(sig_x, shape)
-    return tf.math.betainc(concentration1, concentration0, sig_x)
+    return tfp_math.betainc(concentration1, concentration0, sig_x)
 
   def _mode(self):
     return tf.math.log(self.concentration1 / self.concentration0)

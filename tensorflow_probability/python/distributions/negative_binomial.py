@@ -195,13 +195,9 @@ class NegativeBinomial(distribution.AutoCompositeTensorDistribution):
   def _cdf(self, x):
     logits = self._logits_parameter_no_checks()
     total_count = tf.convert_to_tensor(self.total_count)
-    shape = self._batch_shape_tensor(
-        logits=logits, total_count=total_count)
     safe_x = tf.where(x >= 0, x, 0.)
-    answer = tf.math.betainc(
-        tf.broadcast_to(total_count, shape),
-        tf.broadcast_to(1. + safe_x, shape),
-        tf.broadcast_to(tf.sigmoid(-logits), shape))
+    answer = tfp_math.betainc(
+        total_count, 1. + safe_x, tf.sigmoid(-logits))
     return distribution_util.extend_cdf_outside_support(x, answer, low=0)
 
   def _log_prob(self, x):

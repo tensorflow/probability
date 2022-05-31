@@ -62,7 +62,7 @@ def _bdtr(k, n, p):
   #   where(unsafe, safe_output, betainc(where(unsafe, safe_input, input)))
   ones = tf.ones_like(n - k)
   safe_dn = tf.where(tf.logical_or(k < 0, k >= n), ones, n - k)
-  dk = tf.math.betainc(a=safe_dn, b=k + 1, x=1 - p)
+  dk = tfp_math.betainc(a=safe_dn, b=k + 1, x=1 - p)
   return distribution_util.extend_cdf_outside_support(k, dk, low=0, high=n)
 
 

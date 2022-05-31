@@ -46,6 +46,7 @@ PRECONDITIONING_FAILS_DISTS = (
 
 if JAX_MODE:
   PRECONDITIONING_FAILS_DISTS = (
+      'PERT',  # Testing triggers second derivative path in JAX mode.
       'VonMises',  # Abstract eval for 'von_mises_cdf_jvp' not implemented.
   ) + PRECONDITIONING_FAILS_DISTS
 

@@ -116,8 +116,7 @@ def cdf(x, df, loc, scale):
   """
   y = (x - loc) / tf.abs(scale)
   x_t = df / (y**2. + df)
-  neg_cdf = 0.5 * tf.math.betainc(
-      0.5 * tf.broadcast_to(df, ps.shape(x_t)), 0.5, x_t)
+  neg_cdf = 0.5 * tfp_math.betainc(0.5 * df, 0.5, x_t)
   return tf.where(y < 0., neg_cdf, 1. - neg_cdf)
 
 

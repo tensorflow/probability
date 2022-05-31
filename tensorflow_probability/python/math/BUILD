@@ -482,7 +482,7 @@ multi_substrate_py_test(
     name = "special_test",
     size = "medium",
     srcs = ["special_test.py"],
-    shard_count = 3,
+    shard_count = 6,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
