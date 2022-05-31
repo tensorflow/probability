@@ -18,6 +18,8 @@ import collections
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions
+from tensorflow_probability.python.distributions import mvn_low_rank_update_linear_operator_covariance
+from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
 __all__ = [
@@ -27,6 +29,10 @@ __all__ = [
     'ensemble_kalman_filter_log_marginal_likelihood',
     'inflate_by_scaled_identity_fn',
 ]
+
+MVNLowRankCov = (
+    mvn_low_rank_update_linear_operator_covariance
+    .MultivariateNormalLowRankUpdateLinearOperatorCovariance)
 
 
 class InsufficientEnsembleSizeError(Exception):
@@ -157,6 +163,7 @@ def ensemble_kalman_filter_update(
     observation,
     observation_fn,
     damping=1.,
+    low_rank_ensemble=False,
     seed=None,
     name=None):
   """Ensemble Kalman filter update step.
@@ -185,6 +192,11 @@ def ensemble_kalman_filter_update(
       to be returned in the `EnsembleKalmanFilterState`.
     damping: Floating-point `Tensor` representing how much to damp the
       update by. Used to mitigate filter divergence. Default value: 1.
+    low_rank_ensemble: Whether to use a LinearOperatorLowRankUpdate (rather than
+      a dense Tensor) to represent the observation covariance. The "low rank" is
+      the ensemble size. This is useful only if (i) the ensemble size is much
+      less than the number of observations, and (ii) the LinearOperator
+      associated with the observation_fn has an efficient inverse
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
       Default value: `None` (i.e., `'ensemble_kalman_filter_update'`).
@@ -234,12 +246,6 @@ def ensemble_kalman_filter_update(
     # centered at the predicted observations. This is *not* the ensemble mean.
     predicted_observation_particles = observation_particles_dist.mean()
 
-    # With μ the ensemble average operator. For V a batch of column vectors,
-    # let Vᵀ be a batch of row vectors.
-    # Cov(G(X)) = (G(X) - μ(G(X))) (G(X) - μ(G(X)))ᵀ
-    observation_particles_covariance = _covariance(
-        predicted_observation_particles)
-
     # covariance_between_state_and_predicted_observations
     # Cov(X, G(X))  = (X - μ(X))(G(X) - μ(G(X)))ᵀ
     covariance_between_state_and_predicted_observations = tf.nest.map_structure(
@@ -250,43 +256,63 @@ def ensemble_kalman_filter_update(
     observation_particles_diff = (
         observation - observation_particles_dist.sample(seed=seed))
 
-    # = Cov(G(X)) + Γ
-    observation_particles_covariance = (
-        observation_particles_covariance +
-        # Calling _linop_covariance(...).to_dense() rather than
-        # observation_particles_dist.covariance() means the shape is
-        # [observation_size, observation_size] rather than
-        # [ensemble_size] + [observation_size, observation_size].
-        # Both work, since this matrix is used to do mat-vecs with ensembles
-        # of vectors...however, doing things this way ensures we do an
-        # efficient batch-matmul and (more importantly) don't have to do a
-        # separate Cholesky for every ensemble member!
-        _linop_covariance(observation_particles_dist).to_dense())
+    # observation_particles_covariance ~ Cov(G(X)) + Γ
+    if low_rank_ensemble:
+      # observation_particles_covariance ~ LinearOperatorLowRankUpdate
+      observation_particles_covariance = _observation_particles_cov_linop(
+          predicted_observation_particles=predicted_observation_particles,
+          ensemble_mean_observations=tf.reduce_mean(
+              predicted_observation_particles, axis=0),
+          observation_cov=_linop_covariance(observation_particles_dist),
+      )
+    else:
+      # observation_particles_covariance ~ LinearOperatorFullMatrix
+      observation_particles_covariance_matrix = (
+          # With μ the ensemble average operator. For V a batch of column
+          # vectors, let Vᵀ be a batch of row vectors. Then
+          # _covariance(predicted_observation_particles)
+          #  = Cov(G(X)) = (G(X) - μ(G(X))) (G(X) - μ(G(X)))ᵀ
+          _covariance(predicted_observation_particles) +
+
+          # Calling _linop_covariance(...).to_dense() rather than
+          # observation_particles_dist.covariance() means the shape is
+          # [observation_size, observation_size] rather than
+          # [ensemble_size] + [observation_size, observation_size].
+          # Both work, since this matrix is used to do mat-vecs with ensembles
+          # of vectors...however, doing things this way ensures we do an
+          # efficient batch-matmul and (more importantly) don't have to do a
+          # separate Cholesky for every ensemble member!
+          _linop_covariance(observation_particles_dist).to_dense()
+      )
+      observation_particles_covariance = tf.linalg.LinearOperatorFullMatrix(
+          observation_particles_covariance_matrix,
+          # SPD because _linop_covariance(observation_particles_dist) is SPD
+          # and _covariance(predicted_observation_particles) is SSD
+          is_self_adjoint=True,
+          is_positive_definite=True,
+      )
 
     # We specialize the univariate case.
     # TODO(srvasude): Refactor linear_gaussian_ssm, normal_conjugate_posteriors
     # and this code so we have a central place for normal conjugacy code.
-    if observation_size_is_static_and_scalar:
+    # Note that we do not use this code path if `low_rank_ensemble`, since our
+    # API specifies we will use a LinearOperatorLowRankUpdate. This code path
+    # would be a bit more efficient, but the user is warned in the docstring not
+    # to set `low_rank_ensemble=True` if the observation dimension is low.
+    if observation_size_is_static_and_scalar and not low_rank_ensemble:
       # In the univariate observation case, the Kalman gain is given by:
       # K = cov(X, Y) / (var(Y) + var_noise). That is we just divide
       # by the particle covariance plus the observation noise.
       kalman_gain = tf.nest.map_structure(
-          lambda x: x / observation_particles_covariance,
+          lambda x: x / observation_particles_covariance_matrix,
           covariance_between_state_and_predicted_observations)
       new_particles = tf.nest.map_structure(
           lambda x, g: x + damping * tf.linalg.matvec(  # pylint:disable=g-long-lambda
               g, observation_particles_diff), state.particles, kalman_gain)
     else:
-      # TODO(b/153489530): Handle the case where the dimensionality of the
-      # observations is large. We can use the Sherman-Woodbury-Morrison
-      # identity in this case.
-
       # added_term = [Cov(G(X)) + Γ]⁻¹ [Y - G(X) - η]
-      observation_particles_cholesky = tf.linalg.cholesky(
-          observation_particles_covariance)
-      added_term = tf.squeeze(tf.linalg.cholesky_solve(
-          observation_particles_cholesky,
-          observation_particles_diff[..., tf.newaxis]), axis=-1)
+      added_term = observation_particles_covariance.solvevec(
+          observation_particles_diff)
 
       # added_term
       #  = covariance_between_state_and_predicted_observations @ added_term
@@ -309,6 +335,7 @@ def ensemble_kalman_filter_log_marginal_likelihood(
     observation,
     observation_fn,
     perturbed_observations=True,
+    low_rank_ensemble=False,
     seed=None,
     name=None):
   """Ensemble Kalman filter log marginal likelihood.
@@ -342,6 +369,11 @@ def ensemble_kalman_filter_log_marginal_likelihood(
       `False`, the distribution's covariance matrix is used directly. This
       latter choice is less common in the literature, but works even if the
       ensemble size is smaller than the number of observations.
+    low_rank_ensemble: Whether to use a LinearOperatorLowRankUpdate (rather than
+      a dense Tensor) to represent the observation covariance. The "low rank" is
+      the ensemble size. This is useful only if (i) the ensemble size is much
+      less than the number of observations, and (ii) the LinearOperator
+      associated with the observation_fn has an efficient inverse
     seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
     name: Python `str` name for ops created by this method.
       Default value: `None`
@@ -374,6 +406,10 @@ def ensemble_kalman_filter_log_marginal_likelihood(
 
     observation = tf.convert_to_tensor(observation, dtype=common_dtype)
 
+    if low_rank_ensemble and perturbed_observations:
+      raise ValueError(
+          'A low rank update cannot be used with `perturbed_observations=True`')
+
     if perturbed_observations:
       # With G the observation operator and B the batch shape,
       # observation_particles = G(X) + η, where η ~ Normal(0, Γ).
@@ -392,15 +428,27 @@ def ensemble_kalman_filter_log_marginal_likelihood(
           # Cholesky(Cov(G(X) + η)), where Cov(..) is the ensemble covariance.
           scale_tril=tf.linalg.cholesky(_covariance(observation_particles)))
     else:
-      # predicted_observation = G(X),
-      # and is shape [n_ensemble] + B.
-      predicted_observation = observation_particles_dist.mean()
-      observation_dist = distributions.MultivariateNormalTriL(
-          loc=tf.reduce_mean(predicted_observation, axis=0),  # ensemble mean
-          # Cholesky(Cov(G(X)) + Γ), where Cov(..) is the ensemble covariance.
-          scale_tril=tf.linalg.cholesky(
-              _covariance(predicted_observation) +
-              _linop_covariance(observation_particles_dist).to_dense()))
+      if low_rank_ensemble:  # low_rank_ensemble and not perturbed_observations.
+        predicted_observation_particles = observation_particles_dist.mean()
+        ensemble_mean_observations = tf.reduce_mean(
+            predicted_observation_particles, axis=0)
+        observation_dist = MVNLowRankCov(
+            loc=ensemble_mean_observations,
+            cov_operator=_observation_particles_cov_linop(
+                predicted_observation_particles=predicted_observation_particles,
+                ensemble_mean_observations=ensemble_mean_observations,
+                observation_cov=_linop_covariance(observation_particles_dist),
+            ))
+      else:  # not low_rank_ensemble and not perturbed_observations.
+        # predicted_observation = G(X),
+        # and is shape [n_ensemble] + B.
+        predicted_observations = observation_particles_dist.mean()
+        observation_dist = distributions.MultivariateNormalTriL(
+            loc=tf.reduce_mean(predicted_observations, axis=0),  # ensemble mean
+            # Cholesky(Cov(G(X)) + Γ), where Cov(..) is the ensemble covariance.
+            scale_tril=tf.linalg.cholesky(
+                _covariance(predicted_observations) +
+                _linop_covariance(observation_particles_dist).to_dense()))
 
     # Above we computed observation_dist, the distribution of observations given
     # the predictive distribution of states (e.g. states from previous time).
@@ -423,3 +471,51 @@ def _linop_covariance(dist):
   cov._is_positive_definite = True  # pylint: disable=protected-access
   cov._is_self_adjoint = True  # pylint: disable=protected-access
   return cov
+
+
+def _observation_particles_cov_linop(
+    predicted_observation_particles,
+    ensemble_mean_observations,
+    observation_cov,
+):
+  """LinearOperatorLowRankUpdate holding observation noise covariance.
+
+  All arguments can be derived from `observation_particles_dist`. We pass them
+  as arguments to have a simpler graph, and encourage calling `.sample` once.
+
+  Args:
+    predicted_observation_particles: Ensemble of state particles fed through the
+      observation function.  `observation_particles_dist.mean()`
+    ensemble_mean_observations: Ensemble mean (mean across `axis=0`) of
+      `predicted_observation_particles`.
+    observation_cov: `LinearOperator` defining the observation noise covariance.
+      `_linop_covariance(observation_particles_dist)`.
+
+  Returns:
+    LinearOperatorLowRankUpdate with covariance the sum of `observation_cov`
+      and the ensemble covariance of `predicted_observation_particles`.
+  """
+  # In our usual docstring notation, let B be a batch shape, X be the ensemble
+  # of states, and G(X) the deterministic observation transformation of X. Then,
+  # predicted_observations_particles = G(X)  (an ensemble)
+  #                  shape = [n_ensemble] + B + [n_observations]
+  # ensemble_mean_observations =
+  #    tf.reduce_mean(predicted_observations, axis=0)  # Ensemble mean
+
+  # Create matrix U with shape B + [n_observations, n_ensemble] so that, with
+  # Cov the ensemble covariance, Cov(G(X)) = UUᵀ.
+  centered_observations = (
+      predicted_observation_particles -
+      ensemble_mean_observations
+  )
+  n_ensemble = tf.cast(
+      tf.shape(centered_observations)[0], centered_observations.dtype)
+  u = distribution_util.rotate_transpose(
+      centered_observations / tf.sqrt(n_ensemble), -1)
+
+  # cov_operator ~ Γ + Cov(G(X))
+  return tf.linalg.LinearOperatorLowRankUpdate(
+      base_operator=observation_cov,  # = Γ
+      u=u,  # UUᵀ = Cov(G(X))
+      is_self_adjoint=True,
+      is_positive_definite=True)

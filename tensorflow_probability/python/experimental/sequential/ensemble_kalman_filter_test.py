@@ -17,6 +17,7 @@
 import collections
 
 # Dependency imports
+from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
@@ -346,15 +347,16 @@ EnKFParams = collections.namedtuple(
 
 
 @test_util.test_all_tf_execution_regimes
-class KalmanFilterVersusEnKFTest(test_util.TestCase):
-  """Compare KF to EnKF with large ensemble sizes.
+class ComparingMethodsTest(test_util.TestCase):
+  """Compare various KF EnKF versions.
 
   If the model is linear and Gaussian the EnKF sample mean/cov and marginal
   likelihood converges to that of a KF in the large ensemble limit.
-
   This class tests that they are the same. It does that by implementing a
   one-step KF. It also does some simple checks on the KF, to make sure we didn't
   just replicate misunderstanding in the EnKF.
+
+  This class also checks that various flavors of the EnKF are the same.
   """
 
   def _random_spd_matrix(self, n, noise_level, seed, dtype):
@@ -519,7 +521,7 @@ class KalmanFilterVersusEnKFTest(test_util.TestCase):
           n_observations=[2, 5],
           perturbed_observations=[False, True],
       ))
-  def test_same_solution(
+  def test_kf_vs_enkf(
       self,
       noise_level,
       n_states,
@@ -537,7 +539,7 @@ class KalmanFilterVersusEnKFTest(test_util.TestCase):
     predict_kwargs = {}
     update_kwargs = {}
     log_marginal_likelihood_kwargs = {
-        'perturbed_observations': perturbed_observations
+        'perturbed_observations': perturbed_observations,
     }
 
     linear_model_params = self._get_linear_model_params(
@@ -600,6 +602,109 @@ class KalmanFilterVersusEnKFTest(test_util.TestCase):
     tol_scale = 1 / np.sqrt(n_ensemble)  # 1 / Sqrt(1e6) = 0.001
     self.assertAllCloseNested(
         kf_soln, enkf_soln, atol=20 * tol_scale, rtol=50 * tol_scale)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='low_rank_ensemble',
+          kwargs_1=dict(
+              predict={},
+              update={
+                  'low_rank_ensemble': False,
+              },
+              log_marginal_likelihood={
+                  'low_rank_ensemble': False,
+                  'perturbed_observations': False
+              },
+          ),
+          kwargs_2=dict(
+              predict={},
+              update={
+                  'low_rank_ensemble': True,
+              },
+              log_marginal_likelihood={
+                  'low_rank_ensemble': True,
+                  'perturbed_observations': False
+              },
+          ),
+      ),
+      dict(
+          testcase_name='low_rank_ensemble_1d_obs',
+          # n_observations = 1 invokes a special code path.
+          n_observations=1,
+          kwargs_1=dict(
+              predict={},
+              update={
+                  'low_rank_ensemble': False,
+              },
+              log_marginal_likelihood={
+                  'low_rank_ensemble': False,
+                  'perturbed_observations': False
+              },
+          ),
+          kwargs_2=dict(
+              predict={},
+              update={
+                  'low_rank_ensemble': True,
+              },
+              log_marginal_likelihood={
+                  'low_rank_ensemble': True,
+                  'perturbed_observations': False
+              },
+          ),
+      ),
+  )
+  def test_cases_where_different_kwargs_give_same_enkf_result(
+      self,
+      kwargs_1,
+      kwargs_2,
+      n_states=5,
+      n_observations=5,
+      n_ensemble=10,
+  ):
+    """Check that two sets of kwargs give same result."""
+    # In most cases, `test_kf_vs_enkf` is more complete, since it tests
+    # correctness. However, `test_kf_vs_enkf` requires a huge ensemble.
+    # This test is useful when you cannot use a huge ensemble and/or you want to
+    # compare to a method already checked for correctness by `test_kf_vs_enkf`.
+    salt = str(n_ensemble) + str(n_states) + str(n_observations)
+    seed_stream = test_util.test_seed_stream(salt)
+    dtype = tf.float64
+
+    linear_model_params = self._get_linear_model_params(
+        noise_level=0.1,
+        n_states=n_states,
+        n_observations=n_observations,
+        seed_stream=seed_stream,
+        dtype=dtype)
+
+    # Ensure that our observation comes from a state that ~ prior.
+    prior_dist = tfd.MultivariateNormalTriL(
+        loc=linear_model_params.prior_mean,
+        scale_tril=tf.linalg.cholesky(linear_model_params.prior_cov))
+    true_state = prior_dist.sample(seed=seed_stream())
+    observation = tf.linalg.matvec(linear_model_params.observation_mat,
+                                   true_state)
+
+    enkf_params = self._get_enkf_params(n_ensemble, linear_model_params,
+                                        prior_dist, seed_stream, dtype)
+
+    # Use the exact same seeds for each.
+    enkf_soln_1 = self._enkf_solve(observation, enkf_params,
+                                   kwargs_1['predict'], kwargs_1['update'],
+                                   kwargs_1['log_marginal_likelihood'],
+                                   test_util.test_seed_stream(salt))
+    enkf_soln_2 = self._enkf_solve(observation, enkf_params,
+                                   kwargs_2['predict'], kwargs_2['update'],
+                                   kwargs_2['log_marginal_likelihood'],
+                                   test_util.test_seed_stream(salt))
+
+    # Evaluate at the same time, so both use the same randomness!
+    # Do not use anything that was not evaluated here!
+    enkf_soln_1, enkf_soln_2 = self.evaluate([enkf_soln_1, enkf_soln_2])
+
+    # We used the same seed, so solutions should be identical up to tolerance of
+    # different solver methods.
+    self.assertAllCloseNested(enkf_soln_1, enkf_soln_2)
 
 
 if __name__ == '__main__':
