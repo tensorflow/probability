@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 
 __all__ = [
     'implementation_selecting',
+    'is_xla',
     'never_runs_functions_eagerly',
 ]
 
@@ -47,7 +48,7 @@ JAX_MODE = False
 NUMPY_MODE = False
 
 
-def _is_xla():
+def is_xla():
   """Returns `True` when we are tracing a function for XLA compilation."""
   if JAX_MODE:
     return True
@@ -134,7 +135,7 @@ def implementation_selecting(fn_name, default_fn, cpu_fn):
 
   def impl_selecting_fn(**kwargs):
     """The wrapper function to be returned."""
-    if _is_xla():  # JAX, XLA breakout.
+    if is_xla():  # JAX, XLA breakout.
       return default_fn(**kwargs)
     if NUMPY_MODE:  # Numpy breakout.
       return cpu_fn(**kwargs)
