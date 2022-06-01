@@ -29,14 +29,6 @@ from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 tfd = tfp.distributions
 
 
-def _naive_symmetric_increment(m, idx, increment):
-  m = m.copy()
-  m[..., idx, :] += increment
-  m[..., :, idx] += increment
-  m[..., idx, idx] -= increment[..., idx]
-  return m
-
-
 def _compute_conditional_weights_mean(nonzeros, weights_posterior_precision,
                                       x_transpose_y):
   indices = tf.where(nonzeros)[:, 0]
@@ -106,7 +98,7 @@ class SpikeAndSlabTest(test_util.TestCase):
         design_matrix,
         default_pseudo_observations=default_pseudo_observations)
     initial_state = sampler._initialize_sampler_state(
-        targets=targets, nonzeros=nonzeros)
+        targets=targets, nonzeros=nonzeros, observation_noise_variance=1.)
 
     # Compute the analytic posterior for the regression problem restricted to
     # only the selected features. Note that by slicing a submatrix of the
@@ -124,9 +116,11 @@ class SpikeAndSlabTest(test_util.TestCase):
 
     # The sampler's posterior should match the posterior from the restricted
     # problem.
+    weights_posterior_precision = (sampler.x_transpose_x +
+                                   sampler.weights_prior_precision)
     conditional_weights_mean = _compute_conditional_weights_mean(
         initial_state.nonzeros,
-        sampler.weights_posterior_precision,
+        weights_posterior_precision,
         initial_state.x_transpose_y)
     self.assertAllClose(
         self.evaluate(
@@ -168,7 +162,8 @@ class SpikeAndSlabTest(test_util.TestCase):
     self.assertAllClose(
         tight_slab_sampler._initialize_sampler_state(
             targets=targets,
-            nonzeros=tf.ones([num_features], dtype=tf.bool)
+            nonzeros=tf.ones([num_features], dtype=tf.bool),
+            observation_noise_variance=1.
             ).observation_noise_variance_posterior_scale,
         naive_posterior.scale,
         atol=1e-2)
@@ -186,7 +181,8 @@ class SpikeAndSlabTest(test_util.TestCase):
     self.assertAllClose(
         downweighted_slab_sampler._initialize_sampler_state(
             targets=targets,
-            nonzeros=tf.zeros([num_features], dtype=tf.bool)
+            nonzeros=tf.zeros([num_features], dtype=tf.bool),
+            observation_noise_variance=1.
             ).observation_noise_variance_posterior_scale,
         naive_posterior.scale)
 
@@ -220,14 +216,16 @@ class SpikeAndSlabTest(test_util.TestCase):
     @tf.function(autograph=False, jit_compile=False)
     def _do_flips():
       state = sampler._initialize_sampler_state(
-          targets=targets, nonzeros=initial_nonzeros)
+          targets=targets,
+          nonzeros=initial_nonzeros,
+          observation_noise_variance=1.)
       def _do_flip(state, i):
         new_state = sampler._flip_feature(state, tf.gather(flip_idxs, i))
         return mcmc_util.choose(tf.gather(should_flip, i), new_state, state)
       return tf.foldl(_do_flip, elems=tf.range(num_flips), initializer=state)
 
     self.assertAllCloseNested(
-        sampler._initialize_sampler_state(targets, nonzeros),
+        sampler._initialize_sampler_state(targets, nonzeros, 1.),
         _do_flips(),
         atol=1e-6, rtol=1e-6)
 
@@ -247,15 +245,19 @@ class SpikeAndSlabTest(test_util.TestCase):
         # Ensure the probability of keeping an irrelevant feature is tiny.
         nonzero_prior_prob=1e-6)
     initial_state = sampler._initialize_sampler_state(
-        targets=targets, nonzeros=tf.convert_to_tensor([True, True, True]))
+        targets=targets,
+        nonzeros=tf.convert_to_tensor([True, True, True]),
+        observation_noise_variance=1.)
     final_state = self.evaluate(
         sampler._resample_all_features(
             initial_state, seed=test_util.test_seed()))
 
     # Check that we recovered the true sparsity pattern and approximate weights.
+    weights_posterior_precision = (sampler.x_transpose_x +
+                                   sampler.weights_prior_precision)
     conditional_weights_mean = _compute_conditional_weights_mean(
         final_state.nonzeros,
-        sampler.weights_posterior_precision,
+        weights_posterior_precision,
         final_state.x_transpose_y)
     self.assertAllEqual(final_state.nonzeros, [True, False, True])
     indices = tf.where(final_state.nonzeros)

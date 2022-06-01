@@ -348,7 +348,8 @@ def fit_with_gibbs_sampling(model,
                             initial_state=None,
                             seed=None,
                             default_pseudo_observations=None,
-                            experimental_use_dynamic_cholesky=False):
+                            experimental_use_dynamic_cholesky=False,
+                            experimental_use_weight_adjustment=False):
   """Fits parameters for an STS model using Gibbs sampling.
 
   Args:
@@ -375,6 +376,9 @@ def fit_with_gibbs_sampling(model,
       a speedup when the number of true features is small compared to the size
       of the design matrix. *Note*: If this is true, neither batch shape nor
       `jit_compile` is supported.
+    experimental_use_weight_adjustment: Optional bool - use a nonstandard
+      update for the posterior precision of the weight in case of a spike and
+      slab sampler.
 
 
   Returns:
@@ -433,7 +437,7 @@ def fit_with_gibbs_sampling(model,
 
   sampler_loop_body = _build_sampler_loop_body(
       model, observed_time_series, is_missing, default_pseudo_observations,
-      experimental_use_dynamic_cholesky)
+      experimental_use_dynamic_cholesky, experimental_use_weight_adjustment)
 
   samples = tf.scan(sampler_loop_body,
                     np.arange(num_warmup_steps + num_results), initial_state)
@@ -756,7 +760,8 @@ def _build_sampler_loop_body(model,
                              observed_time_series,
                              is_missing=None,
                              default_pseudo_observations=None,
-                             experimental_use_dynamic_cholesky=False):
+                             experimental_use_dynamic_cholesky=False,
+                             experimental_use_weight_adjustment=False):
   """Builds a Gibbs sampler for the given model and observed data.
 
   Args:
@@ -774,6 +779,9 @@ def _build_sampler_loop_body(model,
       active features to perform the Cholesky decomposition. This may provide
       a speedup when the number of true features is small compared to the size
       of the design matrix.
+    experimental_use_weight_adjustment: Optional bool - use a nonstandard
+      update for the posterior precision of the weight in case of a spike and
+      slab sampler.
 
   Returns:
     sampler_loop_body: Python callable that performs a single cycle of Gibbs
@@ -811,17 +819,22 @@ def _build_sampler_loop_body(model,
     observed_time_series = tf.where(is_missing,
                                     tf.zeros_like(observed_time_series),
                                     observed_time_series)
-
   num_observed_steps = prefer_static.shape(observed_time_series)[-1]
 
   design_matrix = _get_design_matrix(model)
+  num_missing = 0.
   if design_matrix is not None:
     design_matrix = design_matrix.to_dense()[:num_observed_steps]
-    if is_missing is not None:
+    if is_missing is None:
+      num_missing = 0.
+      is_missing = tf.zeros(num_observed_steps, dtype=bool)
+    else:
       # Replace design matrix with zeros at unobserved timesteps. This ensures
       # they will not affect the posterior on weights.
       design_matrix = tf.where(is_missing[..., tf.newaxis],
                                tf.zeros_like(design_matrix), design_matrix)
+      num_missing = tf.reduce_sum(
+          tf.cast(is_missing, design_matrix.dtype), axis=-1)
 
   # Untransform scale priors -> variance priors by reaching thru Sqrt bijector.
   observation_noise_param = model.parameters[0]
@@ -857,6 +870,7 @@ def _build_sampler_loop_body(model,
               tf.math.square(observation_noise_variance_prior.upper_bound)
               if hasattr(observation_noise_variance_prior, 'upper_bound') else
               None),
+          num_missing=num_missing,
           **({
               'default_pseudo_observations': default_pseudo_observations
           } if default_pseudo_observations is not None else {}))
@@ -890,12 +904,21 @@ def _build_sampler_loop_body(model,
       # arbitrary variation, while the weights are limited to representing
       # variation in the subspace given by the design matrix.
       if model_has_spike_slab_regression:
-        (observation_noise_variance,
-         weights) = spike_and_slab_sampler.sample_noise_variance_and_weights(
-             initial_nonzeros=tf.math.logical_or(
-                 tf.not_equal(previous_sample.weights, 0.), pin_to_nonzero),
-             targets=observed_time_series - previous_sample.level,
-             seed=weights_seed)
+        if experimental_use_weight_adjustment:
+          previous_observation_noise_variance = tf.square(
+              previous_sample.observation_noise_scale)
+        else:
+          previous_observation_noise_variance = 1.
+        targets = tf.where(is_missing,
+                           tf.zeros_like(observed_time_series),
+                           observed_time_series - previous_sample.level)
+        (observation_noise_variance, weights
+        ) = spike_and_slab_sampler.sample_noise_variance_and_weights(
+            initial_nonzeros=tf.math.logical_or(
+                tf.not_equal(previous_sample.weights, 0.), pin_to_nonzero),
+            previous_observation_noise_variance=previous_observation_noise_variance,
+            targets=targets,
+            seed=weights_seed)
         observation_noise_scale = tf.sqrt(observation_noise_variance)
 
       else:

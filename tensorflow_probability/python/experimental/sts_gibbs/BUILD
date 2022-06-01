@@ -135,6 +135,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
         "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/experimental/distributions:mvn_precision_factor_linop",
+        "//tensorflow_probability/python/internal:broadcast_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",

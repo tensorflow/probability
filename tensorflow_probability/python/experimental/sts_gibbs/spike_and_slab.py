@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import sample as sample_dist
 from tensorflow_probability.python.experimental.distributions import MultivariateNormalPrecisionFactorLinearOperator
+from tensorflow_probability.python.internal import broadcast_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -32,10 +33,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import vectorization_util
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
-
-__all__ = [
-    'SpikeSlabSampler'
-]
+__all__ = ['SpikeSlabSampler']
 
 
 class InverseGammaWithSampleUpperBound(inverse_gamma.InverseGamma):
@@ -43,9 +41,7 @@ class InverseGammaWithSampleUpperBound(inverse_gamma.InverseGamma):
 
   def __init__(self, concentration, scale, upper_bound, **kwargs):
     self._upper_bound = upper_bound
-    super().__init__(concentration=concentration,
-                     scale=scale,
-                     **kwargs)
+    super().__init__(concentration=concentration, scale=scale, **kwargs)
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):
@@ -95,15 +91,17 @@ class MVNPrecisionFactorHardZeros(
         nonzeros=parameter_properties.BatchedComponentProperties(event_ndims=1))
 
 
-class SpikeSlabSamplerState(collections.namedtuple(
-    'SpikeSlabSamplerState',
-    ['x_transpose_y',
-     'nonzeros',
-     'conditional_prior_precision_chol',
-     'conditional_posterior_precision_chol',
-     'conditional_weights_mean',
-     'observation_noise_variance_posterior_scale',
-     'unnormalized_log_prob'])):
+class SpikeSlabSamplerState(
+    collections.namedtuple('SpikeSlabSamplerState', [
+        'x_transpose_y',
+        'nonzeros',
+        'conditional_prior_precision_chol',
+        'conditional_posterior_precision_chol',
+        'conditional_weights_mean',
+        'weights_posterior_precision',
+        'observation_noise_variance_posterior_scale',
+        'unnormalized_log_prob'
+    ])):
   """Quantities maintained during a sweep of the spike and slab sampler.
 
     This state is generated and consumed by internal sampler methods. It is not
@@ -134,6 +132,10 @@ class SpikeSlabSamplerState(collections.namedtuple(
         `[num_features]`, giving the posterior mean weight vector (`beta_gamma`
         in [1]). This has nonzero values in locations where `nonzeros` is True,
         and zeros elsewhere.
+      weights_posterior_precision: (batch of) float `Tensor`(s) of shape
+        `[num_features]`. This may optionally vary with the observation noise,
+        so is stored in the state, rather than the class. (`V^-1` in [1])
+        sampled posterior (`SS_gamma / 2` in [1]).
       observation_noise_variance_posterior_scale: (batch of) scalar float
         `Tensor`s representing the scale parameter of the inverse gamma
         posterior on the observation noise variance (`SS_gamma / 2` in [1]).
@@ -239,63 +241,60 @@ class SpikeSlabSampler(object):
                default_pseudo_observations=1.,
                observation_noise_variance_prior_concentration=0.005,
                observation_noise_variance_prior_scale=0.0025,
-               observation_noise_variance_upper_bound=None):
+               observation_noise_variance_upper_bound=None,
+               num_missing=0.):
     """Initializes priors for the spike and slab sampler.
 
     Args:
-      design_matrix: (batch of) float `Tensor`(s) regression design matrix
-        (`X` in [1]) having shape `[num_outputs, num_features]`.
+      design_matrix: (batch of) float `Tensor`(s) regression design matrix (`X`
+        in [1]) having shape `[num_outputs, num_features]`.
       nonzero_prior_prob: scalar float `Tensor` prior probability of the 'slab',
         i.e., prior probability that any given feature has nonzero weight (`pi`
-        in [1]).
-        Default value: `0.5`.
+        in [1]). Default value: `0.5`.
       weights_prior_precision: (batch of) float `Tensor` complete prior
-        precision matrix(s) over the weights, of shape
-        `[num_features, num_features]`. If not specified, defaults to the
-        Zellner g-prior specified in `[1]` as
-        `Omega^{-1} = kappa * (X'X + diag(X'X)) / (2 * num_outputs)`,
-        in which we've plugged in the suggested default of `w = 0.5`. The
-        parameter `kappa` is controlled by the `default_pseudo_observations`
-        argument.
-        Default value: `None`.
-      default_pseudo_observations: scalar float `Tensor`
-        Controls the number of pseudo-observations for the prior precision
-        matrix over the weights. Corresponds to `kappa` in [1]. See also
-        `weights_prior_precision`.
+        precision matrix(s) over the weights, of shape `[num_features,
+        num_features]`. If not specified, defaults to the Zellner g-prior
+        specified in `[1]` as `Omega^{-1} = kappa * (X'X + diag(X'X)) / (2 *
+        num_outputs)`, in which we've plugged in the suggested default of `w =
+        0.5`. The parameter `kappa` is controlled by the
+        `default_pseudo_observations` argument. Default value: `None`.
+      default_pseudo_observations: scalar float `Tensor` Controls the number of
+        pseudo-observations for the prior precision matrix over the weights.
+        Corresponds to `kappa` in [1]. See also `weights_prior_precision`.
       observation_noise_variance_prior_concentration: scalar float `Tensor`
         concentration parameter of the inverse gamma prior on the noise
-        variance. Corresponds to `nu / 2` in [1].
-        Default value: 0.005.
-      observation_noise_variance_prior_scale: scalar float `Tensor`
-        scale parameter of the inverse gamma prior on the noise
-        variance. Corresponds to `ss / 2` in [1].
-        Default value: 0.0025.
+        variance. Corresponds to `nu / 2` in [1]. Default value: 0.005.
+      observation_noise_variance_prior_scale: scalar float `Tensor` scale
+        parameter of the inverse gamma prior on the noise variance. Corresponds
+        to `ss / 2` in [1]. Default value: 0.0025.
       observation_noise_variance_upper_bound: optional scalar float `Tensor`
         maximum value of sampled observation noise variance. Specifying a bound
         can help avoid divergence when the sampler is initialized far from the
-        posterior.
-        Default value: `None`.
+        posterior. Default value: `None`.
+      num_missing: Optional scalar float `Tensor`. Corrects for how many missing
+        values are are coded as zero in the design matrix.
     """
     with tf.name_scope('spike_slab_sampler'):
       dtype = dtype_util.common_dtype([
-          design_matrix,
-          nonzero_prior_prob,
-          weights_prior_precision,
+          design_matrix, nonzero_prior_prob, weights_prior_precision,
           observation_noise_variance_prior_concentration,
           observation_noise_variance_prior_scale,
-          observation_noise_variance_upper_bound], dtype_hint=tf.float32)
+          observation_noise_variance_upper_bound, num_missing
+      ],
+                                      dtype_hint=tf.float32)
       design_matrix = tf.convert_to_tensor(design_matrix, dtype=dtype)
       nonzero_prior_prob = tf.convert_to_tensor(nonzero_prior_prob, dtype=dtype)
       observation_noise_variance_prior_concentration = tf.convert_to_tensor(
           observation_noise_variance_prior_concentration, dtype=dtype)
       observation_noise_variance_prior_scale = tf.convert_to_tensor(
           observation_noise_variance_prior_scale, dtype=dtype)
+      num_missing = tf.convert_to_tensor(num_missing, dtype=dtype)
       if observation_noise_variance_upper_bound is not None:
         observation_noise_variance_upper_bound = tf.convert_to_tensor(
             observation_noise_variance_upper_bound, dtype=dtype)
 
       design_shape = ps.shape(design_matrix)
-      num_outputs = design_shape[-2]
+      num_outputs = tf.cast(design_shape[-2], dtype=dtype) - num_missing
       num_features = design_shape[-1]
 
       x_transpose_x = tf.matmul(design_matrix, design_matrix, adjoint_a=True)
@@ -303,24 +302,25 @@ class SpikeSlabSampler(object):
         # Default prior: 'Zellner’s g−prior' from section 3.2.1 of [1]:
         #   `omega^{-1} = kappa * (w X'X + (1 − w) diag(X'X))/n`
         # with default `w = 0.5`.
+        padded_inputs = broadcast_util.left_justified_expand_dims_like(
+            num_outputs, x_transpose_x)
         weights_prior_precision = default_pseudo_observations * tf.linalg.set_diag(
             0.5 * x_transpose_x,
-            tf.linalg.diag_part(x_transpose_x)) / num_outputs
+            tf.linalg.diag_part(x_transpose_x)) / padded_inputs
 
-      weights_posterior_precision = x_transpose_x + weights_prior_precision
       observation_noise_variance_posterior_concentration = (
-          observation_noise_variance_prior_concentration
-          + tf.convert_to_tensor(num_outputs / 2., dtype=dtype))
+          observation_noise_variance_prior_concentration +
+          tf.convert_to_tensor(num_outputs / 2., dtype=dtype))
 
       self.num_outputs = num_outputs
       self.num_features = num_features
       self.design_matrix = design_matrix
+      self.x_transpose_x = x_transpose_x
       self.dtype = dtype
       self.nonzeros_prior = sample_dist.Sample(
           bernoulli.Bernoulli(probs=nonzero_prior_prob),
           sample_shape=[num_features])
       self.weights_prior_precision = weights_prior_precision
-      self.weights_posterior_precision = weights_posterior_precision
       self.observation_noise_variance_prior_concentration = (
           observation_noise_variance_prior_concentration)
       self.observation_noise_variance_prior_scale = (
@@ -330,7 +330,11 @@ class SpikeSlabSampler(object):
       self.observation_noise_variance_posterior_concentration = (
           observation_noise_variance_posterior_concentration)
 
-  def sample_noise_variance_and_weights(self, targets, initial_nonzeros, seed):
+  def sample_noise_variance_and_weights(self,
+                                        targets,
+                                        initial_nonzeros,
+                                        seed,
+                                        previous_observation_noise_variance=1.):
     """(Re)samples regression parameters under the spike-and-slab model.
 
     Args:
@@ -339,6 +343,9 @@ class SpikeSlabSampler(object):
       initial_nonzeros: (batch of) boolean Tensor vector(s) of shape
         `[num_features]`.
       seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+      previous_observation_noise_variance: Optional float to scale the
+        `weights_prior_precision`. This behavior is not recommended.
+
     Returns:
       observation_noise_variance: (batch of) scalar float Tensor posterior
         sample(s) of the observation noise variance, given the resampled
@@ -348,17 +355,22 @@ class SpikeSlabSampler(object):
         weight vector) *and* the sampled observation noise variance. Has
         shape `[num_features]`.
     """
+    previous_observation_noise_variance = tf.convert_to_tensor(
+        previous_observation_noise_variance, dtype=self.dtype)
     feature_sweep_seed, resample_seed = samplers.split_seed(seed, n=2)
-    initial_state = self._initialize_sampler_state(targets=targets,
-                                                   nonzeros=initial_nonzeros)
+    initial_state = self._initialize_sampler_state(
+        targets=targets,
+        observation_noise_variance=previous_observation_noise_variance,
+        nonzeros=initial_nonzeros)
     # Loop over the features to update their sparsity indicators.
-    final_state = self._resample_all_features(initial_state,
-                                              seed=feature_sweep_seed)
+    final_state = self._resample_all_features(
+        initial_state, seed=feature_sweep_seed)
     # Finally, sample parameters given the updated sparsity indicators.
     return self._get_conditional_posterior(final_state).sample(
         seed=resample_seed)
 
-  def _initialize_sampler_state(self, targets, nonzeros):
+  def _initialize_sampler_state(self, targets, nonzeros,
+                                observation_noise_variance):
     """Precompute quantities needed to sample with given targets.
 
     This method computes a sampler state (including factorized precision
@@ -372,6 +384,9 @@ class SpikeSlabSampler(object):
       targets: (batch of) float Tensor regression outputs of shape
         `[num_outputs]`.
       nonzeros: (batch of) boolean Tensor vectors of shape `[num_features]`.
+      observation_noise_variance: float Tensor of to scale the posterior
+        precision.
+
     Returns:
       sampler_state: instance of `SpikeSlabSamplerState` collecting (potentially
         batched) Tensor quantities relevant to the sampler. See
@@ -388,32 +403,34 @@ class SpikeSlabSampler(object):
       batch_shape = ps.shape(x_transpose_y)[:-1]
       nonzeros = tf.broadcast_to(
           nonzeros,
-          ps.broadcast_shape(ps.shape(nonzeros),
-                             ps.concat([batch_shape, [1]], axis=0)))
+          ps.broadcast_shape(
+              ps.shape(nonzeros), ps.concat([batch_shape, [1]], axis=0)))
 
+      weights_posterior_precision = self.x_transpose_x + self.weights_prior_precision * observation_noise_variance
       conditional_prior_precision_chol = tf.linalg.cholesky(
           _select_nonzero_block(self.weights_prior_precision, nonzeros))
       conditional_posterior_precision_chol = tf.linalg.cholesky(
-          _select_nonzero_block(self.weights_posterior_precision, nonzeros))
+          _select_nonzero_block(weights_posterior_precision,
+                                nonzeros))
       conditional_weights_mean = tf.where(
           nonzeros,
           tf.linalg.cholesky_solve(conditional_posterior_precision_chol,
-                                   x_transpose_y[..., tf.newaxis])[..., 0],
-          0.)
+                                   x_transpose_y[..., tf.newaxis])[..., 0], 0.)
       return self._compute_log_prob(
           x_transpose_y=x_transpose_y,
           nonzeros=nonzeros,
           conditional_prior_precision_chol=conditional_prior_precision_chol,
           conditional_posterior_precision_chol=conditional_posterior_precision_chol,
+          weights_posterior_precision=weights_posterior_precision,
           conditional_weights_mean=conditional_weights_mean,
           observation_noise_variance_posterior_scale=(
               # SS_gamma / 2 from eqn (7) of [1].
               self.observation_noise_variance_prior_scale +  # ss / 2
-              (tf.reduce_sum(targets**2, axis=-1) -  # y'y
-               tf.reduce_sum(   # beta_gamma' V_gamma^{-1} beta_gamma
-                   conditional_weights_mean * x_transpose_y,
-                   axis=-1))
-              / 2))
+              (
+                  tf.reduce_sum(targets**2, axis=-1) -  # y'y
+                  tf.reduce_sum(  # beta_gamma' V_gamma^{-1} beta_gamma
+                      conditional_weights_mean * x_transpose_y,
+                      axis=-1)) / 2))
 
   def _flip_feature(self, sampler_state, idx):
     """Proposes flipping the sparsity indicator of the `idx`th feature.
@@ -432,6 +449,7 @@ class SpikeSlabSampler(object):
         `SpikeSlabSamplerState` definition for details.
       idx: scalar int `Tensor` index in `[0, num_features)`. This is a single
         value shared across all batch elements.
+
     Returns:
       updated_sampler_state: instance of `SpikeSlabSamplerState` equivalent to
         `self._initialize_sampler_state(targets, new_nonzeros)`, where
@@ -440,8 +458,8 @@ class SpikeSlabSampler(object):
     """
     with tf.name_scope('flip_feature_indicator'):
       was_nonzero = tf.gather(sampler_state.nonzeros, idx, axis=-1)
-      new_nonzeros = _set_vector_index(
-          sampler_state.nonzeros, idx, tf.logical_not(was_nonzero))
+      new_nonzeros = _set_vector_index(sampler_state.nonzeros, idx,
+                                       tf.logical_not(was_nonzero))
 
       # Update the weight posterior mean and precision for the new nonzeros.
       # (and also update the prior, used to compute the marginal likelihood).
@@ -457,14 +475,15 @@ class SpikeSlabSampler(object):
       new_conditional_posterior_precision_chol = _update_nonzero_block_chol(
           chol=sampler_state.conditional_posterior_precision_chol,
           idx=idx,
-          psd_matrix=self.weights_posterior_precision,
+          psd_matrix=sampler_state.weights_posterior_precision,
           new_nonzeros=new_nonzeros,
           previous_nonzeros=sampler_state.nonzeros)
       new_conditional_weights_mean = tf.where(
           new_nonzeros,
-          tf.linalg.cholesky_solve(
-              new_conditional_posterior_precision_chol,
-              sampler_state.x_transpose_y[..., tf.newaxis])[..., 0],
+          tf.linalg.cholesky_solve(new_conditional_posterior_precision_chol,
+                                   sampler_state.x_transpose_y[...,
+                                                               tf.newaxis])[...,
+                                                                            0],
           0.)
       return self._compute_log_prob(
           nonzeros=new_nonzeros,
@@ -473,6 +492,7 @@ class SpikeSlabSampler(object):
           conditional_posterior_precision_chol=(
               new_conditional_posterior_precision_chol),
           conditional_weights_mean=new_conditional_weights_mean,
+          weights_posterior_precision=sampler_state.weights_posterior_precision,
           observation_noise_variance_posterior_scale=(
               sampler_state.observation_noise_variance_posterior_scale -
               tf.reduce_sum(
@@ -497,6 +517,7 @@ class SpikeSlabSampler(object):
         (potentially batched) Tensor quantities relevant to the sampler. See
         `SpikeSlabSamplerState` for details.
       seed: PRNG seed; see `tfp.random.sanitize_seed` for details.
+
     Returns:
       final sampler_state: instance of `SpikeSlabSamplerState` in which the
         sparsity indicators for all features have been resampled.
@@ -529,14 +550,12 @@ class SpikeSlabSampler(object):
           loop_vars=(0, loop_seed, initial_sampler_state))
       return final_sampler_state
 
-  def _compute_log_prob(
-      self,
-      x_transpose_y,
-      nonzeros,
-      conditional_prior_precision_chol,
-      conditional_posterior_precision_chol,
-      conditional_weights_mean,
-      observation_noise_variance_posterior_scale):  # pylint: disable=g-doc-args
+  def _compute_log_prob(self, x_transpose_y, nonzeros,
+                        conditional_prior_precision_chol,
+                        conditional_posterior_precision_chol,
+                        conditional_weights_mean,
+                        weights_posterior_precision,
+                        observation_noise_variance_posterior_scale):  # pylint: disable=g-doc-args
     """Computes an unnormalized log prob of a sampler state.
 
     This corresponds to equation (8) in [1]. It scores a sparsity pattern by
@@ -544,8 +563,8 @@ class SpikeSlabSampler(object):
     that do not depend on the sparsity pattern) multiplied by the prior
     probability of the sparsity pattern.
 
-    Args:
-      See `SpikeSlabSamplerState`.
+    Args: See `SpikeSlabSamplerState`.
+
     Returns:
       sampler_state: a `SpikeSlabSamplerState` instance containing the given
         args and the corresponding unnormalized log prob.
@@ -556,17 +575,19 @@ class SpikeSlabSampler(object):
         conditional_prior_precision_chol=conditional_prior_precision_chol,
         conditional_posterior_precision_chol=conditional_posterior_precision_chol,
         conditional_weights_mean=conditional_weights_mean,
+        weights_posterior_precision=weights_posterior_precision,
         observation_noise_variance_posterior_scale=(
             observation_noise_variance_posterior_scale),
         unnormalized_log_prob=(  # Equation (8) of [1].
             _half_logdet(conditional_prior_precision_chol) -
             _half_logdet(conditional_posterior_precision_chol) +
             self.nonzeros_prior.log_prob(nonzeros) -
-            (self.observation_noise_variance_posterior_concentration - 1
-             ) * tf.math.log(2 * observation_noise_variance_posterior_scale)))
+            (self.observation_noise_variance_posterior_concentration - 1) *
+            tf.math.log(2 * observation_noise_variance_posterior_scale)))
 
   def _get_conditional_posterior(self, sampler_state):
     """Builds the joint posterior for a sparsity pattern (eqn (7) from [1])."""
+
     @joint_distribution_auto_batched.JointDistributionCoroutineAutoBatched
     def posterior_jd():
       observation_noise_variance = yield InverseGammaWithSampleUpperBound(
@@ -612,9 +633,10 @@ def _select_nonzero_block(matrix, nonzeros):
   the features are left at their original indices (not permuted).
 
   Args:
-    matrix: (batch of) float Tensor matrix(s) of shape
-      `[num_features, num_features]`.
+    matrix: (batch of) float Tensor matrix(s) of shape `[num_features,
+      num_features]`.
     nonzeros: (batch of) boolean Tensor vectors of shape `[num_features]`.
+
   Returns:
     block_matrix: (batch of) float Tensor matrix(s) of the same shape as
       `matrix`, in which `block_matrix[i, j] = matrix[i, j] if
@@ -624,16 +646,15 @@ def _select_nonzero_block(matrix, nonzeros):
   """
   # Zero out all entries in the not-selected rows.
   masked = tf.where(nonzeros[..., tf.newaxis],
-                    tf.where(nonzeros[..., tf.newaxis, :], matrix, 0.),
-                    0.)
+                    tf.where(nonzeros[..., tf.newaxis, :], matrix, 0.), 0.)
   # Restore a value of 1 on the diagonal of the not-selected rows. This avoids
   # numerical issues by ensuring that the matrix still has full rank.
   return tf.linalg.set_diag(masked,
                             tf.where(nonzeros, tf.linalg.diag_part(masked), 1.))
 
 
-def _update_nonzero_block_chol(
-    chol, idx, psd_matrix, new_nonzeros, previous_nonzeros):
+def _update_nonzero_block_chol(chol, idx, psd_matrix, new_nonzeros,
+                               previous_nonzeros):
   """Efficient update to the cholesky factor of the 'slab' (nonzero) submatrix.
 
   This performs an efficient update when `nonzeros` changes by a single entry.
@@ -658,6 +679,7 @@ def _update_nonzero_block_chol(
     new_nonzeros: (batch of) boolean Tensor vectors of shape `[num_features]`.
     previous_nonzeros: (batch of) boolean Tensor vectors of shape
       `[num_features]`.
+
   Returns:
     updated_chol: (batch of) float Tensor lower-triangular Cholesky factor(s) of
       `select_nonzero_block(psd_matrix, new_nonzeros)`.
@@ -719,6 +741,7 @@ def _symmetric_increment_chol(chol, idx, increment):
       update.
     increment: (batch of) float `Tensor` vector(s) to add to the given row and
       column of `M`.
+
   Returns:
     updated_chol: float `Tensor` lower-triangular Cholesky factor of the
       symmetric matrix resulting from adding `increment` to the
@@ -764,13 +787,13 @@ def _symmetric_increment_chol(chol, idx, increment):
     # TODO(b/229298550): Investigate whether this is really necessary, or if the
     # test failures we see without this line are due to an underlying bug.
     return tf.where((tf.range(chol.shape[-1]) < idx)[..., tf.newaxis],
-                    orig_chol,
-                    chol)
+                    orig_chol, chol)
 
 
 def _set_vector_index_unbatched(v, idx, x):
   """Mutation-free equivalent of `v[idx] = x."""
   return tf.tensor_scatter_nd_update(v, indices=[[idx]], updates=[x])
+
 
 _set_vector_index = vectorization_util.make_rank_polymorphic(
     _set_vector_index_unbatched, core_ndims=[1, 0, 0])

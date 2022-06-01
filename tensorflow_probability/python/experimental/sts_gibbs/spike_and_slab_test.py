@@ -125,7 +125,7 @@ class SpikeAndSlabTest(test_util.TestCase):
         design_matrix,
         default_pseudo_observations=default_pseudo_observations)
     initial_state = sampler._initialize_sampler_state(
-        targets=targets, nonzeros=nonzeros)
+        targets=targets, nonzeros=nonzeros, observation_noise_variance=1.)
 
     # Compute the analytic posterior for the regression problem restricted to
     # only the selected features. Note that by slicing a submatrix of the
@@ -186,7 +186,8 @@ class SpikeAndSlabTest(test_util.TestCase):
     self.assertAllClose(
         tight_slab_sampler._initialize_sampler_state(
             targets=targets,
-            nonzeros=tf.ones([num_features], dtype=tf.bool)
+            nonzeros=tf.ones([num_features], dtype=tf.bool),
+            observation_noise_variance=1.
             ).observation_noise_variance_posterior_scale,
         naive_posterior.scale,
         atol=1e-2)
@@ -204,7 +205,8 @@ class SpikeAndSlabTest(test_util.TestCase):
     self.assertAllClose(
         downweighted_slab_sampler._initialize_sampler_state(
             targets=targets,
-            nonzeros=tf.zeros([num_features], dtype=tf.bool)
+            nonzeros=tf.zeros([num_features], dtype=tf.bool),
+            observation_noise_variance=1.
             ).observation_noise_variance_posterior_scale,
         naive_posterior.scale)
 
@@ -242,14 +244,16 @@ class SpikeAndSlabTest(test_util.TestCase):
     @tf.function(autograph=False, jit_compile=use_xla)
     def _do_flips():
       state = sampler._initialize_sampler_state(
-          targets=targets, nonzeros=initial_nonzeros)
+          targets=targets,
+          nonzeros=initial_nonzeros,
+          observation_noise_variance=1.)
       def _do_flip(state, i):
         new_state = sampler._flip_feature(state, tf.gather(flip_idxs, i))
         return mcmc_util.choose(tf.gather(should_flip, i), new_state, state)
       return tf.foldl(_do_flip, elems=tf.range(num_flips), initializer=state)
 
     self.assertAllCloseNested(
-        sampler._initialize_sampler_state(targets, nonzeros),
+        sampler._initialize_sampler_state(targets, nonzeros, 1.),
         _do_flips(),
         atol=num_outputs * 2e-4, rtol=num_outputs * 2e-4)
 
@@ -272,7 +276,9 @@ class SpikeAndSlabTest(test_util.TestCase):
         # Ensure the probability of keeping an irrelevant feature is tiny.
         nonzero_prior_prob=1e-6)
     initial_state = sampler._initialize_sampler_state(
-        targets=targets, nonzeros=tf.convert_to_tensor([True, True, True]))
+        targets=targets,
+        nonzeros=tf.convert_to_tensor([True, True, True]),
+        observation_noise_variance=1.)
     final_state = self.evaluate(
         sampler._resample_all_features(
             initial_state, seed=test_util.test_seed()))
@@ -369,4 +375,3 @@ class SpikeAndSlabTest(test_util.TestCase):
 
 if __name__ == '__main__':
   test_util.main()
-
