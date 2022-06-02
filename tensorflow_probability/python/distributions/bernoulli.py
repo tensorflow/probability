@@ -28,7 +28,9 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
-class Bernoulli(distribution.AutoCompositeTensorDistribution):
+class Bernoulli(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Bernoulli distribution.
 
   The Bernoulli distribution with `probs` parameter, i.e., the probability of a

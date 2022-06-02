@@ -29,6 +29,7 @@ from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import util as tfp_util
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
+from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.experimental import distributions as tfed
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
@@ -48,7 +49,6 @@ TF2_UNFRIENDLY_DISTS = (
     'MultivariateNormalFullCovariance',
     'MultivariateNormalTriL',
 )
-
 
 # SPECIAL_DISTS are distributions that should not be drawn by
 # `base_distributions`, because they are parameterized by one or more
@@ -461,6 +461,27 @@ def _instantiable_base_dists():
 # INSTANTIABLE_BASE_DISTS is a map from str->(DistClass, params_event_ndims)
 INSTANTIABLE_BASE_DISTS = _instantiable_base_dists()
 del _instantiable_base_dists
+
+
+def _discrete_dists():
+  """Computes the table of Discrete Distributions.
+
+  Returns:
+    discrete_dists: A Python list of discrete distributions.
+  """
+  result = []
+  for dist_name in dir(tfd):
+    dist_class = getattr(tfd, dist_name)
+    if (not inspect.isclass(dist_class) or
+        not issubclass(dist_class, tfd.Distribution)):
+      continue
+
+    if issubclass(dist_class, distribution.DiscreteDistributionMixin):
+      result.append(dist_name)
+  return result
+
+DISCRETE_DISTS = _discrete_dists()
+del _discrete_dists
 
 
 INSTANTIABLE_META_DISTS = (

@@ -136,7 +136,9 @@ def random_poisson(
     return sampler_impl(**params)
 
 
-class Poisson(distribution.AutoCompositeTensorDistribution):
+class Poisson(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Poisson distribution.
 
   The Poisson distribution is parameterized by an event `rate` parameter.

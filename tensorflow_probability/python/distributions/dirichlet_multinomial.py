@@ -51,7 +51,9 @@ fractional components, and such that
 with `self.concentration` and `self.total_count`."""
 
 
-class DirichletMultinomial(distribution.AutoCompositeTensorDistribution):
+class DirichletMultinomial(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Dirichlet-Multinomial compound distribution.
 
   The Dirichlet-Multinomial distribution is parameterized by a (batch of)

@@ -91,6 +91,12 @@ SLICING_LOGPROB_RTOL.update({
 })
 
 
+DISCRETE_BUT_NOT_TRANSFORMABLE = [
+    # Samples are integers so can't be transformed by a float bijector.
+    'DeterminantalPointProcess',
+]
+
+
 @test_util.test_all_tf_execution_regimes
 class StatisticConsistentShapesTest(test_util.TestCase):
 
@@ -228,6 +234,43 @@ class ReproducibilityTest(test_util.TestCase):
       s1 = self.evaluate(dist.sample(50, seed=seed))
       s2 = self.evaluate(dist.sample(50, seed=seed))
     self.assertAllEqual(s1, s2)
+
+
+@test_util.test_all_tf_execution_regimes
+class TestDiscreteDistributions(test_util.TestCase):
+
+  @parameterized.named_parameters(
+      {'testcase_name': dname, 'dist_name': dname}
+      for dname in sorted(list(set(dhps.DISCRETE_DISTS) -
+                               set(DISCRETE_BUT_NOT_TRANSFORMABLE))))
+  @hp.given(hps.data())
+  @tfp_hps.tfp_hp_settings()
+  def testNoJacobianCorrection(self, dist_name, data):
+
+    # Disable validate args since transforming with Softplus and inverting
+    # might make arguments not as close to integers.
+    dist = data.draw(dhps.distributions(
+        dist_name=dist_name,
+        enable_vars=False,
+        validate_args=False))
+
+    # Ensure that these are distributions over floats so we can apply the
+    # Softplus bijector.
+    if 'dtype' in dist.parameters:
+      dist = dist.copy(dtype=tf.float32)
+    bij = tfb.Softplus()
+    transformed_dist = tfd.TransformedDistribution(dist, bijector=bij)
+
+    seed = test_util.test_seed()
+    samples = transformed_dist.sample(7, seed=seed)
+    # Break bijector caching.
+    samples = self.evaluate(
+        samples + tf.constant(0., dtype=samples.dtype))
+
+    # Check that no jacobian correction is added for a discrete distribution.
+    self.assertAllClose(
+        self.evaluate(dist.log_prob(bij.inverse(samples))),
+        self.evaluate(transformed_dist.log_prob(samples)))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -630,8 +673,8 @@ class TestMixingGraphAndEagerModes(test_util.TestCase):
 
   @parameterized.named_parameters(
       {'testcase_name': dname, 'dist_name': dname}
-      for dname in  sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
-                           list(dhps.INSTANTIABLE_META_DISTS))
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()) +
+                          list(dhps.INSTANTIABLE_META_DISTS))
   )
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()

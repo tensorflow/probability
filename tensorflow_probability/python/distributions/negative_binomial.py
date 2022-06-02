@@ -30,7 +30,9 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
-class NegativeBinomial(distribution.AutoCompositeTensorDistribution):
+class NegativeBinomial(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """NegativeBinomial distribution.
 
   The NegativeBinomial distribution is related to the experiment of performing

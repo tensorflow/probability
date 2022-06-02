@@ -34,7 +34,9 @@ __all__ = [
 ]
 
 
-class Zipf(distribution.AutoCompositeTensorDistribution):
+class Zipf(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Zipf distribution.
 
   The Zipf distribution is parameterized by a `power` parameter.

@@ -36,7 +36,9 @@ __all__ = [
 ]
 
 
-class FiniteDiscrete(distribution.AutoCompositeTensorDistribution):
+class FiniteDiscrete(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """The finite discrete distribution.
 
   The FiniteDiscrete distribution is parameterized by either probabilities or

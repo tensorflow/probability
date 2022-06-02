@@ -2119,6 +2119,48 @@ class AutoCompositeTensorDistribution(
   pass
 
 
+class DiscreteDistributionMixin(object):
+  """Mixin for Distributions over discrete spaces.
+
+  This mixin identifies a `Distribution` as a discrete distribution, which in
+  turn ensures that it is transformed properly under `TransformedDistribution`.
+
+  Normally, for a continuous distribution `dist` by a bijector `bij`, we have
+  the following formula for the `log_prob`:
+      `dist.log_prob(bij.inverse(y)) + bij.inverse_log_det_jacobian(y)`.
+  For a discrete distribution, we don't apply the `inverse_log_det_jacobian`
+  correction (hence just `dist.log_prob(bij.inverse(y))`). This difference
+  comes from transforming a probability density vs. probabilities.
+
+  As an example, we could take a Bernoulli distribution (
+  whose samples are `0` or `1`) and square it via `tfb.Square`. Samples from
+  this new distribution are still `0` or `1` and one would expect that the
+  probabilities for `0` and `1` are unchanged after this transformation.
+
+  ```python
+  dist = tfp.distributions.Bernoulli(probs=0.5)
+  dist.prob(1.)  # expect 0.5
+  transformed_dist = tfp.bijectors.Square()(dist)
+  transformed_dist.prob(1.) # expect 0.5
+  ```
+
+  If we apply the jacobian correction, we would instead get the wrong answer
+
+  ```python
+  # If we compute with the jacobian correction explicitly, we get the wrong
+  # answer.
+  bij = tfp.bijectors.Square()
+  prob_at_1 = dist.log_prob(bij.inverse(1.)) + bij.inverse_log_det_jacobian(1.)
+  prob_at_1 = tf.math.exp(prob_at_1) # This is 0.25
+  ```
+  """
+
+  @property
+  def _experimental_tangent_space(self):
+    from tensorflow_probability.python.experimental import tangent_spaces  # pylint: disable=g-import-not-at-top
+    return tangent_spaces.ZeroSpace()
+
+
 class _PrettyDict(dict):
   """`dict` with stable `repr`, `str`."""
 
