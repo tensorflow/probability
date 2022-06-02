@@ -47,7 +47,7 @@ __all__ = [
 
 def map_tree(fn, tree, *args):
   """Maps `fn` over the leaves of a nested structure."""
-  return tree_util.tree_multimap(fn, tree, *args)
+  return tree_util.tree_map(fn, tree, *args)
 
 
 def flatten_tree(tree):
@@ -66,7 +66,7 @@ def map_tree_up_to(shallow, fn, tree, *rest):
   def wrapper(_, *rest):
     return fn(*rest)
 
-  return tree_util.tree_multimap(wrapper, shallow, tree, *rest)
+  return tree_util.tree_map(wrapper, shallow, tree, *rest)
 
 
 def get_shallow_tree(is_leaf, tree):
@@ -76,7 +76,7 @@ def get_shallow_tree(is_leaf, tree):
 
 def assert_same_shallow_tree(shallow, tree):
   """Asserts that `tree` has the same shallow structure as `shallow`."""
-  # Do a dummy multimap for the side-effect of verifying that the structures are
+  # Do a dummy map for the side-effect of verifying that the structures are
   # the same. This doesn't catch all the errors we actually care about, sadly.
   map_tree_up_to(shallow, lambda *args: (), tree)
 

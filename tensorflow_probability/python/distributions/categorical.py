@@ -58,7 +58,9 @@ def _broadcast_cat_event_and_params(event, params, base_dtype):
   return event, params
 
 
-class Categorical(distribution.AutoCompositeTensorDistribution):
+class Categorical(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Categorical distribution over integers.
 
   The Categorical distribution is parameterized by either probabilities or

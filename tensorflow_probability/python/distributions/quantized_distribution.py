@@ -108,7 +108,9 @@ The base distribution's `log_cdf` method must be defined on `y - 1`.
 """
 
 
-class _QuantizedDistribution(distributions.Distribution):
+class _QuantizedDistribution(
+    distributions.DiscreteDistributionMixin,
+    distributions.Distribution):
   """Distribution representing the quantization `Y = ceiling(X)`.
 
   #### Definition in Terms of Sampling

@@ -275,6 +275,42 @@ class VariationalGaussianProcessTest(test_util.TestCase):
         observation_index_points=observation_index_points)
     self.assertAllEqual(vgp.batch_shape_tensor(), tf.shape(loss))
 
+  def testCustomCholeskyFn(self):
+    def test_cholesky(x):
+      test_cholesky.cholesky_count += 1
+      return tf.linalg.cholesky(tf.linalg.set_diag(
+          x, tf.linalg.diag_part(x) + 3.))
+    test_cholesky.cholesky_count = 0
+
+    index_points = np.linspace(-4., 4., 5, dtype=np.float64)[..., np.newaxis]
+    inducing_index_points = np.linspace(-4., 4., 3, dtype=np.float64)[
+        ..., np.newaxis]
+
+    variational_inducing_observations_loc = np.zeros([3], dtype=np.float64)
+    variational_inducing_observations_scale = np.eye(3, dtype=np.float64)
+
+    amplitude = np.float64(1.)
+    length_scale = np.float64(1.)
+
+    jitter = np.float64(1e-6)
+    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+        amplitude, length_scale)
+
+    vgp = tfd.VariationalGaussianProcess(
+        kernel=kernel,
+        index_points=index_points,
+        inducing_index_points=inducing_index_points,
+        variational_inducing_observations_loc=(
+            variational_inducing_observations_loc),
+        variational_inducing_observations_scale=(
+            variational_inducing_observations_scale),
+        observation_noise_variance=1e-6,
+        cholesky_fn=test_cholesky,
+        jitter=jitter)
+    self.evaluate(vgp.get_marginal_distribution().stddev())
+    # Assert that the custom cholesky function is called at least once.
+    self.assertGreaterEqual(test_cholesky.cholesky_count, 1)
+
   def testBernoulliLikelihood(self):
     kernel = tfp.math.psd_kernels.ExponentiatedQuadratic()
     num_predictive_points = 10

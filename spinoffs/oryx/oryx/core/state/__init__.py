@@ -22,7 +22,6 @@ from oryx.core.state.api import make_array_spec
 from oryx.core.state.api import Shape
 from oryx.core.state.api import spec
 from oryx.core.state.api import update
-from oryx.core.state.function import custom_unzip_rules
 from oryx.core.state.function import kwargs_rules
 from oryx.core.state.module import assign
 from oryx.core.state.module import ASSIGN

@@ -602,7 +602,7 @@ class GaussianProcess(
   def _event_shape_tensor(self, index_points=None):
     index_points = self._get_index_points(index_points)
     if self._is_univariate_marginal(index_points):
-      return tf.constant([], dtype=tf.int32)
+      return ps.constant([], dtype=tf.int32)
     else:
       # The examples index is one position to the left of the feature dims.
       examples_index = -(self.kernel.feature_ndims + 1)

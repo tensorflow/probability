@@ -21,7 +21,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.sts_gibbs import spike_and_slab
+from tensorflow_probability.python.experimental.sts_gibbs import dynamic_spike_and_slab
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
@@ -29,70 +29,43 @@ from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 tfd = tfp.distributions
 
 
-def _naive_symmetric_increment(m, idx, increment):
-  m = m.copy()
-  m[..., idx, :] += increment
-  m[..., :, idx] += increment
-  m[..., idx, idx] -= increment[..., idx]
-  return m
+def _compute_conditional_weights_mean(nonzeros, weights_posterior_precision,
+                                      x_transpose_y):
+  indices = tf.where(nonzeros)[:, 0]
+  conditional_posterior_precision_chol = tf.linalg.cholesky(
+      tf.gather(
+          tf.gather(weights_posterior_precision, indices),
+          indices, axis=1))
+  return tf.linalg.cholesky_solve(
+      conditional_posterior_precision_chol,
+      tf.gather(x_transpose_y, indices)[..., tf.newaxis])[..., 0]
 
 
 class SpikeAndSlabTest(test_util.TestCase):
 
-  def test_chol_symmetric_increment_batch(self):
-    matrix = samplers.normal([7, 5, 5], seed=test_util.test_seed())
-    psd_matrix = self.evaluate(
-        tf.matmul(matrix, matrix, adjoint_b=True) + tf.eye(5))
-    chol = tf.linalg.cholesky(psd_matrix)
-    increment = self.evaluate(
-        0.1 * samplers.normal([7, 5], seed=test_util.test_seed()))
-    for idx in range(5):
-      expected_result = _naive_symmetric_increment(psd_matrix, idx, increment)
-      chol_result = spike_and_slab._symmetric_increment_chol(
-          chol, idx, increment)
-      result = tf.matmul(chol_result, chol_result, adjoint_b=True)
-      self.assertAllClose(expected_result, result)
-
-  @parameterized.named_parameters(
-      ('_positive_diag', np.float32([0.5, 3.75, -2.5])),
-      ('_zero_diag', np.float32([0., 3.75, -2.5])),
-      ('_negative_diag', np.float32([-0.5, 3.75, -2.5])))
-  def test_chol_symmetric_increment_cases(self, increment):
-    symmetric_matrix = np.float32(
-        [[1.5, -3.75, 2.5],
-         [-3.75, 15., -8.75],
-         [2.5, -8.75, 7.5]])
-    chol = np.linalg.cholesky(symmetric_matrix)
-    expected_result = _naive_symmetric_increment(symmetric_matrix, 0, increment)
-    chol_result = spike_and_slab._symmetric_increment_chol(
-        chol, 0, increment)
-    result = tf.matmul(chol_result, chol_result, adjoint_b=True)
-    self.assertAllClose(expected_result, result)
-
-  def _random_regression_task(self, num_outputs, num_features, batch_shape=(),
+  def _random_regression_task(self, num_outputs, num_features,
                               weights=None, observation_noise_scale=0.1,
                               seed=None):
     design_seed, weights_seed, noise_seed = samplers.split_seed(seed, n=3)
-    batch_shape = list(batch_shape)
 
-    design_matrix = samplers.uniform(batch_shape + [num_outputs, num_features],
+    design_matrix = samplers.uniform([num_outputs, num_features],
                                      seed=design_seed)
     if weights is None:
-      weights = samplers.normal(batch_shape + [num_features], seed=weights_seed)
+      weights = samplers.normal([num_features], seed=weights_seed)
     targets = (tf.linalg.matvec(design_matrix, weights) +
                observation_noise_scale * samplers.normal(
-                   batch_shape + [num_outputs], seed=noise_seed))
+                   [num_outputs], seed=noise_seed))
     return design_matrix, weights, targets
 
   def test_sampler_respects_pseudo_observations(self):
     design_matrix = self.evaluate(
-        samplers.uniform([2, 20, 5], seed=test_util.test_seed()))
+        samplers.uniform([20, 5], seed=test_util.test_seed()))
     first_obs = 2.
     second_obs = 10.
-    first_sampler = spike_and_slab.SpikeSlabSampler(
+    first_sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler(
         design_matrix,
         default_pseudo_observations=first_obs)
-    second_sampler = spike_and_slab.SpikeSlabSampler(
+    second_sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler(
         design_matrix,
         default_pseudo_observations=second_obs)
 
@@ -111,7 +84,7 @@ class SpikeAndSlabTest(test_util.TestCase):
     # Generate a synthetic regression task.
     design_matrix, _, targets = self.evaluate(
         self._random_regression_task(
-            num_features=5, num_outputs=20, batch_shape=[2],
+            num_features=5, num_outputs=20,
             seed=test_util.test_seed()))
 
     # Utilities to extract values for nonzero-weight features.
@@ -121,7 +94,7 @@ class SpikeAndSlabTest(test_util.TestCase):
         lambda x: self.evaluate(x)[..., nonzeros][..., nonzeros, :])
 
     # Compute the weight posterior mean and precision for these nonzeros.
-    sampler = spike_and_slab.SpikeSlabSampler(
+    sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler(
         design_matrix,
         default_pseudo_observations=default_pseudo_observations)
     initial_state = sampler._initialize_sampler_state(
@@ -134,7 +107,7 @@ class SpikeAndSlabTest(test_util.TestCase):
     # into the covariance which would give the marginal (unconditional) prior
     # on the selected weights.
     (restricted_weights_posterior_mean,
-     restricted_weights_posterior_prec) = tfd.mvn_conjugate_linear_update(
+     _) = tfd.mvn_conjugate_linear_update(
          prior_scale=tf.linalg.cholesky(
              tf.linalg.inv(nonzero_submatrix(sampler.weights_prior_precision))),
          linear_transformation=nonzero_subvector(design_matrix),
@@ -143,13 +116,16 @@ class SpikeAndSlabTest(test_util.TestCase):
 
     # The sampler's posterior should match the posterior from the restricted
     # problem.
+    weights_posterior_precision = (sampler.x_transpose_x +
+                                   sampler.weights_prior_precision)
+    conditional_weights_mean = _compute_conditional_weights_mean(
+        initial_state.nonzeros,
+        weights_posterior_precision,
+        initial_state.x_transpose_y)
     self.assertAllClose(
-        nonzero_subvector(self.evaluate(
-            initial_state.conditional_weights_mean)),
+        self.evaluate(
+            conditional_weights_mean),
         restricted_weights_posterior_mean)
-    self.assertAllClose(
-        nonzero_submatrix(initial_state.conditional_posterior_precision_chol),
-        tf.linalg.cholesky(restricted_weights_posterior_prec.to_dense()))
 
   def test_noise_variance_posterior_matches_expected(self):
     # Generate a synthetic regression task.
@@ -157,7 +133,7 @@ class SpikeAndSlabTest(test_util.TestCase):
     num_outputs = 20
     design_matrix, _, targets = self.evaluate(
         self._random_regression_task(
-            num_features=num_features, num_outputs=num_outputs, batch_shape=[2],
+            num_features=num_features, num_outputs=num_outputs,
             seed=test_util.test_seed()))
 
     observation_noise_variance_prior_concentration = 0.03
@@ -173,7 +149,7 @@ class SpikeAndSlabTest(test_util.TestCase):
     # We can do this by reducing the width of the slab (here),
     # or by reducing the probability of the slab (below). Both should give
     # equivalent noise posteriors.
-    tight_slab_sampler = spike_and_slab.SpikeSlabSampler(
+    tight_slab_sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler(
         design_matrix,
         weights_prior_precision=tf.eye(num_features) * 1e6,
         observation_noise_variance_prior_concentration=(
@@ -192,7 +168,7 @@ class SpikeAndSlabTest(test_util.TestCase):
         naive_posterior.scale,
         atol=1e-2)
 
-    downweighted_slab_sampler = spike_and_slab.SpikeSlabSampler(
+    downweighted_slab_sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler(
         design_matrix,
         observation_noise_variance_prior_concentration=(
             observation_noise_variance_prior_concentration),
@@ -211,24 +187,20 @@ class SpikeAndSlabTest(test_util.TestCase):
         naive_posterior.scale)
 
   @parameterized.parameters(
-      (2, 3, 1, [], False),
-      (2, 3, 1, [3, 2], True),
-      (100, 20, 10, [4], False),
-      (100, 20, 10, [], True),
-      (40, 20, 12, [3], True))
+      (2, 3, 1),
+      (2, 3, 1),
+      (100, 20, 10),
+      (100, 20, 10),
+      (40, 20, 12))
   def test_updated_state_matches_initial_computation(
-      self, num_outputs, num_features, num_flips, batch_shape, use_xla):
+      self, num_outputs, num_features, num_flips):
 
     rng = test_util.test_np_rng()
     initial_nonzeros = rng.randint(
-        low=0, high=2, size=batch_shape + [num_features]).astype(np.bool)
+        low=0, high=2, size=[num_features]).astype(np.bool)
     flip_idxs = rng.choice(
         num_features, size=num_flips, replace=False).astype(np.int32)
-    if batch_shape:
-      should_flip = rng.randint(
-          low=0, high=2, size=[num_flips] + batch_shape).astype(np.bool)
-    else:
-      should_flip = np.array([True] * num_flips)
+    should_flip = np.array([True] * num_flips)
 
     nonzeros = initial_nonzeros.copy()
     for i in range(num_flips):
@@ -237,11 +209,11 @@ class SpikeAndSlabTest(test_util.TestCase):
 
     design_matrix, _, targets = self._random_regression_task(
         num_outputs=num_outputs, num_features=num_features,
-        batch_shape=batch_shape, seed=test_util.test_seed())
-    sampler = spike_and_slab.SpikeSlabSampler(design_matrix=design_matrix,
-                                              nonzero_prior_prob=0.3)
+        seed=test_util.test_seed())
+    sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler(
+        design_matrix=design_matrix, nonzero_prior_prob=0.3)
 
-    @tf.function(autograph=False, jit_compile=use_xla)
+    @tf.function(autograph=False, jit_compile=False)
     def _do_flips():
       state = sampler._initialize_sampler_state(
           targets=targets,
@@ -255,23 +227,20 @@ class SpikeAndSlabTest(test_util.TestCase):
     self.assertAllCloseNested(
         sampler._initialize_sampler_state(targets, nonzeros, 1.),
         _do_flips(),
-        atol=num_outputs * 2e-4, rtol=num_outputs * 2e-4)
+        atol=1e-6, rtol=1e-6)
 
   def test_sanity_check_sweep_over_features(self):
     num_outputs = 100
     num_features = 3
-    batch_shape = [2]
     design_matrix, true_weights, targets = self.evaluate(
         self._random_regression_task(
             num_outputs=num_outputs,
             num_features=num_features,
-            batch_shape=batch_shape,
             # Specify weights with a clear sparsity pattern.
-            weights=tf.convert_to_tensor([[10., 0., -10.],
-                                          [0., 0., 0.5]]),
+            weights=tf.convert_to_tensor([10., 0., -10.]),
             seed=test_util.test_seed()))
 
-    sampler = spike_and_slab.SpikeSlabSampler(
+    sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler(
         design_matrix,
         # Ensure the probability of keeping an irrelevant feature is tiny.
         nonzero_prior_prob=1e-6)
@@ -284,22 +253,22 @@ class SpikeAndSlabTest(test_util.TestCase):
             initial_state, seed=test_util.test_seed()))
 
     # Check that we recovered the true sparsity pattern and approximate weights.
-    self.assertAllEqual(final_state.nonzeros, [[True, False, True],
-                                               [False, False, True]])
-    self.assertAllClose(final_state.conditional_weights_mean,
+    weights_posterior_precision = (sampler.x_transpose_x +
+                                   sampler.weights_prior_precision)
+    conditional_weights_mean = _compute_conditional_weights_mean(
+        final_state.nonzeros,
+        weights_posterior_precision,
+        final_state.x_transpose_y)
+    self.assertAllEqual(final_state.nonzeros, [True, False, True])
+    indices = tf.where(final_state.nonzeros)
+    conditional_weights_mean = tf.scatter_nd(
+        indices, conditional_weights_mean, true_weights.shape)
+    self.assertAllClose(conditional_weights_mean,
                         true_weights, rtol=0.05, atol=0.15)
-    # Check shapes of other components.
-    self.assertAllEqual(final_state.conditional_prior_precision_chol.shape,
-                        batch_shape + [num_features, num_features])
-    self.assertAllEqual(final_state.conditional_posterior_precision_chol.shape,
-                        batch_shape + [num_features, num_features])
-    self.assertAllEqual(
-        final_state.observation_noise_variance_posterior_scale.shape,
-        batch_shape)
 
     posterior = sampler._get_conditional_posterior(final_state)
     posterior_variances, posterior_weights = self.evaluate(
-        posterior.sample(10, seed=test_util.test_seed()))
+        posterior.sample(seed=test_util.test_seed()))
     self.assertAllFinite(posterior_variances)
     self.assertAllFinite(posterior_weights)
 
@@ -311,7 +280,7 @@ class SpikeAndSlabTest(test_util.TestCase):
     # about weights, so the sampler should sample from the prior.
     design_matrix = tf.zeros([num_outputs, num_features])
     targets = 0.42 * samplers.normal([num_outputs], seed=test_util.test_seed())
-    sampler = spike_and_slab.SpikeSlabSampler(
+    sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler(
         design_matrix=design_matrix,
         weights_prior_precision=tf.eye(num_features),
         nonzero_prior_prob=nonzero_prior_prob)
@@ -349,19 +318,18 @@ class SpikeAndSlabTest(test_util.TestCase):
                         tf.reduce_mean(nonzero_weight_samples),
                         atol=0.03)
 
-  @parameterized.named_parameters(('', False), ('_xla', True))
-  def test_deterministic_given_seed(self, use_xla):
+  def test_deterministic_given_seed(self):
     design_matrix, _, targets = self.evaluate(
         self._random_regression_task(
-            num_outputs=3, num_features=4, batch_shape=[],
+            num_outputs=3, num_features=4,
             seed=test_util.test_seed()))
 
-    sampler = spike_and_slab.SpikeSlabSampler(design_matrix)
+    sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler(design_matrix)
 
     initial_nonzeros = tf.convert_to_tensor([True, False, False, True])
     seed = test_util.test_seed(sampler_type='stateless')
 
-    @tf.function(jit_compile=use_xla)
+    @tf.function(autograph=False, jit_compile=False)
     def do_sample(seed):
       return sampler.sample_noise_variance_and_weights(
           targets, initial_nonzeros, seed=seed)

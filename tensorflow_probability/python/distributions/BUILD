@@ -309,6 +309,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/experimental/tangent_spaces",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:batched_rejection_sampler",
         "//tensorflow_probability/python/internal:distribution_util",
@@ -598,6 +599,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/stats",
     ],
 )
 
@@ -1564,6 +1566,7 @@ multi_substrate_py_library(
         ":distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:softmax_centered",
+        "//tensorflow_probability/python/experimental/tangent_spaces",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -1583,6 +1586,7 @@ multi_substrate_py_library(
         ":gamma",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/experimental/tangent_spaces",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",

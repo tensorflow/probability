@@ -67,6 +67,7 @@ from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import sts
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
 from tensorflow_probability.python.experimental import distributions as tfde
+from tensorflow_probability.python.experimental.sts_gibbs import dynamic_spike_and_slab
 from tensorflow_probability.python.experimental.sts_gibbs import spike_and_slab
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
@@ -74,6 +75,8 @@ from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.sts import components as sts_components
 from tensorflow_probability.python.sts.internal import util as sts_util
+
+JAX_MODE = False
 
 # The sampler state stores current values for each model parameter,
 # and auxiliary quantities such as the latent level. It should have the property
@@ -109,9 +112,9 @@ class XLACompilableInverseGamma(tfd.InverseGamma):
 class DummySpikeAndSlabPrior(tfd.Distribution):
   """Dummy prior on sparse regression weights."""
 
-  def __init__(self):
+  def __init__(self, dtype=tf.float32):
     super().__init__(
-        dtype=tf.float32,
+        dtype=dtype,
         reparameterization_type=tfd.FULLY_REPARAMETERIZED,
         validate_args=False,
         allow_nan_stats=True,
@@ -137,13 +140,16 @@ class SpikeAndSlabSparseLinearRegression(sts_components.LinearRegression):
 
   def __init__(self,
                design_matrix,
-               weights_prior=None,
+               weights_prior,
                sparse_weights_nonzero_prob=0.5,
                name=None):
     # Extract precision matrix from a multivariate normal prior.
     weights_prior_precision = None
     if hasattr(weights_prior, 'precision'):
-      weights_prior_precision = weights_prior.precision()
+      if isinstance(weights_prior.precision, tf.linalg.LinearOperator):
+        weights_prior_precision = weights_prior.precision.to_dense()
+      else:
+        weights_prior_precision = weights_prior.precision()
     elif weights_prior is not None:
       inverse_scale = weights_prior.scale.inverse()
       weights_prior_precision = inverse_scale.matmul(
@@ -152,7 +158,8 @@ class SpikeAndSlabSparseLinearRegression(sts_components.LinearRegression):
     self._sparse_weights_nonzero_prob = sparse_weights_nonzero_prob
     super().__init__(
         design_matrix=design_matrix,
-        weights_prior=DummySpikeAndSlabPrior(),
+        weights_prior=DummySpikeAndSlabPrior(
+            dtype=dtype_util.common_dtype([design_matrix])),
         name=name)
 
 
@@ -340,7 +347,9 @@ def fit_with_gibbs_sampling(model,
                             num_warmup_steps=200,
                             initial_state=None,
                             seed=None,
-                            default_pseudo_observations=None):
+                            default_pseudo_observations=None,
+                            experimental_use_dynamic_cholesky=False,
+                            experimental_use_weight_adjustment=False):
   """Fits parameters for an STS model using Gibbs sampling.
 
   Args:
@@ -361,6 +370,16 @@ def fit_with_gibbs_sampling(model,
     default_pseudo_observations: Optional scalar float `Tensor` Controls the
       number of pseudo-observations for the prior precision matrix over the
       weights.
+    experimental_use_dynamic_cholesky: Optional bool - in case of spike and slab
+      sampling, will dynamically select the subset of the design matrix with
+      active features to perform the Cholesky decomposition. This may provide
+      a speedup when the number of true features is small compared to the size
+      of the design matrix. *Note*: If this is true, neither batch shape nor
+      `jit_compile` is supported.
+    experimental_use_weight_adjustment: Optional bool - use a nonstandard
+      update for the posterior precision of the weight in case of a spike and
+      slab sampler.
+
 
   Returns:
     model: A `GibbsSamplerState` structure of posterior samples.
@@ -416,9 +435,9 @@ def fit_with_gibbs_sampling(model,
   initial_state = initial_state._replace(
       seed=samplers.sanitize_seed(seed, salt='initial_GibbsSamplerState'))
 
-  sampler_loop_body = _build_sampler_loop_body(model, observed_time_series,
-                                               is_missing,
-                                               default_pseudo_observations)
+  sampler_loop_body = _build_sampler_loop_body(
+      model, observed_time_series, is_missing, default_pseudo_observations,
+      experimental_use_dynamic_cholesky, experimental_use_weight_adjustment)
 
   samples = tf.scan(sampler_loop_body,
                     np.arange(num_warmup_steps + num_results), initial_state)
@@ -430,7 +449,8 @@ def one_step_predictive(model,
                         num_forecast_steps=0,
                         original_mean=0.,
                         original_scale=1.,
-                        thin_every=10):
+                        thin_every=10,
+                        use_zero_step_prediction=False):
   """Constructs a one-step-ahead predictive distribution at every timestep.
 
   Unlike the generic `tfp.sts.one_step_predictive`, this method uses the
@@ -465,6 +485,9 @@ def one_step_predictive(model,
       samples, to reduce complexity of the predictive distribution. For example,
       if `thin_every=10`, every `10`th sample will be used.
       Default value: `10`.
+    use_zero_step_prediction: If true, instead of using the local level
+      and trend from the timestep before, just use the local level from the
+      same timestep.
 
   Returns:
     predictive_dist: A `tfd.MixtureSameFamily` instance of event shape
@@ -489,11 +512,11 @@ def one_step_predictive(model,
         slope=tf.zeros_like(thinned_samples.level),
         slope_scale=tf.zeros_like(thinned_samples.level_scale))
 
-  num_steps_from_last_observation = tf.concat([
-      tf.ones([num_observed_steps], dtype=dtype),
-      tf.range(1, num_forecast_steps + 1, dtype=dtype)
-  ],
-                                              axis=0)
+  num_steps_from_last_observation = tf.concat(
+      [(tf.zeros([num_observed_steps], dtype=dtype) if use_zero_step_prediction
+        else tf.ones([num_observed_steps], dtype=dtype)),
+       tf.range(1, num_forecast_steps + 1, dtype=dtype)],
+      axis=0)
 
   # The local linear trend model expects that the level at step t + 1 is equal
   # to the level at step t, plus the slope at time t - 1,
@@ -514,11 +537,12 @@ def one_step_predictive(model,
         tf.range(1., num_forecast_steps + 1., dtype=forecast_level.dtype))
 
   level_pred = tf.concat(
-      [
+      ([thinned_samples.level] if use_zero_step_prediction else [
           thinned_samples.level[..., :1],  # t == 0
           (thinned_samples.level[..., :-1] + thinned_samples.slope[..., :-1]
-          )  # 1 <= t < T
-      ] + ([forecast_level] if num_forecast_steps > 0 else []),
+          )  # 1 <= t < T. Constructs the next level from previous level
+          # and previous slope.
+      ]) + ([forecast_level] if num_forecast_steps > 0 else []),
       axis=-1)
 
   design_matrix = _get_design_matrix(model)
@@ -735,7 +759,9 @@ def _resample_scale(prior, observed_residuals, is_missing=None, seed=None):
 def _build_sampler_loop_body(model,
                              observed_time_series,
                              is_missing=None,
-                             default_pseudo_observations=None):
+                             default_pseudo_observations=None,
+                             experimental_use_dynamic_cholesky=False,
+                             experimental_use_weight_adjustment=False):
   """Builds a Gibbs sampler for the given model and observed data.
 
   Args:
@@ -748,6 +774,14 @@ def _build_sampler_loop_body(model,
     default_pseudo_observations: Optional scalar float `Tensor` Controls the
       number of pseudo-observations for the prior precision matrix over the
       weights.
+    experimental_use_dynamic_cholesky: Optional bool - in case of spike and slab
+      sampling, will dynamically select the subset of the design matrix with
+      active features to perform the Cholesky decomposition. This may provide
+      a speedup when the number of true features is small compared to the size
+      of the design matrix.
+    experimental_use_weight_adjustment: Optional bool - use a nonstandard
+      update for the posterior precision of the weight in case of a spike and
+      slab sampler.
 
   Returns:
     sampler_loop_body: Python callable that performs a single cycle of Gibbs
@@ -755,6 +789,8 @@ def _build_sampler_loop_body(model,
       new `GibbsSamplerState`. The second argument (passed by `tf.scan`) is
       ignored.
   """
+  if JAX_MODE and experimental_use_dynamic_cholesky:
+    raise ValueError('Dynamic Cholesky decomposition not supported in JAX')
   level_component = model.components[0]
   if not (isinstance(level_component, sts.LocalLevel) or
           isinstance(level_component, sts.LocalLinearTrend)):
@@ -783,17 +819,22 @@ def _build_sampler_loop_body(model,
     observed_time_series = tf.where(is_missing,
                                     tf.zeros_like(observed_time_series),
                                     observed_time_series)
-
   num_observed_steps = prefer_static.shape(observed_time_series)[-1]
 
   design_matrix = _get_design_matrix(model)
+  num_missing = 0.
   if design_matrix is not None:
     design_matrix = design_matrix.to_dense()[:num_observed_steps]
-    if is_missing is not None:
+    if is_missing is None:
+      num_missing = 0.
+      is_missing = tf.zeros(num_observed_steps, dtype=bool)
+    else:
       # Replace design matrix with zeros at unobserved timesteps. This ensures
       # they will not affect the posterior on weights.
       design_matrix = tf.where(is_missing[..., tf.newaxis],
                                tf.zeros_like(design_matrix), design_matrix)
+      num_missing = tf.reduce_sum(
+          tf.cast(is_missing, design_matrix.dtype), axis=-1)
 
   # Untransform scale priors -> variance priors by reaching thru Sqrt bijector.
   observation_noise_param = model.parameters[0]
@@ -811,7 +852,11 @@ def _build_sampler_loop_body(model,
 
   if regression_component:
     if model_has_spike_slab_regression:
-      spike_and_slab_sampler = spike_and_slab.SpikeSlabSampler(
+      if experimental_use_dynamic_cholesky:
+        sampler = dynamic_spike_and_slab.DynamicSpikeSlabSampler
+      else:
+        sampler = spike_and_slab.SpikeSlabSampler
+      spike_and_slab_sampler = sampler(
           design_matrix,
           weights_prior_precision=regression_component._weights_prior_precision,  # pylint: disable=protected-access
           nonzero_prior_prob=regression_component._sparse_weights_nonzero_prob,  # pylint: disable=protected-access
@@ -825,6 +870,7 @@ def _build_sampler_loop_body(model,
               tf.math.square(observation_noise_variance_prior.upper_bound)
               if hasattr(observation_noise_variance_prior, 'upper_bound') else
               None),
+          num_missing=num_missing,
           **({
               'default_pseudo_observations': default_pseudo_observations
           } if default_pseudo_observations is not None else {}))
@@ -858,12 +904,21 @@ def _build_sampler_loop_body(model,
       # arbitrary variation, while the weights are limited to representing
       # variation in the subspace given by the design matrix.
       if model_has_spike_slab_regression:
-        (observation_noise_variance,
-         weights) = spike_and_slab_sampler.sample_noise_variance_and_weights(
-             initial_nonzeros=tf.math.logical_or(
-                 tf.not_equal(previous_sample.weights, 0.), pin_to_nonzero),
-             targets=observed_time_series - previous_sample.level,
-             seed=weights_seed)
+        if experimental_use_weight_adjustment:
+          previous_observation_noise_variance = tf.square(
+              previous_sample.observation_noise_scale)
+        else:
+          previous_observation_noise_variance = 1.
+        targets = tf.where(is_missing,
+                           tf.zeros_like(observed_time_series),
+                           observed_time_series - previous_sample.level)
+        (observation_noise_variance, weights
+        ) = spike_and_slab_sampler.sample_noise_variance_and_weights(
+            initial_nonzeros=tf.math.logical_or(
+                tf.not_equal(previous_sample.weights, 0.), pin_to_nonzero),
+            previous_observation_noise_variance=previous_observation_noise_variance,
+            targets=targets,
+            seed=weights_seed)
         observation_noise_scale = tf.sqrt(observation_noise_variance)
 
       else:
@@ -912,7 +967,7 @@ def _build_sampler_loop_body(model,
           observed_residuals=slope_residuals,
           is_missing=None,
           seed=slope_scale_seed)
-    if regression_component and not model_has_spike_slab_regression:
+    if not (regression_component and model_has_spike_slab_regression):
       # Estimate noise scale from the residuals.
       observation_noise_scale = _resample_scale(
           prior=observation_noise_variance_prior,

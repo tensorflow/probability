@@ -265,6 +265,27 @@ class EmpiricalScalarTest(test_util.VectorDistributionTestHelpers):
       self.assertAllClose(self.evaluate(dist.stddev()),
                           np.sqrt(expected_variance))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='percentile is not implemented in the NumPy backends')
+  def test_empirical_quantiles(self):
+    samples = [
+        [1, 1, 1, 2, 3, 3, 3],
+        [[1.0, 1.1, 1.2, 1.3, 1.4], [2.0, 2.1, 2.2, 2.3, 2.4]],
+    ]
+
+    expected_quantiles = {0.5: [2, [1.2, 2.2]], 0.75: [3, [1.3, 2.3]]}
+
+    for q, q_vals in expected_quantiles.items():
+      for sample, q_val in zip(samples, q_vals):
+        input_ = tf.convert_to_tensor(value=sample, dtype=np.float32)
+        input_ph = tf1.placeholder_with_default(
+            input_,
+            shape=input_.shape
+            if self.static_shape else [None for _ in input_.shape])
+        dist = tfd.Empirical(samples=input_ph, validate_args=True)
+        self.assertAllClose(self.evaluate(dist.quantile(q)), q_val)
+
 
 @test_util.test_all_tf_execution_regimes
 class EmpiricalVectorTest(test_util.VectorDistributionTestHelpers):

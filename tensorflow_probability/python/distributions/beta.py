@@ -14,8 +14,6 @@
 # ============================================================================
 """The Beta distribution class."""
 
-import functools
-
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
@@ -30,7 +28,6 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
-from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
@@ -330,17 +327,8 @@ class Beta(distribution.AutoCompositeTensorDistribution):
   def _cdf(self, x):
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
-    shape = functools.reduce(
-        ps.broadcast_shape,
-        [ps.shape(concentration1),
-         ps.shape(concentration0),
-         ps.shape(x)])
-    concentration1 = tf.broadcast_to(concentration1, shape)
-    concentration0 = tf.broadcast_to(concentration0, shape)
-    x = tf.broadcast_to(x, shape)
-
     safe_x = tf.where(tf.logical_and(x >= 0, x < 1), x, 0.5)
-    answer = tf.math.betainc(concentration1, concentration0, safe_x)
+    answer = tfp_math.betainc(concentration1, concentration0, safe_x)
     return distribution_util.extend_cdf_outside_support(
         x, answer, low=0., high=1.)
 

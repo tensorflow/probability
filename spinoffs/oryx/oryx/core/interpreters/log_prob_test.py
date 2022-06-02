@@ -22,7 +22,6 @@ from jax import random
 import jax.numpy as np
 
 from oryx import bijectors as bb
-from oryx import core
 from oryx import distributions as bd
 from oryx.core import state
 from oryx.core.interpreters.log_prob import log_prob
@@ -128,17 +127,6 @@ class LogProbTest(test_util.TestCase):
 
     f_lp = log_prob(f)
     self.assertEqual(f_lp(0.1, 1.0), bd.Normal(0., 1.).log_prob(-0.9))
-
-  def test_unzip(self):
-
-    def f(rng):
-      k1, k2 = random.split(rng)
-      z = random_normal(k1, name='z')
-      return random_normal(k2, name='x') + z
-
-    init, _ = core.unzip(f, tag=state.VARIABLE)(random.PRNGKey(0))
-    f_lp = log_prob(init)
-    f_lp(init(random.PRNGKey(0)))
 
   def test_log_prob_in_call(self):
 

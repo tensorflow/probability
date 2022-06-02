@@ -67,6 +67,7 @@ from tensorflow_probability.python.math.root_search import secant_root
 from tensorflow_probability.python.math.scan_associative import scan_associative
 from tensorflow_probability.python.math.sparse import dense_to_sparse
 from tensorflow_probability.python.math.special import atan_difference
+from tensorflow_probability.python.math.special import betainc
 from tensorflow_probability.python.math.special import dawsn
 from tensorflow_probability.python.math.special import erfcinv
 from tensorflow_probability.python.math.special import erfcx
@@ -93,6 +94,7 @@ random_rayleigh = deprecation.deprecated(
 
 _allowed_symbols = [
     'atan_difference',
+    'betainc',
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
     'bessel_iv_ratio',

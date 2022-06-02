@@ -55,6 +55,7 @@ FLAGS = flags.FLAGS
 
 ALLOW_NAN = False
 ALLOW_INFINITY = False
+ALLOW_SUBNORMAL = False
 
 JAX_MODE = False
 NUMPY_MODE = not JAX_MODE
@@ -79,6 +80,12 @@ def _add_jax_prng_key_as_seed():
 def _getattr(obj, name):
   names = name.split('.')
   return functools.reduce(getattr, names, obj)
+
+
+def _maybe_get_subnormal_kwarg(allow_subnormal=ALLOW_SUBNORMAL):
+  if hp.__version_info__ >= (6, 30):
+    return {'allow_subnormal': allow_subnormal}
+  return {}
 
 
 class TestCase(dict):
@@ -121,6 +128,7 @@ def floats(draw,
            max_value=1e16,
            allow_nan=ALLOW_NAN,
            allow_infinity=ALLOW_INFINITY,
+           allow_subnormal=ALLOW_SUBNORMAL,
            dtype=None):
   if dtype is None:
     dtype = np.float32 if FLAGS.use_tpu else np.float64
@@ -128,11 +136,13 @@ def floats(draw,
     min_value = onp.array(min_value, dtype=dtype).item()
   if max_value is not None:
     max_value = onp.array(max_value, dtype=dtype).item()
+  subnormal_kwarg = _maybe_get_subnormal_kwarg(allow_subnormal)
   return draw(hps.floats(min_value=min_value,
                          max_value=max_value,
                          allow_nan=allow_nan,
                          allow_infinity=allow_infinity,
-                         width=np.dtype(dtype).itemsize * 8))
+                         width=np.dtype(dtype).itemsize * 8,
+                         **subnormal_kwarg))
 
 
 def integers(min_value=-2**30, max_value=2**30):
@@ -604,11 +614,15 @@ def top_k_params(draw):
 def histogram_fixed_width_bins_params(draw):
   # TODO(b/187125431): the `min_side=2` and `unique` check can be removed if
   # https://github.com/tensorflow/tensorflow/pull/38899 is re-implemented.
+  subnormal_kwarg = _maybe_get_subnormal_kwarg()
   values = draw(single_arrays(
       dtype=np.float32,
       shape=shapes(min_dims=1, min_side=2),
       unique=True,
-      elements=hps.floats(min_value=-1e5, max_value=1e5, width=32)
+      # Avoid intervals containing 0 due to NP/TF discrepancy for bin boundaries
+      # near 0.
+      elements=hps.floats(min_value=0., max_value=1e10, width=32,
+                          **subnormal_kwarg),
   ))
   vmin, vmax = np.min(values), np.max(values)
   value_min = draw(hps.one_of(
@@ -699,10 +713,12 @@ def sparse_xent_params(draw):
       shape=hps.just(tuple()),
       dtype=np.int32,
       elements=hps.integers(0, num_classes - 1))
+  subnormal_kwarg = _maybe_get_subnormal_kwarg()
   logits = single_arrays(
       batch_shape=batch_shape,
       shape=hps.just((num_classes,)),
-      elements=hps.floats(min_value=-1e5, max_value=1e5, width=32))
+      elements=hps.floats(min_value=-1e5, max_value=1e5, width=32,
+                          **subnormal_kwarg))
   return draw(
       hps.fixed_dictionaries(dict(
           labels=labels, logits=logits)).map(Kwargs))
@@ -714,10 +730,12 @@ def xent_params(draw):
   batch_shape = draw(shapes(min_dims=1))
   labels = batched_probabilities(
       batch_shape=batch_shape, num_classes=num_classes)
+  subnormal_kwarg = _maybe_get_subnormal_kwarg()
   logits = single_arrays(
       batch_shape=batch_shape,
       shape=hps.just((num_classes,)),
-      elements=hps.floats(min_value=-1e5, max_value=1e5, width=32))
+      elements=hps.floats(min_value=-1e5, max_value=1e5, width=32,
+                          **subnormal_kwarg))
   return draw(
       hps.fixed_dictionaries(dict(
           labels=labels, logits=logits)).map(Kwargs))
@@ -965,7 +983,9 @@ NUMPY_TEST_CASES = [
     #         keywords=None,
     #         defaults=(False, True, None))
     TestCase(
-        'linalg.svd', [single_arrays(shape=shapes(min_dims=2))],
+        'linalg.svd', [single_arrays(
+            shape=shapes(min_dims=2),
+            elements=floats(min_value=-1e10, max_value=1e10))],
         post_processor=_svd_post_process),
     TestCase(
         'linalg.qr', [
@@ -1177,8 +1197,11 @@ NUMPY_TEST_CASES = [
         xla_const_args=(1, 2, 3)),
     TestCase(
         'math.cumsum', [
-            hps.tuples(array_axis_tuples(), hps.booleans(),
-                       hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
+            hps.tuples(
+                array_axis_tuples(
+                    elements=floats(min_value=-1e12, max_value=1e12)),
+                hps.booleans(),
+                hps.booleans()).map(lambda x: x[0] + (x[1], x[2]))
         ],
         xla_const_args=(1, 2, 3)),
 ]
@@ -1222,7 +1245,8 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.cos', [single_arrays()]),
     TestCase('math.cosh', [single_arrays(elements=floats(-100., 100.))]),
     TestCase('math.digamma',
-             [single_arrays(elements=non_zero_floats(-1e4, 1e4))]),
+             [single_arrays(elements=non_zero_floats(-1e4, 1e4))],
+             rtol=5e-5),
     TestCase('math.erf', [single_arrays()]),
     TestCase('math.erfc', [single_arrays()]),
     TestCase('math.erfinv', [single_arrays(elements=floats(-1., 1.))]),
@@ -1274,7 +1298,10 @@ NUMPY_TEST_CASES += [  # break the array for pylint to not timeout.
     TestCase('math.divide_no_nan', [n_same_shape(n=2)]),
     TestCase('math.equal', [n_same_shape(n=2)]),
     TestCase('math.floordiv',
-             [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
+             # Clip numerator above zero to avoid NP/TF discrepancy in rounding
+             # negative subnormal floats.
+             [n_same_shape(
+                 n=2, elements=[positive_floats(), non_zero_floats()])]),
     TestCase('math.floormod',
              [n_same_shape(n=2, elements=[floats(), non_zero_floats()])]),
     TestCase('math.greater', [n_same_shape(n=2)]),

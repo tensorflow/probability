@@ -27,20 +27,7 @@ py_library(
         ":harvest",
         ":log_prob",
         ":propagate",
-        ":unzip",
         "//oryx/core/interpreters/inverse",
-    ],
-)
-
-# pytype_strict
-py_library(
-    name = "unzip",
-    srcs = ["unzip.py"],
-    deps = [
-        ":harvest",
-        # jax dep,
-        # numpy dep,
-        "//oryx/core:trace_util",
     ],
 )
 
@@ -52,6 +39,7 @@ py_library(
         ":harvest",
         # jax dep,
         "//oryx/core:pytree",
+        "//oryx/core:trace_util",
     ],
 )
 
@@ -75,22 +63,6 @@ py_library(
         # jax dep,
         "//oryx/core:trace_util",
         "//oryx/core/interpreters/inverse",
-    ],
-)
-
-# py_strict
-py_test(
-    name = "unzip_test",
-    srcs = ["unzip_test.py"],
-    deps = [
-        ":harvest",
-        ":unzip",
-        # absl/testing:absltest dep,
-        # jax dep,
-        # numpy dep,
-        "//oryx/core:trace_util",
-        "//oryx/core/state",
-        "//oryx/internal:test_util",
     ],
 )
 
@@ -131,7 +103,6 @@ py_test(
         # absl/testing:absltest dep,
         # jax dep,
         "//oryx/bijectors",
-        "//oryx/core",
         "//oryx/core/state",
         "//oryx/distributions",
         "//oryx/internal:test_util",

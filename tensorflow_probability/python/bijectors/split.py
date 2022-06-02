@@ -79,7 +79,10 @@ class Split(bijector.AutoCompositeTensorBijector):
         self._split_sizes = None
       else:
         self._split_sizes = tensor_util.convert_nonref_to_tensor(
-            num_or_size_splits, name='num_or_size_splits', dtype=tf.int32)
+            num_or_size_splits,
+            name='num_or_size_splits',
+            dtype=tf.int32,
+            as_shape_tensor=True)
 
         if tensorshape_util.rank(self._split_sizes.shape) != 1:
           raise ValueError(

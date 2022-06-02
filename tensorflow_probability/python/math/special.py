@@ -14,17 +14,20 @@
 # ============================================================================
 """Implements special functions in TensorFlow."""
 
+import functools
+
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import custom_gradient as tfp_custom_gradient
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
 
 
 __all__ = [
     'atan_difference',
+    'betainc',
     'dawsn',
     'erfcinv',
     'erfcx',
@@ -82,6 +85,290 @@ def atan_difference(x, y, name=None):
         tf.math.equal(x * y, -1.), np.pi * tf.math.sign(x) / 2., difference)
 
     return difference
+
+
+def _betainc_naive(a, b, x):
+  """Returns the regularized incomplete beta function elementwise."""
+  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
+  a = tf.convert_to_tensor(a, dtype=dtype)
+  b = tf.convert_to_tensor(b, dtype=dtype)
+  x = tf.convert_to_tensor(x, dtype=dtype)
+  broadcast_shape = ps.broadcast_shape(
+      ps.shape(a), ps.shape(b))
+  broadcast_shape = ps.broadcast_shape(
+      broadcast_shape, ps.shape(x))
+  a = tf.broadcast_to(a, broadcast_shape)
+  b = tf.broadcast_to(b, broadcast_shape)
+  x = tf.broadcast_to(x, broadcast_shape)
+  return tf.math.betainc(a, b, x)
+
+# Derivative implementation based on
+# [1] R. Boik, J. Robinson-Cox,
+#     Derivatives of the Incomplete Beta Function
+#     https://www.jstatsoft.org/article/view/v003i01/beta.der.pdf
+
+
+def partial_numerator(a, b, x, i):
+  """Partial numerator used in continued fraction expansion of betainc."""
+  f = b * x / (a * (1 - x))
+  result = (a + b + i - 2.) * (a + i - 1) * (b - i) / (
+      (a + 2 * i - 3.) * tf.math.square(a + 2 * i - 2.) * (a + 2 * i - 1.))
+  result = result * tf.math.square(a * f / b) * (i - 1.)
+  return tf.where(
+      tf.math.equal(i, 1.),
+      a * f * (b - 1.) / (b * (a + 1.)),
+      result)
+
+
+def partial_denominator(a, b, x, i):
+  """Partial denominator used in continued fraction expansion of betainc."""
+  f = b * x / (a * (1 - x))
+  numerator = 2 * (a * f + 2 * b) * i * (i + a - 1.) + a * b * (a - 2. - a * f)
+  denominator = b * (a + 2 * i - 2) * (a + 2 * i)
+  return numerator / denominator
+
+
+def partial_numerator_da(a, b, x, i):
+  """Derivative of betainc partial numerators with respect to a."""
+  f = b * x / (a * (1 - x))
+  result_numerator = 8 * i ** 3 * (a + b - 1.)
+  result_numerator = result_numerator + 2 * tf.math.square(i) * (
+      8 * tf.math.square(a) + (10 * b - 22.) * a + 13. - 12. * b)
+  result_numerator = result_numerator + 2 * i * (
+      5 * a ** 3 + (7 * b - 23) * tf.math.square(a) +
+      (-20. * b + 33) * a - 14. + 12. * b)
+  result_numerator = result_numerator + 2 * a ** 4 + (-13. + 3 * b) * a ** 3
+  result_numerator = result_numerator + (
+      (-14 * b + 30) * tf.math.square(a) + (-29. + 19 * b) * a + 10. - 8 * b)
+  result_denominator = tf.math.square(b * (a + 2 * i - 3.) * (a + 2 * i - 1.))
+  result_denominator = result_denominator * (a + 2 * i - 2.) ** 3
+  result = result_numerator / result_denominator
+  result = -(i - 1.) * (b - i) * tf.math.square(f * a) * result
+  return tf.where(
+      tf.math.equal(i, 1.),
+      -a * f * (b - 1.) / (b * tf.math.square(a + 1.)),
+      result)
+
+
+def partial_denominator_da(a, b, x, i):
+  """Derivative of betainc partial denominators with respect to a."""
+  f = b * x / (a * (1 - x))
+  result_numerator = (a * f / b) * (
+      4. * (1 - a - b) * tf.math.square(i) -
+      (4 * (1 - a - b) + 2 * tf.math.square(a)) * i +
+      tf.math.square(a) * b)
+  result_denominator = tf.math.square((a + 2 * i - 2) * (a + 2 * i))
+  return result_numerator / result_denominator
+
+
+def partial_numerator_db(a, b, x, i):
+  """Derivative of betainc partial numerators with respect to b."""
+  f = b * x / (a * (1 - x))
+  numerator = (
+      tf.math.square(a * f / b) * (i - 1.) * (a + i - 1.) * (2 * b + a - 2.))
+  denominator = (
+      (a + 2 * i - 3.) * tf.math.square(a + 2 * i - 2.) * (a + 2 * i - 1.))
+  return tf.where(
+      tf.math.equal(i, 1.),
+      a * f / (b * (a + 1)),
+      numerator / denominator)
+
+
+def partial_denominator_db(a, b, x, i):
+  """Derivative of betainc partial denominators with respect to b."""
+  f = b * x / (a * (1 - x))
+  return -f * tf.math.square(a) / (b * (a + 2 * i - 2.) * (a + 2 * i))
+
+
+def _betainc_der_helper(a, b, x, compute_partial_a=True):
+  """Shared code for computing partial derivatives of betainc."""
+  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
+  a = tf.convert_to_tensor(a, dtype=dtype)
+  b = tf.convert_to_tensor(b, dtype=dtype)
+  x = tf.convert_to_tensor(x, dtype=dtype)
+
+  if compute_partial_a:
+    numerator_der_fn = partial_numerator_da
+    denominator_der_fn = partial_denominator_da
+  else:
+    numerator_der_fn = partial_numerator_db
+    denominator_der_fn = partial_denominator_db
+
+  def _continued_fraction_one_step(
+      iteration_count,
+      numerator,
+      previous_numerator,
+      dnumerator,
+      previous_dnumerator,
+      denominator,
+      previous_denominator,
+      ddenominator,
+      previous_ddenominator):
+    partial_num = partial_numerator(a, b, x, iteration_count)
+    partial_den = partial_denominator(a, b, x, iteration_count)
+    partial_num_der = numerator_der_fn(a, b, x, iteration_count)
+    partial_den_der = denominator_der_fn(a, b, x, iteration_count)
+
+    # A_n = a_n * A_{n - 2} + b_n * A_{n - 1}
+    new_numerator = (previous_numerator * partial_num +
+                     numerator * partial_den)
+    # dA_n / ds = (da_n/ds * A_{n - 2} +  a_n * dA_{n - 2}/ds) +
+    #             (db_n/ds * A_{n - 1} + b_n * dA_{n - 1}/ds)
+    new_dnumerator = (partial_num_der * previous_numerator +
+                      partial_num * previous_dnumerator +
+                      partial_den_der * numerator +
+                      partial_den * dnumerator)
+    # B_n = a_n * B_{n - 2} + b_n * B_{n - 1}
+    new_denominator = (previous_denominator * partial_num +
+                       denominator * partial_den)
+    # dB_n / ds = (da_n/ds * B_{n - 2} +  a_n * dB_{n - 2}/ds) +
+    #             (db_n/ds * B_{n - 1} + b_n * dB_{n - 1}/ds)
+    new_ddenominator = (partial_num_der * previous_denominator +
+                        partial_num * previous_ddenominator +
+                        partial_den_der * denominator +
+                        partial_den * ddenominator)
+
+    return (iteration_count + 1.,
+            new_numerator,
+            numerator,
+            new_dnumerator,
+            dnumerator,
+            new_denominator,
+            denominator,
+            new_ddenominator,
+            ddenominator)
+
+  broadcast_shape = functools.reduce(
+      ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(x)])
+
+  zeroth_numerator = tf.ones(broadcast_shape, dtype=dtype)
+  first_numerator = tf.ones(broadcast_shape, dtype=dtype)
+
+  zeroth_dnumerator = tf.zeros(broadcast_shape, dtype=dtype)
+  first_dnumerator = tf.zeros(broadcast_shape, dtype=dtype)
+
+  zeroth_denominator = tf.zeros(broadcast_shape, dtype=dtype)
+  first_denominator = tf.ones(broadcast_shape, dtype=dtype)
+
+  zeroth_ddenominator = tf.zeros(broadcast_shape, dtype=dtype)
+  first_ddenominator = tf.zeros(broadcast_shape, dtype=dtype)
+
+  (_,
+   numerator, _,
+   dnumerator, _,
+   denominator, _,
+   ddenominator, _) = tf.while_loop(
+       cond=lambda iteration_count, *_: iteration_count < 50,
+       body=_continued_fraction_one_step,
+       loop_vars=(
+           tf.cast(1., dtype=dtype),
+           first_numerator,
+           zeroth_numerator,
+           first_dnumerator,
+           zeroth_dnumerator,
+           first_denominator,
+           zeroth_denominator,
+           first_ddenominator,
+           zeroth_ddenominator))
+
+  result = numerator / denominator
+  if compute_partial_a:
+    result = result * (
+        tf.math.log(x) - tf.math.reciprocal(a) +
+        tf.math.digamma(a + b) - tf.math.digamma(a))
+  else:
+    result = result * (
+        tf.math.log1p(-x) +
+        tf.math.digamma(a + b) - tf.math.digamma(b))
+
+  result = (result + dnumerator / denominator -
+            numerator * ddenominator / tf.math.square(denominator))
+
+  return result * tf.math.exp(
+      tf.math.xlogy(a, x) + tf.math.xlog1py(b - 1., -x) -
+      tf.math.log(a) - lbeta(a, b))
+
+
+def _betainc_partial_a(a, b, x):
+  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  result = tf.where(
+      x > a / (a + b),
+      -_betainc_der_helper(b, a, 1. - x, compute_partial_a=False),
+      _betainc_der_helper(a, b, x, compute_partial_a=True))
+  return tf.where(tf.math.equal(x, 0.), numpy_dtype(0.), result)
+
+
+def _betainc_partial_b(a, b, x):
+  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  result = tf.where(
+      x > a / (a + b),
+      -_betainc_der_helper(b, a, 1. - x, compute_partial_a=True),
+      _betainc_der_helper(a, b, x, compute_partial_a=False))
+  return tf.where(tf.math.equal(x, 0.), numpy_dtype(0.), result)
+
+
+def _betainc_partial_x(a, b, x):
+  result = tf.math.xlogy(a - 1., x) + tf.math.xlog1py(b - 1., -x) - lbeta(a, b)
+  return tf.math.exp(result)
+
+
+def _betainc_fwd(a, b, x):
+  """Compute output, aux (collaborates with _dawsn_bwd)."""
+  output = _betainc_naive(a, b, x)
+  return output, (a, b, x)
+
+
+def _betainc_bwd(aux, g):
+  """Reverse mode impl for dawsn."""
+  a, b, x = aux
+  pa = _betainc_partial_a(a, b, x)
+  pb = _betainc_partial_b(a, b, x)
+  px = _betainc_partial_x(a, b, x)
+  return _fix_gradient_for_broadcasting(
+      [a, b, x], [pa * g, pb * g, px * g])
+
+
+def _betainc_jvp(primals, tangents):
+  """Computes JVP for dawsn (supports JAX custom derivative)."""
+  a, b, x = primals
+  da, db, dx = tangents
+
+  y = _betainc_custom_gradient(a, b, x)
+  return (y,
+          da * _betainc_partial_a(a, b, x) +
+          db * _betainc_partial_b(a, b, x) +
+          dx * _betainc_partial_x(a, b, x))
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_betainc_fwd,
+    vjp_bwd=_betainc_bwd,
+    jvp_fn=_betainc_jvp)
+def _betainc_custom_gradient(a, b, x):
+  return _betainc_naive(a, b, x)
+
+
+def betainc(a, b, x, name=None):
+  """Computes Regularized Incomplete Beta element-wise.
+
+  Args:
+    a:
+    b:
+    x: A Tensor with type `float32` or `float64`.
+    name: A name for the operation (optional).
+
+  Returns:
+    betainc: dawsn evaluated at `x`. A Tensor with the same shape and same
+      dtype as `x`.
+  """
+  with tf.name_scope(name or 'betainc'):
+    dtype = dtype_util.common_dtype([a, b, x], tf.float32)
+    a = tf.convert_to_tensor(a, dtype=dtype)
+    b = tf.convert_to_tensor(b, dtype=dtype)
+    x = tf.convert_to_tensor(x, dtype=dtype)
+    return _betainc_custom_gradient(a, b, x)
 
 
 def _dawsn_naive(x):
@@ -736,7 +1023,7 @@ def _igammainv_bwd(aux, g):
   x = _igammainv_custom_gradient(a, p)
   # Use the fact that igamma and igammainv are inverses to compute the gradient.
   pa, pp = _igammainv_partials(a, x)
-  return _fix_gradient_for_broadcasting(a, p, pa * g, pp * g)
+  return _fix_gradient_for_broadcasting([a, p], [pa * g, pp * g])
 
 
 def _igammainv_jvp(primals, tangents):
@@ -744,8 +1031,7 @@ def _igammainv_jvp(primals, tangents):
   a, p = primals
   da, dp = tangents
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(da),
-                                         prefer_static.shape(dp))
+  bc_shp = ps.broadcast_shape(ps.shape(da), ps.shape(dp))
   da = tf.broadcast_to(da, bc_shp)
   dp = tf.broadcast_to(dp, bc_shp)
 
@@ -802,7 +1088,7 @@ def _igammacinv_bwd(aux, g):
   x = _igammacinv_custom_gradient(a, p)
   pa, pp = _igammainv_partials(a, x)
   pp = -pp
-  return _fix_gradient_for_broadcasting(a, p, pa * g, pp * g)
+  return _fix_gradient_for_broadcasting([a, p], [pa * g, pp * g])
 
 
 def _igammacinv_jvp(primals, tangents):
@@ -810,8 +1096,7 @@ def _igammacinv_jvp(primals, tangents):
   a, p = primals
   da, dp = tangents
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(da),
-                                         prefer_static.shape(dp))
+  bc_shp = ps.broadcast_shape(ps.shape(da), ps.shape(dp))
   da = tf.broadcast_to(da, bc_shp)
   dp = tf.broadcast_to(dp, bc_shp)
 
@@ -1121,18 +1406,27 @@ def log_gamma_correction(x, name=None):
     return accum * inverse_x
 
 
-def _fix_gradient_for_broadcasting(a, b, grad_a, grad_b):
-  """Reduces broadcast dimensions for a custom gradient."""
-  if (tensorshape_util.is_fully_defined(a.shape) and
-      tensorshape_util.is_fully_defined(b.shape) and
-      a.shape == b.shape):
-    return [grad_a, grad_b]
-  a_shape = tf.shape(a)
-  b_shape = tf.shape(b)
-  ra, rb = tf.raw_ops.BroadcastGradientArgs(s0=a_shape, s1=b_shape)
-  grad_a = tf.reshape(tf.reduce_sum(grad_a, axis=ra), a_shape)
-  grad_b = tf.reshape(tf.reduce_sum(grad_b, axis=rb), b_shape)
-  return [grad_a, grad_b]
+def _fix_gradient_for_broadcasting(primals, grads):
+  """Ensure `grads` have same shape as `primals`."""
+  if len(primals) != len(grads):
+    raise ValueError('Expected same number of `x` and `grads`')
+  if (all(tensorshape_util.is_fully_defined(x.shape) for x in primals) and
+      all(x.shape == primals[0].shape for x in primals)):
+    return grads
+  # Compute the leave one out broadcast shapes, and use that to compute
+  # the axes.
+  new_grads = []
+  primal_shapes = [tf.shape(x) for x in primals]
+  for i in range(len(primals)):
+    loo_primal_shapes = primal_shapes[:i] + primal_shapes[i+1:]
+    x_shape = tf.shape(primals[i])
+    loo_broadcast_shape = functools.reduce(
+        tf.broadcast_dynamic_shape, loo_primal_shapes)
+    rx, _ = tf.raw_ops.BroadcastGradientArgs(
+        s0=x_shape, s1=loo_broadcast_shape)
+    new_grads.append(
+        tf.reshape(tf.reduce_sum(grads[i], axis=rx), shape=x_shape))
+  return new_grads
 
 
 def _log_gamma_difference_big_y(x, y):
@@ -1186,7 +1480,7 @@ def _log_gamma_difference_bwd(aux, g):
   # `_log_gamma_difference`.
   px = -tf.math.digamma(x + y)
   py = tf.math.digamma(y) + px
-  return _fix_gradient_for_broadcasting(x, y, px * g, py * g)
+  return _fix_gradient_for_broadcasting([x, y], [px * g, py * g])
 
 
 def _log_gamma_difference_jvp(primals, tangents):
@@ -1194,8 +1488,7 @@ def _log_gamma_difference_jvp(primals, tangents):
   x, y = primals
   dx, dy = tangents
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dx),
-                                         prefer_static.shape(dy))
+  bc_shp = ps.broadcast_shape(ps.shape(dx), ps.shape(dy))
   dx = tf.broadcast_to(dx, bc_shp)
   dy = tf.broadcast_to(dy, bc_shp)
   # See note above in _log_gamma_difference_bwd.
@@ -1287,7 +1580,7 @@ def _lbeta_bwd(aux, g):
   total_digamma = tf.math.digamma(x + y)
   px = tf.math.digamma(x) - total_digamma
   py = tf.math.digamma(y) - total_digamma
-  return _fix_gradient_for_broadcasting(x, y, px * g, py * g)
+  return _fix_gradient_for_broadcasting([x, y], [px * g, py * g])
 
 
 def _lbeta_jvp(primals, tangents):
@@ -1295,8 +1588,7 @@ def _lbeta_jvp(primals, tangents):
   x, y = primals
   dx, dy = tangents
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dx),
-                                         prefer_static.shape(dy))
+  bc_shp = ps.broadcast_shape(ps.shape(dx), ps.shape(dy))
   dx = tf.broadcast_to(dx, bc_shp)
   dy = tf.broadcast_to(dy, bc_shp)
   total_digamma = tf.math.digamma(x + y)
@@ -1784,7 +2076,7 @@ def _owens_t_bwd(aux, g):
         tf.math.erf(a * h / np.sqrt(2)) / (2 * np.sqrt(2 * np.pi)))
   pa = (tf.math.exp(-0.5 * (tf.math.square(a) + 1) * tf.math.square(h)) /
         (2 * np.pi * (tf.math.square(a) + 1.)))
-  return _fix_gradient_for_broadcasting(h, a, ph * g, pa * g)
+  return _fix_gradient_for_broadcasting([h, a], [ph * g, pa * g])
 
 
 def _owens_t_jvp(primals, tangents):
@@ -1792,8 +2084,7 @@ def _owens_t_jvp(primals, tangents):
   h, a = primals
   dh, da = tangents
   # TODO(https://github.com/google/jax/issues/3768): eliminate broadcast_to?
-  bc_shp = prefer_static.broadcast_shape(prefer_static.shape(dh),
-                                         prefer_static.shape(da))
+  bc_shp = ps.broadcast_shape(ps.shape(dh), ps.shape(da))
   dh = tf.broadcast_to(dh, bc_shp)
   da = tf.broadcast_to(da, bc_shp)
   ph = (-tf.math.exp(-0.5 * tf.math.square(h)) *

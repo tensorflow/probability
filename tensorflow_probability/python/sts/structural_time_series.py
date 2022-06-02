@@ -319,8 +319,8 @@ class StructuralTimeSeries(object):
     import tensorflow_probability as tfp
 
     # Sample and plot 100 trajectories from the prior.
-    model = tfp.sts.LocalLinearTrendModel()
-    prior_samples = model.joint_distribution().sample([100])
+    model = tfp.sts.LocalLinearTrend()
+    prior_samples = model.joint_distribution(num_timesteps=200).sample([100])
     plt.plot(
       tf.linalg.matrix_transpose(prior_samples['observed_time_series'][..., 0]))
     ```

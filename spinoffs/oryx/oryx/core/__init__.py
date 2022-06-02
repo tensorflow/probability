@@ -33,8 +33,6 @@ from oryx.core.interpreters.inverse.custom_inverse import custom_inverse
 from oryx.core.interpreters.inverse.custom_inverse import NonInvertibleError
 from oryx.core.interpreters.log_prob import log_prob
 from oryx.core.interpreters.log_prob import log_prob_registry
-from oryx.core.interpreters.unzip import unzip
-from oryx.core.interpreters.unzip import unzip_registry
 from oryx.core.primitive import call_bind
 from oryx.core.primitive import FlatPrimitive
 from oryx.core.primitive import HigherOrderPrimitive

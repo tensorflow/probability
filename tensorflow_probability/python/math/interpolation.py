@@ -493,7 +493,9 @@ def batch_interp_regular_nd_grid(x,
   """Multi-linear interpolation on a regular (constant spacing) grid.
 
   Given [a batch of] reference values, this function computes a multi-linear
-  interpolant and evaluates it on [a batch of] of new `x` values.
+  interpolant and evaluates it on [a batch of] of new `x` values. This is a
+  multi-dimensional generalization of [Bilinear Interpolation](
+  https://en.wikipedia.org/wiki/Bilinear_interpolation).
 
   The interpolant is built from reference values indexed by `nd` dimensions
   of `y_ref`, starting at `axis`.
