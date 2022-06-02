@@ -20,6 +20,7 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import gamma
 from tensorflow_probability.python.distributions import inverse_gamma
 from tensorflow_probability.python.distributions import joint_distribution_auto_batched
 from tensorflow_probability.python.distributions import sample as sample_dist
@@ -55,7 +56,11 @@ class InverseGammaWithSampleUpperBound(inverse_gamma.InverseGamma):
                 lambda: softplus_bijector.Softplus(low=dtype_util.eps(dtype)))))
 
   def _sample_n(self, n, seed=None):
-    xs = super()._sample_n(n, seed=seed)
+  # TODO(b/151571025): revert to `super()._sample_n` once the InverseGamma
+  # sampler is XLA-able.
+    xs = 1. / gamma.Gamma(
+        concentration=self.concentration, rate=self.scale).sample(
+            n, seed=seed)
     if self._upper_bound is not None:
       xs = tf.minimum(xs, self._upper_bound)
     return xs
