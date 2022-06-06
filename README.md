@@ -87,7 +87,7 @@ for end-to-end examples. It includes tutorial notebooks such as:
 
 It also includes example scripts such as:
 
-* [Variational Autoencoders](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/vae.py).
+* [Variational Autoencoders](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/jupyter_notebooks/Probabilistic_Layers_VAE.ipynb).
   Representation learning with a latent code and variational inference.
 * [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/vq_vae.py).
   Discrete representation learning with vector quantization.
