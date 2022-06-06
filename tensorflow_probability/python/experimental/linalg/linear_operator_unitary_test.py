@@ -82,11 +82,13 @@ class LinearOperatorUnitaryTest(test_util.TestCase):
     broadcasted_y = tf.broadcast_to(y, [7, 1, 13, 3])
     self.assertAllClose(
         self.evaluate(tf.linalg.solve(q, broadcasted_y)),
-        self.evaluate(operator.solve(y)))
+        self.evaluate(operator.solve(y)),
+        atol=1e-5, rtol=1e-5)
 
     self.assertAllClose(
         self.evaluate(tf.linalg.solve(q, broadcasted_y, adjoint=True)),
-        self.evaluate(operator.solve(y, adjoint=True)))
+        self.evaluate(operator.solve(y, adjoint=True)),
+        atol=1e-5, rtol=1e-5)
 
 
 if __name__ == '__main__':
