@@ -365,13 +365,14 @@ def window_tune_nuts_sampling(target_log_prob,
       (possibly unnormalized) log-density under the target distribution.
     prior_samples: Nested structure of `Tensor`s, each of shape `[batches,
       latent_part_event_shape]` and should be sample from the prior. They are
-      used to generate an inital chain position if `init_state` is not supplied.
+      used to generate an initial chain position if `init_state` is not
+      supplied.
     constraining_bijectors: `tfp.distributions.Bijector` or list of
       `tfp.distributions.Bijector`s. These bijectors use `forward` to map the
       state on the real space to the constrained state expected by
       `target_log_prob`.
     init_state: (Optional) `Tensor` or Python `list` of `Tensor`s representing
-      the inital state(s) of the Markov chain(s).
+      the initial state(s) of the Markov chain(s).
     num_samples: Integer number of the Markov chain draws after tuning.
     nchains: Integer number of the Markov chains after tuning.
     init_nchains: Integer number of the Markov chains in the first phase of
@@ -380,7 +381,7 @@ def window_tune_nuts_sampling(target_log_prob,
       probability for step size adaptation.
     max_tree_depth: Maximum depth of the tree implicitly built by NUTS. See
       `tfp.mcmc.NoUTurnSampler` for more details
-    use_scaled_init: Boolean. If `True`, generate inital state within [-1, 1]
+    use_scaled_init: Boolean. If `True`, generate initial state within [-1, 1]
       scaled by prior sample standard deviation in the unconstrained real space.
       This kwarg is ignored if `init_state` is not None
     tuning_window_schedule: List-like sequence of integers that specify the

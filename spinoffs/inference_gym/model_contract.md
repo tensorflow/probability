@@ -14,7 +14,7 @@ others for future refinement.
 The primary use case of a model is to be able to run an inference algorithm on
 it. The secondary goal is to be able to verify the accuracy of the algorithm.
 There are other finer points of usability which also matter, but the overarching
-princple of the contract for models is that it's better to have a model usable
+principle of the contract for models is that it's better to have a model usable
 for its primary use case without all the nice-to-haves, rather than not have
 the model available at all.
 
@@ -82,7 +82,7 @@ argument for inclusion of the model.
    example, regression models should support computing held-out negative
    log-likelihood. Rationale: This is similar to having a standard
    parameterization. In this case, there are certain transformations which are
-   natural to look at when analyizing a model.
+   natural to look at when analyzing a model.
 
 4. If the model has analytic ground truth values, they should be filled in.
    Rationale: Ground truth values enable one way of measuring the bias of an

@@ -36,7 +36,7 @@ Check out the [tutorial].
 
 ```bash
 pip install tfp-nightly inference_gym
-# Install at least one the folowing
+# Install at least one the following
 pip install tf-nightly  # For the TensorFlow backend.
 pip install jax jaxlib  # For the JAX backend.
 # Install to support external datasets
