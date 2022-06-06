@@ -165,7 +165,7 @@ def cholesky_update(chol, update_vector, multiplier=1., name=None):
     def compute_new_column(accumulated_quantities, state):
       """Computes the next column of the updated cholesky."""
       _, _, omega, b = accumulated_quantities
-      index, diagonal_member, col = state
+      index, diagonal_member, col, col_mask = state
       omega_at_index = omega[..., index]
 
       # Line 4
@@ -181,18 +181,21 @@ def cholesky_update(chol, update_vector, multiplier=1., name=None):
       new_col = new_diagonal_member[..., tf.newaxis]  * (
           col / diagonal_member[..., tf.newaxis] +
           (multiplier * omega_at_index / scaling_factor)[
-              ..., tf.newaxis] * omega)
+              ..., tf.newaxis] * omega * col_mask)
       b = b + multiplier * tf.math.square(omega_at_index / diagonal_member)
       return new_diagonal_member, new_col, omega, b
 
     # We will scan over the columns.
+    cols_mask = distribution_util.move_dimension(
+        tf.linalg.band_part(tf.ones_like(chol), -1, 0),
+        source_idx=-1, dest_idx=0)
     chol = distribution_util.move_dimension(chol, source_idx=-1, dest_idx=0)
     chol_diag = distribution_util.move_dimension(
         chol_diag, source_idx=-1, dest_idx=0)
 
     new_diag, new_chol, _, _ = tf.scan(
         fn=compute_new_column,
-        elems=(tf.range(0, ps.shape(chol)[0]), chol_diag, chol),
+        elems=(tf.range(0, ps.shape(chol)[0]), chol_diag, chol, cols_mask),
         initializer=(
             tf.zeros_like(multiplier),
             tf.zeros_like(chol[0, ...]),

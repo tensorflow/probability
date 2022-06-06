@@ -17,7 +17,6 @@
 # Dependency imports
 
 import numpy as np
-import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import stats as tfps
 from tensorflow_probability.python.internal import test_util
@@ -56,8 +55,8 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovarianceTest(
     n = 1000
     samples = mvn.sample(n, seed=test_util.test_seed())
 
-    s_mean, mean, s_cov, cov = self.evaluate([
-        tf.reduce_mean(samples, axis=0),
+    samples_, mean, s_cov, cov = self.evaluate([
+        samples,
         mvn.mean(),
         tfps.covariance(samples, sample_axis=0),
         mvn.covariance(),
@@ -65,7 +64,8 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovarianceTest(
 
     maxstddev = np.sqrt(np.max(cov))
 
-    self.assertAllClose(s_mean, mean, atol=5 * maxstddev / np.sqrt(n))
+    self.assertAllMeansClose(
+        samples_, mean, axis=0, atol=5 * maxstddev / np.sqrt(n))
     self.assertAllClose(s_cov, cov, atol=5 * maxstddev**2 / np.sqrt(n))
 
 

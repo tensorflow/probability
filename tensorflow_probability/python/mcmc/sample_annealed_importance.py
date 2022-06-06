@@ -21,6 +21,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
@@ -258,7 +259,7 @@ def sample_annealed_importance_chain(
 
       convex_combined_log_prob = mh_results.accepted_results.target_log_prob
       dtype = dtype_util.as_numpy_dtype(convex_combined_log_prob.dtype)
-      shape = tf.shape(convex_combined_log_prob)
+      shape = ps.shape(convex_combined_log_prob)
       proposal_log_prob = tf.fill(shape, dtype(np.nan),
                                   name='bootstrap_proposal_log_prob')
       target_log_prob = tf.fill(shape, dtype(np.nan),
@@ -275,9 +276,9 @@ def sample_annealed_importance_chain(
     mh_results = _find_inner_mh_results(inner_results)
 
     ais_weights = tf.zeros(
-        shape=tf.broadcast_dynamic_shape(
-            tf.shape(mh_results.proposed_results.target_log_prob),
-            tf.shape(mh_results.accepted_results.target_log_prob)),
+        shape=ps.broadcast_shape(
+            ps.shape(mh_results.proposed_results.target_log_prob),
+            ps.shape(mh_results.accepted_results.target_log_prob)),
         dtype=mh_results.proposed_results.target_log_prob.dtype)
 
     [_, _, ais_weights, current_state, kernel_results] = tf.while_loop(

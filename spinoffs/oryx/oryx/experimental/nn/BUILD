@@ -57,7 +57,6 @@ py_library(
         # jax:stax dep,
         "//oryx/core:kwargs_util",
         "//oryx/core:primitive",
-        "//oryx/core/interpreters:unzip",
         "//oryx/core/interpreters/inverse:core",
         "//oryx/core/state",
     ],

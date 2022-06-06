@@ -1154,11 +1154,18 @@ class ReproducibleFromSeedTest(test_util.TestCase):
         k.target_log_prob_fn(states[n - 1]),
         tr_nm1.accepted_results.target_log_prob)
 
+    def compare_fn(x, y):
+      # TODO(b/223267515): PRNGKeyArrays have no dtype.
+      if hasattr(x, 'dtype'):
+        self.assertAllClose(x, y)
+      else:
+        self.assertSeedsEqual(x, y)
+
     # Rerun the kernel with the seed that it reported it used
     state, kr = k.one_step(states[n - 1], tr_nm1, seed=tr_n.seed)
     # Check that the results are the same
     self.assertAllClose(state, states[n])
-    self.assertAllAssertsNested(self.assertAllClose, kr, tr_n)
+    self.assertAllAssertsNested(compare_fn, kr, tr_n)
 
 
 @test_util.test_all_tf_execution_regimes

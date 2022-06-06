@@ -401,6 +401,48 @@ class _GaussianProcessTest(object):
         tf.convert_to_tensor([[lp[0, 0], 0.0], [0.0, 0.0], [0., lp[2, 1]]]),
         gp.log_prob(x, is_missing=[[False, True], [True, True], [True, False]]))
 
+  def testAlwaysYieldMultivariateNormal(self):
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=tf.ones([5, 1, 2]),
+        always_yield_multivariate_normal=False,
+    )
+    self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
+    self.assertAllEqual([], self.evaluate(gp.event_shape_tensor()))
+
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=tf.ones([5, 1, 2]),
+        always_yield_multivariate_normal=True,
+    )
+    self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
+    self.assertAllEqual([1], self.evaluate(gp.event_shape_tensor()))
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason="Numpy and JAX have no notion of CompositeTensor.")
+  def testCompositeTensor(self):
+    index_points = np.random.uniform(-1., 1., 10)[..., np.newaxis]
+    gp = tfd.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(),
+        index_points=index_points)
+
+    flat = tf.nest.flatten(gp, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        gp, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfd.GaussianProcess)
+
+    x = self.evaluate(gp.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(gp.log_prob(x))
+
+    self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
+
+    @tf.function
+    def call_log_prob(d):
+      return d.log_prob(x)
+    self.assertAllClose(actual, call_log_prob(gp))
+    self.assertAllClose(actual, call_log_prob(unflat))
+
 
 @test_util.test_all_tf_execution_regimes
 class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):

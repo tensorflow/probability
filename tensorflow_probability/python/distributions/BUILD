@@ -148,6 +148,7 @@ multi_substrate_py_library(
         ":triangular",
         ":truncated_cauchy",
         ":truncated_normal",
+        ":two_piece_normal",
         ":uniform",
         ":variational_gaussian_process",
         ":von_mises",
@@ -308,6 +309,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/experimental/tangent_spaces",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:batched_rejection_sampler",
         "//tensorflow_probability/python/internal:distribution_util",
@@ -597,6 +599,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/stats",
     ],
 )
 
@@ -657,8 +660,8 @@ multi_substrate_py_library(
         ":distribution",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:ascending",
         "//tensorflow_probability/python/bijectors:invert",
-        "//tensorflow_probability/python/bijectors:ordered",
         "//tensorflow_probability/python/bijectors:softmax_centered",
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:assert_util",
@@ -727,6 +730,7 @@ multi_substrate_py_library(
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -742,6 +746,7 @@ multi_substrate_py_library(
     srcs = ["gaussian_process_regression_model.py"],
     deps = [
         ":cholesky_util",
+        ":distribution",
         ":gaussian_process",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:distribution_util",
@@ -1271,6 +1276,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:tensor_util",
     ],
 )
 
@@ -1560,6 +1566,7 @@ multi_substrate_py_library(
         ":distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:softmax_centered",
+        "//tensorflow_probability/python/experimental/tangent_spaces",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -1579,6 +1586,7 @@ multi_substrate_py_library(
         ":gamma",
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/experimental/tangent_spaces",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -1668,8 +1676,8 @@ multi_substrate_py_library(
         ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:ascending",
         "//tensorflow_probability/python/bijectors:invert",
-        "//tensorflow_probability/python/bijectors:ordered",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -1986,8 +1994,8 @@ multi_substrate_py_library(
         ":distribution",
         ":kullback_leibler",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:ascending",
         "//tensorflow_probability/python/bijectors:invert",
-        "//tensorflow_probability/python/bijectors:ordered",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
@@ -2155,6 +2163,29 @@ multi_substrate_py_library(
 )
 
 multi_substrate_py_library(
+    name = "two_piece_normal",
+    srcs = ["two_piece_normal.py"],
+    deps = [
+        ":distribution",
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:identity",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:custom_gradient",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:reparameterization",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:special_math",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/math:numeric",
+    ],
+)
+
+multi_substrate_py_library(
     name = "uniform",
     srcs = ["uniform.py"],
     deps = [
@@ -2195,6 +2226,7 @@ multi_substrate_py_library(
     name = "variational_gaussian_process",
     srcs = ["variational_gaussian_process.py"],
     deps = [
+        ":distribution",
         ":gaussian_process",
         ":independent",
         ":kullback_leibler",
@@ -2634,6 +2666,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "distribution_test",
+    size = "medium",
     srcs = ["distribution_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
@@ -3273,6 +3306,7 @@ multi_substrate_py_test(
 
 multi_substrate_py_test(
     name = "masked_test",
+    size = "medium",
     srcs = ["masked_test.py"],
     deps = [
         # numpy dep,
@@ -3909,7 +3943,6 @@ multi_substrate_py_test(
     name = "truncated_normal_test",
     srcs = ["truncated_normal_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     shard_count = 10,
     deps = [
         # absl/testing:parameterized dep,
@@ -3919,6 +3952,18 @@ multi_substrate_py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_test(
+    name = "two_piece_normal_test",
+    size = "medium",
+    srcs = ["two_piece_normal_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

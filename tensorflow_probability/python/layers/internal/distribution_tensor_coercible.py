@@ -24,7 +24,7 @@ from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.util.deferred_tensor import TensorMetaClass
 from tensorflow.python.framework import composite_tensor  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.training.tracking import data_structures  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.trackable import data_structures  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = []  # We intend nothing public.

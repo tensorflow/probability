@@ -19,6 +19,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.experimental import util as tfe_util
 from tensorflow_probability.python.internal import distribution_util as dist_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -171,8 +172,7 @@ def one_step_predictive(model, observed_time_series, parameter_samples,
 
     # Run filtering over the training timesteps to extract the
     # predictive means and variances.
-    num_timesteps = dist_util.prefer_static_value(
-        tf.shape(observed_time_series))[-2]
+    num_timesteps = ps.dimension_size(observed_time_series, -2)
     lgssm = tfe_util.JitPublicMethods(
         model.make_state_space_model(num_timesteps=num_timesteps,
                                      param_vals=parameter_samples),
@@ -328,8 +328,7 @@ def forecast(model,
     # filtering distribution, pushed through the transition model).
     # This is the prior for the forecast model ("today's prior
     # is yesterday's posterior").
-    num_observed_steps = dist_util.prefer_static_value(
-        tf.shape(observed_time_series))[-2]
+    num_observed_steps = ps.dimension_size(observed_time_series, -2)
     observed_data_ssm = tfe_util.JitPublicMethods(
         model.make_state_space_model(num_timesteps=num_observed_steps,
                                      param_vals=parameter_samples),
@@ -394,8 +393,11 @@ def forecast(model,
     # Avoid eager-mode loops when querying the forecast.
     forecast_ssm = tfe_util.JitPublicMethods(forecast_ssm, trace_only=True)
 
-    num_posterior_draws = dist_util.prefer_static_value(
-        forecast_ssm.batch_shape_tensor())[-1]
+    num_posterior_draws = (
+        tf.compat.dimension_value(forecast_ssm.batch_shape[-1]))
+    if num_posterior_draws is None:
+      num_posterior_draws = (
+          dist_util.prefer_static_value(forecast_ssm.batch_shape_tensor()[-1]))
     return tfd.MixtureSameFamily(
         mixture_distribution=tfd.Categorical(
             logits=tf.zeros([num_posterior_draws], dtype=forecast_ssm.dtype)),
@@ -505,8 +507,7 @@ def impute_missing_values(model,
 
     # Run smoothing over the training timesteps to extract the
     # predictive means and variances.
-    num_timesteps = dist_util.prefer_static_value(
-        tf.shape(observed_time_series))[-2]
+    num_timesteps = ps.dimension_size(observed_time_series, -2)
     lgssm = tfe_util.JitPublicMethods(
         model.make_state_space_model(num_timesteps=num_timesteps,
                                      param_vals=parameter_samples),

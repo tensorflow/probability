@@ -574,12 +574,13 @@ class TransformedDistributionTest(test_util.TestCase):
       kl_val = self.evaluate(kl)
 
       x = td_a.sample(int(1e5), seed=test_util.test_seed())
-      kl_sample = tf.reduce_mean(td_a.log_prob(x) - td_b.log_prob(x), axis=0)
-      kl_sample_ = self.evaluate(kl_sample)
+      kl_samples = td_a.log_prob(x) - td_b.log_prob(x)
+      kl_samples_ = self.evaluate(kl_samples)
 
       self.assertEqual(kl.shape, (batch_size,))
-      self.assertAllClose(kl_val, kl_expected)
-      self.assertAllClose(kl_expected, kl_sample_, atol=0.0, rtol=1e-2)
+      self.assertAllClose(kl_expected, kl_val)
+      self.assertAllMeansClose(
+          kl_samples_, kl_expected, axis=0, atol=0.0, rtol=1e-2)
 
   def testLogProbRatio(self):
     nsamp = 5
@@ -713,8 +714,8 @@ class ScalarToMultiTest(test_util.TestCase):
     num_samples = 7e3
     y = fake_mvn.sample(int(num_samples), seed=test_util.test_seed())
     x = y[0:5, ...]
-    self.assertAllClose(expected_mean, tf.reduce_mean(y, axis=0),
-                        atol=0.1, rtol=0.1)
+    self.assertAllMeansClose(y, expected_mean, axis=0,
+                             atol=0.1, rtol=0.1)
     self.assertAllClose(expected_cov, tfp.stats.covariance(y, sample_axis=0),
                         atol=0., rtol=0.1)
 

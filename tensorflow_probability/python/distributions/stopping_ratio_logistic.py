@@ -17,8 +17,7 @@
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python.bijectors import invert as invert_bijector
-from tensorflow_probability.python.bijectors import ordered as ordered_bijector
+from tensorflow_probability.python.bijectors import ascending
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -184,8 +183,7 @@ class StoppingRatioLogistic(distribution.AutoCompositeTensorDistribution):
         cutpoints=parameter_properties.ParameterProperties(
             event_ndims=1,
             shape_fn=parameter_properties.SHAPE_FN_NOT_IMPLEMENTED,
-            default_constraining_bijector_fn=(
-                lambda: invert_bijector.Invert(ordered_bijector.Ordered()))),
+            default_constraining_bijector_fn=lambda: ascending.Ascending()),  # pylint:disable=unnecessary-lambda
         loc=parameter_properties.ParameterProperties())
 
   @property
@@ -348,4 +346,3 @@ def _kl_stopping_ratio_logistic_stopping_ratio_logistic(a, b, name=None):
             tf.math.exp(a_log_probs),
             a_log_probs - b_log_probs),
         axis=-1)
-

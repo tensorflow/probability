@@ -76,7 +76,6 @@ multi_substrate_py_library(
         ":matrix_inverse_tril",
         ":moyal_cdf",
         ":normal_cdf",
-        ":ordered",
         ":pad",
         ":permute",
         ":power",
@@ -651,17 +650,6 @@ multi_substrate_py_library(
 multi_substrate_py_library(
     name = "ascending",
     srcs = ["ascending.py"],
-    deps = [
-        ":bijector",
-        # tensorflow dep,
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:distribution_util",
-    ],
-)
-
-multi_substrate_py_library(
-    name = "ordered",
-    srcs = ["ordered.py"],
     deps = [
         ":bijector",
         # tensorflow dep,
@@ -1622,20 +1610,6 @@ multi_substrate_py_test(
     name = "ascending_test",
     size = "small",
     srcs = ["ascending_test.py"],
-    deps = [
-        ":bijector_test_util",
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
-multi_substrate_py_test(
-    name = "ordered_test",
-    size = "small",
-    srcs = ["ordered_test.py"],
     deps = [
         ":bijector_test_util",
         # numpy dep,

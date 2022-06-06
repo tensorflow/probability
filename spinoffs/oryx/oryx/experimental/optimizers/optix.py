@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Reimplementation of a subset of the optax library using Oryx's state system.
 
 This module is an advanced example of how to write stateful code using Oryx. For

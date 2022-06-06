@@ -240,7 +240,9 @@ def _sample_from_edpp(eigenvectors, vector_onehot, seed):
     return tf.cast(sample, tf.int32)
 
 
-class DeterminantalPointProcess(distribution.AutoCompositeTensorDistribution):
+class DeterminantalPointProcess(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Determinantal point process (DPP) distribution.
 
   The DPP disribution parameterized by the eigenvalues and eigenvectors of the

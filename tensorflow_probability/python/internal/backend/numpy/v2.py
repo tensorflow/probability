@@ -17,8 +17,6 @@
 import collections
 import functools
 
-import numpy as np
-
 # pylint: disable=unused-import
 from tensorflow_probability.python.internal.backend.numpy import __internal__
 from tensorflow_probability.python.internal.backend.numpy import _utils as utils
@@ -62,7 +60,7 @@ Assert = debugging.Assert
 
 def _function(func=None, input_signature=None, autograph=True,  # pylint: disable=unused-argument
               experimental_autograph_options=None,  # pylint: disable=unused-argument
-              experimental_relax_shapes=False, jit_compile=None):  # pylint: disable=unused-argument
+              reduce_retracing=False, jit_compile=None):  # pylint: disable=unused-argument
   """Like `tf.function`, for JAX."""
   transform = lambda fn: fn
   if jit_compile:
@@ -72,8 +70,10 @@ def _function(func=None, input_signature=None, autograph=True,  # pylint: disabl
       def non_jittable(arg):
         # Use static args for callables and for bools, which will sometimes
         # be used in a `if` block and fail if they are tracers.
+        # We use `type(True)` rather than `bool` because `bool` got overriden by
+        # an import above.
         return (arg is not None and
-                (callable(arg) or np.asarray(arg).dtype == np.bool_))
+                (callable(arg) or isinstance(arg, type(True))))
 
       def jit_decorator(f):
         cache = {}

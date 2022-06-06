@@ -41,9 +41,10 @@ class Softfloor(bijector.AutoCompositeTensorBijector):
 
   This `Bijector` has the following properties:
     * This `Bijector` is a map between `R` to `R`.
-    * For `t` close to `0`, this bijector mimics the identity function.
-    * For `t` approaching `infinity`, this bijector converges pointwise
+    * For `t` close to `0`, this bijector converges pointwise
     to `tf.math.floor` (except at integer points).
+    * For `t` approaching `infinity`, this bijector mimics the identity
+    function.
 
   Note that for lower temperatures `t`, this bijector becomes more numerically
   unstable. In particular, the inverse for this bijector is not numerically
@@ -149,7 +150,7 @@ class Softfloor(bijector.AutoCompositeTensorBijector):
     # the two endpoints will have the same value for derivatives.
     # The below calculations are just
     # (sigmoid((f - 0.5) / t) - sigmoid(-0.5 / t)) /
-    # (sigmoid(0.5 / t) - sigmoid(0.5 / t))
+    # (sigmoid(0.5 / t) - sigmoid(-0.5 / t))
     # We use log_sum_exp and log_sub_exp to make this calculation more
     # numerically stable.
 
@@ -169,7 +170,11 @@ class Softfloor(bijector.AutoCompositeTensorBijector):
         log_denominator,
         tfp_math.log_sub_exp(tf.ones([], self.dtype) / t, one_half / t))
     rescaled_part = tf.math.exp(log_numerator - log_denominator)
-    return integer_part + rescaled_part
+    # We add a term sigmoid(0.5 / t). When t->infinity, this will be 0.5,
+    # which will correctly shift the function so that this acts like the
+    # identity. When t->0, this will approach 0, so that the function
+    # correctly approximates a floor function.
+    return integer_part + rescaled_part + tf.math.sigmoid(-0.5 / t)
 
   def _inverse(self, y):
     # We undo the transformation from [0, 1] -> [0, 1].
@@ -196,10 +201,14 @@ class Softfloor(bijector.AutoCompositeTensorBijector):
         tf.equal(fractional_part, 0.),
         one_half / t, log_denominator)
 
-    new_fractional_part = (t * (log_numerator - log_denominator) + one_half)
-    # We finally shift this up since the original transformation was from
-    # [0.5, 1.5] to [0, 1].
-    new_fractional_part = new_fractional_part + one_half
+    # The result should be t * log(a / b) + 0.5. We shift this up by 0.5
+    # since the original transformation was from [0.5, 1.5] to [0, 1].
+    # Finally we subtract of sigmoid(-0.5 / t) to invert the forward
+    # transformation so that this acts like the identity. We can take advantage
+    # of 1 - sigmoid(-0.5 / t) = sigmoid(0.5 / t).
+
+    new_fractional_part = (
+        t * (log_numerator - log_denominator) + tf.math.sigmoid(0.5 / t))
     return tf.math.floor(y) + new_fractional_part
 
   def _forward_log_det_jacobian(self, x):

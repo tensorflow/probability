@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Tests for tensorflow_probability.spinoffs.oryx.distributions.distributions_extensions."""
 
 from absl.testing import absltest
@@ -121,19 +120,6 @@ class DistributionsExtensionsTest(test_util.TestCase):
     self.assertEqual(
         p.log_prob(sample(random.PRNGKey(0))),
         ppl.log_prob(sample)(sample(random.PRNGKey(0))))
-
-  @parameterized.named_parameters(DISTRIBUTIONS)
-  def test_unzip_transformation(self, dist, args, kwargs, out, flat):
-    del out, flat
-    args = args()
-    kwargs = kwargs()
-    p = dist(*args, **kwargs)
-
-    def model(key):
-      return ppl.random_variable(p, name='x')(key)
-
-    init = core.unzip(model, tag=ppl.RANDOM_VARIABLE)(random.PRNGKey(0))[0]
-    self.assertLen(init(random.PRNGKey(0)), 1)
 
   def test_joint_distribution(self):
 

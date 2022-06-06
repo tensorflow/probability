@@ -708,9 +708,10 @@ class OneByOneConv(bijector.Bijector):
   of the bijector.
   """
 
-  def __init__(self, event_size, seed=None, dtype=tf.float32, **kwargs):
+  def __init__(self, event_size, seed=None, dtype=tf.float32,
+               name='OneByOneConv', **kwargs):
     parameters = dict(locals())
-    with tf.name_scope('OneByOneConv') as name:
+    with tf.name_scope(name) as bijector_name:
       lower_upper, permutation = self.trainable_lu_factorization(
           event_size, seed=seed, dtype=dtype)
       self._bijector = scale_matvec_lu.ScaleMatvecLU(
@@ -720,7 +721,7 @@ class OneByOneConv(bijector.Bijector):
           is_constant_jacobian=True,
           forward_min_event_ndims=1,
           parameters=parameters,
-          name=name)
+          name=bijector_name)
 
   def forward(self, x):
     return self._bijector.forward(x)
@@ -855,11 +856,6 @@ class GlowDefaultNetwork(tfk.Sequential):
     """Default network for glow bijector."""
     # Default is scale and shift, so 2c outputs.
     this_nchan = input_shape[-1] * 2
-    conv = functools.partial(
-        tfkl.Conv2D,
-        padding='same',
-        kernel_initializer=tf.initializers.he_normal(),
-        activation='relu')
     conv_last = functools.partial(
         tfkl.Conv2D,
         padding='same',
@@ -867,8 +863,12 @@ class GlowDefaultNetwork(tfk.Sequential):
         bias_initializer=tf.initializers.zeros())
     super(GlowDefaultNetwork, self).__init__([
         tfkl.Input(shape=input_shape),
-        conv(num_hidden, kernel_shape),
-        conv(num_hidden, 1),
+        tfkl.Conv2D(num_hidden, kernel_shape, padding='same',
+                    kernel_initializer=tf.initializers.he_normal(),
+                    activation='relu'),
+        tfkl.Conv2D(num_hidden, 1, padding='same',
+                    kernel_initializer=tf.initializers.he_normal(),
+                    activation='relu'),
         conv_last(this_nchan, kernel_shape)
     ])
 

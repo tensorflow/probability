@@ -463,12 +463,13 @@ class NormalTest(test_util.TestCase):
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
     x = n_a.sample(int(1e5), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(n_a.log_prob(x) - n_b.log_prob(x), axis=0)
-    kl_sample_ = self.evaluate(kl_sample)
+    kl_samples = n_a.log_prob(x) - n_b.log_prob(x)
+    kl_samples_ = self.evaluate(kl_samples)
 
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected)
-    self.assertAllClose(kl_expected, kl_sample_, atol=0.0, rtol=1e-2)
+    self.assertAllMeansClose(
+        kl_samples_, kl_expected, axis=0, atol=0.0, rtol=1e-2)
 
   def testVariableScale(self):
     x = tf.Variable(1.)

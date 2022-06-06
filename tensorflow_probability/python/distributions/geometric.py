@@ -30,7 +30,9 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 
-class Geometric(distribution.AutoCompositeTensorDistribution):
+class Geometric(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Geometric distribution.
 
   The Geometric distribution is parameterized by p, the probability of a

@@ -72,29 +72,39 @@ negloglik = lambda y, rv_y: -rv_y.log_prob(y)
 @test_util.test_all_tf_execution_regimes
 class DenseVariationalLayerTest(test_util.TestCase):
 
-    def test_end_to_end(self):
-        # Get dataset.
-        y, x, x_tst = create_dataset()
+  def test_end_to_end(self):
+    # Get dataset.
+    y, x, x_tst = create_dataset()
 
-        layer = tfp.layers.DenseVariational(1, posterior_mean_field, prior_trainable)
+    layer = tfp.layers.DenseVariational(1, posterior_mean_field, prior_trainable)
 
-        model = tf.keras.Sequential([
-            layer,
-            tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t, scale=1))
-        ])
+    model = tf.keras.Sequential([
+        layer,
+        tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t, scale=1))
+    ])
 
-        # Do inference.
-        model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.05),
-                      loss=negloglik)
-        model.fit(x, y, epochs=2, verbose=False)
+    # Do inference.
+    model.compile(optimizer=tf.optimizers.Adam(learning_rate=0.05),
+                  loss=negloglik)
+    model.fit(x, y, epochs=2, verbose=False)
 
-        # Check the output_shape.
-        expected_output_shape = layer.compute_output_shape((None, x.shape[-1]))
-        self.assertAllEqual(expected_output_shape, (None, 1))
+    self.assertLen(model.layers, 2)
+    self.assertLen(model.layers[0].variables, 2)
+    self.assertEmpty(model.layers[1].variables)
 
-        # Profit.
-        yhat = model(x_tst)
-        assert isinstance(yhat, tfd.Distribution)
+    posterior, prior = model.layers[0].variables
+    self.assertNotEqual(prior.name, posterior.name)
+    self.assertContainsSubsequence(posterior.name, '/posterior/')
+    self.assertContainsSubsequence(prior.name, '/prior/')
+
+    # Check the output_shape.
+    expected_output_shape = layer.compute_output_shape((None, x.shape[-1]))
+    self.assertAllEqual(expected_output_shape, (None, 1))
+
+    # Profit.
+    yhat = model(x_tst)
+    self.assertIsInstance(yhat, tfd.Distribution)
+
 
 if __name__ == '__main__':
   test_util.main()

@@ -39,7 +39,6 @@ py_library(
         "//oryx/core:trace_util",
         "//oryx/core/interpreters:harvest",
         "//oryx/core/interpreters:log_prob",
-        "//oryx/core/interpreters:unzip",
         "//oryx/core/interpreters/inverse",
         "//oryx/core/ppl",
         # tensorflow_probability/substrates:jax dep,

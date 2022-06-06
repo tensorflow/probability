@@ -330,20 +330,22 @@ def multi_substrate_py_test(
     tags.append("multi_substrate")
 
     test_targets = []
-    native.py_test(
-        name = "{}.tf".format(name),
-        size = size,
-        srcs = srcs,
-        main = main or "{}.py".format(name),
-        deps = deps,
-        tags = tags + tf_tags,
-        srcs_version = srcs_version,
-        python_version = python_version,
-        timeout = timeout,
-        shard_count = shard_count,
-        args = args,
-    )
-    test_targets.append(":{}.tf".format(name))
+
+    if "tf" not in disabled_substrates:
+        native.py_test(
+            name = "{}.tf".format(name),
+            size = size,
+            srcs = srcs,
+            main = main or "{}.py".format(name),
+            deps = deps,
+            tags = tags + tf_tags,
+            srcs_version = srcs_version,
+            python_version = python_version,
+            timeout = timeout,
+            shard_count = shard_count,
+            args = args,
+        )
+        test_targets.append(":{}.tf".format(name))
 
     if "numpy" not in disabled_substrates:
         numpy_srcs = _substrate_srcs(srcs, "numpy")

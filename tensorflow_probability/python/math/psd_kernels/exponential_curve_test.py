@@ -60,11 +60,11 @@ class ExponentialCurveTest(test_util.TestCase):
     concentration = np.array(5., dtype=dtype)
     rate = np.array(.2, dtype=dtype)
 
-    np.random.seed(test_util.test_seed())
+    rng = test_util.test_np_rng()
     k = tfp.math.psd_kernels.ExponentialCurve(concentration, rate)
     for _ in range(5):
-      x = np.random.uniform(0, 2, size=[batch_size, 3]).astype(dtype)
-      y = np.random.uniform(0, 2, size=[batch_size, 1]).astype(dtype)
+      x = rng.uniform(0, 2, size=[batch_size, 3]).astype(dtype)
+      y = rng.uniform(0, 2, size=[batch_size, 1]).astype(dtype)
       self.assertAllClose(
           self._numpyKernel(concentration, rate,
                             x.sum(-1, keepdims=True),

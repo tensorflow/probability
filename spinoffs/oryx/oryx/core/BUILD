@@ -31,7 +31,6 @@ py_library(
         "//oryx/core/interpreters",
         "//oryx/core/interpreters:harvest",
         "//oryx/core/interpreters:log_prob",
-        "//oryx/core/interpreters:unzip",
         "//oryx/core/interpreters/inverse:core",
         "//oryx/core/interpreters/inverse:custom_inverse",
         "//oryx/core/ppl",

@@ -17,17 +17,28 @@
 
 licenses(["notice"])
 
+load(
+    "//tensorflow_probability/python:build_defs.bzl",
+    "multi_substrate_py_library",
+    "multi_substrate_py_test",
+)
+
 package(
     default_visibility = [
         "//tensorflow_probability:__subpackages__",
     ],
 )
 
-py_library(
+multi_substrate_py_library(
     name = "linalg",
     srcs = ["__init__.py"],
+    substrates_omit_deps = [
+        ":linear_operator_psd_kernel",
+        ":no_pivot_ldl",
+    ],
     deps = [
         ":linear_operator_psd_kernel",
+        ":linear_operator_unitary",
         ":no_pivot_ldl",
         "//tensorflow_probability/python/internal:all_util",
     ],
@@ -55,6 +66,30 @@ py_test(
         "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
+    ],
+)
+
+multi_substrate_py_library(
+    name = "linear_operator_unitary",
+    srcs = ["linear_operator_unitary.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "linear_operator_unitary_test",
+    size = "small",
+    srcs = ["linear_operator_unitary_test.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
     ],
 )
 

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Registers state dispatch functions with Python data structures.
 
 In this module, we provide registrations for some Python data structures

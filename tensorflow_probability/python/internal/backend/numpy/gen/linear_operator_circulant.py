@@ -15,6 +15,7 @@
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
 # pylint: disable=trailing-whitespace
+# pylint: disable=g-inconsistent-quotes
 
 # Copyright 2018 The TensorFlow Authors. All Rights Reserved.
 #
@@ -546,6 +547,10 @@ class _BaseLinearOperatorCirculant(linear_operator.LinearOperator):
   def _composite_tensor_fields(self):
     return ("spectrum", "input_output_dtype")
 
+  @property
+  def _experimental_parameter_ndims_to_matrix_ndims(self):
+    return {"spectrum": self.block_depth}
+
 
 # @tf_export("linalg.LinearOperatorCirculant")
 # @linear_operator.make_composite_tensor
@@ -955,9 +960,9 @@ class LinearOperatorCirculant2D(_BaseLinearOperatorCirculant):
     a real type is fine.
 
     Args:
-      spectrum:  Shape `[B1,...,Bb, N]` `Tensor`.  Allowed dtypes: `float16`,
-        `float32`, `float64`, `complex64`, `complex128`.  Type can be different
-        than `input_output_dtype`
+      spectrum:  Shape `[B1,...,Bb, N0, N1]` `Tensor`.  Allowed dtypes:
+        `float16`, `float32`, `float64`, `complex64`, `complex128`.
+        Type can be different than `input_output_dtype`
       input_output_dtype: `dtype` for input/output.
       is_non_singular:  Expect that this operator is non-singular.
       is_self_adjoint:  Expect that this operator is equal to its hermitian
@@ -1117,9 +1122,9 @@ class LinearOperatorCirculant3D(_BaseLinearOperatorCirculant):
     a real type is fine.
 
     Args:
-      spectrum:  Shape `[B1,...,Bb, N]` `Tensor`.  Allowed dtypes: `float16`,
-        `float32`, `float64`, `complex64`, `complex128`.  Type can be different
-        than `input_output_dtype`
+      spectrum:  Shape `[B1,...,Bb, N0, N1, N2]` `Tensor`.  Allowed dtypes:
+        `float16`, `float32`, `float64`, `complex64`, `complex128`.
+        Type can be different than `input_output_dtype`
       input_output_dtype: `dtype` for input/output.
       is_non_singular:  Expect that this operator is non-singular.
       is_self_adjoint:  Expect that this operator is equal to its hermitian

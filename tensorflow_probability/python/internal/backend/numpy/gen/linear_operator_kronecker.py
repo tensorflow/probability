@@ -15,6 +15,7 @@
 # pylint: disable=useless-import-alias
 # pylint: disable=property-with-parameters
 # pylint: disable=trailing-whitespace
+# pylint: disable=g-inconsistent-quotes
 
 # Copyright 2018 The TensorFlow Authors. All Rights Reserved.
 #
@@ -37,7 +38,7 @@ from tensorflow_probability.python.internal.backend.numpy import dtype as dtypes
 from tensorflow_probability.python.internal.backend.numpy import errors
 from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy.gen import tensor_shape
-# from tensorflow.python.framework import tensor_util
+from tensorflow_probability.python.internal.backend.numpy import ops
 from tensorflow_probability.python.internal.backend.numpy import numpy_array as array_ops
 from tensorflow_probability.python.internal.backend.numpy import debugging as check_ops
 from tensorflow_probability.python.internal.backend.numpy import control_flow as control_flow_ops
@@ -522,6 +523,10 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
   @property
   def _composite_tensor_fields(self):
     return ("operators",)
+
+  @property
+  def _experimental_parameter_ndims_to_matrix_ndims(self):
+    return {"operators": [0] * len(self.operators)}
 
 import numpy as np
 from tensorflow_probability.python.internal.backend.numpy import linalg_impl as _linalg

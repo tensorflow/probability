@@ -29,7 +29,9 @@ from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 
 
-class ProbitBernoulli(distribution.AutoCompositeTensorDistribution):
+class ProbitBernoulli(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """ProbitBernoulli distribution.
 
   The ProbitBernoulli distribution with `probs` parameter, i.e., the probability

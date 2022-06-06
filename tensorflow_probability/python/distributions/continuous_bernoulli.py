@@ -59,7 +59,7 @@ def _log_xexp_ratio(x):
 
     x_squared = tf.math.square(x)
 
-    result = (dtype(np.log(2.)) + x_squared / 112. -
+    result = (dtype(np.log(2.)) + x_squared / 12. -
               7 * tf.math.square(x_squared) / 1440.)
     middle_region = (x > small_cutoff) & (x < large_cutoff)
     safe_x_medium = tf.where(middle_region, x, dtype(1.))
@@ -200,9 +200,9 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
     # The normalizer is 2 * atanh(1 - 2 * probs) / (1 - 2 * probs), with the
     # removable singularity at probs = 0.5 removed (and replaced with 2).
     # We do this computation in logit space to be more numerically stable.
-    # Note that 2 * atanh(1 - 2 / (1 + exp(-logits))) = logits.
+    # Note that 2 * atanh(1 - 2 / (1 + exp(-logits))) = -logits.
     # Thus we end up with
-    # logits / (1 - 2 / (1 + exp(-logits))) =
+    # -logits / (1 - 2 / (1 + exp(-logits))) =
     # logits / ((-exp(-logits) + 1) / (exp(-logits) + 1)) =
     # (exp(-logits) + 1) * logits / (-exp(-logits) + 1) =
     # (1 + exp(logits)) * logits / (exp(logits) - 1)
@@ -312,13 +312,19 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
     # 1 / (1 + exp(-logits)) / (2 / (1 + exp(-logits)) - 1) =
     # 1 / (2 - 1 - exp(-logits)) =
     # 1 / (1 - exp(-logits))
-    # The second term becomes 1 / logits.
+    # The second term becomes - 1 / logits.
     # Thus we have mean = 1 / (1 - exp(-logits)) - 1 / logits.
 
     # When logits is close to zero, we can compute the Laurent series for the
     # first term as:
     # 1 / x + 1 / 2 + x / 12 - x**3 / 720 + x**5 / 30240 + O(x**7).
     # Thus we get the pole at zero canceling out with the second term.
+
+    # For large negative logits, the denominator (1 - exp(-logits)) in
+    # the first term yields inf values. Whilst the ratio still returns
+    # zero as it should, the gradients of this ratio become nan.
+    # Thus, noting that 1 / (1 - exp(-logits)) quickly tends towards 0
+    # for large negative logits, the mean tends towards - 1 / logits.
 
     dtype = dtype_util.as_numpy_dtype(self.dtype)
     eps = np.finfo(dtype).eps
@@ -329,14 +335,23 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
     small_cutoff = np.power(eps * 30240, 1 / 5.)
     result = dtype(0.5) + logits / 12. - logits * tf.math.square(logits) / 720
 
-    safe_logits_large = tf.where(
-        tf.math.abs(logits) > small_cutoff, logits, dtype(1.))
-    return tf.where(
-        tf.math.abs(logits) > small_cutoff,
-        -(tf.math.reciprocal(
-            tf.math.expm1(-safe_logits_large)) +
-          tf.math.reciprocal(safe_logits_large)),
-        result)
+    large_cutoff = -np.log(eps)
+
+    safe_logits_mask = ((tf.math.abs(logits) > small_cutoff)
+                        & (logits > -large_cutoff))
+    safe_logits = tf.where(safe_logits_mask, logits, dtype(1.))
+    result = tf.where(
+                safe_logits_mask,
+                -(tf.math.reciprocal(
+                    tf.math.expm1(-safe_logits)) +
+                  tf.math.reciprocal(safe_logits)),
+                result)
+
+    large_neg_mask = logits <= -large_cutoff
+    logits_large_neg = tf.where(large_neg_mask, logits, 1.)
+    return tf.where(large_neg_mask,
+                    -tf.math.reciprocal(logits_large_neg),
+                    result)
 
   def _variance(self):
     # The variance is var = probs (probs - 1) / (2 * probs - 1)**2 +

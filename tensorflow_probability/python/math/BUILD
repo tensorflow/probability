@@ -366,19 +366,6 @@ multi_substrate_py_test(
     ],
 )
 
-multi_substrate_py_test(
-    name = "random_ops_test",
-    size = "small",
-    srcs = ["random_ops_test.py"],
-    deps = [
-        # numpy dep,
-        # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/internal:dtype_util",
-        "//tensorflow_probability/python/internal:test_util",
-    ],
-)
-
 multi_substrate_py_library(
     name = "diag_jacobian",
     srcs = [
@@ -495,7 +482,7 @@ multi_substrate_py_test(
     name = "special_test",
     size = "medium",
     srcs = ["special_test.py"],
-    shard_count = 3,
+    shard_count = 6,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

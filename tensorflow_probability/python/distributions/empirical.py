@@ -26,6 +26,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
+NUMPY = False
 
 __all__ = [
     'Empirical'
@@ -51,7 +52,9 @@ def _broadcast_event_and_samples(event, samples, event_ndims):
   return event, samples
 
 
-class Empirical(distribution.AutoCompositeTensorDistribution):
+class Empirical(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Empirical distribution.
 
   The Empirical distribution is parameterized by a [batch] multiset of samples.
@@ -217,6 +220,16 @@ class Empirical(distribution.AutoCompositeTensorDistribution):
     r = samples - tf.expand_dims(self._mean(samples), axis=axis)
     var = tf.reduce_mean(tf.square(r), axis=axis)
     return tf.sqrt(var)
+
+  def _quantile(self, value, samples=None, **kwargs):
+    if NUMPY:
+      raise NotImplementedError()
+    from tensorflow_probability.python import stats  # pylint: disable=g-import-not-at-top
+    if samples is None:
+      samples = tf.convert_to_tensor(self._samples)
+
+    return stats.percentile(
+        x=samples, q=value * 100, axis=self._samples_axis, **kwargs)
 
   def _sample_n(self, n, seed=None):
     samples = tf.convert_to_tensor(self._samples)

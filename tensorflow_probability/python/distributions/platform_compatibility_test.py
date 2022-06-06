@@ -123,7 +123,7 @@ LOGPROB_AUTOVECTORIZATION_IS_BROKEN = [
 VECTORIZED_LOGPROB_ATOL = collections.defaultdict(lambda: 1e-6)
 VECTORIZED_LOGPROB_ATOL.update({
     'Beta': 1e-5,
-    'BetaBinomial': 1e-5,
+    'BetaBinomial': 3e-5,
     'BetaQuotient': 2e-5,
     'CholeskyLKJ': 1e-4,
     'GammaGamma': 2e-5,
@@ -137,6 +137,7 @@ VECTORIZED_LOGPROB_RTOL.update({
     'Beta': 1e-5,
     'GammaGamma': 1e-4,
     'JohnsonSU': 1e-5,
+    'MultivariateNormalDiagPlusLowRankCovariance': 1e-5,
     'NegativeBinomial': 1e-5,
     'PERT': 1e-5,
     'PowerSpherical': 5e-5,
@@ -149,19 +150,27 @@ XLA_LOGPROB_ATOL.update({
     'BetaBinomial': 5e-6,
     'BetaQuotient': 1e-4,
     'Binomial': 5e-6,
-    'Categorical': 7e-6,  # sparse_softmax_cross_entropy_with_logits
+    'Categorical': 1e-5,  # sparse_softmax_cross_entropy_with_logits
+    'Chi': 1e-5,
+    'CholeskyLKJ': 1e-5,
+    'ContinuousBernoulli': 1e-5,
     'DeterminantalPointProcess': 2e-5,
+    'Dirichlet': 1e-5,  # TODO(b/211121663)
     'DirichletMultinomial': 5e-4,
     'ExpGamma': 2e-3,  # TODO(b/166257329)
-    'ExpInverseGamma': 1.5e-3,  # TODO(b/166257329)
+    'ExpInverseGamma': 3e-3,  # TODO(b/166257329)
     'ExpRelaxedOneHotCategorical': 3e-5,
     'FiniteDiscrete': 1e-5,  # sparse_softmax_cross_entropy_with_logits
+    'GammaGamma': 1e-5,
     'HalfCauchy': 2e-6,
+    'HalfStudentT': 1e-5,
     'InverseGamma': 1e-4,
+    'JohnsonSU': 1e-5,
     'Kumaraswamy': 4e-5,
     'Logistic': 3e-6,
     'Multinomial': 2e-4,
     'OneHotCategorical': 1e-5,
+    'PERT': 1e-5,
     'PowerSpherical': 2e-5,
     'RelaxedBernoulli': 2e-5,
     'SigmoidBeta': 5e-4,
@@ -179,7 +188,8 @@ XLA_LOGPROB_RTOL.update({
     'Chi': 2e-4,
     'Chi2': 5e-5,
     'CholeskyLKJ': 1e-4,
-    'ContinuousBernoulli': 2e-6,
+    'ContinuousBernoulli': 1e-5,
+    'DeterminantalPointProcess': 5e-5,
     'Dirichlet': 1e-2,  # TODO(b/211121663)
     'DirichletMultinomial': 5e-4,
     'ExpRelaxedOneHotCategorical': 1e-3,  # TODO(b/163118820)
@@ -188,8 +198,10 @@ XLA_LOGPROB_RTOL.update({
     'FiniteDiscrete': 6e-6,
     'GammaGamma': 5e-4,
     'Geometric': 5e-5,
+    'HalfStudentT': 1e-5,
     'InverseGamma': 5e-3,
     'JohnsonSU': 1e-2,
+    'LambertWNormal': 1e-5,
     'LKJ': .07,
     'Multinomial': 3e-4,
     'MultivariateNormalDiag': 5e-6,
@@ -203,6 +215,7 @@ XLA_LOGPROB_RTOL.update({
     'RelaxedBernoulli': 3e-3,
     'RelaxedOneHotCategorical': 2e-3,  # TODO(b/163118820)
     'SigmoidBeta': 5e-4,
+    'StudentT': 1e-5,
     'TruncatedCauchy': 5e-5,
     'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,

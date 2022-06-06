@@ -474,7 +474,7 @@ class MaternFiveHalves(_AmplitudeLengthScaleMixin,
       inverse_length_scale = util.pad_shape_with_ones(
           inverse_length_scale, ndims=example_ndims)
       norm = norm * inverse_length_scale
-    series_term = np.sqrt(5) * norm
+    series_term = tf.math.sqrt(tf.constant(5., dtype=norm.dtype)) * norm
     log_result = tf.math.log1p(series_term + series_term**2 / 3.) - series_term
 
     if self.amplitude is not None:

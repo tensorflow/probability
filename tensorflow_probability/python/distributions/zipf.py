@@ -27,7 +27,6 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -35,7 +34,9 @@ __all__ = [
 ]
 
 
-class Zipf(distribution.AutoCompositeTensorDistribution):
+class Zipf(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Zipf distribution.
 
   The Zipf distribution is parameterized by a `power` parameter.
@@ -57,17 +58,10 @@ class Zipf(distribution.AutoCompositeTensorDistribution):
   supported in the current implementation.
   """
 
-  @deprecation.deprecated_args(
-      '2021-02-10',
-      ('The `interpolate_nondiscrete` flag is deprecated; instead use '
-       '`force_probs_to_zero_outside_support` (with the opposite sense).'),
-      'interpolate_nondiscrete',
-      warn_once=True)
   def __init__(self,
                power,
                dtype=tf.int32,
-               force_probs_to_zero_outside_support=None,
-               interpolate_nondiscrete=True,
+               force_probs_to_zero_outside_support=False,
                sample_maximum_iterations=100,
                validate_args=False,
                allow_nan_stats=False,
@@ -89,15 +83,6 @@ class Zipf(distribution.AutoCompositeTensorDistribution):
         continuous function `-power log(k) - log(zeta(power))`.  Note that this
         function is not itself a normalized probability log-density.
         Default value: `False`.
-      interpolate_nondiscrete: Deprecated.  Use
-        `force_probs_to_zero_outside_support` (with the opposite sense) instead.
-        Python `bool`. When `False`, `log_prob` returns
-        `-inf` (and `prob` returns `0`) for non-integer inputs. When `True`,
-        `log_prob` evaluates the continuous function `-power log(k) -
-        log(zeta(power))` , which matches the Zipf pmf at integer arguments `k`
-        (note that this function is not itself a normalized probability
-        log-density).
-        Default value: `True`.
       sample_maximum_iterations: Maximum number of iterations of allowable
         iterations in `sample`. When `validate_args=True`, samples which fail to
         reach convergence (subject to this cap) are masked out with
@@ -130,19 +115,7 @@ class Zipf(distribution.AutoCompositeTensorDistribution):
         raise TypeError(
             'power.dtype ({}) is not a supported `float` type.'.format(
                 dtype_util.name(self._power.dtype)))
-      self._interpolate_nondiscrete = interpolate_nondiscrete
-      if force_probs_to_zero_outside_support is not None:
-        # `force_probs_to_zero_outside_support` was explicitly set, so it
-        # controls.
-        self._force_probs_to_zero_outside_support = (
-            force_probs_to_zero_outside_support)
-      elif not self._interpolate_nondiscrete:
-        # `interpolate_nondiscrete` was explicitly set by the caller, so it
-        # should control until it is removed.
-        self._force_probs_to_zero_outside_support = True
-      else:
-        # Default.
-        self._force_probs_to_zero_outside_support = False
+      self._force_probs_to_zero_outside_support = force_probs_to_zero_outside_support
       self._sample_maximum_iterations = sample_maximum_iterations
       super(Zipf, self).__init__(
           dtype=dtype,
@@ -167,16 +140,6 @@ class Zipf(distribution.AutoCompositeTensorDistribution):
   def power(self):
     """Exponent parameter."""
     return self._power
-
-  @property
-  @deprecation.deprecated(
-      '2021-02-10',
-      ('The `interpolate_nondiscrete` property is deprecated; instead use '
-       '`force_probs_to_zero_outside_support` (with the opposite sense).'),
-      warn_once=True)
-  def interpolate_nondiscrete(self):
-    """Interpolate (log) probs on non-integer inputs."""
-    return self._interpolate_nondiscrete
 
   @property
   def force_probs_to_zero_outside_support(self):

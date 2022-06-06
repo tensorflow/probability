@@ -21,19 +21,18 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
-from tensorflow_probability import distributions as tfd
-
-
 from tensorflow_probability.python.distributions.linear_gaussian_ssm import linear_gaussian_update
 from tensorflow_probability.python.experimental.sts_gibbs import gibbs_sampler
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-from tensorflow.python.ops import parallel_for  # pylint: disable=g-direct-tensorflow-import
+from tensorflow_probability.python.sts.internal import util as sts_util
 
 
 tfd = tfp.distributions
+tfde = tfp.experimental.distributions
 tfl = tf.linalg
+
+JAX_MODE = False
 
 
 @test_util.test_graph_and_eager_modes
@@ -51,8 +50,12 @@ class GibbsSamplerTests(test_util.TestCase):
                         weights=None,
                         weights_prior_scale=10.,
                         sparse_weights_nonzero_prob=None,
-                        dtype=tf.float32):
-    seed = test_util.test_seed(sampler_type='stateless')
+                        time_series_shift=0.,
+                        dtype=tf.float32,
+                        design_matrix=False,
+                        seed=None):
+    if seed is None:
+      seed = test_util.test_seed(sampler_type='stateless')
     (design_seed,
      weights_seed,
      noise_seed,
@@ -60,12 +63,17 @@ class GibbsSamplerTests(test_util.TestCase):
      slope_seed,
      is_missing_seed) = samplers.split_seed(seed, 6, salt='_build_test_model')
 
-    design_matrix = samplers.normal(
-        [num_timesteps, num_features], dtype=dtype, seed=design_seed)
     if weights is None:
       weights = samplers.normal(
           list(batch_shape) + [num_features], dtype=dtype, seed=weights_seed)
-    regression = tf.linalg.matvec(design_matrix, weights)
+    if design_matrix is None:
+      regression = tf.zeros(num_timesteps, dtype)
+    else:
+      if isinstance(design_matrix, bool) and not design_matrix:
+        design_matrix = samplers.normal([num_timesteps, num_features],
+                                        dtype=dtype,
+                                        seed=design_seed)
+      regression = tf.linalg.matvec(design_matrix, weights)
     noise = samplers.normal(
         list(batch_shape) + [num_timesteps],
         dtype=dtype, seed=noise_seed) * true_noise_scale
@@ -79,7 +87,7 @@ class GibbsSamplerTests(test_util.TestCase):
           dtype=dtype, seed=slope_seed) * true_slope_scale, axis=-1)
       level_residuals += slope
     level = tf.cumsum(level_residuals, axis=-1)
-    time_series = (regression + noise + level)
+    time_series = (regression + noise + level + time_series_shift)
     is_missing = samplers.uniform(
         list(batch_shape) + [num_timesteps],
         dtype=dtype, seed=is_missing_seed) < missing_prob
@@ -89,9 +97,19 @@ class GibbsSamplerTests(test_util.TestCase):
         scale=tf.cast(0.01 * 0.01, dtype))
     observation_noise_variance_prior.upper_bound = 100.0
 
+    observed_time_series = tfp.sts.MaskedTimeSeries(
+        time_series[..., tf.newaxis], is_missing)
+    if time_series_shift != 0.:
+      observed_mean, observed_stddev, observed_initial = (
+          sts_util.empirical_statistics(observed_time_series))
+      initial_level_prior = tfd.Normal(
+          loc=observed_mean + observed_initial,
+          scale=tf.abs(observed_initial) + observed_stddev)
+    else:
+      initial_level_prior = None
+
     model = gibbs_sampler.build_model_for_gibbs_fitting(
-        observed_time_series=tfp.sts.MaskedTimeSeries(
-            time_series[..., tf.newaxis], is_missing),
+        observed_time_series=observed_time_series,
         design_matrix=design_matrix,
         weights_prior=(
             None if weights_prior_scale is None
@@ -103,6 +121,7 @@ class GibbsSamplerTests(test_util.TestCase):
         slope_variance_prior=None if true_slope_scale is None else prior_class(
             concentration=tf.cast(0.01, dtype),
             scale=tf.cast(0.01 * 0.01, dtype)),
+        initial_level_prior=initial_level_prior,
         observation_noise_variance_prior=observation_noise_variance_prior,
         sparse_weights_nonzero_prob=sparse_weights_nonzero_prob)
     return model, time_series, is_missing
@@ -111,21 +130,45 @@ class GibbsSamplerTests(test_util.TestCase):
       {
           'testcase_name': 'LocalLinearTrend',
           'use_slope': True,
-          'num_chains': ()
+          'num_chains': (),
+          'time_series_shift': 0.
       }, {
           'testcase_name': 'LocalLinearTrend_4chains',
           'use_slope': True,
-          'num_chains': 4
+          'num_chains': 4,
+          'time_series_shift': 0.
       }, {
           'testcase_name': 'LocalLevel',
           'use_slope': False,
-          'num_chains': ()
+          'num_chains': (),
+          'time_series_shift': 0.
+      }, {
+          'testcase_name': 'LocalLevel_ZeroStepPrediction',
+          'use_slope': False,
+          'num_chains': (),
+          'time_series_shift': 0.,
+          'use_zero_step_prediction': True,
       }, {
           'testcase_name': 'LocalLevel_4chains',
           'use_slope': False,
-          'num_chains': 4
+          'num_chains': 4,
+          'time_series_shift': 0.
+      }, {
+          'testcase_name': 'UnscaledTimeSeries_LocalLinear',
+          'use_slope': False,
+          'num_chains': (),
+          'time_series_shift': 100.
+      }, {
+          'testcase_name': 'UnscaledTimeSeries_LocalLinearTrend',
+          'use_slope': True,
+          'num_chains': (),
+          'time_series_shift': 100.
       })
-  def test_forecasts_match_reference(self, use_slope, num_chains):
+  def test_forecasts_match_reference(self,
+                                     use_slope,
+                                     num_chains,
+                                     time_series_shift,
+                                     use_zero_step_prediction=False):
     seed = test_util.test_seed()
     num_observed_steps = 5
     num_forecast_steps = 4
@@ -139,7 +182,8 @@ class GibbsSamplerTests(test_util.TestCase):
     model, observed_time_series, is_missing = self._build_test_model(
         num_timesteps=num_observed_steps + num_forecast_steps,
         true_slope_scale=0.5 if use_slope else None,
-        batch_shape=[3])
+        batch_shape=[3],
+        time_series_shift=time_series_shift)
 
     @tf.function(autograph=False)
     def do_sampling():
@@ -164,14 +208,23 @@ class GibbsSamplerTests(test_util.TestCase):
       samples = tf.nest.map_structure(reshape_chain_and_sample, samples)
 
     predictive_dist = gibbs_sampler.one_step_predictive(
-        model, samples, num_forecast_steps=num_forecast_steps,
-        thin_every=1)
+        model,
+        samples,
+        num_forecast_steps=num_forecast_steps,
+        thin_every=1,
+        use_zero_step_prediction=use_zero_step_prediction)
     predictive_mean, predictive_stddev = self.evaluate((
         predictive_dist.mean(), predictive_dist.stddev()))
     self.assertAllEqual(predictive_mean.shape,
                         [3, num_observed_steps + num_forecast_steps])
     self.assertAllEqual(predictive_stddev.shape,
                         [3, num_observed_steps + num_forecast_steps])
+
+    # big tolerance, but makes sure the predictive mean initializes near
+    # the initial time series value
+    self.assertAllClose(tf.reduce_mean(predictive_mean[:, 0]),
+                        observed_time_series[0, 0],
+                        atol=10.)
 
     if use_slope:
       parameter_samples = (samples.observation_noise_scale,
@@ -253,6 +306,72 @@ class GibbsSamplerTests(test_util.TestCase):
     self.assertAllEqual(predictive_mean_, predictive_mean2_)
     self.assertAllEqual(predictive_stddev_, predictive_stddev2_)
 
+  def test_no_covariates_is_similar_to_zero_design_matrix(self):
+    if not tf.executing_eagerly():
+      return
+    seed = test_util.test_seed(sampler_type='stateless')
+    build_model_seed, sample_seed = samplers.split_seed(seed)
+    dtype = tf.float32
+    num_timesteps = 5
+    num_features = 2
+    seed = test_util.test_seed(sampler_type='stateless')
+    model, observed_time_series, is_missing = self._build_test_model(
+        num_timesteps=num_timesteps,
+        num_features=num_features,
+        batch_shape=[3],
+        prior_class=gibbs_sampler.XLACompilableInverseGamma,
+        time_series_shift=10.,
+        dtype=dtype,
+        design_matrix=None,
+        weights_prior_scale=None,
+        seed=build_model_seed)
+
+    @tf.function(jit_compile=True)
+    def do_sampling(observed_time_series, is_missing):
+      return gibbs_sampler.fit_with_gibbs_sampling(
+          model,
+          tfp.sts.MaskedTimeSeries(observed_time_series, is_missing),
+          num_results=30,
+          num_warmup_steps=10,
+          seed=sample_seed)
+
+    samples = do_sampling(observed_time_series[..., tf.newaxis], is_missing)
+
+    dummy_model, observed_time_series, is_missing = self._build_test_model(
+        num_timesteps=num_timesteps,
+        num_features=num_features,
+        batch_shape=[3],
+        prior_class=gibbs_sampler.XLACompilableInverseGamma,
+        dtype=dtype,
+        time_series_shift=10.,
+        design_matrix=tf.zeros([num_timesteps, num_features]),
+        weights_prior_scale=None,
+        sparse_weights_nonzero_prob=0.5,
+        seed=build_model_seed)  # reuse seed!
+
+    @tf.function(jit_compile=True)
+    def do_sampling_again(observed_time_series, is_missing):
+      return gibbs_sampler.fit_with_gibbs_sampling(
+          dummy_model,
+          tfp.sts.MaskedTimeSeries(observed_time_series, is_missing),
+          num_results=30,
+          num_warmup_steps=10,
+          seed=sample_seed)
+
+    new_samples = do_sampling_again(observed_time_series[..., tf.newaxis],
+                                    is_missing)
+    for key in ('observation_noise_scale', 'level_scale', 'level',
+                'slope_scale', 'slope'):
+      first_mean = tf.reduce_mean(getattr(samples, key), axis=0)
+      second_mean = tf.reduce_mean(getattr(new_samples, key), axis=0)
+      self.assertAllClose(first_mean, second_mean, atol=0.15,
+                          msg=f'{key} mean differ')
+
+      first_std = tf.math.reduce_std(getattr(samples, key), axis=0)
+      second_std = tf.math.reduce_std(getattr(new_samples, key), axis=0)
+      self.assertAllClose(first_std, second_std, atol=0.2,
+                          msg=f'{key} stddev differ')
+
   def test_invalid_model_spec_raises_error(self):
     observed_time_series = tf.ones([2])
     design_matrix = tf.eye(2)
@@ -280,6 +399,42 @@ class GibbsSamplerTests(test_util.TestCase):
           level_variance_prior=tfd.InverseGamma(0.01, 0.01),
           observation_noise_variance_prior=tfd.LogNormal(0., 3.))
 
+  def test_model_with_linop_precision_works(self):
+    observed_time_series = tf.ones([2])
+    design_matrix = tf.eye(2)
+    sampler = gibbs_sampler.build_model_for_gibbs_fitting(
+        observed_time_series,
+        design_matrix=design_matrix,
+        weights_prior=tfde.MultivariateNormalPrecisionFactorLinearOperator(
+            precision_factor=tf.linalg.LinearOperatorDiag(tf.ones(2))),
+        level_variance_prior=tfd.InverseGamma(0.01, 0.01),
+        observation_noise_variance_prior=tfd.InverseGamma(0.01, 0.01))
+    self.assertIsNotNone(sampler)
+
+  def test_invalid_options_with_none_design_matrix_raises_error(self):
+    observed_time_series = tf.ones([2])
+    with self.assertRaisesRegex(
+        ValueError,
+        'Design matrix is None thus sparse_weights_nonzero_prob should '
+        'not be defined'):
+      gibbs_sampler.build_model_for_gibbs_fitting(
+          observed_time_series,
+          design_matrix=None,
+          weights_prior=None,
+          sparse_weights_nonzero_prob=0.4,
+          level_variance_prior=tfd.InverseGamma(0.01, 0.01),
+          observation_noise_variance_prior=tfd.InverseGamma(0.01, 0.01))
+
+    with self.assertRaisesRegex(
+        ValueError,
+        'Design matrix is None thus weights_prior should not be defined'):
+      gibbs_sampler.build_model_for_gibbs_fitting(
+          observed_time_series,
+          design_matrix=None,
+          weights_prior=tfd.Normal(loc=0., scale=1.),
+          level_variance_prior=tfd.InverseGamma(0.01, 0.01),
+          observation_noise_variance_prior=tfd.InverseGamma(0.01, 0.01))
+
   def test_invalid_model_raises_error(self):
     observed_time_series = tf.convert_to_tensor([1., 0., -1., 2.])
     bad_model = tfp.sts.Sum(
@@ -288,12 +443,14 @@ class GibbsSamplerTests(test_util.TestCase):
         observed_time_series=observed_time_series)
 
     with self.assertRaisesRegexp(ValueError, 'does not support Gibbs sampling'):
-      gibbs_sampler.fit_with_gibbs_sampling(bad_model, observed_time_series)
+      gibbs_sampler.fit_with_gibbs_sampling(
+          bad_model, observed_time_series, seed=test_util.test_seed())
 
     bad_model.supports_gibbs_sampling = True
     with self.assertRaisesRegexp(
         ValueError, 'Expected the first model component to be an instance of'):
-      gibbs_sampler.fit_with_gibbs_sampling(bad_model, observed_time_series)
+      gibbs_sampler.fit_with_gibbs_sampling(
+          bad_model, observed_time_series, seed=test_util.test_seed())
 
     bad_model_with_correct_params = tfp.sts.Sum([
         # A seasonal model with no drift has no parameters, so adding it
@@ -309,7 +466,8 @@ class GibbsSamplerTests(test_util.TestCase):
                                  'Expected the first model component to be an '
                                  'instance of `tfp.sts.LocalLevel`'):
       gibbs_sampler.fit_with_gibbs_sampling(bad_model_with_correct_params,
-                                            observed_time_series)
+                                            observed_time_series,
+                                            seed=test_util.test_seed())
 
   @parameterized.named_parameters(
       {'testcase_name': 'LocalLinearTrend', 'use_slope': True},
@@ -370,6 +528,9 @@ class GibbsSamplerTests(test_util.TestCase):
          tfp.stats.covariance(latents_samples,
                               sample_axis=0,
                               event_axis=-1)))
+    # TODO(axch, cgs): Can we use assertAllMeansClose here?  The
+    # latents_samples are presumably not IID across axis=0, so the
+    # statistical assumptions are not satisfied.
     self.assertAllClose(latents_means_,
                         posterior_means_, atol=0.1)
     self.assertAllClose(latents_covs_,
@@ -385,12 +546,13 @@ class GibbsSamplerTests(test_util.TestCase):
 
     # Check that posterior variance samples have the moments of the correct
     # InverseGamma distribution.
-    posterior_scale_samples = parallel_for.pfor(
-        lambda i: gibbs_sampler._resample_scale(  # pylint: disable=g-long-lambda
+    posterior_scale_samples = tf.vectorized_map(
+        lambda seed: gibbs_sampler._resample_scale(  # pylint: disable=g-long-lambda
             prior=prior,
             observed_residuals=observed_samples,
             is_missing=is_missing,
-            seed=strm()), 10000)
+            seed=seed),
+        tfp.random.split_seed(strm(), tf.constant(10000)))
 
     concentration = prior.concentration + tf.reduce_sum(
         1 - tf.cast(is_missing, tf.float32), axis=-1)/2.
@@ -412,20 +574,19 @@ class GibbsSamplerTests(test_util.TestCase):
     num_timesteps = 10
     num_features = 2
     batch_shape = [3, 1]
-    design_matrix = samplers.normal(
-        batch_shape + [num_timesteps, num_features], seed=design_seed)
-    true_weights = samplers.normal(
-        batch_shape + [num_features, 1], seed=true_weights_seed) * 10.0
-    targets = tf.matmul(design_matrix, true_weights)
-    is_missing = tf.convert_to_tensor([False, False, False, True, True,
-                                       False, False, True, False, False],
-                                      dtype=tf.bool)
+    design_matrix = self.evaluate(samplers.normal(
+        batch_shape + [num_timesteps, num_features], seed=design_seed))
+    true_weights = self.evaluate(samplers.normal(
+        batch_shape + [num_features, 1], seed=true_weights_seed) * 10.0)
+    targets = np.matmul(design_matrix, true_weights)
+    is_missing = np.array([False, False, False, True, True,
+                           False, False, True, False, False])
     prior_scale = tf.convert_to_tensor(5.)
     likelihood_scale = tf.convert_to_tensor(0.1)
 
     # Analytically compute the true posterior distribution on weights.
-    valid_design_matrix = tf.boolean_mask(design_matrix, ~is_missing, axis=-2)
-    valid_targets = tf.boolean_mask(targets, ~is_missing, axis=-2)
+    valid_design_matrix = design_matrix[..., ~is_missing, :]
+    valid_targets = targets[..., ~is_missing, :]
     num_valid_observations = tf.shape(valid_design_matrix)[-2]
     weights_posterior_mean, weights_posterior_cov, _ = linear_gaussian_update(
         prior_mean=tf.zeros([num_features, 1]),
@@ -437,8 +598,8 @@ class GibbsSamplerTests(test_util.TestCase):
         x_observed=valid_targets)
 
     # Check that the empirical moments of sampled weights match the true values.
-    sampled_weights = parallel_for.pfor(
-        lambda i: gibbs_sampler._resample_weights(  # pylint: disable=g-long-lambda
+    sampled_weights = tf.vectorized_map(
+        lambda seed: gibbs_sampler._resample_weights(  # pylint: disable=g-long-lambda
             design_matrix=tf.where(is_missing[..., tf.newaxis],
                                    tf.zeros_like(design_matrix),
                                    design_matrix),
@@ -446,8 +607,8 @@ class GibbsSamplerTests(test_util.TestCase):
             observation_noise_scale=likelihood_scale,
             weights_prior_scale=tf.linalg.LinearOperatorScaledIdentity(
                 num_features, prior_scale),
-            seed=sampled_weights_seed),
-        10000)
+            seed=seed),
+        tfp.random.split_seed(sampled_weights_seed, tf.constant(10000)))
     sampled_weights_mean = tf.reduce_mean(sampled_weights, axis=0)
     centered_weights = sampled_weights - weights_posterior_mean[..., 0]
     sampled_weights_cov = tf.reduce_mean(centered_weights[..., :, tf.newaxis] *
@@ -463,7 +624,7 @@ class GibbsSamplerTests(test_util.TestCase):
     self.assertAllClose(sampled_weights_cov_, weights_posterior_cov_,
                         atol=0.01, rtol=0.05)
 
-  def test_sparse_regression_recovers_plausible_weights(self):
+  def test_sparse_weights_nonzero_prob_of_one_works(self):
     true_weights = tf.constant([0., 0., 2., 0., -2.])
     model, observed_time_series, _ = self._build_test_model(
         num_timesteps=20,
@@ -472,7 +633,7 @@ class GibbsSamplerTests(test_util.TestCase):
         true_noise_scale=0.1,
         weights=true_weights,
         weights_prior_scale=None,  # Default g-prior.
-        sparse_weights_nonzero_prob=0.4)
+        sparse_weights_nonzero_prob=1.)
 
     @tf.function(autograph=False)
     def do_sampling():
@@ -490,6 +651,57 @@ class GibbsSamplerTests(test_util.TestCase):
         axis=-2)
     # Increasing `num_timesteps` relative to `num_features` would give more
     # precise weight estimates, at the cost of longer test runtime.
+    # TODO(axch, cgs): Can we use assertAllMeansClose here too?  The
+    # samples are presumably not IID across axis=0, so the
+    # statistical assumptions are not satisfied.
+    self.assertAllClose(mean_weights, true_weights, atol=0.3)
+    self.assertAllClose(nonzero_probs, [1., 1., 1., 1., 1.])
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'Rank1Updates',
+          'use_dyanamic_cholesky': False,
+      }, {
+          'testcase_name': 'DynamicCholesky',
+          'use_dyanamic_cholesky': True,
+      })
+  def test_sparse_regression_recovers_plausible_weights(
+      self, use_dyanamic_cholesky):
+    true_weights = tf.constant([0., 0., 2., 0., -2.])
+    model, observed_time_series, _ = self._build_test_model(
+        num_timesteps=20,
+        num_features=5,
+        missing_prob=0.,
+        true_noise_scale=0.1,
+        weights=true_weights,
+        weights_prior_scale=None,  # Default g-prior.
+        sparse_weights_nonzero_prob=0.4)
+
+    @tf.function(autograph=False)
+    def do_sampling():
+      return gibbs_sampler.fit_with_gibbs_sampling(
+          model,
+          observed_time_series,
+          num_results=100,
+          num_warmup_steps=100,
+          seed=test_util.test_seed(sampler_type='stateless'),
+          experimental_use_dynamic_cholesky=use_dyanamic_cholesky)
+
+    if JAX_MODE and use_dyanamic_cholesky:
+      with self.assertRaises(ValueError):
+        self.evaluate(do_sampling())
+      return
+    else:
+      samples = self.evaluate(do_sampling())
+    mean_weights = tf.reduce_mean(samples.weights, axis=-2)
+    nonzero_probs = tf.reduce_mean(
+        tf.cast(tf.not_equal(samples.weights, 0.), tf.float32),
+        axis=-2)
+    # Increasing `num_timesteps` relative to `num_features` would give more
+    # precise weight estimates, at the cost of longer test runtime.
+    # TODO(axch, cgs): Can we use assertAllMeansClose here too?  The
+    # samples are presumably not IID across axis=0, so the
+    # statistical assumptions are not satisfied.
     self.assertAllClose(mean_weights, true_weights, atol=0.3)
     self.assertAllClose(nonzero_probs, [0., 0., 1., 0., 1.], atol=0.2)
 

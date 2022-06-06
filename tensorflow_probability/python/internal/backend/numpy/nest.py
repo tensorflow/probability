@@ -327,8 +327,9 @@ def map_structure_with_tuple_paths_up_to(shallow_structure, func, *structures,
   if not structures:
     raise ValueError('Cannot map over no sequences')
 
+  # Internal `tree` does not accept check_types here; see b/198436438.
   check_types = kwargs.get('check_types', True)
-#   kwargs.pop('check_types', None)  # DisableOnExport
+  kwargs.pop('check_types', None)
 
   if expand_composites:
     raise NotImplementedError(

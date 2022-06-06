@@ -51,7 +51,9 @@ fractional components, and such that
 with `self.probs` and `self.total_count`."""
 
 
-class Multinomial(distribution.AutoCompositeTensorDistribution):
+class Multinomial(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Multinomial distribution.
 
   This Multinomial distribution is parameterized by `probs`, a (batch of)

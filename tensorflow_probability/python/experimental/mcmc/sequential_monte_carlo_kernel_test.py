@@ -84,9 +84,16 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         (tf.nest.map_structure(tf.convert_to_tensor, state2),
          tf.nest.map_structure(tf.convert_to_tensor, results2)))
 
+    def compare_fn(x, y):
+      # TODO(b/223267515): PRNGKeyArrays have no dtype.
+      if hasattr(x, 'dtype'):
+        self.assertAllClose(x, y)
+      else:
+        self.assertSeedsEqual(x, y)
+
     # Results should match.
     self.assertAllCloseNested(state, state2)
-    self.assertAllCloseNested(results, results2)
+    self.assertAllAssertsNested(compare_fn, results, results2)
 
   @test_util.numpy_disable_variable_test
   def testMarginalLikelihoodGradientIsDefined(self):

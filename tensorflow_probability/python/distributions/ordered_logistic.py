@@ -18,8 +18,7 @@ import numpy as np
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import math as tfp_math
-from tensorflow_probability.python.bijectors import invert as invert_bijector
-from tensorflow_probability.python.bijectors import ordered as ordered_bijector
+from tensorflow_probability.python.bijectors import ascending
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -216,8 +215,7 @@ class OrderedLogistic(distribution.AutoCompositeTensorDistribution):
             event_ndims=1,
             shape_fn=lambda sample_shape: ps.concat(
                 [sample_shape, [num_classes]], axis=0),
-            default_constraining_bijector_fn=lambda: invert_bijector.Invert(
-                ordered_bijector.Ordered())),
+            default_constraining_bijector_fn=lambda: ascending.Ascending()),  # pylint:disable=unnecessary-lambda
         loc=parameter_properties.ParameterProperties())
     # pylint: enable=g-long-lambda
 

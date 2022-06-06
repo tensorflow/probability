@@ -570,28 +570,29 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
       ('WithCallable',
        _TestTypeSpec(
            param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': tfb.Scale(
-                            tf.Variable(2., shape=None))._type_spec},
+                        'b': tfb.Scale(3.)._type_spec},
            omit_kwargs=('name', 'foo'),
            callable_params={'f': tf.math.exp}),
        _TestTypeSpec(
-           param_specs={'a': tf.TensorSpec([3, None], tf.float32),
-                        'b': tfb.Scale(3.)._type_spec},
+           param_specs={'a': tf.TensorSpec([None, None], tf.float32),
+                        'b': tfb.Scale(2.)._type_spec},
            omit_kwargs=('name', 'foo'),
            callable_params={'f': tf.math.exp})),
       ('DifferentNonIdentifyingKwargsValues',
        _TestTypeSpec(
-           param_specs={'x': tf.TensorSpec(None, tf.float64)},
-           non_tensor_params={'name': 'MyAutoCT'},
-           non_identifying_kwargs=('name')),
-       _TestTypeSpec(
            param_specs={'x': tf.TensorSpec([], tf.float64)},
            non_tensor_params={'name': 'OtherAutoCT'},
+           non_identifying_kwargs=('name')),
+       _TestTypeSpec(
+           param_specs={'x': tf.TensorSpec(None, tf.float64)},
+           non_tensor_params={'name': 'MyAutoCT'},
            non_identifying_kwargs=('name'))),
       )
   def testIsCompatibleWith(self, v1, v2):
     self.assertTrue(v1.is_compatible_with(v2))
     self.assertTrue(v2.is_compatible_with(v1))
+    self.assertTrue(v1.is_subtype_of(v2))
+    self.assertFalse(v2.is_subtype_of(v1))
 
   @parameterized.named_parameters(
       ('IncompatibleTensorSpecs',
@@ -632,6 +633,8 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
   def testIsNotCompatibleWith(self, v1, v2):
     self.assertFalse(v1.is_compatible_with(v2))
     self.assertFalse(v2.is_compatible_with(v1))
+    self.assertFalse(v1.is_subtype_of(v2))
+    self.assertFalse(v2.is_subtype_of(v1))
 
   @parameterized.named_parameters(
       ('WithoutCallable',
@@ -660,9 +663,9 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
                             tf.Variable(2., shape=None))._type_spec},
            callable_params={'f': tf.math.exp})),
       )
-  def testMostSpecificCompatibleType(self, v1, v2, expected):
-    self.assertEqual(v1.most_specific_compatible_type(v2), expected)
-    self.assertEqual(v2.most_specific_compatible_type(v1), expected)
+  def testMostSpecificCommonSupertype(self, v1, v2, expected):
+    self.assertEqual(v1.most_specific_common_supertype([v2]), expected)
+    self.assertEqual(v2.most_specific_common_supertype([v1]), expected)
 
   @parameterized.named_parameters(
       ('DifferentParamSpecs',
@@ -690,11 +693,9 @@ class AutoCompositeTensorTypeSpecTest(test_util.TestCase):
                         'b': tfb.Scale(tf.Variable(3.))._type_spec},
            callable_params={'f': tf.math.softplus})),
       )
-  def testMostSpecificCompatibleTypeException(self, v1, v2):
-    with self.assertRaises(ValueError):
-      v1.most_specific_compatible_type(v2)
-    with self.assertRaises(ValueError):
-      v2.most_specific_compatible_type(v1)
+  def testMostSpecificCommonSupertypeNone(self, v1, v2):
+    self.assertIsNone(v1.most_specific_common_supertype([v2]))
+    self.assertIsNone(v2.most_specific_common_supertype([v1]))
 
   @parameterized.named_parameters(
       ('WithoutCallable',

@@ -17,6 +17,7 @@
 # Dependency imports
 
 import numpy as np
+from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
@@ -101,14 +102,14 @@ class LogNormalTest(test_util.TestCase):
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
 
     x = ln_a.sample(int(2e5), seed=test_util.test_seed())
-    kl_sample = tf.reduce_mean(ln_a.log_prob(x) - ln_b.log_prob(x), axis=0)
-    kl_sample_ = self.evaluate(kl_sample)
+    kl_samples = ln_a.log_prob(x) - ln_b.log_prob(x)
+    kl_samples_ = self.evaluate(kl_samples)
 
     self.assertEqual(kl.shape, (batch_size,))
     self.assertAllClose(kl_val, kl_expected_from_normal)
     self.assertAllClose(kl_val, kl_expected_from_formula)
-    self.assertAllClose(
-        kl_expected_from_formula, kl_sample_, atol=0.0, rtol=1e-2)
+    self.assertAllMeansClose(
+        kl_samples_, kl_expected_from_formula, axis=0, atol=0.0, rtol=1e-2)
 
   # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
   # def testPdfAtBoundary(self):
@@ -128,6 +129,40 @@ class LogNormalTest(test_util.TestCase):
     with self.assertRaisesOpError('must be greater than or equal to 0'):
       dist.experimental_default_event_space_bijector().inverse(
           [-4.2, -1e-6, -1.3])
+
+  def testLogNormalFromMeanVariance(self):
+    loc = np.array([[[-3.], [2.]]], dtype=np.float32)
+    scale = np.array([[[0.1]], [[1.]]], dtype=np.float32)
+    x = np.array([0.1, 7., 4.], dtype=np.float32)
+    mean = sp_stats.lognorm.mean(s=scale, scale=np.exp(loc))
+    var = sp_stats.lognorm.var(s=scale, scale=np.exp(loc))
+    lognormal_mean_var = tfd.LogNormal.experimental_from_mean_variance(
+        mean, variance=var, validate_args=True)
+    expected_log_pdf = sp_stats.lognorm.logpdf(x, s=scale, scale=np.exp(loc))
+    log_pdf = lognormal_mean_var.log_prob(x)
+    self.assertAllClose(expected_log_pdf, self.evaluate(log_pdf), rtol=2e-5)
+    self.assertAllClose(mean, self.evaluate(lognormal_mean_var.mean()))
+    self.assertAllClose(var, self.evaluate(lognormal_mean_var.variance()))
+
+  @test_util.jax_disable_test_missing_functionality('GradientTape')
+  @test_util.numpy_disable_gradient_test
+  def testLogNormalFromMeanVarianceTapeSafe(self):
+    loc = np.float32(0.5)
+    scale = 1.
+    x = np.array([0.4, 5., 3.], dtype=np.float32)
+
+    mean = tf.convert_to_tensor(
+        sp_stats.lognorm.mean(s=scale, scale=np.exp(loc)).astype(np.float32))
+    variance = tf.convert_to_tensor(
+        sp_stats.lognorm.var(s=scale, scale=np.exp(loc)).astype(np.float32))
+
+    dist = tfd.LogNormal.experimental_from_mean_variance(
+        mean, variance, validate_args=True)
+    with tf.GradientTape() as tape:
+      tape.watch((mean, variance))
+      lp = dist.log_prob(x)
+    grads = tape.gradient(lp, (mean, variance))
+    self.assertAllNotNone(grads)
 
 if __name__ == '__main__':
   test_util.main()

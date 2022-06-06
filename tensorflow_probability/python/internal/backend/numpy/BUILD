@@ -385,6 +385,7 @@ py_library(
     name = "test_lib",
     srcs = ["test_lib.py"],
     deps = [
+        ":nest",
         # absl/logging dep,
         # absl/testing:absltest dep,
         # numpy dep,
@@ -547,6 +548,7 @@ LINOP_FILES = [
     "linear_operator_zeros",
     "matmul_registrations",
     "registrations_util",
+    "slicing",
     "solve_registrations",
 ]
 

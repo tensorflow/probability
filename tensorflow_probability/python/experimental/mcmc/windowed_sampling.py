@@ -269,8 +269,9 @@ def _setup_mcmc(model, n_chains, *, init_position=None, seed=None, **pins):
   shard_axis_names = pinned_model.experimental_shard_axis_names
   if any(tf.nest.flatten(shard_axis_names)):
     shard_axis_names = nest.flatten_up_to(
-        initial_transformed_position, pinned_model._model_flatten(  # pylint: disable=protected-access
-            shard_axis_names))
+        initial_transformed_position,
+        list(pinned_model._model_flatten(shard_axis_names)))  # pylint: disable=protected-access
+
   else:
     # No active shard axis names
     shard_axis_names = None

@@ -170,6 +170,54 @@ class RoundExponentialBumpFunctionTest(test_util.TestCase):
 
 
 @test_util.test_graph_and_eager_modes
+class BetaincTest(test_util.TestCase):
+
+  def testBetainc(self):
+    strm = test_util.test_seed_stream()
+    a = tfp.distributions.HalfCauchy(
+        loc=np.float64(1.), scale=15.).sample(2000, strm())
+    a = self.evaluate(a)
+    b = tfp.distributions.HalfCauchy(
+        loc=np.float64(1.), scale=15.).sample(2000, strm())
+    b = self.evaluate(b)
+    x = tfp.distributions.Uniform(
+        high=np.float64(1.)).sample(2000, strm())
+    x = self.evaluate(x)
+
+    self.assertAllClose(
+        scipy_special.betainc(a, b, x),
+        self.evaluate(tfp_math.betainc(a, b, x)), rtol=1e-6)
+
+  def testBetaincBroadcast(self):
+    a = np.ones([3, 2], dtype=np.float32)
+    b = np.ones([5, 1, 1], dtype=np.float32)
+    x = np.ones([7, 1, 1, 2], dtype=np.float32)
+    self.assertAllEqual([7, 5, 3, 2], tfp_math.betainc(a, b, x).shape)
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincGradient(self):
+    a = np.logspace(-2., 2., 11)[..., np.newaxis]
+    b = np.logspace(-2., 2., 11)[..., np.newaxis]
+    # Avoid the end points where the gradient can veer off to infinity.
+    x = np.linspace(0.1, 0.7, 23)
+
+    # Wrap in tf.function for faster computations.
+    betainc = tf.function(tfp_math.betainc)
+
+    err = self.compute_max_gradient_error(
+        lambda z: betainc(a, b, z), [x], delta=1e-4)
+    self.assertLess(err, 2e-5)
+
+    err = self.compute_max_gradient_error(
+        lambda z: betainc(z, b, x), [a], delta=1e-4)
+    self.assertLess(err, 8e-4)
+
+    err = self.compute_max_gradient_error(
+        lambda z: betainc(a, z, x), [b], delta=1e-4)
+    self.assertLess(err, 8e-4)
+
+
+@test_util.test_graph_and_eager_modes
 class DawsnTest(test_util.TestCase):
 
   def testDawsnBoundary(self):
@@ -306,12 +354,16 @@ class IgammainvTest(test_util.TestCase):
     a = np.logspace(-2., 2., 11)[..., np.newaxis]
     # Avoid the end points where the gradient can veer off to infinity.
     p = np.linspace(0.1, 0.7, 23)
+
+    # Wrap in tf.function for faster computations.
+    igammainv = tf.function(tfp_math.igammainv)
+
     err = self.compute_max_gradient_error(
-        lambda x: tfp.math.igammainv(a, x), [p], delta=1e-4)
+        lambda x: igammainv(a, x), [p], delta=1e-4)
     self.assertLess(err, 2e-5)
 
     err = self.compute_max_gradient_error(
-        lambda x: tfp.math.igammainv(x, p), [a], delta=1e-4)
+        lambda x: igammainv(x, p), [a], delta=1e-4)
     self.assertLess(err, 2e-5)
 
   @test_util.numpy_disable_gradient_test
@@ -319,12 +371,16 @@ class IgammainvTest(test_util.TestCase):
     a = np.logspace(-2., 2., 11)[..., np.newaxis]
     # Avoid the end points where the gradient can veer off to infinity.
     p = np.linspace(0.1, 0.7, 23)
+
+    # Wrap in tf.function for faster computations.
+    igammacinv = tf.function(tfp_math.igammacinv)
+
     err = self.compute_max_gradient_error(
-        lambda x: tfp.math.igammacinv(a, x), [p], delta=1e-4)
+        lambda x: igammacinv(a, x), [p], delta=1e-4)
     self.assertLess(err, 2e-5)
 
     err = self.compute_max_gradient_error(
-        lambda x: tfp.math.igammacinv(x, p), [a], delta=1e-4)
+        lambda x: igammacinv(x, p), [a], delta=1e-4)
     self.assertLess(err, 2e-5)
 
   @test_util.numpy_disable_gradient_test
@@ -702,6 +758,15 @@ class SpecialTest(test_util.TestCase):
         tfp.math.value_and_gradient(tfp.math.logerfcx, -x))
     self.assertAllNotNan(logerfcx_)
     self.assertAllNotNan(grad_logerfcx_)
+
+  @parameterized.parameters(tf.float32, tf.float64)
+  def testLogErfcxAtZero(self, dtype):
+    x = tf.constant(0., dtype=dtype)
+    logerfcx_, logerfc_ = self.evaluate([
+        tfp.math.logerfcx(x),
+        tfp.math.logerfc(x)])
+    self.assertAllClose(np.log(scipy_special.erfc(0.)), logerfc_)
+    self.assertAllClose(np.log(scipy_special.erfcx(0.)), logerfcx_)
 
   # See https://en.wikipedia.org/wiki/Lambert_W_function#Special_values
   # for a list of special values and known identities.

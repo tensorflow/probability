@@ -265,14 +265,19 @@ class Gamma(distribution.AutoCompositeTensorDistribution):
       caveats.""")
   def _sample_n(self, n, seed=None):
     seed = samplers.sanitize_seed(seed, salt='gamma')
+    log_space = implementation_selection.is_xla()
 
-    return random_gamma(
+    res = random_gamma(
         shape=ps.convert_to_shape_tensor([n]),
         concentration=tf.convert_to_tensor(self.concentration),
         rate=None if self.rate is None else tf.convert_to_tensor(self.rate),
         log_rate=(None if self.log_rate is None else
                   tf.convert_to_tensor(self.log_rate)),
+        log_space=log_space,
         seed=seed)
+    if log_space:
+      res = tf.math.exp(res)
+    return res
 
   def _log_prob(self, x, rate=None):
     concentration = tf.convert_to_tensor(self.concentration)
@@ -510,7 +515,7 @@ def _random_gamma_noncpu(
 # tf.function required to access Grappler's implementation_selector.
 @implementation_selection.never_runs_functions_eagerly
 # TODO(b/163029794): Shape relaxation breaks XLA.
-@tf.function(autograph=False, experimental_relax_shapes=False)
+@tf.function(autograph=False, reduce_retracing=False)
 def _random_gamma_no_gradient(
     shape, concentration, rate, log_rate, seed, log_space):
   """Sample a gamma, CPU specialized to stateless_gamma.

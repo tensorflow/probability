@@ -279,7 +279,8 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovarianceTest(
     with self.subTest('Samples are correct'):
       n = 10000
       samples = low_rank_update.sample(n, seed=test_util.test_seed())
-      sample_mean, sample_var, sample_cov = self.evaluate([
+      samples, sample_mean, sample_var, sample_cov = self.evaluate([
+          samples,
           tf.reduce_mean(samples, axis=0),
           tfps.variance(samples, sample_axis=0),
           tfps.covariance(samples, sample_axis=0),
@@ -289,9 +290,10 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovarianceTest(
       self.assertAllEqual(ref_samples.shape, samples.shape)
 
       maxstddev = np.max(self.evaluate(low_rank_update.stddev()))
-      self.assertAllClose(
-          sample_mean,
+      self.assertAllMeansClose(
+          samples,
           self.evaluate(low_rank_update.mean()),
+          axis=0,
           atol=5 * maxstddev / np.sqrt(n))
       self.assertAllClose(
           sample_var,

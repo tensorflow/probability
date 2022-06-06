@@ -76,6 +76,7 @@ multi_substrate_py_test(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

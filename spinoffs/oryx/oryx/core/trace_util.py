@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-# Lint as: python3
 """Module for JAX tracing utility functions."""
 import contextlib
 import threading
@@ -51,7 +50,7 @@ def get_shaped_aval(x):
 def pv_like(x, abstract=True):
   """Converts a JAX value type into a JAX `PartialVal`."""
   if abstract:
-    return pe.PartialVal((get_shaped_aval(x), jax_core.unit))
+    return pe.PartialVal.unknown(get_shaped_aval(x))
   else:
     return pe.PartialVal((None, x))  # pytype: disable=wrong-arg-types
 
@@ -71,7 +70,7 @@ def stage(f, dynamic=True):
           flat_fun,
           flat_avals)
     else:
-      pvals = [pe.PartialVal((aval, jax_core.unit)) for aval in flat_avals]
+      pvals = [pe.PartialVal.unknown(aval) for aval in flat_avals]
       jaxpr, _, consts = pe.trace_to_jaxpr(
           flat_fun,
           pvals,
@@ -120,3 +119,11 @@ def get_dynamic_context(trace: jax_core.Trace) -> Any:
   if trace.main not in _thread_local_state.dynamic_contexts:
     raise ValueError(f'No dynamic context registered for trace: {trace}')
   return _thread_local_state.dynamic_contexts[trace.main][-1]
+
+
+def extract_call_jaxpr(primitive, params):
+  if not (primitive.call_primitive or primitive.map_primitive):
+    return None, params
+  else:
+    params = dict(params)
+    return params.pop('call_jaxpr'), params

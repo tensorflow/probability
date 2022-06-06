@@ -27,7 +27,9 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
 
-class PlackettLuce(distribution.AutoCompositeTensorDistribution):
+class PlackettLuce(
+    distribution.DiscreteDistributionMixin,
+    distribution.AutoCompositeTensorDistribution):
   """Plackett-Luce distribution over permutations.
 
   The Plackett-Luce distribution is defined over permutations of
@@ -220,6 +222,9 @@ class PlackettLuce(distribution.AutoCompositeTensorDistribution):
     scores_shape = ps.shape(scores)[:-1]
     scores_2d = tf.reshape(scores, [-1, event_size])
     x_2d = tf.reshape(x, [-1, event_size])
+    # Ensure that these are indices that we can use in a gather.
+    if dtype_util.is_floating(x_2d.dtype):
+      x_2d = tf.cast(x_2d, tf.int32)
 
     rearranged_scores = tf.gather(scores_2d, x_2d, batch_dims=1)
     normalization_terms = tf.cumsum(rearranged_scores, axis=-1, reverse=True)

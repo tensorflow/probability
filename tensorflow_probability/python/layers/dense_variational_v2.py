@@ -99,14 +99,16 @@ class DenseVariational(tf.keras.layers.Layer):
     self.input_spec = tf.keras.layers.InputSpec(
         min_ndim=2, axes={-1: last_dim})
 
-    self._posterior = self._make_posterior_fn(
-        last_dim * self.units,
-        self.units if self.use_bias else 0,
-        dtype)
-    self._prior = self._make_prior_fn(
-        last_dim * self.units,
-        self.units if self.use_bias else 0,
-        dtype)
+    with tf.name_scope('posterior'):
+      self._posterior = self._make_posterior_fn(
+          last_dim * self.units,
+          self.units if self.use_bias else 0,
+          dtype)
+    with tf.name_scope('prior'):
+      self._prior = self._make_prior_fn(
+          last_dim * self.units,
+          self.units if self.use_bias else 0,
+          dtype)
 
     self.built = True
 

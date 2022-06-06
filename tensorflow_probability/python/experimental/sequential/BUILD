@@ -95,6 +95,7 @@ multi_substrate_py_test(
     name = "ensemble_kalman_filter_test",
     size = "medium",
     srcs = ["ensemble_kalman_filter_test.py"],
+    shard_count = 3,
     deps = [
         ":ensemble_kalman_filter",
         # numpy dep,

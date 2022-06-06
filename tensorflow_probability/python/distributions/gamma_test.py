@@ -534,11 +534,11 @@ class GammaTest(test_util.TestCase):
 
     for d0, d1 in (g0, g1), (g0lr, g1), (g0, g1lr), (g0lr, g1lr):
       x = d0.sample(int(1e4), seed=test_util.test_seed())
-      kl_sample = tf.reduce_mean(d0.log_prob(x) - d1.log_prob(x), axis=0)
+      kl_samples = d0.log_prob(x) - d1.log_prob(x)
       kl_actual = tfd.kl_divergence(d0, d1)
 
       # Execute graph.
-      [kl_sample_, kl_actual_] = self.evaluate([kl_sample, kl_actual])
+      [kl_samples_, kl_actual_] = self.evaluate([kl_samples, kl_actual])
 
       self.assertEqual(rate0.shape, kl_actual.shape)
 
@@ -551,7 +551,8 @@ class GammaTest(test_util.TestCase):
                      + concentration0 * (rate1 / rate0 - 1.))
 
       self.assertAllClose(kl_expected, kl_actual_, atol=0., rtol=1e-6)
-      self.assertAllClose(kl_sample_, kl_actual_, atol=0., rtol=1e-1)
+      self.assertAllMeansClose(
+          kl_samples_, kl_actual_, axis=0, atol=0., rtol=1e-1)
 
   @test_util.tf_tape_safety_test
   def testGradientThroughConcentration(self):
@@ -722,9 +723,10 @@ class GammaSamplingTest(test_util.TestCase):
             gamma.cdf,
             false_fail_rate=1e-9))
 
-    self.assertAllClose(
-        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+    self.assertAllMeansClose(
+        self.evaluate(samples),
         sp_stats.gamma.mean(concentration, scale=1 / rate),
+        axis=0,
         rtol=0.04)
     self.assertAllClose(
         self.evaluate(tf.math.reduce_variance(samples, axis=0)),
@@ -755,9 +757,10 @@ class GammaSamplingTest(test_util.TestCase):
             gamma.cdf,
             false_fail_rate=1e-9))
 
-    self.assertAllClose(
-        self.evaluate(tf.math.reduce_mean(samples, axis=0)),
+    self.assertAllMeansClose(
+        self.evaluate(samples),
         sp_stats.gamma.mean(concentration, scale=1 / rate),
+        axis=0,
         rtol=0.01)
     self.assertAllClose(
         self.evaluate(tf.math.reduce_variance(samples, axis=0)),

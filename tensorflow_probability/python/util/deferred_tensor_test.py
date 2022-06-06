@@ -700,6 +700,7 @@ class DeferredTensorSpecTest(test_util.TestCase):
   def testIsCompatibleWith(self, v1, v2):
     self.assertTrue(v1.is_compatible_with(v2))
     self.assertTrue(v2.is_compatible_with(v1))
+    self.assertTrue(v1.is_subtype_of(v2))
 
   @parameterized.named_parameters(
       ('IncompatibleInputSpecs',
@@ -748,6 +749,8 @@ class DeferredTensorSpecTest(test_util.TestCase):
   def testIsNotCompatibleWith(self, v1, v2):
     self.assertFalse(v1.is_compatible_with(v2))
     self.assertFalse(v2.is_compatible_with(v1))
+    self.assertFalse(v1.is_subtype_of(v2))
+    self.assertFalse(v2.is_subtype_of(v1))
 
   @parameterized.named_parameters(
       ('DeferredTensor',
@@ -785,9 +788,9 @@ class DeferredTensorSpecTest(test_util.TestCase):
            input_spec=resource_variable_ops.VariableSpec(None, tf.float32),
            transform_or_spec=tf.math.sigmoid))
       )
-  def testMostSpecificCompatibleType(self, v1, v2, expected):
-    self.assertEqual(v1.most_specific_compatible_type(v2), expected)
-    self.assertEqual(v2.most_specific_compatible_type(v1), expected)
+  def testMostSpecificCommonSupertype(self, v1, v2, expected):
+    self.assertEqual(v1.most_specific_common_supertype([v2]), expected)
+    self.assertEqual(v2.most_specific_common_supertype([v1]), expected)
 
   @parameterized.named_parameters(
       ('IncompatibleInputSpecs',
@@ -824,11 +827,9 @@ class DeferredTensorSpecTest(test_util.TestCase):
            dtype=tf.float64,
            name='two')),
       )
-  def testMostSpecificCompatibleTypeException(self, v1, v2):
-    with self.assertRaises(ValueError):
-      v1.most_specific_compatible_type(v2)
-    with self.assertRaises(ValueError):
-      v2.most_specific_compatible_type(v1)
+  def testMostSpecificCommonSupertypeNone(self, v1, v2):
+    self.assertIsNone(v1.most_specific_common_supertype([v2]))
+    self.assertIsNone(v2.most_specific_common_supertype([v1]))
 
   @parameterized.named_parameters(
       ('DeferredTensor',

@@ -177,9 +177,9 @@ class WishartTest(test_util.TestCase):
     x = chol_w.sample(10000, seed=test_util.test_seed(hardcoded_seed=42))
     self.assertAllEqual((10000, 3, 3), x.shape)
 
-    moment1_estimate = self.evaluate(tf.reduce_mean(x, axis=[0]))
-    self.assertAllClose(
-        self.evaluate(chol_w.mean()), moment1_estimate, rtol=0.05)
+    x_, moment1_estimate = self.evaluate([x, tf.reduce_mean(x, axis=[0])])
+    self.assertAllMeansClose(
+        x_, self.evaluate(chol_w.mean()), axis=0, rtol=0.05)
 
     # The Variance estimate uses the squares rather than outer-products
     # because Wishart.Variance is the diagonal of the Wishart covariance
