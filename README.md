@@ -87,15 +87,11 @@ for end-to-end examples. It includes tutorial notebooks such as:
 
 It also includes example scripts such as:
 
-* [Variational Autoencoders](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/jupyter_notebooks/Probabilistic_Layers_VAE.ipynb).
   Representation learning with a latent code and variational inference.
 * [Vector-Quantized Autoencoder](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/vq_vae.py).
   Discrete representation learning with vector quantization.
 * [Disentangled Sequential Variational Autoencoder](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/disentangled_vae.py)
   Disentangled representation learning over sequences with variational inference.
-* Latent Dirichlet Allocation
-  ([Distributions version](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/latent_dirichlet_allocation_distributions.py),
-  Mixed membership modeling for capturing topics in a document.
 * [Bayesian Neural Networks](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/bayesian_neural_network.py).
   Neural networks with uncertainty over their weights.
 * [Bayesian Logistic Regression](https://github.com/tensorflow/probability/tree/main/tensorflow_probability/examples/logistic_regression.py).
