@@ -142,6 +142,25 @@ class DenseVariational(tf.keras.layers.Layer):
 
     return outputs
 
+  def compute_output_shape(self, input_shape):
+    """Computes the output shape of the layer.
+
+    Args:
+      input_shape: `TensorShape` or `list` of `TensorShape`
+        (only last dim is used)
+    Returns:
+      The output shape.
+    Raises:
+        ValueError: If the innermost dimension of `input_shape` is not defined.
+    """
+    input_shape = tf.TensorShape(input_shape)
+    input_shape = input_shape.with_rank_at_least(2)
+    if input_shape[-1] is None:
+      raise ValueError(
+          f'The innermost dimension of input_shape must be defined, but saw: {input_shape}'
+      )
+    return input_shape[:-1].concatenate(self.units)
+
 
 def _make_kl_divergence_penalty(
     use_exact_kl=False,

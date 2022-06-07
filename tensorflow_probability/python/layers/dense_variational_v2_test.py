@@ -76,10 +76,12 @@ class DenseVariationalLayerTest(test_util.TestCase):
     # Get dataset.
     y, x, x_tst = create_dataset()
 
-    # Build model.
+    layer = tfp.layers.DenseVariational(1, posterior_mean_field,
+                                        prior_trainable)
+
     model = tf.keras.Sequential([
-        tfp.layers.DenseVariational(1, posterior_mean_field, prior_trainable),
-        tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t, scale=1)),
+        layer,
+        tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t, scale=1))
     ])
 
     # Do inference.
@@ -95,6 +97,11 @@ class DenseVariationalLayerTest(test_util.TestCase):
     self.assertNotEqual(prior.name, posterior.name)
     self.assertContainsSubsequence(posterior.name, '/posterior/')
     self.assertContainsSubsequence(prior.name, '/prior/')
+
+    # Check the output_shape.
+    expected_output_shape = layer.compute_output_shape(
+        (None, x.shape[-1])).as_list()
+    self.assertAllEqual(expected_output_shape, (None, 1))
 
     # Profit.
     yhat = model(x_tst)
