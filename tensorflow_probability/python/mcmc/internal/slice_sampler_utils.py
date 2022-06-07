@@ -84,7 +84,7 @@ def _left_doubling_increments(batch_shape, max_doublings, step_size, seed=None,
     widths = width_multipliers * step_size
 
     # Take the cumulative sum of the left side increments in slice width to give
-    # the resulting distance from the inital lower bound.
+    # the resulting distance from the initial lower bound.
     left_increments = tf.cumsum(widths * expand_left, exclusive=True, axis=0)
     return left_increments, widths
 

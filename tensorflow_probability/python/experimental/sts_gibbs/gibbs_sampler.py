@@ -380,7 +380,6 @@ def fit_with_gibbs_sampling(model,
       update for the posterior precision of the weight in case of a spike and
       slab sampler.
 
-
   Returns:
     model: A `GibbsSamplerState` structure of posterior samples.
   """
@@ -436,8 +435,13 @@ def fit_with_gibbs_sampling(model,
       seed=samplers.sanitize_seed(seed, salt='initial_GibbsSamplerState'))
 
   sampler_loop_body = _build_sampler_loop_body(
-      model, observed_time_series, is_missing, default_pseudo_observations,
-      experimental_use_dynamic_cholesky, experimental_use_weight_adjustment)
+      model=model,
+      observed_time_series=observed_time_series,
+      is_missing=is_missing,
+      default_pseudo_observations=default_pseudo_observations,
+      experimental_use_dynamic_cholesky=experimental_use_dynamic_cholesky,
+      experimental_use_weight_adjustment=experimental_use_weight_adjustment
+  )
 
   samples = tf.scan(sampler_loop_body,
                     np.arange(num_warmup_steps + num_results), initial_state)
@@ -885,6 +889,19 @@ def _build_sampler_loop_body(model,
     else:
       weights_prior_scale = (regression_component.parameters[0].prior.scale)
 
+  # Sub-selects in `forward_filter_sequential` take up a lot of the runtime
+  # with a dynamic Cholesky, but compiling here seems to help.
+  # TODO(b/234726324): Should this always be compiled?
+  if experimental_use_dynamic_cholesky:
+    resample_latents = tf.function(
+        jit_compile=True, autograph=False)(
+            _resample_latents)
+    resample_scale = tf.function(
+        jit_compile=True, autograph=False)(
+            _resample_scale)
+  else:
+    resample_latents = _resample_latents
+    resample_scale = _resample_scale
   def sampler_loop_body(previous_sample, _):
     """Runs one sampler iteration, resampling all model variables."""
 
@@ -940,7 +957,7 @@ def _build_sampler_loop_body(model,
       observation_noise_scale = previous_sample.observation_noise_scale
       weights = previous_sample.weights
 
-    latents = _resample_latents(
+    latents = resample_latents(
         observed_residuals=regression_residuals,
         level_scale=previous_sample.level_scale,
         slope_scale=previous_sample.slope_scale if model_has_slope else None,
@@ -956,20 +973,20 @@ def _build_sampler_loop_body(model,
       slope_residuals = slope[..., 1:] - slope[..., :-1]
 
     # Estimate level scale from the empirical changes in level.
-    level_scale = _resample_scale(
+    level_scale = resample_scale(
         prior=level_scale_variance_prior,
         observed_residuals=level_residuals,
         is_missing=None,
         seed=level_scale_seed)
     if model_has_slope:
-      slope_scale = _resample_scale(
+      slope_scale = resample_scale(
           prior=slope_scale_variance_prior,
           observed_residuals=slope_residuals,
           is_missing=None,
           seed=slope_scale_seed)
     if not (regression_component and model_has_spike_slab_regression):
       # Estimate noise scale from the residuals.
-      observation_noise_scale = _resample_scale(
+      observation_noise_scale = resample_scale(
           prior=observation_noise_variance_prior,
           observed_residuals=regression_residuals - level,
           is_missing=is_missing,

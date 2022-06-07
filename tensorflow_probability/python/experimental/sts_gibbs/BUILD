@@ -91,6 +91,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/distributions:bernoulli",
+        "//tensorflow_probability/python/distributions:gamma",
         "//tensorflow_probability/python/distributions:inverse_gamma",
         "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
         "//tensorflow_probability/python/distributions:sample",

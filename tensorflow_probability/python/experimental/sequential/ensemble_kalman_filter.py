@@ -102,10 +102,10 @@ def ensemble_kalman_filter_predict(
   Y[t] ~ observation_fn(X[t])
   ```
 
-  Given the ensemble `state.particles` sampled from `P(X[t-1] | Y[t-1])`, this
-  function produces the predicted (a.k.a. forecast or background) ensemble
-  sampled from `P(X[t] | Y[t-1])`. This is the predicted next state *before*
-  assimilating the observation `Y[t]`.
+  Given the ensemble `state.particles` sampled from `P(X[t-1] | Y[t-1], ...)`,
+  this function produces the predicted (a.k.a. forecast or background) ensemble
+  sampled from `P(X[t] | Y[t-1], ...)`. This is the predicted next state
+  *before* assimilating the observation `Y[t]`.
 
   Typically, with `F` some deterministic mapping, `transition_fn(X)` returns a
   normal distribution centered at `F(X)`.
@@ -177,9 +177,9 @@ def ensemble_kalman_filter_update(
   Y[t] ~ observation_fn(X[t])
   ```
 
-  Given the ensemble `state.particles` sampled from `P(X[t] | Y[t-1])`, this
-  function assimilates obervation `Y[t]` to produce the updated ensemble sampled
-  from `P(X[t] | Y[t])`.
+  Given the ensemble `state.particles` sampled from `P(X[t] | Y[t-1], ...)`,
+  this function assimilates obervation `Y[t]` to produce the updated ensemble
+  sampled from `P(X[t] | Y[t], ...)`.
 
   Typically, with `G` some deterministic observation mapping,
   `observation_fn(X)` returns a normal distribution centered at `G(X)`.

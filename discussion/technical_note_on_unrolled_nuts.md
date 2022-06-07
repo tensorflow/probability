@@ -13,7 +13,7 @@ two reasons:
 
 To accomodate these concerns our implementation makes the following
 novel observations:
-  - We *offline enumerate* the recursion possibilties and note all read/write
+  - We *offline enumerate* the recursion possibilities and note all read/write
     operations.
   - We pre-allocate requisite memory (for what would otherwise be the recursion
     stack).
@@ -258,7 +258,7 @@ step 1(0): x0        ==> U([x0], [1]) ==> x1 --> MH([x',x1], 1/1) --> x''
 ## Performance Optimization
 
 Using a memory slot of the size 2^max_tree_depth like above is quite
-convenient for both sampling and u turn check, as we have the whole history avaiable
+convenient for both sampling and u turn check, as we have the whole history available
 and can easily index to it. In practice, while it works well for small
 problem, users could quickly ran into memory problem with large batch size (i.e.,
 number of chains), large latent size (i.e., dimension of the free parameters),

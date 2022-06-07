@@ -4,8 +4,8 @@ This directory contains proposals and design documents for turnkey inference.
 
 Goal: user specifies how many MCMC samples (or effective samples) they want, and
 the sampling method takes care of the rest. This includes the definition of
-`target_log_prob_fn`, inital states, and choosing the optimal
-(paramterization of) the `TransitionKernel`.
+`target_log_prob_fn`, initial states, and choosing the optimal
+(parameterization of) the `TransitionKernel`.
 
 ### An expanding window tuning for HMC/NUTS
 
@@ -24,14 +24,14 @@ posterior.
 Currently, the TFP NUTS implementation has a speed bottleneck of waiting for the
 slowest chain/batch (due to the SIMD nature), and it could seriously hinder
 performance, especially when the (initial) step size is poorly chosen. Thus,
-our strategy here is to run very few chains in the inital warm up (1 or 2).
+our strategy here is to run very few chains in the initial warm up (1 or 2).
 Moreover, by analogy to Stan's expanding memoryless windows (stage II of Stan's
-automatic parameter tuning), we implmented an expanding batch, fixed step count
+automatic parameter tuning), we implemented an expanding batch, fixed step count
 method.
 
 It is worth noting that, in TFP HMC step sizes are defined per dimension of the
 target_log_prob_fn. To separate the tuning of the step size (a scalar) and the
-mass matrix (a vector for diagnoal mass matrix), we apply an inner transform
+mass matrix (a vector for diagonal mass matrix), we apply an inner transform
 transition kernel (recall that the covariance matrix Σ acts as a Euclidean
 metric to rotate and scale the target_log_prob_fn) using a shift and scale
 bijector.

@@ -167,7 +167,7 @@ def retrying_cholesky(
 
   Args:
     matrix: A batch of symmetric square matrices, with shape `[..., n, n]`.
-    jitter: Initial jitter to add to the diagnoal.  Default: 1e-6, unless
+    jitter: Initial jitter to add to the diagonal.  Default: 1e-6, unless
       `matrix.dtype` is float64, in which case the default is 1e-10.
     max_iters: Maximum number of times to retry the Cholesky decomposition
       with larger diagonal jitter.  Default: 5.
