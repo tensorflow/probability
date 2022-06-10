@@ -160,7 +160,7 @@ multi_substrate_py_test(
     name = "multitask_gaussian_process_test",
     size = "medium",
     srcs = ["multitask_gaussian_process_test.py"],
-    shard_count = 2,
+    shard_count = 3,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
