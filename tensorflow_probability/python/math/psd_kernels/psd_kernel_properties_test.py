@@ -169,6 +169,8 @@ class KernelPropertiesTest(test_util.TestCase):
       self.assertAllClose(diag, diag_fn(kernel))
       self.assertAllClose(diag, diag_fn(unflat))
 
+    self.assertConvertVariablesToTensorsWorks(kernel)
+
 
 @test_util.test_all_tf_execution_regimes
 class PSDKernelSlicingTest(test_util.TestCase):

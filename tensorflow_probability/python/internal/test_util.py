@@ -35,6 +35,8 @@ from tensorflow_probability.python.internal import empirical_statistical_testing
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal.backend.numpy import ops
+from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
+from tensorflow_probability.python.util.deferred_tensor import TransformedVariable
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow.python.eager import context  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import gradient_checker_v2  # pylint: disable=g-direct-tensorflow-import
@@ -457,6 +459,43 @@ class TestCase(tf.test.TestCase, parameterized.TestCase):
         msg += 'False and --fixed_seed is not set.  '
         msg += 'See docstring of `assertAllMeansClose`.'
       raise AssertionError(msg)
+
+  def assertConvertVariablesToTensorsWorks(self, obj):
+    """Checks that Variables are correctly converted to Tensors inside CTs."""
+    self.assertIsInstance(obj, tf.__internal__.CompositeTensor)
+    tensor_obj = obj._convert_variables_to_tensors()  # pylint: disable=protected-access
+    self.assertIs(type(obj), type(tensor_obj))
+    self.assertEmpty(tensor_obj.variables)
+    self._check_tensors_equal_variables(obj, tensor_obj)
+
+  def _check_tensors_equal_variables(self, obj, tensor_obj):
+    """Checks that Variables in `obj` have equivalent Tensors in `tensor_obj."""
+    if isinstance(obj, (tf.Variable, DeferredTensor)):
+      self.assertAllClose(tf.convert_to_tensor(obj),
+                          tf.convert_to_tensor(tensor_obj))
+      if isinstance(obj, TransformedVariable):
+        self.assertIsInstance(tensor_obj, DeferredTensor)
+        self.assertNotIsInstance(tensor_obj, TransformedVariable)
+      if isinstance(obj, DeferredTensor):
+        if isinstance(obj._transform_fn, bijector.Bijector):  # pylint: disable=protected-access
+          self._check_tensors_equal_variables(
+              obj._transform_fn, tensor_obj._transform_fn)  # pylint: disable=protected-access
+      else:
+        self.assertIsInstance(tensor_obj, tf.Tensor)
+    elif isinstance(obj, tf.__internal__.CompositeTensor):
+      params = getattr(obj, 'parameters', {})
+      tensor_params = getattr(tensor_obj, 'parameters', {})
+      self.assertAllEqual(params.keys(), tensor_params.keys())
+      self._check_tensors_equal_variables(params, tensor_params)
+    elif tf.__internal__.nest.is_mapping(obj):
+      for k, v in obj.items():
+        self._check_tensors_equal_variables(v, tensor_obj[k])
+    elif tf.nest.is_nested(obj):
+      for x, y in zip(obj, tensor_obj):
+        self._check_tensors_equal_variables(x, y)
+    else:
+      # We only check Tensor, CompositeTensor, and nested structure parameters.
+      pass
 
   def evaluate_dict(self, dictionary):
     """Invokes `self.evaluate` on the `Tensor`s in `dictionary`.

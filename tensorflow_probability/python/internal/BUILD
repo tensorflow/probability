@@ -707,6 +707,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:bijector",
         "//tensorflow_probability/python/internal:empirical_statistical_testing",
         "//tensorflow_probability/python/internal/backend/numpy",
+        "//tensorflow_probability/python/util:deferred_tensor",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )

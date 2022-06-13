@@ -172,14 +172,17 @@ def guitar_skip_if_matches(pattern, name, reason):
 VAR_USAGES = {}
 
 
-def usage_counting_identity(var):
+def make_usage_counting_identity(var):
   key = (id(var), var.name)
-  VAR_USAGES[key] = VAR_USAGES.get(key, []) + [traceback.format_stack(limit=25)]
-  return tf.identity(var)
+  def _id(x):
+    VAR_USAGES[key] = VAR_USAGES.get(
+        key, []) + [traceback.format_stack(limit=25)]
+    return tf.identity(x)
+  return _id
 
 
 def defer_and_count_usage(var):
-  return DeferredTensor(var, usage_counting_identity)
+  return DeferredTensor(var, make_usage_counting_identity(var))
 
 
 @contextlib.contextmanager

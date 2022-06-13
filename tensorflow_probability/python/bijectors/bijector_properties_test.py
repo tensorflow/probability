@@ -32,7 +32,6 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
@@ -789,13 +788,6 @@ class BijectorPropertiesTest(test_util.TestCase):
                         'bijectors.')
       self.skipTest('`_Invert` bijectors are not `CompositeTensor`s.')
 
-    if not tf.executing_eagerly():
-      bijector = tf.nest.map_structure(
-          lambda x: (tf.convert_to_tensor(x)  # pylint: disable=g-long-lambda
-                     if isinstance(x, DeferredTensor) else x),
-          bijector,
-          expand_composites=True)
-
     self.assertIsInstance(bijector, tf.__internal__.CompositeTensor)
     flat = tf.nest.flatten(bijector, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(bijector, flat, expand_composites=True)
@@ -832,6 +824,8 @@ class BijectorPropertiesTest(test_util.TestCase):
       ys = bijector.forward(xs + 0)
     grads = tape.gradient(ys, wrt_vars)
     assert_no_none_grad(bijector, 'forward', wrt_vars, grads)
+
+    self.assertConvertVariablesToTensorsWorks(bijector)
 
 
 def ensure_nonzero(x):

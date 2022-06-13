@@ -455,6 +455,40 @@ class AutoCompositeTensorTest(test_util.TestCase):
     batch_dist = tf.vectorized_map(fn, tf.convert_to_tensor([1., 2., 3.]))
     self.assertAllEqual(batch_dist.batch_shape, [3, 2])
 
+  def test_convert_variables_to_tensors(self):
+    v = tf.Variable(0.)
+    u = tf.Variable(1.)
+    var_td = tfd.TransformedDistribution(
+        tfd.Normal(v, 1.),
+        bijector=tfb.Shift(u))
+    tensor_td = var_td._convert_variables_to_tensors()
+
+    self.evaluate([x.initializer for x in var_td.trainable_variables])
+    self.assertIsInstance(var_td, tf.__internal__.CompositeTensor)
+    self.assertLen(var_td.trainable_variables, 2)
+    self.assertEmpty(tensor_td.trainable_variables)
+    self.assertEqual(self.evaluate(var_td.distribution.loc),
+                     self.evaluate(tensor_td.distribution.loc))
+    self.assertEqual(self.evaluate(var_td.bijector.shift),
+                     self.evaluate(tensor_td.bijector.shift))
+
+  def test_automatic_conversion_to_tensor(self):
+    v = tf.Variable(tf.ones([5]))
+    d = tfd.Normal(tf.zeros([5]), v)
+    x = tf.convert_to_tensor([3.])
+
+    vectorized_log_prob = tf.vectorized_map(lambda z: z.log_prob(x), d)
+    log_prob = d.log_prob(x)
+    self.evaluate(v.initializer)
+    self.assertAllClose(vectorized_log_prob[:, 0], log_prob)
+
+    loc = tf.Variable(0.)
+    self.evaluate(loc.initializer)
+    cond_dist = tf.cond(
+        tf.convert_to_tensor(True),
+        lambda: tfd.Normal(loc, 1.), lambda: tfd.Normal(0., 1.))
+    self.assertIsInstance(cond_dist, tfd.Normal)
+
 
 class _TestTypeSpec(auto_composite_tensor._AutoCompositeTensorTypeSpec):
 

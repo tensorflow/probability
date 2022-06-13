@@ -62,6 +62,7 @@ py_library(
         ":test_lib",
         ":tf_inspect",
         ":type_spec",
+        ":variable_utils",
         ":variables",
     ],
 )
@@ -406,6 +407,11 @@ py_library(
 py_library(
     name = "type_spec",
     srcs = ["type_spec.py"],
+)
+
+py_library(
+    name = "variable_utils",
+    srcs = ["variable_utils.py"],
 )
 
 py_library(
