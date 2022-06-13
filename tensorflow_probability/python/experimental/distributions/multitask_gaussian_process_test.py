@@ -263,19 +263,18 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
       disable_numpy=True, disable_jax=False,
       reason='Jit not available in numpy.')
   def testJitMultitaskGaussianProcess(self):
-    # 5x5 grid of index points in R^2 and flatten to 25x2
-    index_points = np.linspace(-4., 4., 5, dtype=np.float32)
+    # 3x3 grid of index points in R^2 and flatten to 9x2
+    index_points = np.linspace(-4., 4., 3, dtype=np.float32)
     index_points = np.stack(np.meshgrid(index_points, index_points), axis=-1)
     index_points = np.reshape(index_points, [-1, 2])
-    # ==> shape = [25, 2]
+    # ==> shape = [9, 2]
 
-    # Kernel with batch_shape [2, 4, 3, 1]
-    amplitude = np.array([1., 2.], np.float32).reshape([2, 1, 1, 1])
-    length_scale = np.array([1., 2., 3., 4.], np.float32).reshape([1, 4, 1, 1])
-    observation_noise_variance = np.array(
-        [1e-5, 1e-6, 1e-5], np.float32).reshape([1, 1, 3, 1])
-    batched_index_points = np.stack([index_points]*6)
-    # ==> shape = [6, 25, 2]
+    # Kernel with batch_shape [2, 4, 3]
+    amplitude = np.array([1., 2.], np.float32).reshape([2, 1,])
+    length_scale = np.array([1., 2., 3., 4.], np.float32).reshape([1, 4,])
+    observation_noise_variance = np.float32(1e-5)
+    batched_index_points = np.stack([index_points]*4)
+    # ==> shape = [4, 9, 2]
     kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
     multi_task_kernel = tfe.psd_kernels.Independent(
         num_tasks=3, base_kernel=kernel)
@@ -294,9 +293,9 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
       return multitask_gp.sample(seed=test_util.test_seed())
 
     observations = tf.convert_to_tensor(
-        np.linspace(-20., 20., 75).reshape(25, 3).astype(np.float32))
-    self.assertAllEqual(log_prob(observations).shape, [2, 4, 3, 6])
-    self.assertAllEqual(sample().shape, [2, 4, 3, 6, 25, 3])
+        np.linspace(-20., 20., 27).reshape(9, 3).astype(np.float32))
+    self.assertAllEqual(log_prob(observations).shape, [2, 4])
+    self.assertAllEqual(sample().shape, [2, 4, 9, 3])
 
     multitask_gp = tfe.distributions.MultiTaskGaussianProcess(
         multi_task_kernel,
@@ -312,8 +311,8 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     def sample_no_noise():
       return multitask_gp.sample(seed=test_util.test_seed())
 
-    self.assertAllEqual(log_prob_no_noise(observations).shape, [2, 4, 1, 6])
-    self.assertAllEqual(sample_no_noise().shape, [2, 4, 1, 6, 25, 3])
+    self.assertAllEqual(log_prob_no_noise(observations).shape, [2, 4])
+    self.assertAllEqual(sample_no_noise().shape, [2, 4, 9, 3])
 
   def testMultiTaskBlockSeparable(self):
     # Check that the naive implementation matches any optimizations for a
