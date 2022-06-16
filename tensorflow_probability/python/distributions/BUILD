@@ -36,7 +36,6 @@ multi_substrate_py_library(
     srcs = ["__init__.py"],
     substrates_omit_deps = [
         ":pixel_cnn",
-        ":mixture",
     ],
     deps = [
         ":autoregressive",
@@ -3322,7 +3321,6 @@ multi_substrate_py_test(
     name = "mixture_test",
     size = "medium",
     srcs = ["mixture_test.py"],
-    jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
         # hypothesis dep,

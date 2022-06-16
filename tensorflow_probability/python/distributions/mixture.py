@@ -347,7 +347,7 @@ class _Mixture(distribution.Distribution):
     mask = distribution_util.pad_mixture_dimensions(
         mask, self, self._cat,
         tensorshape_util.rank(self._static_event_shape))  # [n, B, k, [1]*e]
-    if x.dtype.is_floating:
+    if dtype_util.is_floating(x.dtype):
       masked = tf.math.multiply_no_nan(x, mask)
     else:
       masked = x * mask
