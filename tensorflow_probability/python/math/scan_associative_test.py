@@ -215,6 +215,9 @@ class _ScanAssociativeTest(test_util.TestCase):
 class ScanAssociativeTestStatic(_ScanAssociativeTest):
 
   # XLA requires static shapes.
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='No compilation in numpy backend.')
   @test_util.test_graph_and_eager_modes
   def test_cumulative_sum_with_xla(self):
     elems = self._maybe_static(tf.range(0, 2**4 - 1, dtype=tf.int64))

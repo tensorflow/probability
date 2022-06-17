@@ -444,6 +444,7 @@ class MultinomialTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class MultinomialFromVariableTest(test_util.TestCase):
 
+  @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_variable_test
   def testGradientLogits(self):
     x = tf.Variable([-1., 0., 1])
@@ -454,6 +455,7 @@ class MultinomialFromVariableTest(test_util.TestCase):
     self.assertLen(g, 1)
     self.assertAllNotNone(g)
 
+  @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_variable_test
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7, 0.2])

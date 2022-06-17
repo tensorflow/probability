@@ -2668,7 +2668,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["distribution_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # tensorflow dep,
@@ -2918,7 +2917,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "half_cauchy_test",
     srcs = ["half_cauchy_test.py"],
-    numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
         # numpy dep,
@@ -2932,7 +2930,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "half_normal_test",
     srcs = ["half_normal_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3157,7 +3154,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "lambertw_f_test",
     srcs = ["lambertw_f_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         ":lambertw_f",
         # absl/testing:parameterized dep,
@@ -3228,7 +3224,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "loglogistic_test",
     srcs = ["loglogistic_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3339,7 +3334,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["mixture_same_family_test.py"],
     jax_size = "large",
-    numpy_tags = ["notap"],
     shard_count = 3,
     deps = [
         # hypothesis dep,
@@ -3370,7 +3364,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["multinomial_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
         # hypothesis dep,
@@ -3426,7 +3419,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "mvn_diag_test",
     srcs = ["mvn_diag_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3454,7 +3446,6 @@ multi_substrate_py_test(
 multi_substrate_py_test(
     name = "mvn_linear_operator_test",
     srcs = ["mvn_linear_operator_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # numpy dep,
         # scipy dep,
@@ -3481,7 +3472,6 @@ multi_substrate_py_test(
     name = "mvn_tril_test",
     size = "medium",
     srcs = ["mvn_tril_test.py"],
-    numpy_tags = ["notap"],
     shard_count = 7,
     tags = ["nomsan"],
     deps = [

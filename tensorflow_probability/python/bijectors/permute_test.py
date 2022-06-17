@@ -83,8 +83,9 @@ class PermuteBijectorTest(test_util.TestCase):
         bijector, x, y, eval_func=self.evaluate, event_ndims=2, rtol=1e-6,
         atol=0)
 
-  @test_util.jax_disable_test_missing_functionality(
-      'Test specific to Keras with losing shape information.')
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Test specific to Keras with losing shape information.')
   def testPreservesShape(self):
     # TODO(b/131157549, b/131124359): Test should not be needed. Consider
     # deleting when underlying issue with constant eager tensors is fixed.

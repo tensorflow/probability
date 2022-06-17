@@ -401,6 +401,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
     self.assertAllClose(
         sample_kl_chol_, analytical_kl_chol_, atol=0., rtol=0.02)
 
+  @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def testVariableLocation(self):
     loc = tf.Variable([1., 1.])
@@ -411,6 +412,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
       lp = d.log_prob([0., 0.])
     self.assertIsNotNone(tape.gradient(lp, loc))
 
+  @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def testVariableScale(self):
     loc = tf.constant([1., 1.])
@@ -421,6 +423,7 @@ class MultivariateNormalTriLTest(test_util.TestCase):
       lp = d.log_prob([0., 0.])
     self.assertIsNotNone(tape.gradient(lp, scale))
 
+  @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def testVariableScaleAssertions(self):
     # We test that changing the scale to be non-invertible raises an exception

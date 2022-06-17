@@ -1254,7 +1254,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["correlation_cholesky_test.py"],
     jax_size = "large",
-    numpy_tags = ["notap"],
     shard_count = 2,
     deps = [
         ":bijector_test_util",
@@ -1636,7 +1635,6 @@ multi_substrate_py_test(
     name = "permute_test",
     size = "small",
     srcs = ["permute_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         ":bijector_test_util",
         ":bijectors",
@@ -1705,7 +1703,6 @@ multi_substrate_py_test(
     name = "rational_quadratic_spline_test",
     size = "medium",
     srcs = ["rational_quadratic_spline_test.py"],
-    numpy_tags = ["notap"],
     tags = ["hypothesis"],
     deps = [
         ":bijector_test_util",

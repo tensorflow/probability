@@ -232,6 +232,7 @@ class ProbitBernoulliTest(test_util.TestCase):
     x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
+  @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
       'JAX does not return None for gradients.')
   def testNotReparameterized(self):

@@ -160,6 +160,7 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
       lp = d.log_prob([0., 0.])
     self.assertIsNotNone(tape.gradient(lp, loc))
 
+  @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def testVariableScaleAssertions(self):
     # We test that changing the scale to be non-invertible raises an exception

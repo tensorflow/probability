@@ -340,6 +340,7 @@ class MultivariateStudentTTestFloat32StaticShape(
     samples2 = self.evaluate(dist2.sample(100, seed=seed))
     self.assertAllClose(samples1, samples2)
 
+  @test_util.numpy_disable_gradient_test
   def testSamplingFullyReparameterized(self):
     df = self._input(2.)
     loc = self._input([1., 2.])

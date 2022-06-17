@@ -787,6 +787,7 @@ class ParametersTest(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class TfModuleTest(test_util.TestCase):
 
+  @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def test_variable_tracking_works(self):
     scale = tf.Variable(1.)
