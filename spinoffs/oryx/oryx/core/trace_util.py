@@ -17,7 +17,6 @@ import contextlib
 import threading
 from typing import Any, Dict, Generator, List
 
-import jax
 from jax import abstract_arrays
 from jax import api_util
 from jax import core as jax_core
@@ -63,8 +62,6 @@ def stage(f, dynamic=True):
     flat_args, in_tree = tree_util.tree_flatten(args)
     flat_fun, out_tree = api_util.flatten_fun_nokwargs(fun, in_tree)
     flat_avals = safe_map(get_shaped_aval, flat_args)
-    if not jax.config.omnistaging_enabled:
-      raise ValueError('Oryx must be used with JAX omnistaging enabled.')
     if dynamic:
       jaxpr, _, consts = pe.trace_to_jaxpr_dynamic(
           flat_fun,
