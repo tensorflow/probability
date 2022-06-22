@@ -358,7 +358,7 @@ class StudentT(distribution.AutoCompositeTensorDistribution):
 
   @distribution_util.AppendDocstring(
       """The mean of Student's T equals `loc` if `df > 1`, otherwise it is
-      `NaN`. If `self.allow_nan_stats=True`, then an exception will be raised
+      `NaN`. If `self.allow_nan_stats=False`, then an exception will be raised
       rather than returning `NaN`.""")
   def _mean(self):
     df = tf.convert_to_tensor(self.df)
