@@ -131,7 +131,7 @@ multi_substrate_py_test(
     name = "ode_test",
     size = "large",
     srcs = ["ode_test.py"],
-    shard_count = 8,
+    shard_count = 10,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
