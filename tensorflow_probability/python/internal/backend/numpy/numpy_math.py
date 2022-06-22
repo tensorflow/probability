@@ -363,8 +363,8 @@ def _alt_reduce_logsumexp(input_tensor, axis=None, keepdims=False):
   """Alternative to SP logsumexp."""
   m = _max_mask_non_finite(input_tensor, axis=axis, keepdims=True)
   y = input_tensor - m
-  y = np.exp(y, out=y)
-  if not keepdims:
+  y = np.exp(y)
+  if not keepdims and y.size > 0:
     m = np.squeeze(m, axis=_astuple(axis))
   return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
 
