@@ -285,6 +285,9 @@ def _lbeta(x, name=None):  # pylint: disable=unused-argument
 def _max_mask_non_finite(x, axis=-1, keepdims=False, mask=0):
   """Returns `max` or `mask` if `max` is not finite."""
   x = _convert_to_tensor(x)
+  if x.size == 0:
+    # Return `-inf` if `x` is empty for consistency with `tf.reduce_max`.
+    return -np.inf
   m = np.max(x, axis=_astuple(axis), keepdims=keepdims)
   needs_masking = ~np.isfinite(m)
   if needs_masking.ndim > 0:
@@ -356,6 +359,16 @@ def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
   return y
 
 
+def _alt_reduce_logsumexp(input_tensor, axis=None, keepdims=False):
+  """Alternative to SP logsumexp."""
+  m = _max_mask_non_finite(input_tensor, axis=axis, keepdims=True)
+  y = input_tensor - m
+  y = np.exp(y, out=y)
+  if not keepdims:
+    m = np.squeeze(m, axis=_astuple(axis))
+  return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
+
+
 def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # pylint: disable=unused-argument
   """Computes `log(sum(exp(input_tensor))) along the specified axis."""
   input_tensor = _convert_to_tensor(input_tensor)
@@ -364,18 +377,17 @@ def _reduce_logsumexp(input_tensor, axis=None, keepdims=False, name=None):  # py
           or np.issubdtype(dtype, np.complexfloating)):
     # Match TF error
     raise TypeError('Input must be either real or complex')
+  if input_tensor.size == 0:
+    # On empty arrays, mimic TF in returning `-inf` instead of failing, and
+    # preserve error message if `axis` arg is incompatible with an empty array.
+    return _alt_reduce_logsumexp(input_tensor, axis=axis, keepdims=keepdims)
   try:
     return scipy_special.logsumexp(
         input_tensor, axis=_astuple(axis), keepdims=keepdims)
   except NotImplementedError:
     # We offer a non SP version just in case SP isn't installed and this
     # because logsumexp is often used.
-    m = _max_mask_non_finite(input_tensor, axis=axis, keepdims=True)
-    y = input_tensor - m
-    y = np.exp(y, out=y)
-    if not keepdims:
-      m = np.squeeze(m, axis=_astuple(axis))
-    return m + np.log(np.sum(y, axis=_astuple(axis), keepdims=keepdims))
+    return _alt_reduce_logsumexp(input_tensor, axis=axis, keepdims=keepdims)
 
 
 # Match the TF return type for top_k.

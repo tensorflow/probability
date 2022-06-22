@@ -46,7 +46,7 @@ def _find_method_from_name(scope, name):
     child = scope[method[0]]
   else:
     child = getattr(scope, method[0])
-  if len(method) == 1:
+  if len(method) == 1 or (len(method) == 2 and method[0] == 'np'):
     return child
   return _find_method_from_name(child, method[1])
 
