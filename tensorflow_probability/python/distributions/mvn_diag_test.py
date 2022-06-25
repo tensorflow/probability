@@ -230,6 +230,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     self.assertAllClose(
         np.array([[3., 2, 1], [4, 5, 6]]), self.evaluate(mvn.stddev()))
 
+  @test_util.numpy_disable_gradient_test
   def testMultivariateNormalDiagNegLogLikelihood(self):
     num_draws = 50
     dims = 3
@@ -287,6 +288,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
     self.assertListEqual(tensorshape_util.as_list(mvn.batch_shape), [2, 3])
     self.assertListEqual(tensorshape_util.as_list(mvn.event_shape), [None])
 
+  @test_util.numpy_disable_gradient_test
   def testKLDivIdenticalGradientDefined(self):
     dims = 3
     loc = tf.zeros([dims], dtype=tf.float32)
@@ -348,6 +350,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       lp = d.log_prob([0., 0.])
     self.assertIsNotNone(tape.gradient(lp, scale_identity_multiplier))
 
+  @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def testVariableScaleDiagAssertions(self):
     # We test that changing the scale to be non-invertible raises an exception
@@ -363,6 +366,7 @@ class MultivariateNormalDiagTest(test_util.TestCase):
       with tf.control_dependencies([scale_diag.assign([1., 0.])]):
         self.evaluate(d.sample(seed=test_util.test_seed()))
 
+  @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def testVariableScaleIdentityMultiplierAssertions(self):
     # We test that changing the scale to be non-invertible raises an exception

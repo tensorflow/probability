@@ -219,6 +219,7 @@ class JohnsonSUTest(test_util.TestCase):
     expected_cdf = sp_stats.johnsonsu.logcdf(x, skewness, tailweight, mu, sigma)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=0, rtol=1e-3)
 
+  @test_util.numpy_disable_gradient_test
   def testFiniteGradientAtDifficultPoints(self):
     def make_fn(dtype, attr):
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(dtype)
@@ -318,9 +319,11 @@ class JohnsonSUTest(test_util.TestCase):
     self.assertAllFinite(grads[0])
     self.assertAllFinite(grads[1])
 
+  @test_util.numpy_disable_gradient_test
   def testQuantileFiniteGradientAtDifficultPointsFloat32(self):
     self._testQuantileFiniteGradientAtDifficultPoints(np.float32)
 
+  @test_util.numpy_disable_gradient_test
   def testQuantileFiniteGradientAtDifficultPointsFloat64(self):
     self._testQuantileFiniteGradientAtDifficultPoints(np.float64)
 
@@ -389,6 +392,7 @@ class JohnsonSUTest(test_util.TestCase):
     self.assertAllEqual(expected_samples_shape, samples.shape)
     self.assertAllEqual(expected_samples_shape, sample_values.shape)
 
+  @test_util.numpy_disable_gradient_test
   def testJohnsonSUFullyReparameterized(self):
     skewness = tf.constant(1.0)
     tailweight = tf.constant(2.0)

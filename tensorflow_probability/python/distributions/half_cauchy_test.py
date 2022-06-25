@@ -411,6 +411,7 @@ class _HalfCauchyTest(object):
     expected_shape = (tf.TensorShape(n_).concatenate(half_cauchy.batch_shape))
     self.assertAllEqual(expected_shape, samples.shape)
 
+  @test_util.numpy_disable_gradient_test
   def testHalfCauchyPdfGradientZeroOutsideSupport(self):
     loc_ = [-3.1, -2., 0., 1.1]
     loc = self._create_placeholder_with_default(loc_, name='loc')
@@ -430,6 +431,7 @@ class _HalfCauchyTest(object):
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
 
+  @test_util.numpy_disable_gradient_test
   def testHalfCauchyCdfGradientZeroOutsideSupport(self):
     loc_ = [-3.1, -2., 0., 1.1]
     loc = self._create_placeholder_with_default(loc_, name='loc')
@@ -449,6 +451,7 @@ class _HalfCauchyTest(object):
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
 
+  @test_util.numpy_disable_gradient_test
   def testHalfCauchyGradientsAndValueFiniteAtLoc(self):
     batch_size = 1000
     loc_ = np.linspace(0., 100., batch_size)
@@ -470,6 +473,7 @@ class _HalfCauchyTest(object):
       for grad in grads:
         self.assertAllFinite(grad)
 
+  @test_util.numpy_disable_gradient_test
   def testHalfCauchyGradientsAndValueFiniteAtGreaterThanLoc(self):
     batch_size = 1000
     loc = self._create_placeholder_with_default([0.] * batch_size, name='loc')

@@ -167,5 +167,5 @@ def sinc(x, name=None):
   """Calculate the (normalized) sinus cardinalis of x."""
   name = name or 'sinc'
   with tf.name_scope(name):
-    x *= np.pi
+    x = np.pi * x
     return tf.where(x != 0., tf.math.sin(x) / x, 1.)

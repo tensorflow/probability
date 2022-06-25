@@ -222,6 +222,10 @@ XLA_LOGPROB_RTOL.update({
     'WishartTriL': 1e-5,
 })
 
+COMPOSITE_TENSOR_LOGPROB_RTOL = collections.defaultdict(lambda: 1e-6)
+COMPOSITE_TENSOR_LOGPROB_RTOL.update({
+    'WishartTriL': 1e-5,
+})
 
 SKIP_KL_CHECK_DIST_VAR_GRADS = [
     'GeneralizedExtremeValue',  # TD's KL gradients do not rely on bijector
@@ -419,28 +423,34 @@ class DistributionCompositeTensorTest(test_util.TestCase):
     ct_lp1 = unflat.log_prob(sample1)
     orig_lp1 = dist.log_prob(sample1)
     ct_lp1_, orig_lp1_ = self.evaluate((ct_lp1, orig_lp1))
-    self.assertAllClose(ct_lp1_, orig_lp1_)
+    self.assertAllClose(ct_lp1_, orig_lp1_,
+                        rtol=COMPOSITE_TENSOR_LOGPROB_RTOL[dist_name])
 
     # ... and after.  (Even though they're supposed to be the same anyway.)
     ct_lp2 = unflat.log_prob(sample2)
     orig_lp2 = dist.log_prob(sample2)
     ct_lp2_, orig_lp2_ = self.evaluate((ct_lp2, orig_lp2))
-    self.assertAllClose(ct_lp2_, orig_lp2_)
+    self.assertAllClose(ct_lp2_, orig_lp2_,
+                        rtol=COMPOSITE_TENSOR_LOGPROB_RTOL[dist_name])
 
-  # TODO(alexeev): Add coverage for meta distributions, in addition to base
-  # distributions.
   @parameterized.named_parameters(
-      {'testcase_name': dname, 'dist_name': dname}
-      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys()))
+      {'testcase_name': dname, 'dist_name': dname}  # pylint: disable=g-complex-comprehension
+      for dname in sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())
+                          + list(dhps.INSTANTIABLE_META_DISTS))
       if dname not in dhps.TF2_UNFRIENDLY_DISTS)
   @hp.given(hps.data())
   @tfp_hps.tfp_hp_settings()
   def testCompositeTensor(self, dist_name, data):
     dist = data.draw(
         dhps.distributions(
-            dist_name=dist_name, enable_vars=False, validate_args=False))
+            dist_name=dist_name, enable_vars=True, validate_args=False,
+            eligibility_filter=(
+                lambda d: type(d).__name__ not in dhps.TF2_UNFRIENDLY_DISTS)))
+    self.evaluate([v.initializer for v in dist.trainable_variables])
     with tfp_hps.no_tf_rank_errors():
       self._test_sample_and_log_prob(dist_name, dist)
+
+    self.assertConvertVariablesToTensorsWorks(dist)
 
 
 @test_util.test_graph_mode_only

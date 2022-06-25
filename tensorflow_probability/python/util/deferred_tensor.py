@@ -25,8 +25,12 @@ from tensorflow_probability.python.internal import name_util
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 
-from tensorflow.python.framework import type_spec  # pylint: disable=g-direct-tensorflow-import
-from tensorflow.python.ops import resource_variable_ops  # pylint: disable=g-direct-tensorflow-import
+# pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import tensor_spec
+from tensorflow.python.framework import type_spec
+from tensorflow.python.ops import resource_variable_ops
+from tensorflow.python.util import variable_utils
+# pylint: enable=g-direct-tensorflow-import
 
 
 __all__ = [
@@ -408,9 +412,20 @@ class DeferredTensor(six.with_metaclass(
               x.shape, x.dtype, trainable=x.trainable),
           also_track_vars)
 
-    return _DeferredTensorSpec(
+    if isinstance(self.pretransformed_input, tf.Variable):
+      return _DeferredTensorSpec(
+          input_spec, transform_or_spec, dtype=self.dtype, shape=self.shape,
+          name=self.name, also_track_spec=also_track_spec)
+    return _DeferredTensorBatchableSpec(
         input_spec, transform_or_spec, dtype=self.dtype, shape=self.shape,
         name=self.name, also_track_spec=also_track_spec)
+
+  def _convert_variables_to_tensors(self):
+    # pylint: disable=protected-access
+    components = self._type_spec._to_components(self)
+    tensor_components = variable_utils.convert_variables_to_tensors(components)
+    return self._type_spec._from_components(tensor_components)
+    # pylint: enable=protected-access
 
 
 class TransformedVariable(DeferredTensor):
@@ -574,8 +589,18 @@ class TransformedVariable(DeferredTensor):
     return _TransformedVariableSpec(
         input_spec, transform_or_spec, self.dtype, self.name)
 
+  def _convert_variables_to_tensors(self):
+    # pylint: disable=protected-access
+    components = _DeferredTensorSpec._to_components(self._type_spec, self)
+    tensor_components = variable_utils.convert_variables_to_tensors(components)
+    transform_fn = tensor_components.pop(
+        'transform_fn', self._type_spec.transform_or_spec)
+    return DeferredTensor(**tensor_components, transform_fn=transform_fn,
+                          dtype=self.dtype, shape=self.shape, name=self.name)
+    # pylint: enable=protected-access
 
-class _DeferredTensorSpecBase(object):
+
+class _DeferredTensorTransformedVariableSpecBase(object):
   """Common methods for '_DeferredTensorSpec' and '_TransformedVariableSpec."""
 
   @property
@@ -808,13 +833,8 @@ class _DeferredTensorSpecBase(object):
     return hash(self.__get_cmp_key())
 
 
-@auto_composite_tensor.type_spec_register('tfp.util.DeferredTensorSpec')
-class _DeferredTensorSpec(_DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
-  """`tf.TypeSpec` for `tfp.util.DeferredTensor`."""
-
-  __slots__ = ('_input_spec', '_transform_or_spec', '_also_track_spec',
-               '_dtype', '_shape', '_name', '_specs', '_unique_id_params',
-               '_transform_is_composite')
+class _DeferredTensorSpecBase(_DeferredTensorTransformedVariableSpecBase):
+  """Base for batchable/non-batchable `tfp.util.DeferredTensor`."""
 
   def __init__(self, input_spec, transform_or_spec, dtype, shape, name,
                also_track_spec=None):
@@ -885,6 +905,26 @@ class _DeferredTensorSpec(_DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
       specs['also_track'] = self._also_track_spec
     return specs
 
+
+@auto_composite_tensor.type_spec_register('tfp.util.DeferredTensorSpec')
+class _DeferredTensorSpec(_DeferredTensorSpecBase, tensor_spec.DenseSpec):
+  """`tf.TypeSpec` for `tfp.util.DeferredTensor`."""
+
+  __slots__ = ('_input_spec', '_transform_or_spec', '_also_track_spec',
+               '_dtype', '_shape', '_name', '_specs', '_unique_id_params',
+               '_transform_is_composite')
+
+
+@auto_composite_tensor.type_spec_register(
+    'tfp.util.DeferredTensorBatchableSpec')
+class _DeferredTensorBatchableSpec(
+    _DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
+  """`tf.TypeSpec` for `tfp.util.DeferredTensor`."""
+
+  __slots__ = ('_input_spec', '_transform_or_spec', '_also_track_spec',
+               '_dtype', '_shape', '_name', '_specs', '_unique_id_params',
+               '_transform_is_composite')
+
   def _batch(self, batch_size):
     """Returns a TypeSpec representing a batch of DeferredTensors."""
     transform_or_spec = self._specs.get(
@@ -917,7 +957,7 @@ class _DeferredTensorSpec(_DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
 
 @auto_composite_tensor.type_spec_register('tfp.util.TransformedVariableSpec')
 class _TransformedVariableSpec(
-    _DeferredTensorSpecBase, type_spec.BatchableTypeSpec):
+    _DeferredTensorTransformedVariableSpecBase, tensor_spec.DenseSpec):
   """`tf.TypeSpec` for `tfp.util.TransformedVariable`."""
 
   __slots__ = ('_input_spec', '_transform_or_spec', '_dtype', '_name', '_specs',
@@ -972,27 +1012,3 @@ class _TransformedVariableSpec(
     if self._transform_is_composite:
       specs['bijector'] = self.transform_or_spec
     return specs
-
-  def _batch(self, batch_size):
-    """Returns a TypeSpec representing a batch of TransformedVariable."""
-    transform_or_spec = self._specs.get(
-        'transform_or_spec', self.transform_or_spec)
-    if hasattr(transform_or_spec, '_batch'):
-      transform_or_spec = transform_or_spec._batch(batch_size)
-    return _TransformedVariableSpec(
-        self._get_batched_input_spec(batch_size),
-        transform_or_spec=transform_or_spec,
-        dtype=self.dtype,
-        name=self.name)
-
-  def _unbatch(self):
-    """Returns a TypeSpec representing a single TransformedVariable."""
-    transform_or_spec = self._specs.get(
-        'transform_or_spec', self.transform_or_spec)
-    if hasattr(transform_or_spec, '_unbatch'):
-      transform_or_spec = transform_or_spec._unbatch()
-    return _TransformedVariableSpec(
-        self._get_unbatched_input_spec(),
-        transform_or_spec=transform_or_spec,
-        dtype=self.dtype,
-        name=self.name)

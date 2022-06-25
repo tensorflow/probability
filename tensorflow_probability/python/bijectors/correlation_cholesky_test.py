@@ -227,6 +227,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
               cdf=beta_dist.cdf,
               false_fail_rate=1e-9))
 
+  @test_util.numpy_disable_gradient_test
   def testTheoreticalFldj(self):
     bijector = tfb.CorrelationCholesky()
     x = np.linspace(-50, 50, num=30).reshape(5, 6).astype(np.float64)

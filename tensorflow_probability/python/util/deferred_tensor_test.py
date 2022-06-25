@@ -195,6 +195,22 @@ class DeferredTensorTest(test_util.TestCase):
     unflat = tf.nest.pack_sequence_as(x, flat, expand_composites=True)
     self.assertLen(unflat.trainable_variables, 3)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='JAX and Numpy have no notion of `CompositeTensor`.')
+  def test_convert_variables_to_tensors(self):
+    pretransformed_input = tf.Variable(3.)
+    also_track = tfd.Normal(tf.Variable(0.), scale=1.)
+    x = tfp.util.DeferredTensor(pretransformed_input,
+                                tfb.Shift(tf.Variable(2.)),
+                                also_track=also_track)
+    tensorized_x = x._convert_variables_to_tensors()
+    self.evaluate([v.initializer for v in x.trainable_variables])
+    self.assertLen(x.trainable_variables, 3)
+    self.assertEmpty(tensorized_x.trainable_variables)
+    self.assertEqual(self.evaluate(tf.convert_to_tensor(x)),
+                     self.evaluate(tf.convert_to_tensor(tensorized_x)))
+
 
 @test_util.test_all_tf_execution_regimes
 class TransformedVariableTest(test_util.TestCase):
@@ -352,9 +368,27 @@ class TransformedVariableTest(test_util.TestCase):
   def test_vectorized_map(self):
     initial_value = tf.ones([5, 3])
     x = tfp.util.TransformedVariable(initial_value, tfb.Sigmoid())
-    y = tf.vectorized_map(lambda v: v + 2., x)
+
+    # TODO(emilyaf): Remove `convert_to_tensor` after tf.Variables are
+    # CompositeTensor.
+    y = tf.vectorized_map(lambda v: v + 2., tf.convert_to_tensor(x))
     self.evaluate([v.initializer for v in x.trainable_variables])
     self.assertAllClose(self.evaluate(y), initial_value + 2.)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='JAX and Numpy have no notion of `CompositeTensor`.')
+  def test_convert_variables_to_tensors(self):
+    initial_value = tf.ones([5, 3])
+    x = tfp.util.TransformedVariable(initial_value, tfb.Softplus())
+    tensorized_x = x._convert_variables_to_tensors()
+    self.evaluate([v.initializer for v in x.trainable_variables])
+    self.assertIsInstance(tensorized_x, tfp.util.DeferredTensor)
+    self.assertNotIsInstance(tensorized_x, tfp.util.TransformedVariable)
+    self.assertLen(x.trainable_variables, 1)
+    self.assertEmpty(tensorized_x.trainable_variables)
+    self.assertAllEqual(self.evaluate(tf.convert_to_tensor(x)),
+                        self.evaluate(tf.convert_to_tensor(tensorized_x)))
 
 
 @test_util.test_all_tf_execution_regimes

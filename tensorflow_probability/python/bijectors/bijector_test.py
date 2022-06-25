@@ -904,7 +904,8 @@ class BijectorCachingTest(test_util.TestCase):
     z = instance_cache_bijector.forward(x)
     self.assertIsNot(y, z)
 
-  @test_util.jax_disable_test_missing_functionality('keras')
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True, reason='keras')
   @parameterized.named_parameters(
       ('Keras', True),
       ('NoKeras', False))
@@ -1093,6 +1094,7 @@ class NumpyArrayCaching(test_util.TestCase):
 @test_util.test_all_tf_execution_regimes
 class TfModuleTest(test_util.TestCase):
 
+  @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def test_variable_tracking(self):
     x = tf.Variable(1.)
@@ -1100,6 +1102,7 @@ class TfModuleTest(test_util.TestCase):
     self.assertIsInstance(b, tf.Module)
     self.assertEqual((x,), b.trainable_variables)
 
+  @test_util.numpy_disable_variable_test
   @test_util.jax_disable_variable_test
   def test_gradient(self):
     x = tf.Variable(1.)

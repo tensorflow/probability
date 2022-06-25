@@ -154,6 +154,7 @@ class HalfNormalTest(test_util.TestCase):
     expected_x = sp_stats.halfnorm(scale=scale).ppf(p)
     self.assertAllClose(expected_x, self.evaluate(x), atol=0)
 
+  @test_util.numpy_disable_gradient_test
   @parameterized.parameters(np.float32, np.float64)
   def testFiniteGradients(self, dtype):
     scale = tf.constant(dtype(3.0))
@@ -318,12 +319,12 @@ class HalfNormalTest(test_util.TestCase):
 
     kl = tfd.kl_divergence(a, b)
 
-    x = a.sample(int(4e5), seed=test_util.test_seed(hardcoded_seed=0))
+    x = a.sample(int(6e5), seed=test_util.test_seed(hardcoded_seed=0))
     kl_samples = a.log_prob(x) - b.log_prob(x)
 
     kl_, kl_samples_ = self.evaluate([kl, kl_samples])
     self.assertAllClose(kl_, true_kl, atol=2e-15)
-    self.assertAllMeansClose(kl_samples_, true_kl, axis=0, atol=0., rtol=5e-2)
+    self.assertAllMeansClose(kl_samples_, true_kl, axis=0, atol=0., rtol=8e-2)
 
     zero_kl = tfd.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])

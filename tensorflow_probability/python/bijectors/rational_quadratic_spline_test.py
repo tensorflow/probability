@@ -144,6 +144,7 @@ class RationalQuadraticSplineTest(test_util.TestCase):
         np.zeros_like(xs),
         self.evaluate(bijector.forward_log_det_jacobian(xs, event_ndims=0)))
 
+  @test_util.numpy_disable_gradient_test
   def testTheoreticalFldjSimple(self):
     bijector = tfb.RationalQuadraticSpline(
         bin_widths=[1., 1],

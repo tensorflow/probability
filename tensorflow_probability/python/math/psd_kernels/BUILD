@@ -182,7 +182,7 @@ multi_substrate_py_test(
     srcs = ["matern_test.py"],
     jax_size = "medium",
     numpy_tags = ["notap"],
-    shard_count = 2,
+    shard_count = 4,
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

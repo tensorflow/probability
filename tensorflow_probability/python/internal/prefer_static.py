@@ -25,15 +25,9 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal.backend import numpy as nptf
 
-# Try catch required to avoid breaking Probability opensource presubmits.
-# TODO(amitpatankar): Remove this once tf-nightly has latest code.
-# pylint: disable=g-import-not-at-top
-try:
-  from tensorflow.python.client import pywrap_tf_session as c_api  # pylint: disable=g-direct-tensorflow-import
-except ImportError:
-  from tensorflow.python import pywrap_tensorflow as c_api  # pylint: disable=g-direct-tensorflow-import
-
+from tensorflow.python.client import pywrap_tf_session as c_api  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.framework import ops  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.framework import tensor_util  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.ops import control_flow_ops  # pylint: disable=g-direct-tensorflow-import
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -114,14 +108,16 @@ def _get_static_value(pred):
   if tf.is_tensor(pred):
     pred_value = tf.get_static_value(tf.convert_to_tensor(pred))
 
-    # TODO(jamieas): remove the dependency on `pywrap_tensorflow`.
     # Explicitly check for ops.Tensor, to avoid an AttributeError
     # when requesting `KerasTensor.graph`.
-    # pylint: disable=protected-access
     if pred_value is None and isinstance(pred, ops.Tensor):
-      pred_value = c_api.TF_TryEvaluateConstant_wrapper(pred.graph._c_graph,
-                                                        pred._as_tf_output())
-    # pylint: enable=protected-access
+      if hasattr(tensor_util, 'try_evaluate_constant'):
+        pred_value = tensor_util.try_evaluate_constant(pred)
+      else:
+        # TODO(feyu): remove this branch after try_evaluate_constant is in
+        # tf-nightly.
+        pred_value = c_api.TF_TryEvaluateConstant_wrapper(
+            pred.graph._c_graph, pred._as_tf_output())  # pylint: disable=protected-access
     return pred_value
   return pred
 

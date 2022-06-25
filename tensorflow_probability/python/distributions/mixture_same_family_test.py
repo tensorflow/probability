@@ -119,7 +119,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
         axis=1)
     actual_log_cdf_, expected_log_cdf_ = self.evaluate(
         [actual_log_cdf, expected_log_cdf])
-    self.assertAllClose(actual_log_cdf_, expected_log_cdf_, rtol=1e-6, atol=0.0)
+    self.assertAllClose(actual_log_cdf_, expected_log_cdf_, rtol=2e-5, atol=0.0)
 
   def testCovarianceWithBatch(self):
     d = self._build_mvndiag_mixture(
@@ -247,6 +247,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
           reparameterize=True,
           validate_args=True)
 
+  @test_util.numpy_disable_gradient_test
   def testSecondGradientIsDisabled(self):
     if not self.use_static_shape:
       return
@@ -296,6 +297,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     _, expected = tfp.math.value_and_gradient(exact, parameters)
     self.assertAllClose(actual, expected, atol=0.1, rtol=0.2)
 
+  @test_util.numpy_disable_gradient_test
   def testReparameterizationGradientsNormalScalarComponents(self):
     def mixture_func(logits, loc, scale):
       return tfd.MixtureSameFamily(
@@ -313,6 +315,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
           function,
           num_samples=10000)
 
+  @test_util.numpy_disable_gradient_test
   def testReparameterizationGradientsNormalVectorComponents(self):
     def mixture_func(logits, loc, scale):
       return tfd.MixtureSameFamily(
@@ -331,6 +334,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
           function,
           num_samples=20000)
 
+  @test_util.numpy_disable_gradient_test
   def testReparameterizationGradientsNormalMatrixComponents(self):
     def mixture_func(logits, loc, scale):
       return tfd.MixtureSameFamily(
@@ -350,6 +354,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
           function,
           num_samples=50000)
 
+  @test_util.numpy_disable_gradient_test
   def testReparameterizationGradientsExponentialScalarComponents(self):
     def mixture_func(logits, rate):
       return tfd.MixtureSameFamily(
@@ -462,6 +467,7 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     # additional call to `_parameter_control_dependencies`, and thus an
     # additional concretizations of the underlying distribution parameters.
 
+  @test_util.numpy_disable_gradient_test
   def testExcessiveConcretizationOfParamsWithReparameterization(self):
     logits = tfp_hps.defer_and_count_usage(self._build_variable(
         np.zeros(5), name='logits', static_rank=True))

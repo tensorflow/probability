@@ -169,8 +169,9 @@ class LambertWNormalTest(test_util.TestCase):
     else:
       self.assertAllClose(lwn.variance(), scale**2 * variance_multiplier)
 
-  @test_util.jax_disable_test_missing_functionality(
-      "Keras/Layers are not supported in JAX.")
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason="Keras/Layers are not supported in JAX or Numpy.")
   def testWorksInDistributionLayerAndNegloglik(self):
     """Test that distribution works as layer and in gradient optimization."""
     x = np.random.uniform(size=(100, 1))

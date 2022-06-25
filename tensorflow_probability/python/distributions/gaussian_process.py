@@ -38,6 +38,8 @@ from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.math.psd_kernels.internal import util as psd_kernels_util
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
+from tensorflow.python.util import variable_utils  # pylint: disable=g-direct-tensorflow-import
+
 
 __all__ = [
     'GaussianProcess',
@@ -766,6 +768,14 @@ class GaussianProcess(
         self,
         omit_kwargs=('parameters', '_check_marginal_cholesky_fn'),
         non_identifying_kwargs=('name',))
+
+  def _convert_variables_to_tensors(self):
+    # pylint: disable=protected-access
+    components = self._type_spec._to_components(self)
+    tensor_components = variable_utils.convert_variables_to_tensors(
+        components)
+    return self._type_spec._from_components(tensor_components)
+    # pylint: enable=protected-access
 
 
 @auto_composite_tensor.type_spec_register(

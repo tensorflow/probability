@@ -134,6 +134,7 @@ class _VonMisesTest(object):
     expected_cdf = (x + np.pi) / (2. * np.pi)
     self.assertAllClose(expected_cdf, self.evaluate(cdf))
 
+  @test_util.numpy_disable_gradient_test
   def testVonMisesCdfGradient(self):
     # The CDF is implemented manually, with custom gradients.
     # This test checks that the gradients are correct.
@@ -159,6 +160,7 @@ class _VonMisesTest(object):
           tf1.test.compute_gradient_error(concentrations, concentrations.shape,
                                           cdf, cdf.shape), 1e-3)
 
+  @test_util.numpy_disable_gradient_test
   def testVonMisesCdfGradientSimple(self):
     # This is a simple finite difference test that also works in the Eager mode.
     loc = self.make_tensor(0.5)
@@ -368,6 +370,7 @@ class _VonMisesTest(object):
         fails += 1
     self.assertLess(fails, trials * 0.1)
 
+  @test_util.numpy_disable_gradient_test
   def testVonMisesSampleAverageGradient(self):
     loc = self.make_tensor([1.] * 7)
     concentration = self.make_tensor(np.logspace(-3, 3, 7))
@@ -387,6 +390,7 @@ class _VonMisesTest(object):
     self.assertAllClose(grad_loc, grad_ys, atol=1e-1, rtol=1e-1)
     self.assertAllClose(grad_concentration, [0.] * 7, atol=1e-1, rtol=1e-1)
 
+  @test_util.numpy_disable_gradient_test
   def testVonMisesSampleCircularVarianceGradient(self):
     loc = self.make_tensor([1.] * 7)
     concentration = self.make_tensor(np.logspace(-3, 3, 7))
