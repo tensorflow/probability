@@ -485,6 +485,7 @@ multi_substrate_py_test(
     shard_count = 6,
     deps = [
         # absl/testing:parameterized dep,
+        # mpmath dep,
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability",

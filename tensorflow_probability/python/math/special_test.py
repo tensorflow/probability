@@ -15,9 +15,11 @@
 """Tests for special."""
 
 import functools
+import itertools
 
 from absl.testing import parameterized
 import numpy as np
+from mpmath import mp
 from scipy import special as scipy_special
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -194,27 +196,293 @@ class BetaincTest(test_util.TestCase):
     x = np.ones([7, 1, 1, 2], dtype=np.float32)
     self.assertAllEqual([7, 5, 3, 2], tfp_math.betainc(a, b, x).shape)
 
+  @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
-  def testBetaincGradient(self):
-    a = np.logspace(-2., 2., 11)[..., np.newaxis]
-    b = np.logspace(-2., 2., 11)[..., np.newaxis]
-    # Avoid the end points where the gradient can veer off to infinity.
-    x = np.linspace(0.1, 0.7, 23)
+  def testBetaincGradient(self, dtype):
+    space = np.logspace(-2., 2., 10).tolist()
+    space_x = np.linspace(0.01, 0.99, 10).tolist()
+    a, b, x = zip(*list(itertools.product(space, space, space_x)))
+
+    a = np.array(a, dtype=dtype)
+    b = np.array(b, dtype=dtype)
+    x = np.array(x, dtype=dtype)
+
+    # Wrap in tf.function and compile for faster computations.
+    betainc = tf.function(tfp_math.betainc, autograph=False, jit_compile=True)
+
+    delta = 1e-4 if dtype == np.float64 else 1e-3
+    tolerance = 7e-3 if dtype == np.float64 else 7e-2
+    tolerance_x = 1e-3 if dtype == np.float64 else 0.1
+
+    err = self.compute_max_gradient_error(
+        lambda z: betainc(z, b, x), [a], delta=delta)
+    self.assertLess(err, tolerance)
+
+    err = self.compute_max_gradient_error(
+        lambda z: betainc(a, z, x), [b], delta=delta)
+    self.assertLess(err, tolerance)
+
+    err = self.compute_max_gradient_error(
+        lambda z: betainc(a, b, z), [x], delta=delta)
+    self.assertLess(err, tolerance_x)
+
+  @parameterized.parameters(np.float32, np.float64)
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeFinite(self, dtype):
+    eps = np.finfo(dtype).eps
+
+    space = np.logspace(np.log10(eps), 5.).tolist()
+    space_x = np.linspace(eps, 1. - eps).tolist()
+    a, b, x = zip(*list(itertools.product(space, space, space_x)))
+
+    a = np.array(a, dtype=dtype)
+    b = np.array(b, dtype=dtype)
+    x = np.array(x, dtype=dtype)
+
+    def betainc_partials(a, b, x):
+      return tfp_math.value_and_gradient(tfp_math.betainc, [a, b, x])[1]
+
+    # Wrap in tf.function and compile for faster computations.
+    betainc_partials = tf.function(
+        betainc_partials, autograph=False, jit_compile=True)
+
+    self.assertAllFinite(self.evaluate(betainc_partials(a, b, x)))
+
+  @parameterized.parameters(np.float32, np.float64)
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeBounds(self, dtype):
+
+    def betainc_partials(a, b, x):
+      return tfp_math.value_and_gradient(tfp_math.betainc, [a, b, x])[1]
+
+    # Wrap in tf.function and compile for faster computations.
+    betainc_partials = tf.function(
+        betainc_partials, autograph=False, jit_compile=True)
+
+    # Test out-of-range values (should return NaN output).
+    a = np.array([-1., 0., 0.4, 0.4, 0.4, 0.4], dtype=dtype)
+    b = np.array([0.6, 0.6, -1., 0., 0.6, 0.6], dtype=dtype)
+    x = np.array([0.5, 0.5, 0.5, 0.5, -1., 2.], dtype=dtype)
+
+    for partial in self.evaluate(betainc_partials(a, b, x)):
+      self.assertAllClose(np.full_like(a, np.nan), partial)
+
+    # Test partials when x is equal to 0 or 1.
+    a = np.array([0.4, 0.4], dtype=dtype)
+    b = np.array([0.6, 0.6], dtype=dtype)
+    x = np.array([0., 1.], dtype=dtype)
+
+    for partial in self.evaluate(betainc_partials(a, b, x)):
+      self.assertAllClose(np.zeros_like(a), partial)
+
+  def _testBetaincDerivative(self,
+                             a,
+                             b,
+                             x,
+                             rtol_a=1e-6,
+                             atol_a=1e-6,
+                             rtol_b=1e-6,
+                             atol_b=1e-6,
+                             rtol_x=1e-6,
+                             atol_x=1e-6):
+
+    def _mp_betainc_partial_a(a, b, x):
+      return mp.diff(lambda z: mp.betainc(z, b, 0., x, regularized=True), a)
+
+    def _mp_betainc_partial_b(a, b, x):
+      return mp.diff(lambda z: mp.betainc(a, z, 0., x, regularized=True), b)
+
+    def _mp_betainc_partial_x(a, b, x):
+      return mp.diff(lambda z: mp.betainc(a, b, 0., z, regularized=True), x)
+
+    mp_betainc_partial_a = np.frompyfunc(_mp_betainc_partial_a, 3, 1)
+    mp_betainc_partial_b = np.frompyfunc(_mp_betainc_partial_b, 3, 1)
+    mp_betainc_partial_x = np.frompyfunc(_mp_betainc_partial_x, 3, 1)
+    mp_betainc_partials = [
+        mp_betainc_partial_a, mp_betainc_partial_b, mp_betainc_partial_x]
+
+    with mp.workdps(25): # Set the decimal precision of mpmath.
+      mp_partials = [
+          mp_partial_fn(a, b, x).astype(a.dtype)
+          for mp_partial_fn in mp_betainc_partials]
+
+    def tfp_betainc_partials(a, b, x):
+      return tfp_math.value_and_gradient(tfp_math.betainc, [a, b, x])[1]
+
+    # Wrap in tf.function and compile for faster computations.
+    tfp_betainc_partials = tf.function(
+        tfp_betainc_partials, autograph=False, jit_compile=True)
+
+    tfp_partials = self.evaluate(tfp_betainc_partials(a, b, x))
+
+    # Check that partials preserve dtype.
+    for partial in tfp_partials:
+      self.assertEqual(a.dtype, partial.dtype)
+
+    # Check that partials are accurate.
+    self.assertAllClose(
+        mp_partials[0], tfp_partials[0], rtol=rtol_a, atol=atol_a)
+    self.assertAllClose(
+        mp_partials[1], tfp_partials[1], rtol=rtol_b, atol=atol_b)
+    self.assertAllClose(
+        mp_partials[2], tfp_partials[2], rtol=rtol_x, atol=atol_x)
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeVerySmallFloat(self):
+    strm = test_util.test_seed_stream()
+    a = tfp.distributions.HalfNormal(
+        scale=np.float32(1e-8)).sample(100, strm())
+    a = self.evaluate(a)
+    b = tfp.distributions.HalfNormal(
+        scale=np.float32(1e-8)).sample(100, strm())
+    b = self.evaluate(b)
+    x = tfp.distributions.Uniform(
+        high=np.float32(1.)).sample(100, strm())
+    x = self.evaluate(x)
+
+    self._testBetaincDerivative(
+        a, b, x, rtol_a=6e-3, rtol_b=4e-3, rtol_x=1e-5)
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeSmallFloat(self):
+    strm = test_util.test_seed_stream()
+    a = tfp.distributions.Uniform(
+        high=np.float32(5.)).sample(100, strm())
+    a = self.evaluate(a)
+    b = tfp.distributions.Uniform(
+        high=np.float32(5.)).sample(100, strm())
+    b = self.evaluate(b)
+    x = tfp.distributions.Uniform(
+        high=np.float32(1.)).sample(100, strm())
+    x = self.evaluate(x)
+
+    self._testBetaincDerivative(
+        a, b, x,
+        atol_a=4e-5, atol_b=2e-4, atol_x=2e-4,
+        rtol_a=1e-5, rtol_b=1e-5, rtol_x=1e-5)
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeFloat(self):
+    strm = test_util.test_seed_stream()
+    a = tfp.distributions.Uniform(
+        high=np.float32(100.)).sample(100, strm())
+    a = self.evaluate(a)
+    b = tfp.distributions.Uniform(
+        high=np.float32(100.)).sample(100, strm())
+    b = self.evaluate(b)
+    x = tfp.distributions.Uniform(
+        high=np.float32(1.)).sample(100, strm())
+    x = self.evaluate(x)
+
+    self._testBetaincDerivative(
+        a, b, x,
+        atol_a=7e-6, atol_b=9e-5, atol_x=4e-4,
+        rtol_a=1e-5, rtol_b=1e-5, rtol_x=1e-5)
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeVerySmallDouble(self):
+    strm = test_util.test_seed_stream()
+    a = tfp.distributions.HalfNormal(
+        scale=np.float64(1e-16)).sample(100, strm())
+    a = self.evaluate(a)
+    b = tfp.distributions.HalfNormal(
+        scale=np.float64(1e-16)).sample(100, strm())
+    b = self.evaluate(b)
+    x = tfp.distributions.Uniform(
+        high=np.float64(1.)).sample(100, strm())
+    x = self.evaluate(x)
+
+    self._testBetaincDerivative(a, b, x)
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeSmallDouble(self):
+    strm = test_util.test_seed_stream()
+    a = tfp.distributions.Uniform(
+        high=np.float64(10.)).sample(100, strm())
+    a = self.evaluate(a)
+    b = tfp.distributions.Uniform(
+        high=np.float64(10.)).sample(100, strm())
+    b = self.evaluate(b)
+    x = tfp.distributions.Uniform(
+        high=np.float64(1.)).sample(100, strm())
+    x = self.evaluate(x)
+
+    self._testBetaincDerivative(a, b, x)
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeDouble(self):
+    strm = test_util.test_seed_stream()
+    a = tfp.distributions.Uniform(
+        high=np.float64(100.)).sample(100, strm())
+    a = self.evaluate(a)
+    b = tfp.distributions.Uniform(
+        high=np.float64(100.)).sample(100, strm())
+    b = self.evaluate(b)
+    x = tfp.distributions.Uniform(
+        high=np.float64(1.)).sample(100, strm())
+    x = self.evaluate(x)
+
+    self._testBetaincDerivative(a, b, x)
+
+  @parameterized.parameters(np.float32, np.float64)
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeChallengingPoints(self, dtype):
+    a = np.array([0.014, 5.90, 0.536, 0.836, 0.3, 9., 1.69], dtype=dtype)
+    b = np.array([3.467, 0.01, 2.315, 0.221, 9., 0.24, 0.117], dtype=dtype)
+    x = np.array(
+        [0.007, 0.99, 0.215, 0.782, 1e-16, 1. - 1e-6, 3.4e-4], dtype=dtype)
+
+    if dtype == np.float32:
+      self._testBetaincDerivative(
+          a, b, x,
+          atol_a=5e-5, atol_b=5e-4, atol_x=5e-4,
+          rtol_a=1e-5, rtol_b=1e-5, rtol_x=1e-5)
+    else:
+      self._testBetaincDerivative(a, b, x)
+
+  @parameterized.parameters(np.float32, np.float64)
+  @test_util.numpy_disable_gradient_test
+  def testBetaincSecondDerivativeFinite(self, dtype):
+    space = np.logspace(-2., 2., 5).tolist()
+    space_x = np.linspace(0.01, 0.99, 5).tolist()
+    a, b, x = zip(*list(itertools.product(space, space, space_x)))
+
+    a = np.array(a, dtype=dtype)
+    b = np.array(b, dtype=dtype)
+    x = np.array(x, dtype=dtype)
+
+    def betainc_partials(a, b, x):
+      return tfp_math.value_and_gradient(tfp_math.betainc, [a, b, x])[1]
+
+    def betainc_partials_of_partial_a(a, b, x):
+      return tfp_math.value_and_gradient(
+          lambda a, b, x: betainc_partials(a, b, x)[0],
+          [a, b, x])[1]
+
+    def betainc_partials_of_partial_b(a, b, x):
+      return tfp_math.value_and_gradient(
+          lambda a, b, x: betainc_partials(a, b, x)[1],
+          [a, b, x])[1]
+
+    def betainc_partials_of_partial_x(a, b, x):
+      return tfp_math.value_and_gradient(
+          lambda a, b, x: betainc_partials(a, b, x)[2],
+          [a, b, x])[1]
+
+    betainc_partials_of_partials = [
+        betainc_partials_of_partial_a,
+        betainc_partials_of_partial_b,
+        betainc_partials_of_partial_x]
 
     # Wrap in tf.function for faster computations.
-    betainc = tf.function(tfp_math.betainc)
+    betainc_partials_of_partials = [
+      tf.function(partial_fn, autograph=False, jit_compile=True)
+      for partial_fn in betainc_partials_of_partials]
 
-    err = self.compute_max_gradient_error(
-        lambda z: betainc(a, b, z), [x], delta=1e-4)
-    self.assertLess(err, 2e-5)
+    partials_of_partials = [
+        partial_fn(a, b, x) for partial_fn in betainc_partials_of_partials]
 
-    err = self.compute_max_gradient_error(
-        lambda z: betainc(z, b, x), [a], delta=1e-4)
-    self.assertLess(err, 8e-4)
-
-    err = self.compute_max_gradient_error(
-        lambda z: betainc(a, z, x), [b], delta=1e-4)
-    self.assertLess(err, 8e-4)
+    self.assertAllFinite(self.evaluate(partials_of_partials))
 
 
 @test_util.test_graph_and_eager_modes
