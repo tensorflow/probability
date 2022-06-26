@@ -426,18 +426,26 @@ class BetaincTest(test_util.TestCase):
   @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
   def testBetaincDerivativeChallengingPoints(self, dtype):
-    a = np.array([0.014, 5.90, 0.536, 0.836, 0.3, 9., 1.69], dtype=dtype)
-    b = np.array([3.467, 0.01, 2.315, 0.221, 9., 0.24, 0.117], dtype=dtype)
+    a = np.array(
+        [0.014, 5.90, 0.536, 0.836, 0.3, 9., 1.69, 880.],
+        dtype=dtype)
+    b = np.array(
+        [3.467, 0.01, 2.315, 0.221, 9., 0.24, 0.117, 990.],
+        dtype=dtype)
     x = np.array(
-        [0.007, 0.99, 0.215, 0.782, 1e-16, 1. - 1e-6, 3.4e-4], dtype=dtype)
+        [0.007, 0.99, 0.215, 0.782, 1e-16, 1. - 1e-6, 3.4e-4, 0.47],
+        dtype=dtype)
 
     if dtype == np.float32:
       self._testBetaincDerivative(
           a, b, x,
-          atol_a=5e-5, atol_b=5e-4, atol_x=5e-4,
-          rtol_a=1e-5, rtol_b=1e-5, rtol_x=1e-5)
+          atol_a=5e-4, atol_b=5e-4, atol_x=5e-4,
+          rtol_a=5e-4, rtol_b=5e-4, rtol_x=5e-4)
     else:
-      self._testBetaincDerivative(a, b, x)
+      self._testBetaincDerivative(
+          a, b, x,
+          atol_a=1e-10, atol_b=1e-10, atol_x=1e-10,
+          rtol_a=1e-11, rtol_b=1e-11, rtol_x=1e-11)
 
   @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
