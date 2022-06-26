@@ -341,7 +341,7 @@ class BetaincTest(test_util.TestCase):
     x = self.evaluate(x)
 
     self._testBetaincDerivative(
-        a, b, x, rtol_a=6e-3, rtol_b=4e-3, rtol_x=1e-5)
+        a, b, x, rtol_a=0.05, rtol_b=0.05, rtol_x=1e-5)
 
   @test_util.numpy_disable_gradient_test
   def testBetaincDerivativeSmallFloat(self):
@@ -357,9 +357,7 @@ class BetaincTest(test_util.TestCase):
     x = self.evaluate(x)
 
     self._testBetaincDerivative(
-        a, b, x,
-        atol_a=4e-5, atol_b=2e-4, atol_x=2e-4,
-        rtol_a=1e-5, rtol_b=1e-5, rtol_x=1e-5)
+        a, b, x, atol_a=1e-3, atol_b=1e-3, atol_x=0.01)
 
   @test_util.numpy_disable_gradient_test
   def testBetaincDerivativeFloat(self):
@@ -375,9 +373,7 @@ class BetaincTest(test_util.TestCase):
     x = self.evaluate(x)
 
     self._testBetaincDerivative(
-        a, b, x,
-        atol_a=7e-6, atol_b=9e-5, atol_x=4e-4,
-        rtol_a=1e-5, rtol_b=1e-5, rtol_x=1e-5)
+        a, b, x, atol_a=1e-3, atol_b=1e-3, atol_x=1e-3)
 
   @test_util.numpy_disable_gradient_test
   def testBetaincDerivativeVerySmallDouble(self):
@@ -392,7 +388,8 @@ class BetaincTest(test_util.TestCase):
         high=np.float64(1.)).sample(100, strm())
     x = self.evaluate(x)
 
-    self._testBetaincDerivative(a, b, x)
+    self._testBetaincDerivative(
+        a, b, x, rtol_a=1e-11, rtol_b=1e-11, rtol_x=1e-13)
 
   @test_util.numpy_disable_gradient_test
   def testBetaincDerivativeSmallDouble(self):
@@ -407,7 +404,8 @@ class BetaincTest(test_util.TestCase):
         high=np.float64(1.)).sample(100, strm())
     x = self.evaluate(x)
 
-    self._testBetaincDerivative(a, b, x)
+    self._testBetaincDerivative(
+        a, b, x, atol_a=1e-12, atol_b=1e-12, atol_x=1e-11)
 
   @test_util.numpy_disable_gradient_test
   def testBetaincDerivativeDouble(self):
@@ -422,7 +420,8 @@ class BetaincTest(test_util.TestCase):
         high=np.float64(1.)).sample(100, strm())
     x = self.evaluate(x)
 
-    self._testBetaincDerivative(a, b, x)
+    self._testBetaincDerivative(
+        a, b, x, atol_a=1e-12, atol_b=1e-12, atol_x=1e-10)
 
   @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
