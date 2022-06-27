@@ -23,7 +23,6 @@ from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
-from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import reparameterization
@@ -337,21 +336,9 @@ class _Mixture(distribution.Distribution):
         samples.append(self.components[c].sample(n, seed=seed_stream()))
     stack_axis = -1 - tensorshape_util.rank(self._static_event_shape)
     x = tf.stack(samples, axis=stack_axis)  # [n, B, k, E]
-    # TODO(b/170730865): Is all this masking stuff really called for?
-    npdt = dtype_util.as_numpy_dtype(x.dtype)
-    mask = tf.one_hot(
-        indices=cat_samples,  # [n, B]
-        depth=self._num_components,  # == k
-        on_value=npdt(1),
-        off_value=npdt(0))  # [n, B, k]
-    mask = distribution_util.pad_mixture_dimensions(
-        mask, self, self._cat,
-        tensorshape_util.rank(self._static_event_shape))  # [n, B, k, [1]*e]
-    if dtype_util.is_floating(x.dtype):
-      masked = tf.math.multiply_no_nan(x, mask)
-    else:
-      masked = x * mask
-    return tf.reduce_sum(masked, axis=stack_axis)  # [n, B, E]
+    return tf.gather(x, cat_samples, axis=stack_axis,
+                     batch_dims=1 + tensorshape_util.rank(
+                         self._static_batch_shape))
 
   def entropy_lower_bound(self, name='entropy_lower_bound'):
     r"""A lower bound on the entropy of this mixture model.

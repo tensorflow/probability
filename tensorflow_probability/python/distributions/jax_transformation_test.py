@@ -120,7 +120,7 @@ DEFAULT_MAX_EXAMPLES = 3
 test_all_distributions = parameterized.named_parameters(
     {'testcase_name': dname, 'dist_name': dname} for dname in
     sorted(list(dhps.INSTANTIABLE_BASE_DISTS.keys())
-           + list(d for d in dhps.INSTANTIABLE_META_DISTS if d != 'Mixture')))
+           + list(dhps.INSTANTIABLE_META_DISTS)))
 
 
 test_base_distributions = parameterized.named_parameters(
