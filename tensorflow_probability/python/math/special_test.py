@@ -178,13 +178,11 @@ class BetaincTest(test_util.TestCase):
     strm = test_util.test_seed_stream()
     a = tfp.distributions.HalfCauchy(
         loc=np.float64(1.), scale=15.).sample(2000, strm())
-    a = self.evaluate(a)
     b = tfp.distributions.HalfCauchy(
         loc=np.float64(1.), scale=15.).sample(2000, strm())
-    b = self.evaluate(b)
     x = tfp.distributions.Uniform(
         high=np.float64(1.)).sample(2000, strm())
-    x = self.evaluate(x)
+    a, b, x = self.evaluate([a, b, x])
 
     self.assertAllClose(
         scipy_special.betainc(a, b, x),
@@ -332,13 +330,11 @@ class BetaincTest(test_util.TestCase):
     strm = test_util.test_seed_stream()
     a = tfp.distributions.HalfNormal(
         scale=np.float32(1e-8)).sample(100, strm())
-    a = self.evaluate(a)
     b = tfp.distributions.HalfNormal(
         scale=np.float32(1e-8)).sample(100, strm())
-    b = self.evaluate(b)
     x = tfp.distributions.Uniform(
         high=np.float32(1.)).sample(100, strm())
-    x = self.evaluate(x)
+    a, b, x = self.evaluate([a, b, x])
 
     self._testBetaincDerivative(
         a, b, x, rtol_a=0.05, rtol_b=0.05, rtol_x=1e-5)
@@ -348,13 +344,11 @@ class BetaincTest(test_util.TestCase):
     strm = test_util.test_seed_stream()
     a = tfp.distributions.Uniform(
         high=np.float32(5.)).sample(100, strm())
-    a = self.evaluate(a)
     b = tfp.distributions.Uniform(
         high=np.float32(5.)).sample(100, strm())
-    b = self.evaluate(b)
     x = tfp.distributions.Uniform(
         high=np.float32(1.)).sample(100, strm())
-    x = self.evaluate(x)
+    a, b, x = self.evaluate([a, b, x])
 
     self._testBetaincDerivative(
         a, b, x, atol_a=1e-3, atol_b=1e-3, atol_x=0.01)
@@ -364,13 +358,11 @@ class BetaincTest(test_util.TestCase):
     strm = test_util.test_seed_stream()
     a = tfp.distributions.Uniform(
         high=np.float32(100.)).sample(100, strm())
-    a = self.evaluate(a)
     b = tfp.distributions.Uniform(
         high=np.float32(100.)).sample(100, strm())
-    b = self.evaluate(b)
     x = tfp.distributions.Uniform(
         high=np.float32(1.)).sample(100, strm())
-    x = self.evaluate(x)
+    a, b, x = self.evaluate([a, b, x])
 
     self._testBetaincDerivative(
         a, b, x, atol_a=1e-3, atol_b=1e-3, atol_x=1e-3)
@@ -380,13 +372,11 @@ class BetaincTest(test_util.TestCase):
     strm = test_util.test_seed_stream()
     a = tfp.distributions.HalfNormal(
         scale=np.float64(1e-16)).sample(100, strm())
-    a = self.evaluate(a)
     b = tfp.distributions.HalfNormal(
         scale=np.float64(1e-16)).sample(100, strm())
-    b = self.evaluate(b)
     x = tfp.distributions.Uniform(
         high=np.float64(1.)).sample(100, strm())
-    x = self.evaluate(x)
+    a, b, x = self.evaluate([a, b, x])
 
     self._testBetaincDerivative(
         a, b, x, rtol_a=1e-11, rtol_b=1e-11, rtol_x=1e-13)
@@ -396,13 +386,11 @@ class BetaincTest(test_util.TestCase):
     strm = test_util.test_seed_stream()
     a = tfp.distributions.Uniform(
         high=np.float64(10.)).sample(100, strm())
-    a = self.evaluate(a)
     b = tfp.distributions.Uniform(
         high=np.float64(10.)).sample(100, strm())
-    b = self.evaluate(b)
     x = tfp.distributions.Uniform(
         high=np.float64(1.)).sample(100, strm())
-    x = self.evaluate(x)
+    a, b, x = self.evaluate([a, b, x])
 
     self._testBetaincDerivative(
         a, b, x, atol_a=1e-12, atol_b=1e-12, atol_x=1e-11)
@@ -412,13 +400,11 @@ class BetaincTest(test_util.TestCase):
     strm = test_util.test_seed_stream()
     a = tfp.distributions.Uniform(
         high=np.float64(100.)).sample(100, strm())
-    a = self.evaluate(a)
     b = tfp.distributions.Uniform(
         high=np.float64(100.)).sample(100, strm())
-    b = self.evaluate(b)
     x = tfp.distributions.Uniform(
         high=np.float64(1.)).sample(100, strm())
-    x = self.evaluate(x)
+    a, b, x = self.evaluate([a, b, x])
 
     self._testBetaincDerivative(
         a, b, x, atol_a=1e-12, atol_b=1e-12, atol_x=1e-10)
