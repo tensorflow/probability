@@ -200,10 +200,7 @@ class BetaincTest(test_util.TestCase):
     space = np.logspace(-2., 2., 10).tolist()
     space_x = np.linspace(0.01, 0.99, 10).tolist()
     a, b, x = zip(*list(itertools.product(space, space, space_x)))
-
-    a = np.array(a, dtype=dtype)
-    b = np.array(b, dtype=dtype)
-    x = np.array(x, dtype=dtype)
+    a, b, x = [np.array(z, dtype=dtype) for z in [a, b, x]]
 
     # Wrap in tf.function and compile for faster computations.
     betainc = tf.function(tfp_math.betainc, autograph=False, jit_compile=True)
@@ -232,10 +229,7 @@ class BetaincTest(test_util.TestCase):
     space = np.logspace(np.log10(eps), 5.).tolist()
     space_x = np.linspace(eps, 1. - eps).tolist()
     a, b, x = zip(*list(itertools.product(space, space, space_x)))
-
-    a = np.array(a, dtype=dtype)
-    b = np.array(b, dtype=dtype)
-    x = np.array(x, dtype=dtype)
+    a, b, x = [np.array(z, dtype=dtype) for z in [a, b, x]]
 
     def betainc_partials(a, b, x):
       return tfp_math.value_and_gradient(tfp_math.betainc, [a, b, x])[1]
@@ -439,10 +433,7 @@ class BetaincTest(test_util.TestCase):
     space = np.logspace(-2., 2., 5).tolist()
     space_x = np.linspace(0.01, 0.99, 5).tolist()
     a, b, x = zip(*list(itertools.product(space, space, space_x)))
-
-    a = np.array(a, dtype=dtype)
-    b = np.array(b, dtype=dtype)
-    x = np.array(x, dtype=dtype)
+    a, b, x = [np.array(z, dtype=dtype) for z in [a, b, x]]
 
     def betainc_partials(a, b, x):
       return tfp_math.value_and_gradient(tfp_math.betainc, [a, b, x])[1]
