@@ -523,11 +523,20 @@ class name_scope(object):  # pylint: disable=invalid-name
   def __init__(self, name, *args, **kwargs):
     del args, kwargs
     self._name = name
+    if JAX_MODE and name is not None:
+      jax_named_scope = jax.named_scope(name)
+    else:
+      jax_named_scope = None
+    self._jax_named_scope = jax_named_scope
 
   def __enter__(self):
+    if self._jax_named_scope is not None:
+      self._jax_named_scope.__enter__()
     return self._name
 
   def __exit__(self, type_arg, value_arg, traceback_arg):
+    if self._jax_named_scope is not None:
+      self._jax_named_scope.__exit__(type_arg, value_arg, traceback_arg)
     return False  # False values do not suppress exceptions.
 
 
