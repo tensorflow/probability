@@ -249,14 +249,14 @@ def _betainc_der_continued_fraction(a, b, x, dtype, where):
   cf, cf_grad_a, cf_grad_b = _betainc_modified_lentz_method(
       a, b, x, dtype, where)
 
-  more_terms = tf.math.exp(
+  normalization = tf.math.exp(
       tf.math.xlogy(a, x) + tf.math.xlog1py(b, -x) -
       tf.math.log(a) - lbeta(a, b))
 
   digamma_apb = tf.math.digamma(a + b)
-  grad_a = more_terms * (cf_grad_a + cf * (tf.math.log(x) -
+  grad_a = normalization * (cf_grad_a + cf * (tf.math.log(x) -
       tf.math.reciprocal(a) + digamma_apb - tf.math.digamma(a)))
-  grad_b = more_terms * (cf_grad_b + cf * (tf.math.log1p(-x) +
+  grad_b = normalization * (cf_grad_b + cf * (tf.math.log1p(-x) +
       digamma_apb - tf.math.digamma(b)))
 
   # If we are taking advantage of the symmetry relation, then we have to
@@ -344,13 +344,13 @@ def _betainc_der_power_series(a, b, x, dtype, where):
   _, _, series_sum = values
   _, series_grad_a, series_grad_b = gradients
 
-  more_terms = tf.math.exp(
+  normalization = tf.math.exp(
       tf.math.xlogy(safe_a, safe_x) - lbeta(safe_a, safe_b))
 
   digamma_apb = tf.math.digamma(safe_a + safe_b)
-  grad_a = more_terms * (series_grad_a + series_sum * (
+  grad_a = normalization * (series_grad_a + series_sum * (
       digamma_apb - tf.math.digamma(safe_a) + tf.math.log(safe_x)))
-  grad_b = more_terms * (series_grad_b + series_sum * (
+  grad_b = normalization * (series_grad_b + series_sum * (
       digamma_apb - tf.math.digamma(safe_b)))
 
   # If we are taking advantage of the symmetry relation, then we have to
