@@ -240,11 +240,11 @@ def _betainc_der_continued_fraction(a, b, x, dtype, where):
   # for x < (a - 1) / (a + b - 2). For x >= (a - 1) / (a + b - 2),
   # we can obtain an equivalent computation by using the symmetry
   # relation given here: https://dlmf.nist.gov/8.17#E4
-  apply_symmetry = (x >= (a - one) / (a + b - two))
+  use_symmetry_relation = (x >= (a - one) / (a + b - two))
   a_orig = a
-  a = tf.where(apply_symmetry, b, a)
-  b = tf.where(apply_symmetry, a_orig, b)
-  x = tf.where(apply_symmetry, one - x, x)
+  a = tf.where(use_symmetry_relation, b, a)
+  b = tf.where(use_symmetry_relation, a_orig, b)
+  x = tf.where(use_symmetry_relation, one - x, x)
 
   cf, cf_grad_a, cf_grad_b = _betainc_modified_lentz_method(
       a, b, x, dtype, where)
@@ -262,8 +262,8 @@ def _betainc_der_continued_fraction(a, b, x, dtype, where):
   # If we are taking advantage of the symmetry relation, then we have to
   # adjust grad_a and grad_b.
   grad_a_orig = grad_a
-  grad_a = tf.where(apply_symmetry, -grad_b, grad_a)
-  grad_b = tf.where(apply_symmetry, -grad_a_orig, grad_b)
+  grad_a = tf.where(use_symmetry_relation, -grad_b, grad_a)
+  grad_b = tf.where(use_symmetry_relation, -grad_a_orig, grad_b)
 
   return grad_a, grad_b
 
@@ -290,11 +290,11 @@ def _betainc_der_power_series(a, b, x, dtype, where):
 
   # When the condition C1 is false, we apply the symmetry relation given
   # here: http://dlmf.nist.gov/8.17.E4
-  apply_symmetry = (safe_x >= safe_a / (safe_a + safe_b))
+  use_symmetry_relation = (safe_x >= safe_a / (safe_a + safe_b))
   safe_a_orig = safe_a
-  safe_a = tf.where(apply_symmetry, safe_b, safe_a)
-  safe_b = tf.where(apply_symmetry, safe_a_orig, safe_b)
-  safe_x = tf.where(apply_symmetry, one - safe_x, safe_x)
+  safe_a = tf.where(use_symmetry_relation, safe_b, safe_a)
+  safe_b = tf.where(use_symmetry_relation, safe_a_orig, safe_b)
+  safe_x = tf.where(use_symmetry_relation, one - safe_x, safe_x)
 
   # max_iterations was set by experimentation and tolerance was taken from
   # Cephes.
@@ -356,8 +356,8 @@ def _betainc_der_power_series(a, b, x, dtype, where):
   # If we are taking advantage of the symmetry relation, then we have to
   # adjust grad_a and grad_b.
   grad_a_orig = grad_a
-  grad_a = tf.where(apply_symmetry, -grad_b, grad_a)
-  grad_b = tf.where(apply_symmetry, -grad_a_orig, grad_b)
+  grad_a = tf.where(use_symmetry_relation, -grad_b, grad_a)
+  grad_b = tf.where(use_symmetry_relation, -grad_a_orig, grad_b)
 
   return grad_a, grad_b
 
