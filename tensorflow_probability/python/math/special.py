@@ -147,7 +147,7 @@ def _betainc_nth_partial_numerator(iteration, a, b, x, dtype):
       iteration_is_even, even_partial_numerator, odd_partial_numerator)
 
 
-def _betainc_modified_lentz_method(a, b, x, dtype, where):
+def _betainc_modified_lentz_method(a, b, x, dtype, use_continued_fraction):
   """Returns the continued fraction for betainc by modified Lentz's method."""
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   one = tf.constant(1., dtype=dtype)
@@ -192,7 +192,8 @@ def _betainc_modified_lentz_method(a, b, x, dtype, where):
 
   # Assume all input Tensors have the same shape. The extra dimension is
   # needed to compute the gradients with respect to a and b.
-  a, b, x, where = (z[..., tf.newaxis] for z in (a, b, x, where))
+  a, b, x, use_continued_fraction = [
+      z[..., tf.newaxis] for z in (a, b, x, use_continued_fraction)]
 
   apb = a + b
   ap1 = a + one
@@ -214,7 +215,7 @@ def _betainc_modified_lentz_method(a, b, x, dtype, where):
       cond=lambda stop, *_: tf.reduce_any(~stop),
       body=continued_fraction_evaluation,
       loop_vars=(
-          ~where,
+          ~use_continued_fraction,
           tf.constant(2., dtype=dtype),
           initial_values,
           initial_gradients),
@@ -227,7 +228,7 @@ def _betainc_modified_lentz_method(a, b, x, dtype, where):
   return f, f_grad_a, f_grad_b
 
 
-def _betainc_der_continued_fraction(a, b, x, dtype, where):
+def _betainc_der_continued_fraction(a, b, x, dtype, use_continued_fraction):
   """Returns the partial derivatives of betainc with respect to a and b."""
   # This function evaluates betainc(a, b, x) by its continued fraction
   # expansion given here: https://dlmf.nist.gov/8.17.E22
@@ -247,7 +248,7 @@ def _betainc_der_continued_fraction(a, b, x, dtype, where):
   x = tf.where(use_symmetry_relation, one - x, x)
 
   cf, cf_grad_a, cf_grad_b = _betainc_modified_lentz_method(
-      a, b, x, dtype, where)
+      a, b, x, dtype, use_continued_fraction)
 
   normalization = tf.math.exp(
       tf.math.xlogy(a, x) + tf.math.xlog1py(b, -x) -
@@ -268,7 +269,7 @@ def _betainc_der_continued_fraction(a, b, x, dtype, where):
   return grad_a, grad_b
 
 
-def _betainc_der_power_series(a, b, x, dtype, where):
+def _betainc_der_power_series(a, b, x, dtype, use_power_series):
   """Returns the partial derivatives of betainc with respect to a and b."""
   # This function evaluates betainc(a, b, x) by its series representation:
   #   x ** a * 2F1(a, 1 - b; a + 1; x) / (a * B(a, b)) ,
@@ -284,9 +285,9 @@ def _betainc_der_power_series(a, b, x, dtype, where):
 
   # Avoid returning NaN or infinity when the input does not satisfy either
   # C1 or C2.
-  safe_a = tf.where(where, a, half)
-  safe_b = tf.where(where, b, half)
-  safe_x = tf.where(where, x, half)
+  safe_a = tf.where(use_power_series, a, half)
+  safe_b = tf.where(use_power_series, b, half)
+  safe_x = tf.where(use_power_series, x, half)
 
   # When the condition C1 is false, we apply the symmetry relation given
   # here: http://dlmf.nist.gov/8.17.E4
@@ -336,7 +337,7 @@ def _betainc_der_power_series(a, b, x, dtype, where):
       cond=lambda stop, *_: tf.reduce_any(~stop),
       body=power_series_evaluation,
       loop_vars=(
-          ~where,
+          ~use_power_series,
           initial_values,
           initial_gradients),
       maximum_iterations=max_iterations)
