@@ -388,13 +388,14 @@ def _betainc_partials(a, b, x):
 
   # The partial derivatives of betainc with respect to a and b are computed
   # using forward mode.
-  region_ps = ((x < a / (a + b)) & (b * x <= 1.) & (x <= 0.95) |
+  use_power_series = ((x < a / (a + b)) & (b * x <= 1.) & (x <= 0.95) |
       ((x >= a / (a + b)) & (a * (1. - x) <= 1.) & (x >= 0.05)))
-  ps_grad_a, ps_grad_b = _betainc_der_power_series(a, b, x, dtype, region_ps)
+  ps_grad_a, ps_grad_b = _betainc_der_power_series(
+      a, b, x, dtype, use_power_series)
   cf_grad_a, cf_grad_b = _betainc_der_continued_fraction(
-      a, b, x, dtype, ~region_ps)
-  grad_a = tf.where(region_ps, ps_grad_a, cf_grad_a)
-  grad_b = tf.where(region_ps, ps_grad_b, cf_grad_b)
+      a, b, x, dtype, ~use_power_series)
+  grad_a = tf.where(use_power_series, ps_grad_a, cf_grad_a)
+  grad_b = tf.where(use_power_series, ps_grad_b, cf_grad_b)
 
   # According to the code accompanying [1], grad_a = grad_b = 0 when x is
   # equal to 0 or 1. Under the same condition, grad_x = 0 by its expression.
