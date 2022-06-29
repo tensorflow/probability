@@ -241,6 +241,7 @@ def _betainc_der_continued_fraction(a, b, x, dtype, use_continued_fraction):
   # for x < (a - 1) / (a + b - 2). For x >= (a - 1) / (a + b - 2),
   # we can obtain an equivalent computation by using the symmetry
   # relation given here: https://dlmf.nist.gov/8.17#E4
+  #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x)
   use_symmetry_relation = (x >= (a - one) / (a + b - two))
   a_orig = a
   a = tf.where(use_symmetry_relation, b, a)
@@ -290,7 +291,8 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
   safe_x = tf.where(use_power_series, x, half)
 
   # When the condition C1 is false, we apply the symmetry relation given
-  # here: http://dlmf.nist.gov/8.17.E4
+  # here: https://dlmf.nist.gov/8.17#E4
+  #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x)
   use_symmetry_relation = (safe_x >= safe_a / (safe_a + safe_b))
   safe_a_orig = safe_a
   safe_a = tf.where(use_symmetry_relation, safe_b, safe_a)
