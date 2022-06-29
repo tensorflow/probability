@@ -179,7 +179,7 @@ def _betainc_modified_lentz_method(a, b, x, dtype, where):
     delta = new_c * new_d
     new_f = f * delta
 
-    new_c_grad = (numerator_grad * c - numerator * c_grad) / (c * c)
+    new_c_grad = (numerator_grad * c - numerator * c_grad) / tf.math.square(c)
     new_d_grad = -new_d * new_d * (numerator_grad * d + numerator * d_grad)
     new_f_grad = f_grad * delta + (f * new_c_grad * new_d) + (
         f * new_d_grad * new_c)
@@ -204,7 +204,7 @@ def _betainc_modified_lentz_method(a, b, x, dtype, where):
   initial_f = initial_d
   initial_values = (initial_c, initial_d, initial_f)
 
-  initial_d_grad = tf.concat([one - b, ap1], axis=-1) * x / tf.square(
+  initial_d_grad = tf.concat([one - b, ap1], axis=-1) * x / tf.math.square(
       x * apb - ap1)
   initial_c_grad = tf.zeros_like(initial_d_grad)
   initial_f_grad = initial_d_grad
@@ -314,7 +314,7 @@ def _betainc_der_power_series(a, b, x, dtype, where):
     new_product = product * factor
     term = new_product / apn
     new_dpdb = factor * dpdb - product * x_div_n
-    new_da = da - new_product / (apn * apn)
+    new_da = da - new_product / tf.math.square(apn)
     new_db = db + new_dpdb / apn
 
     values = n + one, new_product, series_sum + term
@@ -328,7 +328,7 @@ def _betainc_der_power_series(a, b, x, dtype, where):
   initial_values = (n, product, series_sum)
 
   dpdb = tf.zeros_like(safe_b)
-  da = -tf.math.reciprocal(safe_a * safe_a)
+  da = -tf.math.reciprocal(tf.math.square(safe_a))
   db = dpdb
   initial_gradients = (dpdb, da, db)
 
