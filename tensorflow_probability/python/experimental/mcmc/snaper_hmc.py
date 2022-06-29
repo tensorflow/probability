@@ -365,9 +365,15 @@ class SNAPERHamiltonianMonteCarlo(kernel_base.TransitionKernel):
       shard_axis_names = self.experimental_shard_axis_names
 
     def _max_part(x, named_axis):
-      return distribute_lib.reduce_max(
-          # all_gather is fine here, since we're reducing locally to a scalar.
-          x, None, named_axis, allow_all_gather=True)
+      size = tf.get_static_value(ps.size(x))
+      # Support zero-sized states. It's invalid (under JAX) to reduce zero-sized
+      # tensors along the zero-sized axis. TF, returns -inf in this case.
+      if size is not None and size == 0:
+        return tf.ones([], x.dtype)
+      else:
+        return distribute_lib.reduce_max(
+            # all_gather is fine here, since we're reducing locally to a scalar.
+            x, None, named_axis, allow_all_gather=True)
 
     max_variance = tf.reduce_max(
         tf.nest.flatten(
@@ -777,7 +783,9 @@ def _init_chain_state(
             unconstrained_shape, unconstrained_dtype)
 
     else:
-      unconstrained_state = flat_event_space_bijector.inverse(init_state)
+      with tf.name_scope('unconstrained_state'):
+        unconstrained_state = tf.nest.map_structure(
+            tf.identity, flat_event_space_bijector.inverse(init_state))
 
     shard_axis_names_parts = None
     if experimental_shard_axis_names is None:

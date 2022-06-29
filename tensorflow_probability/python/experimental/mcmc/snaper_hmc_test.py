@@ -413,6 +413,55 @@ class _SampleSNAPERHMCTest(test_util.TestCase, parameterized.TestCase):
     self.assertEqual(expected_num_reductions * 10, reduction_results)
     self.assertTrue(hasattr(results.final_kernel_results, 'target_accept_prob'))
 
+  def testInitState(self):
+
+    root = tfd.JointDistributionCoroutine.Root
+
+    @tfd.JointDistributionCoroutine
+    def model():
+      beta = yield root(
+          tfd.Normal(tf.constant(0., self.dtype), 1.7, name='beta'))
+      sigma = yield root(
+          tfd.HalfCauchy(tf.constant(0., self.dtype), 5., name='sigma'))
+      pct_sill = yield root(
+          tfd.Beta(tf.constant(1., self.dtype), 1., name='pct_sill'))
+      rho = yield root(
+          tfd.InverseGamma(tf.constant(10, self.dtype), 5, name='rho'))
+
+      tau = yield tfd.Deterministic(sigma * (1 / pct_sill - 1), name='tau')
+
+      def mean_fn(_):
+        return beta[..., tf.newaxis]
+
+      kernel = tfp.math.psd_kernels.MaternOneHalf(sigma, rho)
+      yield tfd.GaussianProcess(
+          kernel=kernel,
+          index_points=x,
+          mean_fn=mean_fn,
+          observation_noise_variance=tf.square(tau),
+          name='obs',
+      )
+
+    x = tf.cast(
+        tf.repeat(tf.linspace(0., 1., 10)[..., tf.newaxis], 2, axis=-1),
+        self.dtype)
+    y = tf.ones(10, self.dtype)
+    pinned_model = model.experimental_pin(obs=y)
+
+    seed = test_util.test_seed(sampler_type='stateless')
+
+    @tf.function(jit_compile=True, autograph=False)
+    def run(init_state):
+      return tfp.experimental.mcmc.sample_snaper_hmc(
+          pinned_model,
+          16,
+          discard_burnin_steps=False,
+          num_burnin_steps=8,
+          init_state=init_state,
+          seed=seed)
+
+    run(pinned_model.sample_unpinned(16, seed=seed))
+
 
 @test_util.test_graph_and_eager_modes
 class SampleSNAPERHMCTestFloat32(_SampleSNAPERHMCTest):
