@@ -104,51 +104,55 @@ def _betainc_naive(a, b, x):
   return tf.math.betainc(a, b, x)
 
 
-def _betainc_nth_partial_numerator(iteration, a, b, x, dtype):
-  """Partial numerator used in the continued fraction for betainc."""
-  zero = tf.constant(0., dtype=dtype)
+def _betainc_even_partial_numerator(iteration, a, b, x, dtype):
+  """Even partial numerator used in the continued fraction for betainc."""
+  # This function computes the partial numerator d_{2m} that is specified
+  # here: https://dlmf.nist.gov/8.17#E23
   one = tf.constant(1., dtype=dtype)
   two = tf.constant(2., dtype=dtype)
 
-  iteration_is_even = tf.equal(iteration % two, zero)
+  m = iteration
+  a_plus_2m = a + two * m
+  a_plus_2m_minus_one = a_plus_2m - one
+  denominator = a_plus_2m * a_plus_2m_minus_one
 
-  # The nth partial numerator is given here: https://dlmf.nist.gov/8.17#E23
-  def even_partial_numerator():
-    # d_{2m}
-    n = iteration / two
-    a_plus_2n = a + two * n
-    a_plus_2n_minus_one = a_plus_2n - one
-    denominator = a_plus_2n * a_plus_2n_minus_one
+  db = m * x / denominator
+  value =  db * (b - m)
+  da = -value * (a_plus_2m + a_plus_2m_minus_one) / denominator
+  gradient = tf.concat([da, db], axis=-1)
+  return value, gradient
 
-    db = n * x / denominator
-    value =  db * (b - n)
-    da = -value * (a_plus_2n + a_plus_2n_minus_one) / denominator
-    gradient = tf.concat([da, db], axis=-1)
-    return value, gradient
 
-  def odd_partial_numerator():
-    # d_{2m+1}
-    n = (iteration - one) / two
-    a_plus_n = a + n
-    a_plus_2n = a_plus_n + n
-    a_plus_2n_plus_one = a_plus_2n + one
-    a_plus_b_plus_n = a_plus_n + b
-    denominator = a_plus_2n * a_plus_2n_plus_one
+def _betainc_odd_partial_numerator(iteration, a, b, x, dtype):
+  """Odd partial numerator used in the continued fraction for betainc."""
+  # This function computes the partial numerator d_{2m + 1} that is specified
+  # here: https://dlmf.nist.gov/8.17#E23
+  one = tf.constant(1., dtype=dtype)
+  two = tf.constant(2., dtype=dtype)
 
-    db = -a_plus_n * x / denominator
-    value =  db * a_plus_b_plus_n
-    da = -value * ((a_plus_2n + a_plus_2n_plus_one) / denominator) - x * (
-        two * a_plus_n + b) / denominator
-    gradient = tf.concat([da, db], axis=-1)
-    return value, gradient
+  m = iteration
+  a_plus_m = a + m
+  a_plus_2m = a_plus_m + m
+  a_plus_2m_plus_one = a_plus_2m + one
+  a_plus_b_plus_m = a_plus_m + b
+  denominator = a_plus_2m * a_plus_2m_plus_one
 
-  # Assume iteration is always greater than 1.
-  return tf.cond(
-      iteration_is_even, even_partial_numerator, odd_partial_numerator)
+  db = -a_plus_m * x / denominator
+  value =  db * a_plus_b_plus_m
+  da = -value * ((a_plus_2m + a_plus_2m_plus_one) / denominator) - x * (
+      two * a_plus_m + b) / denominator
+  gradient = tf.concat([da, db], axis=-1)
+  return value, gradient
 
 
 def _betainc_modified_lentz_method(a, b, x, dtype, use_continued_fraction):
   """Returns the continued fraction for betainc by modified Lentz's method."""
+  # This function implements the method described in the appendix of [1] for
+  # evaluating continued fractions.
+  # [1] Thompson, Ian J., and A. Ross Barnett.
+  #     Coulomb and Bessel functions of complex arguments and order.
+  #     Journal of Computational Physics 64.2 (1986): 490-509.
+  #     https://www.fresco.org.uk/papers/Thompson-JCP64p490.pdf
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   one = tf.constant(1., dtype=dtype)
   eps = tf.constant(np.finfo(numpy_dtype).eps, dtype=dtype)
@@ -156,76 +160,115 @@ def _betainc_modified_lentz_method(a, b, x, dtype, use_continued_fraction):
 
   # max_iterations and tolerance were taken from Cephes.
   if numpy_dtype == np.float32:
-    max_iterations = 200
+    max_iterations = 100
     tolerance = eps
   else:
-    max_iterations = 600
+    max_iterations = 300
     tolerance = tf.constant(3., dtype=dtype) * eps
 
   small = tf.sqrt(tiny)
 
-  def continued_fraction_evaluation(should_stop, iteration, values, gradients):
-    c, d, f = values
-    c_grad, d_grad, f_grad = gradients
+  def continued_fraction_step(
+      iteration,
+      values,
+      gradients,
+      partial_numerator_fn):
+    ratio_numerators, ratio_denominators, convergent = values
+    dratio_numerators, dratio_denominators, dconvergent = gradients
 
-    numerator, numerator_grad = _betainc_nth_partial_numerator(
+    partial_numerator, dpartial_numerator = partial_numerator_fn(
         iteration, a, b, x, dtype)
 
-    new_c = one + numerator / c
-    new_c = tf.where(tf.abs(new_c) < small, small, new_c)
-    new_d = one + numerator * d
-    new_d = tf.where(tf.abs(new_d) < small, small, new_d)
-    new_d = tf.math.reciprocal(new_d)
-    delta = new_c * new_d
-    new_f = f * delta
+    # new_ratio_numerators = C_n = A_n / A_{n - 1}
+    new_ratio_numerators = one + partial_numerator / ratio_numerators
+    new_ratio_numerators = tf.where(
+        tf.abs(new_ratio_numerators) < small, small, new_ratio_numerators)
+    # new_ratio_denominators = D_n = B_{n - 1} / B_n
+    new_ratio_denominators = one + partial_numerator * ratio_denominators
+    new_ratio_denominators = tf.where(
+        tf.abs(new_ratio_denominators) < small, small, new_ratio_denominators)
+    new_ratio_denominators = tf.math.reciprocal(new_ratio_denominators)
+    # new_convergent = h_n = A_n / B_n = h_{n - 1} * C_n * D_n
+    delta = new_ratio_numerators * new_ratio_denominators
+    new_convergent = convergent * delta
 
-    new_c_grad = (numerator_grad * c - numerator * c_grad) / tf.math.square(c)
-    new_d_grad = -new_d * new_d * (numerator_grad * d + numerator * d_grad)
-    new_f_grad = f_grad * delta + (f * new_c_grad * new_d) + (
-        f * new_d_grad * new_c)
+    new_dratio_numerators = (dpartial_numerator * ratio_numerators -
+        partial_numerator * dratio_numerators)
+    new_dratio_numerators = new_dratio_numerators / tf.math.square(
+        ratio_numerators)
+    new_dratio_denominators = (dpartial_numerator * ratio_denominators +
+        partial_numerator * dratio_denominators)
+    new_dratio_denominators = -new_dratio_denominators * tf.math.square(
+        new_ratio_denominators)
+    new_dconvergent = dconvergent * delta + (convergent *
+        new_dratio_numerators * new_ratio_denominators)
+    new_dconvergent = new_dconvergent + (convergent *
+        new_dratio_denominators * new_ratio_numerators)
+
+    new_values = (new_ratio_numerators, new_ratio_denominators, new_convergent)
+    new_gradients = (
+        new_dratio_numerators, new_dratio_denominators, new_dconvergent)
+
+    return new_values, new_gradients, delta
+
+  def continued_fraction_evaluation(should_stop, iteration, values, gradients):
+    # We run two steps of modified Lentz's method per iteration.
+    # First step of the iteration: the even one.
+    new_values, new_gradients, _ = continued_fraction_step(
+      iteration, values, gradients, _betainc_even_partial_numerator)
+
+    # Second step of the iteration: the odd one.
+    new_values, new_gradients, delta = continued_fraction_step(
+      iteration, new_values, new_gradients, _betainc_odd_partial_numerator)
 
     should_stop = should_stop | (tf.math.abs(delta - one) < tolerance)
-    values = (new_c, new_d, new_f)
-    gradients = (new_c_grad, new_d_grad, new_f_grad)
 
-    return should_stop, iteration + one, values, gradients
+    return should_stop, iteration + one, new_values, new_gradients
 
   # Assume all input Tensors have the same shape. The extra dimension is
   # needed to compute the gradients with respect to a and b.
   a, b, x, use_continued_fraction = [
-      z[..., tf.newaxis] for z in (a, b, x, use_continued_fraction)]
+      z[..., tf.newaxis] for z in [a, b, x, use_continued_fraction]]
 
   apb = a + b
   ap1 = a + one
 
-  initial_c = tf.ones_like(x)
-  initial_d = one - apb * x / ap1
-  initial_d = tf.where(tf.abs(initial_d) < small, small, initial_d)
-  initial_d = tf.math.reciprocal(initial_d)
-  initial_f = initial_d
-  initial_values = (initial_c, initial_d, initial_f)
+  # Initialization and first step of modified Lentz's method.
+  initial_ratio_numerators = tf.ones_like(x)
+  initial_ratio_denominators = one - apb * x / ap1
+  initial_ratio_denominators = tf.where(
+      tf.abs(initial_ratio_denominators) < small,
+      small,
+      initial_ratio_denominators)
+  initial_ratio_denominators = tf.math.reciprocal(initial_ratio_denominators)
+  initial_convergent = initial_ratio_denominators
+  initial_values = (
+      initial_ratio_numerators, initial_ratio_denominators, initial_convergent)
 
-  initial_d_grad = tf.concat([one - b, ap1], axis=-1) * x / tf.math.square(
-      x * apb - ap1)
-  initial_c_grad = tf.zeros_like(initial_d_grad)
-  initial_f_grad = initial_d_grad
-  initial_gradients = (initial_c_grad, initial_d_grad, initial_f_grad)
+  initial_dratio_denominators = (tf.concat([one - b, ap1], axis=-1) * x /
+      tf.math.square(x * apb - ap1))
+  initial_dratio_numerators = tf.zeros_like(initial_dratio_denominators)
+  initial_dconvergent = initial_dratio_denominators
+  initial_gradients = (
+      initial_dratio_numerators,
+      initial_dratio_denominators,
+      initial_dconvergent)
 
   (_, _, values, gradients) = tf.while_loop(
       cond=lambda stop, *_: tf.reduce_any(~stop),
       body=continued_fraction_evaluation,
       loop_vars=(
           ~use_continued_fraction,
-          tf.constant(2., dtype=dtype),
+          tf.constant(1., dtype=dtype),
           initial_values,
           initial_gradients),
       maximum_iterations=max_iterations)
 
   # Remove the previously added extra dimension: it is no longer needed.
-  f = tf.squeeze(values[-1], axis=-1)
-  f_grad_a, f_grad_b = tf.unstack(gradients[-1], axis=-1)
+  convergent = tf.squeeze(values[-1], axis=-1)
+  convergent_grad_a, convergent_grad_b = tf.unstack(gradients[-1], axis=-1)
 
-  return f, f_grad_a, f_grad_b
+  return convergent, convergent_grad_a, convergent_grad_b
 
 
 def _betainc_der_continued_fraction(a, b, x, dtype, use_continued_fraction):
