@@ -107,7 +107,7 @@ def _betainc_naive(a, b, x):
 def _betainc_even_partial_numerator(iteration, a, b, x, dtype):
   """Even partial numerator used in the continued fraction for betainc."""
   # This function computes the partial numerator d_{2m} that is specified
-  # here: https://dlmf.nist.gov/8.17#E23
+  # here: https://dlmf.nist.gov/8.17.E23
   one = tf.constant(1., dtype=dtype)
   two = tf.constant(2., dtype=dtype)
 
@@ -126,7 +126,7 @@ def _betainc_even_partial_numerator(iteration, a, b, x, dtype):
 def _betainc_odd_partial_numerator(iteration, a, b, x, dtype):
   """Odd partial numerator used in the continued fraction for betainc."""
   # This function computes the partial numerator d_{2m + 1} that is specified
-  # here: https://dlmf.nist.gov/8.17#E23
+  # here: https://dlmf.nist.gov/8.17.E23
   one = tf.constant(1., dtype=dtype)
   two = tf.constant(2., dtype=dtype)
 
@@ -283,7 +283,7 @@ def _betainc_der_continued_fraction(a, b, x, dtype, use_continued_fraction):
   # This continued fraction expansion of betainc converges rapidly
   # for x < (a - 1) / (a + b - 2). For x >= (a - 1) / (a + b - 2),
   # we can obtain an equivalent computation by using the symmetry
-  # relation given here: https://dlmf.nist.gov/8.17#E4
+  # relation given here: https://dlmf.nist.gov/8.17.E4
   #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x)
   use_symmetry_relation = (x >= (a - one) / (a + b - two))
   a_orig = a
@@ -317,7 +317,7 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
   """Returns the partial derivatives of betainc with respect to a and b."""
   # This function evaluates betainc(a, b, x) by its series representation:
   #   x ** a * 2F1(a, 1 - b; a + 1; x) / (a * B(a, b)) ,
-  # where 2F1 is defined here: http://dlmf.nist.gov/15.2.i
+  # where 2F1 is the Gauss series as defined here: http://dlmf.nist.gov/15.2.i
   # We apply this function when the input (a, b, x) satisfies at least one
   # of the following conditions:
   #   C1: (x < a / (a + b)) & (b * x <= 1) & (x <= 0.95)
@@ -334,7 +334,7 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
   safe_x = tf.where(use_power_series, x, half)
 
   # When the condition C1 is false, we apply the symmetry relation given
-  # here: https://dlmf.nist.gov/8.17#E4
+  # here: https://dlmf.nist.gov/8.17.E4
   #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x)
   use_symmetry_relation = (safe_x >= safe_a / (safe_a + safe_b))
   safe_a_orig = safe_a
