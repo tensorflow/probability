@@ -317,7 +317,7 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
   """Returns the partial derivatives of betainc with respect to a and b."""
   # This function evaluates betainc(a, b, x) by its series representation:
   #   x ** a * 2F1(a, 1 - b; a + 1; x) / (a * B(a, b)) ,
-  # where 2F1 is the Gauss series as defined here: http://dlmf.nist.gov/15.2.i
+  # where 2F1 is the Gaussian hypergeometric function.
   # We apply this function when the input (a, b, x) satisfies at least one
   # of the following conditions:
   #   C1: (x < a / (a + b)) & (b * x <= 1) & (x <= 0.95)
@@ -333,8 +333,8 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
   safe_b = tf.where(use_power_series, b, half)
   safe_x = tf.where(use_power_series, x, half)
 
-  # When the condition C1 is false, we apply the symmetry relation given
-  # here: https://dlmf.nist.gov/8.17.E4
+  # When x >= a / (a + b), we must apply the symmetry relation given here:
+  # https://dlmf.nist.gov/8.17.E4
   #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x)
   use_symmetry_relation = (safe_x >= safe_a / (safe_a + safe_b))
   safe_a_orig = safe_a
@@ -427,13 +427,13 @@ def _betainc_partials(a, b, x):
   x = tf.broadcast_to(x, broadcast_shape)
 
   # The partial derivative of betainc with respect to x can be obtained
-  # directly using the expression given here:
+  # directly by using the expression given here:
   # http://functions.wolfram.com/06.21.20.0001.01
   grad_x = tf.math.exp(
       tf.math.xlogy(a - one, x) + tf.math.xlog1py(b - one, -x) - lbeta(a, b))
 
   # The partial derivatives of betainc with respect to a and b are computed
-  # using forward mode.
+  # by using forward mode.
   use_power_series = ((x < a / (a + b)) & (b * x <= 1.) & (x <= 0.95) |
       ((x >= a / (a + b)) & (a * (1. - x) <= 1.) & (x >= 0.05)))
   ps_grad_a, ps_grad_b = _betainc_der_power_series(
