@@ -351,7 +351,7 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
   #   2F1(a, 1 - b; a + 1; x) / a
   def power_series_evaluation(should_stop, values, gradients):
     n, product, series_sum = values
-    dpdb, da, db = gradients
+    product_grad_b, da, db = gradients
 
     x_div_n = safe_x / n
     factor = (n - safe_b) * x_div_n
@@ -359,24 +359,24 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
 
     new_product = product * factor
     term = new_product / apn
-    new_dpdb = factor * dpdb - product * x_div_n
+    new_product_grad_b = factor * product_grad_b - product * x_div_n
     new_da = da - new_product / tf.math.square(apn)
-    new_db = db + new_dpdb / apn
+    new_db = db + new_product_grad_b / apn
 
     values = n + one, new_product, series_sum + term
-    gradients = new_dpdb, new_da, new_db
+    gradients = new_product_grad_b, new_da, new_db
 
     return should_stop | (tf.math.abs(term) <= tolerance), values, gradients
 
-  n = one
-  product = tf.ones_like(safe_a)
-  series_sum = one / safe_a
-  initial_values = (n, product, series_sum)
+  initial_n = one
+  initial_product = tf.ones_like(safe_a)
+  initial_series_sum = one / safe_a
+  initial_values = (initial_n, initial_product, initial_series_sum)
 
-  dpdb = tf.zeros_like(safe_b)
-  da = -tf.math.reciprocal(tf.math.square(safe_a))
-  db = dpdb
-  initial_gradients = (dpdb, da, db)
+  initial_product_grad_b = tf.zeros_like(safe_b)
+  initial_da = -tf.math.reciprocal(tf.math.square(safe_a))
+  initial_db = initial_product_grad_b
+  initial_gradients = (initial_product_grad_b, initial_da, initial_db)
 
   (_, values, gradients) = tf.while_loop(
       cond=lambda stop, *_: tf.reduce_any(~stop),
