@@ -106,8 +106,8 @@ class Cauchy(distribution.AutoCompositeTensorDistribution):
 
     Args:
       loc: Floating point tensor; the modes of the distribution(s).
-      scale: Floating point tensor; the locations of the distribution(s).
-        Must contain only positive values.
+      scale: Floating point tensor; the half-widths of the distribution(s) at
+        their half-maximums. Must contain only positive values.
       validate_args: Python `bool`, default `False`. When `True` distribution
         parameters are checked for validity despite possibly degrading runtime
         performance. When `False` invalid inputs may silently render incorrect
