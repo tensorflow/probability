@@ -469,8 +469,8 @@ class BetaincTest(test_util.TestCase):
 
     # Wrap in tf.function and compile for faster computations.
     betainc_partials_of_partials = [
-      tf.function(partial_fn, autograph=False, jit_compile=True)
-      for partial_fn in betainc_partials_of_partials]
+        tf.function(partial_fn, autograph=False, jit_compile=True)
+        for partial_fn in betainc_partials_of_partials]
 
     partials_of_partials = [
         partial_fn(a, b, x) for partial_fn in betainc_partials_of_partials]

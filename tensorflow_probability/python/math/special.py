@@ -215,11 +215,11 @@ def _betainc_modified_lentz_method(a, b, x, dtype, use_continued_fraction):
     # We run two steps of modified Lentz's method per iteration.
     # First step of the iteration: the even one.
     new_values, new_gradients, _ = continued_fraction_step(
-      iteration, values, gradients, _betainc_even_partial_numerator)
+        iteration, values, gradients, _betainc_even_partial_numerator)
 
     # Second step of the iteration: the odd one.
     new_values, new_gradients, delta = continued_fraction_step(
-      iteration, new_values, new_gradients, _betainc_odd_partial_numerator)
+        iteration, new_values, new_gradients, _betainc_odd_partial_numerator)
 
     should_stop = should_stop | (tf.math.abs(delta - one) < tolerance)
 
@@ -420,7 +420,7 @@ def _betainc_partials(a, b, x):
   x = tf.convert_to_tensor(x, dtype=dtype)
 
   broadcast_shape = functools.reduce(
-    ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(x)])
+      ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(x)])
 
   a = tf.broadcast_to(a, broadcast_shape)
   b = tf.broadcast_to(b, broadcast_shape)
