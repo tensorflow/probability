@@ -434,8 +434,9 @@ def _betainc_partials(a, b, x):
 
   # The partial derivatives of betainc with respect to a and b are computed
   # by using forward mode.
-  use_power_series = ((x < a / (a + b)) & (b * x <= 1.) & (x <= 0.95) |
-      ((x >= a / (a + b)) & (a * (1. - x) <= 1.) & (x >= 0.05)))
+  use_power_series = (
+      ((x < a / (a + b)) & (b * x <= one) & (x <= 0.95)) | (
+      (x >= a / (a + b)) & (a * (one - x) <= one) & (x >= 0.05)))
   ps_grad_a, ps_grad_b = _betainc_der_power_series(
       a, b, x, dtype, use_power_series)
   cf_grad_a, cf_grad_b = _betainc_der_continued_fraction(
