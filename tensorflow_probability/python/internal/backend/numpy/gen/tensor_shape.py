@@ -16,14 +16,36 @@
 """TensorShape, for numpy & jax."""
 from absl import logging
 
+
 class Monitoring(object):
   def __getattr__(self, name):
     return lambda *args, **kwargs: ()
 monitoring = Monitoring()
 
-class Trace(object):
-  TraceType = object
-trace = Trace()
+
+class TraceType:
+  pass
+
+
+class Serializable:
+  pass
+
+
+class trace:
+  pass
+
+
+class trace_type:
+  register_serializable = lambda *args, **kwargs: None
+
+
+setattr(trace, "TraceType", TraceType)
+setattr(trace_type, "Serializable", Serializable)
+
+
+class tensor_shape_pb2:
+  TensorShapeProto = object
+
 
 def tf_export(*args, **kwargs):
   return lambda f: f
@@ -45,11 +67,12 @@ def tf_export(*args, **kwargs):
 """Helper classes for tensor shape inference."""
 import functools
 import operator
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Type
 
 import six
 
 # from tensorflow.core.framework import tensor_shape_pb2
+# from tensorflow.core.function import trace_type
 # from tensorflow.python import tf2
 # from tensorflow.python.eager import monitoring
 # from tensorflow.python.platform import tf_logging as logging
@@ -770,7 +793,7 @@ def as_dimension(value):
 
 
 @tf_export("TensorShape")
-class TensorShape(trace.TraceType):
+class TensorShape(trace.TraceType, trace_type.Serializable):
   """Represents the shape of a `Tensor`.
 
   A `TensorShape` represents a possibly-partial shape specification for a
@@ -1257,6 +1280,21 @@ class TensorShape(trace.TraceType):
     ]
     return TensorShape(dims)
 
+  @classmethod
+  def experimental_type_proto(cls) -> Type[tensor_shape_pb2.TensorShapeProto]:
+    """Returns the type of proto associated with TensorShape serialization."""
+    return tensor_shape_pb2.TensorShapeProto
+
+  @classmethod
+  def experimental_from_proto(
+      cls, proto: tensor_shape_pb2.TensorShapeProto) -> "TensorShape":
+    """Returns a TensorShape instance based on the serialized proto."""
+    return TensorShape(proto)
+
+  def experimental_as_proto(self) -> tensor_shape_pb2.TensorShapeProto:
+    """Returns a proto representation of the TensorShape instance."""
+    return self.as_proto()
+
   # TODO(b/216206374): Consider deprecation at TraceType release.
   def is_compatible_with(self, other):
     """Returns True iff `self` is compatible with `other`.
@@ -1451,6 +1489,8 @@ class TensorShape(trace.TraceType):
   def __concat__(self, other):
     return self.concatenate(other)
 
+trace_type.register_serializable(TensorShape)
+
 
 def as_shape(shape):
   """Converts the given object to a TensorShape."""
@@ -1484,6 +1524,7 @@ def unknown_shape(rank=None, **kwargs):
 
 
 TensorShape._v2_behavior = True
+
 class TensorShapePb2:
   def __init__(self):
     class _dummy:

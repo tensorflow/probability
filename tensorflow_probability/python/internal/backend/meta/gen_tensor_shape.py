@@ -26,6 +26,7 @@ FLAGS = flags.FLAGS
 
 COMMENT_OUT = [
     'from tensorflow.core.framework import tensor_shape_pb2',
+    'from tensorflow.core.function import trace_type',
     'from tensorflow.python import tf2',
     'from tensorflow.python.eager import monitoring',
     ('from tensorflow.python.platform '
@@ -38,14 +39,36 @@ PREAMBLE = """
 \"\"\"TensorShape, for numpy & jax.\"\"\"
 from absl import logging
 
+
 class Monitoring(object):
   def __getattr__(self, name):
     return lambda *args, **kwargs: ()
 monitoring = Monitoring()
 
-class Trace(object):
-  TraceType = object
-trace = Trace()
+
+class TraceType:
+  pass
+
+
+class Serializable:
+  pass
+
+
+class trace:
+  pass
+
+
+class trace_type:
+  register_serializable = lambda *args, **kwargs: None
+
+
+setattr(trace, "TraceType", TraceType)
+setattr(trace_type, "Serializable", Serializable)
+
+
+class tensor_shape_pb2:
+  TensorShapeProto = object
+
 
 def tf_export(*args, **kwargs):
   return lambda f: f
@@ -54,6 +77,7 @@ def tf_export(*args, **kwargs):
 
 POSTAMBLE = """
 TensorShape._v2_behavior = True
+
 class TensorShapePb2:
   def __init__(self):
     class _dummy:
