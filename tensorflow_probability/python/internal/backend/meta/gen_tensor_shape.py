@@ -66,8 +66,12 @@ setattr(trace, "TraceType", TraceType)
 setattr(trace_type, "Serializable", Serializable)
 
 
-class tensor_shape_pb2:
-  TensorShapeProto = object
+class TensorShapePb2:
+  def __init__(self):
+    class _dummy:
+      pass
+    self.TensorShapeProto = _dummy
+tensor_shape_pb2 = TensorShapePb2()
 
 
 def tf_export(*args, **kwargs):
@@ -77,13 +81,6 @@ def tf_export(*args, **kwargs):
 
 POSTAMBLE = """
 TensorShape._v2_behavior = True
-
-class TensorShapePb2:
-  def __init__(self):
-    class _dummy:
-      pass
-    self.TensorShapeProto = _dummy
-tensor_shape_pb2 = TensorShapePb2()
 """
 
 
