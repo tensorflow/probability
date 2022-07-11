@@ -398,8 +398,9 @@ class JointDistributionNamedAutoBatched(
     """Construct the `JointDistributionNamedAutoBatched` distribution.
 
     Args:
-      model: A generator that yields a sequence of `tfd.Distribution`-like
-        instances.
+      model: Python `dict`, `collections.OrderedDict`, or `namedtuple` of
+        distribution-making functions each with required args corresponding
+        only to other keys.
       batch_ndims: `int` `Tensor` number of batch dimensions. The `batch_shape`s
         of all component distributions must be such that the prefixes of
         length `batch_ndims` broadcast to a consistent joint batch shape.
@@ -543,8 +544,9 @@ class JointDistributionSequentialAutoBatched(
     """Construct the `JointDistributionSequentialAutoBatched` distribution.
 
     Args:
-      model: A generator that yields a sequence of `tfd.Distribution`-like
-        instances.
+      model: Python list of either tfd.Distribution instances and/or
+        lambda functions which take the `k` previous distributions and returns a
+        new tfd.Distribution instance.
       batch_ndims: `int` `Tensor` number of batch dimensions. The `batch_shape`s
         of all component distributions must be such that the prefixes of
         length `batch_ndims` broadcast to a consistent joint batch shape.
