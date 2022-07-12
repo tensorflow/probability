@@ -317,14 +317,7 @@ class HalfNormalTest(test_util.TestCase):
     true_kl = (np.log(b_scale) - np.log(a_scale) +
                (a_scale ** 2 - b_scale ** 2) / (2 * b_scale ** 2))
 
-    kl = tfd.kl_divergence(a, b)
-
-    x = a.sample(int(6e5), seed=test_util.test_seed(hardcoded_seed=0))
-    kl_samples = a.log_prob(x) - b.log_prob(x)
-
-    kl_, kl_samples_ = self.evaluate([kl, kl_samples])
-    self.assertAllClose(kl_, true_kl, atol=2e-15)
-    self.assertAllMeansClose(kl_samples_, true_kl, axis=0, atol=0., rtol=8e-2)
+    self.assertAllClose(true_kl, tfd.kl_divergence(a, b), atol=2e-15)
 
     zero_kl = tfd.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
