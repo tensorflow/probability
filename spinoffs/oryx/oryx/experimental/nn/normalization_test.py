@@ -233,8 +233,9 @@ class GradTest(test_util.TestCase):
     self.assertGreater(mse(initial_network.state.moving_var,
                            new_network.state.moving_var),
                        0.0)
-    final_network = new_network.replace(params=jax.tree_util.tree_multimap(
-        lambda w, g: w - 0.1 * g, network.params, grads.params))
+    final_network = new_network.replace(
+        params=jax.tree_util.tree_map(lambda w, g: w - 0.1 * g, network.params,
+                                      grads.params))
     final_loss, final_network = reconstruct_loss(final_network, x0)
     self.assertLess(final_loss, initial_loss)
     self.assertGreater(mse(new_network.state.moving_mean,

@@ -276,8 +276,9 @@ class GradTest(absltest.TestCase):
     initial_loss = reconstruct_loss(network, x0)
     grads = grad_fn(network, x0)
     self.assertGreater(initial_loss, 0.0)
-    network = network.replace(params=jax.tree_util.tree_multimap(
-        lambda w, g: w - 0.1 * g, network.params, grads.params))
+    network = network.replace(
+        params=jax.tree_util.tree_map(lambda w, g: w - 0.1 * g, network.params,
+                                      grads.params))
     final_loss = reconstruct_loss(network, x0)
     self.assertLess(final_loss, initial_loss)
 
@@ -293,8 +294,9 @@ class GradTest(absltest.TestCase):
     initial_loss = reconstruct_loss(network, x0, rng=net_rng)
     grads = grad_fn(network, x0, rng=net_rng)
     self.assertGreater(initial_loss, 0.0)
-    network = network.replace(params=jax.tree_util.tree_multimap(
-        lambda w, g: w - 0.1 * g, network.params, grads.params))
+    network = network.replace(
+        params=jax.tree_util.tree_map(lambda w, g: w - 0.1 * g, network.params,
+                                      grads.params))
     final_loss = reconstruct_loss(network, x0, rng=net_rng)
     self.assertEqual(final_loss, initial_loss)
 

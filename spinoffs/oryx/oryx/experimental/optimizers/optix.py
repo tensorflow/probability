@@ -30,7 +30,7 @@ import jax.numpy as jnp
 from oryx.core import primitive
 from oryx.core import state
 
-tree_map = tree_util.tree_multimap
+tree_map = tree_util.tree_map
 tree_leaves = tree_util.tree_leaves
 tree_structure = tree_util.tree_structure
 tree_unflatten = tree_util.tree_unflatten

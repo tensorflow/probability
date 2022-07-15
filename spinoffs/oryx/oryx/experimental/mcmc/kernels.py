@@ -55,7 +55,7 @@ def random_walk(scale=1.) -> Program:
               reinterpreted_batch_ndims=np.ndim(state)))(
                   key)
 
-    return tree_util.tree_multimap(_sample, keys, state)
+    return tree_util.tree_map(_sample, keys, state)
 
   return step
 
@@ -88,8 +88,8 @@ def metropolis(unnormalized_log_prob: LogProbFunction,
     accept_prob = np.clip(np.exp(log_unclipped_accept_prob), 0., 1.)
     u = primitive.tie_in(accept_prob, random.uniform(accept_key))
     accept = np.log(u) < log_unclipped_accept_prob
-    return tree_util.tree_multimap(lambda n, s: np.where(accept, n, s),
-                                   next_state, state)
+    return tree_util.tree_map(lambda n, s: np.where(accept, n, s), next_state,
+                              state)
 
   return step
 
@@ -129,8 +129,8 @@ def metropolis_hastings(unnormalized_log_prob: LogProbFunction,
     accept_prob = np.clip(np.exp(log_unclipped_accept_prob), 0., 1.)
     u = primitive.tie_in(accept_prob, random.uniform(accept_key))
     accept = np.log(u) < log_unclipped_accept_prob
-    return tree_util.tree_multimap(lambda n, s: np.where(accept, n, s),
-                                   next_state, state)
+    return tree_util.tree_map(lambda n, s: np.where(accept, n, s), next_state,
+                              state)
 
   return step
 
@@ -145,14 +145,14 @@ def hmc(unnormalized_log_prob: LogProbFunction,
     # TODO(sharadmv): add gradients to the state to avoid recalculation.
     def leapfrog(carry, _):
       state, momentum = carry
-      momentum = tree_util.tree_multimap(lambda m, g: m + 0.5 * step_size * g,
-                                         momentum,
-                                         jax.grad(unnormalized_log_prob)(state))
-      state = tree_util.tree_multimap(lambda s, m: s + step_size * m, state,
-                                      momentum)
-      momentum = tree_util.tree_multimap(lambda m, g: m + 0.5 * step_size * g,
-                                         momentum,
-                                         jax.grad(unnormalized_log_prob)(state))
+      momentum = tree_util.tree_map(lambda m, g: m + 0.5 * step_size * g,
+                                    momentum,
+                                    jax.grad(unnormalized_log_prob)(state))
+      state = tree_util.tree_map(lambda s, m: s + step_size * m, state,
+                                 momentum)
+      momentum = tree_util.tree_map(lambda m, g: m + 0.5 * step_size * g,
+                                    momentum,
+                                    jax.grad(unnormalized_log_prob)(state))
       return (state, momentum), ()
 
     # Use scan since it's differentiable
@@ -171,7 +171,7 @@ def hmc(unnormalized_log_prob: LogProbFunction,
             bd.Sample(bd.Normal(0., 1.),  # pytype: disable=module-attr
                       sample_shape=s.shape))(key).astype(s.dtype)
 
-      return tree_util.tree_multimap(_sample, momentum_keys, state)
+      return tree_util.tree_map(_sample, momentum_keys, state)
 
     momentum = momentum_distribution(momentum_key)
 

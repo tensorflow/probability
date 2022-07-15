@@ -314,7 +314,8 @@ class FunctionTest(test_util.TestCase):
     g = jax.grad(loss)(net, jnp.ones(5))
     def add(x, y):
       return x + y
-    net = tree_util.tree_multimap(add, net, g)
+
+    net = tree_util.tree_map(add, net, g)
     # w_new = w_old + 5
     np.testing.assert_array_equal(net(jnp.ones(5)), 6 * jnp.ones(5))
 
@@ -327,7 +328,8 @@ class FunctionTest(test_util.TestCase):
     g = jax.grad(loss)(net, jnp.ones(5))
     def add(x, y):
       return x + y
-    net = tree_util.tree_multimap(add, net, g)
+
+    net = tree_util.tree_map(add, net, g)
     # w_new = w_old + 5
     np.testing.assert_array_equal(net(jnp.ones(5)), 2 * jnp.ones(5))
 
@@ -341,7 +343,8 @@ class FunctionTest(test_util.TestCase):
     g = jax.grad(loss)(net, jnp.ones(5))
     def add(x, y):
       return x + y
-    net = tree_util.tree_multimap(add, net, g)
+
+    net = tree_util.tree_map(add, net, g)
     # w_new = w_old + 5
     np.testing.assert_array_equal(net(jnp.ones(5)), 6 * jnp.ones(5))
 
@@ -356,14 +359,15 @@ class FunctionTest(test_util.TestCase):
     g = jax.grad(loss)(net, jnp.ones(5))
     def add(x, y):
       return x + y
-    net = tree_util.tree_multimap(add, net, g)
+
+    net = tree_util.tree_map(add, net, g)
     # w_new = w_old + 5
     np.testing.assert_array_equal(net(jnp.ones(5)), 6 * jnp.ones(5))
     net = net.update(jnp.ones(5))
     np.testing.assert_array_equal(net(jnp.ones(5)), 7 * jnp.ones(5))
 
     g = jax.grad(loss)(net, jnp.ones(5))
-    net = tree_util.tree_multimap(add, net, g)
+    net = tree_util.tree_map(add, net, g)
     # w_new = w_old + 5
     np.testing.assert_array_equal(net(jnp.ones(5)), 12 * jnp.ones(5))
 
@@ -393,7 +397,8 @@ class FunctionTest(test_util.TestCase):
     g = jax.grad(loss)(net, jnp.ones(()))
     def add(x, y):
       return x + y
-    net = tree_util.tree_multimap(add, net, g)
+
+    net = tree_util.tree_map(add, net, g)
     np.testing.assert_array_equal(net(jnp.ones(())), 36.)
 
   def test_update(self):
