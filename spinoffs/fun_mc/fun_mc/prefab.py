@@ -583,6 +583,7 @@ def step_size_adaptation_step(
     min_log_accept_prob: 'fun_mc.FloatTensor' = np.log(1e-5),
     reduce_fn: 'Callable[[fun_mc.FloatTensor], fun_mc.FloatTensor]' = (
         tfp.math.reduce_logmeanexp),
+    opt_kwargs: 'Optional[Dict[str, Any]]' = None,
 ) -> 'Tuple[StepSizeAdaptationState, StepSizeAdaptationExtra]':
   """Gradient based step size adaptation using ADAM.
 
@@ -604,11 +605,13 @@ def step_size_adaptation_step(
       numerical stability.
     reduce_fn: A function that reduces `log_accept_ratio` in log-space. By
       default, this computes the log-mean-exp.
+    opt_kwargs: Additional arguments to pass to the optimizer.
 
   Returns:
     step_size_adaptation_state: `StepSizeAdaptationState`
     step_size_adaptation_extra: `StepSizeAdaptationExtra`
   """
+  opt_kwargs = {} if opt_kwargs is None else opt_kwargs
   dtype = log_accept_ratio.dtype
   adaptation_rate = tf.convert_to_tensor(adaptation_rate, dtype=dtype)
   target_accept_prob = tf.convert_to_tensor(target_accept_prob, dtype=dtype)
@@ -638,7 +641,7 @@ def step_size_adaptation_step(
 
   # Optimize step size.
   opt_state, opt_extra = fun_mc.adam_step(state.opt_state, loss_fn,
-                                          adaptation_rate)
+                                          adaptation_rate, **opt_kwargs)
 
   # Do iterate averaging.
   old_rms_state = state.rms_state
