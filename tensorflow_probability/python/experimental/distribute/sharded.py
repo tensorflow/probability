@@ -39,7 +39,7 @@ def _implement_sharded_lp_fn(fn_name):
   return lp_fn
 
 
-class Sharded(distribution_lib.Distribution):
+class Sharded(distribution_lib.AutoCompositeTensorDistribution):
   """A meta-distribution meant for use in an SPMD distributed context.
 
   `Sharded` is a meta-distribution that enables distributions to be used in SPMD
@@ -75,6 +75,9 @@ class Sharded(distribution_lib.Distribution):
         Default value: `None` (i.e., `'Sharded' + distribution.name`).
     """
     parameters = dict(locals())
+
+    if not isinstance(distribution, tf.__internal__.CompositeTensor):
+      raise ValueError('`distribution` must be a `CompositeTensor`.')
 
     if shard_axis_name is None:
       if JAX_MODE:

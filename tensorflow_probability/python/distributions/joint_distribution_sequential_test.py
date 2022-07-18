@@ -787,6 +787,57 @@ class JointDistributionSequentialTest(test_util.TestCase):
     model.sample([2], seed=test_util.test_seed())
     self.assertLen(model_traces, 3)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX have no notion of CompositeTensor.')
+  def testCompositeTensor(self):
+    d = tfd.JointDistributionSequential(
+        tuple([
+            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+            lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+            tfd.Normal(loc=0, scale=2.),
+            tfd.Normal,  # Or, `lambda loc, scale: tfd.Normal(loc, scale)`.
+            lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12),
+        ]),
+        validate_args=True)
+
+    flat = tf.nest.flatten(d, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        d, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfd.JointDistributionSequential)
+    self.assertIs(type(d.model), type(unflat.model))
+
+    x = self.evaluate(d.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(d.log_prob(x))
+
+    self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
+
+    @tf.function
+    def call_log_prob(d):
+      return d.log_prob(x)
+    self.assertAllClose(actual, call_log_prob(d))
+    self.assertAllClose(actual, call_log_prob(unflat))
+
+    encodable_jd = tfd.JointDistributionSequential(  # no lambdas
+        [
+            tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+            tfd.Normal(loc=0, scale=2.),
+            tfd.Sample(tfd.Bernoulli(logits=0.), 12),
+        ],
+        validate_args=True)
+
+    enc = tf.__internal__.saved_model.encode_structure(encodable_jd._type_spec)
+    dec = tf.__internal__.saved_model.decode_proto(enc)
+    self.assertEqual(dec, encodable_jd._type_spec)
+
+    non_ct_jd = tfd.JointDistributionSequential(
+        [
+            tfd.Normal(loc=0., scale=1.),
+            test_util.NonCompositeTensorExp()(tfd.Normal(loc=0., scale=1.)),
+        ],
+        validate_args=True)
+    self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)
+
 
 class ResolveDistributionNamesTest(test_util.TestCase):
 

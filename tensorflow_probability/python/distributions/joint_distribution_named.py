@@ -16,7 +16,10 @@
 
 import collections
 
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import joint_distribution_sequential
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 
 
@@ -25,8 +28,8 @@ __all__ = [
 ]
 
 
-class JointDistributionNamed(
-    joint_distribution_sequential.JointDistributionSequential):
+class _JointDistributionNamed(
+    joint_distribution_sequential._JointDistributionSequential):  # pylint: disable=protected-access
   """Joint distribution parameterized by named distribution-making functions.
 
   This distribution enables both sampling and joint probability computation from
@@ -150,6 +153,12 @@ class JointDistributionNamed(
   structure of `TensorShape`s for each of the distributions' batch shapes and
   `joint.event_shape_tensor()` returns a structure of `Tensor`s for each of the
   distributions' event shapes.
+
+  **Note**: If a `JointDistributionNamed` instance contains a `callable` that
+  closes over a `Tensor`, the `JointDistributionNamed` cannot cross the boundary
+  of a `tf.function`. (If this behavior is necessary, an instance of
+  `_JointDistributionNamed` may be used instead, at the expense of extra
+  `tf.function` retracing.)
 
   #### Vectorized sampling and model evaluation
 
@@ -308,7 +317,7 @@ class JointDistributionNamed(
       name: The name for ops managed by the distribution.
         Default value: `None` (i.e., `"JointDistributionNamed"`).
     """
-    super(JointDistributionNamed, self).__init__(
+    super(_JointDistributionNamed, self).__init__(
         model,
         batch_ndims=batch_ndims,
         use_vectorized_map=use_vectorized_map,
@@ -445,3 +454,110 @@ def _convert_to_dict(x):
     # order (by default, they convert to just `dict` in Python 3.8+).
     return collections.OrderedDict(x._asdict())
   return dict(x)
+
+
+class JointDistributionNamed(_JointDistributionNamed,
+                             tf.__internal__.CompositeTensor):
+
+  def __new__(cls, *args, **kwargs):
+    """Returns a `_JointDistributionNamed` if `model` contains non-CT dists."""
+    if args:
+      model = args[0]
+    else:
+      model = kwargs.get('model')
+
+    if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
+               for d in tf.nest.flatten(model)):
+      return _JointDistributionNamed(*args, **kwargs)
+    return super(JointDistributionNamed, cls).__new__(cls)
+
+  @property
+  def _type_spec(self):
+    return _JointDistributionNamedSpec.from_instance(self)
+
+  def _convert_variables_to_tensors(self):
+    return auto_composite_tensor.convert_variables_to_tensors(self)
+
+
+@auto_composite_tensor.type_spec_register(
+    'tfp.distributions.JointDistributionNamedSpec')
+class _JointDistributionNamedSpec(
+    auto_composite_tensor._AutoCompositeTensorTypeSpec):  # pylint: disable=protected-access
+  """Type spec for `JointDistributionNamed`."""
+
+  @property
+  def value_type(self):
+    return JointDistributionNamed
+
+  def _to_components(self, obj):
+    if self._callable_params:
+      components = []
+      for d in tf.nest.flatten(obj.model):
+        if isinstance(d, tf.__internal__.CompositeTensor):
+          components.append(d)
+    else:
+      components = obj.model
+    return dict(model=components)
+
+  def _from_components(self, components):
+    if self._callable_params:
+      model_components = []
+      i = 0
+      for c in tf.nest.flatten(self._structure_with_callables):
+        if c is None:
+          model_components.append(components['model'][i])
+          i += 1
+        else:
+          model_components.append(c)
+
+      model = tf.nest.pack_sequence_as(
+          self._structure_with_callables, model_components)
+    else:
+      model = components['model']
+    return self.value_type(model, **self._non_tensor_params)
+
+  @classmethod
+  def from_instance(cls, obj):
+    model_param_specs, callable_model_params = [], []
+    for d in tf.nest.flatten(obj.model):
+      if isinstance(d, tf.__internal__.CompositeTensor):
+        model_param_specs.append(d._type_spec)  # pylint: disable=protected-access
+      else:
+        callable_model_params.append(d)
+    non_tensor_params = {k: v for k, v in obj.parameters.items()
+                         if k != 'model'}
+
+    if callable_model_params:
+      callable_params = dict(model=callable_model_params)
+      param_specs = dict(model=model_param_specs)
+    else:
+      callable_params = None
+      param_specs = dict(
+          model=tf.nest.pack_sequence_as(obj.model, model_param_specs))
+
+    spec = cls(
+        param_specs=param_specs,
+        non_tensor_params=non_tensor_params,
+        non_identifying_kwargs=('name',),
+        omit_kwargs=('parameters',),
+        prefer_static_value=('batch_ndims',),
+        callable_params=callable_params)
+
+    if callable_params:
+      # Store the nested structure of `model` so that it can be reconstituted in
+      # `_from_components`. If the typespec is built by `_deserialize`, this
+      # attribute will not exist -- however, the type spec serializable only if
+      # there are no callable elements of `model`, in which case the nested
+      # structure of `model` is recorded in `param_specs`.
+      structure_with_callables = tf.nest.map_structure(
+          lambda x: (None if isinstance(x, tf.__internal__.CompositeTensor)  # pylint: disable=g-long-lambda
+                     else x),
+          obj.model)
+      spec._structure_with_callables = structure_with_callables
+    return spec
+
+
+JointDistributionNamed.__doc__ = _JointDistributionNamed.__doc__ + (
+    '\nIf every element of `model` is a `CompositeTensor` or a callable, the '
+    'resulting `JointDistributionNamed` is a `CompositeTensor`. Otherwise, '
+    'a non-`CompositeTensor` `_JointDistributionNamed` instance is created.')

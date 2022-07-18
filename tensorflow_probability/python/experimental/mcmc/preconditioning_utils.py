@@ -19,7 +19,6 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import reshape
 from tensorflow_probability.python.distributions import batch_broadcast
-from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution_named as jdn
 from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
 from tensorflow_probability.python.distributions import transformed_distribution
@@ -36,32 +35,6 @@ __all__ = [
 
 JAX_MODE = False
 NUMPY_MODE = False
-
-# TODO(b/182603117): Remove this block once distributions are auto-composite.
-if JAX_MODE or NUMPY_MODE:
-  _CompositeJointDistributionSequential = jds.JointDistributionSequential
-  _CompositeShardedJointDistributionSequential = sharded_jd_lib.JointDistributionSequential
-  _CompositeMultivariateNormalPrecisionFactorLinearOperator = mvn_pfl.MultivariateNormalPrecisionFactorLinearOperator
-  _CompositeIndependent = independent.Independent
-  _CompositeTransformedDistribution = transformed_distribution.TransformedDistribution
-
-else:
-  from tensorflow_probability.python.internal import auto_composite_tensor  # pylint: disable=g-import-not-at-top
-
-  # Add auto-composite tensors to the global namespace to avoid creating new
-  # classes inside functions.
-  _CompositeJointDistributionSequential = auto_composite_tensor.auto_composite_tensor(
-      jds.JointDistributionSequential, omit_kwargs=('name',))
-  _CompositeShardedJointDistributionSequential = auto_composite_tensor.auto_composite_tensor(
-      sharded_jd_lib.JointDistributionSequential, omit_kwargs=('name',))
-  _CompositeMultivariateNormalPrecisionFactorLinearOperator = auto_composite_tensor.auto_composite_tensor(
-      mvn_pfl.MultivariateNormalPrecisionFactorLinearOperator,
-      omit_kwargs=('name',))
-  _CompositeIndependent = auto_composite_tensor.auto_composite_tensor(
-      independent.Independent, omit_kwargs=('name',))
-  _CompositeTransformedDistribution = auto_composite_tensor.auto_composite_tensor(
-      transformed_distribution.TransformedDistribution,
-      omit_kwargs=('name', 'kwargs_split_fn', 'parameters'))
 
 
 def make_momentum_distribution(state_parts, batch_shape,
@@ -104,11 +77,11 @@ def make_momentum_distribution(state_parts, batch_shape,
     variance_flattened = tf.reshape(
         variance_tiled, ps.concat([batch_shape, [nevt]], axis=0))
 
-    distribution = _CompositeTransformedDistribution(
+    distribution = transformed_distribution.TransformedDistribution(
         bijector=reshape.Reshape(
             event_shape_out=event_shape,
             name='reshape_mvnpfl'),
-        distribution=(_CompositeMultivariateNormalPrecisionFactorLinearOperator(
+        distribution=(mvn_pfl.MultivariateNormalPrecisionFactorLinearOperator(
             precision_factor=tf.linalg.LinearOperatorDiag(
                 tf.math.sqrt(variance_flattened)),
             precision=tf.linalg.LinearOperatorDiag(variance_flattened),
@@ -117,9 +90,9 @@ def make_momentum_distribution(state_parts, batch_shape,
       distribution = sharded.Sharded(distribution, shard_axis_name=shard_axes)
     distributions.append(distribution)
   if use_sharded_jd:
-    jd = _CompositeShardedJointDistributionSequential(distributions)
+    jd = sharded_jd_lib.JointDistributionSequential(distributions)
   else:
-    jd = _CompositeJointDistributionSequential(distributions)
+    jd = jds.JointDistributionSequential(distributions)
   return maybe_make_list_and_batch_broadcast(jd, batch_shape)
 
 
@@ -143,16 +116,14 @@ def update_momentum_distribution(momentum_distribution,
         'State size mismatch: '
         f'{len(running_variance_parts)} vs {len(momentum_distribution.model)}')
   for var, bb in zip(running_variance_parts, momentum_distribution.model):
-    # TODO(b/182603117): Check public BatchBroadcast when Sharded is
-    # guaranteed to be CompositeTensor.
-    if not isinstance(bb, batch_broadcast._BatchBroadcast):  # pylint: disable=protected-access
+    if not isinstance(bb, batch_broadcast.BatchBroadcast):
       raise ValueError(f'Part dist is not a BatchBroadcast: {bb}')
     td = bb.distribution
     is_sharded, shard_axes = False, None
     if isinstance(td, sharded.Sharded):
       is_sharded, shard_axes = True, td.experimental_shard_axis_names
       td = td.distribution
-    if not isinstance(td, transformed_distribution._TransformedDistribution):  # pylint:disable=protected-access
+    if not isinstance(td, transformed_distribution.TransformedDistribution):
       raise ValueError(f'Inner dist is not a TransformedDistribution: {td}')
     mvnpfl = td.distribution
     if not isinstance(
@@ -178,15 +149,13 @@ def update_momentum_distribution(momentum_distribution,
 def maybe_make_list_and_batch_broadcast(momentum_distribution, batch_shape):
   """Makes the distribution list-like and batched, if possible."""
   if not mcmc_util.is_list_like(momentum_distribution.dtype):
-    momentum_distribution = _CompositeJointDistributionSequential(
+    momentum_distribution = jds.JointDistributionSequential(
         [momentum_distribution], name='joint_momentum')
   if (isinstance(momentum_distribution, jds.JointDistributionSequential) and
       not isinstance(momentum_distribution, jdn.JointDistributionNamed) and
       # Skip this step if we already batch broadcast.
-      # TODO(b/182603117): Check public BatchBroadcast when JDS/JDN is
-      # CompositeTensor.
       not all(
-          isinstance(md, batch_broadcast._BatchBroadcast)  # pylint: disable=protected-access
+          isinstance(md, batch_broadcast.BatchBroadcast)
           for md in momentum_distribution.model) and
       not any(callable(dist_fn) for dist_fn in momentum_distribution.model)):
     momentum_distribution = momentum_distribution.copy(model=[

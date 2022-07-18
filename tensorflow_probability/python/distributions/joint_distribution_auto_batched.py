@@ -14,9 +14,12 @@
 # ============================================================================
 """Joint distributions with inferred batch semantics."""
 
+import tensorflow.compat.v2 as tf
+
 from tensorflow_probability.python.distributions import joint_distribution_coroutine
 from tensorflow_probability.python.distributions import joint_distribution_named
 from tensorflow_probability.python.distributions import joint_distribution_sequential
+from tensorflow_probability.python.internal import auto_composite_tensor
 
 
 class JointDistributionCoroutineAutoBatched(
@@ -285,8 +288,8 @@ class JointDistributionCoroutineAutoBatched(
 
 
 # TODO(b/159723894): Reduce complexity by eliminating use of mixins.
-class JointDistributionNamedAutoBatched(
-    joint_distribution_named.JointDistributionNamed):
+class _JointDistributionNamedAutoBatched(
+    joint_distribution_named._JointDistributionNamed):  # pylint: disable=protected-access
   """Joint distribution parameterized by named distribution-making functions.
 
   This class provides automatic vectorization and alternative semantics for
@@ -423,7 +426,7 @@ class JointDistributionNamedAutoBatched(
         Default value: `None` (i.e., `JointDistributionNamed`).
     """
     parameters = dict(locals())
-    super(JointDistributionNamedAutoBatched, self).__init__(
+    super(_JointDistributionNamedAutoBatched, self).__init__(
         model, batch_ndims=batch_ndims, use_vectorized_map=use_vectorized_map,
         validate_args=validate_args,
         experimental_use_kahan_sum=experimental_use_kahan_sum,
@@ -431,8 +434,8 @@ class JointDistributionNamedAutoBatched(
     self._parameters = self._no_dependency(parameters)
 
 
-class JointDistributionSequentialAutoBatched(
-    joint_distribution_sequential.JointDistributionSequential):
+class _JointDistributionSequentialAutoBatched(
+    joint_distribution_sequential._JointDistributionSequential):  # pylint: disable=protected-access
   """Joint distribution parameterized by distribution-making functions.
 
   This class provides automatic vectorization and alternative semantics for
@@ -569,9 +572,97 @@ class JointDistributionSequentialAutoBatched(
         Default value: `None` (i.e., `JointDistributionSequential`).
     """
     parameters = dict(locals())
-    super(JointDistributionSequentialAutoBatched, self).__init__(
+    super(_JointDistributionSequentialAutoBatched, self).__init__(
         model, batch_ndims=batch_ndims, use_vectorized_map=use_vectorized_map,
         validate_args=validate_args,
         experimental_use_kahan_sum=experimental_use_kahan_sum,
         name=name or 'JointDistributionSequentialAutoBatched')
     self._parameters = self._no_dependency(parameters)
+
+
+class JointDistributionSequentialAutoBatched(
+    _JointDistributionSequentialAutoBatched, tf.__internal__.CompositeTensor):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe returns a `_JointDistributionSequentialAutobatched`."""
+    if args:
+      model = args[0]
+    else:
+      model = kwargs.get('model')
+
+    # Return a `_JointDistributionSequentialAutoBatched` instance if `model`
+    # contains distributions that are not CompositeTensors.
+    if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
+               for d in model):
+      return _JointDistributionSequentialAutoBatched(*args, **kwargs)
+    return super(JointDistributionSequentialAutoBatched, cls).__new__(cls)
+
+  @property
+  def _type_spec(self):
+    return _JointDistributionSequentialAutoBatchedSpec.from_instance(self)
+
+  def _convert_variables_to_tensors(self):
+    return auto_composite_tensor.convert_variables_to_tensors(self)
+
+
+@auto_composite_tensor.type_spec_register(
+    'tfp.distributions.JointDistributionSequentialAutoBatchedSpec')
+class _JointDistributionSequentialAutoBatchedSpec(
+    joint_distribution_sequential._JointDistributionSequentialSpec):  # pylint: disable=protected-access
+  """Type spec for `JointDistributionSequentialAutoBatched`."""
+
+  @property
+  def value_type(self):
+    return JointDistributionSequentialAutoBatched
+
+
+class JointDistributionNamedAutoBatched(
+    _JointDistributionNamedAutoBatched, tf.__internal__.CompositeTensor):
+
+  def __new__(cls, *args, **kwargs):
+    """Maybe returns a `_JointDistributionNamedAutoBatched`."""
+    if args:
+      model = args[0]
+    else:
+      model = kwargs.get('model')
+
+    # Return a `_JointDistributionNamedAutoBatched` instance if `model` contains
+    # distributions that are not CompositeTensors.
+    if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
+               for d in tf.nest.flatten(model)):
+      return _JointDistributionNamedAutoBatched(*args, **kwargs)
+    return super(JointDistributionNamedAutoBatched, cls).__new__(cls)
+
+  @property
+  def _type_spec(self):
+    return _JointDistributionNamedAutoBatchedSpec.from_instance(self)
+
+  def _convert_variables_to_tensors(self):
+    return auto_composite_tensor.convert_variables_to_tensors(self)
+
+
+@auto_composite_tensor.type_spec_register(
+    'tfp.distributions.JointDistributionNamedAutoBatchedSpec')
+class _JointDistributionNamedAutoBatchedSpec(
+    joint_distribution_named._JointDistributionNamedSpec):  # pylint: disable=protected-access
+  """Type spec for `JointDistributionNamedAutoBatched`."""
+
+  @property
+  def value_type(self):
+    return JointDistributionNamedAutoBatched
+
+
+JointDistributionSequentialAutoBatched.__doc__ = (
+    _JointDistributionSequentialAutoBatched.__doc__ + (
+        '\nIf every element of `model` is a `CompositeTensor` or a callable, '
+        'the resulting `JointDistributionSequentialAutoBatched` is a '
+        '`CompositeTensor`. Otherwise, a non-`CompositeTensor` '
+        '`_JointDistributionSequentialAutoBatched` instance is created.'))
+
+
+JointDistributionNamedAutoBatched.__doc__ = (
+    _JointDistributionNamedAutoBatched.__doc__ + (
+        '\nIf every element of `model` is a `CompositeTensor` or a callable, '
+        ' the resulting `JointDistributionNamedAutoBatched` is a '
+        ' `CompositeTensor`. Otherwise, a non-`CompositeTensor` '
+        '`_JointDistributionNamedAutoBatched` instance is created.'))

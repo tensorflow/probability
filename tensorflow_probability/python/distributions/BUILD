@@ -1054,9 +1054,7 @@ multi_substrate_py_library(
         ":joint_distribution_named",
         ":joint_distribution_sequential",
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:assert_util",
-        "//tensorflow_probability/python/internal:prefer_static",
-        "//tensorflow_probability/python/util:seed_stream",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
     ],
 )
 
@@ -1064,6 +1062,7 @@ multi_substrate_py_library(
     name = "joint_distribution_coroutine",
     srcs = ["joint_distribution_coroutine.py"],
     deps = [
+        ":distribution",
         ":joint_distribution",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
@@ -1078,6 +1077,8 @@ multi_substrate_py_library(
     srcs = ["joint_distribution_named.py"],
     deps = [
         ":joint_distribution_sequential",
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
@@ -1090,6 +1091,7 @@ multi_substrate_py_library(
         ":kullback_leibler",
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/util:seed_stream",
     ],
@@ -2117,6 +2119,7 @@ multi_substrate_py_library(
         ":kullback_leibler",
         ":log_prob_ratio",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensorshape_util",

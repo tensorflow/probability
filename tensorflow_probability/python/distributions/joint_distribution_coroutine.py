@@ -19,6 +19,7 @@ import warnings
 
 import tensorflow.compat.v2 as tf
 
+from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 
 from tensorflow_probability.python.internal import structural_tuple
@@ -40,7 +41,9 @@ warnings.filterwarnings(
     append=True)  # Don't override user-set filters.
 
 
-class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
+class JointDistributionCoroutine(
+    joint_distribution_lib.JointDistribution,
+    distribution_lib.AutoCompositeTensorDistribution):
   """Joint distribution parameterized by a distribution-making generator.
 
   This distribution enables both sampling and joint probability computation from
@@ -195,6 +198,10 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
   `([3], [3])`. Such structured batch shapes will be deprecated in the future,
   since they are inconsistent with the definition of batch shapes used
   elsewhere in TFP.
+
+  **Note**: If `model_fn` closes over a `Tensor`, the
+  `JointDistributionCoroutine` instance cannot cross the boundary of a
+  `tf.function`.
 
   #### Examples
 
@@ -360,3 +367,6 @@ class JointDistributionCoroutine(joint_distribution_lib.JointDistribution):
       return tuple((xs[k] for k in self._flat_resolve_names())
                    if isinstance(xs, collections.abc.Mapping) else xs)
     return nest.flatten_up_to(self._sample_dtype, xs)
+
+  _composite_tensor_shape_params = ('batch_ndims',)
+  _composite_tensor_nonshape_params = ()

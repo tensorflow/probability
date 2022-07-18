@@ -770,12 +770,7 @@ class GaussianProcess(
         non_identifying_kwargs=('name',))
 
   def _convert_variables_to_tensors(self):
-    # pylint: disable=protected-access
-    components = self._type_spec._to_components(self)
-    tensor_components = variable_utils.convert_variables_to_tensors(
-        components)
-    return self._type_spec._from_components(tensor_components)
-    # pylint: enable=protected-access
+    return auto_composite_tensor.convert_variables_to_tensors(self)
 
 
 @auto_composite_tensor.type_spec_register(

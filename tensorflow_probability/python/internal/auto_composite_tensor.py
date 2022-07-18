@@ -659,37 +659,6 @@ def auto_composite_tensor(
   type_spec_class_name = f'{cls.__name__}_ACTTypeSpec'
   type_spec_name = f'{module_name}.{type_spec_class_name}'
 
-  def _convert_variables_to_tensors(obj):
-    """Recursively converts Variables in the AutoCompositeTensor to Tensors.
-
-    This method flattens `obj` into a nested structure of `Tensor`s or
-    `CompositeTensor`s, converts any `ResourceVariable`s (which are
-    `CompositeTensor`s) to `Tensor`s, and rebuilds `obj` with `Tensor`s in place
-    of `ResourceVariable`s.
-
-    The usage of `obj._type_spec._from_components` violates the contract of
-    `CompositeTensor`, since it is called on a different nested structure
-    (one containing only `Tensor`s) than `obj.type_spec` specifies (one that may
-    contain `ResourceVariable`s). Since `AutoCompositeTensor`'s
-    `_from_components` method passes the contents of the nested structure to
-    `__init__` to rebuild the TFP object, and any TFP object that may be
-    instantiated with `ResourceVariables` may also be instantiated with
-    `Tensor`s, this usage is valid.
-
-    Args:
-      obj: An `AutoCompositeTensor` instance.
-
-    Returns:
-      tensor_obj: `obj` with all internal `ResourceVariable`s converted to
-        `Tensor`s.
-    """
-    # pylint: disable=protected-access
-    components = obj._type_spec._to_components(obj)
-    tensor_components = variable_utils.convert_variables_to_tensors(
-        components)
-    return obj._type_spec._from_components(tensor_components)
-    # pylint: enable=protected-access
-
   # If the declared class is already a CompositeTensor subclass, we can avoid
   # affecting the actual type of the returned class. Otherwise, we need to
   # explicitly mix in the CT type, and hence create and return a newly
@@ -711,7 +680,7 @@ def auto_composite_tensor(
 
     # pylint: disable=protected-access
     cls._type_spec = property(_type_spec)
-    cls._convert_variables_to_tensors = _convert_variables_to_tensors
+    cls._convert_variables_to_tensors = convert_variables_to_tensors
     # pylint: enable=protected-access
     return cls
 
@@ -740,9 +709,41 @@ def auto_composite_tensor(
           self, omit_kwargs, non_identifying_kwargs)
 
     def _convert_variables_to_tensors(self):
-      return _convert_variables_to_tensors(self)
+      return convert_variables_to_tensors(self)
 
   _AutoCompositeTensor.__name__ = cls.__name__
   _registry[clsid] = _AutoCompositeTensor
   type_spec_register(type_spec_name)(_GeneratedCTTypeSpec)
   return _AutoCompositeTensor
+
+
+def convert_variables_to_tensors(obj):
+  """Recursively converts Variables in the AutoCompositeTensor to Tensors.
+
+  This method flattens `obj` into a nested structure of `Tensor`s or
+  `CompositeTensor`s, converts any `ResourceVariable`s (which are
+  `CompositeTensor`s) to `Tensor`s, and rebuilds `obj` with `Tensor`s in place
+  of `ResourceVariable`s.
+
+  The usage of `obj._type_spec._from_components` violates the contract of
+  `CompositeTensor`, since it is called on a different nested structure
+  (one containing only `Tensor`s) than `obj.type_spec` specifies (one that may
+  contain `ResourceVariable`s). Since `AutoCompositeTensor`'s
+  `_from_components` method passes the contents of the nested structure to
+  `__init__` to rebuild the TFP object, and any TFP object that may be
+  instantiated with `ResourceVariables` may also be instantiated with
+  `Tensor`s, this usage is valid.
+
+  Args:
+    obj: An `AutoCompositeTensor` instance.
+
+  Returns:
+    tensor_obj: `obj` with all internal `ResourceVariable`s converted to
+      `Tensor`s.
+  """
+  # pylint: disable=protected-access
+  components = obj._type_spec._to_components(obj)
+  tensor_components = variable_utils.convert_variables_to_tensors(
+      components)
+  return obj._type_spec._from_components(tensor_components)
+  # pylint: enable=protected-access

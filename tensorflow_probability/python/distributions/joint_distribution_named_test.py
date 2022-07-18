@@ -652,6 +652,65 @@ class JointDistributionNamedTest(test_util.TestCase):
         ValueError, r'Supplied both `value` and keyword arguments .*'):
       joint.sample(seed=seed, a=1., value={'a': 1})
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX have no notion of CompositeTensor.')
+  def testCompositeTensor(self):
+    d = tfd.JointDistributionNamed(dict(
+        e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
+        scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
+        loc  =          tfd.Normal(loc=0, scale=2.),
+        m    =          tfd.Normal,
+        x    =lambda m: tfd.Sample(tfd.Bernoulli(logits=m), 12)),
+                                   validate_args=True)
+
+    flat = tf.nest.flatten(d, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        d, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfd.JointDistributionNamed)
+    self.assertIs(type(d.model), type(unflat.model))
+
+    x = self.evaluate(d.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(d.log_prob(x))
+
+    self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
+
+    @tf.function
+    def call_log_prob(d):
+      return d.log_prob(x)
+    self.assertAllClose(actual, call_log_prob(d))
+    self.assertAllClose(actual, call_log_prob(unflat))
+
+    encodable_jd = tfd.JointDistributionNamed(  # No lambdas.
+        dict(
+            e    =          tfd.Independent(tfd.Exponential(rate=[10, 12]), 1),
+            loc  =          tfd.Normal(loc=0, scale=2.),
+            m    =          tfd.Normal(loc=-1., scale=1.)),
+        validate_args=True)
+
+    enc = tf.__internal__.saved_model.encode_structure(encodable_jd._type_spec)
+    dec = tf.__internal__.saved_model.decode_proto(enc)
+    flat = tf.nest.flatten(encodable_jd, expand_composites=True)
+    deserialized_flat = dec._to_components(encodable_jd)
+    unflat = tf.nest.pack_sequence_as(
+        encodable_jd, flat, expand_composites=True)
+    deserialized_unflat = dec._from_components(deserialized_flat)
+
+    self.assertEqual(dec, encodable_jd._type_spec)
+    self.assertAllEqualNested(
+        flat, tf.nest.flatten(deserialized_flat, expand_composites=True))
+    self.assertIsInstance(deserialized_unflat, tfd.JointDistributionNamed)
+    self.assertIs(type(d.model), type(deserialized_unflat.model))
+
+    non_ct_jd = tfd.JointDistributionNamed(
+        dict(
+            e    =          tfd.Normal(loc=0, scale=2.),
+            m    =          tfd.TransformedDistribution(
+                                tfd.Normal(loc=-1., scale=1.),
+                                test_util.NonCompositeTensorExp()),
+        )
+    )
+    self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)
 
 if __name__ == '__main__':
   test_util.main()

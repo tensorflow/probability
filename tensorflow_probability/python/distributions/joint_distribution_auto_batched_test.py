@@ -96,6 +96,13 @@ class JointDistributionAutoBatchedTest(test_util.TestCase):
     batch_shape = joint.batch_shape_tensor()
     self.assertAllEqual(batch_shape, [])
 
+    self.assertIsInstance(joint, tf.__internal__.CompositeTensor)
+    flat = tf.nest.flatten(joint, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        joint, flat, expand_composites=True)
+    self.assertIsInstance(unflat, jd_class)
+    self.assertIs(type(joint.model), type(unflat.model))
+
   @parameterized.named_parameters(
       *(dict(  # pylint: disable=g-complex-comprehension
           testcase_name=jd_type + '_' + sampler_type,

@@ -1439,5 +1439,32 @@ class JointDistributionCoroutineTest(test_util.TestCase):
     self.assertAllEqual(('x', 'y'), model._flat_resolve_names())
     self.assertLen(model_executions, 1)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX have no notion of CompositeTensor.')
+  def testCompositeTensor(self):
+    def model_fn():
+      c1 = yield Root(tfd.Gamma(1.2, 1.3, name='c1'))
+      c0 = yield Root(tfd.Gamma(1.4, 1.5, name='c0'))
+      yield tfd.BetaBinomial(concentration1=c1, concentration0=c0,
+                             total_count=100, name='successes')
+
+    d = tfd.JointDistributionCoroutine(model_fn, validate_args=True)
+
+    flat = tf.nest.flatten(d, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(
+        d, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfd.JointDistributionCoroutine)
+
+    x = self.evaluate(d.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(d.log_prob(x))
+    self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
+
+    @tf.function
+    def call_log_prob(d):
+      return d.log_prob(x)
+    self.assertAllClose(actual, call_log_prob(d))
+    self.assertAllClose(actual, call_log_prob(unflat))
+
 if __name__ == '__main__':
   test_util.main()

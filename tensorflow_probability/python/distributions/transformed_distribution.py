@@ -20,6 +20,7 @@ from tensorflow_probability.python.distributions import batch_broadcast
 from tensorflow_probability.python.distributions import distribution as distribution_lib
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions import log_prob_ratio
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -627,8 +628,43 @@ class _TransformedDistribution(distribution_lib.Distribution):
       raise NotImplementedError
 
 
+class _TransformedDistributionMeta(distribution_lib._DistributionMeta):  # pylint: disable=protected-access
+  """Metaclass for TransformedDistribution.
+
+  This metaclass ensures that subclasses of TransformedDistribution are
+  AutoCompositeTensors. TransformedDistribution itself is not an
+  AutoCompositeTensor, since we define its type spec differently depending on
+  whether `split_kwargs_fn` is the default (in which case we omit it from the
+  type spec, making the spec serializable).
+  """
+
+  def __new__(mcs, classname, baseclasses, attrs):  # pylint: disable=bad-classmethod-argument
+    cls = super(_TransformedDistributionMeta, mcs).__new__(
+        mcs, classname, baseclasses, attrs)
+    if ((cls.__module__ ==
+         'tensorflow_probability.python.distributions.transformed_distribution')
+        and classname == 'TransformedDistribution'):
+      return cls
+
+    # Ensure that subclasses of TransformedDistribution are
+    # AutoCompositeTensors.
+    if 'tensorflow_probability.python.distributions' in cls.__module__:
+      module_name = 'tfp.distributions'
+    elif ('tensorflow_probability.python.experimental.distributions'
+          in cls.__module__):
+      module_name = 'tfp.experimental.distributions'
+    else:
+      module_name = cls.__module__
+    return auto_composite_tensor.auto_composite_tensor(
+        cls,
+        omit_kwargs=('parameters',),
+        non_identifying_kwargs=('name',),
+        module_name=module_name)
+
+
 class TransformedDistribution(
-    _TransformedDistribution, distribution_lib.AutoCompositeTensorDistribution):
+    _TransformedDistribution, tf.__internal__.CompositeTensor,
+    metaclass=_TransformedDistributionMeta):
 
   def __new__(cls, *args, **kwargs):
     """Maybe return a non-`CompositeTensor` `_TransformedDistribution`."""
@@ -647,6 +683,30 @@ class TransformedDistribution(
               and isinstance(bijector, tf.__internal__.CompositeTensor)):
         return _TransformedDistribution(*args, **kwargs)
     return super(TransformedDistribution, cls).__new__(cls)
+
+  @property
+  def _type_spec(self):
+    # If `kwargs_split_fn` is the default, omit it so the type spec is
+    # serializable.
+    if self._kwargs_split_fn is _default_kwargs_split_fn:
+      omit_kwargs = ('parameters', 'kwargs_split_fn')
+    else:
+      omit_kwargs = ('parameters',)
+    return _TransformedDistributionSpec.from_instance(
+        self, omit_kwargs=omit_kwargs, non_identifying_kwargs=('name',))
+
+  def _convert_variables_to_tensors(self):
+    return auto_composite_tensor.convert_variables_to_tensors(self)
+
+
+@auto_composite_tensor.type_spec_register(
+    'tfp.distributions.TransformedDistributionSpec')
+class _TransformedDistributionSpec(
+    auto_composite_tensor._AutoCompositeTensorTypeSpec):  # pylint: disable=protected-access
+
+  @property
+  def value_type(self):
+    return TransformedDistribution
 
 
 TransformedDistribution.__doc__ = _TransformedDistribution.__doc__ + '\n' + (
@@ -683,7 +743,7 @@ def _kl_transformed_transformed(a, b, name=None):
           a, b, a.bijector, b.bijector))
 
 
-@log_prob_ratio.RegisterLogProbRatio(TransformedDistribution)
+@log_prob_ratio.RegisterLogProbRatio(_TransformedDistribution)
 def _transformed_log_prob_ratio(p, x, q, y, name=None):
   """Computes p.log_prob(x) - q.log_prob(y) for p and q both TDs."""
   with tf.name_scope(name or 'transformed_log_prob_ratio'):

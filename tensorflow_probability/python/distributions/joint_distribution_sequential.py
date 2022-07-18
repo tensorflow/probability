@@ -22,6 +22,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.distributions import joint_distribution as joint_distribution_lib
 
 from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow.python.util import tf_inspect  # pylint: disable=g-direct-tensorflow-import
 
@@ -46,7 +47,7 @@ def _make_summary_statistic(attr):
   return _fn
 
 
-class JointDistributionSequential(joint_distribution_lib.JointDistribution):
+class _JointDistributionSequential(joint_distribution_lib.JointDistribution):
   """Joint distribution parameterized by distribution-making functions.
 
   This distribution enables both sampling and joint probability computation from
@@ -187,6 +188,12 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
   `TensorShape`s for each of the distributions' event shapes and
   `joint.event_shape_tensor()` returns a `list`-like structure of `Tensor`s for
   each of the distributions' event shapes.
+
+  **Note**: If a `JointDistributionSequential` instance contains a `callable`
+  that closes over a `Tensor`, the `JointDistributionSequential` cannot cross
+  the boundary of a `tf.function`. (If this behavior is necessary, an instance
+  of `_JointDistributionSequential` may be used instead, at the expense of extra
+  `tf.function` retracing.)
 
 
   #### Vectorized sampling and model evaluation
@@ -354,7 +361,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
       self._model = self._no_dependency(model)
       self._build(model)
 
-      super(JointDistributionSequential, self).__init__(
+      super(_JointDistributionSequential, self).__init__(
           dtype=None,  # Ignored; we'll override.
           batch_ndims=batch_ndims,
           use_vectorized_map=use_vectorized_map,
@@ -492,7 +499,7 @@ class JointDistributionSequential(joint_distribution_lib.JointDistribution):
         self.validate_args))
 
   def _cross_entropy(self, other):
-    if (not isinstance(other, JointDistributionSequential) or
+    if (not isinstance(other, type(self)) or
         len(self.model) != len(other.model)):
       raise ValueError(
           'Can only compute cross entropy between `JointDistributionSequential`s '
@@ -680,8 +687,8 @@ def _get_required_args(fn, previous_args=()):
   return tuple(args)
 
 
-@kullback_leibler.RegisterKL(JointDistributionSequential,
-                             JointDistributionSequential)
+@kullback_leibler.RegisterKL(_JointDistributionSequential,
+                             _JointDistributionSequential)
 def _kl_joint_joint(d0, d1, name=None):
   """Calculate the KL divergence between two `JointDistributionSequential`s.
 
@@ -714,3 +721,78 @@ def _kl_joint_joint(d0, d1, name=None):
   with tf.name_scope(name or 'kl_jointseq_jointseq'):
     return sum(kullback_leibler.kl_divergence(d0_(), d1_())
                for d0_, d1_ in zip(d0._dist_fn_wrapped, d1._dist_fn_wrapped))  # pylint: disable=protected-access
+
+
+class JointDistributionSequential(_JointDistributionSequential,
+                                  tf.__internal__.CompositeTensor):
+
+  def __new__(cls, *args, **kwargs):
+    """Returns a `_JointDistributionSequential` if `model` has non-CT dists."""
+    if args:
+      model = args[0]
+    else:
+      model = kwargs.get('model')
+
+    if not all(isinstance(d, tf.__internal__.CompositeTensor) or callable(d)
+               for d in model):
+      return _JointDistributionSequential(*args, **kwargs)
+    return super(JointDistributionSequential, cls).__new__(cls)
+
+  @property
+  def _type_spec(self):
+    return _JointDistributionSequentialSpec.from_instance(self)
+
+  def _convert_variables_to_tensors(self):
+    return auto_composite_tensor.convert_variables_to_tensors(self)
+
+
+@auto_composite_tensor.type_spec_register(
+    'tfp.distributions.JointDistributionSequentialSpec')
+class _JointDistributionSequentialSpec(
+    auto_composite_tensor._AutoCompositeTensorTypeSpec):  # pylint: disable=protected-access
+  """Type spec for `JointDistributionSequential`."""
+
+  @property
+  def value_type(self):
+    return JointDistributionSequential
+
+  def _to_components(self, obj):
+    components = [d for d in obj.model
+                  if isinstance(d, tf.__internal__.CompositeTensor)]
+    return dict(model=type(obj.model)(components))
+
+  def _from_components(self, components):
+    model_components = components['model']
+    num_components = len(model_components) + len(self._callable_params)
+
+    # Preserve the order of `model`.
+    components_ind = [i for i in range(num_components)
+                      if i not in self._callable_params]
+    keyed_model = (list(zip(components_ind, model_components))
+                   + list(self._callable_params.items()))
+    model = type(model_components)(d[1] for d in sorted(keyed_model))
+    return self.value_type(model, **self._non_tensor_params)
+
+  @classmethod
+  def from_instance(cls, obj):
+    param_specs, callable_params = [], []
+    for i, d in enumerate(obj.model):
+      if isinstance(d, tf.__internal__.CompositeTensor):
+        param_specs.append(d._type_spec)  # pylint: disable=protected-access
+      else:  # Guaranteed to be a callable by the check in JDS.__new__.
+        callable_params.append((i, d))
+    non_tensor_params = {k: v for k, v in obj.parameters.items()
+                         if k != 'model'}
+    return cls(param_specs=dict(model=type(obj.model)(param_specs)),
+               non_tensor_params=non_tensor_params,
+               non_identifying_kwargs=('name',),
+               omit_kwargs=('parameters',),
+               prefer_static_value=('batch_ndims',),
+               callable_params=dict(callable_params))
+
+
+JointDistributionSequential.__doc__ = _JointDistributionSequential.__doc__ + (
+    '\nIf every element of `model` is a `CompositeTensor` or a callable, the '
+    'resulting `JointDistributionSequential` is a `CompositeTensor`.'
+    'Otherwise, a non-`CompositeTensor` `_JointDistributionSequential` '
+    'instance is created.')
