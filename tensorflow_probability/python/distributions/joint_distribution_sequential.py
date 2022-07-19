@@ -117,7 +117,7 @@ class _JointDistributionSequential(joint_distribution_lib.JointDistribution):
                    tfd.Exponential(rate=[100, 120]),           # e
       lambda    e: tfd.Gamma(concentration=e[0], rate=e[1]),    # g
                    tfd.Normal(loc=0, scale=2.),                 # n
-      lambda n, g: tfd.Normal(loc=n, scale=g)                   # m
+      lambda n, g: tfd.Normal(loc=n, scale=g),                  # m
       lambda    m: tfd.Sample(tfd.Bernoulli(logits=m), 12)      # x
   ], batch_ndims=0, use_vectorized_map=True)
   ```
