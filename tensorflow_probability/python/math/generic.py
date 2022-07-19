@@ -431,9 +431,10 @@ def soft_threshold(x, threshold, name=None):
   This operator is defined by the equations
 
   ```none
-                                { x[i] - gamma,  x[i] >   gamma
-  SoftThreshold(x, gamma)[i] =  { 0,             x[i] ==  gamma
-                                { x[i] + gamma,  x[i] <  -gamma
+                            { x - gamma,  x >   gamma
+  SoftThreshold(x, gamma) = { 0,         -gamma <= x <= gamma
+                            { x + gamma,  x <  -gamma
+                          = sign(x) max(0, |x| - gamma)
   ```
 
   In the context of proximal gradient methods, we have
