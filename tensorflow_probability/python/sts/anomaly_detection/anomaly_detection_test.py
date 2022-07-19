@@ -128,6 +128,19 @@ class AnomalyDetectionTests(test_util.TestCase):
                         ones * np.nanmean(df.series1),
                         atol=stddev1 * 4)
 
+    self.assertAllClose(predictions.lower_limit[0, :],
+                        predictions.mean[0, :] - stddev0,
+                        rtol=1e-3)
+    self.assertAllClose(predictions.lower_limit[1, :],
+                        predictions.mean[1, :] - stddev1,
+                        rtol=1e-3)
+    self.assertAllClose(predictions.upper_limit[0, :],
+                        predictions.mean[0, :] + stddev0,
+                        rtol=1e-3)
+    self.assertAllClose(predictions.upper_limit[1, :],
+                        predictions.mean[1, :] + stddev1,
+                        rtol=1e-3)
+
   def test_constant_series(self):
     values = np.concatenate([np.nan * np.ones([5]),
                              np.ones([10]),

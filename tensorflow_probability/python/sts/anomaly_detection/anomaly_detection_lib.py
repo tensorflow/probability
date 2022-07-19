@@ -133,6 +133,7 @@ def detect_anomalies(series,
   lower_limit, upper_limit, mean, tail_probabilities = inner_fn(
       observed_time_series,
       seasonal_structure=seasonal_structure,
+      anomaly_threshold=anomaly_threshold,
       use_gibbs_predictive_dist=use_gibbs_predictive_dist,
       num_warmup_steps=num_warmup_steps,
       num_samples=num_samples,
