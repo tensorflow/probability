@@ -137,14 +137,6 @@ class ReapTest(absltest.TestCase):
 
     self.assertTupleEqual(harvest_variables(foo)({}, 1.), (1., {'x': 1.}))
 
-  def test_should_reap_constant(self):
-
-    def f(x):
-      y = variable(10., name='y')
-      return x + y
-
-    self.assertDictEqual(reap_variables(f)(1.), {'y': 10.})
-
 
 class PlantTest(test_util.TestCase):
 
@@ -225,16 +217,6 @@ class PlantTest(test_util.TestCase):
       return bar(1.0)
 
     self.assertTupleEqual(harvest_variables(foo)({'x': 2.}, 1.), (2., {}))
-
-  def test_should_plant_constant(self):
-
-    def f(x):
-      y = variable(717, name='y')
-      x = variable(x, name='x')
-      return x + y
-
-    self.assertEqual(plant_variables(f)({}, 1.), 718.)
-    self.assertEqual(plant_variables(f)({'x': 2., 'y': 15.}, 1.), 17.)
 
 
 class HarvestTest(test_util.TestCase):

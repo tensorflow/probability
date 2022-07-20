@@ -216,7 +216,6 @@ def sow(value, *, tag: str, name: str, mode: str = 'strict', key=None):
   Returns:
     The original `value` that was passed in.
   """
-  value = tree_util.tree_map(jax_core.raise_as_much_as_possible, value)
   if key is not None:
     value = prim.tie_in(key, value)
   flat_args, in_tree = tree_util.tree_flatten(value)
