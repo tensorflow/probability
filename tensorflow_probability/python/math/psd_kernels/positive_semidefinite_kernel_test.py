@@ -465,5 +465,16 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
     with self.assertRaises(TypeError):
       _ = float32_kernel * float64_kernel
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='Numpy has no notion of CompositeTensor/Pytree.')
+  def testInputOutputOfJittedFunction(self):
+    @tf.function(jit_compile=True)
+    def create_kernel(m):
+      return CompositeTensorTestKernel(multiplier=m)
+
+    create_kernel(np.array([1., 2., 3.]))
+
+
 if __name__ == '__main__':
   test_util.main()

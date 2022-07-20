@@ -18,7 +18,6 @@ import abc
 import contextlib
 import functools
 import operator
-import six
 import tensorflow.compat.v2 as tf
 
 
@@ -41,8 +40,45 @@ __all__ = [
 JAX_MODE = False  # Overwritten by rewrite script.
 
 
-@six.add_metaclass(abc.ABCMeta)
-class PositiveSemidefiniteKernel(tf.Module):
+class _PositiveSemidefiniteKernelMeta(abc.ABCMeta):
+  """Helper metaclass for tfp.math.psd_kernels.PositiveSemidefiniteKernel."""
+
+  def __init__(cls, name, bases, dct):
+    super(_PositiveSemidefiniteKernelMeta, cls).__init__(name, bases, dct)
+    if not JAX_MODE:
+      return
+    def flatten(kernel):
+      param_names = set(kernel._composite_tensor_nonshape_params)  # pylint: disable=protected-access
+      components = {param_name: getattr(
+          kernel, param_name, value) for param_name, value
+                    in kernel.parameters.items() if param_name in param_names}
+      metadata = {param_name: value for param_name, value
+                  in kernel.parameters.items() if param_name not in param_names}
+      if components:
+        keys, values = zip(*sorted(components.items()))
+      else:
+        keys, values = (), ()
+      # Mimics the logic in `tfp.experimental.composite_tensor` where we
+      # aggressively try to convert arguments into Tensors.
+      def _maybe_convert_to_tensor(value, name):
+        try:
+          value = tf.convert_to_tensor(value, name=name)
+        except (ValueError, TypeError, AssertionError):
+          pass
+        return value
+      values = tuple([_maybe_convert_to_tensor(value, name) for value, name,
+                      in zip(values, keys)])
+      return values, (keys, metadata)
+    def unflatten(info, xs):
+      keys, metadata = info
+      parameters = dict(list(zip(keys, xs)), **metadata)
+      return cls(**parameters)
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    tree_util.register_pytree_node(cls, flatten, unflatten)
+
+
+class PositiveSemidefiniteKernel(
+    tf.Module, metaclass=_PositiveSemidefiniteKernelMeta):
   """Abstract base class for positive semi-definite kernel functions.
 
   #### Background
@@ -1111,8 +1147,59 @@ class PositiveSemidefiniteKernel(tf.Module):
     """
     return ()
 
+  @property
+  def _composite_tensor_params(self):
+    """A tuple describing which parameters are expected to be tensors.
 
-class _AutoCompositeTensorPsdKernelMeta(abc.ABCMeta):
+    CompositeTensor requires us to partition dynamic (tensor) parts from static
+    (metadata) parts like 'validate_args'.  This collects the keys of parameters
+    which are expected to be tensors.
+    """
+    return (self._composite_tensor_nonshape_params +
+            self._composite_tensor_shape_params)
+
+  @property
+  def _composite_tensor_nonshape_params(self):
+    """A tuple describing which parameters are non-shape-related tensors.
+
+    Flattening in JAX involves many of the same considerations with regards to
+    identifying tensor arguments for the purposes of CompositeTensor, except
+    that shape-related items will be considered metadata.  This property
+    identifies the keys of parameters that are expected to be tensors, except
+    those that are shape-related.
+    """
+    try:
+      return tuple(k for k, v in self.parameter_properties().items()
+                   if not v.specifies_shape)
+    except NotImplementedError:
+      # Attempt to find parameters heuristically.
+      pnames = ()
+      for p in self.parameters:
+        if p in self._composite_tensor_shape_params:
+          continue
+        if tf.is_tensor(getattr(self, p, None)):
+          pnames += (p,)
+      return pnames
+
+  @property
+  def _composite_tensor_shape_params(self):
+    """A tuple describing which parameters are shape-related tensors.
+
+    Flattening in JAX involves many of the same considerations with regards to
+    identifying tensor arguments for the purposes of CompositeTensor, except
+    that shape-related items will be considered metadata.  This property
+    identifies the keys of parameters that are expected to be shape-related
+    tensors, so that they can be collected appropriately in CompositeTensor but
+    not in JAX applications.
+    """
+    try:
+      return tuple(k for k, v in self.parameter_properties().items()
+                   if v.specifies_shape)
+    except NotImplementedError:
+      return ()
+
+
+class _AutoCompositeTensorPsdKernelMeta(_PositiveSemidefiniteKernelMeta):
   """Metaclass for `AutoCompositeTensorPsdKernel`."""
 
   def __new__(mcs, classname, baseclasses, attrs):  # pylint: disable=bad-mcs-classmethod-argument
