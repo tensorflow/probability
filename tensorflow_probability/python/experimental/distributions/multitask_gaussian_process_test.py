@@ -412,6 +412,56 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         self.evaluate(single_task_log_prob),
         self.evaluate(multitask_log_prob), rtol=4e-3)
 
+  def testMTGPPosteriorPredictive(self):
+    amplitude = np.float64(.5)
+    length_scale = np.float64(2.)
+    observation_noise_variance = np.float64(3e-3)
+    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
+    # Ensure Symmetric + Strictly Diagonally Dominant -> Positive Definite.
+    task_kernel_matrix = np.array([[6., 2., 3.],
+                                   [2., 7., 4.],
+                                   [3., 4., 8.]],
+                                  dtype=np.float64)
+    task_kernel_matrix_linop = tf.linalg.LinearOperatorFullMatrix(
+        task_kernel_matrix)
+    multi_task_kernel = tfe.psd_kernels.Separable(
+        num_tasks=3, task_kernel_matrix_linop=task_kernel_matrix_linop,
+        base_kernel=kernel)
+
+    index_points = np.random.uniform(-1., 1., 10)[..., np.newaxis]
+
+    mtgp = tfe.distributions.MultiTaskGaussianProcess(
+        multi_task_kernel,
+        index_points,
+        observation_noise_variance=observation_noise_variance,
+        validate_args=True)
+
+    predictive_index_points = np.random.uniform(1., 2., 10)[..., np.newaxis]
+    observations = np.linspace(1., 10., 30).reshape(10, 3)
+
+    expected_mtgprm = tfe.distributions.MultiTaskGaussianProcessRegressionModel(
+        kernel=multi_task_kernel,
+        observation_index_points=index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        index_points=predictive_index_points,
+        validate_args=True)
+
+    actual_mtgprm = mtgp.posterior_predictive(
+        predictive_index_points=predictive_index_points,
+        observations=observations)
+
+    samples = self.evaluate(
+        actual_mtgprm.sample(10, seed=test_util.test_seed()))
+
+    self.assertAllClose(
+        self.evaluate(expected_mtgprm.mean()),
+        self.evaluate(actual_mtgprm.mean()))
+
+    self.assertAllClose(
+        self.evaluate(expected_mtgprm.log_prob(samples)),
+        self.evaluate(actual_mtgprm.log_prob(samples)))
+
 
 if __name__ == '__main__':
   test_util.main()
