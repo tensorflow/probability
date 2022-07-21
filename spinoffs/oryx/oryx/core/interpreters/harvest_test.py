@@ -13,10 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """Tests for tensorflow_probability.spinoffs.oryx.core.interpreters.harvest."""
+import enum
 import functools
 import os
 
 from absl.testing import absltest
+from absl.testing import parameterized
 import jax
 from jax import lax
 import jax.numpy as jnp
@@ -39,7 +41,11 @@ reap_variables = functools.partial(reap, tag='variable')
 call_and_reap_variables = functools.partial(call_and_reap, tag='variable')
 
 
-class ReapTest(absltest.TestCase):
+class EnumTag(enum.Enum):
+  TAG = 'tag'
+
+
+class ReapTest(parameterized.TestCase):
 
   def test_should_reap(self):
 
@@ -137,6 +143,14 @@ class ReapTest(absltest.TestCase):
 
     self.assertTupleEqual(harvest_variables(foo)({}, 1.), (1., {'x': 1.}))
 
+  @parameterized.named_parameters(('int', 1), ('float', 1.), ('tuple', (1,)),
+                                  ('enum', EnumTag.TAG))
+  def test_should_reap_hashables(self, tag):
+    def f(x):
+      return sow(x, tag=tag, name='x')
+
+    self.assertDictEqual(reap(f, tag=tag)(1.), {'x': 1.})
+
 
 class PlantTest(test_util.TestCase):
 
@@ -217,6 +231,16 @@ class PlantTest(test_util.TestCase):
       return bar(1.0)
 
     self.assertTupleEqual(harvest_variables(foo)({'x': 2.}, 1.), (2., {}))
+
+  @parameterized.named_parameters(('int', 1), ('float', 1.), ('tuple', (1,)),
+                                  ('enum', EnumTag.TAG))
+  def test_should_plant_hashables(self, tag):
+
+    def f(x):
+      return sow(x, tag=tag, name='x')
+
+    self.assertEqual(plant(f, tag=tag)({}, 1.), 1.)
+    self.assertEqual(plant(f, tag=tag)({'x': 2.}, 1.), 2.)
 
 
 class HarvestTest(test_util.TestCase):

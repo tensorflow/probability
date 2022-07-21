@@ -135,7 +135,7 @@ import collections
 import dataclasses
 import functools
 
-from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tuple, Union, Hashable
 
 from jax import abstract_arrays
 from jax import api_util
@@ -197,7 +197,7 @@ batching.primitive_batchers[sow_p] = _sow_batch_rule
 xla.translations[sow_p] = lambda c, *args, **params: xc.ops.Tuple(c, args)
 
 
-def sow(value, *, tag: str, name: str, mode: str = 'strict', key=None):
+def sow(value, *, tag: Hashable, name: str, mode: str = 'strict', key=None):
   """Marks a value with a name and a tag.
 
   Args:
