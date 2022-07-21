@@ -582,7 +582,7 @@ def batch_interp_regular_nd_grid(x,
   ```
 
   """
-  with tf.name_scope(name or 'interp_regular_nd_grid'):
+  with tf.name_scope(name or 'batch_interp_regular_nd_grid'):
     dtype = dtype_util.common_dtype([x, x_ref_min, x_ref_max, y_ref],
                                     dtype_hint=tf.float32)
 
@@ -665,49 +665,53 @@ def batch_interp_regular_nd_grid(x,
         _batch_shape_of_zeros_with_rightmost_singletons(
             n_singletons=ps.rank(y_ref) - axis))
 
+    # In this function,
+    # x.shape = [A1, ..., An, D, nd], where n = batch_ndims
+    # and
+    # y_ref.shape = [A1, ..., An, C1, C2,..., Cnd, B1,...,BM]
+    # y_ref[A1, ..., An, i1,...,ind] is a shape [B1,...,BM] Tensor with value
+    # at index [i1,...,ind] in the interpolation table.
+    #  and x_ref_max have shapes [A1, ..., An, nd].
+
+    batch_ndims = ps.rank(x) - 2
+
+    # ny[k] is number of y reference points in interp dim k.
+    # It is used to indicate the dimension sizes.
+    ny = tf.cast(
+        ps.shape_slice(y_ref, np.s_[batch_ndims:batch_ndims + nd]), dtype)
+
+    # Map [x_ref_min, x_ref_max] to [0, ny - 1].
+    # This is the (fractional) index of x.
+    # x_idx_unclipped[A1, ..., An, d, k] is the fractional index into dim k of
+    # interpolation table for the dth x value.
+    x_ref_min_expanded = tf.expand_dims(x_ref_min, axis=-2)
+    x_ref_max_expanded = tf.expand_dims(x_ref_max, axis=-2)
+    x_idx_unclipped = (ny - 1) * (x - x_ref_min_expanded) / (
+        x_ref_max_expanded - x_ref_min_expanded)
+
     return _batch_interp_with_gather_nd(
         x=x,
-        x_ref_min=x_ref_min,
-        x_ref_max=x_ref_max,
+        x_idx_unclipped=x_idx_unclipped,
         y_ref=y_ref,
         nd=nd,
         fill_value=fill_value,
-        batch_dims=ps.rank(x) - 2)
+        batch_ndims=batch_ndims)
 
 
-def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
-                                 batch_dims):
-  """N-D interpolation that works with leading batch dims."""
+def _batch_interp_with_gather_nd(x, x_idx_unclipped, y_ref, nd, fill_value,
+                                 batch_ndims):
+  """Batch interpolation starting with indices."""
   dtype = x.dtype
-
-  # In this function,
-  # x.shape = [A1, ..., An, D, nd], where n = batch_dims
-  # and
-  # y_ref.shape = [A1, ..., An, C1, C2,..., Cnd, B1,...,BM]
-  # y_ref[A1, ..., An, i1,...,ind] is a shape [B1,...,BM] Tensor with the value
-  # at index [i1,...,ind] in the interpolation table.
-  #  and x_ref_max have shapes [A1, ..., An, nd].
-
-  # ny[k] is number of y reference points in interp dim k.
-  ny = tf.cast(
-      ps.shape_slice(y_ref, np.s_[batch_dims:batch_dims + nd]), dtype)
-
-  # Map [x_ref_min, x_ref_max] to [0, ny - 1].
-  # This is the (fractional) index of x.
-  # x_idx_unclipped[A1, ..., An, d, k] is the fractional index into dim k of
-  # interpolation table for the dth x value.
-  x_ref_min_expanded = tf.expand_dims(x_ref_min, axis=-2)
-  x_ref_max_expanded = tf.expand_dims(x_ref_max, axis=-2)
-  x_idx_unclipped = (ny - 1) * (x - x_ref_min_expanded) / (
-      x_ref_max_expanded - x_ref_min_expanded)
-
   # Wherever x is NaN, x_idx_unclipped will be NaN as well.
   # Keep track of the nan indices here (so we can impute NaN later).
   # Also eliminate any NaN indices, since there is not NaN in 32bit.
   nan_idx = tf.math.is_nan(x_idx_unclipped)
-  x_idx_unclipped = tf.where(nan_idx,
-                             tf.cast(0., dtype=dtype),
-                             x_idx_unclipped)
+  x_idx_unclipped = tf.where(nan_idx, tf.cast(0., dtype=dtype), x_idx_unclipped)
+
+  # ny[k] is number of y reference points in interp dim k.
+  # It is used to indicate the dimension sizes.
+  ny = tf.cast(
+      ps.shape_slice(y_ref, np.s_[batch_ndims:batch_ndims + nd]), dtype)
 
   # x_idx.shape = [A1, ..., An, D, nd]
   x_idx = tf.clip_by_value(x_idx_unclipped, tf.zeros((), dtype=dtype), ny - 1)
@@ -746,13 +750,13 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
             ps.shape(tensor),
             ps.ones_like(
                 ps.convert_to_shape_tensor(
-                    ps.shape_slice(y_ref, np.s_[batch_dims + nd:])))
+                    ps.shape_slice(y_ref, np.s_[batch_ndims + nd:])))
         ],
         axis=0,
     )
     return tf.reshape(tensor, extended_shape)
 
-  # Now, t.shape = [A1, ..., An, D, nd] + [1] * (rank(y_ref) - nd - batch_dims)
+  # Now, t.shape = [A1, ..., An, D, nd] + [1] * (rank(y_ref) - nd - batch_ndims)
   t = _expand_x_fn(t)
   s = 1 - t
 
@@ -810,9 +814,7 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
     )  # pyformat: disable
 
     y_ref_pt = tf.gather_nd(
-        y_ref,
-        tf.stack(gather_from_y_ref_idx, axis=-1),
-        batch_dims=batch_dims)
+        y_ref, tf.stack(gather_from_y_ref_idx, axis=-1), batch_dims=batch_ndims)
 
     terms.append(y_ref_pt * opposite_volume)
 
@@ -823,8 +825,7 @@ def _batch_interp_with_gather_nd(x, x_ref_min, x_ref_max, y_ref, nd, fill_value,
     # so here we check if it was out of bounds in any of the nd dims.
     # Thus, oob_idx.shape = [D].
     oob_idx = tf.reduce_any(
-        (x_idx_unclipped < 0) | (x_idx_unclipped > ny - 1),
-        axis=-1)
+        (x_idx_unclipped < 0) | (x_idx_unclipped > ny - 1), axis=-1)
 
     # Now, y.shape = [D, B1,...,BM], so we'll have to broadcast oob_idx.
 
