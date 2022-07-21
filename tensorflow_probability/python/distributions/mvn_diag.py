@@ -271,6 +271,8 @@ class MultivariateNormalDiag(
           experimental_use_kahan_sum=experimental_use_kahan_sum,
           name=name)
       self._parameters = parameters
+      self._scale_diag = scale_diag
+      self._scale_identity_multiplier = scale_identity_multiplier
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):

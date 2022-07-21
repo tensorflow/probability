@@ -279,6 +279,9 @@ class MultivariateNormalDiagPlusLowRank(
         allow_nan_stats=allow_nan_stats,
         name=name)
     self._parameters = parameters
+    self._scale_diag = scale_diag
+    self._scale_perturb_factor = scale_perturb_factor
+    self._scale_perturb_diag = scale_perturb_diag
 
   @classmethod
   def _parameter_properties(cls, dtype, num_classes=None):

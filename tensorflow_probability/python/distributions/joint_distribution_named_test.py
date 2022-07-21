@@ -653,9 +653,9 @@ class JointDistributionNamedTest(test_util.TestCase):
       joint.sample(seed=seed, a=1., value={'a': 1})
 
   @test_util.disable_test_for_backend(
-      disable_numpy=True, disable_jax=True,
-      reason='Numpy and JAX have no notion of CompositeTensor.')
-  def testCompositeTensor(self):
+      disable_numpy=True,
+      reason='Numpy has no notion of CompositeTensor/Pytree.')
+  def testCompositeTensorOrPytree(self):
     d = tfd.JointDistributionNamed(dict(
         e    =          tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
         scale=lambda e: tfd.Gamma(concentration=e[..., 0], rate=e[..., 1]),
@@ -681,6 +681,10 @@ class JointDistributionNamedTest(test_util.TestCase):
     self.assertAllClose(actual, call_log_prob(d))
     self.assertAllClose(actual, call_log_prob(unflat))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX do not have type spec serialization.')
+  def testCompositeTensorSerialization(self):
     encodable_jd = tfd.JointDistributionNamed(  # No lambdas.
         dict(
             e    =          tfd.Independent(tfd.Exponential(rate=[10, 12]), 1),
@@ -700,7 +704,7 @@ class JointDistributionNamedTest(test_util.TestCase):
     self.assertAllEqualNested(
         flat, tf.nest.flatten(deserialized_flat, expand_composites=True))
     self.assertIsInstance(deserialized_unflat, tfd.JointDistributionNamed)
-    self.assertIs(type(d.model), type(deserialized_unflat.model))
+    self.assertIs(type(unflat.model), type(deserialized_unflat.model))
 
     non_ct_jd = tfd.JointDistributionNamed(
         dict(
@@ -711,6 +715,7 @@ class JointDistributionNamedTest(test_util.TestCase):
         )
     )
     self.assertNotIsInstance(non_ct_jd, tf.__internal__.CompositeTensor)
+
 
 if __name__ == '__main__':
   test_util.main()

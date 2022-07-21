@@ -29,6 +29,8 @@ from tensorflow.python.util import tf_inspect
 from tensorflow.python.util import variable_utils
 # pylint: enable=g-direct-tensorflow-import
 
+JAX_MODE = False
+
 __all__ = [
     'auto_composite_tensor',
     'AutoCompositeTensor',
@@ -653,6 +655,11 @@ def auto_composite_tensor(
                              non_identifying_kwargs=non_identifying_kwargs,
                              module_name=module_name)
 
+  if JAX_MODE:
+    from jax import tree_util  # pylint: disable=g-import-not-at-top
+    tree_util.register_pytree_node(
+        cls, pytree_flatten, functools.partial(pytree_unflatten, cls))
+
   if module_name is None:
     module_name = cls.__module__
 
@@ -747,3 +754,27 @@ def convert_variables_to_tensors(obj):
       components)
   return obj._type_spec._from_components(tensor_components)
   # pylint: enable=protected-access
+
+
+def pytree_flatten(obj):
+  """Flatten method for JAX pytrees."""
+  # pylint: disable=protected-access
+  components = obj._type_spec._to_components(obj)
+
+  if components:
+    keys, values = zip(*components.items())
+  else:
+    keys, values = (), ()
+
+  metadata = dict(non_tensor_params=obj._type_spec._non_tensor_params,
+                  callable_params=obj._type_spec._callable_params)
+  return values, (keys, metadata)
+
+
+def pytree_unflatten(cls, aux_data, children):
+  """Unflatten method for JAX pytrees."""
+  keys, metadata = aux_data
+  parameters = dict(list(zip(keys, children)),
+                    **metadata['non_tensor_params'],
+                    **metadata['callable_params'])
+  return cls(**parameters)

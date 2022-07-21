@@ -14,12 +14,16 @@
 # ============================================================================
 """Joint distributions with inferred batch semantics."""
 
+import functools
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.distributions import joint_distribution_coroutine
 from tensorflow_probability.python.distributions import joint_distribution_named
 from tensorflow_probability.python.distributions import joint_distribution_sequential
 from tensorflow_probability.python.internal import auto_composite_tensor
+
+JAX_MODE = False
 
 
 class JointDistributionCoroutineAutoBatched(
@@ -650,6 +654,22 @@ class _JointDistributionNamedAutoBatchedSpec(
   @property
   def value_type(self):
     return JointDistributionNamedAutoBatched
+
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top
+  tree_util.register_pytree_node(
+      JointDistributionSequentialAutoBatched,
+      auto_composite_tensor.pytree_flatten,
+      functools.partial(
+          joint_distribution_sequential._pytree_unflatten,  # pylint: disable=protected-access
+          JointDistributionSequentialAutoBatched))
+  tree_util.register_pytree_node(
+      JointDistributionNamedAutoBatched,
+      joint_distribution_named._pytree_flatten,  # pylint: disable=protected-access
+      functools.partial(
+          joint_distribution_named._pytree_unflatten,  # pylint: disable=protected-access
+          JointDistributionNamedAutoBatched))
 
 
 JointDistributionSequentialAutoBatched.__doc__ = (

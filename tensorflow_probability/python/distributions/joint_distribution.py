@@ -80,12 +80,7 @@ class StaticDistributionAttributes(auto_composite_tensor.AutoCompositeTensor):
                  self.experimental_shard_axis_names, self.name,
                  self.reparameterization_type))
 
-if JAX_MODE:
-  from jax import tree_util  # pylint: disable=g-import-not-at-top
-  tree_util.register_pytree_node(
-      StaticDistributionAttributes,
-      flatten_func=lambda sda: ([], list(sda)),
-      unflatten_func=lambda attrs, _: StaticDistributionAttributes(*attrs))
+  _composite_tensor_shape_params = ('batch_shape', 'event_shape')
 
 
 class ValueWithTrace(collections.namedtuple(

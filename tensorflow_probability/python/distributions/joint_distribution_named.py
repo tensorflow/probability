@@ -15,6 +15,7 @@
 """The `JointDistributionNamed` class."""
 
 import collections
+import functools
 
 import tensorflow.compat.v2 as tf
 
@@ -26,6 +27,8 @@ from tensorflow_probability.python.internal import distribution_util
 __all__ = [
     'JointDistributionNamed',
 ]
+
+JAX_MODE = False
 
 
 class _JointDistributionNamed(
@@ -479,6 +482,18 @@ class JointDistributionNamed(_JointDistributionNamed,
     return auto_composite_tensor.convert_variables_to_tensors(self)
 
 
+def _unflatten_model(components, structure_with_callables):
+  model_components = []
+  i = 0
+  for c in tf.nest.flatten(structure_with_callables):
+    if c is None:
+      model_components.append(components['model'][i])
+      i += 1
+    else:
+      model_components.append(c)
+  return tf.nest.pack_sequence_as(structure_with_callables, model_components)
+
+
 @auto_composite_tensor.type_spec_register(
     'tfp.distributions.JointDistributionNamedSpec')
 class _JointDistributionNamedSpec(
@@ -501,17 +516,7 @@ class _JointDistributionNamedSpec(
 
   def _from_components(self, components):
     if self._callable_params:
-      model_components = []
-      i = 0
-      for c in tf.nest.flatten(self._structure_with_callables):
-        if c is None:
-          model_components.append(components['model'][i])
-          i += 1
-        else:
-          model_components.append(c)
-
-      model = tf.nest.pack_sequence_as(
-          self._structure_with_callables, model_components)
+      model = _unflatten_model(components, self._structure_with_callables)
     else:
       model = components['model']
     return self.value_type(model, **self._non_tensor_params)
@@ -555,6 +560,35 @@ class _JointDistributionNamedSpec(
           obj.model)
       spec._structure_with_callables = structure_with_callables
     return spec
+
+
+def _pytree_flatten(obj):
+  """Flatten method for JAX pytrees."""
+  # pylint: disable=protected-access
+  components = obj._type_spec._to_components(obj)
+  if components:
+    keys, values = zip(*components.items())
+  else:
+    keys, values = (), ()
+  metadata = dict(
+      non_tensor_params=obj._type_spec._non_tensor_params,
+      structure_with_callables=obj._type_spec._structure_with_callables)
+  return values, (keys, metadata)
+
+
+def _pytree_unflatten(cls, aux_data, children):
+  keys, metadata = aux_data
+  model_dists = dict(list(zip(keys, children)))
+  model = _unflatten_model(model_dists, metadata['structure_with_callables'])
+  return cls(model, **metadata['non_tensor_params'])
+
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top
+  tree_util.register_pytree_node(
+      JointDistributionNamed,
+      _pytree_flatten,
+      functools.partial(_pytree_unflatten, JointDistributionNamed))
 
 
 JointDistributionNamed.__doc__ = _JointDistributionNamed.__doc__ + (

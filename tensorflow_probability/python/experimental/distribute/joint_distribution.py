@@ -14,13 +14,20 @@
 # ============================================================================
 """Contains sharding-aware versions of tfd.JointDistributions."""
 
+import functools
+
 import tensorflow.compat.v2 as tf
 from tensorflow_probability.python import distributions as distribution_lib
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.distributions import joint_distribution as jd_lib
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn_lib
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds_lib
 from tensorflow_probability.python.distributions import log_prob_ratio as lp_ratio
+from tensorflow_probability.python.internal import auto_composite_tensor
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import samplers
+
+JAX_MODE = False
 
 
 def pbroadcast_value(value, value_axis_names, output_axis_names):
@@ -161,3 +168,16 @@ class _DefaultJointBijector(jd_lib._DefaultJointBijector):  # pylint: disable=pr
         value=samples,
         seed=samplers.zeros_seed(),
         sample_and_trace_fn=sample_and_trace_fn)
+
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top
+  # pylint: disable=protected-access
+  tree_util.register_pytree_node(
+      JointDistributionSequential,
+      auto_composite_tensor.pytree_flatten,
+      functools.partial(jds_lib._pytree_unflatten, JointDistributionSequential))
+  tree_util.register_pytree_node(
+      JointDistributionNamed,
+      jdn_lib._pytree_flatten,
+      functools.partial(jdn_lib._pytree_unflatten, JointDistributionNamed))

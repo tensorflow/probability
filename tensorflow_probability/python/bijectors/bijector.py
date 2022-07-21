@@ -51,45 +51,7 @@ SKIP_DTYPE_CHECKS = False
 UNSPECIFIED = object()
 
 
-class _BijectorMeta(abc.ABCMeta):
-  """Helper metaclass for tfp.Bijector."""
-
-  def __init__(cls, name, bases, dct):
-    super(_BijectorMeta, cls).__init__(name, bases, dct)
-    if not JAX_MODE:
-      return
-    def flatten(bij):
-      param_names = set(bij._composite_tensor_nonshape_params)  # pylint: disable=protected-access
-      components = {param_name: getattr(
-          bij, param_name, value) for param_name, value
-                    in bij.parameters.items() if param_name in param_names}
-      metadata = {param_name: value for param_name, value
-                  in bij.parameters.items() if param_name not in param_names}
-      if components:
-        keys, values = zip(*sorted(components.items()))
-      else:
-        keys, values = (), ()
-      # Mimics the logic in `tfp.experimental.composite_tensor` where we
-      # aggressively try to convert arguments into Tensors.
-      def _maybe_convert_to_tensor(value, name):
-        try:
-          value = tf.convert_to_tensor(value, name=name)
-        except (ValueError, TypeError, AssertionError):
-          pass
-        return value
-      values = tuple([_maybe_convert_to_tensor(value, name) for value, name,
-                      in zip(values, keys)])
-      return values, (keys, metadata)
-    def unflatten(info, xs):
-      keys, metadata = info
-      parameters = dict(list(zip(keys, xs)), **metadata)
-      return cls(**parameters)
-    from jax import tree_util  # pylint: disable=g-import-not-at-top
-    tree_util.register_pytree_node(cls, flatten, unflatten)
-
-
-# TODO(emilyaf): Look at using `__init_subclass__` instead of a metaclass.
-class Bijector(tf.Module, metaclass=_BijectorMeta):
+class Bijector(tf.Module, metaclass=abc.ABCMeta):
   r"""Interface for transformations of a `Distribution` sample.
 
   Bijectors can be used to represent any differentiable and injective
@@ -1989,7 +1951,7 @@ class Bijector(tf.Module, metaclass=_BijectorMeta):
                 dtype_y=_str_dtype(self.forward_dtype())))
 
 
-class _AutoCompositeTensorBijectorMeta(_BijectorMeta):
+class _AutoCompositeTensorBijectorMeta(abc.ABCMeta):
   """Metaclass for `AutoCompositeTensorBijector`."""
 
   def __new__(mcs, classname, baseclasses, attrs):  # pylint: disable=bad-mcs-classmethod-argument

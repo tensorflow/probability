@@ -13,6 +13,10 @@
 # limitations under the License.
 # ============================================================================
 """Wraps TFP bijectors for use with Jax."""
+
+import functools
+import inspect
+
 from jax import tree_util
 from jax import util as jax_util
 import jax.numpy as np
@@ -109,13 +113,29 @@ def make_wrapper_type(cls):
     else:
       raise ValueError('Bijector direction must be "forward" or "inverse".')
 
+  def unify_signature(f):
+    """Unify __init__ signature for _Wrapper, cls for auto Pytree conversion."""
+
+    @functools.wraps(f)
+    def with_fixed_signature(*args, **kwargs):
+      return f(*args, **kwargs)
+
+    old_init_sig = inspect.signature(f)
+    new_init_sig = inspect.signature(cls.__init__)
+    sig = old_init_sig.replace(
+        parameters=(tuple(new_init_sig.parameters.values()) +
+                    (old_init_sig.parameters['use_primitive'],)))
+    f.__signature__ = sig
+    return with_fixed_signature
+
   if clsid not in _registry:
 
     class _WrapperType(cls):
       """Oryx bijector wrapper type."""
 
-      def __init__(self, *args, **kwargs):
-        self.use_primitive = kwargs.pop('use_primitive', True)
+      @unify_signature
+      def __init__(self, *args, use_primitive=True, **kwargs):
+        self.use_primitive = use_primitive
         self._args = args
         self._kwargs = kwargs
 

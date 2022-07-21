@@ -419,9 +419,9 @@ class _GaussianProcessTest(object):
     self.assertAllEqual([1], self.evaluate(gp.event_shape_tensor()))
 
   @test_util.disable_test_for_backend(
-      disable_numpy=True, disable_jax=True,
-      reason="Numpy and JAX have no notion of CompositeTensor.")
-  def testCompositeTensor(self):
+      disable_numpy=True,
+      reason="Numpy has no notion of CompositeTensor/Pytree.")
+  def testCompositeTensorOrPytree(self):
     index_points = np.random.uniform(-1., 1., 10)[..., np.newaxis]
     gp = tfd.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(),

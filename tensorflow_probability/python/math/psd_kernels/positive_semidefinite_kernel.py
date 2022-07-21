@@ -37,48 +37,7 @@ __all__ = [
 ]
 
 
-JAX_MODE = False  # Overwritten by rewrite script.
-
-
-class _PositiveSemidefiniteKernelMeta(abc.ABCMeta):
-  """Helper metaclass for tfp.math.psd_kernels.PositiveSemidefiniteKernel."""
-
-  def __init__(cls, name, bases, dct):
-    super(_PositiveSemidefiniteKernelMeta, cls).__init__(name, bases, dct)
-    if not JAX_MODE:
-      return
-    def flatten(kernel):
-      param_names = set(kernel._composite_tensor_nonshape_params)  # pylint: disable=protected-access
-      components = {param_name: getattr(
-          kernel, param_name, value) for param_name, value
-                    in kernel.parameters.items() if param_name in param_names}
-      metadata = {param_name: value for param_name, value
-                  in kernel.parameters.items() if param_name not in param_names}
-      if components:
-        keys, values = zip(*sorted(components.items()))
-      else:
-        keys, values = (), ()
-      # Mimics the logic in `tfp.experimental.composite_tensor` where we
-      # aggressively try to convert arguments into Tensors.
-      def _maybe_convert_to_tensor(value, name):
-        try:
-          value = tf.convert_to_tensor(value, name=name)
-        except (ValueError, TypeError, AssertionError):
-          pass
-        return value
-      values = tuple([_maybe_convert_to_tensor(value, name) for value, name,
-                      in zip(values, keys)])
-      return values, (keys, metadata)
-    def unflatten(info, xs):
-      keys, metadata = info
-      parameters = dict(list(zip(keys, xs)), **metadata)
-      return cls(**parameters)
-    from jax import tree_util  # pylint: disable=g-import-not-at-top
-    tree_util.register_pytree_node(cls, flatten, unflatten)
-
-
-class PositiveSemidefiniteKernel(
-    tf.Module, metaclass=_PositiveSemidefiniteKernelMeta):
+class PositiveSemidefiniteKernel(tf.Module, metaclass=abc.ABCMeta):
   """Abstract base class for positive semi-definite kernel functions.
 
   #### Background
@@ -1199,7 +1158,7 @@ class PositiveSemidefiniteKernel(
       return ()
 
 
-class _AutoCompositeTensorPsdKernelMeta(_PositiveSemidefiniteKernelMeta):
+class _AutoCompositeTensorPsdKernelMeta(abc.ABCMeta):
   """Metaclass for `AutoCompositeTensorPsdKernel`."""
 
   def __new__(mcs, classname, baseclasses, attrs):  # pylint: disable=bad-mcs-classmethod-argument

@@ -46,6 +46,8 @@ __all__ = [
     'make_cholesky_factored_marginal_fn'
 ]
 
+JAX_MODE = False
+
 
 def _add_diagonal_shift(matrix, shift):
   return tf.linalg.set_diag(
@@ -884,3 +886,21 @@ def _kl_mvn_gp(mvn, gp, name=None):
     Batchwise KL(mvn || gp)
   """
   return _kl_compatible_gp(mvn, gp, name or 'kl_mvn_gp')
+
+
+def _pytree_unflatten(aux_data, children):
+  keys, metadata = aux_data
+  non_tensor_params = metadata['non_tensor_params']
+  non_tensor_params['_check_marginal_cholesky_fn'] = False
+  parameters = dict(list(zip(keys, children)),
+                    **non_tensor_params,
+                    **metadata['callable_params'])
+  return GaussianProcess(**parameters)
+
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top
+  tree_util.register_pytree_node(
+      GaussianProcess,
+      auto_composite_tensor.pytree_flatten,
+      _pytree_unflatten)

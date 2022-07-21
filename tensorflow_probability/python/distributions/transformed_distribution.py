@@ -13,6 +13,9 @@
 # limitations under the License.
 # ============================================================================
 """A Transformed Distribution class."""
+
+import functools
+
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.bijectors import ldj_ratio
@@ -29,6 +32,8 @@ from tensorflow_probability.python.internal import tensorshape_util
 __all__ = [
     'TransformedDistribution',
 ]
+
+JAX_MODE = False
 
 
 def _default_kwargs_split_fn(kwargs):
@@ -707,6 +712,15 @@ class _TransformedDistributionSpec(
   @property
   def value_type(self):
     return TransformedDistribution
+
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top
+  tree_util.register_pytree_node(
+      TransformedDistribution,
+      auto_composite_tensor.pytree_flatten,
+      functools.partial(auto_composite_tensor.pytree_unflatten,
+                        TransformedDistribution))
 
 
 TransformedDistribution.__doc__ = _TransformedDistribution.__doc__ + '\n' + (

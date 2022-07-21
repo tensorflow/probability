@@ -36,16 +36,6 @@ tfde = tfp.experimental.distributions
 
 JAX_MODE = False
 
-if JAX_MODE:
-  _CompositeMultivariateNormalPrecisionFactorLinearOperator = tfde.MultivariateNormalPrecisionFactorLinearOperator
-  _CompositeJointDistributionSequential = tfd.JointDistributionSequential
-else:
-  _CompositeMultivariateNormalPrecisionFactorLinearOperator = tfp.experimental.auto_composite_tensor(
-      tfde.MultivariateNormalPrecisionFactorLinearOperator,
-      omit_kwargs=('name',))
-  _CompositeJointDistributionSequential = tfp.experimental.auto_composite_tensor(
-      tfd.JointDistributionSequential, omit_kwargs=('name',))
-
 
 @tf.function(autograph=False)
 def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None,
@@ -657,7 +647,7 @@ class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
           scale=cov_linop.inverse().cholesky(),
       )
     elif precondition_scheme == 'precision_factor':
-      momentum_distribution = _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+      momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
           # The precision of momentum is the covariance of position.
           # The "factor" is the cholesky factor.
           precision_factor=cov_linop.cholesky(),
@@ -665,13 +655,13 @@ class PreconditionedNUTSCorrectnessTest(test_util.TestCase):
     elif precondition_scheme == 'sqrtm':
       if JAX_MODE:
         self.skipTest('`sqrtm` is not yet implemented in JAX.')
-      momentum_distribution = _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+      momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
           # The symmetric square root is a perfectly valid "factor".
           precision_factor=tf.linalg.LinearOperatorFullMatrix(
               tf.linalg.sqrtm(target_cov)),
       )
     elif precondition_scheme == 'scale':
-      momentum_distribution = _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+      momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
           # Nothing wrong with using "scale", since the scale should be the
           # same as cov_linop.cholesky().
           precision_factor=target_mvn.scale,
@@ -894,7 +884,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
       momentum_distribution = None
       step_size = 0.1
     else:
-      momentum_distribution = _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+      momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
           precision_factor=mvn.scale,
       )
       step_size = 1.1
@@ -929,7 +919,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
       momentum_distribution = None
       step_size = 0.3
     else:
-      momentum_distribution = _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+      momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
           # TODO(b/170015229) Don't use the covariance as inverse scale,
           # it is the wrong preconditioner.
           precision_factor=tf.linalg.LinearOperatorFullMatrix(cov),
@@ -972,15 +962,15 @@ class PreconditionedNUTSTest(test_util.TestCase):
     else:
       reshape_to_scalar = tfp.bijectors.Reshape(event_shape_out=[])
       reshape_to_234 = tfp.bijectors.Reshape(event_shape_out=[2, 3, 4])
-      momentum_distribution = _CompositeJointDistributionSequential([
+      momentum_distribution = tfd.JointDistributionSequential([
           reshape_to_scalar(
-              _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+              tfde.MultivariateNormalPrecisionFactorLinearOperator(
                   precision_factor=tf.linalg.LinearOperatorDiag([0.1]))),
           reshape_to_scalar(
-              _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+              tfde.MultivariateNormalPrecisionFactorLinearOperator(
                   precision_factor=tf.linalg.LinearOperatorDiag([1.]))),
           reshape_to_234(
-              _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+              tfde.MultivariateNormalPrecisionFactorLinearOperator(
                   precision_factor=tf.linalg.LinearOperatorDiag(
                       tf.fill([24], 10.))))
       ])
@@ -1018,7 +1008,7 @@ class PreconditionedNUTSTest(test_util.TestCase):
       momentum_distribution = None
     else:
       step_size = 1.0
-      momentum_distribution = _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+      momentum_distribution = tfde.MultivariateNormalPrecisionFactorLinearOperator(
           tf.zeros((2, 4, 3)), precision_factor=mvn.scale)
 
     nuts_kernel = tfp.experimental.mcmc.PreconditionedNoUTurnSampler(
@@ -1052,17 +1042,17 @@ class PreconditionedNUTSTest(test_util.TestCase):
       step_size = 0.1
     else:
       reshape_to_scalar = tfp.bijectors.Reshape(event_shape_out=[])
-      momentum_distribution = _CompositeJointDistributionSequential([
+      momentum_distribution = tfd.JointDistributionSequential([
           reshape_to_scalar(
-              _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+              tfde.MultivariateNormalPrecisionFactorLinearOperator(
                   precision_factor=tf.linalg.LinearOperatorDiag(
                       tf.fill([n_chains, 1], 0.1)))),
           reshape_to_scalar(
-              _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+              tfde.MultivariateNormalPrecisionFactorLinearOperator(
                   precision_factor=tf.linalg.LinearOperatorDiag(
                       tf.fill([n_chains, 1], 1.)))),
           reshape_to_scalar(
-              _CompositeMultivariateNormalPrecisionFactorLinearOperator(
+              tfde.MultivariateNormalPrecisionFactorLinearOperator(
                   precision_factor=tf.linalg.LinearOperatorDiag(
                       tf.fill([n_chains, 1], 10.)))),
       ])

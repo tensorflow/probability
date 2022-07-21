@@ -746,6 +746,18 @@ class JointDistributionSequential(_JointDistributionSequential,
     return auto_composite_tensor.convert_variables_to_tensors(self)
 
 
+def _unflatten_model(components, callable_params):
+  model_components = components['model']
+  num_components = len(model_components) + len(callable_params)
+
+  # Preserve the order of `model`.
+  components_ind = [i for i in range(num_components)
+                    if i not in callable_params]
+  keyed_model = (list(zip(components_ind, model_components))
+                 + list(callable_params.items()))
+  return type(model_components)(d[1] for d in sorted(keyed_model))
+
+
 @auto_composite_tensor.type_spec_register(
     'tfp.distributions.JointDistributionSequentialSpec')
 class _JointDistributionSequentialSpec(
@@ -762,15 +774,7 @@ class _JointDistributionSequentialSpec(
     return dict(model=type(obj.model)(components))
 
   def _from_components(self, components):
-    model_components = components['model']
-    num_components = len(model_components) + len(self._callable_params)
-
-    # Preserve the order of `model`.
-    components_ind = [i for i in range(num_components)
-                      if i not in self._callable_params]
-    keyed_model = (list(zip(components_ind, model_components))
-                   + list(self._callable_params.items()))
-    model = type(model_components)(d[1] for d in sorted(keyed_model))
+    model = _unflatten_model(components, self._callable_params)
     return self.value_type(model, **self._non_tensor_params)
 
   @classmethod
@@ -789,6 +793,21 @@ class _JointDistributionSequentialSpec(
                omit_kwargs=('parameters',),
                prefer_static_value=('batch_ndims',),
                callable_params=dict(callable_params))
+
+
+def _pytree_unflatten(cls, aux_data, children):
+  keys, metadata = aux_data
+  model_dists = dict(list(zip(keys, children)))
+  model = _unflatten_model(model_dists, metadata['callable_params'])
+  return cls(model, **metadata['non_tensor_params'])
+
+
+if JAX_MODE:
+  from jax import tree_util  # pylint: disable=g-import-not-at-top
+  tree_util.register_pytree_node(
+      JointDistributionSequential,
+      auto_composite_tensor.pytree_flatten,
+      functools.partial(_pytree_unflatten, JointDistributionSequential))
 
 
 JointDistributionSequential.__doc__ = _JointDistributionSequential.__doc__ + (

@@ -78,6 +78,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
         "//tensorflow_probability/python/internal:distribute_lib",
         "//tensorflow_probability/python/internal:samplers",
     ],

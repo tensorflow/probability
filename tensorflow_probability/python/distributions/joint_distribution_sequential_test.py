@@ -788,9 +788,9 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertLen(model_traces, 3)
 
   @test_util.disable_test_for_backend(
-      disable_numpy=True, disable_jax=True,
-      reason='Numpy and JAX have no notion of CompositeTensor.')
-  def testCompositeTensor(self):
+      disable_numpy=True,
+      reason='Numpy has no notion of CompositeTensor/Pytree.')
+  def testCompositeTensorOrPytree(self):
     d = tfd.JointDistributionSequential(
         tuple([
             tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),
@@ -818,6 +818,10 @@ class JointDistributionSequentialTest(test_util.TestCase):
     self.assertAllClose(actual, call_log_prob(d))
     self.assertAllClose(actual, call_log_prob(unflat))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=True,
+      reason='Numpy and JAX have no notion of type spec serialization.')
+  def testCompositeTensorSerialization(self):
     encodable_jd = tfd.JointDistributionSequential(  # no lambdas
         [
             tfd.Independent(tfd.Exponential(rate=[100, 120]), 1),

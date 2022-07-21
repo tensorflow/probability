@@ -281,9 +281,9 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
       self.assertAllClose(gprm.log_prob(x)[i], gprm_i.log_prob(x[i]))
 
   @test_util.disable_test_for_backend(
-      disable_numpy=True, disable_jax=True,
-      reason='Numpy and JAX have no notion of CompositeTensor/saved_model')
-  def testPrecomputedCompositeTensor(self):
+      disable_numpy=True,
+      reason='Numpy has no notion of CompositeTensor/Pytree.')
+  def testPrecomputedCompositeTensorOrPytree(self):
     amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
     length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
     observation_noise_variance = np.array([1e-9], np.float64)
