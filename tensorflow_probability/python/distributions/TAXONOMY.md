@@ -20,7 +20,8 @@ limitations under the License.
 
 ### Distributions Supported on a Single Point
 
-[Deterministic](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Deterministic)
+[Deterministic](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/Deterministic),
+[VectorDeterministic](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/VectorDeterministic)
 
 ### Distributions Supported on Two Points
 
@@ -190,7 +191,7 @@ limitations under the License.
 
 [CholeskyLKJ](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/CholeskyLKJ)
 
-#### Distributions over Positive Definite Matrices
+#### Distributions over Positive Definite Correlation Matrices
 
 [WishartLinearOperator](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/WishartLinearOperator),
 [WishartTriL](https://www.tensorflow.org/probability/api_docs/python/tfp/distributions/WishartTriL)
