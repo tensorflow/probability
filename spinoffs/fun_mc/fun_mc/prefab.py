@@ -30,8 +30,10 @@ import numpy as np
 
 from fun_mc import backend
 from fun_mc import fun_mc_lib as fun_mc
+from fun_mc import malt
 from fun_mc import sga_hmc
-# Re-export sga_hmc symbols.
+# Re-export sga_hmc and malt symbols.
+from fun_mc.malt import *  # pylint: disable=wildcard-import
 from fun_mc.sga_hmc import *  # pylint: disable=wildcard-import
 
 tf = backend.tf
@@ -47,7 +49,7 @@ __all__ = [
     'step_size_adaptation_step',
     'StepSizeAdaptationExtra',
     'StepSizeAdaptationState',
-] + sga_hmc.__all__
+] + sga_hmc.__all__ + malt.__all__
 
 
 @util.named_call(name='polynomial_decay')
@@ -790,15 +792,15 @@ def persistent_hamiltonian_monte_carlo_step(
   ```none
   num_integrator_steps = 1
   step_size > 0
-  noise_fraction = (1 - exp(-2 * step_size * dampening))**0.5
+  noise_fraction = (1 - exp(-2 * step_size * damping))**0.5
   # This disables the MH step for all but most extreme divergences.
   log_uniform = -1000
   ```
 
-  `dampening` refers to the parameter in the SDE formulation of the algorithm:
+  `damping` refers to the parameter in the SDE formulation of the algorithm:
 
   ```none
-  dv_t = -dampening * v_t * dt - grad(f)(x_t) * dt + (2 * dampening)**0.5 * dB_t
+  dv_t = -damping * v_t * dt - grad(f)(x_t) * dt + (2 * damping)**0.5 * dB_t
   dx_t = v_t * dt
   ```
 

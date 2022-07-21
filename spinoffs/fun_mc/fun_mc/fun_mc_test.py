@@ -890,6 +890,71 @@ class FunMCTest(tfp_test_util.TestCase, parameterized.TestCase):
         adaptation_rate=self._constant(0.1))
     self.assertAllClose(new_control, 1. * 1.1)
 
+  def testOBABOLangevinIntegrator(self):
+
+    def target_log_prob_fn(q):
+      return -q**2, q
+
+    def kinetic_energy_fn(p):
+      return p**2., p
+
+    def momentum_refresh_fn(p, seed):
+      del seed
+      return p
+
+    def energy_change_fn(old_is, new_is):
+      old_energy = -old_is.target_log_prob + old_is.momentum**2
+      new_energy = -new_is.target_log_prob + new_is.momentum**2
+      return new_energy - old_energy, ()
+
+    integrator_step_fn = lambda state: fun_mc.leapfrog_step(  # pylint: disable=g-long-lambda
+        state,
+        step_size=0.1,
+        target_log_prob_fn=target_log_prob_fn,
+        kinetic_energy_fn=kinetic_energy_fn)
+
+    lt_integrator_fn = lambda state: fun_mc.obabo_langevin_integrator(  # pylint: disable=g-long-lambda
+        state,
+        num_steps=10,
+        integrator_step_fn=integrator_step_fn,
+        energy_change_fn=energy_change_fn,
+        momentum_refresh_fn=momentum_refresh_fn,
+        integrator_trace_fn=lambda state, _, __: state.state,
+        seed=self._make_seed(_test_seed()),
+    )
+
+    ham_integrator_fn = lambda state: fun_mc.hamiltonian_integrator(  # pylint: disable=g-long-lambda
+        state,
+        num_steps=10,
+        kinetic_energy_fn=kinetic_energy_fn,
+        integrator_step_fn=integrator_step_fn,
+        integrator_trace_fn=lambda state, _: state.state,
+    )
+
+    state = tf.zeros([2], dtype=self._dtype)
+    momentum = tf.ones([2], dtype=self._dtype)
+    target_log_prob, _, state_grads = fun_mc.call_potential_fn_with_grads(
+        target_log_prob_fn, state)
+
+    start_state = fun_mc.IntegratorState(
+        target_log_prob=target_log_prob,
+        momentum=momentum,
+        state=state,
+        state_grads=state_grads,
+        state_extra=state,
+    )
+
+    lt_state, lt_extra = lt_integrator_fn(start_state)
+    ham_state, ham_extra = ham_integrator_fn(start_state)
+
+    # Langevin and Hamiltonian integrator should be the same when no noise is
+    # present.
+    self.assertAllClose(lt_state, ham_state)
+    self.assertAllClose(lt_extra.energy_change, ham_extra.energy_change)
+    self.assertAllClose(lt_extra.energy_change,
+                        ham_extra.final_energy - ham_extra.initial_energy)
+    self.assertAllClose(lt_extra.integrator_trace, ham_extra.integrator_trace)
+
   def testRaggedIntegrator(self):
 
     def target_log_prob_fn(q):

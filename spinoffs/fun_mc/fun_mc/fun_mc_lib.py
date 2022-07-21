@@ -85,6 +85,7 @@ __all__ = [
     'mclachlan_optimal_4th_order_step',
     'metropolis_hastings_step',
     'MetropolisHastingsExtra',
+    'obabo_langevin_integrator',
     'persistent_metropolis_hastings_init',
     'persistent_metropolis_hastings_step',
     'PersistentMetropolistHastingsExtra',
@@ -1319,7 +1320,7 @@ def _default_hamiltonian_monte_carlo_energy_change_fn(
   """Default HMC energy change function."""
   del current_integrator_state
   del proposed_integrator_state
-  return integrator_extra.final_energy - integrator_extra.initial_energy, ()
+  return integrator_extra.energy_change, ()
 
 
 @util.named_call
@@ -1506,6 +1507,7 @@ class IntegratorExtras(NamedTuple):
   final_energy: 'FloatTensor'
   final_kinetic_energy: 'FloatTensor'
   final_kinetic_energy_extra: Any
+  energy_change: 'FloatTensor'
   integrator_trace: Any
   momentum_grads: 'State'
 
@@ -1623,10 +1625,127 @@ def hamiltonian_integrator(
       final_energy=final_energy,
       final_kinetic_energy=integrator_step_extra.kinetic_energy,
       final_kinetic_energy_extra=integrator_step_extra.kinetic_energy_extra,
+      energy_change=final_energy - initial_energy,
       integrator_trace=integrator_trace,
       momentum_grads=integrator_step_extra.momentum_grads)
 
   return state, extra
+
+
+@util.named_call
+def obabo_langevin_integrator(
+    int_state: 'IntegratorState',
+    num_steps: 'IntTensor',
+    integrator_step_fn: 'IntegratorStep',
+    momentum_refresh_fn: 'Callable[[State, Any], State]',
+    energy_change_fn: 'Callable[[IntegratorState, IntegratorState], '
+                      'Tuple[FloatTensor, Any]]',
+    integrator_trace_fn: 'Callable[[IntegratorState, IntegratorStepState, '
+                         'IntegratorStepExtras], '
+                         'TensorNest]' = lambda *args: (),
+    unroll: 'bool' = False,
+    seed: Any = None,
+) -> 'Tuple[IntegratorState, IntegratorExtras]':
+  """Integrates discretized Langevin dynamics.
+
+  This implements a generalized version of the OBABO integrator from [1]. In
+  this integrator, the Langevin dynamics are split into Hamiltonian dynamics and
+  an thermostat moves. The former is solved typically solved using the leapfrog
+  integrator (generalized here to the `integrator_step_fn`), corresponding to
+  the BAB steps. The latter is exactly solved by the `momentum_refresh_fn`, and
+  corresponds to the two O steps.
+
+  In the typical configuration where a leapfrog integrator is used for the
+  Hamiltonian part, the momentum refreshment steps should implement half-steps.
+  The integration error is assumed to only arise from `integrator_step_fn`.
+
+  Args:
+    int_state: Current `IntegratorState`.
+    num_steps: Integer scalar. Number of steps to take.
+    integrator_step_fn: Instance of `IntegratorStep`.
+    momentum_refresh_fn: Momentum refreshment step. This must preserve the
+      momentum density implied by the `integrator_step_fn`.
+    energy_change_fn: Computes the change in energy between two integrator
+      states.
+    integrator_trace_fn: Trace function for the integrator.
+    unroll: Whether to unroll the loop in the integrator. Only works if
+      `num_steps` is statically known.
+    seed: For reproducibility.
+
+  Returns:
+    integrator_state: `IntegratorState`
+    integrator_exras: `IntegratorExtras`. Due to the structure of this
+      integrator, the initial/final energy terms in `IntegratorExtras` return
+      value are set to empty tuples.
+
+  #### References
+
+  [1]: Bussi, G., & Parrinello, M. (2008). Accurate sampling using Langevin
+       dynamics. http://arxiv.org/abs/0803.4083
+  """
+
+  def step_fn(int_state, energy_change, seed):
+    seed, refresh_seed_1, refresh_seed_2 = util.split_seed(seed, 3)
+
+    # Refresh.
+    momentum = momentum_refresh_fn(int_state.momentum, refresh_seed_1)
+    int_state = int_state._replace(momentum=momentum)
+
+    integrator_step_state = IntegratorStepState(
+        state=int_state.state,
+        state_grads=int_state.state_grads,
+        momentum=int_state.momentum)
+
+    # Integrate.
+    integrator_step_state, integrator_step_extra = integrator_step_fn(
+        integrator_step_state)
+
+    new_int_state = int_state._replace(
+        state=integrator_step_state.state,
+        state_extra=integrator_step_extra.state_extra,
+        state_grads=integrator_step_state.state_grads,
+        momentum=integrator_step_state.momentum,
+        target_log_prob=integrator_step_extra.target_log_prob,
+    )
+
+    # TODO(siege): Somehow return the energy change extra.
+    new_energy_change, _ = energy_change_fn(int_state, new_int_state)
+    energy_change += new_energy_change
+
+    # Refresh.
+    momentum = momentum_refresh_fn(new_int_state.momentum, refresh_seed_2)
+    new_int_state = new_int_state._replace(momentum=momentum)
+
+    if integrator_trace_fn is None:
+      integrator_trace = ()
+    else:
+      integrator_trace = integrator_trace_fn(new_int_state,
+                                             integrator_step_state,
+                                             integrator_step_extra)
+    return (new_int_state, energy_change, seed), (integrator_trace,
+                                                  integrator_step_extra)
+
+  (int_state, energy_change,
+   _), (integrator_trace, integrator_step_extra) = trace(
+       (int_state, tf.zeros_like(int_state.target_log_prob), seed),
+       step_fn,
+       num_steps,
+       unroll=unroll,
+       trace_mask=(True, False),
+   )
+
+  extra = IntegratorExtras(
+      initial_energy=(),
+      initial_kinetic_energy=(),
+      initial_kinetic_energy_extra=(),
+      final_energy=(),
+      final_kinetic_energy=(),
+      final_kinetic_energy_extra=(),
+      energy_change=energy_change,
+      integrator_trace=integrator_trace,
+      momentum_grads=integrator_step_extra.momentum_grads)
+
+  return int_state, extra
 
 
 @util.named_call

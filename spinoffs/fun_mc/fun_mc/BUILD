@@ -118,6 +118,30 @@ py_test(
 
 # pytype
 py_library(
+    name = "malt",
+    srcs = ["malt.py"],
+    deps = [
+        ":backend",
+        ":fun_mc_lib",
+    ],
+)
+
+py_test(
+    name = "malt_test",
+    srcs = ["malt_test.py"],
+    shard_count = 2,
+    deps = [
+        ":fun_mc",
+        ":test_util",
+        # jax dep,
+        # tensorflow dep,
+        # tensorflow_probability/python/internal:test_util dep,
+        # tensorflow/compiler/jit dep,
+    ],
+)
+
+# pytype
+py_library(
     name = "sga_hmc",
     srcs = ["sga_hmc.py"],
     deps = [
@@ -148,6 +172,7 @@ py_library(
     deps = [
         ":backend",
         ":fun_mc_lib",
+        ":malt",
         ":sga_hmc",
     ],
 )
