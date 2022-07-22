@@ -4192,7 +4192,10 @@ py_test(
     size = "large",
     srcs = ["platform_compatibility_test.py"],
     shard_count = 50,
-    tags = ["hypothesis"],
+    tags = [
+        "hypothesis",
+        "tf1-broken",  # TODO(b/239963967): Flaky under TF1.
+    ],
     deps = [
         ":distributions",
         ":hypothesis_testlib",
