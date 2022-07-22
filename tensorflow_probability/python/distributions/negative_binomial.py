@@ -60,6 +60,7 @@ class NegativeBinomial(
                probs=None,
                validate_args=False,
                allow_nan_stats=True,
+               require_integer_total_count=True,
                name='NegativeBinomial'):
     """Construct NegativeBinomial distributions.
 
@@ -89,6 +90,8 @@ class NegativeBinomial(
         (e.g., mean, mode, variance) use the value "`NaN`" to indicate the
         result is undefined. When `False`, an exception is raised if one or
         more of the statistic's batch members are undefined.
+      require_integer_total_count: Python `bool`, default `True`.  When `True`,
+        the total_count parameter is required to be integer.
       name: Python `str` name prefixed to Ops created by this class.
     """
 
@@ -105,6 +108,7 @@ class NegativeBinomial(
           logits, dtype=dtype, name='logits')
       self._total_count = tensor_util.convert_nonref_to_tensor(
           total_count, dtype=dtype, name='total_count')
+      self._require_integer_total_count = require_integer_total_count
 
       super(NegativeBinomial, self).__init__(
           dtype=dtype,
@@ -255,7 +259,7 @@ class NegativeBinomial(
   def _parameter_control_dependencies(self, is_init):
     return maybe_assert_negative_binomial_param_correctness(
         is_init, self.validate_args, self._total_count, self._probs,
-        self._logits)
+        self._logits, self._require_integer_total_count)
 
   def _sample_control_dependencies(self, x):
     """Check counts for proper shape and values, then return tensor version."""
@@ -267,7 +271,8 @@ class NegativeBinomial(
 
 
 def maybe_assert_negative_binomial_param_correctness(
-    is_init, validate_args, total_count, probs, logits):
+    is_init, validate_args, total_count, probs, logits,
+    require_integer_total_count):
   """Return assertions for `NegativeBinomial`-type distributions."""
   if is_init:
     x, name = (probs, 'probs') if logits is None else (logits, 'logits')
@@ -284,11 +289,13 @@ def maybe_assert_negative_binomial_param_correctness(
     assertions.extend([
         assert_util.assert_positive(
             total_count,
-            message='`total_count` has components less than or equal to 0.'),
-        distribution_util.assert_integer_form(
-            total_count,
-            message='`total_count` has fractional components.')
+            message='`total_count` has components less than or equal to 0.')
     ])
+    if require_integer_total_count:
+      assertions.extend([
+          distribution_util.assert_integer_form(
+              total_count, message='`total_count` has fractional components.')
+      ])
   if probs is not None:
     if is_init != tensor_util.is_ref(probs):
       probs = tf.convert_to_tensor(probs)

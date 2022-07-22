@@ -318,6 +318,16 @@ class NegativeBinomialTest(test_util.TestCase):
     self.evaluate(tfp.math.value_and_gradient(
         tfd.NegativeBinomial(0.1, 0.).log_prob, [0.1]))
 
+  def testRequireIntegerTotalCount(self):
+    with self.assertRaisesOpError(
+        '`total_count` has fractional components.'):
+      d = tfd.NegativeBinomial(total_count=2.5, probs=0.7, validate_args=True)
+      self.evaluate(d.log_prob(5))
+
+    d2 = tfd.NegativeBinomial(total_count=2.5, probs=0.7, validate_args=True,
+                              require_integer_total_count=False)
+    self.evaluate(d2.log_prob(5))
+
 
 @test_util.test_all_tf_execution_regimes
 class NegativeBinomialFromVariableTest(test_util.TestCase):
