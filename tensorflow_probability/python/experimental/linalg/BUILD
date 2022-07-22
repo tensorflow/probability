@@ -32,15 +32,49 @@ package(
 multi_substrate_py_library(
     name = "linalg",
     srcs = ["__init__.py"],
+    numpy_omit_deps = [
+        ":linear_operator_interpolated_psd_kernel",
+    ],
     substrates_omit_deps = [
         ":linear_operator_psd_kernel",
         ":no_pivot_ldl",
     ],
     deps = [
+        ":linear_operator_interpolated_psd_kernel",
         ":linear_operator_psd_kernel",
         ":linear_operator_unitary",
         ":no_pivot_ldl",
         "//tensorflow_probability/python/internal:all_util",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "linear_operator_interpolated_psd_kernel",
+    srcs = ["linear_operator_interpolated_psd_kernel.py"],
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:gradient",
+        "//tensorflow_probability/python/math:interpolation",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "linear_operator_interpolated_psd_kernel_test",
+    size = "large",
+    srcs = ["linear_operator_interpolated_psd_kernel_test.py"],
+    disabled_substrates = ["numpy"],
+    shard_count = 8,
+    deps = [
+        # numpy dep,
+        # tensorflow dep,
+        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:test_util",
+        # tensorflow/compiler/jit dep,
     ],
 )
 

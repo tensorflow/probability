@@ -115,7 +115,8 @@ def _tensor_scatter_nd_add(tensor, indices, updates, name=None):  # pylint: disa
   indices = _convert_to_tensor(indices)
   tensor = _convert_to_tensor(tensor)
   updates = _convert_to_tensor(updates)
-  indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
+  indices = tuple(
+      indices[..., i] for i in range(indices.shape[-1]))  # TODO(b/140685491)
   if JAX_MODE:
     return tensor.at[indices].add(updates)
   tensor[indices] += updates
@@ -128,7 +129,8 @@ def _tensor_scatter_nd_sub(tensor, indices, updates, name=None):  # pylint: disa
   indices = _convert_to_tensor(indices)
   tensor = _convert_to_tensor(tensor)
   updates = _convert_to_tensor(updates)
-  indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
+  indices = tuple(
+      indices[..., i] for i in range(indices.shape[-1]))  # TODO(b/140685491)
   if JAX_MODE:
     return tensor.at[indices].add(np.negative(updates))
   tensor[indices] -= updates
@@ -141,7 +143,8 @@ def _tensor_scatter_nd_update(tensor, indices, updates, name=None):  # pylint: d
   indices = _convert_to_tensor(indices)
   tensor = _convert_to_tensor(tensor)
   updates = _convert_to_tensor(updates)
-  indices = indices[..., 0]  # TODO(b/140685491): This is probably wrong!
+  indices = tuple(
+      indices[..., i] for i in range(indices.shape[-1]))  # TODO(b/140685491)
   if JAX_MODE:
     return tensor.at[indices].set(updates)
   tensor[indices] = updates

@@ -395,12 +395,13 @@ class MaternThreeHalves(_AmplitudeLengthScaleMixin,
       self, x1, x2, pairwise_square_distance, example_ndims=0):
     # Use util.sqrt_with_finite_grads to avoid NaN gradients when `x1 == x2`.
     norm = util.sqrt_with_finite_grads(pairwise_square_distance)
+    np_dtype = dtype_util.as_numpy_dtype(norm.dtype)
     inverse_length_scale = self._inverse_length_scale_parameter()
     if inverse_length_scale is not None:
       inverse_length_scale = util.pad_shape_with_ones(
           inverse_length_scale, ndims=example_ndims)
       norm = norm * inverse_length_scale
-    series_term = np.sqrt(3) * norm
+    series_term = np.sqrt(3).astype(np_dtype) * norm
     log_result = tf.math.log1p(series_term) - series_term
 
     if self.amplitude is not None:
