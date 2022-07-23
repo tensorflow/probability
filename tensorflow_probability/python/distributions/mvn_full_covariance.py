@@ -195,7 +195,6 @@ class MultivariateNormalFullCovariance(mvn_tril.MultivariateNormalTriL):
             allow_nan_stats=allow_nan_stats,
             name=name)
     self._parameters = parameters
-    self._covariance_matrix = covariance_matrix
 
   @classmethod
   def _maximum_likelihood_parameters(cls, value):

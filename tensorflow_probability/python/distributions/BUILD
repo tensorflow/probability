@@ -4194,7 +4194,6 @@ py_test(
     shard_count = 50,
     tags = [
         "hypothesis",
-        "tf1-broken",  # TODO(b/239963967): Flaky under TF1.
     ],
     deps = [
         ":distributions",
