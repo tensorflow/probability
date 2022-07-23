@@ -42,6 +42,7 @@ from tensorflow_probability.python.math.generic import sqrt1pm1
 from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.math.gram_schmidt import gram_schmidt
 from tensorflow_probability.python.math.integration import trapz
+from tensorflow_probability.python.math.interpolation import batch_interp_rectilinear_nd_grid
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_1d_grid
 from tensorflow_probability.python.math.interpolation import batch_interp_regular_nd_grid
 from tensorflow_probability.python.math.interpolation import interp_regular_1d_grid
@@ -95,6 +96,7 @@ random_rayleigh = deprecation.deprecated(
 _allowed_symbols = [
     'atan_difference',
     'betainc',
+    'batch_interp_rectilinear_nd_grid',
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
     'bessel_iv_ratio',

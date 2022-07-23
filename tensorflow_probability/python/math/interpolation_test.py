@@ -21,6 +21,8 @@ import tensorflow.compat.v2 as tf
 import tensorflow_probability as tfp
 
 
+from tensorflow_probability.python.internal import dtype_util
+from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
 
 
@@ -570,12 +572,11 @@ class BatchInterpRegular1DGridTest(test_util.TestCase):
       self.assertAllClose([2., 2., 0., 2., 2.], dy_dx_)
 
 
-@test_util.test_all_tf_execution_regimes
-class BatchInterpRegularNDGridTest(test_util.TestCase):
+class BaseBatchInterpNDGridTest:
 
   def test_2d_scalar_valued_no_leading_dims(self):
     y_ref = [[0., 1.], [2., 3.]]
-    y = tfp.math.batch_interp_regular_nd_grid(
+    y = self.batch_interp_regular_nd_grid_fn(
         # Interpolate at one single point.
         x=[[0., 0.]],
         x_ref_min=[0., 0.],
@@ -586,7 +587,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     self.assertAllClose([0.0], self.evaluate(y))
 
     # Test x at all grid points
-    y = tfp.math.batch_interp_regular_nd_grid(
+    y = self.batch_interp_regular_nd_grid_fn(
         x=[[0., 0.], [0., 1.], [1., 0.], [1., 1.]],
         x_ref_min=[0., 0.],
         x_ref_max=[1., 1.],
@@ -595,7 +596,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     self.assertAllClose([0.0, 1.0, 2.0, 3.0], self.evaluate(y))
 
     # Test x at intermediate grid points, outside points, and NaN.
-    y = tfp.math.batch_interp_regular_nd_grid(
+    y = self.batch_interp_regular_nd_grid_fn(
         x=[
             [0.0, 0.5],
             [0.5, 0.0],
@@ -616,7 +617,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     y_ref = [[0., 1.], [2., 3.]]
 
     # Test x at intermediate grid points, outside points, and NaN.
-    y = tfp.math.batch_interp_regular_nd_grid(
+    y = self.batch_interp_regular_nd_grid_fn(
         x=[
             [-1.0, 0.5],  # Outside the grid.
             [10.0, 0.5],  # Outside the grid.
@@ -658,7 +659,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     x = self.evaluate(x)
 
     expected_y = func(x[:, 0])
-    actual_y = tfp.math.batch_interp_regular_nd_grid(
+    actual_y = self.batch_interp_regular_nd_grid_fn(
         x=x, x_ref_min=x_ref_min, x_ref_max=x_ref_max, y_ref=y_ref, axis=-1)
 
     self.assertAllClose(
@@ -696,7 +697,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     x = self.evaluate(x)
 
     expected_y = func(x[..., 0])
-    actual_y = tfp.math.batch_interp_regular_nd_grid(
+    actual_y = self.batch_interp_regular_nd_grid_fn(
         x=x, x_ref_min=x_ref_min, x_ref_max=x_ref_max, y_ref=y_ref, axis=-1)
 
     self.assertAllClose(
@@ -732,7 +733,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     x = self.evaluate(x)
 
     expected_y = func(x[:, 0], x[:, 1])
-    actual_y = tfp.math.batch_interp_regular_nd_grid(
+    actual_y = self.batch_interp_regular_nd_grid_fn(
         x=x, x_ref_min=x_ref_min, x_ref_max=x_ref_max, y_ref=y_ref, axis=-2)
 
     self.assertAllClose(
@@ -769,7 +770,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     x = self.evaluate(x)
 
     expected_y = func(x[:, 0], x[:, 1])
-    actual_y = tfp.math.batch_interp_regular_nd_grid(
+    actual_y = self.batch_interp_regular_nd_grid_fn(
         x=x, x_ref_min=x_ref_min, x_ref_max=x_ref_max, y_ref=y_ref, axis=-3)
 
     self.assertAllClose(
@@ -816,7 +817,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     x = self.evaluate(x)
 
     expected_y = func(x[..., 0], x[..., 1])
-    actual_y = tfp.math.batch_interp_regular_nd_grid(
+    actual_y = self.batch_interp_regular_nd_grid_fn(
         x=x, x_ref_min=x_ref_min, x_ref_max=x_ref_max, y_ref=y_ref, axis=-3)
 
     self.assertAllClose(
@@ -860,7 +861,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     fill_value = -42
     expected_y[0, :] = fill_value
 
-    actual_y = tfp.math.batch_interp_regular_nd_grid(
+    actual_y = self.batch_interp_regular_nd_grid_fn(
         x=x,
         x_ref_min=x_ref_min,
         x_ref_max=x_ref_max,
@@ -869,11 +870,6 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
         fill_value=fill_value)
 
     self.assertAllClose(expected_y, self.evaluate(actual_y), atol=0.02)
-
-  def test_axis_set_too_large_raises(self):
-    with self.assertRaisesRegexp(ValueError, 'Since dims'):
-      tfp.math.batch_interp_regular_nd_grid(
-          x=[[1.]], x_ref_min=[0.], x_ref_max=[1.], y_ref=[0., 1.], axis=3)
 
   @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
@@ -915,7 +911,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
     x = tf.convert_to_tensor(value=x)
 
     def func(xx):
-      return tfp.math.batch_interp_regular_nd_grid(
+      return self.batch_interp_regular_nd_grid_fn(
           x=xx, x_ref_min=x_ref_min, x_ref_max=x_ref_max, y_ref=y_ref, axis=-1)
 
     _, dy_dx_ = self.evaluate(tfp.math.value_and_gradient(func, x))
@@ -923,7 +919,7 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
 
   def test_float64(self):
     y_ref = tf.convert_to_tensor([[0., 1.], [2., 3.]], dtype=tf.float64)
-    y = tfp.math.batch_interp_regular_nd_grid(
+    y = self.batch_interp_regular_nd_grid_fn(
         # Interpolate at one single point.
         x=tf.convert_to_tensor([[0., 0.]], dtype=tf.float64),
         x_ref_min=tf.convert_to_tensor([0., 0.], dtype=tf.float64),
@@ -940,8 +936,118 @@ class BatchInterpRegularNDGridTest(test_util.TestCase):
       self.skipTest('Graph-mode only')
     x = tf1.placeholder_with_default(tf.zeros((3, 1)), shape=[None, 1])
     y_ref = tf.ones(10)
-    tfp.math.batch_interp_regular_nd_grid(
+    self.batch_interp_regular_nd_grid_fn(
         x=x, x_ref_min=[0.], x_ref_max=[1.], y_ref=y_ref, axis=0)
+
+
+@test_util.test_all_tf_execution_regimes
+class BatchInterpRegularNDGridTest(BaseBatchInterpNDGridTest,
+                                   test_util.TestCase):
+
+  @property
+  def batch_interp_regular_nd_grid_fn(self):
+    return tfp.math.batch_interp_regular_nd_grid
+
+  def test_axis_set_too_large_raises(self):
+    with self.assertRaisesRegexp(ValueError, 'Since dims'):
+      tfp.math.batch_interp_regular_nd_grid(
+          x=[[1.]], x_ref_min=[0.], x_ref_max=[1.], y_ref=[0., 1.], axis=3)
+
+
+@test_util.test_all_tf_execution_regimes
+class BatchInterpRectilinearNDGridTest(BaseBatchInterpNDGridTest,
+                                       test_util.TestCase):
+
+  @property
+  def batch_interp_regular_nd_grid_fn(self):
+
+    def regular_to_rectilinear_interp(x,
+                                      x_ref_min,
+                                      x_ref_max,
+                                      y_ref,
+                                      axis,
+                                      fill_value='constant_extension'):
+      """Call rectilinear interpolation on args from regular grid interp."""
+      dtype = dtype_util.common_dtype([x, x_ref_min, x_ref_max, y_ref],
+                                      dtype_hint=tf.float32)
+      x = tf.convert_to_tensor(x, dtype=dtype)
+
+      y_ref = tf.convert_to_tensor(y_ref, dtype=dtype)
+      x_ref_min = tf.convert_to_tensor(x_ref_min, dtype=dtype)
+      x_ref_max = tf.convert_to_tensor(x_ref_max, dtype=dtype)
+      nd = tf.compat.dimension_value(x_ref_min.shape[-1])
+      pos_axis = ps.non_negative_axis(axis, ps.rank(y_ref))
+      ny = tf.cast(
+          ps.shape_slice(y_ref, np.s_[pos_axis:pos_axis + nd]), tf.int32)
+
+      x_grid_points = []
+      for k in range(nd):
+        x_grid_points.append(
+            tf.linspace(
+                x_ref_min[..., k], x_ref_max[..., k], num=ny[k], axis=-1))
+
+      return tfp.math.batch_interp_rectilinear_nd_grid(
+          x, tuple(x_grid_points), y_ref, axis, fill_value=fill_value)
+
+    return regular_to_rectilinear_interp
+
+  def test_axis_set_too_large_raises(self):
+    with self.assertRaisesRegexp(ValueError, 'Since dims'):
+      tfp.math.batch_interp_rectilinear_nd_grid(
+          x=[[1.]], x_grid_points=([0, 1, 2.],), y_ref=[1., 2., 3.], axis=3)
+
+  def test_x_grid_points_and_y_ref_must_have_same_n_points_or_raises(self):
+    with self.assertRaisesRegexp(ValueError, 'the number of points'):
+      tfp.math.batch_interp_rectilinear_nd_grid(
+          x=[[0.5]], x_grid_points=([0, 1, 2.],), y_ref=[1., 2.], axis=0)
+
+  def test_1d_function_on_nonlinear_grid(self):
+    x_min, x_max = 0., 3.
+    x_grid = np.linspace(x_min, x_max, num=100, dtype=np.float32)**2
+    y_ref = tf.sin(x_grid)
+
+    # Argument `x` must be shape [..., D, nd] = [50, 1].
+    x = tf.linspace(x_min, x_max, 50)[..., tf.newaxis]
+
+    y = tfp.math.batch_interp_rectilinear_nd_grid(x, (x_grid,), y_ref, axis=0)
+
+    # Linear interpolation of f(x) leads to error bounded by
+    #   Max{|f''|} * Max{Δx}.
+    # Put a '2' in front for safety.
+    atol = 2. * (x_grid[-1] - x_grid[-2])
+    expected_y = tf.sin(x[:, 0])
+
+    self.assertAllClose(self.evaluate(y), self.evaluate(expected_y), atol=atol)
+
+  def test_2d_function_on_nonlinear_grid(self):
+    x0_min, x0_max = 0., 3.
+    x1_min, x1_max = -1., 1.
+    x0_grid = np.linspace(x0_min, x0_max, num=50, dtype=np.float32)**2
+    x1_grid = np.linspace(x1_min, x1_max, num=50, dtype=np.float32)**3
+    x0_mesh, x1_mesh = np.meshgrid(x0_grid, x1_grid, indexing='ij')
+
+    def f(x0, x1):
+      return tf.sin(x0) * tf.cos(x1)
+
+    y_ref = f(x0_mesh, x1_mesh)
+
+    # Argument `x` must be shape [..., D, nd] = [50, 2].
+    rng = np.random.RandomState(42)
+    x0 = x0_min + (x0_max - x0_min) * rng.rand(50).astype(np.float32)
+    x1 = x1_min + (x1_max - x1_min) * rng.rand(50).astype(np.float32)
+    x = tf.stack((x0, x1), axis=-1)
+
+    y = tfp.math.batch_interp_rectilinear_nd_grid(
+        x, (x0_grid, x1_grid), y_ref, axis=0)
+
+    # Linear interpolation of f(x) leads to error bounded by
+    #   Max{|f''|} * Max{Δx}.
+    # Put a '2' in front for safety.
+    atol = 2. * (x0_grid[-1] - x0_grid[-2])
+    expected_y = f(x0, x1)
+
+    self.assertAllClose(self.evaluate(y), self.evaluate(expected_y), atol=atol)
+
 
 if __name__ == '__main__':
   test_util.main()

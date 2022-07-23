@@ -29,6 +29,7 @@ __all__ = [
     'interp_regular_1d_grid',
     'batch_interp_regular_1d_grid',
     'batch_interp_regular_nd_grid',
+    'batch_interp_rectilinear_nd_grid',
 ]
 
 
@@ -500,6 +501,9 @@ def batch_interp_regular_nd_grid(x,
   The interpolant is built from reference values indexed by `nd` dimensions
   of `y_ref`, starting at `axis`.
 
+  The x grid span is defined by `x_ref_min`, `x_ref_max`. The number of grid
+  points is inferred from the shape of `y_ref`.
+
   For example, take the case of a `2-D` scalar valued function and no leading
   batch dimensions.  In this case, `y_ref.shape = [C1, C2]` and `y_ref[i, j]`
   is the reference value corresponding to grid point
@@ -539,10 +543,12 @@ def batch_interp_regular_nd_grid(x,
     y_interp:  Interpolation between members of `y_ref`, at points `x`.
       `Tensor` of same `dtype` as `x`, and shape `[..., D, B1, ..., BM].`
 
+  Exceptions will be raised if shapes are statically determined to be wrong.
+
   Raises:
-    ValueError:  If `rank(x) < 2` is determined statically.
-    ValueError:  If `axis` is not a scalar is determined statically.
-    ValueError:  If `axis + nd > rank(y_ref)` is determined statically.
+    ValueError:  If `rank(x) < 2`.
+    ValueError:  If `axis` is not a scalar.
+    ValueError:  If `axis + nd > rank(y_ref)`.
 
   #### Examples
 
@@ -575,7 +581,7 @@ def batch_interp_regular_nd_grid(x,
 
   y_ref = func(x0s, x1s)
 
-  x = np.pi * tf.random.uniform(shape=(10, 2))
+  x = 2 * np.pi * tf.random.uniform(shape=(10, 2))
 
   tfp.math.batch_interp_regular_nd_grid(x, x_ref_min, x_ref_max, y_ref, axis=-2)
   ==> tf.sin(x[:, 0]) * tf.cos(x[:, 1])
@@ -587,15 +593,7 @@ def batch_interp_regular_nd_grid(x,
                                     dtype_hint=tf.float32)
 
     # Arg checking.
-    if isinstance(fill_value, str):
-      if fill_value != 'constant_extension':
-        raise ValueError(
-            'A fill value ({}) was not an allowed string ({})'.format(
-                fill_value, 'constant_extension'))
-    else:
-      fill_value = tf.convert_to_tensor(
-          fill_value, name='fill_value', dtype=dtype)
-      _assert_ndims_statically(fill_value, expect_ndims=0)
+    fill_value = _intake_fill_value_for_nd_interp(fill_value, dtype)
 
     # x.shape = [..., nd].
     x = tf.convert_to_tensor(x, name='x', dtype=dtype)
@@ -623,19 +621,7 @@ def batch_interp_regular_nd_grid(x,
         x_ref_max.shape[-1:], x_ref_min.shape[-1:])
 
     # Convert axis and check it statically.
-    axis = ps.convert_to_shape_tensor(axis, dtype=tf.int32, name='axis')
-    axis = ps.non_negative_axis(axis, ps.rank(y_ref))
-    tensorshape_util.assert_has_rank(axis.shape, 0)
-    axis_ = tf.get_static_value(axis)
-    y_ref_rank_ = tf.get_static_value(tf.rank(y_ref))
-    if axis_ is not None and y_ref_rank_ is not None:
-      if axis_ + nd > y_ref_rank_:
-        raise ValueError(
-            'Since dims `[axis, axis + nd)` index the interpolation table, we '
-            'must have `axis + nd <= rank(y_ref)`.  Found: '
-            '`axis`: {},  rank(y_ref): {}, and inferred `nd` from trailing '
-            'dimensions of `x_ref_min` to be {}.'.format(
-                axis_, y_ref_rank_, nd))
+    axis = _intake_axis_for_nd_interp(axis, y_ref, nd)
 
     x_batch_shape = ps.shape_slice(x, np.s_[:-2])
     x_ref_min_batch_shape = ps.shape_slice(x_ref_min, np.s_[:-1])
@@ -665,7 +651,7 @@ def batch_interp_regular_nd_grid(x,
         _batch_shape_of_zeros_with_rightmost_singletons(
             n_singletons=ps.rank(y_ref) - axis))
 
-    # In this function,
+    # At this point,
     # x.shape = [A1, ..., An, D, nd], where n = batch_ndims
     # and
     # y_ref.shape = [A1, ..., An, C1, C2,..., Cnd, B1,...,BM]
@@ -678,6 +664,9 @@ def batch_interp_regular_nd_grid(x,
     # ny[k] is number of y reference points in interp dim k.
     # It is used to indicate the dimension sizes.
     ny = tf.cast(
+        # After broadcasting y_ref with x, slice(batch_ndims, batch_ndims + nd)
+        # is the proper way to extract ny. Before broadcasting, use
+        # slice(axis, axis + nd)
         ps.shape_slice(y_ref, np.s_[batch_ndims:batch_ndims + nd]), dtype)
 
     # Map [x_ref_min, x_ref_max] to [0, ny - 1].
@@ -688,6 +677,228 @@ def batch_interp_regular_nd_grid(x,
     x_ref_max_expanded = tf.expand_dims(x_ref_max, axis=-2)
     x_idx_unclipped = (ny - 1) * (x - x_ref_min_expanded) / (
         x_ref_max_expanded - x_ref_min_expanded)
+
+    return _batch_interp_with_gather_nd(
+        x=x,
+        x_idx_unclipped=x_idx_unclipped,
+        y_ref=y_ref,
+        nd=nd,
+        fill_value=fill_value,
+        batch_ndims=batch_ndims)
+
+
+def batch_interp_rectilinear_nd_grid(x,
+                                     x_grid_points,
+                                     y_ref,
+                                     axis,
+                                     fill_value='constant_extension',
+                                     name=None):
+  """Multi-linear interpolation on a rectilinear grid.
+
+  Given [a batch of] reference values, this function computes a multi-linear
+  interpolant and evaluates it on [a batch of] new `x` values. This is a
+  multi-dimensional generalization of [Bilinear Interpolation](
+  https://en.wikipedia.org/wiki/Bilinear_interpolation).
+
+  The interpolant is built from reference values indexed by `nd` dimensions
+  of `y_ref`, starting at `axis`.
+
+  The x grid is defined by `1-D` points along each dimension. These points must
+  be sorted, but may have unequal spacing.
+
+  For example, take the case of a `2-D` scalar valued function and no leading
+  batch dimensions.  In this case, `y_ref.shape = [C1, C2]` and `y_ref[i, j]`
+  is the reference value corresponding to grid point
+
+  ```[x_grid_points[0][i], x_grid_points[1][j]]```
+
+  In the general case, dimensions to the left of `axis` in `y_ref` are broadcast
+  with leading dimensions in `x`, and `x_grid_points[k]`, `k = 0, ..., nd - 1`.
+
+  Args:
+    x: Numeric `Tensor` The x-coordinates of the interpolated output values for
+      each batch.  Shape `[..., D, nd]`, designating [a batch of] `D`
+      coordinates in `nd` space.  `D` must be `>= 1` and is not a batch dim.
+    x_grid_points: Tuple of dimension points. `x_grid_points[k]` are a shape
+      `[..., Ck]` `Tensor` of the same dtype as `x` that must be sorted along
+      the innermost (-1) axis. These represent [a batch of] points defining the
+      `kth` dimension values.
+    y_ref:  `Tensor` of same `dtype` as `x`.  The reference output values. Shape
+      `[..., C1, ..., Cnd, B1,...,BM]`, designating [a batch of] reference
+      values indexed by `nd` dimensions, of a shape `[B1,...,BM]` valued
+      function (for `M >= 0`).
+    axis:  Scalar integer `Tensor`.  Dimensions `[axis, axis + nd)` of `y_ref`
+      index the interpolation table.  E.g. `3-D` interpolation of a scalar
+      valued function requires `axis=-3` and a `3-D` matrix valued function
+      requires `axis=-5`.
+    fill_value:  Determines what values output should take for `x` values that
+      are below/above the min/max values in `x_grid_points`.
+      'constant_extension' ==> Extend as constant function.
+      Default value: `'constant_extension'`
+    name:  A name to prepend to created ops.
+      Default value: `'batch_interp_rectilinear_nd_grid'`.
+
+  Returns:
+    y_interp:  Interpolation between members of `y_ref`, at points `x`.
+      `Tensor` of same `dtype` as `x`, and shape `[..., D, B1, ..., BM].`
+
+  Exceptions will be raised if shapes are statically determined to be wrong.
+
+  Raises:
+    ValueError:  If `rank(x) < 2`
+    ValueError:  If `axis` is not a scalar.
+    ValueError:  If `axis + nd > rank(y_ref)`.
+    ValueError:  If `x_grid_points[k].shape[-1] != y_ref.shape[axis + k]`.
+
+  #### Examples
+
+  Interpolate a function of one variable.
+
+  ```python
+  x_grid = tf.linspace(0., 1., 20)**2   # Nonlinearly spaced
+  y_ref = tf.exp(x_grid)
+
+  tfp.math.batch_interp_rectilinear_nd_grid(
+      # x.shape = [3, 1], with the trailing `1` for `1-D`.
+      x=[[6.0], [0.5], [3.3]], x_grid_points=(x_grid,), y_ref=y_ref, axis=0)
+  ==> approx [exp(6.0), exp(0.5), exp(3.3)]
+  ```
+
+  Interpolate a scalar function of two variables.
+
+  ```python
+  x0_grid = tf.linspace(0., 2 * np.pi, num=100),
+  x1_grid = tf.linspace(0., 2 * np.pi, num=100),
+
+  # Build y_ref.
+  x0s, x1s = tf.meshgrid(x0_grid, x1_grid, indexing='ij')
+
+  def func(x0, x1):
+    return tf.sin(x0) * tf.cos(x1)
+
+  y_ref = func(x0s, x1s)
+
+  x = np.pi * tf.random.uniform(shape=(10, 2))
+
+  tfp.math.batch_interp_regular_nd_grid(x, x_grid_points=(x0_grid, x1_grid),
+                                        y_ref, axis=-2)
+  ==> tf.sin(x[:, 0]) * tf.cos(x[:, 1])
+  ```
+
+  """
+  with tf.name_scope(name or 'batch_interp_rectilinear_nd_grid'):
+    if not isinstance(x_grid_points, tuple):
+      raise ValueError(
+          f'`x_grid_points` must be a tuple. Found {type(x_grid_points)}')
+
+    dtype = dtype_util.common_dtype([x, y_ref] + list(x_grid_points),
+                                    dtype_hint=tf.float32)
+
+    # Arg checking.
+    fill_value = _intake_fill_value_for_nd_interp(fill_value, dtype)
+
+    # x.shape = [..., nd].
+    x = tf.convert_to_tensor(x, name='x', dtype=dtype)
+    _assert_ndims_statically(x, expect_ndims_at_least=2)
+
+    # y_ref.shape = [..., C1,...,Cnd, B1,...,BM]
+    y_ref = tf.convert_to_tensor(y_ref, name='y_ref', dtype=dtype)
+
+    # x_ref_min.shape = [nd]
+    x_grid_points = tuple(
+        tf.convert_to_tensor(p, dtype=dtype) for p in x_grid_points)
+    for p in x_grid_points:
+      _assert_ndims_statically(p, expect_ndims_at_least=1, expect_static=True)
+
+    # nd is the number of dimensions indexing the interpolation table, it's the
+    # 'nd' in the function name.
+    nd = len(x_grid_points)
+
+    # Convert axis and check it statically.
+    axis = _intake_axis_for_nd_interp(axis, y_ref, nd)
+
+    # Check that the number of grid points implied by x_grid_points and y_ref
+    # match.
+    for k, p_k in enumerate(x_grid_points):
+      nx_k = p_k.shape[-1]
+      ny_k = y_ref.shape[axis + k]
+      if ny_k is not None and ny_k is not None and nx_k != ny_k:
+        raise ValueError(
+            f'x_grid_points[{k}] contained {nx_k} points, which differed from '
+            f'{ny_k}, the number of points in the {k}th table dimension of '
+            f'y_ref.')
+
+    x_batch_shape = ps.shape_slice(x, np.s_[:-2])
+    x_grid_points_batch_shapes = list(
+        ps.shape_slice(p, np.s_[:-1]) for p in x_grid_points)
+    y_ref_batch_shape = ps.shape_slice(y_ref, np.s_[:axis])
+
+    # Do a brute-force broadcast of batch dims (add zeros).
+    batch_shape = y_ref_batch_shape
+    for tensor in [x_batch_shape] + x_grid_points_batch_shapes:
+      batch_shape = ps.broadcast_shape(batch_shape, tensor)
+
+    def _batch_shape_of_zeros_with_rightmost_singletons(n_singletons):
+      """Return Tensor of zeros with some singletons on the rightmost dims."""
+      ones = ps.ones(shape=[n_singletons], dtype=tf.int32)
+      return ps.concat([batch_shape, ones], axis=0)
+
+    x = _broadcast_with(
+        x, _batch_shape_of_zeros_with_rightmost_singletons(n_singletons=2))
+    x_grid_points = tuple(
+        _broadcast_with(
+            p, _batch_shape_of_zeros_with_rightmost_singletons(n_singletons=1))
+        for p in x_grid_points)
+    y_ref = _broadcast_with(
+        y_ref,
+        _batch_shape_of_zeros_with_rightmost_singletons(
+            n_singletons=ps.rank(y_ref) - axis))
+
+    # At this point,
+    # x.shape = [A1, ..., An, D, nd], where n = batch_ndims
+    # and
+    # y_ref.shape = [A1, ..., An, C1, C2,..., Cnd, B1,...,BM]
+    # y_ref[A1, ..., An, i1,...,ind] is a shape [B1,...,BM] Tensor with value
+    # at index [i1,...,ind] in the interpolation table.
+    # and `p_k = x_grid_points[k]` has shape [A1, ..., An, Ck].
+
+    batch_ndims = ps.rank(x) - 2
+
+    # ny[k] is number of y reference points in interp dim k.
+    # It is used to indicate the dimension sizes...
+    # It could also be called nx, if we actually materialized a grid of x
+    # points. We don't though, as x points are given only as axis values.
+    ny = tf.cast(
+        ps.shape_slice(y_ref, np.s_[batch_ndims:batch_ndims + nd]), tf.int32)
+
+    # Map the `kth` point `x_grid_points[k]` to [0, ny[k] - 1].
+    # This is the (fractional) index of x, "unclipped" meaning it may take
+    # values outside [0, ..., ny[k]].
+    # x_idx_unclipped[A1, ..., An, d, k] is the fractional index into dim k of
+    # interpolation table for the dth x value.
+    x_idx_unclipped = []
+    for k, p_k in enumerate(x_grid_points):
+      # x_k and x_k_clipped shape [A1, ..., An, D].
+      # Clip x_k below...no need to clip above since, in the place it is used
+      # below, we have a tf.minimum(ny[k] - 1,...)
+      x_k = x[..., k]
+      x_k_clipped = tf.maximum(x_k, tf.reduce_min(p_k, axis=-1, keepdims=True))
+
+      # This construction of indices ensures that idx_below_k < idx_above_k.
+      # In particular, the use of x_k_clipped ensures this, even if x_k is OOB.
+      idx_above_k = tf.minimum(
+          ny[k] - 1, tf.searchsorted(p_k, x_k_clipped, side='right'))
+      idx_below_k = tf.maximum(idx_above_k - 1, 0)
+      x_above_k = tf.gather(p_k, idx_above_k, batch_dims=batch_ndims)
+      x_below_k = tf.gather(p_k, idx_below_k, batch_dims=batch_ndims)
+
+      # The use of x_k (not clipped) here allows x_idx_unclipped to be < 0 or >
+      # ny[k] - 1.
+      x_idx_unclipped.append(
+          tf.cast(idx_below_k, dtype) + (x_k - x_below_k) /
+          (x_above_k - x_below_k))
+
+    x_idx_unclipped = tf.stack(x_idx_unclipped, axis=-1)
 
     return _batch_interp_with_gather_nd(
         x=x,
@@ -850,6 +1061,38 @@ def _assert_ndims_statically(x,
   if expect_ndims_at_least is not None and ndims < expect_ndims_at_least:
     raise ValueError('ndims must be at least {}. Found {}'.format(
         expect_ndims_at_least, ndims))
+
+
+def _intake_fill_value_for_nd_interp(fill_value, dtype):
+  """Check `fill_value` and return after converting numeric to tensor."""
+  if isinstance(fill_value, str):
+    if fill_value != 'constant_extension':
+      raise ValueError(
+          'A fill value ({}) was not an allowed string ({})'.format(
+              fill_value, 'constant_extension'))
+  else:
+    fill_value = tf.convert_to_tensor(
+        fill_value, name='fill_value', dtype=dtype)
+    _assert_ndims_statically(fill_value, expect_ndims=0)
+  return fill_value
+
+
+def _intake_axis_for_nd_interp(axis, y_ref, nd):
+  """Convert `axis` to its non-negative value and return after validation."""
+  axis = ps.convert_to_shape_tensor(axis, dtype=tf.int32, name='axis')
+  axis = ps.non_negative_axis(axis, ps.rank(y_ref))
+  tensorshape_util.assert_has_rank(axis.shape, 0)
+  axis_ = tf.get_static_value(axis)
+  y_ref_rank_ = tf.get_static_value(tf.rank(y_ref))
+  if axis_ is not None and y_ref_rank_ is not None:
+    if axis_ + nd > y_ref_rank_:
+      raise ValueError(
+          'Since dims `[axis, axis + nd)` index the interpolation table, we '
+          'must have `axis + nd <= rank(y_ref)`.  Found: '
+          '`axis`: {},  rank(y_ref): {}, and inferred `nd` from trailing '
+          'dimensions of `x_ref_min` to be {}.'.format(
+              axis_, y_ref_rank_, nd))
+  return axis
 
 
 def _make_expand_x_fn_for_non_batch_interpolation(y_ref, axis):
