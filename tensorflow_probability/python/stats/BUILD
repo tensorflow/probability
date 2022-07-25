@@ -33,7 +33,6 @@ multi_substrate_py_library(
     name = "stats",
     srcs = ["__init__.py"],
     jax_omit_deps = [
-        ":kendalls_tau",
         ":ranking",
     ],
     deps = [

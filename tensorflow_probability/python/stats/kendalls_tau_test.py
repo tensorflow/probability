@@ -26,17 +26,6 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class KendallsTauTest(test_util.TestCase):
 
-  def test_iterative_mergesort(self):
-    values = [7, 3, 9, 0, -6, 12, 54, 3, -6, 88, 1412]
-    array = tf.constant(values, tf.int32)
-    iperm = tf.range(len(values), dtype=tf.int32)
-    exchanges, perm = tfp.stats.iterative_mergesort(array, iperm)
-    expected = sorted(values)
-    self.assertAllEqual(expected, tf.gather(array, perm))
-    ordered, _ = tfp.stats.iterative_mergesort(array, perm)
-    self.assertAllEqual(ordered, 0)
-    self.assertAllEqual(exchanges, 19)
-
   def test_kendall_tau(self):
     x1 = [12, 2, 1, 12, 2]
     x2 = [1, 4, 7, 1, 0]
@@ -45,14 +34,6 @@ class KendallsTauTest(test_util.TestCase):
         tfp.stats.kendalls_tau(
             tf.constant(x1, tf.float32), tf.constant(x2, tf.float32)))
     self.assertAllClose(expected, res, atol=1e-5)
-
-  def test_lexicographical_sort(self):
-    primary = [12, 2, 1, 12, 2]
-    secondary = [1, 4, 7, 1, 0]
-    expected = [2, 4, 1, 0, 3]  # Assumes stable sort.
-    res = self.evaluate(
-        tfp.stats.lexicographical_indirect_sort(primary, secondary))
-    self.assertAllEqual(expected, res)
 
   def test_kendall_tau_float(self):
     x1 = [0.12, 0.02, 0.01, 0.12, 0.02]
