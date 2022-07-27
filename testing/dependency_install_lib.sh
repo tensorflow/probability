@@ -54,7 +54,7 @@ find_good_tf_nightly_version_str() {
   VERSION=$1
   curl -s "https://pypi.org/pypi/${VERSION}/json" \
     | python -c "$PYTHON_PARSE_PACKAGE_JSON" \
-        --bad_dates 20210519 20210619
+        --bad_dates 20210519 20210619 20220727
 }
 
 install_tensorflow() {
