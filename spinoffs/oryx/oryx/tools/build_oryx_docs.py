@@ -17,8 +17,8 @@ import os
 
 from absl import app
 from absl import flags
-from tensorflow_docs.api_generator import generate_lib
 import oryx
+from tensorflow_docs.api_generator import generate_lib
 
 
 flags.DEFINE_string("output_dir", "/tmp/oryx_api",
@@ -26,8 +26,8 @@ flags.DEFINE_string("output_dir", "/tmp/oryx_api",
 
 flags.DEFINE_string(
     "code_url_prefix",
-    ("https://github.com/tensorflow/probability/blob/main/spinoffs/oryx/"
-     "oryx"), "The url prefix for links to code.")
+    "https://github.com/jax-ml/oryx/blob/main/oryx",
+    "The url prefix for links to code.")
 
 flags.DEFINE_bool("search_hints", True,
                   "Include metadata search hints in the generated files")

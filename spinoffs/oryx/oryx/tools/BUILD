@@ -18,15 +18,14 @@ licenses(["notice"])
 
 package(default_visibility = ["//visibility:public"])
 
-# pytype_strict
-py_binary(
+pytype_strict_binary(
     name = "build_oryx_docs",
     srcs = ["build_oryx_docs.py"],
     deps = [
         # absl:app dep,
         # absl/flags dep,
+        # oryx dep,
         # tensorflow_docs/api_generator:doc_controls dep,
         # tensorflow_docs/api_generator:generate_lib dep,
-        "//oryx",
     ],
 )
