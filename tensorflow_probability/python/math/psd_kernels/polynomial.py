@@ -22,6 +22,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
+from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
 __all__ = [
     'Constant',
@@ -40,7 +41,7 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
     or None.
 
     ```none
-    k(x, y) = bias_variance**2 + slope_variance**2 *
+    k(x, y) = bias_amplitude**2 + slope_amplitude**2 *
               ((x - shift) dot (y - shift))**exponent
     ```
 
@@ -54,9 +55,16 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
 
   """
 
+  @deprecation.deprecated_args(
+      '2022-11-01',
+      '`bias_variance` and `slope_variance` are deprecated. Please use '
+      '`bias_amplitude` and `slope_amplitude` instead.',
+      'bias_variance', 'slope_variance')
   def __init__(self,
                bias_variance=None,
                slope_variance=None,
+               bias_amplitude=None,
+               slope_amplitude=None,
                shift=None,
                exponent=None,
                feature_ndims=1,
@@ -66,28 +74,40 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
     """Construct a Polynomial kernel instance.
 
     Args:
-      bias_variance: Non-negative floating point `Tensor` that controls the
-        variance from the origin. If bias = 0, there is no variance and the
+      bias_variance: Deprecated. Non-negative floating point `Tensor` that
+        controls the variance from the origin. If bias = 0, there is no
+        variance and the fitted function goes through the origin.  Must be
+        broadcastable with `slope_variance`, `shift`, `exponent`, and inputs
+        to `apply` and `matrix` methods. A value of `None` is treated like 0.
+        Default Value: `None`
+      slope_variance: Deprecated. Non-negative floating point `Tensor` that
+        controls the variance of the regression line slope that is the basis
+        for the polynomial. Must be broadcastable with `bias_variance`, `shift`,
+        `exponent`, and inputs to `apply` and `matrix` methods. A value of
+        `None` is treated like 1.
+        Default Value: `None`
+      bias_amplitude: Non-negative floating point `Tensor` that controls the
+        stddev from the origin. If bias = 0, there is no stddev and the
         fitted function goes through the origin.  Must be broadcastable with
-        `slope_variance`, `shift`, `exponent`, and inputs to `apply` and
+        `slope_amplitude`, `shift`, `exponent`, and inputs to `apply` and
         `matrix` methods. A value of `None` is treated like 0.
         Default Value: `None`
-      slope_variance: Non-negative floating point `Tensor` that controls the
-        variance of the regression line slope that is the basis for the
-        polynomial. Must be broadcastable with `bias_variance`, `shift`,
+      slope_amplitude: Non-negative floating point `Tensor` that controls the
+        stddev of the regression line slope that is the basis for the
+        polynomial. Must be broadcastable with `bias_amplitude`, `shift`,
         `exponent`, and inputs to `apply` and `matrix` methods. A value of
         `None` is treated like 1.
         Default Value: `None`
       shift: Floating point `Tensor` that contols the intercept with the x-axis
         of the linear function to be exponentiated to get this polynomial. Must
-        be broadcastable with `bias_variance`, `slope_variance`, `exponent` and
-        inputs to `apply` and `matrix` methods. A value of `None` is treated
+        be broadcastable with `bias_amplitude`, `slope_amplitude`, `exponent`
+        and inputs to `apply` and `matrix` methods. A value of `None` is treated
         like 0, which results in having the intercept at the origin.
         Default Value: `None`
       exponent: Positive floating point `Tensor` that controls the exponent
         (also known as the degree) of the polynomial function, and must be an
         integer.
-        Must be broadcastable with `bias_variance`, `slope_variance`, `shift`,
+        Must be broadcastable with `bias_amplitude`, `slope_amplitude`, `shift`,
         and inputs to `apply` and `matrix` methods. A value of `None` is treated
         like 1, which results in a linear kernel.
         Default Value: `None`
@@ -104,11 +124,20 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
     parameters = dict(locals()) if parameters is None else parameters
     with tf.name_scope(name):
       dtype = util.maybe_get_common_dtype(
-          [bias_variance, slope_variance, shift, exponent])
+          [bias_variance,
+           slope_variance,
+           bias_amplitude,
+           slope_amplitude,
+           shift,
+           exponent])
       self._bias_variance = tensor_util.convert_nonref_to_tensor(
           bias_variance, name='bias_variance', dtype=dtype)
       self._slope_variance = tensor_util.convert_nonref_to_tensor(
           slope_variance, name='slope_variance', dtype=dtype)
+      self._bias_amplitude = tensor_util.convert_nonref_to_tensor(
+          bias_amplitude, name='bias_amplitude', dtype=dtype)
+      self._slope_amplitude = tensor_util.convert_nonref_to_tensor(
+          slope_amplitude, name='slope_amplitude', dtype=dtype)
       self._shift = tensor_util.convert_nonref_to_tensor(
           shift, name='shift', dtype=dtype)
       self._exponent = tensor_util.convert_nonref_to_tensor(
@@ -124,10 +153,16 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
   def _parameter_properties(cls, dtype):
     from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
     return dict(
+        bias_amplitude=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
         bias_variance=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
                 lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
         exponent=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        slope_amplitude=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
                 lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
         slope_variance=parameter_properties.ParameterProperties(
@@ -146,6 +181,16 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
     return self._slope_variance
 
   @property
+  def bias_amplitude(self):
+    """Stddev on bias parameter."""
+    return self._bias_amplitude
+
+  @property
+  def slope_amplitude(self):
+    """Amplitude on slope parameter."""
+    return self._slope_amplitude
+
+  @property
   def shift(self):
     """Shift of linear function that is exponentiated."""
     return self._shift
@@ -154,6 +199,16 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
   def exponent(self):
     """Exponent of the polynomial term."""
     return self._exponent
+
+  def _get_bias_amplitude(self):
+    if self.bias_amplitude is not None:
+      return self.bias_amplitude
+    return self.bias_variance
+
+  def _get_slope_amplitude(self):
+    if self.slope_amplitude is not None:
+      return self.slope_amplitude
+    return self.slope_variance
 
   def _apply(self, x1, x2, example_ndims=0):
     if self.shift is None:
@@ -169,17 +224,19 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
     if self.exponent is not None:
       exponent = tf.convert_to_tensor(self.exponent)
       exponent = util.pad_shape_with_ones(exponent, example_ndims)
-      dot_prod **= exponent
+      dot_prod = dot_prod ** exponent
 
-    if self.slope_variance is not None:
-      slope_variance = tf.convert_to_tensor(self.slope_variance)
-      slope_variance = util.pad_shape_with_ones(slope_variance, example_ndims)
-      dot_prod *= slope_variance**2.
+    slope_amplitude = self._get_slope_amplitude()
+    if slope_amplitude is not None:
+      slope_amplitude = tf.convert_to_tensor(slope_amplitude)
+      slope_amplitude = util.pad_shape_with_ones(slope_amplitude, example_ndims)
+      dot_prod = dot_prod * slope_amplitude**2.
 
-    if self.bias_variance is not None:
-      bias_variance = tf.convert_to_tensor(self.bias_variance)
-      bias_variance = util.pad_shape_with_ones(bias_variance, example_ndims)
-      dot_prod += bias_variance**2.
+    bias_amplitude = self._get_bias_amplitude()
+    if bias_amplitude is not None:
+      bias_amplitude = tf.convert_to_tensor(bias_amplitude)
+      bias_amplitude = util.pad_shape_with_ones(bias_amplitude, example_ndims)
+      dot_prod = dot_prod + bias_amplitude**2.
 
     return dot_prod
 
@@ -190,8 +247,8 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
     ok_to_check = lambda x: (  # pylint:disable=g-long-lambda
         x is not None) and (is_init != tensor_util.is_ref(x))
 
-    bias_variance = self.bias_variance
-    slope_variance = self.slope_variance
+    bias_amplitude = self._get_bias_amplitude()
+    slope_amplitude = self._get_slope_amplitude()
 
     if ok_to_check(self.exponent):
       exponent = tf.convert_to_tensor(self.exponent)
@@ -202,23 +259,23 @@ class Polynomial(psd_kernel.AutoCompositeTensorPsdKernel):
       assertions.append(
           distribution_util.assert_integer_form(
               exponent, message='`exponent` must be an integer.'))
-    if ok_to_check(self.bias_variance):
-      bias_variance = tf.convert_to_tensor(self.bias_variance)
+    if ok_to_check(bias_amplitude):
+      bias_amplitude = tf.convert_to_tensor(bias_amplitude)
       assertions.append(
           assert_util.assert_non_negative(
-              bias_variance, message='`bias_variance` must be non-negative.'))
-    if ok_to_check(self.slope_variance):
-      slope_variance = tf.convert_to_tensor(self.slope_variance)
+              bias_amplitude, message='`bias_amplitude` must be non-negative.'))
+    if ok_to_check(slope_amplitude):
+      slope_amplitude = tf.convert_to_tensor(slope_amplitude)
       assertions.append(
           assert_util.assert_non_negative(
-              slope_variance,
-              message='`slope_variance` must be non-negative.'))
+              slope_amplitude,
+              message='`slope_amplitude` must be non-negative.'))
 
-    if (ok_to_check(self.bias_variance) and ok_to_check(self.slope_variance)):
+    if (ok_to_check(self.bias_amplitude) and ok_to_check(self.slope_amplitude)):
       assertions.append(
           assert_util.assert_positive(
-              tf.math.abs(slope_variance) + tf.math.abs(bias_variance),
-              message=('`slope_variance` and `bias_variance` '
+              tf.math.abs(slope_amplitude) + tf.math.abs(bias_amplitude),
+              message=('`slope_amplitude` and `bias_amplitude` '
                        'can not both be zero.')))
 
     return assertions
@@ -234,14 +291,21 @@ class Linear(Polynomial):
     exponent.
 
     ```none
-    k(x, y) = bias_variance**2 + slope_variance**2 *
+    k(x, y) = bias_amplitude**2 + slope_amplitude**2 *
               ((x - shift) dot (y - shift))
     ```
   """
 
+  @deprecation.deprecated_args(
+      '2022-11-01',
+      '`bias_variance` and `slope_variance` are deprecated. Please use '
+      '`bias_amplitude` and `slope_amplitude` instead.',
+      'bias_variance', 'slope_variance')
   def __init__(self,
                bias_variance=None,
                slope_variance=None,
+               bias_amplitude=None,
+               slope_amplitude=None,
                shift=None,
                feature_ndims=1,
                validate_args=False,
@@ -261,11 +325,23 @@ class Linear(Polynomial):
         `bias_variance`, `shift`, and inputs to `apply` and `matrix` methods. A
         value of `None` is treated like 1.
         Default Value: `None`
+      bias_amplitude: Non-negative floating point `Tensor` that controls the
+        stddev from the origin. If bias = 0, there is no stddev and the
+        fitted function goes through the origin.  Must be broadcastable with
+        `slope_amplitude`, `shift`, `exponent`, and inputs to `apply` and
+        `matrix` methods. A value of `None` is treated like 0.
+        Default Value: `None`
+      slope_amplitude: Non-negative floating point `Tensor` that controls the
+        stddev of the regression line slope that is the basis for the
+        polynomial. Must be broadcastable with `bias_amplitude`, `shift`,
+        `exponent`, and inputs to `apply` and `matrix` methods. A value of
+        `None` is treated like 1.
+        Default Value: `None`
       shift: Floating point `Tensor` that controls the intercept with the x-axis
-        of the linear interpolation. Must be broadcastable with `bias_variance`,
-        `slope_variance`, and inputs to `apply` and `matrix` methods. A value of
-        `None` is treated like 0, which results in having the intercept at the
-        origin.
+        of the linear interpolation. Must be broadcastable with
+        `bias_amplitude`, `slope_amplitude`, and inputs to `apply` and `matrix`
+        methods. A value of `None` is treated like 0, which results in having
+        the intercept at the origin.
       feature_ndims: Python `int` number of rightmost dims to include in kernel
         computation.
         Default Value: 1
@@ -280,6 +356,8 @@ class Linear(Polynomial):
     super(Linear, self).__init__(
         bias_variance=bias_variance,
         slope_variance=slope_variance,
+        bias_amplitude=bias_amplitude,
+        slope_amplitude=slope_amplitude,
         shift=shift,
         exponent=None,
         feature_ndims=feature_ndims,
@@ -291,7 +369,13 @@ class Linear(Polynomial):
   def _parameter_properties(cls, dtype):
     from tensorflow_probability.python.bijectors import softplus  # pylint:disable=g-import-not-at-top
     return dict(
+        bias_amplitude=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
         bias_variance=parameter_properties.ParameterProperties(
+            default_constraining_bijector_fn=(
+                lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
+        slope_amplitude=parameter_properties.ParameterProperties(
             default_constraining_bijector_fn=(
                 lambda: softplus.Softplus(low=dtype_util.eps(dtype)))),
         slope_variance=parameter_properties.ParameterProperties(
@@ -334,8 +418,8 @@ class Constant(Linear):
           constant, name='constant')
       from tensorflow_probability.python import util as tfp_util  # pylint:disable=g-import-not-at-top
       super(Constant, self).__init__(
-          bias_variance=tfp_util.DeferredTensor(self._constant, tf.math.sqrt),
-          slope_variance=0.0,
+          bias_amplitude=tfp_util.DeferredTensor(self._constant, tf.math.sqrt),
+          slope_amplitude=0.0,
           shift=None,
           feature_ndims=feature_ndims,
           validate_args=validate_args,

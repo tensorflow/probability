@@ -255,7 +255,6 @@ multi_substrate_py_test(
     name = "polynomial_test",
     size = "small",
     srcs = ["polynomial_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
