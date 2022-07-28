@@ -31,6 +31,8 @@ class _MaternTestCase(test_util.TestCase):
   Subclasses must specify _kernel_type and _numpy_kernel.
   """
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testMismatchedFloatTypesAreBad(self):
     self._kernel_type(1., 1)  # Should be OK (float32 fallback).
     self._kernel_type(1., np.float64(1.))  # Should be OK.

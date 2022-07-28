@@ -195,6 +195,8 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
   @parameterized.named_parameters(
       ('Dynamic-shape [2] kernel', [1., 2.], [2]),
       ('Dynamic-shape [2, 1] kernel', [[1.], [2.]], [2, 1]))
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='No dynamic shapes.')
   def testDynamicBatchShape(self, params, shape):
     tensor_params = tf1.placeholder_with_default(params, shape=None)
     k = TestKernel(tensor_params)
@@ -231,6 +233,8 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
             y   # shape [3, 3]
         ).shape)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='No dynamic shapes in numpy.')
   def testApplyOutputWithDynamicShapes(self):
     params_2_dynamic = tf1.placeholder_with_default([1., 2.], shape=None)
     k = TestKernel(params_2_dynamic)
@@ -437,6 +441,8 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
              for k in product_kernel[:, :1].kernels]),
         self.evaluate(product_kernel[:, :1].matrix(x, y)))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testSumOfKernelsWithNoneDtypes(self):
     none_kernel = TestKernel()
     float32_kernel = TestKernel(np.float32(1))
@@ -451,6 +457,8 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
     with self.assertRaises(TypeError):
       _ = float32_kernel + float64_kernel
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testProductOfKernelsWithNoneDtypes(self):
     none_kernel = TestKernel()
     float32_kernel = TestKernel(np.float32(1))

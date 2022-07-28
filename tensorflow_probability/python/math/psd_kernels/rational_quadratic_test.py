@@ -32,6 +32,8 @@ class RationalQuadraticTest(test_util.TestCase):
     return (amplitude ** 2) * (1. + np.sum((x - y) ** 2) / (
         2 * scale_mixture_rate * length_scale ** 2)) ** (-scale_mixture_rate)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testMismatchedFloatTypesAreBad(self):
     with self.assertRaises(TypeError):
       tfp.math.psd_kernels.RationalQuadratic(np.float32(1.), np.float64(1.))

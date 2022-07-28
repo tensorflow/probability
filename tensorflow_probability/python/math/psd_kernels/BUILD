@@ -72,7 +72,6 @@ multi_substrate_py_test(
     name = "positive_semidefinite_kernel_test",
     size = "small",
     srcs = ["positive_semidefinite_kernel_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         ":positive_semidefinite_kernel",
         # absl/testing:parameterized dep,
@@ -126,7 +125,6 @@ multi_substrate_py_test(
     name = "exponentiated_quadratic_test",
     size = "small",
     srcs = ["exponentiated_quadratic_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -153,7 +151,6 @@ multi_substrate_py_test(
     name = "exp_sin_squared_test",
     size = "small",
     srcs = ["exp_sin_squared_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -181,7 +178,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["matern_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     shard_count = 4,
     deps = [
         # absl/testing:parameterized dep,
@@ -233,7 +229,6 @@ multi_substrate_py_test(
     name = "rational_quadratic_test",
     size = "small",
     srcs = ["rational_quadratic_test.py"],
-    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,
@@ -291,7 +286,6 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["schur_complement_test.py"],
     jax_size = "large",
-    numpy_tags = ["notap"],
     deps = [
         # absl/testing:parameterized dep,
         # numpy dep,

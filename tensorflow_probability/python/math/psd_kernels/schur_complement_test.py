@@ -56,6 +56,8 @@ def broadcast_shapes(*shapes):
 @test_util.test_all_tf_execution_regimes
 class SchurComplementTest(test_util.TestCase):
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testMismatchedFloatTypesAreBad(self):
     base_kernel = tfpk.ExponentiatedQuadratic(
         np.float64(5.), np.float64(.2))
@@ -255,6 +257,8 @@ class SchurComplementTest(test_util.TestCase):
         self.evaluate(base_kernel.matrix(x, y)),
         self.evaluate(schur.matrix(x, y)))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testBaseKernelNoneDtype(self):
     # Test that we don't have problems when base_kernel has no explicit dtype
     # (ie, params are all None), but fixed_inputs has a different dtype than the

@@ -27,6 +27,8 @@ from tensorflow_probability.python.internal import test_util
 @test_util.test_all_tf_execution_regimes
 class ExponentiatedQuadraticTest(test_util.TestCase):
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def testMismatchedFloatTypesAreBad(self):
     tfp.math.psd_kernels.ExponentiatedQuadratic(
         1, 1)  # Should be OK (float32 fallback).

@@ -98,7 +98,7 @@ class ExpSinSquared(psd_kernel.AutoCompositeTensorPsdKernel):
       # pad the shape with self.feature_ndims number of ones.
       period = util.pad_shape_with_ones(
           period, ndims=(example_ndims + self.feature_ndims))
-      difference /= period
+      difference = difference / period
     log_kernel = util.sum_rightmost_ndims_preserving_shape(
         -2 * tf.sin(difference) ** 2, ndims=self.feature_ndims)
 
@@ -106,12 +106,12 @@ class ExpSinSquared(psd_kernel.AutoCompositeTensorPsdKernel):
       length_scale = tf.convert_to_tensor(self.length_scale)
       length_scale = util.pad_shape_with_ones(
           length_scale, ndims=example_ndims)
-      log_kernel /= length_scale ** 2
+      log_kernel = log_kernel / length_scale ** 2
 
     if self.amplitude is not None:
       amplitude = tf.convert_to_tensor(self.amplitude)
       amplitude = util.pad_shape_with_ones(amplitude, ndims=example_ndims)
-      log_kernel += 2. * tf.math.log(amplitude)
+      log_kernel = log_kernel + 2. * tf.math.log(amplitude)
     return tf.exp(log_kernel)
 
   @property

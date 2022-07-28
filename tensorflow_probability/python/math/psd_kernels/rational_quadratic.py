@@ -148,7 +148,7 @@ class RationalQuadratic(psd_kernel.AutoCompositeTensorPsdKernel):
       scale_mixture_rate = tf.convert_to_tensor(self.scale_mixture_rate)
       power = util.pad_shape_with_ones(
           scale_mixture_rate, ndims=example_ndims)
-      pairwise_square_distance /= power
+      pairwise_square_distance = pairwise_square_distance / power
 
     log_result = -power * tf.math.log1p(pairwise_square_distance)
 
