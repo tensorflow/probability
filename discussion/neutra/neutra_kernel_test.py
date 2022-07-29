@@ -41,8 +41,8 @@ class NeutraKernelTest(tf.test.TestCase, parameterized.TestCase):
     base_mean = tf.convert_to_tensor(value=[1., 0], dtype=dtype)
     base_cov = tf.convert_to_tensor(value=[[1, 0.5], [0.5, 1]], dtype=dtype)
 
-    base_dist = tfd.MultivariateNormalFullCovariance(
-        loc=base_mean, covariance_matrix=base_cov)
+    base_dist = tfd.MultivariateNormalTriL(
+        loc=base_mean, scale_tril=tf.linalg.cholesky(base_cov))
     target_dist = bijector(base_dist)
 
     def debug_fn(*args):
@@ -90,8 +90,8 @@ class NeutraKernelTest(tf.test.TestCase, parameterized.TestCase):
     base_mean = tf.constant([1., 0])
     base_cov = tf.constant([[1, 0.5], [0.5, 1]])
 
-    dist_2d = tfd.MultivariateNormalFullCovariance(
-        loc=base_mean, covariance_matrix=base_cov)
+    dist_2d = tfd.MultivariateNormalTriL(
+        loc=base_mean, scale_tril=tf.linalg.cholesky(base_cov))
     dist_4d = tfd.MultivariateNormalDiag(scale_diag=tf.ones(4))
 
     target_dist = tfd.JointDistributionSequential([

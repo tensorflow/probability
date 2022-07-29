@@ -1035,10 +1035,10 @@ class LinearGaussianStateSpaceModel(
                 log_marginal_likelihood=0, timestep=0))
 
       # We could directly construct the batch Distributions
-      # filtered_marginals = tfd.MultivariateNormalFullCovariance(
-      #      filtered_means, filtered_covs)
-      # predicted_marginals = tfd.MultivariateNormalFullCovariance(
-      #      predicted_means, predicted_covs)
+      # filtered_marginals = tfd.MultivariateNormalTriL(
+      #      filtered_means, tf.linalg.cholesky(filtered_covs))
+      # predicted_marginals = tfd.MultivariateNormalTriL(
+      #      predicted_means, tf.linalg.cholesky(predicted_covs))
       # but we choose not to: returning the raw means and covariances
       # saves computation in Eager mode (avoiding an immediate
       # Cholesky factorization that the user may not want) and aids

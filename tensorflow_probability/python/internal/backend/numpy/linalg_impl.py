@@ -84,6 +84,8 @@ def _band_part(input, num_lower, num_upper, name=None):  # pylint: disable=redef
 
 def _cholesky_solve(chol, rhs, name=None):  # pylint: disable=unused-argument
   """Scipy cho_solve does not broadcast, so we must do so explicitly."""
+  chol = ops.convert_to_tensor(chol)
+  rhs = ops.convert_to_tensor(rhs)
   if JAX_MODE:  # But JAX uses XLA, which can do a batched solve.
     chol = chol + np.zeros(rhs.shape[:-2] + (1, 1), dtype=chol.dtype)
     rhs = rhs + np.zeros(chol.shape[:-2] + (1, 1), dtype=rhs.dtype)
@@ -368,7 +370,7 @@ band_part = utils.copy_docstring(
 
 cholesky = utils.copy_docstring(
     'tf.linalg.cholesky',
-    lambda input, name=None: np.linalg.cholesky(input))
+    lambda input, name=None: np.linalg.cholesky(ops.convert_to_tensor(input)))
 
 cholesky_solve = utils.copy_docstring(
     'tf.linalg.cholesky_solve',

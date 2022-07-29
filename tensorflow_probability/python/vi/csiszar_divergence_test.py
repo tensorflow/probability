@@ -557,8 +557,9 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
   def test_kl_forward_multidim(self):
     d = 5  # Dimension
 
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+    p = tfd.MultivariateNormalTriL(
+        scale_tril=tf.linalg.cholesky(
+            tridiag(d, diag_value=1, offdiag_value=0.5)))
 
     # Variance is very high when approximating Forward KL, so we make
     # scale_diag large. This ensures q
@@ -596,8 +597,9 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
   def test_kl_reverse_multidim(self):
     d = 5  # Dimension
 
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+    p = tfd.MultivariateNormalTriL(
+        scale_tril=tf.linalg.cholesky(
+            tridiag(d, diag_value=1, offdiag_value=0.5)))
 
     # Variance is very high when approximating Reverse KL with self
     # normalization, because we pick up a term E_q[p / q]. So we make
@@ -742,8 +744,9 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
 
     def construct_monte_carlo_csiszar_f_divergence(func, gradient_estimator):
       def _fn(s):
-        p = tfd.MultivariateNormalFullCovariance(
-            covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+        p = tfd.MultivariateNormalTriL(
+            scale_tril=tf.linalg.cholesky(
+                tridiag(d, diag_value=1, offdiag_value=0.5)))
         q = tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
         return tfp.vi.monte_carlo_variational_loss(
             target_log_prob_fn=p.log_prob,
@@ -772,8 +775,9 @@ class MonteCarloVariationalLossTest(test_util.TestCase):
             gradient_estimator=tfp.vi.GradientEstimators.SCORE_FUNCTION))
 
     def exact_kl(s):
-      p = tfd.MultivariateNormalFullCovariance(
-          covariance_matrix=tridiag(d, diag_value=1, offdiag_value=0.5))
+      p = tfd.MultivariateNormalTriL(
+          scale_tril=tf.linalg.cholesky(
+              tridiag(d, diag_value=1, offdiag_value=0.5)))
       q = tfd.MultivariateNormalDiag(scale_diag=tf.tile([s], [d]))
       return tfd.kl_divergence(q, p)
 
@@ -989,8 +993,9 @@ class CsiszarVIMCOTest(test_util.TestCase):
 
     f = lambda logu: tfp.vi.kl_reverse(logu, self_normalized=False)
     np_f = lambda logu: -logu
-    p = tfd.MultivariateNormalFullCovariance(
-        covariance_matrix=tridiag(dims, diag_value=1, offdiag_value=0.5))
+    p = tfd.MultivariateNormalTriL(
+        scale_tril=tf.linalg.cholesky(
+            tridiag(dims, diag_value=1, offdiag_value=0.5)))
     # Variance is very high when approximating Forward KL, so we make
     # scale_diag large. This ensures q "covers" p and thus Var_q[p/q] is
     # smaller.

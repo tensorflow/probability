@@ -233,21 +233,23 @@ class _KalmanFilterTest(test_util.TestCase):
            (type(my_filter_results)(1, 2, 3, 2, 3, 2, 3), 2, 1))
 
       # pylint: disable=g-long-lambda,cell-var-from-loop
-      mvn = tfd.MultivariateNormalFullCovariance
       dist = tfd.LinearGaussianStateSpaceModel(
           num_timesteps=nsteps,
           transition_matrix=lambda t: tf.linalg.LinearOperatorFullMatrix(
               tf.gather(transition_matrix, t, axis=0)),
-          transition_noise=lambda t: mvn(
+          transition_noise=lambda t: tfd.MultivariateNormalTriL(
               loc=tf.gather(transition_mean, t, axis=0),
-              covariance_matrix=tf.gather(transition_cov, t, axis=0)),
+              scale_tril=tf.linalg.cholesky(
+                  tf.gather(transition_cov, t, axis=0))),
           observation_matrix=lambda t: tf.linalg.LinearOperatorFullMatrix(
               tf.gather(observation_matrix, t, axis=0)),
-          observation_noise=lambda t: mvn(
+          observation_noise=lambda t: tfd.MultivariateNormalTriL(
               loc=tf.gather(observation_mean, t, axis=0),
-              covariance_matrix=tf.gather(observation_cov, t, axis=0)),
-          initial_state_prior=mvn(loc=initial_mean,
-                                  covariance_matrix=initial_cov),
+              scale_tril=tf.linalg.cholesky(
+                  tf.gather(observation_cov, t, axis=0))),
+          initial_state_prior=tfd.MultivariateNormalTriL(
+              loc=initial_mean,
+              scale_tril=tf.linalg.cholesky(initial_cov)),
           experimental_parallelize=False)  # Compare against sequential filter.
       # pylint: enable=g-long-lambda,cell-var-from-loop
 

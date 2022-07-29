@@ -122,8 +122,9 @@ class DistributionBijectorsTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def test_multivariate_normal(self):
-    d = tfd.MultivariateNormalFullCovariance(
-        loc=[4., 8.], covariance_matrix=[[11., 0.099], [0.099, 0.1]])
+    d = tfd.MultivariateNormalTriL(
+        loc=[4., 8.],
+        scale_tril=tf.linalg.cholesky([[11., 0.099], [0.099, 0.1]]))
     b = tfp.experimental.bijectors.make_distribution_bijector(d)
     self.assertDistributionIsApproximatelyStandardNormal(tfb.Invert(b)(d))
 

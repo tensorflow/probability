@@ -39,10 +39,10 @@ class MultivariateNormalUtilsTest(test_util.TestCase):
         loc=tf.zeros(batch_shape + [3]),
         scale_diag=tf.ones(batch_shape + [3]))
 
-    mvn2 = tfd.MultivariateNormalFullCovariance(
+    mvn2 = tfd.MultivariateNormalTriL(
         loc=tf.ones(batch_shape + [2]),
-        covariance_matrix=(tf.ones(batch_shape + [2, 2]) *
-                           tf.constant([[5., -2], [-2, 3.1]])))
+        scale_tril=(tf.ones(batch_shape + [2, 2]) *
+                    tf.linalg.cholesky([[5., -2], [-2, 3.1]])))
 
     joint = sts_util.factored_joint_mvn([mvn1, mvn2])
     self.assertEqual(self.evaluate(joint.event_shape_tensor()),

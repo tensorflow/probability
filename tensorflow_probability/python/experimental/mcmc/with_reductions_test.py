@@ -240,8 +240,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov = [[0.36, 0.12, 0.06],
            [0.12, 0.29, -0.13],
            [0.06, -0.13, 0.26]]
-    target = tfp.distributions.MultivariateNormalFullCovariance(
-        loc=mu, covariance_matrix=cov
+    target = tfp.distributions.MultivariateNormalTriL(
+        loc=mu, scale_tril=tf.linalg.cholesky(cov)
     )
     fake_kernel = tfp.mcmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target.log_prob,

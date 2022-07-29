@@ -116,10 +116,8 @@ def assert_univariate_target_conservation(test, target_d, step_size):
 
 def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
   strm = test_util.test_seed_stream()
-  initialization = tfd.MultivariateNormalFullCovariance(
-      loc=tf.zeros(event_size),
-      covariance_matrix=tf.eye(event_size)).sample(
-          batch_size, seed=strm())
+  initialization = tfd.MultivariateNormalDiag(
+      loc=tf.zeros(event_size)).sample(batch_size, seed=strm())
   samples, _ = run_nuts_chain(
       event_size, batch_size, num_steps=1,
       initial_state=initialization, **kwargs)
