@@ -45,6 +45,13 @@ def _initialize_arrays(initial_values,
       lambda ta, t: ta.write(0, t), trace_arrays, initial_values)
 
 
+def _convert_variables_to_tensors(values):
+  """Read `tf.Variables` in `values` and keep other objects unchanged."""
+  return tf.nest.map_structure(
+      lambda x: tf.convert_to_tensor(x) if isinstance(x, tf.Variable) else x,
+      values)
+
+
 def smart_for_loop(loop_num_iter, body_fn, initial_loop_vars,
                    parallel_iterations=10, unroll_threshold=1, name=None):
   """Construct a for loop, preferring a python loop if `n` is statically known.
@@ -127,7 +134,7 @@ def trace_scan(loop_fn,
     elems: A `Tensor` that is split along the first dimension and each element
       of which is passed to `loop_fn`.
     trace_fn: A callable that takes in the return value of `loop_fn` and returns
-      a `Tensor` or a nested collection of `Tensor`s.
+      a `Tensor`, 'Variable' or a nested collection of `Tensor`s or 'Variable's.
     trace_criterion_fn: Optional callable that takes in the return value of
       `loop_fn` and returns a boolean `Tensor` indicating whether to trace it.
       If `None`, all steps are traced.
@@ -182,7 +189,8 @@ def trace_scan(loop_fn,
       dynamic_size, initial_size = False, length
     else:
       dynamic_size, initial_size = True, 0
-    initial_trace = trace_fn(initial_state)
+    # Convert variables returned by trace_fn to tensors.
+    initial_trace = _convert_variables_to_tensors(trace_fn(initial_state))
     flat_initial_trace = tf.nest.flatten(initial_trace, expand_composites=True)
     trace_arrays = []
     for trace_elt in flat_initial_trace:
@@ -195,9 +203,9 @@ def trace_scan(loop_fn,
 
     # Helper for writing a (structured) state to (structured) arrays.
     def trace_one_step(num_steps_traced, trace_arrays, state):
-      return [ta.write(num_steps_traced, x) for ta, x in
-              zip(trace_arrays,
-                  tf.nest.flatten(trace_fn(state), expand_composites=True))]
+      trace = _convert_variables_to_tensors(trace_fn(state))
+      return [ta.write(num_steps_traced, x) for ta, x in zip(
+          trace_arrays, tf.nest.flatten(trace, expand_composites=True))]
 
     def _body(i, state, num_steps_traced, trace_arrays):
       elem = elems_array.read(i)

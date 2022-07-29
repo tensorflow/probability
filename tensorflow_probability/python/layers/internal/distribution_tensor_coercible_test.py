@@ -292,6 +292,9 @@ class MemoryLeakTest(test_util.TestCase):
     layer = tfp.layers.DistributionLambda(tfp.distributions.Categorical)
     x = tf.constant([-.23, 1.23, 1.42])
     dist = layer(x)
+    # Investigate why the second layer call creates a few more weakrefs.
+    # These weakrefs could potentially come from tf.function.variables.
+    dist = layer(x)
     gc.collect()
     before_objs = len(gc.get_objects())
     for _ in range(int(1e2)):
