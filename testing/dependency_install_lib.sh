@@ -19,6 +19,7 @@
 
 # TODO(b/191965268): Move this to a proper python script, maybe even test it.
 PYTHON_PARSE_PACKAGE_JSON="
+import re
 import sys
 import json
 import argparse
@@ -33,10 +34,15 @@ parser.add_argument(
 args = parser.parse_args()
 
 pypi_version_str = 'cp' + sysconfig.get_config_var('py_version_nodot')
+release_pattern = re.compile('.+dev[0-9]+$')
 
 package_data = json.loads(sys.stdin.read())
 releases = []
 for release, release_info in package_data['releases'].items():
+  # Skip bad releases like '2.11.0'.
+  if not release_pattern.match(release):
+    continue
+
   # Skip bad dates.
   if any(bad_date in release for bad_date in args.bad_dates):
     continue
