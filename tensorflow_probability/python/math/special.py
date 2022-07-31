@@ -750,6 +750,29 @@ def _betaincinv_computation(a, b, y):
   return result
 
 
+def betaincinv(a, b, y, name=None):
+  """Computes the inverse of `tfp.math.betainc` with respect to `x`.
+
+  This function returns a value `x` such that `y = tfp.math.betainc(a, b, x)`.
+
+  Args:
+    a: Floating-point Tensor. Must be broadcastable with `b` and `y`.
+    b: Floating-point Tensor. Must be broadcastable with `a` and `y`.
+    y: Floating-point Tensor. Must be broadcastable with `a` and `b`.
+    name: A name for the operation (optional).
+
+  Returns:
+    betaincinv: Floating-point Tensor, inverse of the regularized incomplete
+    beta function computed element-wise.
+  """
+  with tf.name_scope(name or 'betaincinv'):
+    dtype = dtype_util.common_dtype([a, b, y], tf.float32)
+    a = tf.convert_to_tensor(a, dtype=dtype)
+    b = tf.convert_to_tensor(b, dtype=dtype)
+    y = tf.convert_to_tensor(y, dtype=dtype)
+    return _betaincinv_computation(a, b, y)
+
+
 def _dawsn_naive(x):
   """Returns the Dawson Integral computed at x elementwise."""
   dtype = dtype_util.common_dtype([x], tf.float32)
