@@ -521,6 +521,25 @@ def betainc(a, b, x, name=None):
     return _betainc_custom_gradient(a, b, x)
 
 
+# The implementation of the inverse of the regularized incomplete beta function
+# is based on ideas and equations available in the following references:
+# [1] Milton Abramowitz and Irene A. Stegun
+#     Handbook of Mathematical Functions with Formulas, Graphs, and
+#         Mathematical Tables.
+#     US Government Printing Office, 1964 (reprinted 1972).
+#     https://archive.org/details/AandS-mono600
+# [2] William Press, Saul Teukolsky, William Vetterling and Brian Flannery
+#     Numerical Recipes: The Art of Scientific Computing
+#     Cambridge University Press, 2007 (Third Edition)
+#     http://numerical.recipes/book/book.html
+# [3] John Maddock, Paul A. Bristow, et al.
+#     The Incomplete Beta Function Inverses
+#     https://www.boost.org/doc/libs/1_79_0/libs/math/doc/html/math_toolkit/sf_beta/ibeta_inv_function.html
+# [4] Stephen L. Moshier
+#     Cephes Mathematical Library
+#     https://netlib.org/cephes/
+
+
 def _dawsn_naive(x):
   """Returns the Dawson Integral computed at x elementwise."""
   dtype = dtype_util.common_dtype([x], tf.float32)
