@@ -534,7 +534,7 @@ def betainc(a, b, x, name=None):
 #     http://numerical.recipes/book/book.html
 # [3] John Maddock, Paul A. Bristow, et al.
 #     The Incomplete Beta Function Inverses
-#     https://www.boost.org/doc/libs/1_79_0/libs/math/doc/html/math_toolkit/sf_beta/ibeta_inv_function.html
+#     https://www.boost.org/doc/libs/1_79_0/libs/math/doc/html/special.html
 # [4] Stephen L. Moshier
 #     Cephes Mathematical Library
 #     https://netlib.org/cephes/
