@@ -28,6 +28,7 @@ from tensorflow_probability.python.internal import tensorshape_util
 __all__ = [
     'atan_difference',
     'betainc',
+    'betaincinv',
     'dawsn',
     'erfcinv',
     'erfcx',
