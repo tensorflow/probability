@@ -540,6 +540,86 @@ def betainc(a, b, x, name=None):
 #     https://netlib.org/cephes/
 
 
+def _betaincinv_initial_approx(a, b, y, dtype):
+  """Computes an initial approximation for `betaincinv(a, b, y)`."""
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  tiny = tf.constant(np.finfo(numpy_dtype).tiny, dtype=dtype)
+  eps = tf.constant(np.finfo(numpy_dtype).eps, dtype=dtype)
+  one = tf.constant(1., dtype=dtype)
+  two = tf.constant(2., dtype=dtype)
+  three = tf.constant(3., dtype=dtype)
+  five = tf.constant(5., dtype=dtype)
+  six = tf.constant(6., dtype=dtype)
+  min_log = tf.math.log(
+      tf.constant(2. ** np.finfo(numpy_dtype).minexp, dtype))
+  max_log = tf.math.log(
+      tf.constant(2. ** (np.finfo(numpy_dtype).maxexp - 1.), dtype))
+
+  # When min(a, b) >= 1, we use the approximation proposed by [1].
+
+  # Equation 26.5.22 [1, page 945].
+  yp = -tf.math.ndtri(y)
+  inv_2a_minus_one = tf.math.reciprocal(two * a - one)
+  inv_2b_minus_one = tf.math.reciprocal(two * b - one)
+  lmb = (tf.math.square(yp) - three) / six
+  h = two * tf.math.reciprocal(inv_2a_minus_one + inv_2b_minus_one)
+  w = (yp * tf.math.sqrt(h + lmb) / h -
+      (inv_2b_minus_one - inv_2a_minus_one) *
+      (lmb + five / six - two / (three * h)))
+  result_for_large_a_and_b = a / (a + b * tf.math.exp(two * w))
+
+  # When min(a, b) < 1 and max(a, b) >= 1, we use the approximation proposed by
+  # [2]. This approximation depends on the following approximation for betainc:
+  #   betainc(a, b, x) ~=
+  #       x ** a / (integral_approx * a) , when x <= mean ,
+  #       (1 - x) ** b / (integral_approx * b) , when x > mean ,
+  # where:
+  #   integral_approx = (mean ** a) / a + (mean_complement ** b) / b ,
+  #   mean = a / (a + b) ,
+  #   mean_complement = 1 - mean = b / (a + b) .
+  # We invert betainc(a, b, x) with respect to x in the proper regime.
+
+  # Equation 6.4.7 [2, page 271].
+  a_plus_b = a + b
+  mean = a / a_plus_b
+  mean_complement = b / a_plus_b
+  integral_approx_part_a = tf.math.exp(tf.math.xlogy(a, mean) - tf.math.log(a))
+  integral_approx_part_b = tf.math.exp(tf.math.xlogy(b, mean_complement) -
+      tf.math.log(b))
+  integral_approx = integral_approx_part_a + integral_approx_part_b
+
+  # Solve Equation 6.4.8 [2, page 271] for x in the respective regimes.
+  inv_a = tf.math.reciprocal(a)
+  inv_b = tf.math.reciprocal(b)
+  result_for_small_a_or_b = tf.where(
+      tf.math.less_equal(y, (integral_approx_part_a / integral_approx)),
+      tf.math.exp(tf.math.xlogy(inv_a, y) + tf.math.xlogy(inv_a, a) +
+          tf.math.xlogy(inv_a, integral_approx)),
+      one - tf.math.exp(tf.math.xlog1py(inv_b, -y) + tf.math.xlogy(inv_b, b) +
+          tf.math.xlogy(inv_b, integral_approx)))
+
+  # And when max(a, b) < 1, we use the approximation proposed by [3] for the
+  # same domain:
+  #   betaincinv(a, b, y) ~= xg / (1 + xg) ,
+  # where:
+  #   xg = (a * y * Beta(a, b)) ** (1 / a) .
+  log_xg = tf.math.xlogy(inv_a, a) + tf.math.xlogy(inv_a, y) + (
+      inv_a * lbeta(a, b))
+  xg = tf.math.exp(tf.clip_by_value(log_xg, min_log, max_log))
+  result_for_small_a_and_b = xg / (one + xg)
+
+  # Return the appropriate result for parameters a and b.
+  result = tf.where(
+      tf.math.greater_equal(tf.math.minimum(a, b), one),
+      result_for_large_a_and_b,
+      tf.where(
+          tf.math.maximum(a, b) < one,
+          result_for_small_a_and_b,
+          result_for_small_a_or_b))
+
+  return tf.clip_by_value(result, tiny, one - eps)
+
+
 def _dawsn_naive(x):
   """Returns the Dawson Integral computed at x elementwise."""
   dtype = dtype_util.common_dtype([x], tf.float32)
