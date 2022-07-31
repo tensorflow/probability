@@ -620,6 +620,136 @@ def _betaincinv_initial_approx(a, b, y, dtype):
   return tf.clip_by_value(result, tiny, one - eps)
 
 
+def _betaincinv_computation(a, b, y):
+  """Returns the inverse of `betainc(a, b, x)` with respect to `x`."""
+  dtype = dtype_util.common_dtype([a, b, y], tf.float32)
+  numpy_dtype = dtype_util.as_numpy_dtype(dtype)
+  zero = tf.constant(0., dtype=dtype)
+  tiny = tf.constant(np.finfo(numpy_dtype).tiny, dtype=dtype)
+  eps = tf.constant(np.finfo(numpy_dtype).eps, dtype=dtype)
+  half = tf.constant(0.5, dtype=dtype)
+  one = tf.constant(1., dtype=dtype)
+  two = tf.constant(2., dtype=dtype)
+  halley_correction_min = tf.constant(0.5, dtype=dtype)
+  halley_correction_max = tf.constant(1.5, dtype=dtype)
+
+  a = tf.convert_to_tensor(a, dtype=dtype)
+  b = tf.convert_to_tensor(b, dtype=dtype)
+  y = tf.convert_to_tensor(y, dtype=dtype)
+
+  broadcast_shape = functools.reduce(
+      ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(y)])
+
+  a = tf.broadcast_to(a, broadcast_shape)
+  b = tf.broadcast_to(b, broadcast_shape)
+  y = tf.broadcast_to(y, broadcast_shape)
+
+  # When tfp_math.betainc(a, b, 0.5) < y, we apply the symmetry relation given
+  # here: https://dlmf.nist.gov/8.17.E4
+  #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x) .
+  # If dtype != float64, we have additional conditions to apply this relation:
+  #   (a < 1) & (b < 1) & (tfp_math.betainc(a, b, a / (a + b)) < y) .
+  error_at_half = betainc(a, b, half) - y
+  if numpy_dtype == np.float64:
+    use_symmetry_relation = (error_at_half < zero)
+  else:
+    a_and_b_are_small = (a < one) & (b < one)
+    error_at_mean = betainc(a, b, a / (a + b)) - y
+    use_symmetry_relation = (error_at_half < zero) & a_and_b_are_small & (
+        error_at_mean < zero)
+
+  a_orig = a
+  a = tf.where(use_symmetry_relation, b, a)
+  b = tf.where(use_symmetry_relation, a_orig, b)
+  y = tf.where(use_symmetry_relation, one - y, y)
+
+  a_minus_1 = a - one
+  b_minus_1 = b - one
+  one_minus_eps = one - eps
+
+  # tolerance was set by experimentation and max_iterations was taken from [4].
+  if numpy_dtype == np.float64:
+    tolerance = 1e-12
+    max_iterations = 8
+  else:
+    tolerance = 1e-6
+    max_iterations = 10
+
+  def root_finding_iteration(should_stop, low, high, candidate):
+    error = betainc(a, b, candidate) - y
+    error_over_der = error / tf.math.exp(
+        tf.math.xlogy(a_minus_1, candidate) +
+        tf.math.xlog1py(b_minus_1, -candidate) -
+        lbeta(a, b))
+    second_der_over_der = a_minus_1 / candidate - b_minus_1 / (one - candidate)
+    # Following [2, section 9.4.2, page 463], we limit the influence of the
+    # Halley's correction to the Newton's method, since this correction can
+    # reduce the Newton's region of convergence. We set minimum and maximum
+    # values for this correction by experimentation.
+    halley_correction = tf.clip_by_value(
+        one - half * error_over_der * second_der_over_der,
+        halley_correction_min,
+        halley_correction_max)
+    halley_delta = error_over_der / halley_correction
+    halley_candidate = tf.where(
+        should_stop, candidate, candidate - halley_delta)
+
+    # Fall back to bisection if the current step would take the new candidate
+    # out of bounds.
+    new_candidate = tf.where(
+        tf.less_equal(halley_candidate, low),
+        half * (candidate + low),
+        tf.where(
+            tf.greater_equal(halley_candidate, high),
+            half * (candidate + high),
+            halley_candidate))
+
+    new_delta = candidate - new_candidate
+    new_delta_is_negative = (new_delta < zero)
+    new_low = tf.where(new_delta_is_negative, candidate, low)
+    new_high = tf.where(new_delta_is_negative, high, candidate)
+
+    adjusted_tolerance = tf.maximum(tolerance * new_candidate, two * tiny)
+    should_stop = (should_stop | (tf.math.abs(new_delta) < adjusted_tolerance) |
+        tf.math.equal(new_low, new_high))
+
+    return should_stop, new_low, new_high, new_candidate
+
+  initial_candidate = _betaincinv_initial_approx(a, b, y, dtype)
+  # Bracket the solution with the interval (low, high).
+  initial_low = tf.zeros_like(y)
+  if numpy_dtype == np.float64:
+    initial_high = tf.ones_like(y) * half
+  else:
+    initial_high = tf.ones_like(y) * tf.where(
+        a_and_b_are_small & (error_at_mean < zero), half, one)
+
+  (_, _, _, result) = tf.while_loop(
+      cond=lambda stop, *_: tf.reduce_any(~stop),
+      body=root_finding_iteration,
+      loop_vars=(
+          tf.equal(y, initial_low) | tf.equal(y, initial_high),
+          initial_low,
+          initial_high,
+          initial_candidate),
+      maximum_iterations=max_iterations)
+
+  # If we are taking advantage of the symmetry relation, we have to adjust the
+  # input y and the solution.
+  y = tf.where(use_symmetry_relation, one - y, y)
+  result = tf.where(use_symmetry_relation, one - result, result)
+  result = tf.clip_by_value(result, tiny, one_minus_eps)
+
+  # Handle trivial cases.
+  result = tf.where(tf.equal(y, zero) | tf.equal(y, one), y, result)
+
+  # Determine if the inputs are out of range (should return NaN output).
+  result_is_nan = (a <= zero) | (b <= zero) | (y < zero) | (y > one)
+  result = tf.where(result_is_nan, numpy_dtype(np.nan), result)
+
+  return result
+
+
 def _dawsn_naive(x):
   """Returns the Dawson Integral computed at x elementwise."""
   dtype = dtype_util.common_dtype([x], tf.float32)
