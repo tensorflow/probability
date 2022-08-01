@@ -175,6 +175,9 @@ class PixelCnnTest(test_util.TestCase):
     model.add_loss(-tf.reduce_mean(log_prob))
 
     model.compile()
+    if not tf.executing_eagerly() and isinstance(
+        model.optimizer, tf.keras.optimizers.experimental.Optimizer):
+      return
     train_data = self._make_fake_inputs()
     model.fit(x=train_data)
 
