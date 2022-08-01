@@ -498,6 +498,95 @@ class BetaincTest(test_util.TestCase):
 
 
 @test_util.test_graph_and_eager_modes
+class BetaincinvTest(test_util.TestCase):
+
+  def testBetaincinvBroadcast(self):
+    a = np.ones([3, 2], dtype=np.float32)
+    b = np.ones([5, 1, 1], dtype=np.float32)
+    y = np.ones([7, 1, 1, 2], dtype=np.float32)
+    self.assertAllEqual([7, 5, 3, 2], tfp_math.betaincinv(a, b, y).shape)
+
+  def _test_betaincinv_value(self, a_high, b_high, dtype, atol, rtol):
+    tiny = tf.constant(np.finfo(dtype).tiny, dtype)
+    n = [int(1e4)]
+    strm = test_util.test_seed_stream()
+    a = tfp.distributions.Uniform(
+        low=tiny, high=dtype(a_high)).sample(n, strm())
+    b = tfp.distributions.Uniform(
+        low=tiny, high=dtype(b_high)).sample(n, strm())
+    y = tfp.distributions.Uniform(
+        low=tiny, high=dtype(1.)).sample(n, strm())
+
+    betaincinv, a, b, y = self.evaluate(
+        [tfp_math.betaincinv(a, b, y), a, b, y])
+
+    # Check that tfp_math.betaincinv preserves dtype.
+    self.assertEqual(dtype, betaincinv.dtype)
+
+    # Check that tfp_math.betaincinv is accurate.
+    self.assertAllClose(
+        scipy_special.betaincinv(a, b, y), betaincinv, atol=atol, rtol=rtol)
+
+  @parameterized.named_parameters(
+      {"testcase_name": "float32",
+       "dtype": np.float32,
+       "atol": 1e-6,
+       "rtol": 1.5e-3},
+      {"testcase_name": "float64",
+       "dtype": np.float64,
+       "atol": 1e-12,
+       "rtol": 1e-11})
+  def testBetaincinvSmallValues(self, dtype, atol, rtol):
+    self._test_betaincinv_value(
+        a_high=1., b_high=1., dtype=dtype, atol=atol, rtol=rtol)
+
+  @parameterized.named_parameters(
+      {"testcase_name": "float32",
+       "dtype": np.float32,
+       "atol": 1e-6,
+       "rtol": 6e-4},
+      {"testcase_name": "float64",
+       "dtype": np.float64,
+       "atol": 1e-12,
+       "rtol": 0.})
+  def testBetaincinvMediumValues(self, dtype, atol, rtol):
+    self._test_betaincinv_value(
+        a_high=100., b_high=100., dtype=dtype, atol=atol, rtol=rtol)
+
+  @parameterized.named_parameters(
+      {"testcase_name": "float32",
+       "dtype": np.float32,
+       "atol": 1e-5,
+       "rtol": 8.5e-4},
+      {"testcase_name": "float64",
+       "dtype": np.float64,
+       "atol": 1e-12,
+       "rtol": 0.})
+  def testBetaincinvLargeValues(self, dtype, atol, rtol):
+    self._test_betaincinv_value(
+        a_high=1e4, b_high=1e4, dtype=dtype, atol=atol, rtol=rtol)
+
+  @parameterized.parameters(np.float32, np.float64)
+  def testBetaincinvBounds(self, dtype):
+    # Test out-of-range values (should return NaN output).
+    a = np.array([-1., 0., 0.4, 0.4, 0.4, 0.4], dtype=dtype)
+    b = np.array([0.6, 0.6, -1., 0., 0.6, 0.6], dtype=dtype)
+    y = np.array([0.5, 0.5, 0.5, 0.5, -1., 2.], dtype=dtype)
+
+    betaincinv = self.evaluate(tfp_math.betaincinv(a, b, y))
+    self.assertEqual(dtype, betaincinv.dtype)
+    self.assertAllEqual(np.full_like(a, np.nan), betaincinv)
+
+    # Test tfp_math.betaincinv when y is equal to 0 or 1.
+    a, b, y0, y1 = [np.array([z], dtype=dtype) for z in [0.4, 0.6, 0., 1.]]
+
+    for y in [y0, y1]:
+      betaincinv = self.evaluate(tfp_math.betaincinv(a, b, y))
+      self.assertEqual(dtype, betaincinv.dtype)
+      self.assertAllEqual(y, betaincinv)
+
+
+@test_util.test_graph_and_eager_modes
 class DawsnTest(test_util.TestCase):
 
   def testDawsnBoundary(self):
