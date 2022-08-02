@@ -213,6 +213,9 @@ class _GaussianProcessTest(object):
     with self.assertRaises(ValueError):
       gp.mean()
 
+    self.assertIn("event_shape=?", repr(gp))
+    self.assertIn("event_shape=[10]", repr(gp.copy(index_points=index_points)))
+
   def testMarginalHasCorrectTypes(self):
     gp = tfd.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(), validate_args=True)

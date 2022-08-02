@@ -774,6 +774,22 @@ class GaussianProcess(
   def _convert_variables_to_tensors(self):
     return auto_composite_tensor.convert_variables_to_tensors(self)
 
+  def __repr__(self):
+    if self.index_points is None:
+      event_shape_str = '?'
+    else:
+      event_shape_str = distribution._str_tensorshape(self.event_shape)
+    return ('<tfp.distributions.{type_name} '
+            '\'{self_name}\''
+            ' batch_shape={batch_shape}'
+            ' event_shape={event_shape}'
+            ' dtype={dtype}>'.format(
+                type_name=type(self).__name__,
+                self_name=self.name or '<unknown>',
+                batch_shape=distribution._str_tensorshape(self.batch_shape),
+                event_shape=event_shape_str,
+                dtype=distribution._str_dtype(self.dtype)))
+
 
 @auto_composite_tensor.type_spec_register(
     'tfp.distributions.GaussianProcess_ACTTypeSpec')
