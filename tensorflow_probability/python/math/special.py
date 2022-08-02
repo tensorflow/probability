@@ -751,6 +751,56 @@ def _betaincinv_computation(a, b, y):
   return result
 
 
+def _betaincinv_partials(a, b, x):
+  """Returns the partial derivatives of `betaincinv(a, b, y)`."""
+  betainc_partial_a, betainc_partial_b, betainc_partial_x = _betainc_partials(
+      a, b, x)
+
+  # Use the fact that betainc and betaincinv are inverses of each other to
+  # compute the gradients.
+  betaincinv_partial_a = -betainc_partial_a / betainc_partial_x
+  betaincinv_partial_b = -betainc_partial_b / betainc_partial_x
+  betaincinv_partial_y = tf.math.reciprocal(betainc_partial_x)
+
+  return betaincinv_partial_a, betaincinv_partial_b, betaincinv_partial_y
+
+
+def _betaincinv_fwd(a, b, y):
+  """Computes output, aux (collaborates with _betaincinv_bwd)."""
+  output = _betaincinv_computation(a, b, y)
+  return output, (a, b, y)
+
+
+def _betaincinv_bwd(aux, g):
+  """Reverse mode impl for betaincinv."""
+  a, b, y = aux
+  x = _betaincinv_custom_gradient(a, b, y)
+  # Use the fact that betainc and betaincinv are inverses of each other to
+  # compute the gradients.
+  pa, pb, py = _betaincinv_partials(a, b, x)
+  return _fix_gradient_for_broadcasting(
+      [a, b, x], [pa * g, pb * g, py * g])
+
+
+def _betaincinv_jvp(primals, tangents):
+  """Computes JVP for betaincinv (supports JAX custom derivative)."""
+  a, b, y = primals
+  da, db, dy = tangents
+
+  x = _betaincinv_custom_gradient(a, b, y)
+  pa, pb, py = _betaincinv_partials(a, b, x)
+  return (x, pa * da + pb * db + py * dy)
+
+
+@tfp_custom_gradient.custom_gradient(
+    vjp_fwd=_betaincinv_fwd,
+    vjp_bwd=_betaincinv_bwd,
+    jvp_fn=_betaincinv_jvp)
+def _betaincinv_custom_gradient(a, b, y):
+  """Computes `betaincinv(a, b, y)` with correct custom gradient."""
+  return _betaincinv_computation(a, b, y)
+
+
 def betaincinv(a, b, y, name=None):
   """Computes the inverse of `tfp.math.betainc` with respect to `x`.
 
@@ -771,7 +821,7 @@ def betaincinv(a, b, y, name=None):
     a = tf.convert_to_tensor(a, dtype=dtype)
     b = tf.convert_to_tensor(b, dtype=dtype)
     y = tf.convert_to_tensor(y, dtype=dtype)
-    return _betaincinv_computation(a, b, y)
+    return _betaincinv_custom_gradient(a, b, y)
 
 
 def _dawsn_naive(x):
