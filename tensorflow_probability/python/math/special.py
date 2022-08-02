@@ -779,7 +779,7 @@ def _betaincinv_bwd(aux, g):
   # compute the gradients.
   pa, pb, py = _betaincinv_partials(a, b, x)
   return _fix_gradient_for_broadcasting(
-      [a, b, x], [pa * g, pb * g, py * g])
+      [a, b, y], [pa * g, pb * g, py * g])
 
 
 def _betaincinv_jvp(primals, tangents):
