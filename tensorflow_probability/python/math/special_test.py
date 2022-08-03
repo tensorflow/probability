@@ -263,15 +263,16 @@ class BetaincTest(test_util.TestCase):
     x = np.array([0.5, 0.5, 0.5, 0.5, -1., 2.], dtype=dtype)
 
     for partial in self.evaluate(betainc_partials(a, b, x)):
-      self.assertAllClose(np.full_like(a, np.nan), partial)
+      self.assertAllEqual(np.full_like(a, np.nan), partial)
 
     # Test partials when x is equal to 0 or 1.
     a = np.array([0.4, 0.4], dtype=dtype)
     b = np.array([0.6, 0.6], dtype=dtype)
     x = np.array([0., 1.], dtype=dtype)
 
-    for partial in self.evaluate(betainc_partials(a, b, x)):
-      self.assertAllClose(np.zeros_like(a), partial)
+    partial_a, partial_b, _ = self.evaluate(betainc_partials(a, b, x))
+    for partial in [partial_a, partial_b]:
+      self.assertAllEqual(np.zeros_like(a), partial)
 
   def _testBetaincDerivative(self,
                              a,

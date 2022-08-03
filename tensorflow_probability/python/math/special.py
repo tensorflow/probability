@@ -450,14 +450,14 @@ def _betainc_partials(a, b, x):
   grad_b = tf.where(use_power_series, ps_grad_b, cf_grad_b)
 
   # According to the code accompanying [1], grad_a = grad_b = 0 when x is
-  # equal to 0 or 1. Under the same condition, grad_x = 0 by its expression.
+  # equal to 0 or 1.
   # [1] R. Boik, J. Robinson-Cox,
   #     Derivatives of the Incomplete Beta Function
   #     https://www.jstatsoft.org/article/view/v003i01/beta.der.pdf
-  result_is_zero = tf.math.equal(x, zero) | tf.math.equal(x, one)
-  grad_a, grad_b, grad_x = [
-      tf.where(result_is_zero, zero, grad)
-      for grad in [grad_a, grad_b, grad_x]]
+  grads_a_and_b_should_be_zero = tf.math.equal(x, zero) | tf.math.equal(x, one)
+  grad_a, grad_b = [
+      tf.where(grads_a_and_b_should_be_zero, zero, grad)
+      for grad in [grad_a, grad_b]]
 
   # Determine if the inputs are out of range (should return NaN output).
   result_is_nan = (a <= zero) | (b <= zero) | (x < zero) | (x > one)
