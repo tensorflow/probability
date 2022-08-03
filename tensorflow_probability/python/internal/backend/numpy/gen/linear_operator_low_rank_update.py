@@ -370,13 +370,13 @@ class LinearOperatorLowRankUpdate(linear_operator.LinearOperator):
     return batch_shape.concatenate(tensor_shape.TensorShape(self.base_operator.shape)[-2:])
 
   def _shape_tensor(self):
-    batch_shape = array_ops.broadcast_dynamic_shape(
+    batch_shape = _ops.broadcast_dynamic_shape(
         self.base_operator.batch_shape_tensor(),
         self.diag_operator.batch_shape_tensor())
-    batch_shape = array_ops.broadcast_dynamic_shape(
+    batch_shape = _ops.broadcast_dynamic_shape(
         batch_shape,
         prefer_static.shape(self.u)[:-2])
-    batch_shape = array_ops.broadcast_dynamic_shape(
+    batch_shape = _ops.broadcast_dynamic_shape(
         batch_shape,
         prefer_static.shape(self.v)[:-2])
     return prefer_static.concat(

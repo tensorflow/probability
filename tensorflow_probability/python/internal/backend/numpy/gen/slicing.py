@@ -76,7 +76,7 @@ def _broadcast_parameter_with_batch_shape(
           [param_ndims_to_matrix_ndims], dtype=dtypes.int32)], axis=0)
   return _ops.broadcast_to(
       param,
-      array_ops.broadcast_dynamic_shape(base_shape, prefer_static.shape(param)))
+      _ops.broadcast_dynamic_shape(base_shape, prefer_static.shape(param)))
 
 
 def _sanitize_slices(slices, intended_shape, deficient_shape):

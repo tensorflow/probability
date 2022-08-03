@@ -1968,6 +1968,10 @@ class NumpyTest(test_util.TestCase):
     self.assertLen(
         tree_util.tree_leaves(nptf.linalg.LinearOperatorIdentity(5)), 0)
 
+    linop = nptf.linalg.LinearOperatorPermutation(onp.array([0, 2, 3, 4, 1]))
+    self.assertLen(tree_util.tree_leaves(linop), 1)
+    self.assertTupleEqual(tree_util.tree_leaves(linop)[0].shape, (5,))
+
     linop = nptf.linalg.LinearOperatorDiag(nptf.ones(5))
     self.assertLen(tree_util.tree_leaves(linop), 1)
     self.assertTupleEqual(tree_util.tree_leaves(linop)[0].shape, (5,))

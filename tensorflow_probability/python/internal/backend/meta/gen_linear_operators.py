@@ -45,6 +45,7 @@ MODULE_MAPPINGS = {
     'ops import linalg_ops': 'linalg_impl as linalg_ops',
     'ops import math_ops': 'numpy_math as math_ops',
     'ops import nn': 'nn',
+    'ops import sort_ops': 'misc as sort_ops',
     'ops import variables as variables_module': 'ops as variables_module',
     'ops.linalg import linalg_impl as linalg': 'linalg_impl as linalg'
 }
@@ -185,6 +186,8 @@ def gen_module(module_name):
 
   code = code.replace('array_ops.shape', 'prefer_static.shape')
   code = code.replace('array_ops.concat', 'prefer_static.concat')
+  code = code.replace('array_ops.broadcast_dynamic_shape',
+                      '_ops.broadcast_dynamic_shape')
   code = code.replace('array_ops.broadcast_static_shape',
                       '_ops.broadcast_static_shape')
   code = code.replace('array_ops.broadcast_to', '_ops.broadcast_to')

@@ -42,6 +42,7 @@ try:
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_householder import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_identity import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_kronecker import *
+  from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_permutation import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_low_rank_update import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_lower_triangular import *
   from tensorflow_probability.python.internal.backend.numpy.gen.linear_operator_toeplitz import *
@@ -70,6 +71,7 @@ try:
           'LinearOperatorKronecker': ('operators',),
           'LinearOperatorLowRankUpdate': ('base_operator', 'diag_update'),
           'LinearOperatorLowerTriangular': ('tril',),
+          'LinearOperatorPermutation': ('perm',),
           'LinearOperatorToeplitz': ('col', 'row'),
           'LinearOperatorZeros': (),
       }

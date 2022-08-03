@@ -367,7 +367,7 @@ def broadcast_matrix_batch_dims(batch_matrices, name=None):
     # Since static didn't work, do dynamic, which always copies data.
     bcast_batch_shape = prefer_static.shape(batch_matrices[0])[:-2]
     for mat in batch_matrices[1:]:
-      bcast_batch_shape = array_ops.broadcast_dynamic_shape(
+      bcast_batch_shape = _ops.broadcast_dynamic_shape(
           bcast_batch_shape,
           prefer_static.shape(mat)[:-2])
     for i, mat in enumerate(batch_matrices):

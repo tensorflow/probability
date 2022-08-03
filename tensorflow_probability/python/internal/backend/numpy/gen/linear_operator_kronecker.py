@@ -292,7 +292,7 @@ class LinearOperatorKronecker(linear_operator.LinearOperator):
     # broadcast_shape checks for compatibility.
     batch_shape = self.operators[0].batch_shape_tensor()
     for operator in self.operators[1:]:
-      batch_shape = array_ops.broadcast_dynamic_shape(
+      batch_shape = _ops.broadcast_dynamic_shape(
           batch_shape, operator.batch_shape_tensor())
 
     return prefer_static.concat((batch_shape, matrix_shape), 0)

@@ -204,7 +204,7 @@ class LinearOperatorToeplitz(linear_operator.LinearOperator):
   def _shape_tensor(self, row=None, col=None):
     row = self.row if row is None else row
     col = self.col if col is None else col
-    v_shape = array_ops.broadcast_dynamic_shape(
+    v_shape = _ops.broadcast_dynamic_shape(
         prefer_static.shape(row),
         prefer_static.shape(col))
     k = v_shape[-1]
@@ -262,7 +262,7 @@ class LinearOperatorToeplitz(linear_operator.LinearOperator):
   def _to_dense(self):
     row = ops.convert_to_tensor(self.row)
     col = ops.convert_to_tensor(self.col)
-    total_shape = array_ops.broadcast_dynamic_shape(
+    total_shape = _ops.broadcast_dynamic_shape(
         prefer_static.shape(row), prefer_static.shape(col))
     n = prefer_static.shape(row)[-1]
     row = _ops.broadcast_to(row, total_shape)

@@ -548,6 +548,7 @@ LINOP_FILES = [
     "linear_operator_kronecker",
     "linear_operator_lower_triangular",
     "linear_operator_low_rank_update",
+    "linear_operator_permutation",
     "linear_operator",
     "linear_operator_toeplitz",
     "linear_operator_util",
