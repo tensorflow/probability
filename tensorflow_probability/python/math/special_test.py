@@ -536,7 +536,7 @@ class BetaincinvTest(test_util.TestCase):
        "dtype": np.float64,
        "atol": 1e-12,
        "rtol": 1e-11})
-  def testBetaincinvSmallValues(self, dtype, atol, rtol):
+  def testBetaincinvSmall(self, dtype, atol, rtol):
     self._test_betaincinv_value(
         a_high=1., b_high=1., dtype=dtype, atol=atol, rtol=rtol)
 
@@ -549,7 +549,7 @@ class BetaincinvTest(test_util.TestCase):
        "dtype": np.float64,
        "atol": 1e-12,
        "rtol": 0.})
-  def testBetaincinvMediumValues(self, dtype, atol, rtol):
+  def testBetaincinvMedium(self, dtype, atol, rtol):
     self._test_betaincinv_value(
         a_high=100., b_high=100., dtype=dtype, atol=atol, rtol=rtol)
 
@@ -562,7 +562,7 @@ class BetaincinvTest(test_util.TestCase):
        "dtype": np.float64,
        "atol": 1e-12,
        "rtol": 0.})
-  def testBetaincinvLargeValues(self, dtype, atol, rtol):
+  def testBetaincinvLarge(self, dtype, atol, rtol):
     self._test_betaincinv_value(
         a_high=1e4, b_high=1e4, dtype=dtype, atol=atol, rtol=rtol)
 
@@ -584,6 +584,111 @@ class BetaincinvTest(test_util.TestCase):
       betaincinv = self.evaluate(tfp_math.betaincinv(a, b, y))
       self.assertEqual(dtype, betaincinv.dtype)
       self.assertAllEqual(y, betaincinv)
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincinvGradient(self):
+    space = np.logspace(np.log10(0.5), 3., 5).tolist()
+    space_y = np.linspace(0.01, 0.99, 10).tolist()
+    a, b, y = [
+        tf.constant(z, dtype='float64')
+        for z in zip(*list(itertools.product(space, space, space_y)))]
+
+    # Wrap in tf.function for faster computations.
+    betaincinv = tf.function(tfp_math.betaincinv, autograph=False)
+
+    err = self.compute_max_gradient_error(
+        lambda z: betaincinv(z, b, y), [a], delta=1e-7)
+    self.assertLess(err, 2e-7)
+
+    err = self.compute_max_gradient_error(
+        lambda z: betaincinv(a, z, y), [b], delta=1e-7)
+    self.assertLess(err, 2e-7)
+
+    err = self.compute_max_gradient_error(
+        lambda z: betaincinv(a, b, z), [y], delta=1e-7)
+    self.assertLess(err, 5e-8)
+
+  @parameterized.parameters(np.float32, np.float64)
+  @test_util.numpy_disable_gradient_test
+  def _testBetaincinvGradientFinite(self, dtype):
+    eps = np.finfo(dtype).eps
+    small = np.sqrt(eps)
+
+    space = np.logspace(np.log10(eps), 4.).tolist()
+    space_y = np.linspace(eps, 1. - small).tolist()
+    a, b, y = [
+        tf.constant(z, dtype=dtype)
+        for z in zip(*list(itertools.product(space, space, space_y)))]
+
+    def betaincinv_partials(a, b, y):
+      return tfp_math.value_and_gradient(tfp_math.betaincinv, [a, b, y])[1]
+
+    # Wrap in tf.function for faster computations.
+    betaincinv_partials = tf.function(betaincinv_partials, autograph=False)
+
+    self.assertAllFinite(self.evaluate(betaincinv_partials(a, b, y)))
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincinvGradientBroadcast(self):
+    a = 0.5 * np.ones([3, 2], dtype=np.float32)
+    b = 0.5 * np.ones([5, 1, 1], dtype=np.float32)
+    y = 0.5 * np.ones([7, 1, 1, 2], dtype=np.float32)
+
+    def simple_ternary_operator(a, b, y):
+      return a + b + y
+
+    _, simple_partials = tfp_math.value_and_gradient(
+        simple_ternary_operator, [a, b, y])
+    _, betaincinv_partials = tfp_math.value_and_gradient(
+        tfp_math.betaincinv, [a, b, y])
+    pairs_of_partials = zip([*simple_partials], [*betaincinv_partials])
+
+    for simple_partial, betaincinv_partial in pairs_of_partials:
+      self.assertAllEqual(simple_partial.shape, betaincinv_partial.shape)
+
+  @parameterized.parameters(np.float32, np.float64)
+  @test_util.numpy_disable_gradient_test
+  def testBetaincinvSecondDerivativeFinite(self, dtype):
+    # Avoid small values for parameters a and b where the gradient can veer off
+    # to infinity.
+    space = np.logspace(np.log10(0.5), 3., 5).tolist()
+    space_y = np.linspace(0.01, 0.99, 5).tolist()
+    a, b, y = [
+        tf.constant(z, dtype=dtype)
+        for z in zip(*list(itertools.product(space, space, space_y)))]
+
+    def betaincinv_partials(a, b, y):
+      return tfp_math.value_and_gradient(tfp_math.betaincinv, [a, b, y])[1]
+
+    def betaincinv_partials_of_partial_a(a, b, y):
+      return tfp_math.value_and_gradient(
+          lambda a, b, y: betaincinv_partials(a, b, y)[0],
+          [a, b, y])[1]
+
+    def betaincinv_partials_of_partial_b(a, b, y):
+      return tfp_math.value_and_gradient(
+          lambda a, b, y: betaincinv_partials(a, b, y)[1],
+          [a, b, y])[1]
+
+    def betaincinv_partials_of_partial_y(a, b, y):
+      return tfp_math.value_and_gradient(
+          lambda a, b, y: betaincinv_partials(a, b, y)[2],
+          [a, b, y])[1]
+
+    betaincinv_partials_of_partials = [
+        betaincinv_partials_of_partial_a,
+        betaincinv_partials_of_partial_b,
+        betaincinv_partials_of_partial_y]
+
+    # Wrap in tf.function for faster computations.
+    betaincinv_partials_of_partials = [
+        tf.function(partial_fn, autograph=False)
+        for partial_fn in betaincinv_partials_of_partials]
+
+    partials_of_partials = [
+        partial_fn(a, b, y) for partial_fn in betaincinv_partials_of_partials]
+
+    self.assertAllFinite(self.evaluate(partials_of_partials))
 
 
 @test_util.test_graph_and_eager_modes
