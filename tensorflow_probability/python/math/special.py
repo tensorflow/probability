@@ -666,7 +666,8 @@ def _betaincinv_computation(a, b, y):
 
   a_minus_1 = a - one
   b_minus_1 = b - one
-  one_minus_eps = one - eps
+  lbeta_a_and_b = lbeta(a, b)
+  two_tiny = two * tiny
 
   # tolerance was set by experimentation and max_iterations was taken from [4].
   if numpy_dtype == np.float64:
@@ -681,7 +682,7 @@ def _betaincinv_computation(a, b, y):
     error_over_der = error / tf.math.exp(
         tf.math.xlogy(a_minus_1, candidate) +
         tf.math.xlog1py(b_minus_1, -candidate) -
-        lbeta(a, b))
+        lbeta_a_and_b)
     second_der_over_der = a_minus_1 / candidate - b_minus_1 / (one - candidate)
     # Following [2, section 9.4.2, page 463], we limit the influence of the
     # Halley's correction to the Newton's method, since this correction can
@@ -710,7 +711,7 @@ def _betaincinv_computation(a, b, y):
     new_low = tf.where(new_delta_is_negative, candidate, low)
     new_high = tf.where(new_delta_is_negative, high, candidate)
 
-    adjusted_tolerance = tf.maximum(tolerance * new_candidate, two * tiny)
+    adjusted_tolerance = tf.maximum(tolerance * new_candidate, two_tiny)
     should_stop = (should_stop | (tf.math.abs(new_delta) < adjusted_tolerance) |
         tf.math.equal(new_low, new_high))
 
@@ -739,7 +740,7 @@ def _betaincinv_computation(a, b, y):
   # input y and the solution.
   y = tf.where(use_symmetry_relation, one - y, y)
   result = tf.where(use_symmetry_relation, one - result, result)
-  result = tf.clip_by_value(result, tiny, one_minus_eps)
+  result = tf.clip_by_value(result, tiny, one - eps)
 
   # Handle trivial cases.
   result = tf.where(tf.equal(y, zero) | tf.equal(y, one), y, result)
