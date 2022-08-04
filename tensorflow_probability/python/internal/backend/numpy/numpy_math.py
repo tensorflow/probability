@@ -223,7 +223,7 @@ def _confusion_matrix(
   if weights is None:
     weights = 1
   if not JAX_MODE:
-    np.add.at(cmatrix, [labels, predictions], weights)
+    np.add.at(cmatrix, (labels, predictions), weights)
     return cmatrix
   return cmatrix.at[(labels, predictions)].add(weights)
 
