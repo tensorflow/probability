@@ -712,7 +712,7 @@ def windowed_variance(
 
   Computes variances among data in the Tensor `x` along the given windows:
 
-    result[i] = variance(x[low_indices[i]:high_indices[i]+1])
+    result[i] = variance(x[low_indices[i]:high_indices[i]])
 
   accurately and efficiently.  To wit, if K is the size of
   `low_indices` and `high_indices`, and `N` is the size of `x` along
