@@ -829,7 +829,7 @@ def windowed_mean(
 
   Computes means among data in the Tensor `x` along the given windows:
 
-    result[i] = mean(x[low_indices[i]:high_indices[i]+1])
+    result[i] = mean(x[low_indices[i]:high_indices[i]])
 
   efficiently.  To wit, if K is the size of `low_indices` and
   `high_indices`, and `N` is the size of `x` along the given `axis`,
