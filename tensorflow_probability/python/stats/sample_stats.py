@@ -925,13 +925,6 @@ def _prepare_window_args(x, low_indices=None, high_indices=None, axis=0):
   return x, indices, axis
 
 
-def _safe_average(totals, counts):
-  # This tf.where protects `totals` from getting a gradient signal
-  # when `counts` is 0.
-  safe_totals = tf.where(~tf.equal(counts, 0), totals, 0)
-  return tf.where(~tf.equal(counts, 0), safe_totals / counts, 0)
-
-
 def log_average_probs(logits, sample_axis=0, event_axis=None, keepdims=False,
                       validate_args=False, name=None):
   """Computes `log(average(to_probs(logits)))` in a numerically stable manner.

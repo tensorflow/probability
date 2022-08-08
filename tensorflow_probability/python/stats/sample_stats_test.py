@@ -731,13 +731,16 @@ class WindowedStatsTest(test_util.TestCase):
     check_fn((64, 4, 8), (32, 1, 1), axis=0)
     check_fn((64, 4, 8), (32, 4, 1), axis=0)
     check_fn((64, 4, 8), (32, 4, 8), axis=0)
+    check_fn((64, 4, 8), (64, 4, 8), axis=0)
     check_fn((64, 4, 8), (64, 64, 1), axis=1)
     check_fn((64, 4, 8), (1, 64, 1), axis=1)
     check_fn((64, 4, 8), (64, 2, 8), axis=1)
+    check_fn((64, 4, 8), (64, 4, 8), axis=1)
     check_fn((64, 4, 8), (64, 4, 64), axis=2)
     check_fn((64, 4, 8), (1, 1, 64), axis=2)
     check_fn((64, 4, 8), (64, 4, 4), axis=2)
     check_fn((64, 4, 8), (1, 1, 4), axis=2)
+    check_fn((64, 4, 8), (64, 4, 8), axis=2)
 
     with self.assertRaises(Exception):
       # Non broadcastable shapes
