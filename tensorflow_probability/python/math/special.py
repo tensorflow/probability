@@ -46,6 +46,9 @@ __all__ = [
 ]
 
 
+NUMPY_MODE = False
+
+
 def atan_difference(x, y, name=None):
   """Difference of arctan(x) and arctan(y).
 
@@ -88,21 +91,34 @@ def atan_difference(x, y, name=None):
     return difference
 
 
+# 16-bit (half precision) floating-point dtypes available on current backend.
+_f16bit_dtypes = [tf.float16] if NUMPY_MODE else [tf.bfloat16, tf.float16]
+
+
 def _betainc_naive(a, b, x):
   """Returns the regularized incomplete beta function element-wise."""
-  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
-  a = tf.convert_to_tensor(a, dtype=dtype)
-  b = tf.convert_to_tensor(b, dtype=dtype)
-  x = tf.convert_to_tensor(x, dtype=dtype)
+  dtype_orig = dtype_util.common_dtype([a, b, x], tf.float32)
+  # We promote bfloat16 and float16 to float32 to make this function consistent
+  # with the XLA implementation of betainc.
+  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  dtype = tf.float32 if should_promote_dtype else dtype_orig
+
+  a, b, x = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, x]]
+  if should_promote_dtype:
+    a, b, x = [tf.cast(z, dtype) for z in [a, b, x]]
 
   broadcast_shape = functools.reduce(
       ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(x)])
+  a, b, x = [tf.broadcast_to(z, broadcast_shape) for z in [a, b, x]]
 
-  a = tf.broadcast_to(a, broadcast_shape)
-  b = tf.broadcast_to(b, broadcast_shape)
-  x = tf.broadcast_to(x, broadcast_shape)
+  result = tf.math.betainc(a, b, x)
 
-  return tf.math.betainc(a, b, x)
+  # If we promoted the dtype, then we have to convert the result back to the
+  # original dtype.
+  if should_promote_dtype:
+    result = tf.cast(result, dtype_orig)
+
+  return result
 
 
 def _betainc_even_partial_numerator(iteration, a, b, x, dtype):
@@ -415,21 +431,22 @@ def _betainc_der_power_series(a, b, x, dtype, use_power_series):
 
 def _betainc_partials(a, b, x):
   """Returns the partial derivatives of `betainc(a, b, x)`."""
-  dtype = dtype_util.common_dtype([a, b, x], tf.float32)
+  dtype_orig = dtype_util.common_dtype([a, b, x], tf.float32)
+  # We promote bfloat16 and float16 to float32 to make this function consistent
+  # with betainc.
+  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  dtype = tf.float32 if should_promote_dtype else dtype_orig
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   zero = tf.constant(0., dtype=dtype)
   one = tf.constant(1., dtype=dtype)
 
-  a = tf.convert_to_tensor(a, dtype=dtype)
-  b = tf.convert_to_tensor(b, dtype=dtype)
-  x = tf.convert_to_tensor(x, dtype=dtype)
+  a, b, x = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, x]]
+  if should_promote_dtype:
+    a, b, x = [tf.cast(z, dtype) for z in [a, b, x]]
 
   broadcast_shape = functools.reduce(
       ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(x)])
-
-  a = tf.broadcast_to(a, broadcast_shape)
-  b = tf.broadcast_to(b, broadcast_shape)
-  x = tf.broadcast_to(x, broadcast_shape)
+  a, b, x = [tf.broadcast_to(z, broadcast_shape) for z in [a, b, x]]
 
   # The partial derivative of betainc with respect to x can be obtained
   # directly by using the expression given here:
@@ -464,6 +481,12 @@ def _betainc_partials(a, b, x):
   grad_a, grad_b, grad_x = [
       tf.where(result_is_nan, numpy_dtype(np.nan), grad)
       for grad in [grad_a, grad_b, grad_x]]
+
+  # If we promoted the dtype, then we have to convert the gradients back to the
+  # original dtype.
+  if should_promote_dtype:
+    grad_a, grad_b, grad_x = [
+        tf.cast(grad, dtype_orig) for grad in [grad_a, grad_b, grad_x]]
 
   return grad_a, grad_b, grad_x
 
@@ -623,7 +646,11 @@ def _betaincinv_initial_approx(a, b, y, dtype):
 
 def _betaincinv_computation(a, b, y):
   """Returns the inverse of `betainc(a, b, x)` with respect to `x`."""
-  dtype = dtype_util.common_dtype([a, b, y], tf.float32)
+  dtype_orig = dtype_util.common_dtype([a, b, y], tf.float32)
+  # We promote bfloat16 and float16 to float32 to make this function consistent
+  # with betainc.
+  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  dtype = tf.float32 if should_promote_dtype else dtype_orig
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
   zero = tf.constant(0., dtype=dtype)
   tiny = tf.constant(np.finfo(numpy_dtype).tiny, dtype=dtype)
@@ -634,30 +661,27 @@ def _betaincinv_computation(a, b, y):
   halley_correction_min = tf.constant(0.5, dtype=dtype)
   halley_correction_max = tf.constant(1.5, dtype=dtype)
 
-  a = tf.convert_to_tensor(a, dtype=dtype)
-  b = tf.convert_to_tensor(b, dtype=dtype)
-  y = tf.convert_to_tensor(y, dtype=dtype)
+  a, b, y = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, y]]
+  if should_promote_dtype:
+    a, b, y = [tf.cast(z, dtype) for z in [a, b, y]]
 
   broadcast_shape = functools.reduce(
       ps.broadcast_shape, [ps.shape(a), ps.shape(b), ps.shape(y)])
-
-  a = tf.broadcast_to(a, broadcast_shape)
-  b = tf.broadcast_to(b, broadcast_shape)
-  y = tf.broadcast_to(y, broadcast_shape)
+  a, b, y = [tf.broadcast_to(z, broadcast_shape) for z in [a, b, y]]
 
   # When tfp_math.betainc(a, b, 0.5) < y, we apply the symmetry relation given
   # here: https://dlmf.nist.gov/8.17.E4
   #   betainc(a, b, x) = 1 - betainc(b, a, 1 - x) .
-  # If dtype != float64, we have additional conditions to apply this relation:
+  # If dtype is float32, we have additional conditions to apply this relation:
   #   (a < 1) & (b < 1) & (tfp_math.betainc(a, b, a / (a + b)) < y) .
   error_at_half = betainc(a, b, half) - y
-  if numpy_dtype == np.float64:
-    use_symmetry_relation = (error_at_half < zero)
-  else:
+  if numpy_dtype == np.float32:
     a_and_b_are_small = (a < one) & (b < one)
     error_at_mean = betainc(a, b, a / (a + b)) - y
     use_symmetry_relation = (error_at_half < zero) & a_and_b_are_small & (
         error_at_mean < zero)
+  else:
+    use_symmetry_relation = (error_at_half < zero)
 
   a_orig = a
   a = tf.where(use_symmetry_relation, b, a)
@@ -669,13 +693,13 @@ def _betaincinv_computation(a, b, y):
   lbeta_a_and_b = lbeta(a, b)
   two_tiny = two * tiny
 
-  # tolerance was set by experimentation and max_iterations was taken from [4].
-  if numpy_dtype == np.float64:
-    tolerance = 1e-12
-    max_iterations = 8
-  else:
-    tolerance = 1e-6
+  # max_iterations was taken from [4] and tolerance was set by experimentation.
+  if numpy_dtype == np.float32:
     max_iterations = 10
+    tolerance = tf.constant(8., dtype=dtype) * eps
+  else:
+    max_iterations = 8
+    tolerance = tf.constant(4096., dtype=dtype) * eps
 
   def root_finding_iteration(should_stop, low, high, candidate):
     error = betainc(a, b, candidate) - y
@@ -720,11 +744,11 @@ def _betaincinv_computation(a, b, y):
   initial_candidate = _betaincinv_initial_approx(a, b, y, dtype)
   # Bracket the solution with the interval (low, high).
   initial_low = tf.zeros_like(y)
-  if numpy_dtype == np.float64:
-    initial_high = tf.ones_like(y) * half
-  else:
+  if numpy_dtype == np.float32:
     initial_high = tf.ones_like(y) * tf.where(
         a_and_b_are_small & (error_at_mean < zero), half, one)
+  else:
+    initial_high = tf.ones_like(y) * half
 
   (_, _, _, result) = tf.while_loop(
       cond=lambda stop, *_: tf.reduce_any(~stop),
@@ -749,21 +773,47 @@ def _betaincinv_computation(a, b, y):
   result_is_nan = (a <= zero) | (b <= zero) | (y < zero) | (y > one)
   result = tf.where(result_is_nan, numpy_dtype(np.nan), result)
 
+  # If we promoted the dtype, then we have to convert the result back to the
+  # original dtype.
+  if should_promote_dtype:
+    result = tf.cast(result, dtype_orig)
+
   return result
 
 
-def _betaincinv_partials(a, b, x):
+def _betaincinv_partials(a, b, y, return_value=False):
   """Returns the partial derivatives of `betaincinv(a, b, y)`."""
+  dtype_orig = dtype_util.common_dtype([a, b, y], tf.float32)
+  # We promote bfloat16 and float16 to float32 to make this function consistent
+  # with betaincinv.
+  should_promote_dtype = (dtype_orig in _f16bit_dtypes)
+  dtype = tf.float32 if should_promote_dtype else dtype_orig
+
+  a, b, y = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, y]]
+  if should_promote_dtype:
+    a, b, y = [tf.cast(z, dtype) for z in [a, b, y]]
+
+  # We use the fact that betainc and betaincinv are inverses of each other to
+  # compute the gradients.
+  x = _betaincinv_custom_gradient(a, b, y)
   betainc_partial_a, betainc_partial_b, betainc_partial_x = _betainc_partials(
       a, b, x)
 
-  # Use the fact that betainc and betaincinv are inverses of each other to
-  # compute the gradients.
-  betaincinv_partial_a = -betainc_partial_a / betainc_partial_x
-  betaincinv_partial_b = -betainc_partial_b / betainc_partial_x
-  betaincinv_partial_y = tf.math.reciprocal(betainc_partial_x)
+  partial_a = -betainc_partial_a / betainc_partial_x
+  partial_b = -betainc_partial_b / betainc_partial_x
+  partial_y = tf.math.reciprocal(betainc_partial_x)
 
-  return betaincinv_partial_a, betaincinv_partial_b, betaincinv_partial_y
+  if return_value:
+    results = (partial_a, partial_b, partial_y, x)
+  else:
+    results = (partial_a, partial_b, partial_y)
+
+  # If we promoted the dtype, then we have to convert the results back to the
+  # original dtype.
+  if should_promote_dtype:
+    results = [tf.cast(z, dtype_orig) for z in results]
+
+  return results
 
 
 def _betaincinv_fwd(a, b, y):
@@ -775,10 +825,8 @@ def _betaincinv_fwd(a, b, y):
 def _betaincinv_bwd(aux, g):
   """Reverse mode impl for betaincinv."""
   a, b, y = aux
-  x = _betaincinv_custom_gradient(a, b, y)
-  # Use the fact that betainc and betaincinv are inverses of each other to
-  # compute the gradients.
-  pa, pb, py = _betaincinv_partials(a, b, x)
+  # pylint: disable=unbalanced-tuple-unpacking
+  pa, pb, py = _betaincinv_partials(a, b, y)
   return _fix_gradient_for_broadcasting(
       [a, b, y], [pa * g, pb * g, py * g])
 
@@ -787,9 +835,7 @@ def _betaincinv_jvp(primals, tangents):
   """Computes JVP for betaincinv (supports JAX custom derivative)."""
   a, b, y = primals
   da, db, dy = tangents
-
-  x = _betaincinv_custom_gradient(a, b, y)
-  pa, pb, py = _betaincinv_partials(a, b, x)
+  pa, pb, py, x = _betaincinv_partials(a, b, y, return_value=True)
   return (x, pa * da + pb * db + py * dy)
 
 

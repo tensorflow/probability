@@ -194,6 +194,37 @@ class BetaincTest(test_util.TestCase):
     x = np.ones([7, 1, 1, 2], dtype=np.float32)
     self.assertAllEqual([7, 5, 3, 2], tfp_math.betainc(a, b, x).shape)
 
+  def testBetaincHalfPrecision(self):
+    a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.float16)
+    b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.float16)
+    x = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=tf.float16)
+    result = tfp_math.betainc(a, b, x)
+
+    self.assertEqual(a.dtype, result.dtype)
+
+    expected_result = tfp_math.betainc(
+        *[tf.cast(z, tf.float32) for z in [a, b, x]])
+    expected_result = tf.cast(expected_result, a.dtype)
+
+    self.assertAllEqual(*self.evaluate([expected_result, result]))
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=False,
+      reason="Numpy does not support brain floating point.")
+  def testBetaincBrain(self):
+    a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.bfloat16)
+    b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.bfloat16)
+    x = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=tf.bfloat16)
+    result = tfp_math.betainc(a, b, x)
+
+    self.assertEqual(a.dtype, result.dtype)
+
+    expected_result = tfp_math.betainc(
+        *[tf.cast(z, tf.float32) for z in [a, b, x]])
+    expected_result = tf.cast(expected_result, a.dtype)
+
+    self.assertAllEqual(*self.evaluate([expected_result, result]))
+
   @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
   def testBetaincGradient(self, dtype):
@@ -453,6 +484,23 @@ class BetaincTest(test_util.TestCase):
           atol_a=1e-10, atol_b=1e-10, atol_x=1e-10,
           rtol_a=1e-11, rtol_b=1e-11, rtol_x=1e-11)
 
+  @test_util.numpy_disable_gradient_test
+  def testBetaincDerivativeBrainAndHalfPrecision(self):
+    for dtype in [tf.float16, tf.bfloat16]:
+      a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=dtype)
+      b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=dtype)
+      x = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=dtype)
+      grads = tfp_math.value_and_gradient(tfp_math.betainc, [a, b, x])[1]
+
+      for grad in grads:
+        self.assertEqual(a.dtype, grad.dtype)
+
+      expected_grads = tfp_math.value_and_gradient(
+          tfp_math.betainc, *[tf.cast(z, tf.float32) for z in [a, b, x]])[1]
+      expected_grads = [tf.cast(grad, a.dtype) for grad in expected_grads]
+
+      self.assertAllEqual(*self.evaluate([expected_grads, grads]))
+
   @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
   def testBetaincSecondDerivativeFinite(self, dtype):
@@ -586,6 +634,37 @@ class BetaincinvTest(test_util.TestCase):
       self.assertEqual(dtype, betaincinv.dtype)
       self.assertAllEqual(y, betaincinv)
 
+  def testBetaincinvHalfPrecision(self):
+    a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.float16)
+    b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.float16)
+    y = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=tf.float16)
+    result = tfp_math.betaincinv(a, b, y)
+
+    self.assertEqual(a.dtype, result.dtype)
+
+    expected_result = tfp_math.betaincinv(
+        *[tf.cast(z, tf.float32) for z in [a, b, y]])
+    expected_result = tf.cast(expected_result, a.dtype)
+
+    self.assertAllEqual(*self.evaluate([expected_result, result]))
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, disable_jax=False,
+      reason="Numpy does not support brain floating point.")
+  def testBetaincinvBrain(self):
+    a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.bfloat16)
+    b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.bfloat16)
+    y = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=tf.bfloat16)
+    result = tfp_math.betaincinv(a, b, y)
+
+    self.assertEqual(a.dtype, result.dtype)
+
+    expected_result = tfp_math.betaincinv(
+        *[tf.cast(z, tf.float32) for z in [a, b, y]])
+    expected_result = tf.cast(expected_result, a.dtype)
+
+    self.assertAllEqual(*self.evaluate([expected_result, result]))
+
   @test_util.numpy_disable_gradient_test
   def testBetaincinvGradient(self):
     space = np.logspace(np.log10(0.5), 3., 5).tolist()
@@ -646,6 +725,23 @@ class BetaincinvTest(test_util.TestCase):
 
     for simple_partial, betaincinv_partial in pairs_of_partials:
       self.assertAllEqual(simple_partial.shape, betaincinv_partial.shape)
+
+  @test_util.numpy_disable_gradient_test
+  def testBetaincinvGradientBrainAndHalfPrecision(self):
+    for dtype in [tf.float16, tf.bfloat16]:
+      a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=dtype)
+      b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=dtype)
+      y = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=dtype)
+      grads = tfp_math.value_and_gradient(tfp_math.betaincinv, [a, b, y])[1]
+
+      for grad in grads:
+        self.assertEqual(a.dtype, grad.dtype)
+
+      expected_grads = tfp_math.value_and_gradient(
+          tfp_math.betaincinv, *[tf.cast(z, tf.float32) for z in [a, b, y]])[1]
+      expected_grads = [tf.cast(grad, a.dtype) for grad in expected_grads]
+
+      self.assertAllEqual(*self.evaluate([expected_grads, grads]))
 
   @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
