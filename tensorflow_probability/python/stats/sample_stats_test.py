@@ -15,7 +15,7 @@
 """Tests for Sample Stats Ops."""
 
 # Dependency imports
-
+import functools
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
@@ -677,6 +677,85 @@ class MeanTest(test_util.TestCase):
     y = [0., 1., 2., 3.]
     self.assertAllClose([0., 1., 1.5, 2.5],
                         self.evaluate(sample_stats.windowed_mean(y)))
+
+
+@test_util.test_all_tf_execution_regimes
+class WindowedStatsTest(test_util.TestCase):
+  def apply_slice_along_axis(self, func, arr, low, high, axis):
+    """Applies `func` over slices of `arr` along `axis`. Slices intervals are
+    specified through `low` and `high`. Support broadcasting.
+    """
+    np.testing.assert_equal(low.shape, high.shape)
+    ni, _, nk = arr.shape[:axis], arr.shape[axis], arr.shape[axis + 1:]
+    si, j, sk = low.shape[:axis], low.shape[axis], low.shape[axis + 1:]
+    mk = max(nk, sk)
+    mi = max(ni, si)
+    out = np.empty(mi + (j,) + mk)
+    for ki in np.ndindex(ni):
+      for kk in np.ndindex(mk):
+        ak = tuple(np.mod(kk, nk))
+        ik = tuple(np.mod(kk, sk))
+        ai = tuple(np.mod(ki, ni))
+        ii = tuple(np.mod(ki, si))
+        a_1d = arr[ai + np.s_[:, ] + ak]
+        out_1d = out[ki + np.s_[:, ] + kk]
+        low_1d = low[ii + np.s_[:, ] + ik]
+        high_1d = high[ii + np.s_[:, ] + ik]
+
+        for r in range(j):
+          out_1d[r] = func(a_1d[low_1d[r]:high_1d[r]])
+    return out
+  def check_gaussian_windowed(self, shape, indice_shape, axis,
+                              window_func, np_func):
+    stat_shape = np.array(shape).astype(np.int32)
+    stat_shape[axis] = 1
+    loc = np.arange(np.prod(stat_shape)).reshape(stat_shape)
+    scale = 0.1 * np.arange(np.prod(stat_shape)).reshape(stat_shape)
+    rng = test_util.test_np_rng()
+    x = rng.normal(loc=loc, scale=scale, size=shape)
+    indice_shape = [2] + list(indice_shape)
+    indices = rng.randint(shape[axis] + 1, size=indice_shape)
+    indices = np.sort(indices, axis=0)
+    low_indices, high_indices = indices[0], indices[1]
+    a = window_func(x, low_indices=low_indices,
+                    high_indices=high_indices, axis=axis)
+    b = self.apply_slice_along_axis(np_func, x, low_indices, high_indices,
+                               axis=axis)
+    b[np.isnan(b)] = 0  # We treat stats computed on empty sets as zeros
+    self.assertAllClose(a, b)
+
+  def check_windowed(self, func, numpy_func):
+    check_fn = functools.partial(self.check_gaussian_windowed,
+                                 window_func=func, np_func=numpy_func)
+    check_fn((64, 4, 8), (128, 1, 1), axis=0)
+    check_fn((64, 4, 8), (32, 1, 1), axis=0)
+    check_fn((64, 4, 8), (32, 4, 1), axis=0)
+    check_fn((64, 4, 8), (32, 4, 8), axis=0)
+    check_fn((64, 4, 8), (64, 64, 1), axis=1)
+    check_fn((64, 4, 8), (1, 64, 1), axis=1)
+    check_fn((64, 4, 8), (64, 2, 8), axis=1)
+    check_fn((64, 4, 8), (64, 4, 64), axis=2)
+    check_fn((64, 4, 8), (1, 1, 64), axis=2)
+    check_fn((64, 4, 8), (64, 4, 4), axis=2)
+    check_fn((64, 4, 8), (1, 1, 4), axis=2)
+
+    with self.assertRaises(Exception):
+      # Non broadcastable shapes
+      check_fn((64, 4, 8), (4, 1, 4), axis=2)
+
+  def test_windowed_mean(self):
+    self.check_windowed(func=tfp.stats.windowed_mean, numpy_func=np.mean)
+
+  def test_windowed_mean_graph(self):
+    func = tf.function(tfp.stats.windowed_mean)
+    self.check_windowed(func=func, numpy_func=np.mean)
+
+  def test_windowed_variance(self):
+    self.check_windowed(func=tfp.stats.windowed_variance, numpy_func=np.var)
+
+  def test_windowed_variance_graph(self):
+    func = tf.function(tfp.stats.windowed_variance)
+    self.check_windowed(func=func, numpy_func=np.var)
 
 
 @test_util.test_all_tf_execution_regimes

@@ -14,9 +14,17 @@
 # ============================================================================
 """Functions for computing statistics of samples."""
 
+JAX_MODE = False
+NUMPY_MODE = False
+
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
+
+if JAX_MODE or NUMPY_MODE:
+  tnp = np
+else:
+  import tensorflow.experimental.numpy as tnp
 
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
@@ -712,7 +720,7 @@ def windowed_variance(
 
   Computes variances among data in the Tensor `x` along the given windows:
 
-    result[i] = variance(x[low_indices[i]:high_indices[i]+1])
+    result[i] = variance(x[low_indices[i]:high_indices[i]])
 
   accurately and efficiently.  To wit, if K is the size of
   `low_indices` and `high_indices`, and `N` is the size of `x` along
@@ -727,10 +735,9 @@ def windowed_variance(
   last half of an MCMC chain.
 
   Suppose `x` has shape `Bx + [N] + E`, where the `Bx` component has
-  rank `axis`, and `low_indices` and `high_indices` broadcast to shape
-  `[M]`.  Then each element of `low_indices` and `high_indices`
-  must be between 0 and N+1, and the shape of the output will be
-  `Bx + [M] + E`.  Batch shape in the indices is not currently supported.
+  rank `axis`, and `low_indices` and `high_indices` broadcast to `x`.
+  Then each element of `low_indices` and `high_indices` must be
+  between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
 
   The default windows are
   `[0, 1), [1, 2), [1, 3), [2, 4), [2, 5), ...`
@@ -769,7 +776,7 @@ def windowed_variance(
   """
   with tf.name_scope(name or 'windowed_variance'):
     x = tf.convert_to_tensor(x)
-    low_indices, high_indices, low_counts, high_counts = _prepare_window_args(
+    x, indices, axis = _prepare_window_args(
         x, low_indices, high_indices, axis)
 
     # We have a problem with indexing: the standard convention demands
@@ -786,15 +793,11 @@ def windowed_variance(
     def index_for_cumulative(indices):
       return tf.maximum(indices - 1, 0)
     cum_sums = tf.cumsum(x, axis=axis)
-    low_sums = tf.gather(
-        cum_sums, index_for_cumulative(low_indices), axis=axis)
-    high_sums = tf.gather(
-        cum_sums, index_for_cumulative(high_indices), axis=axis)
+    sums = tnp.take_along_axis(
+        cum_sums, index_for_cumulative(indices), axis=axis)
     cum_variances = cumulative_variance(x, sample_axis=axis)
-    low_variances = tf.gather(
-        cum_variances, index_for_cumulative(low_indices), axis=axis)
-    high_variances = tf.gather(
-        cum_variances, index_for_cumulative(high_indices), axis=axis)
+    variances = tnp.take_along_axis(
+        cum_variances, index_for_cumulative(indices), axis=axis)
 
     # This formula is the binary accurate variance merge from [1],
     # adapted to subtract and batched across the indexed counts, sums,
@@ -812,15 +815,18 @@ def windowed_variance(
     # This formula can also be read as implementing the above variance
     # computation by "unioning" A u B with a notional "negative B"
     # multiset.
-    counts = high_counts - low_counts  # |A|
-    discrepancies = (
-        _safe_average(high_sums, high_counts) -
-        _safe_average(low_sums, low_counts))**2  # (mean(A u B) - mean(B))**2
-    adjustments = high_counts * (-low_counts) / counts  # |A u B| * -|B| / |A|
-    residuals = (high_variances * high_counts -
-                 low_variances * low_counts +
+    bounds = ps.cast(indices, sums.dtype)
+    counts = bounds[1] - bounds[0]  # |A|
+    sum_averages = tf.math.divide_no_nan(sums, bounds)
+    # (mean(A u B) - mean(B))**2
+    discrepancies = tf.square(sum_averages[1] - sum_averages[0])
+    # |A u B| * -|B| / |A|
+    adjustments = tf.math.divide_no_nan(bounds[1] * (-bounds[0]), counts)
+    variances_scaled = variances * bounds
+    residuals = (variances_scaled[1] -
+                 variances_scaled[0] +
                  adjustments * discrepancies)
-    return _safe_average(residuals, counts)
+    return tf.math.divide_no_nan(residuals, counts)
 
 
 def windowed_mean(
@@ -829,7 +835,7 @@ def windowed_mean(
 
   Computes means among data in the Tensor `x` along the given windows:
 
-    result[i] = mean(x[low_indices[i]:high_indices[i]+1])
+    result[i] = mean(x[low_indices[i]:high_indices[i]])
 
   efficiently.  To wit, if K is the size of `low_indices` and
   `high_indices`, and `N` is the size of `x` along the given `axis`,
@@ -842,10 +848,9 @@ def windowed_mean(
   last half of an MCMC chain.
 
   Suppose `x` has shape `Bx + [N] + E`, where the `Bx` component has
-  rank `axis`, and `low_indices` and `high_indices` broadcast to shape
-  `[M]`.  Then each element of `low_indices` and `high_indices`
-  must be between 0 and N+1, and the shape of the output will be
-  `Bx + [M] + E`.  Batch shape in the indices is not currently supported.
+  rank `axis`, and `low_indices` and `high_indices` broadcast to `x`.
+  Then each element of `low_indices` and `high_indices` must be
+  between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
 
   The default windows are
   `[0, 1), [1, 2), [1, 3), [2, 4), [2, 5), ...`
@@ -878,18 +883,17 @@ def windowed_mean(
   """
   with tf.name_scope(name or 'windowed_mean'):
     x = tf.convert_to_tensor(x)
-    low_indices, high_indices, low_counts, high_counts = _prepare_window_args(
-        x, low_indices, high_indices, axis)
+    x, indices, axis = _prepare_window_args(x, low_indices, high_indices, axis)
 
     raw_cumsum = tf.cumsum(x, axis=axis)
-    cum_sums = tf.concat(
-        [tf.zeros_like(tf.gather(raw_cumsum, [0], axis=axis)), raw_cumsum],
-        axis=axis)
-    low_sums = tf.gather(cum_sums, low_indices, axis=axis)
-    high_sums = tf.gather(cum_sums, high_indices, axis=axis)
-
-    counts = high_counts - low_counts
-    return _safe_average(high_sums - low_sums, counts)
+    rank = ps.rank(x)
+    paddings = ps.reshape(ps.one_hot(2*axis, depth=2*rank, dtype=tf.int32),
+                          (rank, 2))
+    cum_sums = ps.pad(raw_cumsum, paddings)
+    sums = tnp.take_along_axis(cum_sums, indices,
+      axis=axis)
+    counts = ps.cast(indices[1] - indices[0], dtype=sums.dtype)
+    return tf.math.divide_no_nan(sums[1] - sums[0], counts)
 
 
 def _prepare_window_args(x, low_indices=None, high_indices=None, axis=0):
@@ -905,24 +909,20 @@ def _prepare_window_args(x, low_indices=None, high_indices=None, axis=0):
   # Broadcast indices together.
   high_indices = high_indices + tf.zeros_like(low_indices)
   low_indices = low_indices + tf.zeros_like(high_indices)
+  indices = ps.stack([low_indices, high_indices], axis=0)
+  x = tf.expand_dims(x, axis=0)
+  axis += 1
 
-  # TODO(axch): Support batch low and high indices.  That would
-  # complicate this shape munging (though tf.gather should work
-  # fine).
-
-  # We want to place `low_counts` and `high_counts` at the `axis`
-  # position, so we reshape them to shape `[1, 1, ..., 1, N, 1, ...,
-  # 1]`, where the `N` is at `axis`.  The `counts_shp`, below,
-  # is this shape.
-  size = ps.size(high_indices)
-  counts_shp = ps.one_hot(
-      axis, depth=ps.rank(x), on_value=size, off_value=1)
-
-  low_counts = tf.reshape(tf.cast(low_indices, dtype=x.dtype),
-                          shape=counts_shp)
-  high_counts = tf.reshape(tf.cast(high_indices, dtype=x.dtype),
-                           shape=counts_shp)
-  return low_indices, high_indices, low_counts, high_counts
+  if ps.rank(indices) != ps.rank(x) and ps.rank(indices) == 2:
+    # legacy usage, kept for backward compatibility
+    size = ps.size(indices) // 2
+    bc_shape = ps.one_hot(axis, depth=ps.rank(x), on_value=size,
+      off_value=1)
+    bc_shape = ps.concat([[2], bc_shape[1:]], axis=0)
+    indices = ps.reshape(indices, bc_shape)
+  # `take_along_axis` requires the type to be int32
+  indices = ps.cast(indices, dtype=tf.int32)
+  return x, indices, axis
 
 
 def _safe_average(totals, counts):
