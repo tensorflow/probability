@@ -702,8 +702,8 @@ def cumulative_variance(x, sample_axis=0, name=None):
     excl_counts = tf.reshape(tf.range(size, dtype=x.dtype), shape=counts_shp)
     incl_counts = excl_counts + 1
     excl_sums = tf.cumsum(x, axis=sample_axis, exclusive=True)
-    discrepancies = (excl_sums / excl_counts - x)**2
-    discrepancies = tf.where(excl_counts == 0, x**2, discrepancies)
+    discrepancies = tf.math.square(excl_sums / excl_counts - x)
+    discrepancies = tf.where(excl_counts == 0, tf.math.square(x), discrepancies)
     adjustments = excl_counts / incl_counts
     # The zeroth item's residual contribution is 0, because it has no
     # other items to vary from.  The preceding expressions, however,
@@ -734,8 +734,10 @@ def windowed_variance(
   trailing-window estimators from some iterative process, such as the
   last half of an MCMC chain.
 
-  Suppose `x` has shape `Bx + [N] + E`, where the `Bx` component has
-  rank `axis`, and `low_indices` and `high_indices` broadcast to `x`.
+  Suppose `x` has shape `Bx + [N] + E`, `low_indices` and `high_indices`
+  have shape `Bi + [M] + F`, such that:
+      - `rank(Bx) = rank(Bi) = axis`,
+      - `Bi + [1] + F` broadcasts to `Bx + [N] + E`.
   Then each element of `low_indices` and `high_indices` must be
   between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
 
@@ -847,8 +849,10 @@ def windowed_mean(
   trailing-window estimators from some iterative process, such as the
   last half of an MCMC chain.
 
-  Suppose `x` has shape `Bx + [N] + E`, where the `Bx` component has
-  rank `axis`, and `low_indices` and `high_indices` broadcast to `x`.
+  Suppose `x` has shape `Bx + [N] + E`, `low_indices` and `high_indices`
+  have shape `Bi + [M] + F`, such that:
+      - `rank(Bx) = rank(Bi) = axis`,
+      - `Bi + [1] + F` broadcasts to `Bx + [N] + E`.
   Then each element of `low_indices` and `high_indices` must be
   between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
 
