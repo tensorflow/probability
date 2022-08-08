@@ -14,6 +14,8 @@
 # ============================================================================
 """Numpy stub for `tensor_spec`."""
 
+from tensorflow_probability.python.internal.backend.numpy.ops import _convert_to_tensor
+
 __all__ = [
     'TensorSpec',
 ]
@@ -32,4 +34,8 @@ class DenseSpec(object):
 
 
 class TensorSpec(DenseSpec):
-  pass
+
+  @classmethod
+  def from_tensor(cls, tensor, name=None):
+    tensor = _convert_to_tensor(tensor)
+    return cls(tensor.shape, tensor.dtype, name)
