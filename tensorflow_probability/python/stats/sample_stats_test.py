@@ -681,6 +681,19 @@ class MeanTest(test_util.TestCase):
 
 @test_util.test_all_tf_execution_regimes
 class WindowedStatsTest(test_util.TestCase):
+
+  def _maybe_expand_dims_to_make_broadcastable(self, x, shape, axis):
+    if len(shape) > len(x.shape):
+      if len(x.shape) == 1:
+        bc_shape = np.ones(len(shape), dtype=np.int32)
+        bc_shape[axis] = x.shape[0]
+        return x.reshape(bc_shape)
+      else:
+        extra_dims = len(shape) - len(x.shape)
+        bc_shape = x.shape + (1,) * extra_dims
+        return x.reshape(bc_shape)
+    return x
+
   def apply_slice_along_axis(self, func, arr, low, high, axis):
     """Applies `func` over slices of `arr` along `axis`. Slices intervals are
     specified through `low` and `high`. Support broadcasting.
@@ -705,6 +718,7 @@ class WindowedStatsTest(test_util.TestCase):
         for r in range(j):
           out_1d[r] = func(a_1d[low_1d[r]:high_1d[r]])
     return out
+
   def check_gaussian_windowed(self, shape, indice_shape, axis,
                               window_func, np_func):
     stat_shape = np.array(shape).astype(np.int32)
@@ -717,6 +731,10 @@ class WindowedStatsTest(test_util.TestCase):
     indices = rng.randint(shape[axis] + 1, size=indice_shape)
     indices = np.sort(indices, axis=0)
     low_indices, high_indices = indices[0], indices[1]
+    low_indices = self._maybe_expand_dims_to_make_broadcastable(
+      low_indices, x.shape, axis)
+    high_indices = self._maybe_expand_dims_to_make_broadcastable(
+      high_indices, x.shape, axis)
     a = window_func(x, low_indices=low_indices,
                     high_indices=high_indices, axis=axis)
     b = self.apply_slice_along_axis(np_func, x, low_indices, high_indices,
@@ -732,19 +750,33 @@ class WindowedStatsTest(test_util.TestCase):
     check_fn((64, 4, 8), (32, 4, 1), axis=0)
     check_fn((64, 4, 8), (32, 4, 8), axis=0)
     check_fn((64, 4, 8), (64, 4, 8), axis=0)
+    check_fn((64, 4, 8), (128, 1), axis=0)
+    check_fn((64, 4, 8), (32,), axis=0)
+    check_fn((64, 4, 8), (32, 4), axis=0)
+
     check_fn((64, 4, 8), (64, 64, 1), axis=1)
     check_fn((64, 4, 8), (1, 64, 1), axis=1)
     check_fn((64, 4, 8), (64, 2, 8), axis=1)
     check_fn((64, 4, 8), (64, 4, 8), axis=1)
+    check_fn((64, 4, 8), (16,), axis=1)
+    check_fn((64, 4, 8), (1, 64), axis=1)
+
     check_fn((64, 4, 8), (64, 4, 64), axis=2)
     check_fn((64, 4, 8), (1, 1, 64), axis=2)
     check_fn((64, 4, 8), (64, 4, 4), axis=2)
     check_fn((64, 4, 8), (1, 1, 4), axis=2)
     check_fn((64, 4, 8), (64, 4, 8), axis=2)
+    check_fn((64, 4, 8), (16,), axis=2)
+    check_fn((64, 4, 8), (1, 4), axis=2)
+    check_fn((64, 4, 8), (64, 4), axis=2)
 
     with self.assertRaises(Exception):
       # Non broadcastable shapes
       check_fn((64, 4, 8), (4, 1, 4), axis=2)
+
+    with self.assertRaises(Exception):
+      # Non broadcastable shapes
+      check_fn((64, 4, 8), (2, 4), axis=2)
 
   def test_windowed_mean(self):
     self.check_windowed(func=tfp.stats.windowed_mean, numpy_func=np.mean)

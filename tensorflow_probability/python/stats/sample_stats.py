@@ -735,11 +735,17 @@ def windowed_variance(
   last half of an MCMC chain.
 
   Suppose `x` has shape `Bx + [N] + E`, `low_indices` and `high_indices`
-  have shape `Bi + [M] + F`, such that:
-      - `rank(Bx) = rank(Bi) = axis`,
-      - `Bi + [1] + F` broadcasts to `Bx + [N] + E`.
+  have shape `Bi + [M] + F`, such that `rank(Bx) = rank(Bi) = axis`.
   Then each element of `low_indices` and `high_indices` must be
   between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
+
+  The shape of indices must be broadcastable with `x` unless the rank is lower
+  than the rank of `x`, then the shape is expanded with extra inner dimensions
+  to match the rank of `x`.
+
+  In the special case where the rank of indices is one, i.e when
+  `rank(Bi) = rank(F) = 0`, the indices are reshaped to
+  `[1] * rank(Bx) + [M] + [1] * rank(E)`.
 
   The default windows are
   `[0, 1), [1, 2), [1, 3), [2, 4), [2, 5), ...`
@@ -850,11 +856,17 @@ def windowed_mean(
   last half of an MCMC chain.
 
   Suppose `x` has shape `Bx + [N] + E`, `low_indices` and `high_indices`
-  have shape `Bi + [M] + F`, such that:
-      - `rank(Bx) = rank(Bi) = axis`,
-      - `Bi + [1] + F` broadcasts to `Bx + [N] + E`.
+  have shape `Bi + [M] + F`, such that `rank(Bx) = rank(Bi) = axis`.
   Then each element of `low_indices` and `high_indices` must be
   between 0 and N+1, and the shape of the output will be `Bx + [M] + E`.
+
+  The shape of indices must be broadcastable with `x` unless the rank is lower
+  than the rank of `x`, then the shape is expanded with extra inner dimensions
+  to match the rank of `x`.
+
+  In the special case where the rank of indices is one, i.e when
+  `rank(Bi) = rank(F) = 0`, the indices are reshaped to
+  `[1] * rank(Bx) + [M] + [1] * rank(E)`.
 
   The default windows are
   `[0, 1), [1, 2), [1, 3), [2, 4), [2, 5), ...`
@@ -913,17 +925,26 @@ def _prepare_window_args(x, low_indices=None, high_indices=None, axis=0):
   # Broadcast indices together.
   high_indices = high_indices + tf.zeros_like(low_indices)
   low_indices = low_indices + tf.zeros_like(high_indices)
-  indices = ps.stack([low_indices, high_indices], axis=0)
+
+  indices_shape = ps.shape(low_indices)
+  if ps.rank(low_indices) < ps.rank(x):
+    if ps.rank(low_indices) == 1:
+      size = ps.size(low_indices)
+      bc_shape = ps.one_hot(axis, depth=ps.rank(x), on_value=size,
+        off_value=1)
+    else:
+      # we assume the first dimensions are broadcastable with `x`,
+      # we add trailing dimensions
+      extra_dims = ps.rank(x) - ps.rank(low_indices)
+      bc_shape = ps.concat([indices_shape, [1]*extra_dims], axis=0)
+  else:
+    bc_shape = indices_shape
+
+  bc_shape = ps.concat([[2], bc_shape], axis=0)
+  indices = tf.stack([low_indices, high_indices], axis=0)
+  indices = ps.reshape(indices, bc_shape)
   x = tf.expand_dims(x, axis=0)
   axis += 1
-
-  if ps.rank(indices) != ps.rank(x) and ps.rank(indices) == 2:
-    # legacy usage, kept for backward compatibility
-    size = ps.size(indices) // 2
-    bc_shape = ps.one_hot(axis, depth=ps.rank(x), on_value=size,
-      off_value=1)
-    bc_shape = ps.concat([[2], bc_shape[1:]], axis=0)
-    indices = ps.reshape(indices, bc_shape)
   # `take_along_axis` requires the type to be int32
   indices = ps.cast(indices, dtype=tf.int32)
   return x, indices, axis
