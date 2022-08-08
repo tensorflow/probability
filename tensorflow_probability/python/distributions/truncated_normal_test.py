@@ -293,7 +293,7 @@ class TruncatedNormalStandaloneTestCase(_TruncatedNormalTestCase):
   def testMode(self, loc, scale, low, high):
     dist = tfd.TruncatedNormal(
         loc=loc, scale=scale, low=low, high=high, validate_args=True)
-    mode = np.asscalar(self.evaluate(dist.mode()))
+    mode = self.evaluate(dist.mode()).item()
     if loc < low:
       expected_mode = low
     elif loc > high:
