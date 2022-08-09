@@ -410,7 +410,7 @@ class LinearOperatorBlockLowerTriangular(linear_operator.LinearOperator):
     batch_shape = self.operators[0][0].batch_shape_tensor()
     for row in self.operators[1:]:
       for operator in row:
-        batch_shape = array_ops.broadcast_dynamic_shape(
+        batch_shape = _ops.broadcast_dynamic_shape(
             batch_shape, operator.batch_shape_tensor())
 
     return prefer_static.concat((batch_shape, matrix_shape), 0)
