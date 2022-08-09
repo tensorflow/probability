@@ -165,6 +165,13 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     self.assertAllClose(expected_mean,
                         self.evaluate(gprm.mean()))
 
+    flat = tf.nest.flatten(gprm, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(gprm, flat, expand_composites=True)
+
+    x = self.evaluate(gprm.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(gprm.log_prob(x))
+    self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
+
     gprm_no_predictive_noise = tfd.GaussianProcessRegressionModel(
         kernel=kernel,
         index_points=index_points,
@@ -314,6 +321,10 @@ class _GaussianProcessRegressionModelTest(test_util.TestCase):
     # unflattening.
     self.assertIs(precomputed_gprm.kernel._precomputed_divisor_matrix_cholesky,
                   unflat.kernel._precomputed_divisor_matrix_cholesky)
+
+    x = self.evaluate(precomputed_gprm.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(precomputed_gprm.log_prob(x))
+    self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
 
     # TODO(b/196219597): Enable this test once GPRM works across TF function
     # boundaries.

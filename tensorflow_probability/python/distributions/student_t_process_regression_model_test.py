@@ -59,11 +59,6 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     event_shape = [25]
     sample_shape = [7, 2]
 
-    print(stprm.batch_shape)
-    print(stprm.kernel.batch_shape)
-    print(stprm.kernel.schur_complement.batch_shape)
-    print(stprm.kernel.schur_complement.base_kernel.batch_shape)
-
     self.assertIs(cholesky_fn, stprm.cholesky_fn)
 
     samples = stprm.sample(sample_shape, seed=test_util.test_seed())
@@ -336,6 +331,53 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
                         event_shape_2)
     self.assertAllEqual(self.evaluate(stprm1.index_points), index_points_1)
     self.assertAllEqual(self.evaluate(stprm2.index_points), index_points_2)
+
+  @test_util.disable_test_for_backend(
+      disable_numpy=True,
+      reason='Numpy has no notion of CompositeTensor/Pytree.')
+  def testCompositeTensorOrPytree(self):
+    amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
+    length_scale = np.array([.1, .2, .3], np.float64).reshape([1, 3])
+    observation_noise_variance = np.array([1e-9], np.float64)
+    observation_index_points = (
+        np.random.uniform(-1., 1., (1, 1, 7, 2)).astype(np.float64))
+    observations = np.random.uniform(-1., 1., (1, 1, 7)).astype(np.float64)
+    index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
+    kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
+
+    def cholesky_fn(x):
+      return tf.linalg.cholesky(
+          tf.linalg.set_diag(x, tf.linalg.diag_part(x) + 1.))
+
+    stprm = tfd.StudentTProcessRegressionModel(
+        df=np.float64(5.),
+        kernel=kernel,
+        index_points=index_points,
+        observation_index_points=observation_index_points,
+        observations=observations,
+        observation_noise_variance=observation_noise_variance,
+        cholesky_fn=cholesky_fn)
+
+    flat = tf.nest.flatten(stprm, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(stprm, flat, expand_composites=True)
+    self.assertIsInstance(unflat, tfd.StudentTProcessRegressionModel)
+    # Check that we don't recompute the divisor matrix on flattening /
+    # unflattening.
+    self.assertIs(
+        stprm.kernel.schur_complement._precomputed_divisor_matrix_cholesky,
+        unflat.kernel.schur_complement._precomputed_divisor_matrix_cholesky)
+
+    x = self.evaluate(stprm.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(stprm.log_prob(x))
+    self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
+
+    # TODO(b/196219597): Enable this test once STPRM works across TF function
+    # boundaries.
+    # @tf.function
+    # def call_log_prob(d):
+    #   return d.log_prob(x)
+    # self.assertAllClose(actual, call_log_prob(stprm))
+    # self.assertAllClose(actual, call_log_prob(unflat))
 
 
 if __name__ == '__main__':

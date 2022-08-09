@@ -571,6 +571,10 @@ class GaussianProcessRegressionModel(
                   chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
             _conditional_mean_fn = conditional_mean_fn
 
+        # Store `_conditional_kernel` and `_conditional_mean_fn` as attributes
+        # for `AutoCompositeTensor`.
+        self._conditional_kernel = _conditional_kernel
+        self._conditional_mean_fn = _conditional_mean_fn
         super(GaussianProcessRegressionModel, self).__init__(
             kernel=_conditional_kernel,
             mean_fn=_conditional_mean_fn,

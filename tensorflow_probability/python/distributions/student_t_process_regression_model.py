@@ -102,7 +102,7 @@ def _validate_observation_data(
               index_point_count, observation_count))
 
 
-class DampedSchurComplement(tfpk.PositiveSemidefiniteKernel):
+class DampedSchurComplement(tfpk.AutoCompositeTensorPsdKernel):
   """Schur complement kernel, damped by scalar factors.
 
   This kernel is the same as the SchurComplement kernel, except we multiply by
@@ -418,8 +418,12 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
               kernel=kernel,
               observation_index_points=observation_index_points,
               observations=observations)
-          n = tf.cast(ps.shape(observations)[-1], dtype=dtype)
-          df = tfp_util.DeferredTensor(df, lambda x: x + n)
+
+          # If `__init__` is called for CompositeTensor/Pytree unflattening,
+          # `df` is already the `DeferredTensor`.
+          if _conditional_mean_fn is None:
+            n = tf.cast(ps.shape(observations)[-1], dtype=dtype)
+            df = tfp_util.DeferredTensor(df, lambda x: x + n)
 
           if _conditional_mean_fn is None:
 
@@ -438,6 +442,10 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
                   chol_linop.solvevec(chol_linop.solvevec(diff), adjoint=True))
             _conditional_mean_fn = conditional_mean_fn
 
+        # Store `_conditional_kernel` and `_conditional_mean_fn` as attributes
+        # for `AutoCompositeTensor`.
+        self._conditional_kernel = _conditional_kernel
+        self._conditional_mean_fn = _conditional_mean_fn
         super(StudentTProcessRegressionModel, self).__init__(
             df=df,
             kernel=_conditional_kernel,
