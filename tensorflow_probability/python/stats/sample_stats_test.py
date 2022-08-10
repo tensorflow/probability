@@ -731,16 +731,25 @@ class WindowedStatsTest(test_util.TestCase):
     indices = rng.randint(shape[axis] + 1, size=indice_shape)
     indices = np.sort(indices, axis=0)
     low_indices, high_indices = indices[0], indices[1]
+
+    tf_low_indices = self._make_dynamic_shape(low_indices)
+    tf_high_indices = self._make_dynamic_shape(high_indices)
+    tf_x = self._make_dynamic_shape(x)
+
+    a = window_func(tf_x, low_indices=tf_low_indices,
+                    high_indices=tf_high_indices, axis=axis)
+
     low_indices = self._maybe_expand_dims_to_make_broadcastable(
       low_indices, x.shape, axis)
     high_indices = self._maybe_expand_dims_to_make_broadcastable(
       high_indices, x.shape, axis)
-    a = window_func(x, low_indices=low_indices,
-                    high_indices=high_indices, axis=axis)
     b = self.apply_slice_along_axis(np_func, x, low_indices, high_indices,
                                axis=axis)
     b[np.isnan(b)] = 0  # We treat stats computed on empty sets as zeros
     self.assertAllClose(a, b)
+
+  def _make_dynamic_shape(self, x):
+    return tf1.placeholder_with_default(x, shape=(None,)*len(x.shape))
 
   def check_windowed(self, func, numpy_func):
     check_fn = functools.partial(self.check_gaussian_windowed,
