@@ -105,6 +105,23 @@ class HighwayFlowTests(test_util.TestCase):
         -bijector.inverse_log_det_jacobian(
             tf.identity(bijector.forward(x)), event_ndims=2))
 
+    bijector = tfp.experimental.bijectors.HighwayFlow(
+      residual_fraction=0.5,
+      activation_fn=None,
+      bias=tf.zeros(4),
+      upper_diagonal_weights_matrix=tf.experimental.numpy.tril(tf.ones((4, 4)),
+                                                               0),
+      lower_diagonal_weights_matrix=tf.experimental.numpy.tril(tf.ones((4, 4)),
+                                                               0),
+      gate_first_n=2
+    )
+    x = tf.ones(4)
+    self.evaluate([v.initializer for v in bijector.trainable_variables])
+    self.assertStartsWith(bijector.name, 'highway_flow')
+    expected_y = tf.convert_to_tensor([5.25, 5., 7., 4.])
+    self.assertAllClose(expected_y, bijector.forward(x))
+    bijector.inverse(expected_y)
+
   @test_util.numpy_disable_gradient_test
   def testResidualFractionGradientsWithCenteredDifference(self):
     width = 4

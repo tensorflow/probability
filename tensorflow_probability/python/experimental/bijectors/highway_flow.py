@@ -18,7 +18,8 @@ import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import util
-from tensorflow_probability.python.experimental.bijectors import scalar_function_with_inferred_inverse
+from tensorflow_probability.python.experimental.bijectors import \
+  scalar_function_with_inferred_inverse
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -26,8 +27,8 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 
 __all__ = [
-    'build_trainable_highway_flow',
-    'HighwayFlow'
+  'build_trainable_highway_flow',
+  'HighwayFlow'
 ]
 
 
@@ -66,51 +67,51 @@ def build_trainable_highway_flow(width,
   """
 
   residual_fraction_initial_value = tf.convert_to_tensor(
-      residual_fraction_initial_value,
-      dtype_hint=tf.float32,
-      name='residual_fraction_initial_value')
+    residual_fraction_initial_value,
+    dtype_hint=tf.float32,
+    name='residual_fraction_initial_value')
   dtype = residual_fraction_initial_value.dtype
 
   bias_seed, upper_seed, lower_seed = samplers.split_seed(seed, n=3)
   lower_bijector = tfb.Chain([
-      tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
-      tfb.Pad(paddings=[(1, 0), (0, 1)]),
-      tfb.FillTriangular()
+    tfb.TransformDiagonal(diag_bijector=tfb.Shift(1.)),
+    tfb.Pad(paddings=[(1, 0), (0, 1)]),
+    tfb.FillTriangular()
   ])
   unconstrained_lower_initial_values = samplers.normal(
-      shape=lower_bijector.inverse_event_shape([width, width]),
-      mean=0.,
-      stddev=.01,
-      seed=lower_seed)
+    shape=lower_bijector.inverse_event_shape([width, width]),
+    mean=0.,
+    stddev=.01,
+    seed=lower_seed)
   upper_bijector = tfb.FillScaleTriL(
-      diag_bijector=tfb.Softplus(), diag_shift=None)
+    diag_bijector=tfb.Softplus(), diag_shift=None)
   unconstrained_upper_initial_values = samplers.normal(
-      shape=upper_bijector.inverse_event_shape([width, width]),
-      mean=0.,
-      stddev=.01,
-      seed=upper_seed)
+    shape=upper_bijector.inverse_event_shape([width, width]),
+    mean=0.,
+    stddev=.01,
+    seed=upper_seed)
 
   return HighwayFlow(
-      residual_fraction=util.TransformedVariable(
-          initial_value=residual_fraction_initial_value,
-          bijector=tfb.Sigmoid(),
-          dtype=dtype),
-      activation_fn=activation_fn,
-      bias=tf.Variable(
-          samplers.normal((width,), mean=0., stddev=0.01, seed=bias_seed),
-          dtype=dtype),
-      upper_diagonal_weights_matrix=util.TransformedVariable(
-          initial_value=upper_bijector.forward(
-              unconstrained_upper_initial_values),
-          bijector=upper_bijector,
-          dtype=dtype),
-      lower_diagonal_weights_matrix=util.TransformedVariable(
-          initial_value=lower_bijector.forward(
-              unconstrained_lower_initial_values),
-          bijector=lower_bijector,
-          dtype=dtype),
-      gate_first_n=gate_first_n,
-      validate_args=validate_args)
+    residual_fraction=util.TransformedVariable(
+      initial_value=residual_fraction_initial_value,
+      bijector=tfb.Sigmoid(),
+      dtype=dtype),
+    activation_fn=activation_fn,
+    bias=tf.Variable(
+      samplers.normal((width,), mean=0., stddev=0.01, seed=bias_seed),
+      dtype=dtype),
+    upper_diagonal_weights_matrix=util.TransformedVariable(
+      initial_value=upper_bijector.forward(
+        unconstrained_upper_initial_values),
+      bijector=upper_bijector,
+      dtype=dtype),
+    lower_diagonal_weights_matrix=util.TransformedVariable(
+      initial_value=lower_bijector.forward(
+        unconstrained_lower_initial_values),
+      bijector=lower_bijector,
+      dtype=dtype),
+    gate_first_n=gate_first_n,
+    validate_args=validate_args)
 
 
 # TODO(b/188814119): Decorate as auto composite tensor and add test.
@@ -175,7 +176,7 @@ class HighwayFlow(tfb.Bijector):
   # updating them only when the LDJ methods themselves are called).
 
   _cache = cache_util.BijectorCacheWithGreedyAttrs(
-      forward_name='_augmented_forward', inverse_name='_augmented_inverse')
+    forward_name='_augmented_forward', inverse_name='_augmented_inverse')
 
   def __init__(self,
                residual_fraction,
@@ -213,37 +214,45 @@ class HighwayFlow(tfb.Bijector):
     parameters = dict(locals())
     name = name or 'highway_flow'
     dtype = dtype_util.common_dtype([
-        residual_fraction, bias, upper_diagonal_weights_matrix,
-        lower_diagonal_weights_matrix
+      residual_fraction, bias, upper_diagonal_weights_matrix,
+      lower_diagonal_weights_matrix
     ], dtype_hint=tf.float32)
     with tf.name_scope(name) as name:
       self._width = ps.shape(bias)[-1]
       self._bias = tensor_util.convert_nonref_to_tensor(
-          bias, dtype=dtype, name='bias')
+        bias, dtype=dtype, name='bias')
       self._residual_fraction = tensor_util.convert_nonref_to_tensor(
-          residual_fraction, dtype=dtype, name='residual_fraction')
+        residual_fraction, dtype=dtype, name='residual_fraction')
       # The upper matrix is still lower triangular. The transpose is done in
       # the _inverse and _forward methods, within matvec.
       self._upper_diagonal_weights_matrix = (
-          tensor_util.convert_nonref_to_tensor(
-              upper_diagonal_weights_matrix,
-              dtype=dtype,
-              name='upper_diagonal_weights_matrix'))
+        tensor_util.convert_nonref_to_tensor(
+          upper_diagonal_weights_matrix,
+          dtype=dtype,
+          name='upper_diagonal_weights_matrix'))
       self._lower_diagonal_weights_matrix = (
-          tensor_util.convert_nonref_to_tensor(
-              lower_diagonal_weights_matrix,
-              dtype=dtype,
-              name='lower_diagonal_weights_matrix'))
+        tensor_util.convert_nonref_to_tensor(
+          lower_diagonal_weights_matrix,
+          dtype=dtype,
+          name='lower_diagonal_weights_matrix'))
       self._activation_fn = activation_fn
       self._gate_first_n = self.width if gate_first_n is None else gate_first_n
       self._num_ungated = self.width - self.gate_first_n
 
+      if self._residual_fraction < 0. or self._residual_fraction > 1.:
+        raise ValueError('residual_fraction must be between 0 and 1')
+
+      if self._gate_first_n < 0 or self._gate_first_n > self._width:
+        raise ValueError(
+          'gate_first_n cannot be smaller than 0 or bigger than the input '
+          'dimension')
+
       super(HighwayFlow, self).__init__(
-          validate_args=validate_args,
-          forward_min_event_ndims=1,
-          parameters=parameters,
-          dtype=dtype,
-          name=name)
+        validate_args=validate_args,
+        forward_min_event_ndims=1,
+        parameters=parameters,
+        dtype=dtype,
+        name=name)
 
   @property
   def bias(self):
@@ -280,18 +289,18 @@ class HighwayFlow(tfb.Bijector):
   def _gated_residual_fraction(self):
     """Returns a vector of residual fractions that encodes gated dimensions."""
     return tf.concat(
-        [
-            self.residual_fraction * tf.ones([self.gate_first_n],
-                                             dtype=self.dtype),
-            tf.zeros([self.num_ungated], dtype=self.dtype)
-        ], axis=0)
+      [
+        self.residual_fraction * tf.ones([self.gate_first_n],
+                                         dtype=self.dtype),
+        tf.zeros([self.num_ungated], dtype=self.dtype)
+      ], axis=0)
 
   def _activation_bijector(self, gated_residual_fraction):
     return (scalar_function_with_inferred_inverse.
-            ScalarFunctionWithInferredInverse(
-                lambda x, lam: lam * x + (1 - lam) * self.activation_fn(x),
-                additional_scalar_parameters_requiring_gradients=[
-                    gated_residual_fraction]))
+      ScalarFunctionWithInferredInverse(
+      lambda x, lam: lam * x + (1 - lam) * self.activation_fn(x),
+      additional_scalar_parameters_requiring_gradients=[
+        gated_residual_fraction]))
 
   def _augmented_forward(self, x):
     """Computes forward and forward_log_det_jacobian transformations.
@@ -308,16 +317,16 @@ class HighwayFlow(tfb.Bijector):
     # of the lower matrix is zero.
     gated_residual_fraction = self._gated_residual_fraction()
     fldj = tf.reduce_sum(
-        tf.math.log(gated_residual_fraction +
-                    (1 - gated_residual_fraction) * tf.linalg.diag_part(
-                        self.upper_diagonal_weights_matrix)),
-        axis=-1)
+      tf.math.log(gated_residual_fraction +
+                  (1 - gated_residual_fraction) * tf.linalg.diag_part(
+        self.upper_diagonal_weights_matrix)),
+      axis=-1)
     x = (gated_residual_fraction * x +
          (1 - gated_residual_fraction) * tf.linalg.matvec(
-             self.lower_diagonal_weights_matrix, x))
+          self.lower_diagonal_weights_matrix, x))
     x = (gated_residual_fraction * x +
          (1 - gated_residual_fraction) * tf.linalg.matvec(
-             self.upper_diagonal_weights_matrix, x, transpose_a=True))
+          self.upper_diagonal_weights_matrix, x, transpose_a=True))
     x = x + (1 - gated_residual_fraction) * self.bias
 
     if self.activation_fn:
@@ -340,11 +349,11 @@ class HighwayFlow(tfb.Bijector):
 
     gated_residual_fraction = self._gated_residual_fraction()
     ildj = -tf.reduce_sum(
-        tf.math.log(
-            gated_residual_fraction +
-            (1 - gated_residual_fraction) * tf.linalg.diag_part(
-                self.upper_diagonal_weights_matrix)),
-        axis=-1)
+      tf.math.log(
+        gated_residual_fraction +
+        (1 - gated_residual_fraction) * tf.linalg.diag_part(
+          self.upper_diagonal_weights_matrix)),
+      axis=-1)
 
     if self.activation_fn:
       bij = self._activation_bijector(gated_residual_fraction)
@@ -355,20 +364,20 @@ class HighwayFlow(tfb.Bijector):
 
     y = y[..., tf.newaxis]  # Triangular solve requires matrix input.
     y = tf.linalg.triangular_solve(
-        # Apply gating over columns (not rows) since this is transposed.
-        (gated_residual_fraction[..., tf.newaxis, :] *
-         tf.eye(self.width, dtype=self.dtype) +
-         ((1 - gated_residual_fraction)[..., tf.newaxis, :] *
-          self.upper_diagonal_weights_matrix)),
-        y,
-        lower=True,
-        adjoint=True)
+      # Apply gating over columns (not rows) since this is transposed.
+      (gated_residual_fraction[..., tf.newaxis, :] *
+       tf.eye(self.width, dtype=self.dtype) +
+       ((1 - gated_residual_fraction)[..., tf.newaxis, :] *
+        self.upper_diagonal_weights_matrix)),
+      y,
+      lower=True,
+      adjoint=True)
     y = tf.linalg.triangular_solve(
-        (gated_residual_fraction[..., tf.newaxis] *
-         tf.eye(self.width, dtype=self.dtype) +
-         ((1 - gated_residual_fraction)[..., tf.newaxis] *
-          self.lower_diagonal_weights_matrix)),
-        y)
+      (gated_residual_fraction[..., tf.newaxis] *
+       tf.eye(self.width, dtype=self.dtype) +
+       ((1 - gated_residual_fraction)[..., tf.newaxis] *
+        self.lower_diagonal_weights_matrix)),
+      y)
     y = y[..., 0]
 
     return y, {'ildj': ildj, 'fldj': -ildj}
