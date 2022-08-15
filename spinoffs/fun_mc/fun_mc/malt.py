@@ -22,7 +22,7 @@
 """
 
 import functools
-from typing import Any, Callable, NamedTuple, Optional
+from typing import Any, Callable, NamedTuple, Optional, Tuple
 
 from fun_mc import backend
 from fun_mc import fun_mc_lib as fun_mc
@@ -74,7 +74,7 @@ def _default_energy_change_fn(
     old_int_state: fun_mc.State,
     new_int_state: fun_mc.State,
     kinetic_energy_fn: Optional[fun_mc.PotentialFn],
-) -> tuple[fun_mc.FloatTensor, tuple[Any, Any]]:
+) -> Tuple[fun_mc.FloatTensor, Tuple[Any, Any]]:
   """Default energy change function."""
   old_kinetic_energy, old_kinetic_energy_extra = fun_mc.call_potential_fn(
       kinetic_energy_fn, old_int_state.momentum)
@@ -150,13 +150,13 @@ def metropolis_adjusted_langevin_trajectories_step(
                                            fun_mc.State]] = None,
     energy_change_fn: Optional[
         Callable[[fun_mc.IntegratorState, fun_mc.IntegratorState],
-                 tuple[fun_mc.FloatTensor, Any]]] = None,
+                 Tuple[fun_mc.FloatTensor, Any]]] = None,
     integrator_fn: Optional[Callable[[fun_mc.IntegratorState, Any],
-                                     tuple[fun_mc.IntegratorState,
+                                     Tuple[fun_mc.IntegratorState,
                                            fun_mc.IntegratorExtras]]] = None,
     named_axis: Optional[fun_mc.StringNest] = None,
     seed: Any = None
-) -> tuple[MetropolisAdjustedLangevinTrajectoriesState,
+) -> Tuple[MetropolisAdjustedLangevinTrajectoriesState,
            MetropolisAdjustedLangevinTrajectoriesExtra]:
   """MALT `TransitionOperator`.
 
