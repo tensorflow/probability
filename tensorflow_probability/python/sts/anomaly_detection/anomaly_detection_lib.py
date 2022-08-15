@@ -175,8 +175,6 @@ def _detect_anomalies_inner(observed_time_series,
         num_results=num_samples,
         num_warmup_steps=num_warmup_steps,
         seed=seed)
-    parameter_samples = _parameter_samples_from_gibbs_posterior(
-        model, posterior_samples)
     if use_gibbs_predictive_dist:
       predictive_dist = gibbs_sampler.one_step_predictive(model,
                                                           posterior_samples)
@@ -193,6 +191,8 @@ def _detect_anomalies_inner(observed_time_series,
                             observed_time_series,
                             # Gibbs sampling didn't fit a drift scale(s).
                             allow_drift=False))
+      parameter_samples = gibbs_sampler.model_parameter_samples_from_gibbs_samples(
+          model, posterior_samples)
       predictive_dist = one_step_predictive(seasonal_model,
                                             observed_time_series,
                                             timesteps_are_event_shape=False,
@@ -256,14 +256,6 @@ def _fit_seasonal_model_with_gibbs_sampling(observed_time_series,
                                             num_warmup_steps=num_warmup_steps,
                                             seed=seed)
   ]
-
-
-def _parameter_samples_from_gibbs_posterior(model, posterior_samples):
-  """Extracts samples of model parameters from Gibbs posterior samples."""
-  posterior_samples_dict = posterior_samples._asdict()
-  get_param = lambda param_name: posterior_samples_dict[  # pylint: disable=g-long-lambda
-      [k for k in posterior_samples_dict if k in param_name][0]]
-  return [get_param(param.name) for param in model.parameters]
 
 
 def compute_predictive_bounds(predictive_dist, anomaly_threshold=0.01):

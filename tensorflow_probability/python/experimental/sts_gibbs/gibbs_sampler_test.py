@@ -225,16 +225,8 @@ class GibbsSamplerTests(test_util.TestCase):
     self.assertAllClose(tf.reduce_mean(predictive_mean[:, 0]),
                         observed_time_series[0, 0],
                         atol=10.)
-
-    if use_slope:
-      parameter_samples = (samples.observation_noise_scale,
-                           samples.level_scale,
-                           samples.slope_scale,
-                           samples.weights)
-    else:
-      parameter_samples = (samples.observation_noise_scale,
-                           samples.level_scale,
-                           samples.weights)
+    parameter_samples = gibbs_sampler.model_parameter_samples_from_gibbs_samples(
+        model, samples)
 
     # Note that although we expect the Gibbs-sampled forecasts to match a
     # reference implementation, we *don't* expect the one-step predictions to

@@ -79,11 +79,7 @@ from tensorflow_probability.python.sts.internal import util as sts_util
 JAX_MODE = False
 
 # The sampler state stores current values for each model parameter,
-# and auxiliary quantities such as the latent level. It should have the property
-# that `model.make_state_space_model(num_timesteps, GibbsSamplerState(...))`
-# behaves properly -- i.e., that the state contains all model
-# parameters *in the same order* as they are listed in `model.parameters`. This
-# is currently enforced by construction in `build_gibbs_fittable_model`.
+# and auxiliary quantities such as the latent level.
 GibbsSamplerState = collections.namedtuple(  # pylint: disable=unexpected-keyword-arg
     'GibbsSamplerState', [
         'observation_noise_scale',
@@ -446,6 +442,35 @@ def fit_with_gibbs_sampling(model,
   samples = tf.scan(sampler_loop_body,
                     np.arange(num_warmup_steps + num_results), initial_state)
   return tf.nest.map_structure(lambda x: x[num_warmup_steps:], samples)
+
+
+def model_parameter_samples_from_gibbs_samples(model, gibbs_samples):
+  """Constructs parameter samples to match the model (e.g. for sts.forecast).
+
+  This unpacks the Gibbs samples, dropping the latents, to match the order
+  needed for `make_state_space_model`.
+
+  Args:
+   model: A `tfd.sts.StructuralTimeSeries` model instance. This must be of the
+     form constructed by `build_model_for_gibbs_sampling`.
+   gibbs_samples: A `GibbsSamplerState` instance, presumably from
+     `fit_with_gibbs_sampling`.
+
+  Returns:
+   A set of posterior samples, that can be used with `make_state_space_model`
+   or `sts.forecast`.
+  """
+  if not hasattr(model, 'supports_gibbs_sampling'):
+    raise ValueError('This STS model does not support Gibbs sampling. Models '
+                     'for Gibbs sampling must be created using the '
+                     'method `build_model_for_gibbs_fitting`.')
+
+  if isinstance(model.components[0], sts.LocalLinearTrend):
+    return (gibbs_samples.observation_noise_scale, gibbs_samples.level_scale,
+            gibbs_samples.slope_scale, gibbs_samples.weights)
+  else:
+    return (gibbs_samples.observation_noise_scale, gibbs_samples.level_scale,
+            gibbs_samples.weights)
 
 
 def one_step_predictive(model,
