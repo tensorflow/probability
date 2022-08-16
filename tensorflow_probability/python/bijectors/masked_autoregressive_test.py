@@ -759,8 +759,12 @@ class AutoregressiveNetworkTest(test_util.TestCase):
         x_, bijector_kwargs={"conditional_input": c_})
     model = tfk.Model([x_, c_], log_prob_)
 
+    if tf.__internal__.tf2.enabled():
+      optimizer = tf.keras.optimizers.Adam(learning_rate=0.1)
+    else:
+      optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.1)
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=0.1),
+        optimizer=optimizer,
         loss=lambda _, log_prob: -log_prob)
 
     batch_size = 25

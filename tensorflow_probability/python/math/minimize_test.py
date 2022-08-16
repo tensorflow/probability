@@ -29,6 +29,18 @@ tfd = tfp.distributions
 JAX_MODE = False
 
 
+def _get_adam_optimizer(learning_rate):
+  if tf.__internal__.tf2.enabled():
+    return tf.keras.optimizers.Adam(learning_rate=learning_rate)
+  return tf.keras.optimizers.legacy.Adam(learning_rate=learning_rate)
+
+
+def _get_sgd_optimizer(learning_rate):
+  if tf.__internal__.tf2.enabled():
+    return tf.keras.optimizers.SGD(learning_rate=learning_rate)
+  return tf.keras.optimizers.legacy.SGD(learning_rate=learning_rate)
+
+
 @test_util.test_all_tf_execution_regimes
 class MinimizeTests(test_util.TestCase):
 
@@ -47,7 +59,7 @@ class MinimizeTests(test_util.TestCase):
               'sqdiff': (x - target_x)**2}
 
     results = tfp.math.minimize(loss_fn, num_steps=100,
-                                optimizer=tf.optimizers.Adam(0.1),
+                                optimizer=_get_adam_optimizer(0.1),
                                 trace_fn=trace_fn)
     self.evaluate(tf1.global_variables_initializer())
     results_ = self.evaluate(results)
@@ -61,7 +73,7 @@ class MinimizeTests(test_util.TestCase):
     trace_fn = lambda traceable_quantities: traceable_quantities
     results = tfp.math.minimize(loss_fn=lambda: tf.reduce_sum((x - 1.0)**2),
                                 num_steps=10,
-                                optimizer=tf.optimizers.Adam(0.1),
+                                optimizer=_get_adam_optimizer(0.1),
                                 trace_fn=trace_fn)
     self.evaluate(tf1.global_variables_initializer())
     self.evaluate(results)
@@ -74,7 +86,7 @@ class MinimizeTests(test_util.TestCase):
     loss_fn = lambda: tf.reduce_sum((x - y)**2)
 
     loss = tfp.math.minimize(loss_fn, num_steps=100,
-                             optimizer=tf.optimizers.Adam(0.1),
+                             optimizer=_get_adam_optimizer(0.1),
                              trainable_variables=[x])
     with tf.control_dependencies([loss]):
       final_x = tf.identity(x)
@@ -118,7 +130,7 @@ class MinimizeTests(test_util.TestCase):
     losses = tfp.math.minimize(
         loss_fn=lambda: (x - 2.)**2,
         num_steps=num_steps,
-        optimizer=tf.optimizers.Adam(0.1))
+        optimizer=_get_adam_optimizer(0.1))
     self.assertAllEqual(losses.shape, [num_steps, 2])
 
   @test_util.jax_disable_variable_test
@@ -130,7 +142,7 @@ class MinimizeTests(test_util.TestCase):
     losses = tfp.math.minimize(
         loss_fn=lambda: (x - 2.)**2,
         num_steps=num_steps,
-        optimizer=tf.optimizers.Adam(0.1))
+        optimizer=_get_adam_optimizer(0.1))
     with tf.control_dependencies([losses]):
       final_x = tf.identity(x)
     self.evaluate(tf1.global_variables_initializer())
@@ -154,7 +166,7 @@ class MinimizeTests(test_util.TestCase):
     atol = 0.1
     results = tfp.math.minimize(
         loss_fn, num_steps=100,
-        optimizer=tf.optimizers.SGD(0.1),
+        optimizer=_get_sgd_optimizer(0.1),
         convergence_criterion=(
             tfp.optimizer.convergence_criteria.LossNotDecreasing(atol=atol)),
         trace_fn=trace_fn,
@@ -185,7 +197,7 @@ class MinimizeTests(test_util.TestCase):
             tf.cast(has_converged, tf.float32)) > target_portion_converged)
     results = tfp.math.minimize(
         loss_fn, num_steps=200,
-        optimizer=tf.optimizers.Adam(1.0),
+        optimizer=_get_adam_optimizer(1.0),
         convergence_criterion=(
             tfp.optimizer.convergence_criteria.LossNotDecreasing(atol=0.1)),
         batch_convergence_reduce_fn=batch_convergence_reduce_fn,
@@ -209,7 +221,7 @@ class MinimizeTests(test_util.TestCase):
 
     x = tf.Variable(init_x)
     loss_fn = lambda: tf.reduce_sum((x - target_x)**2)
-    optimizer = tf.optimizers.Adam(0.1)
+    optimizer = _get_adam_optimizer(0.1)
     num_steps = 100
 
     # This test verifies that it works to compile the entire optimization loop,
@@ -247,7 +259,7 @@ class MinimizeTests(test_util.TestCase):
       self.skipTest('XLA test does not make sense without tf.function')
 
     x = tf.Variable(0.)
-    optimizer = tf.optimizers.SGD(0.1)
+    optimizer = _get_sgd_optimizer(0.1)
 
     # Define a 'loss' that returns a constant value indicating
     # whether it is executing in an XLA context.
@@ -286,7 +298,7 @@ class MinimizeTests(test_util.TestCase):
     losses = tfp.math.minimize(
         loss_fn=lambda: tf.reduce_sum((x - 2.)**2),
         num_steps=10,
-        optimizer=tf.optimizers.Adam(0.1),
+        optimizer=_get_adam_optimizer(0.1),
         jit_compile=True)
     self.evaluate(tf1.global_variables_initializer())
     losses_ = self.evaluate(losses)
@@ -296,7 +308,7 @@ class MinimizeTests(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def test_deterministic_results_with_seed(self):
     stochastic_loss_fn = lambda seed: tf.random.stateless_normal([], seed=seed)
-    optimizer = tf.optimizers.SGD(1e-3)
+    optimizer = _get_sgd_optimizer(1e-3)
     seed = test_util.test_seed(sampler_type='stateless')
     losses1 = self.evaluate(
         tfp.math.minimize(loss_fn=stochastic_loss_fn,

@@ -28,7 +28,8 @@ __all__ = [
 ]
 
 
-class StochasticGradientLangevinDynamics(tf.optimizers.Optimizer):
+# pylint: disable=g-classes-have-attributes
+class StochasticGradientLangevinDynamics(tf.keras.optimizers.legacy.Optimizer):
   """An optimizer module for stochastic gradient Langevin dynamics.
 
   This implements the preconditioned Stochastic Gradient Langevin Dynamics

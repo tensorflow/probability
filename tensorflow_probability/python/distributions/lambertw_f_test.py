@@ -193,8 +193,12 @@ class LambertWNormalTest(test_util.TestCase):
         tf.keras.layers.Dense(1 + 1 + 1),
         dist_layer])
     negloglik = lambda y, p_y: -p_y.log_prob(y)
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
-                  loss=negloglik)
+    if tf.__internal__.tf2.enabled():
+      optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
+    else:
+      optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.01)
+
+    model.compile(optimizer=optimizer, loss=negloglik)
 
     model.fit(x, y, epochs=1, verbose=True, batch_size=32, validation_split=0.2)
     self.assertGreater(model.history.history["val_loss"][0], -np.Inf)
