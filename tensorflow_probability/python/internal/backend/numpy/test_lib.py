@@ -57,6 +57,9 @@ if have_tf:
       def _evaluate(x):
         if x is None:
           return x
+        # TODO(b/223267515): Improve handling of JAX PRNGKeyArray objects.
+        if type(x).__name__ == 'PRNGKeyArray':
+          return x
         return onp.array(x)
       return nest.map_structure(_evaluate, x, expand_composites=True)
 
