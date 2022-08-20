@@ -1012,21 +1012,12 @@ class JointDistribution(distribution_lib.Distribution):
                   stateful_sample_seed is None):
             raise
           msg = (
-              'Falling back to stateful sampling for distribution #{index} '
-              '(0-based) of type `{dist_cls}` with component name '
-              '{component_name} and `dist.name` "{dist_name}". Please '
-              'update to use `tf.random.stateless_*` RNGs. This fallback may '
-              'be removed after 20-Dec-2020. ({exc})')
-          component_name = get_explicit_name_for_component(actual_distribution)
-          if component_name is None:
-            component_name = '[None specified]'
-          else:
-            component_name = '"{}"'.format(component_name)
+              'Falling back to stateful sampling for {dist_description}. '
+              'Please update to use `tf.random.stateless_*` RNGs. This '
+              'fallback may be removed after 20-Dec-2020. ({exc})')
           warnings.warn(msg.format(
-              index=index,
-              component_name=component_name,
-              dist_name=actual_distribution.name,
-              dist_cls=type(actual_distribution),
+              dist_description=get_distribution_description(
+                  actual_distribution, index),
               exc=str(e)))
           next_value, traced_values = sample_and_trace_fn(
               actual_distribution,
@@ -1036,7 +1027,10 @@ class JointDistribution(distribution_lib.Distribution):
         if self._validate_args:
           with tf.control_dependencies(
               itertools.chain.from_iterable(
-                  self._assert_compatible_shape(index, sample_shape, value_part)
+                  self._assert_compatible_shape(  # pylint:disable=g-complex-comprehension
+                      get_distribution_description(
+                          actual_distribution, index),
+                      sample_shape, value_part)
                   for value_part in tf.nest.flatten(next_value))):
             values_out.append(
                 tf.nest.map_structure(
@@ -1053,7 +1047,7 @@ class JointDistribution(distribution_lib.Distribution):
       pass
     return values_out
 
-  def _assert_compatible_shape(self, index, sample_shape, samples):
+  def _assert_compatible_shape(self, dist_description, sample_shape, samples):
     requested_shape, _ = self._expand_sample_shape_to_vector(
         tf.convert_to_tensor(sample_shape, dtype=tf.int32),
         name='requested_shape')
@@ -1072,10 +1066,10 @@ class JointDistribution(distribution_lib.Distribution):
     static_actual_rank = tf.get_static_value(actual_rank)
     static_requested_rank = tf.get_static_value(requested_rank)
 
-    assertion_message = ('Samples yielded by distribution #{} are not '
+    assertion_message = ('Samples yielded by {} are not '
                          'consistent with `sample_shape` passed to '
                          '`JointDistributionCoroutine` '
-                         'distribution.'.format(index))
+                         'distribution.'.format(dist_description))
 
     # TODO Remove this static check (b/138738650)
     if (static_actual_rank is not None and
@@ -1185,6 +1179,23 @@ def get_explicit_name_for_component(d):
                      'JointDistribution component; please choose a different '
                      'name.'.format(name))
   return name
+
+
+def get_distribution_description(d, index):
+  """Returns a verbose description of a distribution for error messages."""
+  component_name = get_explicit_name_for_component(d)
+  if component_name is None:
+    component_name = '[None specified]'
+  else:
+    component_name = '"{}"'.format(component_name)
+  return (
+      'distribution #{index} '
+      '(0-based) of type `{dist_cls}` with component name '
+      '{component_name} and `dist.name` "{dist_name}"').format(
+          index=index,
+          component_name=component_name,
+          dist_name=d.name,
+          dist_cls=type(d))
 
 
 def _resolve_value_from_args(args,
