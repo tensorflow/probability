@@ -549,8 +549,8 @@ def betainc(a, b, x, name=None):
 # is based on ideas and equations available in the following references:
 # [1] Milton Abramowitz and Irene A. Stegun
 #     Handbook of Mathematical Functions with Formulas, Graphs, and
-#         Mathematical Tables.
-#     US Government Printing Office, 1964 (reprinted 1972).
+#         Mathematical Tables
+#     US Government Printing Office, 1964 (reprinted 1972)
 #     https://archive.org/details/AandS-mono600
 # [2] William Press, Saul Teukolsky, William Vetterling and Brian Flannery
 #     Numerical Recipes: The Art of Scientific Computing

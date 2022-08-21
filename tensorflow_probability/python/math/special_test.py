@@ -667,6 +667,8 @@ class BetaincinvTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def testBetaincinvGradient(self):
+    # Avoid small values for parameters a and b where the gradient can veer off
+    # to infinity.
     space = np.logspace(np.log10(0.5), 3., 5).tolist()
     space_y = np.linspace(0.01, 0.99, 10).tolist()
     a, b, y = [
