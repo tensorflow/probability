@@ -616,7 +616,7 @@ def _betaincinv_initial_approx(a, b, y, dtype):
   inv_a = tf.math.reciprocal(a)
   inv_b = tf.math.reciprocal(b)
   result_for_small_a_or_b = tf.where(
-      tf.math.less_equal(y, (integral_approx_part_a / integral_approx)),
+      y <= (integral_approx_part_a / integral_approx),
       tf.math.exp(tf.math.xlogy(inv_a, y) + tf.math.xlogy(inv_a, a) +
           tf.math.xlogy(inv_a, integral_approx)),
       one - tf.math.exp(tf.math.xlog1py(inv_b, -y) + tf.math.xlogy(inv_b, b) +
@@ -634,7 +634,7 @@ def _betaincinv_initial_approx(a, b, y, dtype):
 
   # Return the appropriate result for parameters a and b.
   result = tf.where(
-      tf.math.greater_equal(tf.math.minimum(a, b), one),
+      tf.math.minimum(a, b) >= one,
       result_for_large_a_and_b,
       tf.where(
           tf.math.maximum(a, b) < one,
@@ -723,10 +723,10 @@ def _betaincinv_computation(a, b, y):
     # Fall back to bisection if the current step would take the new candidate
     # out of bounds.
     new_candidate = tf.where(
-        tf.less_equal(halley_candidate, low),
+        halley_candidate <= low,
         half * (candidate + low),
         tf.where(
-            tf.greater_equal(halley_candidate, high),
+            halley_candidate >= high,
             half * (candidate + high),
             halley_candidate))
 
