@@ -194,7 +194,7 @@ class BetaincTest(test_util.TestCase):
     x = np.ones([7, 1, 1, 2], dtype=np.float32)
     self.assertAllEqual([7, 5, 3, 2], tfp_math.betainc(a, b, x).shape)
 
-  def testBetaincHalfPrecision(self):
+  def testBetaincFloat16(self):
     a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.float16)
     b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.float16)
     x = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=tf.float16)
@@ -210,8 +210,8 @@ class BetaincTest(test_util.TestCase):
 
   @test_util.disable_test_for_backend(
       disable_numpy=True, disable_jax=False,
-      reason="Numpy does not support brain floating point.")
-  def testBetaincBrain(self):
+      reason="Numpy does not support BFloat16.")
+  def testBetaincBFloat16(self):
     a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.bfloat16)
     b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.bfloat16)
     x = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=tf.bfloat16)
@@ -294,7 +294,7 @@ class BetaincTest(test_util.TestCase):
     x = np.array([0.5, 0.5, 0.5, 0.5, -1., 2.], dtype=dtype)
 
     for partial in self.evaluate(betainc_partials(a, b, x)):
-      self.assertAllEqual(np.full_like(a, np.nan), partial)
+      self.assertAllNan(partial)
 
     # Test partials when x is equal to 0 or 1.
     a = np.array([0.4, 0.4], dtype=dtype)
@@ -485,7 +485,7 @@ class BetaincTest(test_util.TestCase):
           rtol_a=1e-11, rtol_b=1e-11, rtol_x=1e-11)
 
   @test_util.numpy_disable_gradient_test
-  def testBetaincDerivativeBrainAndHalfPrecision(self):
+  def testBetaincDerivativeFloat16AndBFloat16(self):
     for dtype in [tf.float16, tf.bfloat16]:
       a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=dtype)
       b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=dtype)
@@ -624,7 +624,7 @@ class BetaincinvTest(test_util.TestCase):
 
     betaincinv = self.evaluate(tfp_math.betaincinv(a, b, y))
     self.assertEqual(dtype, betaincinv.dtype)
-    self.assertAllEqual(np.full_like(a, np.nan), betaincinv)
+    self.assertAllNan(betaincinv)
 
     # Test tfp_math.betaincinv when y is equal to 0 or 1.
     a, b, y0, y1 = [np.array([z], dtype=dtype) for z in [0.4, 0.6, 0., 1.]]
@@ -634,7 +634,7 @@ class BetaincinvTest(test_util.TestCase):
       self.assertEqual(dtype, betaincinv.dtype)
       self.assertAllEqual(y, betaincinv)
 
-  def testBetaincinvHalfPrecision(self):
+  def testBetaincinvFloat16(self):
     a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.float16)
     b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.float16)
     y = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=tf.float16)
@@ -650,8 +650,8 @@ class BetaincinvTest(test_util.TestCase):
 
   @test_util.disable_test_for_backend(
       disable_numpy=True, disable_jax=False,
-      reason="Numpy does not support brain floating point.")
-  def testBetaincinvBrain(self):
+      reason="Numpy does not support BFloat16.")
+  def testBetaincinvBFloat16(self):
     a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.bfloat16)
     b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.bfloat16)
     y = tf.constant([0.0, 0.1, 0.9, 1.0, 0.5, 0.5, -1.], dtype=tf.bfloat16)
@@ -692,11 +692,11 @@ class BetaincinvTest(test_util.TestCase):
 
   @parameterized.parameters(np.float32, np.float64)
   @test_util.numpy_disable_gradient_test
-  def _testBetaincinvGradientFinite(self, dtype):
+  def testBetaincinvGradientFinite(self, dtype):
     eps = np.finfo(dtype).eps
     small = np.sqrt(eps)
 
-    space = np.logspace(np.log10(eps), 4.).tolist()
+    space = np.logspace(np.log10(small), 4.).tolist()
     space_y = np.linspace(eps, 1. - small).tolist()
     a, b, y = [
         tf.constant(z, dtype=dtype)
@@ -729,7 +729,7 @@ class BetaincinvTest(test_util.TestCase):
       self.assertAllEqual(simple_partial.shape, betaincinv_partial.shape)
 
   @test_util.numpy_disable_gradient_test
-  def testBetaincinvGradientBrainAndHalfPrecision(self):
+  def testBetaincinvGradientFloat16AndBFloat16(self):
     for dtype in [tf.float16, tf.bfloat16]:
       a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=dtype)
       b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=dtype)
