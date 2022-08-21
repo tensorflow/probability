@@ -619,7 +619,7 @@ def _betaincinv_initial_approx(a, b, y, dtype):
       y <= (integral_approx_part_a / integral_approx),
       tf.math.exp(tf.math.xlogy(inv_a, y) + tf.math.xlogy(inv_a, a) +
           tf.math.xlogy(inv_a, integral_approx)),
-      one - tf.math.exp(tf.math.xlog1py(inv_b, -y) + tf.math.xlogy(inv_b, b) +
+      -tf.math.expm1(tf.math.xlog1py(inv_b, -y) + tf.math.xlogy(inv_b, b) +
           tf.math.xlogy(inv_b, integral_approx)))
 
   # And when max(a, b) < 1, we use the approximation proposed by [3] for the
