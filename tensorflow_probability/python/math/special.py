@@ -567,17 +567,15 @@ def betainc(a, b, x, name=None):
 def _betaincinv_initial_approx(a, b, y, dtype):
   """Computes an initial approximation for `betaincinv(a, b, y)`."""
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
-  tiny = tf.constant(np.finfo(numpy_dtype).tiny, dtype=dtype)
-  eps = tf.constant(np.finfo(numpy_dtype).eps, dtype=dtype)
-  one = tf.constant(1., dtype=dtype)
-  two = tf.constant(2., dtype=dtype)
-  three = tf.constant(3., dtype=dtype)
-  five = tf.constant(5., dtype=dtype)
-  six = tf.constant(6., dtype=dtype)
-  min_log = tf.math.log(
-      tf.constant(2. ** np.finfo(numpy_dtype).minexp, dtype))
-  max_log = tf.math.log(
-      tf.constant(2. ** (np.finfo(numpy_dtype).maxexp - 1.), dtype))
+  tiny = np.finfo(numpy_dtype).tiny
+  eps = np.finfo(numpy_dtype).eps
+  one = numpy_dtype(1.)
+  two = numpy_dtype(2.)
+  three = numpy_dtype(3.)
+  five = numpy_dtype(5.)
+  six = numpy_dtype(6.)
+  min_log = numpy_dtype(np.finfo(numpy_dtype).minexp * np.log(2.))
+  max_log = numpy_dtype((np.finfo(numpy_dtype).maxexp - 1.) * np.log(2.))
 
   # When min(a, b) >= 1, we use the approximation proposed by [1].
 
@@ -652,14 +650,14 @@ def _betaincinv_computation(a, b, y):
   should_promote_dtype = (dtype_orig in _f16bit_dtypes)
   dtype = tf.float32 if should_promote_dtype else dtype_orig
   numpy_dtype = dtype_util.as_numpy_dtype(dtype)
-  zero = tf.constant(0., dtype=dtype)
-  tiny = tf.constant(np.finfo(numpy_dtype).tiny, dtype=dtype)
-  eps = tf.constant(np.finfo(numpy_dtype).eps, dtype=dtype)
-  half = tf.constant(0.5, dtype=dtype)
-  one = tf.constant(1., dtype=dtype)
-  two = tf.constant(2., dtype=dtype)
-  halley_correction_min = tf.constant(0.5, dtype=dtype)
-  halley_correction_max = tf.constant(1.5, dtype=dtype)
+  zero = numpy_dtype(0.)
+  tiny = np.finfo(numpy_dtype).tiny
+  eps = np.finfo(numpy_dtype).eps
+  half = numpy_dtype(0.5)
+  one = numpy_dtype(1.)
+  two = numpy_dtype(2.)
+  halley_correction_min = numpy_dtype(0.5)
+  halley_correction_max = numpy_dtype(1.5)
 
   a, b, y = [tf.convert_to_tensor(z, dtype=dtype_orig) for z in [a, b, y]]
   if should_promote_dtype:
@@ -696,10 +694,10 @@ def _betaincinv_computation(a, b, y):
   # max_iterations was taken from [4] and tolerance was set by experimentation.
   if numpy_dtype == np.float32:
     max_iterations = 10
-    tolerance = tf.constant(8., dtype=dtype) * eps
+    tolerance = numpy_dtype(8.) * eps
   else:
     max_iterations = 8
-    tolerance = tf.constant(4096., dtype=dtype) * eps
+    tolerance = numpy_dtype(4096.) * eps
 
   def root_finding_iteration(should_stop, low, high, candidate):
     error = betainc(a, b, candidate) - y

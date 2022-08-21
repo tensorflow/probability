@@ -556,7 +556,7 @@ class BetaincinvTest(test_util.TestCase):
     self.assertAllEqual([7, 5, 3, 2], tfp_math.betaincinv(a, b, y).shape)
 
   def _test_betaincinv_value(self, a_high, b_high, dtype, atol, rtol):
-    tiny = tf.constant(np.finfo(dtype).tiny, dtype)
+    tiny = np.finfo(dtype).tiny
     n = [int(1e4)]
     strm = test_util.test_seed_stream()
     a = tfp.distributions.Uniform(
