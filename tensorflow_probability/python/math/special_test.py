@@ -210,7 +210,7 @@ class BetaincTest(test_util.TestCase):
 
   @test_util.disable_test_for_backend(
       disable_numpy=True, disable_jax=False,
-      reason="Numpy does not support BFloat16.")
+      reason="Numpy does not support bfloat16.")
   def testBetaincBFloat16(self):
     a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.bfloat16)
     b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.bfloat16)
@@ -650,7 +650,7 @@ class BetaincinvTest(test_util.TestCase):
 
   @test_util.disable_test_for_backend(
       disable_numpy=True, disable_jax=False,
-      reason="Numpy does not support BFloat16.")
+      reason="Numpy does not support bfloat16.")
   def testBetaincinvBFloat16(self):
     a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.bfloat16)
     b = tf.constant([0.6, 0.6, 0.6, 0.6, 0.6, -1., 0.6], dtype=tf.bfloat16)
