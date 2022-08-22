@@ -574,7 +574,6 @@ def _betaincinv_initial_approx(a, b, y, dtype):
   three = numpy_dtype(3.)
   five = numpy_dtype(5.)
   six = numpy_dtype(6.)
-  min_log = numpy_dtype(np.finfo(numpy_dtype).minexp * np.log(2.))
   max_log = numpy_dtype((np.finfo(numpy_dtype).maxexp - 1.) * np.log(2.))
 
   # When min(a, b) >= 1, we use the approximation proposed by [1].
@@ -627,7 +626,7 @@ def _betaincinv_initial_approx(a, b, y, dtype):
   #   xg = (a * y * Beta(a, b)) ** (1 / a) .
   log_xg = tf.math.xlogy(inv_a, a) + tf.math.xlogy(inv_a, y) + (
       inv_a * lbeta(a, b))
-  xg = tf.math.exp(tf.clip_by_value(log_xg, min_log, max_log))
+  xg = tf.math.exp(tf.math.minimum(log_xg, max_log))
   result_for_small_a_and_b = xg / (one + xg)
 
   # Return the appropriate result for parameters a and b.
@@ -681,7 +680,7 @@ def _betaincinv_computation(a, b, y):
   else:
     use_symmetry_relation = (error_at_half < zero)
 
-  a_orig = a
+  a_orig, y_orig = (a, y)
   a = tf.where(use_symmetry_relation, b, a)
   b = tf.where(use_symmetry_relation, a_orig, b)
   y = tf.where(use_symmetry_relation, one - y, y)
@@ -733,7 +732,7 @@ def _betaincinv_computation(a, b, y):
     new_low = tf.where(new_delta_is_negative, candidate, low)
     new_high = tf.where(new_delta_is_negative, high, candidate)
 
-    adjusted_tolerance = tf.maximum(tolerance * new_candidate, two_tiny)
+    adjusted_tolerance = tf.math.maximum(tolerance * new_candidate, two_tiny)
     should_stop = (should_stop | (tf.math.abs(new_delta) < adjusted_tolerance) |
         tf.math.equal(new_low, new_high))
 
@@ -760,9 +759,9 @@ def _betaincinv_computation(a, b, y):
 
   # If we are taking advantage of the symmetry relation, we have to adjust the
   # input y and the solution.
-  y = tf.where(use_symmetry_relation, one - y, y)
-  result = tf.where(use_symmetry_relation, one - result, result)
-  result = tf.clip_by_value(result, tiny, one - eps)
+  y = y_orig
+  result = tf.where(
+      use_symmetry_relation, one - tf.math.maximum(result, eps), result)
 
   # Handle trivial cases.
   result = tf.where(tf.equal(y, zero) | tf.equal(y, one), y, result)
