@@ -350,6 +350,13 @@ def _segment_mean(data, segment_ids, name=None):
   return sm / denom.reshape(denom.shape + (1,) * (data.ndim - 1))
 
 
+def _log_softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
+  logits = _convert_to_tensor(logits)
+  axis = -1 if axis is None else axis
+  y = logits - _max_mask_non_finite(logits, axis=axis, keepdims=True)
+  return y - np.log(np.sum(np.exp(y), axis=_astuple(axis), keepdims=True))
+
+
 def _softmax(logits, axis=None, name=None):  # pylint: disable=unused-argument
   logits = _convert_to_tensor(logits)
   axis = -1 if axis is None else axis
@@ -681,9 +688,7 @@ log_sigmoid = utils.copy_docstring(
 
 log_softmax = utils.copy_docstring(
     'tf.math.log_softmax',
-    lambda logits, axis=None, name=None: (np.subtract(  # pylint: disable=g-long-lambda
-        logits,
-        reduce_logsumexp(logits, -1 if axis is None else axis, keepdims=True))))
+    _log_softmax)
 
 logical_and = utils.copy_docstring(
     'tf.math.logical_and',
