@@ -546,6 +546,27 @@ class CategoricalTest(test_util.TestCase):
     kl_val = self.evaluate(kl)
     self.assertEqual(kl_val, np.inf)
 
+  @test_util.numpy_disable_gradient_test
+  @parameterized.parameters(
+      (np.array([-np.inf, np.log(0.5), np.log(0.5)]),
+       np.array([np.log(0.2), np.log(0.2), np.log(0.6)])),
+      (np.array([-np.inf, np.log(0.5), np.log(0.5)]),
+       np.array([-np.inf, np.log(0.2), np.log(0.6)])),
+  )
+  def testCategoricalCategoricalKLExtremeGrad(self, a_logits, b_logits):
+    def get_kl_fn(a_logits, b_logits):
+      a = tfd.Categorical(logits=a_logits)
+      b = tfd.Categorical(logits=b_logits)
+      return a.kl_divergence(b)
+
+    kl, grads = tfp.math.value_and_gradient(
+        get_kl_fn, a_logits, b_logits)
+    # We get the expected answer when clipping the -inf.
+    expected_kl, expected_grads = tfp.math.value_and_gradient(
+        get_kl_fn, np.maximum(-10000, a_logits), np.maximum(-10000, b_logits))
+    self.assertAllClose(kl, expected_kl)
+    self.assertAllClose(grads, expected_grads)
+
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
     d = tfd.Categorical(logits=x, validate_args=True)

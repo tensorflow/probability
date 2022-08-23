@@ -297,27 +297,12 @@ class Categorical(
     if self._logits is None:
       # If we only have probs, there's not much we can do to ensure numerical
       # precision.
-      probs = tf.convert_to_tensor(self._probs)
-      return -tf.reduce_sum(
-          tf.math.multiply_no_nan(tf.math.log(probs), probs),
-          axis=-1)
-    # The following result can be derived as follows. Let s[i] be a logit.
-    # The entropy is:
-    #   H = -sum_i(p[i] * log(p[i]))
-    #     = -sum_i(p[i] * (s[i] - logsumexp(s))
-    #     = logsumexp(s) - sum_i(p[i] * s[i])
-    logits = tf.convert_to_tensor(self._logits)
-    logits = logits - tf.reduce_max(logits, axis=-1, keepdims=True)
-    lse_logits = tf.reduce_logsumexp(logits, axis=-1)
-
-    # TODO(b/161014180): Workaround to support correct gradient calculations
-    # with -inf logits.
-    masked_logits = tf.where(
-        (tf.math.is_inf(logits) & (logits < 0)),
-        tf.cast(1.0, dtype=logits.dtype), logits)
-    return lse_logits - tf.reduce_sum(
-        tf.math.multiply_no_nan(masked_logits, tf.math.exp(logits)),
-        axis=-1) / tf.math.exp(lse_logits)
+      log_probs = tf.math.log(self._probs)
+    else:
+      log_probs = tf.math.log_softmax(self._logits)
+    return -tf.reduce_sum(
+        _mul_exp(log_probs, log_probs),
+        axis=-1)
 
   def _mode(self):
     x = self._probs if self._logits is None else self._logits
@@ -455,8 +440,27 @@ def _kl_categorical_categorical(a, b, name=None):
   with tf.name_scope(name or 'kl_categorical_categorical'):
     a_logits = a._logits_parameter_no_checks()  # pylint:disable=protected-access
     b_logits = b._logits_parameter_no_checks()  # pylint:disable=protected-access
+    a_log_probs = tf.math.log_softmax(a_logits)
     return tf.reduce_sum(
-        tf.math.multiply_no_nan(
-            tf.math.log_softmax(a_logits) - tf.math.log_softmax(b_logits),
-            tf.math.softmax(a_logits)),
+        _mul_exp(
+            a_log_probs - tf.math.log_softmax(b_logits),
+            a_log_probs),
         axis=-1)
+
+
+def _mul_exp(x, logp):
+  """Returns `x * exp(logp)` with zero output if `exp(logp)==0`.
+
+  Args:
+    x: A `Tensor`.
+    logp: A `Tensor`.
+
+  Returns:
+    `x * exp(logp)` with zero output and zero gradient if `exp(logp)==0`,
+    even if `x` is NaN or infinite.
+  """
+  p = tf.math.exp(logp)
+  # If p==0, the gradient with respect to logp is zero,
+  # so we can replace the possibly non-finite `x` with zero.
+  x = tf.where(tf.math.equal(p, 0), tf.zeros_like(x), x)
+  return x * p
