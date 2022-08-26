@@ -566,15 +566,18 @@ class BetaincinvTest(test_util.TestCase):
     y = tfp.distributions.Uniform(
         low=tiny, high=dtype(1.)).sample(n, strm())
 
-    betaincinv, a, b, y = self.evaluate(
-        [tfp_math.betaincinv(a, b, y), a, b, y])
+    # Wrap in tf.function and compile for faster computations.
+    betaincinv = tf.function(tfp_math.betaincinv, autograph=False)
+
+    result, a, b, y = self.evaluate(
+        [betaincinv(a, b, y), a, b, y])
 
     # Check that tfp_math.betaincinv preserves dtype.
-    self.assertEqual(dtype, betaincinv.dtype)
+    self.assertEqual(dtype, result.dtype)
 
     # Check that tfp_math.betaincinv is accurate.
     self.assertAllClose(
-        scipy_special.betaincinv(a, b, y), betaincinv, atol=atol, rtol=rtol)
+        scipy_special.betaincinv(a, b, y), result, atol=atol, rtol=rtol)
 
   @parameterized.named_parameters(
       {"testcase_name": "float32",
@@ -622,17 +625,20 @@ class BetaincinvTest(test_util.TestCase):
     b = np.array([0.6, 0.6, -1., 0., 0.6, 0.6], dtype=dtype)
     y = np.array([0.5, 0.5, 0.5, 0.5, -1., 2.], dtype=dtype)
 
-    betaincinv = self.evaluate(tfp_math.betaincinv(a, b, y))
-    self.assertEqual(dtype, betaincinv.dtype)
-    self.assertAllNan(betaincinv)
+    # Wrap in tf.function and compile for faster computations.
+    betaincinv = tf.function(tfp_math.betaincinv, autograph=False)
+
+    result = self.evaluate(tfp_math.betaincinv(a, b, y))
+    self.assertEqual(dtype, result.dtype)
+    self.assertAllNan(result)
 
     # Test tfp_math.betaincinv when y is equal to 0 or 1.
-    a, b, y0, y1 = [np.array([z], dtype=dtype) for z in [0.4, 0.6, 0., 1.]]
-
-    for y in [y0, y1]:
-      betaincinv = self.evaluate(tfp_math.betaincinv(a, b, y))
-      self.assertEqual(dtype, betaincinv.dtype)
-      self.assertAllEqual(y, betaincinv)
+    a = dtype(0.4)
+    b = dtype(0.6)
+    y = np.array([0., 1.], dtype=dtype)
+    result = self.evaluate(betaincinv(a, b, y))
+    self.assertEqual(dtype, result.dtype)
+    self.assertAllEqual(y, result)
 
   def testBetaincinvFloat16(self):
     a = tf.constant([0.4, 0.4, 0.4, 0.4, -1., 0.4, 0.4], dtype=tf.float16)
