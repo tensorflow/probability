@@ -19,8 +19,10 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import transform_diagonal
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import mvn_full_covariance
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -33,7 +35,7 @@ class MultivariateNormalFullCovarianceTest(test_util.TestCase):
 
   def _random_pd_matrix(self, *shape):
     mat = rng.rand(*shape)
-    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
+    chol = transform_diagonal.TransformDiagonal(softplus.Softplus())(mat)
     chol = tf.linalg.band_part(chol, -1, 0)
     return self.evaluate(tf.matmul(chol, chol, adjoint_b=True))
 
@@ -41,27 +43,30 @@ class MultivariateNormalFullCovarianceTest(test_util.TestCase):
     mu = [1., 2.]
     sigma = [[1., 0.], [1., 1.]]  # Nonsingular, but not symmetric
     with self.assertRaisesOpError("not symmetric"):
-      mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
+      mvn = mvn_full_covariance.MultivariateNormalFullCovariance(
+          mu, sigma, validate_args=True)
       self.evaluate(mvn.covariance())
 
   def testNamePropertyIsSetByInitArg(self):
     mu = [1., 2.]
     sigma = [[1., 0.], [0., 1.]]
-    mvn = tfd.MultivariateNormalFullCovariance(
+    mvn = mvn_full_covariance.MultivariateNormalFullCovariance(
         mu, sigma, name="Billy", validate_args=True)
     self.assertStartsWith(mvn.name, "Billy")
 
   def testDoesNotRaiseIfInitializedWithSymmetricMatrix(self):
     mu = rng.rand(10)
     sigma = self._random_pd_matrix(10, 10)
-    mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
+    mvn = mvn_full_covariance.MultivariateNormalFullCovariance(
+        mu, sigma, validate_args=True)
     # Should not raise
     self.evaluate(mvn.covariance())
 
   def testLogPDFScalarBatch(self):
     mu = rng.rand(2)
     sigma = self._random_pd_matrix(2, 2)
-    mvn = tfd.MultivariateNormalFullCovariance(mu, sigma, validate_args=True)
+    mvn = mvn_full_covariance.MultivariateNormalFullCovariance(
+        mu, sigma, validate_args=True)
     x = rng.rand(2)
 
     log_pdf = mvn.log_prob(x)
@@ -78,7 +83,7 @@ class MultivariateNormalFullCovarianceTest(test_util.TestCase):
 
   def testLogPDFScalarBatchCovarianceNotProvided(self):
     mu = rng.rand(2)
-    mvn = tfd.MultivariateNormalFullCovariance(
+    mvn = mvn_full_covariance.MultivariateNormalFullCovariance(
         mu, covariance_matrix=None, validate_args=True)
     x = rng.rand(2)
 
@@ -99,7 +104,7 @@ class MultivariateNormalFullCovarianceTest(test_util.TestCase):
     mu = rng.rand(3, 5, 2)
     covariance = self._random_pd_matrix(3, 5, 2, 2)
 
-    mvn = tfd.MultivariateNormalFullCovariance(
+    mvn = mvn_full_covariance.MultivariateNormalFullCovariance(
         mu, covariance, validate_args=True)
 
     # Shapes known at graph construction time.
@@ -128,12 +133,12 @@ class MultivariateNormalFullCovarianceTest(test_util.TestCase):
     event_shape = [3]
     mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
     mu_b, sigma_b = self._random_mu_and_sigma(batch_shape, event_shape)
-    mvn_a = tfd.MultivariateNormalFullCovariance(
+    mvn_a = mvn_full_covariance.MultivariateNormalFullCovariance(
         loc=mu_a, covariance_matrix=sigma_a, validate_args=True)
-    mvn_b = tfd.MultivariateNormalFullCovariance(
+    mvn_b = mvn_full_covariance.MultivariateNormalFullCovariance(
         loc=mu_b, covariance_matrix=sigma_b, validate_args=True)
 
-    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    kl = kullback_leibler.kl_divergence(mvn_a, mvn_b)
     self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
@@ -150,12 +155,12 @@ class MultivariateNormalFullCovarianceTest(test_util.TestCase):
     mu_a, sigma_a = self._random_mu_and_sigma(batch_shape, event_shape)
     # No batch shape.
     mu_b, sigma_b = self._random_mu_and_sigma([], event_shape)
-    mvn_a = tfd.MultivariateNormalFullCovariance(
+    mvn_a = mvn_full_covariance.MultivariateNormalFullCovariance(
         loc=mu_a, covariance_matrix=sigma_a, validate_args=True)
-    mvn_b = tfd.MultivariateNormalFullCovariance(
+    mvn_b = mvn_full_covariance.MultivariateNormalFullCovariance(
         loc=mu_b, covariance_matrix=sigma_b, validate_args=True)
 
-    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    kl = kullback_leibler.kl_divergence(mvn_a, mvn_b)
     self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)

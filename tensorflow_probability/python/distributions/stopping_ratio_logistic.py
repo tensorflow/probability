@@ -16,7 +16,6 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import ascending
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
@@ -29,6 +28,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 
 class StoppingRatioLogistic(distribution.AutoCompositeTensorDistribution):
@@ -213,7 +213,7 @@ class StoppingRatioLogistic(distribution.AutoCompositeTensorDistribution):
     # Conditional probabilities. These are log(F(k)) and log(1 - F(k))
     conditional_log_probs = tf.math.log_sigmoid(
         cutpoints - loc[..., tf.newaxis])
-    conditional_log_probs_complement = tfp_math.log1mexp(conditional_log_probs)
+    conditional_log_probs_complement = generic.log1mexp(conditional_log_probs)
 
     # Note that F(0) = G(0).
     # G(1) = P(X = 1; cutpoints, loc) =

@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -31,6 +30,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 __all__ = [
@@ -328,7 +328,7 @@ class Beta(distribution.AutoCompositeTensorDistribution):
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
     safe_x = tf.where(tf.logical_and(x >= 0, x < 1), x, 0.5)
-    answer = tfp_math.betainc(concentration1, concentration0, safe_x)
+    answer = special.betainc(concentration1, concentration0, safe_x)
     return distribution_util.extend_cdf_outside_support(
         x, answer, low=0., high=1.)
 
@@ -337,7 +337,7 @@ class Beta(distribution.AutoCompositeTensorDistribution):
             tf.math.xlog1py(concentration0 - 1., -x))
 
   def _log_normalization(self, concentration1, concentration0):
-    return tfp_math.lbeta(concentration1, concentration0)
+    return special.lbeta(concentration1, concentration0)
 
   def _entropy(self):
     concentration1 = tf.convert_to_tensor(self.concentration1)

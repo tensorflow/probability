@@ -16,7 +16,6 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import stats as tfp_stats
 from tensorflow_probability.python.bijectors import fill_scale_tril as fill_scale_tril_bijector
 from tensorflow_probability.python.distributions import mvn_linear_operator
@@ -25,6 +24,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic
 
 from tensorflow.python.ops.linalg import linear_operator  # pylint: disable=g-direct-tensorflow-import
 
@@ -38,7 +38,7 @@ class KahanLogDetLinOpTriL(tf.linalg.LinearOperatorLowerTriangular):
   """Override `LinearOperatorLowerTriangular` logdet to use Kahan summation."""
 
   def _log_abs_determinant(self):
-    return tfp_math.reduce_kahan_sum(
+    return generic.reduce_kahan_sum(
         tf.math.log(tf.math.abs(self._get_diag())), axis=[-1]).total
 
 

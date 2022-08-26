@@ -20,11 +20,10 @@ from scipy import stats
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import gev
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 class _GEVTest(object):
@@ -38,31 +37,30 @@ class _GEVTest(object):
     loc = np.array([3.0] * 5, dtype=self._dtype)
     scale = np.array([3.0] * 5, dtype=self._dtype)
     conc = np.array([3.0] * 5, dtype=self._dtype)
-    gev = tfd.GeneralizedExtremeValue(loc=loc, scale=scale,
-                                      concentration=conc,
-                                      validate_args=True)
+    dist = gev.GeneralizedExtremeValue(
+        loc=loc, scale=scale, concentration=conc, validate_args=True)
 
-    self.assertEqual((5,), self.evaluate(gev.batch_shape_tensor()))
-    self.assertEqual(tf.TensorShape([5]), gev.batch_shape)
-    self.assertAllEqual([], self.evaluate(gev.event_shape_tensor()))
-    self.assertEqual(tf.TensorShape([]), gev.event_shape)
+    self.assertEqual((5,), self.evaluate(dist.batch_shape_tensor()))
+    self.assertEqual(tf.TensorShape([5]), dist.batch_shape)
+    self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+    self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
   def testInvalidScale(self):
     scale = [-.01, 0., 2.]
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      gev = tfd.GeneralizedExtremeValue(loc=0., scale=scale, concentration=1.,
-                                        validate_args=True)
-      self.evaluate(gev.mean())
+      dist = gev.GeneralizedExtremeValue(
+          loc=0., scale=scale, concentration=1., validate_args=True)
+      self.evaluate(dist.mean())
 
     scale = tf.Variable([.01])
     self.evaluate(scale.initializer)
-    gev = tfd.GeneralizedExtremeValue(loc=0., scale=scale, concentration=1.,
-                                      validate_args=True)
-    self.assertIs(scale, gev.scale)
-    self.evaluate(gev.mean())
+    dist = gev.GeneralizedExtremeValue(
+        loc=0., scale=scale, concentration=1., validate_args=True)
+    self.assertIs(scale, dist.scale)
+    self.evaluate(dist.mean())
     with tf.control_dependencies([scale.assign([-.01])]):
       with self.assertRaisesOpError('Argument `scale` must be positive.'):
-        self.evaluate(gev.mean())
+        self.evaluate(dist.mean())
 
   def testGEVLogPdf(self):
     batch_size = 6
@@ -71,17 +69,17 @@ class _GEVTest(object):
     conc = np.array([2.] * batch_size, dtype=self._dtype)
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=self._dtype)
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
-    log_pdf = gev.log_prob(self.make_tensor(x))
+    log_pdf = dist.log_prob(self.make_tensor(x))
     self.assertAllClose(
         gev_dist.logpdf(x),
         self.evaluate(log_pdf))
 
-    pdf = gev.prob(x)
+    pdf = dist.prob(x)
     self.assertAllClose(
         gev_dist.pdf(x), self.evaluate(pdf))
 
@@ -93,16 +91,16 @@ class _GEVTest(object):
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=self._dtype).T
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
-    log_pdf = gev.log_prob(self.make_tensor(x))
+    log_pdf = dist.log_prob(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_pdf), gev_dist.logpdf(x))
 
-    pdf = gev.prob(self.make_tensor(x))
+    pdf = dist.prob(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(pdf), gev_dist.pdf(x))
 
@@ -114,17 +112,17 @@ class _GEVTest(object):
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=self._dtype)
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
 
-    log_cdf = gev.log_cdf(self.make_tensor(x))
+    log_cdf = dist.log_cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_cdf), gev_dist.logcdf(x))
 
-    cdf = gev.cdf(self.make_tensor(x))
+    cdf = dist.cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(cdf), gev_dist.cdf(x))
 
@@ -136,18 +134,18 @@ class _GEVTest(object):
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=self._dtype).T
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
 
-    log_cdf = gev.log_cdf(self.make_tensor(x))
+    log_cdf = dist.log_cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_cdf),
         gev_dist.logcdf(x))
 
-    cdf = gev.cdf(self.make_tensor(x))
+    cdf = dist.cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(cdf),
         gev_dist.cdf(x))
@@ -158,16 +156,15 @@ class _GEVTest(object):
     conc = np.array([-0.9, 0.0], dtype=self._dtype)
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
-    self.assertAllClose(self.evaluate(gev.mean()),
-                        gev_dist.mean())
+    self.assertAllClose(self.evaluate(dist.mean()), gev_dist.mean())
 
     conc_with_inf_mean = np.array([2.], dtype=self._dtype)
-    gev_with_inf_mean = tfd.GeneralizedExtremeValue(
+    gev_with_inf_mean = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc_with_inf_mean),
@@ -181,17 +178,16 @@ class _GEVTest(object):
     conc = np.array([-0.9, 0.0], dtype=self._dtype)
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(gev.variance()),
-                        gev_dist.var())
+    self.assertAllClose(self.evaluate(dist.variance()), gev_dist.var())
 
     conc_with_inf_var = np.array([1.5], dtype=self._dtype)
-    gev_with_inf_var = tfd.GeneralizedExtremeValue(
+    gev_with_inf_var = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc_with_inf_var),
@@ -205,17 +201,16 @@ class _GEVTest(object):
     conc = np.array([-0.9, 0.0], dtype=self._dtype)
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(gev.stddev()),
-                        gev_dist.std())
+    self.assertAllClose(self.evaluate(dist.stddev()), gev_dist.std())
 
     conc_with_inf_std = np.array([1.5], dtype=self._dtype)
-    gev_with_inf_std = tfd.GeneralizedExtremeValue(
+    gev_with_inf_std = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc_with_inf_std),
@@ -228,7 +223,7 @@ class _GEVTest(object):
     scale = np.array([1.5], dtype=self._dtype)
     conc = np.array([-0.9, 0.0, 1.5], dtype=self._dtype)
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
@@ -236,7 +231,7 @@ class _GEVTest(object):
 
     np_mode_z = np.where(conc == 0., 0., ((conc+1)**(-conc) - 1.) / conc)
     np_mode = loc + np_mode_z * scale
-    self.assertAllClose(self.evaluate(gev.mode()), np_mode)
+    self.assertAllClose(self.evaluate(dist.mode()), np_mode)
 
   def testGEVSample(self):
     loc = self._dtype(4.0)
@@ -245,13 +240,13 @@ class _GEVTest(object):
     n = int(1e6)
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
 
-    samples = gev.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n,), sample_values.shape)
     self.assertAllClose(
@@ -268,13 +263,13 @@ class _GEVTest(object):
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
     n = int(1e6)
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
 
-    samples = gev.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         gev_dist.mean(),
@@ -289,13 +284,13 @@ class _GEVTest(object):
     gev_dist = stats.genextreme(-conc, loc=loc, scale=scale)
     n = int(1e6)
 
-    gev = tfd.GeneralizedExtremeValue(
+    dist = gev.GeneralizedExtremeValue(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         concentration=self.make_tensor(conc),
         validate_args=True)
 
-    samples = gev.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         gev_dist.var(),
@@ -308,20 +303,23 @@ class _GEVTest(object):
     def make_fn(dtype, attr):
       x = np.array([1.]).astype(dtype)
       return lambda m, s, p: getattr(  # pylint: disable=g-long-lambda
-          tfd.GeneralizedExtremeValue(loc=m, scale=s,
-                                      concentration=p, validate_args=True),
-          attr)(x)
+          gev.GeneralizedExtremeValue(
+              loc=m, scale=s, concentration=p, validate_args=True), attr)(
+                  x)
 
     loc = np.array([1.0], dtype=self._dtype)
     scale = np.array([1.5], dtype=self._dtype)
     conc = np.array([-0.7, 0.0, 0.5, 1.], dtype=self._dtype)
 
     for attr in ['log_prob', 'prob', 'cdf', 'log_cdf']:
-      value, grads = self.evaluate(tfp.math.value_and_gradient(
-          make_fn(self._dtype, attr),
-          [self.make_tensor(loc),     # loc
-           self.make_tensor(scale),   # scale
-           self.make_tensor(conc)]))  # conc
+      value, grads = self.evaluate(
+          gradient.value_and_gradient(
+              make_fn(self._dtype, attr),
+              [
+                  self.make_tensor(loc),  # loc
+                  self.make_tensor(scale),  # scale
+                  self.make_tensor(conc)
+              ]))  # conc
       self.assertAllFinite(value)
       self.assertAllFinite(grads[0])  # d/d loc
       self.assertAllFinite(grads[1])  # d/d scale
@@ -339,23 +337,26 @@ class _GEVTest(object):
           37, seed=test_util.test_seed()).shape, (37, 3,))
 
     _check(
-        tfd.GeneralizedExtremeValue(loc=[
-            2.,
-            3.,
-            4.,
-        ], scale=2., concentration=1., validate_args=True))
+        gev.GeneralizedExtremeValue(
+            loc=[
+                2.,
+                3.,
+                4.,
+            ], scale=2., concentration=1., validate_args=True))
     _check(
-        tfd.GeneralizedExtremeValue(loc=3., scale=[
-            2.,
-            3.,
-            4.,
-        ], concentration=1., validate_args=True))
+        gev.GeneralizedExtremeValue(
+            loc=3., scale=[
+                2.,
+                3.,
+                4.,
+            ], concentration=1., validate_args=True))
     _check(
-        tfd.GeneralizedExtremeValue(loc=3., scale=3., concentration=[
-            2.,
-            3.,
-            4.,
-        ], validate_args=True))
+        gev.GeneralizedExtremeValue(
+            loc=3., scale=3., concentration=[
+                2.,
+                3.,
+                4.,
+            ], validate_args=True))
 
   def testBroadcastingPdfArgs(self):
 
@@ -373,23 +374,29 @@ class _GEVTest(object):
       _assert_shape(gev_dist, xs, (3, 3))
 
     _check(
-        tfd.GeneralizedExtremeValue(loc=[
-            -2.,
-            -3.,
-            -4.,
-        ], scale=2., concentration=1., validate_args=True))
+        gev.GeneralizedExtremeValue(
+            loc=[
+                -2.,
+                -3.,
+                -4.,
+            ],
+            scale=2.,
+            concentration=1.,
+            validate_args=True))
     _check(
-        tfd.GeneralizedExtremeValue(loc=-6., scale=[
-            2.,
-            3.,
-            4.,
-        ], concentration=1., validate_args=True))
+        gev.GeneralizedExtremeValue(
+            loc=-6., scale=[
+                2.,
+                3.,
+                4.,
+            ], concentration=1., validate_args=True))
     _check(
-        tfd.GeneralizedExtremeValue(loc=-7., scale=3., concentration=[
-            2.,
-            3.,
-            4.,
-        ], validate_args=True))
+        gev.GeneralizedExtremeValue(
+            loc=-7., scale=3., concentration=[
+                2.,
+                3.,
+                4.,
+            ], validate_args=True))
 
     def _check2d(gev_dist):
       _assert_shape(gev_dist, 5., (1, 3))
@@ -401,23 +408,35 @@ class _GEVTest(object):
       _assert_shape(gev_dist, xs, (3, 3))
 
     _check2d(
-        tfd.GeneralizedExtremeValue(loc=[[
-            -2.,
-            -3.,
-            -4.,
-        ]], scale=2., concentration=1., validate_args=True))
+        gev.GeneralizedExtremeValue(
+            loc=[[
+                -2.,
+                -3.,
+                -4.,
+            ]],
+            scale=2.,
+            concentration=1.,
+            validate_args=True))
     _check2d(
-        tfd.GeneralizedExtremeValue(loc=-7., scale=[[
-            2.,
-            3.,
-            4.,
-        ]], concentration=1., validate_args=True))
+        gev.GeneralizedExtremeValue(
+            loc=-7.,
+            scale=[[
+                2.,
+                3.,
+                4.,
+            ]],
+            concentration=1.,
+            validate_args=True))
     _check2d(
-        tfd.GeneralizedExtremeValue(loc=-7., scale=3., concentration=[[
-            2.,
-            3.,
-            4.,
-        ]], validate_args=True))
+        gev.GeneralizedExtremeValue(
+            loc=-7.,
+            scale=3.,
+            concentration=[[
+                2.,
+                3.,
+                4.,
+            ]],
+            validate_args=True))
 
     def _check2d_rows(gev_dist):
       _assert_shape(gev_dist, 5., (3, 1))
@@ -429,16 +448,22 @@ class _GEVTest(object):
       _assert_shape(gev_dist, xs, (3, 1))
 
     _check2d_rows(
-        tfd.GeneralizedExtremeValue(
-            loc=[[-2.], [-3.], [-4.]], scale=2., concentration=1.,
+        gev.GeneralizedExtremeValue(
+            loc=[[-2.], [-3.], [-4.]],
+            scale=2.,
+            concentration=1.,
             validate_args=True))
     _check2d_rows(
-        tfd.GeneralizedExtremeValue(
-            loc=-7., scale=[[2.], [3.], [4.]], concentration=1.,
+        gev.GeneralizedExtremeValue(
+            loc=-7.,
+            scale=[[2.], [3.], [4.]],
+            concentration=1.,
             validate_args=True))
     _check2d_rows(
-        tfd.GeneralizedExtremeValue(
-            loc=-7., scale=3., concentration=[[2.], [3.], [4.]],
+        gev.GeneralizedExtremeValue(
+            loc=-7.,
+            scale=3.,
+            concentration=[[2.], [3.], [4.]],
             validate_args=True))
 
 

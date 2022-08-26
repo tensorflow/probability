@@ -22,9 +22,9 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import stats as tfps
 from tensorflow_probability.python.distributions import mvn_low_rank_update_linear_operator_covariance
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import test_util
 
 MultivariateNormalLowRankUpdateLinearOperatorCovariance = (
@@ -201,7 +201,7 @@ class MultivariateNormalLowRankUpdateLinearOperatorCovarianceTest(
 
   def _mvn_pair(self, loc, cov_operator):
     """Construct a pair of MVNs."""
-    tril = tfd.MultivariateNormalTriL(
+    tril = mvn_tril.MultivariateNormalTriL(
         loc=loc, scale_tril=cov_operator.cholesky().to_dense())
     low_rank_update = (
         MultivariateNormalLowRankUpdateLinearOperatorCovariance(

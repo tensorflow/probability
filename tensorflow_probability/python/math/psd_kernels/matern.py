@@ -21,7 +21,7 @@ from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.math import bessel as tfp_math
+from tensorflow_probability.python.math import bessel
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
@@ -227,7 +227,7 @@ class GeneralizedMatern(_AmplitudeLengthScaleMixin,
         tf.math.equal(norm, 0.),
         dtype_util.as_numpy_dtype(self.dtype)(0.),
         df * tf.math.log(safe_norm) +
-        tfp_math.log_bessel_kve(df, safe_norm) - safe_norm -
+        bessel.log_bessel_kve(df, safe_norm) - safe_norm -
         tf.math.lgamma(df) + (1. - df) * np.log(2.))
 
     if self.amplitude is not None:

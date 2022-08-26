@@ -27,7 +27,6 @@ import scipy
 import scipy.integrate
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.distributions import bates
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import test_util
@@ -40,7 +39,7 @@ class BatesTest(test_util.TestCase):
     n = 8.
     l = -11.
     h = -5.
-    b = tfd.Bates(total_count=n, low=l, high=h, validate_args=True)
+    b = bates.Bates(total_count=n, low=l, high=h, validate_args=True)
     self.assertAllClose(n, self.evaluate(b.total_count))
     self.assertAllClose(l, self.evaluate(b.low))
     self.assertAllClose(h, self.evaluate(b.high))
@@ -50,7 +49,7 @@ class BatesTest(test_util.TestCase):
     n = tf.ones((2, 1, 3), dtype=tf.float32)
     l = tf.zeros((2, 2, 1), dtype=tf.float32)
     h = tf.constant(3, dtype=tf.float32)
-    b = tfd.Bates(total_count=n, low=l, high=h, validate_args=True)
+    b = bates.Bates(total_count=n, low=l, high=h, validate_args=True)
     self.assertAllClose(n, self.evaluate(b.total_count))
     self.assertAllClose(l, self.evaluate(b.low))
     self.assertAllClose(h, self.evaluate(b.high))
@@ -63,7 +62,7 @@ class BatesTest(test_util.TestCase):
         ValueError,
         'Arguments `total_count`, `low` and `high` must have compatible shapes'
     ):
-      d = tfd.Bates(total_count=n, low=l, validate_args=True)
+      d = bates.Bates(total_count=n, low=l, validate_args=True)
       self.evaluate(d.prob(1.))
 
   def testBatesNonNegTotalCount(self):
@@ -71,19 +70,19 @@ class BatesTest(test_util.TestCase):
     for n in ns:
       with self.assertRaisesOpError(
           '`total_count` must be positive.'):
-        d = tfd.Bates(total_count=n, validate_args=True)
+        d = bates.Bates(total_count=n, validate_args=True)
         self.evaluate(d.prob(1.))
 
   def testBatesIntegralTotalCount(self):
     msg = '`total_count` must be representable as a 32-bit integer.'
     with self.assertRaisesOpError(msg):
-      d = tfd.Bates(total_count=1.5, validate_args=True)
+      d = bates.Bates(total_count=1.5, validate_args=True)
       self.evaluate(d.prob(1.))
 
   def testBatesStableTotalCount(self):
     bad = max(bates.BATES_TOTAL_COUNT_STABILITY_LIMITS.values()) + 10.
     with self.assertRaisesOpError('`total_count` > .* is numerically unstable'):
-      d = tfd.Bates(total_count=bad, validate_args=True)
+      d = bates.Bates(total_count=bad, validate_args=True)
       self.evaluate(d.prob(1.))
 
   # TODO(b/157665671): Figure out a way to capture output in all modes.
@@ -93,7 +92,7 @@ class BatesTest(test_util.TestCase):
       reason='Unable to capture stderr in numpy / JAX tests.')
   def testBatesStableTotalCountWarning(self):
     bad = max(bates.BATES_TOTAL_COUNT_STABILITY_LIMITS.values()) + 10.
-    d = tfd.Bates(total_count=bad, validate_args=False)
+    d = bates.Bates(total_count=bad, validate_args=False)
     with self.captureWritesToStream(sys.stderr) as captured:
       self.evaluate(d.prob(1.))
     self.assertRegex(
@@ -109,7 +108,7 @@ class BatesTest(test_util.TestCase):
     bounds = [(-1., -1.), (0., 0.), (-1., -1.1), (1.1, 1.)]
     for l, h in bounds:
       with self.assertRaisesOpError('`low` must be less than `high`'):
-        d = tfd.Bates(total_count=1, low=l, high=h, validate_args=True)
+        d = bates.Bates(total_count=1, low=l, high=h, validate_args=True)
         self.evaluate(d.prob(1.))
 
   def testBatesVariables(self):
@@ -119,7 +118,7 @@ class BatesTest(test_util.TestCase):
     n = tf.Variable(n0)
     l = tf.Variable(l0)
     h = tf.Variable(h0)
-    d = tfd.Bates(total_count=n, low=l, high=h, validate_args=True)
+    d = bates.Bates(total_count=n, low=l, high=h, validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     self.evaluate(d.prob([.5, 1.]))
 
@@ -155,9 +154,10 @@ class BatesTest(test_util.TestCase):
     return var
 
   def make_shapeless_bates(self, total_count, low, high):
-    return tfd.Bates(total_count=self.shapeless(total_count),
-                     low=self.shapeless(low),
-                     high=self.shapeless(high))
+    return bates.Bates(
+        total_count=self.shapeless(total_count),
+        low=self.shapeless(low),
+        high=self.shapeless(high))
 
   def testBatesDynamicShapeTensor(self):
     dist = self.make_shapeless_bates(1., 0., [0.5, 1.])
@@ -189,15 +189,17 @@ class BatesTest(test_util.TestCase):
         bates._segmented_range(limits))
 
   def testEmpty(self):
-    d = tfd.Bates(total_count=tf.zeros([0]))
+    d = bates.Bates(total_count=tf.zeros([0]))
     self.evaluate(d.log_prob(d.sample(seed=test_util.test_seed())))
 
   def testBatesPDFLowTotalCount(self):
     ns = np.array([1., 2.])
     lss = np.array([[0., -1.], [-10., -1.]])
     hss = np.array([[1., 3.], [-9., 0.]])
-    b = tfd.Bates(
-        total_count=tf.reshape(ns, (2, 1, 1)), low=lss, high=hss,
+    b = bates.Bates(
+        total_count=tf.reshape(ns, (2, 1, 1)),
+        low=lss,
+        high=hss,
         validate_args=True)
     self.assertAllEqual([2, 2, 2], self.evaluate(b.batch_shape_tensor()))
     xs = np.array([0., .25, .5, 1.1, 1.5, 2.])
@@ -237,7 +239,7 @@ class BatesTest(test_util.TestCase):
       nx = int(nx_)
       self.assertAllClose(nx_, nx)
 
-      b = tfd.Bates(total_count=n, low=tf.cast(0, tf.float64))
+      b = bates.Bates(total_count=n, low=tf.cast(0, tf.float64))
       val = b.prob(tf.cast(x, tf.float64))
       self.assertAllEqual([], self.evaluate(tf.shape(val)))
       self.assertAllClose(self.evaluate(val), exact(n, nx))
@@ -249,7 +251,7 @@ class BatesTest(test_util.TestCase):
   )
   def testBatesPDFisNormalized(self, total_count, bounds):
     low, high = tf.cast(bounds[0], tf.float64), tf.cast(bounds[1], tf.float64)
-    d = tfd.Bates(total_count=total_count, low=low, high=high)
+    d = bates.Bates(total_count=total_count, low=low, high=high)
     # This is about as high as JAX can go and still finish in time.
     nx = 100
     x = tf.linspace(low, high, nx)
@@ -259,7 +261,7 @@ class BatesTest(test_util.TestCase):
                         atol=5e-05, rtol=5e-05)
 
   def testBatesPDFonNaNs(self):
-    for b in [tfd.Bates(1, 0, 1), tfd.Bates(4, -10, -8)]:
+    for b in [bates.Bates(1, 0, 1), bates.Bates(4, -10, -8)]:
       values_with_nans = [
           np.nan, -1., np.nan, 0., np.nan, .5, np.nan, 1., np.nan, 2., np.nan]
       values = [v if i % 2 != 0 else 0. for i, v in enumerate(values_with_nans)]
@@ -279,7 +281,7 @@ class BatesTest(test_util.TestCase):
     ns = np.array([1., 2.])
     ls = np.array([0., 1.])
     hs = np.array([1., 3.])
-    b = tfd.Bates(
+    b = bates.Bates(
         total_count=tf.expand_dims(ns, -1), low=ls, high=hs, validate_args=True)
     self.assertAllEqual([2, 2], self.evaluate(b.batch_shape_tensor()))
     xs = np.array([0., .25, .5, 1.1, 1.5, 2.])
@@ -320,7 +322,7 @@ class BatesTest(test_util.TestCase):
       nx = int(nx_)
       self.assertAllClose(nx_, nx)
 
-      b = tfd.Bates(total_count=n, low=tf.cast(0, tf.float64))
+      b = bates.Bates(total_count=n, low=tf.cast(0, tf.float64))
       val = b.cdf(tf.cast(x, tf.float64))
       self.assertAllEqual([], self.evaluate(tf.shape(val)))
       self.assertAllClose(self.evaluate(val), exact(n, nx))
@@ -328,8 +330,11 @@ class BatesTest(test_util.TestCase):
   def testBatesMean(self):
     # TODO(b/157666350): Turn this into a hypothesis test.
     bounds = np.array([[0., 1.], [1., 2.], [-2., -1.], [10., 20.]])
-    b = tfd.Bates(total_count=10., low=bounds[..., 0], high=bounds[..., 1],
-                  validate_args=True)
+    b = bates.Bates(
+        total_count=10.,
+        low=bounds[..., 0],
+        high=bounds[..., 1],
+        validate_args=True)
     self.assertAllClose(
         bounds.mean(1),
         self.evaluate(b.mean()))
@@ -338,8 +343,11 @@ class BatesTest(test_util.TestCase):
     ns = np.array([1., 2., 10.])
     lss = np.array([[-10., -2.], [-10., 0.]])
     hss = np.array([[-1., 0.], [10., 100.]])
-    b = tfd.Bates(total_count=tf.reshape(ns, (3, 1, 1)), low=lss, high=hss,
-                  validate_args=True)
+    b = bates.Bates(
+        total_count=tf.reshape(ns, (3, 1, 1)),
+        low=lss,
+        high=hss,
+        validate_args=True)
     expected = [[[np.power(h - l, 2) / (12 * n) for l, h in zip(ls, hs)]
                  for ls, hs in zip(lss, hss)]
                 for n in ns]
@@ -350,8 +358,11 @@ class BatesTest(test_util.TestCase):
   def testBatesSampleStatistics(self):
     # TODO(b/157666350): Turn this into a hypothesis test.
     bounds = np.array([[0., 1.], [1., 2.], [-2., -1.], [10., 20.]])
-    b = tfd.Bates(total_count=10., low=bounds[..., 0], high=bounds[..., 1],
-                  validate_args=True)
+    b = bates.Bates(
+        total_count=10.,
+        low=bounds[..., 0],
+        high=bounds[..., 1],
+        validate_args=True)
     samples = b.sample(1e6, seed=test_util.test_seed())
     self.assertAllClose(
         self.evaluate(b.mean()),

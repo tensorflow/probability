@@ -20,12 +20,11 @@ import itertools
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import two_piece_normal
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
-
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -34,10 +33,10 @@ class _TwoPieceNormalTest(object):
   def make_two_piece_normal(self):
     if self.dtype is np.float32:
       # Raw Python literals should always be interpreted as float32.
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc=3., scale=10., skewness=0.75, validate_args=True)
     elif self.dtype is np.float64:
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc=tf.constant(3., dtype=self.dtype),
           scale=tf.constant(10., dtype=self.dtype),
           skewness=tf.constant(0.75, dtype=self.dtype),
@@ -48,10 +47,10 @@ class _TwoPieceNormalTest(object):
   def make_two_piece_normals(self):
     if self.dtype is np.float32:
       # Raw Python literals should always be interpreted as float32.
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc=3., scale=10., skewness=[0.75, 1., 1.33], validate_args=True)
     elif self.dtype is np.float64:
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc=tf.constant(3., dtype=self.dtype),
           scale=tf.constant(10., dtype=self.dtype),
           skewness=tf.constant([0.75, 1., 1.33], dtype=self.dtype),
@@ -60,7 +59,7 @@ class _TwoPieceNormalTest(object):
     return dist
 
   def helper_param_shapes(self, sample_shape, expected):
-    param_shapes = tfd.TwoPieceNormal.param_shapes(sample_shape)
+    param_shapes = two_piece_normal.TwoPieceNormal.param_shapes(sample_shape)
     mu_shape = param_shapes['loc']
     sigma_shape = param_shapes['scale']
     skewness_shape = param_shapes['skewness']
@@ -73,13 +72,14 @@ class _TwoPieceNormalTest(object):
     sigma = tf.ones(sigma_shape)
     skewness = tf.ones(skewness_shape)
     seed = test_util.test_seed()
-    samples = tfd.TwoPieceNormal(
+    samples = two_piece_normal.TwoPieceNormal(
         mu, sigma, skewness, validate_args=True).sample(seed=seed)
 
     self.assertAllEqual(expected, self.evaluate(tf.shape(samples)))
 
   def helper_param_static_shapes(self, sample_shape, expected):
-    param_shapes = tfd.TwoPieceNormal.param_static_shapes(sample_shape)
+    param_shapes = two_piece_normal.TwoPieceNormal.param_static_shapes(
+        sample_shape)
     mu_shape = param_shapes['loc']
     sigma_shape = param_shapes['scale']
     skewness_shape = param_shapes['skewness']
@@ -169,7 +169,7 @@ class _TwoPieceNormalTest(object):
       uniform_sample = tf.random.uniform(
           sample.shape, maxval=1., dtype=self.dtype, seed=seed_stream())
       sign = tf.where(uniform_sample < 0.5, -one, one)
-      normal_sample = self.evaluate(sign * tfd.two_piece_normal.standardize(
+      normal_sample = self.evaluate(sign * two_piece_normal.standardize(
           sample, loc=dist.loc, scale=dist.scale, skewness=dist.skewness))
 
       # Note that the standard error for the sample mean is ~ sigma / sqrt(n).
@@ -284,8 +284,9 @@ class _TwoPieceNormalTest(object):
     def make_fn(attr):
       x = np.array([-100, -20, -5., 0., 5., 20, 100]).astype(self.dtype)
       return lambda m, s, g: getattr(  # pylint: disable=g-long-lambda
-          tfd.TwoPieceNormal(m, scale=s, skewness=g, validate_args=True),
-          attr)(x)
+          two_piece_normal.TwoPieceNormal(
+              m, scale=s, skewness=g, validate_args=True), attr)(
+                  x)
 
     loc = tf.constant(0., self.dtype)
     scale = tf.constant(1., self.dtype)
@@ -302,7 +303,7 @@ class _TwoPieceNormalTest(object):
     for skewness in [0.75, 1., 1.33]:
       for attr in ('prob', 'cdf', 'survival_function', 'log_prob'):
         value, grads = self.evaluate(
-            tfp.math.value_and_gradient(
+            gradient.value_and_gradient(
                 make_fn(attr),
                 [loc, scale, tf.constant(skewness, self.dtype)]))
         self.assertAllFinite(value)
@@ -313,7 +314,7 @@ class _TwoPieceNormalTest(object):
   @test_util.numpy_disable_gradient_test
   def testQuantileFiniteGradientAtDifficultPoints(self):
     def quantile(loc, scale, skewness, probs):
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc, scale=scale, skewness=skewness, validate_args=True)
       return dist.quantile(probs)
 
@@ -325,8 +326,9 @@ class _TwoPieceNormalTest(object):
         dtype=self.dtype)
 
     for skewness in [0.75, 1., 1.33]:
-      value, grads = tfp.math.value_and_gradient(
-          quantile, [loc, scale, tf.constant(skewness, self.dtype), probs])
+      value, grads = gradient.value_and_gradient(
+          quantile,
+          [loc, scale, tf.constant(skewness, self.dtype), probs])
       self.assertAllFinite(value)
       self.assertAllFinite(grads[0])  # d/d loc
       self.assertAllFinite(grads[1])  # d/d scale
@@ -337,7 +339,7 @@ class _TwoPieceNormalTest(object):
   def testFullyReparameterized(self):
     n = 100
     def sampler(loc, scale, skewness):
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc, scale=scale, skewness=skewness, validate_args=True)
       return dist.sample(n, seed=test_util.test_seed())
 
@@ -345,7 +347,7 @@ class _TwoPieceNormalTest(object):
     scale = tf.constant(1., self.dtype)
 
     for skewness in [0.75, 1., 1.33]:
-      _, grads = tfp.math.value_and_gradient(
+      _, grads = gradient.value_and_gradient(
           sampler, [loc, scale, tf.constant(skewness, self.dtype)])
       self.assertIsNotNone(grads[0])  # d/d loc
       self.assertIsNotNone(grads[1])  # d/d scale
@@ -360,7 +362,7 @@ class _TwoPieceNormalTest(object):
     def get_abs_sample_mean(skewness):
       loc = tf.constant(0., self.dtype)
       scale = tf.constant(1., self.dtype)
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc, scale=scale, skewness=skewness, validate_args=True)
       return tf.reduce_mean(tf.abs(dist.sample(sample_shape, seed=seed)))
 
@@ -387,12 +389,12 @@ class _TwoPieceNormalTest(object):
     seed = test_util.test_seed()
 
     def get_exp_samples(loc, scale):
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc=loc, scale=scale, skewness=skewness, validate_args=True)
       return tf.math.exp(dist.sample(sample_shape, seed=seed))
 
-    exp_samples, dsamples = tfp.math.value_and_gradient(
-        get_exp_samples, [loc, scale])
+    exp_samples, dsamples = gradient.value_and_gradient(get_exp_samples,
+                                                        [loc, scale])
     dloc_auto, dscale_auto = [grad / n_samples for grad in dsamples]
 
     dloc_calc = tf.reduce_mean(exp_samples, axis=[0, 1])
@@ -404,12 +406,12 @@ class _TwoPieceNormalTest(object):
 
   def testNegativeScaleSkewnessFails(self):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc=[0.], scale=[-1.], skewness=[1.], validate_args=True)
       self.evaluate(dist.mean())
 
     with self.assertRaisesOpError('Argument `skewness` must be positive.'):
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc=[0.], scale=[1.], skewness=[-1.], validate_args=True)
       self.evaluate(dist.mean())
 
@@ -422,7 +424,7 @@ class _TwoPieceNormalTest(object):
     skewness = tf.Variable(
         self.dtype([[0.75, 1.33]]).T, shape=tf.TensorShape(None))
     self.evaluate([loc.initializer, scale.initializer, skewness.initializer])
-    dist = tfd.TwoPieceNormal(
+    dist = two_piece_normal.TwoPieceNormal(
         loc=loc, scale=scale, skewness=skewness, validate_args=True)
 
     # get_batch_shape should return an '<unknown>' tensor (graph mode only).
@@ -435,7 +437,7 @@ class _TwoPieceNormalTest(object):
     loc = tf.constant(0., self.dtype)
     scale = tf.constant(1., self.dtype)
     skewness = tf.Variable(1., dtype=self.dtype)
-    dist = tfd.TwoPieceNormal(
+    dist = two_piece_normal.TwoPieceNormal(
         loc=loc, scale=scale, skewness=skewness, validate_args=True)
 
     self.evaluate([v.initializer for v in dist.variables])
@@ -452,7 +454,7 @@ class _TwoPieceNormalTest(object):
     self.evaluate(skewness.initializer)
 
     with self.assertRaisesRegexp(Exception, r'compatible shapes'):
-      dist = tfd.TwoPieceNormal(
+      dist = two_piece_normal.TwoPieceNormal(
           loc=tf.zeros([4, 1], dtype=self.dtype),
           scale=tf.ones([4, 1], dtype=self.dtype),
           skewness=skewness,
@@ -464,7 +466,7 @@ class TwoPieceNormalEagerGCTest(test_util.TestCase):
 
   @tf_test_util.run_in_graph_and_eager_modes(assert_no_eager_garbage=True)
   def testMeanAndMode(self):
-    dist = tfd.TwoPieceNormal(
+    dist = two_piece_normal.TwoPieceNormal(
         loc=3., scale=10., skewness=[0.75, 1., 1.33], validate_args=True)
 
     self.assertAllEqual((3,), dist.mean().shape)

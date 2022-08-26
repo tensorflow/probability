@@ -16,7 +16,6 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -27,6 +26,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 
@@ -202,7 +202,7 @@ class NegativeBinomial(
     logits = self._logits_parameter_no_checks()
     total_count = tf.convert_to_tensor(self.total_count)
     safe_x = tf.where(x >= 0, x, 0.)
-    answer = tfp_math.betainc(
+    answer = special.betainc(
         total_count, 1. + safe_x, tf.sigmoid(-logits))
     return distribution_util.extend_cdf_outside_support(x, answer, low=0)
 
@@ -212,7 +212,7 @@ class NegativeBinomial(
     log_unnormalized_prob = (
         total_count * tf.math.log_sigmoid(-logits) +
         tf.math.multiply_no_nan(tf.math.log_sigmoid(logits), x))
-    log_normalization = (tfp_math.lbeta(1. + x, total_count) +
+    log_normalization = (special.lbeta(1. + x, total_count) +
                          tf.math.log(total_count + x))
     return log_unnormalized_prob - log_normalization
 

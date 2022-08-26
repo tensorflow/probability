@@ -19,29 +19,30 @@ import numpy as np
 import scipy.stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import horseshoe
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
 class _HorseshoeTest(object):
 
   def _test_param_shapes(self, sample_shape, expected):
-    param_shapes = tfd.Horseshoe.param_shapes(sample_shape)
+    param_shapes = horseshoe.Horseshoe.param_shapes(sample_shape)
     scale_shape = param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(scale_shape))
     scale = self._test_param(np.ones(self.evaluate(scale_shape)))
     self.assertAllEqual(
         expected,
         self.evaluate(
-            tf.shape(tfd.Horseshoe(scale, validate_args=True).sample(
-                seed=test_util.test_seed()))))
+            tf.shape(
+                horseshoe.Horseshoe(
+                    scale,
+                    validate_args=True).sample(seed=test_util.test_seed()))))
 
   def _test_param_static_shapes(self, sample_shape, expected):
-    param_shapes = tfd.Horseshoe.param_static_shapes(sample_shape)
+    param_shapes = horseshoe.Horseshoe.param_static_shapes(sample_shape)
     scale_shape = param_shapes['scale']
     self.assertEqual(expected, scale_shape)
 
@@ -61,7 +62,7 @@ class _HorseshoeTest(object):
   def testHorseshoeMeanAndMode(self):
     scale = self._test_param([11., 12., 13.])
 
-    dist = tfd.Horseshoe(scale=scale, validate_args=True)
+    dist = horseshoe.Horseshoe(scale=scale, validate_args=True)
 
     self.assertAllEqual((3,), self.evaluate(dist.mean()).shape)
     self.assertAllEqual([0., 0., 0.], self.evaluate(dist.mean()))
@@ -72,7 +73,7 @@ class _HorseshoeTest(object):
   def testHorseshoeSample(self):
     scale = self.dtype(2.6)
     n = 100000
-    dist = tfd.Horseshoe(scale=scale, validate_args=True)
+    dist = horseshoe.Horseshoe(scale=scale, validate_args=True)
 
     sample = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(self.evaluate(sample).shape, (n,))
@@ -96,7 +97,7 @@ class _HorseshoeTest(object):
     batch_size = 2
     scale = self._test_param([[2.8, 3.1]] * batch_size)
     n = 100000
-    dist = tfd.Horseshoe(scale=scale, validate_args=True)
+    dist = horseshoe.Horseshoe(scale=scale, validate_args=True)
 
     sample = dist.sample(n, seed=test_util.test_seed())
     self.assertEqual(self.evaluate(sample).shape, (n, batch_size, 2))
@@ -117,12 +118,13 @@ class _HorseshoeTest(object):
 
   def testNegativeScaleFails(self):
     with self.assertRaisesOpError('Condition x > 0 did not hold'):
-      dist = tfd.Horseshoe(scale=[self.dtype(-5)], validate_args=True, name='G')
+      dist = horseshoe.Horseshoe(
+          scale=[self.dtype(-5)], validate_args=True, name='G')
       self.evaluate(dist.sample(1, seed=test_util.test_seed()))
 
   def testHorseshoeShape(self):
     scale = self._test_param([6.0] * 5)
-    dist = tfd.Horseshoe(scale=scale, validate_args=True)
+    dist = horseshoe.Horseshoe(scale=scale, validate_args=True)
 
     self.assertEqual(self.evaluate(dist.batch_shape_tensor()), [5])
     if self.use_static_shape or tf.executing_eagerly():
@@ -145,10 +147,10 @@ class _HorseshoeTest(object):
     x_np = np.logspace(-8, 8, 9).reshape((-1, 1))
     scale = self._test_param(scale_np)
     x = self._test_param(x_np)
-    horseshoe = tfd.Horseshoe(scale=scale, validate_args=True)
+    dist = horseshoe.Horseshoe(scale=scale, validate_args=True)
 
-    log_pdf = horseshoe.log_prob(x)
-    self._test_batch_shapes(horseshoe, log_pdf[0])
+    log_pdf = dist.log_prob(x)
+    self._test_batch_shapes(dist, log_pdf[0])
 
     k = 1 / np.sqrt(2 * np.pi**3)
     upper_bound = np.log(
@@ -165,10 +167,10 @@ class _HorseshoeTest(object):
   def testHorseshoeLogPDFWithQuadrature(self):
     scale_np = np.array([.5, .8, 1.0, 2.0, 3.0])
     scale = self._test_param(scale_np)
-    horseshoe = tfd.Horseshoe(scale=scale, validate_args=True)
+    dist = horseshoe.Horseshoe(scale=scale, validate_args=True)
     x = np.linspace(.1, 10.1, 11)
-    horseshoe_log_pdf = self.evaluate(horseshoe.log_prob(
-        self._test_param(x.reshape((-1, 1)))))
+    dist_log_pdf = self.evaluate(
+        dist.log_prob(self._test_param(x.reshape((-1, 1)))))
 
     # Now use quadrature to estimate the log_prob. This is
     def log_prob_at_x(x, global_shrinkage):
@@ -184,30 +186,29 @@ class _HorseshoeTest(object):
       for s in scale_np:
         log_probs_quad[-1].append(log_prob_at_x(p, s))
     log_probs_quad = np.log(log_probs_quad)
-    self.assertAllClose(log_probs_quad, horseshoe_log_pdf, atol=0.01)
+    self.assertAllClose(log_probs_quad, dist_log_pdf, atol=0.01)
 
   @test_util.numpy_disable_gradient_test
   def testHorseshoeLogPDFGradient(self):
     scale = self.dtype(2.3)
     x = self._test_param(np.linspace(0.1, 10.1, 11))
     [
-        horseshoe_log_prob,
-        horseshoe_log_prob_gradient,
-    ] = tfp.math.value_and_gradient(
-        lambda x_: tfd.Horseshoe(scale=scale, validate_args=True).log_prob(x_),
-        x)
+        dist_log_prob,
+        dist_log_prob_gradient,
+    ] = gradient.value_and_gradient(
+        lambda x_: horseshoe.Horseshoe(scale=scale, validate_args=True).  # pylint: disable=g-long-lambda
+        log_prob(x_), x)
     # The expected derivative of log_prob can be explicitly derived from
     # PDF formula as shown in Horseshoe class docstring; it will have a
     # relatively simple form assuming PDF is known.
     k = 1 / np.sqrt(2 * np.pi**3)
-    horseshoe_log_prob_derivatives_expected = x / scale**2 - 2 * k * tf.exp(
-        -horseshoe_log_prob - tf.math.log(x * scale))
-    horseshoe_log_prob_gradient_expected = tf.reshape(
-        horseshoe_log_prob_derivatives_expected,
-        tf.shape(horseshoe_log_prob_gradient))
+    dist_log_prob_derivatives_expected = x / scale**2 - 2 * k * tf.exp(
+        -dist_log_prob - tf.math.log(x * scale))
+    dist_log_prob_gradient_expected = tf.reshape(
+        dist_log_prob_derivatives_expected, tf.shape(dist_log_prob_gradient))
     self.assertAllClose(
-        self.evaluate(horseshoe_log_prob_gradient_expected),
-        self.evaluate(horseshoe_log_prob_gradient),
+        self.evaluate(dist_log_prob_gradient_expected),
+        self.evaluate(dist_log_prob_gradient),
         # atol is not set to very tight and the max difference is observed
         # to be around 1e-3.
         atol=1.5e-3)
@@ -224,7 +225,7 @@ class _HorseshoeTest(object):
     Returns:
       scale_mle: max log-likelihood estimate for scale.
     """
-    dist = tfd.Horseshoe(scale=scale_candidates, validate_args=True)
+    dist = horseshoe.Horseshoe(scale=scale_candidates, validate_args=True)
     dims = tf.shape(scale_candidates)
     num_candidates = dims[-1]
     original_batch_shape = dims[:-1]

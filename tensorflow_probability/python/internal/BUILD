@@ -618,6 +618,7 @@ multi_substrate_py_library(
     deps = [
         ":samplers",
         # tensorflow dep,
+        "//tensorflow_probability/python/util",
     ],
 )
 

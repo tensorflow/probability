@@ -18,9 +18,9 @@ import numpy as np
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import negative_binomial
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 # In all tests that follow, we use scipy.stats.nbinom, which
@@ -32,7 +32,7 @@ class NegativeBinomialTest(test_util.TestCase):
   def testNegativeBinomialShape(self):
     probs = [.1] * 5
     total_count = [2.0] * 5
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
 
     self.assertEqual([5], self.evaluate(negbinom.batch_shape_tensor()))
@@ -43,7 +43,7 @@ class NegativeBinomialTest(test_util.TestCase):
   def testNegativeBinomialShapeBroadcast(self):
     probs = [[.1, .2, .3]] * 5
     total_count = [[2.]] * 5
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
 
     self.assertAllEqual([5, 3], self.evaluate(negbinom.batch_shape_tensor()))
@@ -53,7 +53,7 @@ class NegativeBinomialTest(test_util.TestCase):
 
   def testLogits(self):
     logits = [[0., 9., -0.5]]
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=3., logits=logits, validate_args=True)
     self.assertEqual([1, 3], negbinom.probs_parameter().shape)
     self.assertEqual([1, 3], negbinom.logits.shape)
@@ -62,17 +62,19 @@ class NegativeBinomialTest(test_util.TestCase):
   def testInvalidP(self):
     invalid_ps = [-.01, 0., -2.,]
     with self.assertRaisesOpError('`probs` has components less than 0.'):
-      negbinom = tfd.NegativeBinomial(5., probs=invalid_ps, validate_args=True)
+      negbinom = negative_binomial.NegativeBinomial(
+          5., probs=invalid_ps, validate_args=True)
       self.evaluate(negbinom.sample(seed=test_util.test_seed()))
 
     invalid_ps = [1.01, 2., 1.001,]
     with self.assertRaisesOpError('`probs` has components greater than 1.'):
-      negbinom = tfd.NegativeBinomial(5., probs=invalid_ps, validate_args=True)
+      negbinom = negative_binomial.NegativeBinomial(
+          5., probs=invalid_ps, validate_args=True)
       self.evaluate(negbinom.sample(seed=test_util.test_seed()))
 
   def testZeroP(self):
     prob = 0.
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=3., probs=prob, validate_args=True)
     self.assertAllClose(prob, self.evaluate(negbinom.probs))
     self.assertAllClose(0., negbinom.prob(3))
@@ -83,14 +85,14 @@ class NegativeBinomialTest(test_util.TestCase):
     invalid_rs = [-3., 0., -2.,]
     with self.assertRaisesOpError(
         '`total_count` has components less than or equal to 0.'):
-      negbinom = tfd.NegativeBinomial(
+      negbinom = negative_binomial.NegativeBinomial(
           total_count=invalid_rs, probs=0.1, validate_args=True)
       self.evaluate(negbinom.sample(seed=test_util.test_seed()))
 
     invalid_rs = [3., 2., 0.]
     with self.assertRaisesOpError(
         '`total_count` has components less than or equal to 0.'):
-      negbinom = tfd.NegativeBinomial(
+      negbinom = negative_binomial.NegativeBinomial(
           total_count=invalid_rs, probs=0.1, validate_args=True)
       self.evaluate(negbinom.sample(seed=test_util.test_seed()))
 
@@ -100,7 +102,7 @@ class NegativeBinomialTest(test_util.TestCase):
     probs_v = .2
     total_count = 5.
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=np.float32)
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
     expected_log_cdf = stats.nbinom.logcdf(x, n=total_count, p=1 - probs_v)
     log_cdf = negbinom.log_cdf(x)
@@ -116,7 +118,7 @@ class NegativeBinomialTest(test_util.TestCase):
     probs = [.9] * batch_size
     total_count = 5.
     with self.assertRaisesOpError('Condition x >= 0'):
-      negbinom = tfd.NegativeBinomial(
+      negbinom = negative_binomial.NegativeBinomial(
           total_count=total_count, probs=probs, validate_args=True)
       self.evaluate(negbinom.log_cdf(-1.))
 
@@ -126,7 +128,7 @@ class NegativeBinomialTest(test_util.TestCase):
     probs_v = .2
     total_count = 5.
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=np.float32)
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
     expected_log_pmf = stats.nbinom.logpmf(x, n=total_count, p=1 - probs_v)
     log_pmf = negbinom.log_prob(x)
@@ -138,7 +140,7 @@ class NegativeBinomialTest(test_util.TestCase):
     self.assertAllClose(np.exp(expected_log_pmf), self.evaluate(pmf))
 
   def testCdfBeyondSupport(self):
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=5., probs=.7, validate_args=False)
     cdf = self.evaluate(negbinom.cdf(-1.))
     self.assertEqual(0, cdf)
@@ -148,7 +150,7 @@ class NegativeBinomialTest(test_util.TestCase):
     probs = np.repeat(0.2, 3).astype(np.float32)
     x = np.array([4., 5., 6.], dtype=np.float32)
     mu = stats.nbinom.mean(total_count, 1 - probs)
-    negbinom_mean_disp = tfd.NegativeBinomial.experimental_from_mean_dispersion(
+    negbinom_mean_disp = negative_binomial.NegativeBinomial.experimental_from_mean_dispersion(
         mu, 1 / total_count, validate_args=True)
     expected_log_pmf = stats.nbinom.logpmf(x, n=total_count, p=1 - probs)
     log_pmf = negbinom_mean_disp.log_prob(x)
@@ -166,7 +168,7 @@ class NegativeBinomialTest(test_util.TestCase):
         stats.nbinom.mean(total_count, p_fail).astype(np.float32))
     dispersion = tf.convert_to_tensor(dispersion)
 
-    dist = tfd.NegativeBinomial.experimental_from_mean_dispersion(
+    dist = negative_binomial.NegativeBinomial.experimental_from_mean_dispersion(
         mean, dispersion, validate_args=True)
     with tf.GradientTape() as tape:
       tape.watch((mean, dispersion))
@@ -179,7 +181,7 @@ class NegativeBinomialTest(test_util.TestCase):
     probs = [.9] * batch_size
     total_count = 5.
     x = tf1.placeholder_with_default([2.5, 3.2, 4.3, 5.1, 6., 7.], shape=[6])
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
 
     with self.assertRaisesOpError('cannot contain fractional components'):
@@ -188,7 +190,7 @@ class NegativeBinomialTest(test_util.TestCase):
     with self.assertRaisesOpError('Condition x >= 0'):
       self.evaluate(negbinom.log_prob([-1.]))
 
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=False)
     log_pmf = negbinom.log_prob(x)
     self.assertEqual([6], log_pmf.shape)
@@ -201,7 +203,7 @@ class NegativeBinomialTest(test_util.TestCase):
     probs_v = np.array([.2, .3, .5])
     total_count = 5.
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=np.float32).T
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
     expected_log_pmf = stats.nbinom.logpmf(x, n=total_count, p=1 - probs_v)
     log_pmf = negbinom.log_prob(x)
@@ -217,7 +219,7 @@ class NegativeBinomialTest(test_util.TestCase):
   def testNegativeBinomialMean(self):
     total_count = 5.
     probs = np.array([.1, .3, .25], dtype=np.float32)
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
     expected_means = stats.nbinom.mean(n=total_count, p=1 - probs)
     self.assertEqual([3], negbinom.mean().shape)
@@ -226,7 +228,7 @@ class NegativeBinomialTest(test_util.TestCase):
   def testNegativeBinomialVariance(self):
     total_count = 5.
     probs = np.array([.1, .3, .25], dtype=np.float32)
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
     expected_vars = stats.nbinom.var(n=total_count, p=1 - probs)
     self.assertEqual([3], negbinom.variance().shape)
@@ -235,7 +237,7 @@ class NegativeBinomialTest(test_util.TestCase):
   def testNegativeBinomialStddev(self):
     total_count = 5.
     probs = np.array([.1, .3, .25], dtype=np.float32)
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
     expected_stds = stats.nbinom.std(n=total_count, p=1 - probs)
     self.assertEqual([3], negbinom.stddev().shape)
@@ -245,7 +247,7 @@ class NegativeBinomialTest(test_util.TestCase):
     probs = [.3, .9]
     total_count = [4., 11.]
     n = int(100e3)
-    negbinom = tfd.NegativeBinomial(
+    negbinom = negative_binomial.NegativeBinomial(
         total_count=total_count, probs=probs, validate_args=True)
 
     samples = negbinom.sample(n, seed=test_util.test_seed())
@@ -275,7 +277,7 @@ class NegativeBinomialTest(test_util.TestCase):
     logits = np.float32([20., 30., 40.])
     total_count = np.float32(1.)
     x = np.float32(0.)
-    nb = tfd.NegativeBinomial(
+    nb = negative_binomial.NegativeBinomial(
         total_count=total_count, logits=logits, validate_args=True)
     log_prob_ = self.evaluate(nb.log_prob(x))
     self.assertAllEqual(
@@ -285,7 +287,7 @@ class NegativeBinomialTest(test_util.TestCase):
     logits = np.float32([-90, -100, -110])
     total_count = np.float32(1.)
     x = np.float32(0.)
-    nb = tfd.NegativeBinomial(
+    nb = negative_binomial.NegativeBinomial(
         total_count=total_count, logits=logits, validate_args=True)
     log_prob_ = self.evaluate(nb.log_prob(x))
     self.assertAllEqual(
@@ -293,7 +295,8 @@ class NegativeBinomialTest(test_util.TestCase):
 
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
-    d = tfd.NegativeBinomial(total_count=1, logits=x, validate_args=True)
+    d = negative_binomial.NegativeBinomial(
+        total_count=1, logits=x, validate_args=True)
     logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
     self.assertAllClose(
         *self.evaluate([-logit(d.prob(0.)), d.logits_parameter()]),
@@ -304,7 +307,8 @@ class NegativeBinomialTest(test_util.TestCase):
 
   def testParamTensorFromProbs(self):
     x = tf.constant([0.1, 0.5, 0.4])
-    d = tfd.NegativeBinomial(total_count=1, probs=x, validate_args=True)
+    d = negative_binomial.NegativeBinomial(
+        total_count=1, probs=x, validate_args=True)
     logit = lambda x: tf.math.log(x) - tf.math.log1p(-x)
     self.assertAllClose(
         *self.evaluate([-logit(d.prob(0.)), d.logits_parameter()]),
@@ -315,17 +319,22 @@ class NegativeBinomialTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def testGradientOfLogProbEvaluates(self):
-    self.evaluate(tfp.math.value_and_gradient(
-        tfd.NegativeBinomial(0.1, 0.).log_prob, [0.1]))
+    self.evaluate(
+        gradient.value_and_gradient(
+            negative_binomial.NegativeBinomial(0.1, 0.).log_prob, [0.1]))
 
   def testRequireIntegerTotalCount(self):
     with self.assertRaisesOpError(
         '`total_count` has fractional components.'):
-      d = tfd.NegativeBinomial(total_count=2.5, probs=0.7, validate_args=True)
+      d = negative_binomial.NegativeBinomial(
+          total_count=2.5, probs=0.7, validate_args=True)
       self.evaluate(d.log_prob(5))
 
-    d2 = tfd.NegativeBinomial(total_count=2.5, probs=0.7, validate_args=True,
-                              require_integer_total_count=False)
+    d2 = negative_binomial.NegativeBinomial(
+        total_count=2.5,
+        probs=0.7,
+        validate_args=True,
+        require_integer_total_count=False)
     self.evaluate(d2.log_prob(5))
 
 
@@ -334,7 +343,8 @@ class NegativeBinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionsProbsMutation(self):
     x = tf.Variable([0.1, 0.7, 0.0])
-    d = tfd.NegativeBinomial(total_count=8., probs=x, validate_args=True)
+    d = negative_binomial.NegativeBinomial(
+        total_count=8., probs=x, validate_args=True)
     self.evaluate(x.initializer)
     self.evaluate(d.sample(seed=test_util.test_seed()))
     with tf.control_dependencies([x.assign([0.1, -0.7, 0.0])]):
@@ -347,21 +357,23 @@ class NegativeBinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionProbsLessThanZero(self):
     x = tf.Variable([-0.1, 0.7, 0.0])
-    d = tfd.NegativeBinomial(total_count=8., probs=x, validate_args=True)
+    d = negative_binomial.NegativeBinomial(
+        total_count=8., probs=x, validate_args=True)
     self.evaluate(x.initializer)
     with self.assertRaisesOpError('`probs` has components less than 0.'):
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionProbsGreaterThanOne(self):
     x = tf.Variable([0.1, 1.07, 0.0])
-    d = tfd.NegativeBinomial(total_count=8., probs=x, validate_args=True)
+    d = negative_binomial.NegativeBinomial(
+        total_count=8., probs=x, validate_args=True)
     self.evaluate(x.initializer)
     with self.assertRaisesOpError('`probs` has components greater than 1.'):
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertionsTotalCountMutation(self):
     x = tf.Variable([5., 3., 1.], dtype=tf.float32)
-    d = tfd.NegativeBinomial(
+    d = negative_binomial.NegativeBinomial(
         total_count=x, probs=0.7, validate_args=True)
     self.evaluate(x.initializer)
     self.evaluate(d.sample(seed=test_util.test_seed()))
@@ -377,14 +389,16 @@ class NegativeBinomialFromVariableTest(test_util.TestCase):
 
   def testAssertionsTotalCount(self):
     x = tf.Variable([-5., 3., -1.])
-    d = tfd.NegativeBinomial(total_count=x, probs=0.7, validate_args=True)
+    d = negative_binomial.NegativeBinomial(
+        total_count=x, probs=0.7, validate_args=True)
     self.evaluate(x.initializer)
     with self.assertRaisesOpError(
         '`total_count` has components less than or equal to 0.'):
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
     x = tf.Variable([5., 3.7, 1.])
-    d = tfd.NegativeBinomial(total_count=x, probs=0.7, validate_args=True)
+    d = negative_binomial.NegativeBinomial(
+        total_count=x, probs=0.7, validate_args=True)
     self.evaluate(x.initializer)
     with self.assertRaisesOpError(
         '`total_count` has fractional components.'):

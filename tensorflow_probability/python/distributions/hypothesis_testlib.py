@@ -25,9 +25,9 @@ import numpy as np
 import six
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python import util as tfp_util
+from tensorflow_probability.python.bijectors import ascending
 from tensorflow_probability.python.bijectors import hypothesis_testlib as bijector_hps
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.experimental import distributions as tfed
@@ -275,7 +275,7 @@ CONSTRAINTS = {
         tf.sigmoid,
     'cutpoints':
         # Permit values that aren't too large
-        lambda x: tfb.Ascending().forward(10 * tf.math.tanh(x)),
+        lambda x: ascending.Ascending().forward(10 * tf.math.tanh(x)),
     # Capping log_rate because of weird semantics of Poisson with very
     # large rates (see b/178842153).
     'log_rate':
@@ -349,12 +349,17 @@ CONSTRAINTS = {
     'Triangular':
         fix_triangular,
     'TruncatedCauchy':
-        lambda d: dict(d, high=tfp_hps.ensure_high_gt_low(  # pylint:disable=g-long-lambda
-            d['low'], d['high'])),
-    'TruncatedNormal': fix_truncated_normal,
+        lambda d: dict(  # pylint:disable=g-long-lambda
+            d,
+            high=tfp_hps.ensure_high_gt_low(
+                d['low'], d['high'])),
+    'TruncatedNormal':
+        fix_truncated_normal,
     'Uniform':
-        lambda d: dict(d, high=tfp_hps.ensure_high_gt_low(  # pylint:disable=g-long-lambda
-            d['low'], d['high'])),
+        lambda d: dict(  # pylint:disable=g-long-lambda
+            d,
+            high=tfp_hps.ensure_high_gt_low(
+                d['low'], d['high'])),
     'SphericalUniform':
         fix_spherical_uniform,
     'Wishart':

@@ -89,6 +89,8 @@ multi_substrate_py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:ascending",
+        "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -169,6 +171,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/math:bessel",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -407,6 +410,7 @@ py_library(
     testonly = True,
     srcs = ["hypothesis_testlib.py"],
     deps = [
+        ":psd_kernels",
         # hypothesis dep,
         # numpy dep,
         "//tensorflow_probability/python/experimental/distributions:marginal_fns",
@@ -427,7 +431,6 @@ py_test(
         # numpy dep,
         # six dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensor_util",

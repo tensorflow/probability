@@ -19,7 +19,11 @@ import numpy as np
 from scipy import special as sp_special
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python import stats as tfp_stats
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import power_spherical
+from tensorflow_probability.python.distributions import spherical_uniform
+from tensorflow_probability.python.distributions import von_mises_fisher
 
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import tensorshape_util
@@ -29,9 +33,9 @@ from tensorflow_probability.python.internal import test_util
 class _PowerSphericalTest(object):
 
   def testReproducibleGraph(self):
-    pspherical = tfp.distributions.PowerSpherical(
-        mean_direction=tf.math.l2_normalize(np.array(
-            [1., 2.], dtype=self.dtype)),
+    pspherical = power_spherical.PowerSpherical(
+        mean_direction=tf.math.l2_normalize(
+            np.array([1., 2.], dtype=self.dtype)),
         concentration=self.dtype(1.2))
     seed = test_util.test_seed()
     s1 = self.evaluate(pspherical.sample(50, seed=seed))
@@ -41,7 +45,7 @@ class _PowerSphericalTest(object):
     self.assertAllEqual(s1, s2)
 
   def VerifySampleMean(self, mean_dirs, concentration, batch_shape):
-    pspherical = tfp.distributions.PowerSpherical(
+    pspherical = power_spherical.PowerSpherical(
         mean_direction=mean_dirs,
         concentration=concentration,
         validate_args=True,
@@ -216,27 +220,33 @@ class _PowerSphericalTest(object):
   def testSampleAndPdfConsistency2d(self):
     mean_dir = tf.math.l2_normalize([[1., 2], [-2, -3]], axis=-1)
     concentration = [[0], [1e-5], [0.1], [1], [4]]
-    pspherical = tfp.distributions.PowerSpherical(
-        mean_direction=mean_dir, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
+    pspherical = power_spherical.PowerSpherical(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(pspherical)
     self.VerifyPdfWithNumpy(pspherical)
 
   def testSampleAndPdfConsistency3d(self):
     mean_dir = tf.math.l2_normalize([[1., 2, 3], [-2, -3, -1]], axis=-1)
     concentration = [[0], [1e-5], [0.1], [1], [4]]
-    pspherical = tfp.distributions.PowerSpherical(
-        mean_direction=mean_dir, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
+    pspherical = power_spherical.PowerSpherical(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(pspherical)
     self.VerifyPdfWithNumpy(pspherical, atol=.002)
 
   def testSampleAndPdfConsistency4d(self):
     mean_dir = tf.math.l2_normalize([[1., 2, 3, 4], [-2, -3, -1, 0]], axis=-1)
     concentration = [[0], [1e-4], [0.1], [1], [4]]
-    pspherical = tfp.distributions.PowerSpherical(
-        mean_direction=mean_dir, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
+    pspherical = power_spherical.PowerSpherical(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(pspherical)
     self.VerifyPdfWithNumpy(pspherical)
 
@@ -244,25 +254,29 @@ class _PowerSphericalTest(object):
     mean_dir = tf.math.l2_normalize(
         [[1., 2, 3, 4, 5], [-2, -3, -1, 0, 1]], axis=-1)
     concentration = [[0], [5e-2], [0.1], [1], [4]]
-    pspherical = tfp.distributions.PowerSpherical(
-        mean_direction=mean_dir, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
+    pspherical = power_spherical.PowerSpherical(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(pspherical)
     self.VerifyPdfWithNumpy(pspherical, atol=2e-4)
 
   def testSampleAndPdfForMeanDirNorthPole(self):
     mean_dir = np.array([1., 0., 0., 0., 0.], dtype=self.dtype)
     concentration = [[0], [5e-2], [0.1], [1], [4]]
-    pspherical = tfp.distributions.PowerSpherical(
-        mean_direction=mean_dir, concentration=concentration,
-        validate_args=True, allow_nan_stats=False)
+    pspherical = power_spherical.PowerSpherical(
+        mean_direction=mean_dir,
+        concentration=concentration,
+        validate_args=True,
+        allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(pspherical)
     self.VerifyPdfWithNumpy(pspherical, atol=2e-4)
     self.VerifySampleMean(mean_dir, concentration, [5, 1])
 
     # Verify the covariance.
     samples = pspherical.sample(int(7e4), seed=test_util.test_seed())
-    sample_cov = tfp.stats.covariance(samples, sample_axis=0)
+    sample_cov = tfp_stats.covariance(samples, sample_axis=0)
     true_cov, sample_cov = self.evaluate([
         pspherical.covariance(), sample_cov])
     self.assertAllClose(true_cov, sample_cov, rtol=0.15, atol=1.5e-3)
@@ -285,13 +299,13 @@ class _PowerSphericalTest(object):
             dtype=self.dtype,
             seed=seed_stream()))
 
-    ps = tfp.distributions.PowerSpherical(
+    ps = power_spherical.PowerSpherical(
         mean_direction=mean_direction,
         concentration=concentration,
         validate_args=True,
         allow_nan_stats=False)
     samples = ps.sample(num_samples, seed=test_util.test_seed())
-    sample_cov = tfp.stats.covariance(samples, sample_axis=0)
+    sample_cov = tfp_stats.covariance(samples, sample_axis=0)
     true_cov, sample_cov = self.evaluate([
         ps.covariance(), sample_cov])
     self.assertAllClose(true_cov, sample_cov, rtol=0.15, atol=1.5e-3)
@@ -321,7 +335,7 @@ class _PowerSphericalTest(object):
             maxval=self.dtype(100.),
             dtype=self.dtype,
             seed=seed_stream()))
-    ps = tfp.distributions.PowerSpherical(
+    ps = power_spherical.PowerSpherical(
         mean_direction=mean_direction,
         concentration=concentration,
         validate_args=True,
@@ -346,7 +360,7 @@ class _PowerSphericalTest(object):
 
   def testAssertsValidImmutableParams(self):
     with self.assertRaisesOpError('`concentration` must be non-negative'):
-      pspherical = tfp.distributions.PowerSpherical(
+      pspherical = power_spherical.PowerSpherical(
           mean_direction=tf.math.l2_normalize([1., 2, 3], axis=-1),
           concentration=-1.,
           validate_args=True,
@@ -355,7 +369,7 @@ class _PowerSphericalTest(object):
 
     with self.assertRaisesOpError(
         '`mean_direction` must be a vector of at least size 2'):
-      pspherical = tfp.distributions.PowerSpherical(
+      pspherical = power_spherical.PowerSpherical(
           mean_direction=[1.],
           concentration=0.,
           validate_args=True,
@@ -363,7 +377,7 @@ class _PowerSphericalTest(object):
       self.evaluate(pspherical.mean())
 
     with self.assertRaisesOpError('`mean_direction` must be unit-length'):
-      pspherical = tfp.distributions.PowerSpherical(
+      pspherical = power_spherical.PowerSpherical(
           mean_direction=tf.convert_to_tensor([1., 2, 3]),
           concentration=1.,
           validate_args=True,
@@ -373,7 +387,7 @@ class _PowerSphericalTest(object):
   def testAssertsValidMutableParams(self):
     mean_direction = tf.Variable(tf.math.l2_normalize([1., 2, 3], axis=-1))
     concentration = tf.Variable(1.)
-    pspherical = tfp.distributions.PowerSpherical(
+    pspherical = power_spherical.PowerSpherical(
         mean_direction=mean_direction,
         concentration=concentration,
         validate_args=True,
@@ -392,7 +406,7 @@ class _PowerSphericalTest(object):
     mean_direction = tf.Variable([1.])
     with self.assertRaisesOpError(
         '`mean_direction` must be a vector of at least size 2'):
-      pspherical = tfp.distributions.PowerSpherical(
+      pspherical = power_spherical.PowerSpherical(
           mean_direction=mean_direction,
           concentration=concentration,
           validate_args=True,
@@ -403,7 +417,7 @@ class _PowerSphericalTest(object):
   def testAssertValidSample(self):
     mean_dir = tf.math.l2_normalize([[1., 2, 3], [-2, -3, -1]], axis=-1)
     concentration = [[0.], [2.]]
-    pspherical = tfp.distributions.PowerSpherical(
+    pspherical = power_spherical.PowerSpherical(
         mean_direction=mean_dir,
         concentration=concentration,
         validate_args=True,
@@ -431,7 +445,7 @@ class _PowerSphericalTest(object):
     mean_dir = np.array([[1., 2., 3.], [-2., -3., -1.]]).astype(np.float32)
     mean_dir /= np.linalg.norm(mean_dir, axis=-1)[:, np.newaxis]
     concentration = [[0], [0.1], [2], [40], [1000]]
-    dist = tfp.distributions.PowerSpherical(
+    dist = power_spherical.PowerSpherical(
         mean_direction=mean_dir,
         concentration=concentration,
         validate_args=True)
@@ -459,10 +473,9 @@ class _PowerSphericalTest(object):
     # Check that the log_probs agree and the KL divergence is zero.
     concentration = self.dtype(0.)
 
-    ps = tfp.distributions.PowerSpherical(
-        mean_direction=mean_direction,
-        concentration=concentration)
-    su = tfp.distributions.SphericalUniform(dimension=dim, dtype=self.dtype)
+    ps = power_spherical.PowerSpherical(
+        mean_direction=mean_direction, concentration=concentration)
+    su = spherical_uniform.SphericalUniform(dimension=dim, dtype=self.dtype)
 
     x = ps.sample(int(5e4), seed=test_util.test_seed())
 
@@ -470,7 +483,7 @@ class _PowerSphericalTest(object):
     su_lp = su.log_prob(x)
     ps_lp_, su_lp_ = self.evaluate([ps_lp, su_lp])
     self.assertAllClose(ps_lp_, su_lp_, rtol=1e-6)
-    true_kl = tfp.distributions.kl_divergence(ps, su)
+    true_kl = kullback_leibler.kl_divergence(ps, su)
     true_kl_ = self.evaluate([true_kl])
     self.assertAllClose(true_kl_, np.zeros_like(true_kl_), atol=1e-4)
 
@@ -491,15 +504,14 @@ class _PowerSphericalTest(object):
             dtype=self.dtype,
             seed=seed_stream()))
 
-    ps = tfp.distributions.PowerSpherical(
-        mean_direction=mean_direction,
-        concentration=concentration)
-    su = tfp.distributions.SphericalUniform(dimension=dim, dtype=self.dtype)
+    ps = power_spherical.PowerSpherical(
+        mean_direction=mean_direction, concentration=concentration)
+    su = spherical_uniform.SphericalUniform(dimension=dim, dtype=self.dtype)
 
     x = ps.sample(int(5e4), seed=test_util.test_seed())
 
     kl_samples = ps.log_prob(x) - su.log_prob(x)
-    true_kl = tfp.distributions.kl_divergence(ps, su)
+    true_kl = kullback_leibler.kl_divergence(ps, su)
     true_kl_, kl_samples_ = self.evaluate([true_kl, kl_samples])
     self.assertAllMeansClose(kl_samples_, true_kl_, axis=0, atol=0.0, rtol=7e-2)
 
@@ -532,13 +544,11 @@ class _PowerSphericalTest(object):
     # Check that the KL divergence is zero.
     concentration = self.dtype(0.)
 
-    ps = tfp.distributions.PowerSpherical(
-        mean_direction=mean_direction,
-        concentration=concentration)
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_direction,
-        concentration=concentration)
-    true_kl = tfp.distributions.kl_divergence(ps, vmf)
+    ps = power_spherical.PowerSpherical(
+        mean_direction=mean_direction, concentration=concentration)
+    vmf = von_mises_fisher.VonMisesFisher(
+        mean_direction=mean_direction, concentration=concentration)
+    true_kl = kullback_leibler.kl_divergence(ps, vmf)
     true_kl_ = self.evaluate(true_kl)
     self.assertAllClose(true_kl_, np.zeros_like(true_kl_), atol=1e-4)
 
@@ -562,14 +572,12 @@ class _PowerSphericalTest(object):
 
     concentration = self.dtype(0.)
 
-    ps = tfp.distributions.PowerSpherical(
-        mean_direction=mean_direction1,
-        concentration=concentration)
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_direction2,
-        concentration=concentration)
+    ps = power_spherical.PowerSpherical(
+        mean_direction=mean_direction1, concentration=concentration)
+    vmf = von_mises_fisher.VonMisesFisher(
+        mean_direction=mean_direction2, concentration=concentration)
     with self.assertRaisesRegexp(ValueError, 'Can not compute the KL'):
-      tfp.distributions.kl_divergence(ps, vmf)
+      kullback_leibler.kl_divergence(ps, vmf)
 
   def VerifyPowerSphericalVonMisesFisherKL(self, dim):
     seed_stream = test_util.test_seed_stream()
@@ -603,16 +611,14 @@ class _PowerSphericalTest(object):
             dtype=self.dtype,
             seed=seed_stream()))
 
-    ps = tfp.distributions.PowerSpherical(
-        mean_direction=mean_direction1,
-        concentration=concentration1)
-    vmf = tfp.distributions.VonMisesFisher(
-        mean_direction=mean_direction2,
-        concentration=concentration2)
+    ps = power_spherical.PowerSpherical(
+        mean_direction=mean_direction1, concentration=concentration1)
+    vmf = von_mises_fisher.VonMisesFisher(
+        mean_direction=mean_direction2, concentration=concentration2)
     x = ps.sample(int(6e4), seed=test_util.test_seed())
 
     kl_samples = ps.log_prob(x) - vmf.log_prob(x)
-    true_kl = tfp.distributions.kl_divergence(ps, vmf)
+    true_kl = kullback_leibler.kl_divergence(ps, vmf)
     true_kl_, kl_samples_ = self.evaluate([true_kl, kl_samples])
     self.assertAllMeansClose(kl_samples_, true_kl_, axis=0, atol=0.0, rtol=7e-2)
 

@@ -49,6 +49,8 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:distribution",
         "//tensorflow_probability/python/experimental/mcmc:weighted_resampling",
         "//tensorflow_probability/python/internal:nest_util",
         "//tensorflow_probability/python/internal:parameter_properties",

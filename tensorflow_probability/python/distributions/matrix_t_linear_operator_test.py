@@ -18,8 +18,11 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import transform_diagonal
+from tensorflow_probability.python.distributions import matrix_t_linear_operator as mtlo
+from tensorflow_probability.python.distributions import multivariate_student_t as mst
 from tensorflow_probability.python.internal import test_util
 
 
@@ -32,8 +35,9 @@ class _MatrixTTest(object):
 
   def _random_tril_matrix(self, shape, seed):
     mat = tf.random.normal(shape=shape, seed=seed, dtype=self.dtype)
-    chol = tfb.TransformDiagonal(
-        tfb.Shift(shift=self.dtype(1.))(tfb.Softplus()))(mat)
+    chol = transform_diagonal.TransformDiagonal(
+        shift.Shift(shift=self.dtype(1.))(softplus.Softplus()))(
+            mat)
     return tf.linalg.band_part(chol, -1, 0)
 
   def _random_df_loc_and_scale(
@@ -62,7 +66,7 @@ class _MatrixTTest(object):
     seed_stream = test_util.test_seed_stream()
     df, loc, scale_row, scale_col = self._random_df_loc_and_scale(
         [], [2, 3], seed_stream)
-    matrix_t = tfd.MatrixTLinearOperator(
+    matrix_t = mtlo.MatrixTLinearOperator(
         df, loc, scale_row, scale_col, validate_args=True)
     x = tf.random.normal(shape=[2, 3], seed=seed_stream(), dtype=self.dtype)
 
@@ -70,9 +74,10 @@ class _MatrixTTest(object):
     pdf = matrix_t.prob(x)
 
     # Check that this matches using a Multivariate-T.
-    mvt = tfd.MultivariateStudentTLinearOperator(
-        df, loc=_vec(loc), scale=tf.linalg.LinearOperatorKronecker(
-            [scale_row, scale_col]))
+    mvt = mst.MultivariateStudentTLinearOperator(
+        df,
+        loc=_vec(loc),
+        scale=tf.linalg.LinearOperatorKronecker([scale_row, scale_col]))
 
     log_pdf_, pdf_, mvt_log_pdf_, mvt_pdf_ = self.evaluate([
         log_pdf, pdf, mvt.log_prob(_vec(x)), mvt.prob(_vec(x))])
@@ -86,7 +91,7 @@ class _MatrixTTest(object):
     seed_stream = test_util.test_seed_stream()
     df, loc, scale_row, scale_col = self._random_df_loc_and_scale(
         batch_shape=[7], matrix_shape=[3, 5], seed_stream=seed_stream)
-    matrix_t = tfd.MatrixTLinearOperator(
+    matrix_t = mtlo.MatrixTLinearOperator(
         df, loc, scale_row, scale_col, validate_args=True)
     x = tf.random.normal(shape=[3, 5], seed=seed_stream(), dtype=self.dtype)
 
@@ -94,9 +99,10 @@ class _MatrixTTest(object):
     pdf = matrix_t.prob(x)
 
     # Check that this matches using a Multivariate-T.
-    mvt = tfd.MultivariateStudentTLinearOperator(
-        df, loc=_vec(loc), scale=tf.linalg.LinearOperatorKronecker(
-            [scale_row, scale_col]))
+    mvt = mst.MultivariateStudentTLinearOperator(
+        df,
+        loc=_vec(loc),
+        scale=tf.linalg.LinearOperatorKronecker([scale_row, scale_col]))
 
     log_pdf_, pdf_, mvt_log_pdf_, mvt_pdf_ = self.evaluate([
         log_pdf, pdf, mvt.log_prob(_vec(x)), mvt.prob(_vec(x))])
@@ -118,7 +124,7 @@ class _MatrixTTest(object):
         self._random_tril_matrix([9, 1, 1, 1, 3, 3], seed_stream()),
         is_non_singular=True)
 
-    matrix_t = tfd.MatrixTLinearOperator(
+    matrix_t = mtlo.MatrixTLinearOperator(
         df, loc, scale_row, scale_col, validate_args=True)
 
     self.assertAllEqual((2, 3), matrix_t.event_shape)
@@ -132,7 +138,7 @@ class _MatrixTTest(object):
   def testMeanAndVariance(self):
     df, loc, scale_row, scale_col = self._random_df_loc_and_scale(
         batch_shape=[3, 4], matrix_shape=[2, 5])
-    matrix_t = tfd.MatrixTLinearOperator(df, loc, scale_row, scale_col)
+    matrix_t = mtlo.MatrixTLinearOperator(df, loc, scale_row, scale_col)
 
     cov_row = scale_row.matmul(scale_row.adjoint())
     cov_col = scale_col.matmul(scale_col.adjoint())
@@ -154,7 +160,7 @@ class _MatrixTTest(object):
     seed_stream = test_util.test_seed_stream()
     df, loc, scale_row, scale_col = self._random_df_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
-    matrix_t = tfd.MatrixTLinearOperator(df, loc, scale_row, scale_col)
+    matrix_t = mtlo.MatrixTLinearOperator(df, loc, scale_row, scale_col)
     samples = matrix_t.sample(int(1e6), seed=seed_stream())
     mean_, samples_ = self.evaluate([matrix_t.mean(), samples])
     self.assertAllClose(np.mean(samples_, axis=0), mean_, rtol=2e-2)
@@ -163,7 +169,7 @@ class _MatrixTTest(object):
     seed_stream = test_util.test_seed_stream()
     df, loc, scale_row, scale_col = self._random_df_loc_and_scale(
         batch_shape=[5, 2], matrix_shape=[2, 3], seed_stream=seed_stream)
-    matrix_t = tfd.MatrixTLinearOperator(df, loc, scale_row, scale_col)
+    matrix_t = mtlo.MatrixTLinearOperator(df, loc, scale_row, scale_col)
     samples = matrix_t.sample(int(2e6), seed=seed_stream())
     variance_, samples_ = self.evaluate([matrix_t.variance(), samples])
     self.assertAllClose(np.var(samples_, axis=0), variance_, rtol=4e-2)
@@ -176,7 +182,7 @@ class _MatrixTTest(object):
         tf.eye(1), is_non_singular=True)
     scale_column = tf.linalg.LinearOperatorLowerTriangular(
         tf.eye(2), is_non_singular=True)
-    d = tfd.MatrixTLinearOperator(
+    d = mtlo.MatrixTLinearOperator(
         df, loc, scale_row, scale_column, validate_args=True)
     self.evaluate(loc.initializer)
     with tf.GradientTape() as tape:
@@ -191,7 +197,7 @@ class _MatrixTTest(object):
         tf.eye(1), is_non_singular=True)
     scale_column = tf.linalg.LinearOperatorLowerTriangular(
         tf.eye(2), is_non_singular=True)
-    d = tfd.MatrixTLinearOperator(
+    d = mtlo.MatrixTLinearOperator(
         df, loc, scale_row, scale_column, validate_args=True)
     self.evaluate(df.initializer)
     with self.assertRaises(Exception):

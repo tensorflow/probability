@@ -17,12 +17,11 @@ import itertools
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import ascending as tfb
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import stopping_ratio_logistic as srp
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
-tfb = tfp.bijectors
 
 
 @test_util.test_all_tf_execution_regimes
@@ -56,7 +55,7 @@ class StoppingRatioLogisticTest(test_util.TestCase):
       cutpoints = self._random_cutpoints(batch_shape + [2])
       loc = self._random_location(batch_shape)
 
-    dist = tfd.StoppingRatioLogistic(cutpoints=cutpoints, loc=loc)
+    dist = srp.StoppingRatioLogistic(cutpoints=cutpoints, loc=loc)
 
     self.assertAllEqual(dist.batch_shape, batch_shape)
     self.assertAllEqual(
@@ -92,7 +91,7 @@ class StoppingRatioLogisticTest(test_util.TestCase):
 
   def testProbs(self):
     expected_probs = [0.11920291, 0.44039854, 0.38790172, 0.05249681]
-    dist = tfd.StoppingRatioLogistic(cutpoints=[-2., 0., 2.], loc=0.)
+    dist = srp.StoppingRatioLogistic(cutpoints=[-2., 0., 2.], loc=0.)
 
     categorical_probs = self.evaluate(dist.categorical_probs())
     self.assertAllClose(expected_probs, categorical_probs, atol=1e-4)
@@ -101,12 +100,12 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     self.assertAllClose(expected_probs, probs, atol=1e-4)
 
   def testMode(self):
-    dist = tfd.StoppingRatioLogistic(cutpoints=[-10., 10.], loc=[-20., 0., 20.])
+    dist = srp.StoppingRatioLogistic(cutpoints=[-10., 10.], loc=[-20., 0., 20.])
     mode = self.evaluate(dist.mode())
     self.assertAllEqual([0, 1, 2], mode)
 
   def testSample(self):
-    dist = tfd.StoppingRatioLogistic(cutpoints=[-1., 0., 1.], loc=0.)
+    dist = srp.StoppingRatioLogistic(cutpoints=[-1., 0., 1.], loc=0.)
     samples = self.evaluate(dist.sample(int(1e5), seed=test_util.test_seed()))
     expected_probs = [0.2689414, 0.3655293, 0.26722333, 0.09830596]
     for k, p in enumerate(expected_probs):
@@ -117,19 +116,19 @@ class StoppingRatioLogisticTest(test_util.TestCase):
     b_cutpoints = self._random_cutpoints([4])
     loc = self._random_location([])
 
-    a = tfd.StoppingRatioLogistic(cutpoints=a_cutpoints, loc=loc)
-    b = tfd.StoppingRatioLogistic(cutpoints=b_cutpoints, loc=loc)
+    a = srp.StoppingRatioLogistic(cutpoints=a_cutpoints, loc=loc)
+    b = srp.StoppingRatioLogistic(cutpoints=b_cutpoints, loc=loc)
 
     samples = a.sample(int(1e5), seed=test_util.test_seed())
     kl_samples = self.evaluate(a.log_prob(samples) - b.log_prob(samples))
-    kl = self.evaluate(tfd.kl_divergence(a, b))
+    kl = self.evaluate(kullback_leibler.kl_divergence(a, b))
 
     self.assertAllMeansClose(kl_samples, kl, axis=0, atol=2e-2)
 
   def testUnorderedCutpointsFails(self):
     with self.assertRaisesRegexp(
         ValueError, 'Argument `cutpoints` must be non-decreasing.'):
-      dist = tfd.StoppingRatioLogistic(
+      dist = srp.StoppingRatioLogistic(
           cutpoints=[1., 0.9], loc=0.0, validate_args=True)
       self.evaluate(dist.mode())
 

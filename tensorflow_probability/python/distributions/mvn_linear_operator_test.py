@@ -19,8 +19,10 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import transform_diagonal
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -34,7 +36,7 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
 
   def _random_tril_matrix(self, shape):
     mat = self.rng.rand(*shape)
-    chol = tfb.TransformDiagonal(tfb.Softplus())(mat)
+    chol = transform_diagonal.TransformDiagonal(softplus.Softplus())(mat)
     return tf.linalg.band_part(chol, -1, 0)
 
   def _random_loc_and_scale(self, batch_shape, event_shape):
@@ -50,7 +52,7 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
   def testNamePropertyIsSetByInitArg(self):
     loc = [1., 2.]
     scale = tf.linalg.LinearOperatorIdentity(2)
-    mvn = tfd.MultivariateNormalLinearOperator(
+    mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc, scale, name='Billy', validate_args=True)
     self.assertStartsWith(mvn.name, 'Billy')
 
@@ -58,7 +60,8 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
     loc = self.rng.rand(2)
     scale = tf.linalg.LinearOperatorLowerTriangular(
         self._random_tril_matrix([2, 2]), is_non_singular=True)
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
+        loc, scale, validate_args=True)
     x = self.rng.rand(2)
 
     log_pdf = mvn.log_prob(x)
@@ -78,14 +81,16 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
   def testRaisesIfScaleNotProvided(self):
     loc = self.rng.rand(2)
     with self.assertRaises(ValueError):
-      tfd.MultivariateNormalLinearOperator(loc, scale=None, validate_args=True)
+      mvn_linear_operator.MultivariateNormalLinearOperator(
+          loc, scale=None, validate_args=True)
 
   def testShapes(self):
     loc = self.rng.rand(3, 5, 2)
     scale = tf.linalg.LinearOperatorLowerTriangular(
         self._random_tril_matrix([3, 5, 2, 2]), is_non_singular=True)
 
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
+        loc, scale, validate_args=True)
 
     # Shapes known at graph construction time.
     self.assertEqual((2,), tuple(tensorshape_util.as_list(mvn.event_shape)))
@@ -98,7 +103,8 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
   def testMeanAndCovariance(self):
     loc, scale = self._random_loc_and_scale(
         batch_shape=[3, 4], event_shape=[5])
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
+        loc, scale, validate_args=True)
 
     self.assertAllEqual(self.evaluate(mvn.mean()), loc)
     self.assertAllClose(
@@ -116,7 +122,8 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
         self._random_tril_matrix(scale_shape),
         is_non_singular=True)
 
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
+        loc, scale, validate_args=True)
 
     self.assertAllEqual(self.evaluate(mvn.mean()), loc)
     cov = mvn.covariance()
@@ -136,7 +143,8 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
     scale = tf.linalg.LinearOperatorLowerTriangular(
         self._random_tril_matrix(scale_shape), is_non_singular=True)
 
-    mvn = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    mvn = mvn_linear_operator.MultivariateNormalLinearOperator(
+        loc, scale, validate_args=True)
 
     self.assertAllEqual(
         self.evaluate(mvn.mean()), np.zeros((2, 4), dtype=np.float32))
@@ -154,7 +162,8 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
     loc = tf.Variable([1., 1.])
     scale = tf.linalg.LinearOperatorLowerTriangular(
         tf.eye(2), is_non_singular=True)
-    d = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    d = mvn_linear_operator.MultivariateNormalLinearOperator(
+        loc, scale, validate_args=True)
     self.evaluate(loc.initializer)
     with tf.GradientTape() as tape:
       lp = d.log_prob([0., 0.])
@@ -172,7 +181,8 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
     scale = tf.linalg.LinearOperatorLowerTriangular(
         scale_tensor,
         is_non_singular=True)
-    d = tfd.MultivariateNormalLinearOperator(loc, scale, validate_args=True)
+    d = mvn_linear_operator.MultivariateNormalLinearOperator(
+        loc, scale, validate_args=True)
     self.evaluate(scale_tensor.initializer)
     with self.assertRaises(Exception):
       with tf.control_dependencies([scale_tensor.assign([[1., 0.], [1., 0.]])]):
@@ -183,12 +193,12 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
     event_shape = [3]
     loc_a, scale_a = self._random_loc_and_scale(batch_shape, event_shape)
     loc_b, scale_b = self._random_loc_and_scale(batch_shape, event_shape)
-    mvn_a = tfd.MultivariateNormalLinearOperator(
+    mvn_a = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=loc_a, scale=scale_a, validate_args=True)
-    mvn_b = tfd.MultivariateNormalLinearOperator(
+    mvn_b = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=loc_b, scale=scale_b, validate_args=True)
 
-    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    kl = kullback_leibler.kl_divergence(mvn_a, mvn_b)
     self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)
@@ -209,12 +219,12 @@ class MultivariateNormalLinearOperatorTest(test_util.TestCase):
     loc_a, scale_a = self._random_loc_and_scale(batch_shape, event_shape)
     # No batch shape.
     loc_b, scale_b = self._random_loc_and_scale([], event_shape)
-    mvn_a = tfd.MultivariateNormalLinearOperator(
+    mvn_a = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=loc_a, scale=scale_a, validate_args=True)
-    mvn_b = tfd.MultivariateNormalLinearOperator(
+    mvn_b = mvn_linear_operator.MultivariateNormalLinearOperator(
         loc=loc_b, scale=scale_b, validate_args=True)
 
-    kl = tfd.kl_divergence(mvn_a, mvn_b)
+    kl = kullback_leibler.kl_divergence(mvn_a, mvn_b)
     self.assertEqual(batch_shape, kl.shape)
 
     kl_v = self.evaluate(kl)

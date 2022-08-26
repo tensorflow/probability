@@ -21,9 +21,14 @@ import numpy as np
 import six
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import gaussian_process
+from tensorflow_probability.python.distributions import gaussian_process_regression_model as gprm
+from tensorflow_probability.python.distributions import student_t_process
+from tensorflow_probability.python.distributions import student_t_process_regression_model as stprm
+from tensorflow_probability.python.distributions import variational_gaussian_process
 from tensorflow_probability.python.experimental.distributions import marginal_fns
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -185,7 +190,7 @@ def gaussian_processes(draw,
       event_dim=event_dim,
       enable_vars=enable_vars))
 
-  gp = tfd.GaussianProcess(
+  gp = gaussian_process.GaussianProcess(
       kernel=k,
       index_points=index_points,
       cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
@@ -251,7 +256,7 @@ def gaussian_process_regression_models(draw,
       enable_vars=enable_vars))
   hp.note('Params:\n{}'.format(repr(params)))
 
-  gp = tfd.GaussianProcessRegressionModel(
+  gp = gprm.GaussianProcessRegressionModel(
       kernel=k,
       index_points=index_points,
       observation_index_points=observation_index_points,
@@ -325,7 +330,7 @@ def variational_gaussian_processes(draw,
       enable_vars=enable_vars))
   hp.note('Params:\n{}'.format(repr(params)))
 
-  vgp = tfd.VariationalGaussianProcess(
+  vgp = variational_gaussian_process.VariationalGaussianProcess(
       kernel=k,
       index_points=index_points,
       inducing_index_points=inducing_index_points,
@@ -333,8 +338,7 @@ def variational_gaussian_processes(draw,
           variational_inducing_observations_loc),
       variational_inducing_observations_scale=(
           variational_inducing_observations_scale),
-      observation_noise_variance=params[
-          'observation_noise_variance'])
+      observation_noise_variance=params['observation_noise_variance'])
   return vgp
 
 
@@ -369,7 +373,7 @@ def student_t_processes(draw,
       compatible_batch_shape,
       event_dim=event_dim,
       enable_vars=enable_vars))
-  stp = tfd.StudentTProcess(
+  stp = student_t_process.StudentTProcess(
       kernel=k,
       index_points=index_points,
       cholesky_fn=lambda x: marginal_fns.retrying_cholesky(x)[0],
@@ -436,7 +440,7 @@ def student_t_process_regression_models(draw,
       enable_vars=enable_vars))
   hp.note('Params:\n{}'.format(repr(params)))
 
-  stp = tfd.StudentTProcessRegressionModel(
+  stp = stprm.StudentTProcessRegressionModel(
       # Ensure that the `df` parameter is not a `Variable` since we pass
       # in a `DeferredTensor` of the `df` parameter.
       df=tf.convert_to_tensor(params['df']),
@@ -518,7 +522,8 @@ class StochasticProcessParamsAreVarsTest(test_util.TestCase):
 
     with tf.GradientTape() as tape:
       sample = process.sample()
-    if process.reparameterization_type == tfd.FULLY_REPARAMETERIZED:
+    if (process.reparameterization_type ==
+        reparameterization.FULLY_REPARAMETERIZED):
       grads = tape.gradient(sample, process.variables)
       for grad, var in zip(grads, process.variables):
         self.assertIsNotNone(

@@ -17,7 +17,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import ascending
 from tensorflow_probability.python.distributions import categorical
 from tensorflow_probability.python.distributions import distribution
@@ -30,6 +29,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 # TODO(b/149334734): Consider rewriting this underlying class via using
 # QuantizedDistribution.
@@ -233,7 +233,7 @@ class OrderedLogistic(distribution.AutoCompositeTensorDistribution):
     """Log probabilities for the `K+1` ordered categories."""
     log_survival = tf.math.log_sigmoid(
         self.loc[..., tf.newaxis] - self._augmented_cutpoints())
-    return tfp_math.log_sub_exp(
+    return generic.log_sub_exp(
         log_survival[..., :-1], log_survival[..., 1:])
 
   def categorical_probs(self):

@@ -26,7 +26,7 @@ from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.distributions import normal
-from tensorflow_probability.python.experimental import parallel_filter
+from tensorflow_probability.python.experimental.parallel_filter import parallel_kalman_filter_lib
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
@@ -714,7 +714,7 @@ class LinearGaussianStateSpaceModel(
 
   def _joint_sample_n(self, n, seed=None):
     if self.experimental_parallelize:
-      x, y = parallel_filter.sample_walk(
+      x, y = parallel_kalman_filter_lib.sample_walk(
           seed=seed,
           **self._build_model_spec_kwargs_for_parallel_fns(sample_shape=[n]))
       return (distribution_util.move_dimension(x, 0, -2),
@@ -903,10 +903,10 @@ class LinearGaussianStateSpaceModel(
   def _forward_filter(self, x, mask=None, final_step_only=False):
     mask = self._get_mask(mask)
     if self.experimental_parallelize:
-      filter_results = parallel_filter.kalman_filter(
+      filter_results = parallel_kalman_filter_lib.kalman_filter(
           y=distribution_util.move_dimension(x, -2, 0),
-          mask=(None if mask is None
-                else distribution_util.move_dimension(mask, -1, 0)),
+          mask=(None if mask is None else distribution_util.move_dimension(
+              mask, -1, 0)),
           **self._build_model_spec_kwargs_for_parallel_fns(
               pass_covariance=True))
       if final_step_only:
@@ -2069,7 +2069,7 @@ def _get_covariance_no_broadcast(dist):
     # Dist is MultivariateNormalLowRankUpdateLinearOperatorCovariance.
     return dist.cov_operator.to_dense()
   elif hasattr(dist, 'scale') and hasattr(dist.scale, 'matmul'):
-     # Dist is MultivariateNormalLinearOperator.
+    # Dist is MultivariateNormalLinearOperator.
     return dist.scale.matmul(dist.scale, adjoint_arg=True).to_dense()
   raise ValueError(
       'Could not compute unbroadcast covariance of distribution {}.'.format(

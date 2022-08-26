@@ -19,12 +19,9 @@ from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python.distributions import cauchy
+from tensorflow_probability.python.distributions import truncated_cauchy
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -36,7 +33,7 @@ class TruncatedCauchyTest(test_util.TestCase):
     n = int(1e5)
     lb = [[-1.0, 9.0], [0., 8.]]
     ub = [[1.0, 11.0], [5., 20.]]
-    dist = tfd.TruncatedCauchy(
+    dist = truncated_cauchy.TruncatedCauchy(
         loc=[[0., 10.], [0., 10.]],
         scale=[[1., 1.], [5., 5.]],
         low=lb,
@@ -59,7 +56,7 @@ class TruncatedCauchyTest(test_util.TestCase):
     scale = tf.ones((2, 3), dtype=tf.float64)
     low = -tf.ones((4, 1, 1), dtype=tf.float64)
     high = 1.0
-    d = tfd.TruncatedCauchy(loc, scale, low, high)
+    d = truncated_cauchy.TruncatedCauchy(loc, scale, low, high)
     self.assertAllEqual([7, 2, 4, 2, 3],
                         d.sample([7, 2], seed=test_util.test_seed()).shape)
 
@@ -68,7 +65,8 @@ class TruncatedCauchyTest(test_util.TestCase):
     scale = np.array([1., 1., 0.5, 3., 1.5, 0.2], dtype=np.float32)
     low = np.array([-1., 0., -0.9, 9.9, 0.1, -1.5], dtype=np.float32)
     high = np.array([1., 2., -0.5, 25., 1.9, -0.5], dtype=np.float32)
-    dist = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=True)
+    dist = truncated_cauchy.TruncatedCauchy(
+        loc, scale, low, high, validate_args=True)
     self.assertAllClose([0., 1., -0.5, 10., 1.9, -1.5],
                         self.evaluate(dist.mode()))
 
@@ -80,8 +78,9 @@ class TruncatedCauchyTest(test_util.TestCase):
       (2., 1.5, 0.1, 1.9),
       (-2., 0.2, -1.5, -0.5))
   def testLogProb(self, loc, scale, low, high):
-    tc = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=False)
-    c = tfd.Cauchy(loc, scale)
+    tc = truncated_cauchy.TruncatedCauchy(
+        loc, scale, low, high, validate_args=False)
+    c = cauchy.Cauchy(loc, scale)
 
     x = tf.concat([tf.range(low, high, 0.1), [high]], axis=0)
     self.assertAllClose(
@@ -100,8 +99,9 @@ class TruncatedCauchyTest(test_util.TestCase):
       (2., 1.5, 0.1, 1.9),
       (-2., 0.2, -1.5, -0.5))
   def testCdf(self, loc, scale, low, high):
-    tc = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=False)
-    c = tfd.Cauchy(loc, scale)
+    tc = truncated_cauchy.TruncatedCauchy(
+        loc, scale, low, high, validate_args=False)
+    c = cauchy.Cauchy(loc, scale)
 
     x = tf.concat([tf.range(low, high, 0.1), [high]], axis=0)
     self.assertAllClose(
@@ -121,8 +121,9 @@ class TruncatedCauchyTest(test_util.TestCase):
       (2., 1.5, 0.1, 1.9),
       (-2., 0.2, -1.5, -0.5))
   def testQuantile(self, loc, scale, low, high):
-    tc = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=True)
-    c = tfd.Cauchy(np.float64(loc), scale)
+    tc = truncated_cauchy.TruncatedCauchy(
+        loc, scale, low, high, validate_args=True)
+    c = cauchy.Cauchy(np.float64(loc), scale)
 
     p = np.arange(0.025, 1., step=0.025)
     self.assertAllClose(p, tc.cdf(tc.quantile(p.astype(np.float32))))
@@ -144,7 +145,8 @@ class TruncatedCauchyTest(test_util.TestCase):
     high = tf.random.uniform(
         [20], minval=-50., maxval=50., dtype=dtype, seed=seed_stream())
     low, high = tf.math.minimum(low, high), tf.math.maximum(low, high)
-    tc = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=True)
+    tc = truncated_cauchy.TruncatedCauchy(
+        loc, scale, low, high, validate_args=True)
     samples_, mean_ = self.evaluate([
         tc.sample(int(1e6), seed=seed_stream()), tc.mean()])
     self.assertAllClose(mean_, np.mean(samples_, axis=0), rtol=0.08)
@@ -160,7 +162,8 @@ class TruncatedCauchyTest(test_util.TestCase):
     high = tf.random.uniform(
         [20], minval=-50., maxval=50., dtype=dtype, seed=seed_stream())
     low, high = tf.math.minimum(low, high), tf.math.maximum(low, high)
-    tc = tfd.TruncatedCauchy(loc, scale, low, high, validate_args=True)
+    tc = truncated_cauchy.TruncatedCauchy(
+        loc, scale, low, high, validate_args=True)
     samples_, variance_ = self.evaluate([
         tc.sample(int(1e6), seed=seed_stream()), tc.variance()])
     self.assertAllClose(
@@ -168,23 +171,23 @@ class TruncatedCauchyTest(test_util.TestCase):
 
   def testNegativeScaleFails(self):
     with self.assertRaisesOpError('`scale` must be positive'):
-      dist = tfd.TruncatedCauchy(
+      dist = truncated_cauchy.TruncatedCauchy(
           loc=0., scale=-0.1, low=-1.0, high=1.0, validate_args=True)
       self.evaluate(dist.mode())
 
   def testIncorrectBoundsFails(self):
     with self.assertRaisesOpError('`low >= high`'):
-      dist = tfd.TruncatedCauchy(
+      dist = truncated_cauchy.TruncatedCauchy(
           loc=0., scale=0.1, low=1.0, high=-1.0, validate_args=True)
       self.evaluate(dist.mode())
 
     with self.assertRaisesOpError('`low >= high`'):
-      dist = tfd.TruncatedCauchy(
+      dist = truncated_cauchy.TruncatedCauchy(
           loc=0., scale=0.1, low=1.0, high=1.0, validate_args=True)
       self.evaluate(dist.mode())
 
   def testAssertValidSample(self):
-    dist = tfd.TruncatedCauchy(
+    dist = truncated_cauchy.TruncatedCauchy(
         loc=0., scale=2., low=-4., high=3., validate_args=True)
     with self.assertRaisesOpError('must be greater than or equal to `low`'):
       self.evaluate(dist.cdf([-4.2, 1.7, 2.3]))

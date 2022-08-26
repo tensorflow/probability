@@ -17,7 +17,6 @@
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import sigmoid as sigmoid_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -28,6 +27,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic
 
 
 def _log_xexp_ratio(x):
@@ -241,9 +241,9 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
     # For logits < 0, we can directly use the expression.
     safe_logits = tf.where(logits < 0., logits, -1.)
     result_negative_logits = (
-        tfp_math.log1mexp(
+        generic.log1mexp(
             tf.math.multiply_no_nan(safe_logits, x)) -
-        tfp_math.log1mexp(safe_logits))
+        generic.log1mexp(safe_logits))
     # For logits > 0, to avoid infs with large arguments we rewrite the
     # expression. Let z = log(exp(logits) - 1)
     # log_cdf = log((exp(logits * x) - 1) / (exp(logits) - 1))
@@ -261,7 +261,7 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
         safe_logits > -np.log(eps),
         safe_logits, tf.math.log(tf.math.expm1(safe_logits)))
     result_positive_logits = tf.math.multiply_no_nan(
-        safe_logits, x) - z + tfp_math.log1mexp(
+        safe_logits, x) - z + generic.log1mexp(
             -tf.math.multiply_no_nan(safe_logits, x))
 
     result = tf.where(
@@ -419,8 +419,8 @@ class ContinuousBernoulli(distribution.AutoCompositeTensorDistribution):
     safe_positive_logits = tf.where(logits > 0., logits, 1.)
     result = tf.where(
         logits > 0.,
-        1. + tfp_math.log_add_exp(
-            logp + tfp_math.log1mexp(safe_positive_logits),
+        1. + generic.log_add_exp(
+            logp + generic.log1mexp(safe_positive_logits),
             tf.math.negative(safe_positive_logits)) / safe_positive_logits,
         tf.math.log1p(
             tf.math.expm1(safe_negative_logits) * p) / safe_negative_logits)

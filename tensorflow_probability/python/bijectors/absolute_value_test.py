@@ -16,7 +16,7 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import absolute_value
 from tensorflow_probability.python.internal import test_util
 
 
@@ -25,7 +25,7 @@ class AbsoluteValueTest(test_util.TestCase):
   """Tests correctness of the absolute value bijector."""
 
   def testBijectorVersusNumpyRewriteOfBasicFunctionsEventNdims0(self):
-    bijector = tfb.AbsoluteValue(validate_args=True)
+    bijector = absolute_value.AbsoluteValue(validate_args=True)
     self.assertStartsWith(bijector.name, "absolute_value")
     x = tf.constant([[0., 1., -1], [0., -5., 3.]])  # Shape [2, 3]
     y = tf.math.abs(x)
@@ -47,17 +47,17 @@ class AbsoluteValueTest(test_util.TestCase):
                             y, event_ndims=0)))
 
   def testNegativeYRaisesForInverseIfValidateArgs(self):
-    bijector = tfb.AbsoluteValue(validate_args=True)
+    bijector = absolute_value.AbsoluteValue(validate_args=True)
     with self.assertRaisesOpError("y was negative"):
       self.evaluate(bijector.inverse(-1.))
 
   def testNegativeYRaisesForILDJIfValidateArgs(self):
-    bijector = tfb.AbsoluteValue(validate_args=True)
+    bijector = absolute_value.AbsoluteValue(validate_args=True)
     with self.assertRaisesOpError("y was negative"):
       self.evaluate(bijector.inverse_log_det_jacobian(-1., event_ndims=0))
 
   def testCompositeTensor(self):
-    bijector = tfb.AbsoluteValue(validate_args=True)
+    bijector = absolute_value.AbsoluteValue(validate_args=True)
     flat = tf.nest.flatten(bijector, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(bijector, flat, expand_composites=True)
     x = tf.convert_to_tensor([0., 1., -1.])

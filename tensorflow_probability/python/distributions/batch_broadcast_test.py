@@ -21,8 +21,8 @@ import hypothesis.strategies as hps
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python import random
 from tensorflow_probability.python.distributions import hypothesis_testlib as tfd_hps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
@@ -204,13 +204,13 @@ class _BatchBroadcastTest(object):
 
   def test_docstring_example(self):
     stream = test_util.test_seed_stream()
-    loc = tfp.random.spherical_uniform([10], 3, seed=stream())
+    loc = random.spherical_uniform([10], 3, seed=stream())
     components_dist = tfd.VonMisesFisher(mean_direction=loc, concentration=50.)
     mixture_dist = tfd.Categorical(
         logits=tf.random.uniform([500, 10], seed=stream()))
     obs_dist = tfd.MixtureSameFamily(
         mixture_dist, tfd.BatchBroadcast(components_dist, [500, 10]))
-    test_sites = tfp.random.spherical_uniform([20], 3, seed=stream())
+    test_sites = random.spherical_uniform([20], 3, seed=stream())
     lp = tfd.Sample(obs_dist, 20).log_prob(test_sites)
     self.assertEqual([500], lp.shape)
     self.evaluate(lp)

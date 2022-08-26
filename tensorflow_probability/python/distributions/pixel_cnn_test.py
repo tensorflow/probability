@@ -18,11 +18,10 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import pixel_cnn
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 # Not decorating with `test_util.test_all_tf_execution_regimes` since the
@@ -40,7 +39,7 @@ class PixelCnnTest(test_util.TestCase):
     self.num_logistic_mix = 1
 
   def _make_pixel_cnn(self, use_weight_norm_and_data_init=False):
-    return tfd.PixelCNN(
+    return pixel_cnn.PixelCNN(
         image_shape=self.image_shape,
         conditional_shape=self.h_shape,
         num_resnet=2,
@@ -78,7 +77,7 @@ class PixelCnnTest(test_util.TestCase):
       return out[logit_ind][pixel_ind]
 
     image_input = self._make_fake_images()
-    _, grads = tfp.math.value_and_gradient(g, image_input)
+    _, grads = gradient.value_and_gradient(g, image_input)
     return self.evaluate(grads)
 
   def _grads_assertions(self, grads, i, j):
@@ -241,7 +240,7 @@ class PixelCnnTest(test_util.TestCase):
     self.assertEqual(dist.dtype, samples.dtype)
     self.assertEqual(dist.dtype, log_prob.dtype)
 
-    dist64 = tfd.PixelCNN(
+    dist64 = pixel_cnn.PixelCNN(
         image_shape=self.image_shape,
         conditional_shape=self.h_shape,
         num_resnet=2,
@@ -281,7 +280,7 @@ class ConditionalPixelCnnTest(PixelCnnTest):
             tf.keras.layers.Input(shape=self.h_shape)]
 
   def testScalarConditional(self):
-    dist = tfd.PixelCNN(
+    dist = pixel_cnn.PixelCNN(
         image_shape=self.image_shape,
         conditional_shape=(),
         num_resnet=2,

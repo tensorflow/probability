@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -30,6 +29,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import bessel
 
 __all__ = [
     'NormalInverseGaussian',
@@ -239,7 +239,7 @@ class NormalInverseGaussian(distribution.AutoCompositeTensorDistribution):
     w = tailweight * tf.math.exp(0.5 * tf.math.log1p(
         -tf.math.square(skewness / tailweight)))
     log_unnormalized_prob = (
-        tfp_math.log_bessel_kve(
+        bessel.log_bessel_kve(
             numpy_dtype(1.), tailweight * scale * tf.math.exp(0.5 * z)) -
         0.5 * z - tailweight * scale * tf.math.exp(0.5 * z))
     log_unnormalized_prob = log_unnormalized_prob + scale * skewness * y

@@ -17,7 +17,6 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -28,6 +27,7 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 
 __all__ = [
     'SigmoidBeta',
@@ -226,7 +226,7 @@ class SigmoidBeta(distribution.AutoCompositeTensorDistribution):
     return log_gamma1 - log_gamma2
 
   def _log_normalization(self, concentration0, concentration1):
-    return tfp_math.lbeta(concentration0, concentration1)
+    return special.lbeta(concentration0, concentration1)
 
   def _log_unnormalized_prob(self, concentration0, concentration1, x):
     return (-concentration0 * tf.math.softplus(-x)
@@ -242,7 +242,7 @@ class SigmoidBeta(distribution.AutoCompositeTensorDistribution):
     concentration1 = tf.convert_to_tensor(self.concentration1)
     concentration0 = tf.convert_to_tensor(self.concentration0)
     sig_x = tf.math.sigmoid(x)
-    return tfp_math.betainc(concentration1, concentration0, sig_x)
+    return special.betainc(concentration1, concentration0, sig_x)
 
   def _mode(self):
     return tf.math.log(self.concentration1 / self.concentration0)

@@ -19,8 +19,9 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import ascending
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import invert
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -30,11 +31,11 @@ class AscendingBijectorTest(test_util.TestCase):
   """Tests correctness of the Ascending transformation."""
 
   def testName(self):
-    ascending = tfb.Ascending()
-    self.assertStartsWith(ascending.name, "ascending")
+    bij = ascending.Ascending()
+    self.assertStartsWith(bij.name, "ascending")
 
   def testBijectorVector(self):
-    ordered = tfb.Invert(tfb.Ascending())
+    ordered = invert.Invert(ascending.Ascending())
     x = np.asarray([[2., 3, 4], [4., 8, 13]])
     y = [[2., 0, 0], [4., np.log(4.), np.log(5.)]]
     self.assertAllClose(y, self.evaluate(ordered.forward(x)))
@@ -51,7 +52,7 @@ class AscendingBijectorTest(test_util.TestCase):
         rtol=1e-7)
 
   def testBijectorUnknownShape(self):
-    ordered = tfb.Invert(tfb.Ascending())
+    ordered = invert.Invert(ascending.Ascending())
     x_ = np.asarray([[2., 3, 4], [4., 8, 13]], dtype=np.float32)
     y_ = np.asarray(
         [[2., 0, 0], [4., np.log(4.), np.log(5.)]], dtype=np.float32)
@@ -73,7 +74,7 @@ class AscendingBijectorTest(test_util.TestCase):
   def testShapeGetters(self):
     x = tf.TensorShape([4])
     y = tf.TensorShape([4])
-    bijector = tfb.Ascending(validate_args=True)
+    bijector = ascending.Ascending(validate_args=True)
     self.assertAllEqual(y, bijector.forward_event_shape(x))
     self.assertAllEqual(
         tensorshape_util.as_list(y),
@@ -86,11 +87,11 @@ class AscendingBijectorTest(test_util.TestCase):
             bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testBijectiveAndFinite(self):
-    ascending = tfb.Ascending()
+    bij = ascending.Ascending()
     x = (np.random.randn(3, 10)).astype(np.float32)
     y = np.sort(np.random.randn(3, 10), axis=-1).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
-        ascending, x, y, eval_func=self.evaluate, event_ndims=1)
+        bij, x, y, eval_func=self.evaluate, event_ndims=1)
 
 
 if __name__ == "__main__":

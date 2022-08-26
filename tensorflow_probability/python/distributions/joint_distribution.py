@@ -24,7 +24,6 @@ import six
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import composition
 from tensorflow_probability.python.bijectors import identity as identity_bijector
@@ -41,6 +40,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import vectorization_util
+from tensorflow_probability.python.math import generic
 from tensorflow_probability.python.util.seed_stream import SeedStream
 from tensorflow_probability.python.util.seed_stream import TENSOR_SEED_MSG_PREFIX
 
@@ -568,7 +568,7 @@ class JointDistribution(distribution_lib.Distribution):
     with self._name_and_control_scope(name):
       sum_fn = tf.reduce_sum
       if self._experimental_use_kahan_sum:
-        sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
+        sum_fn = lambda x, axis: generic.reduce_kahan_sum(x, axis=axis).total
       return self._model_unflatten(
           self._reduce_measure_over_dists(
               self._map_measure_over_dists('log_prob', value),
@@ -612,7 +612,7 @@ class JointDistribution(distribution_lib.Distribution):
     with self._name_and_control_scope(name or 'unnormalized_log_prob_parts'):
       sum_fn = tf.reduce_sum
       if self._experimental_use_kahan_sum:
-        sum_fn = lambda x, axis: tfp_math.reduce_kahan_sum(x, axis=axis).total
+        sum_fn = lambda x, axis: generic.reduce_kahan_sum(x, axis=axis).total
       return self._model_unflatten(
           self._reduce_measure_over_dists(
               self._map_measure_over_dists('unnormalized_log_prob', value),
@@ -749,7 +749,7 @@ class JointDistribution(distribution_lib.Distribution):
     """Sum computed log probs across joint distribution parts."""
     if self._experimental_use_kahan_sum:
       reduced_lps = self._reduce_measure_over_dists(
-          lps, reduce_fn=tfp_math.reduce_kahan_sum)
+          lps, reduce_fn=generic.reduce_kahan_sum)
       broadcasting_checks = maybe_check_wont_broadcast(
           [v.total for v in reduced_lps], self.validate_args)
       with tf.control_dependencies(broadcasting_checks):

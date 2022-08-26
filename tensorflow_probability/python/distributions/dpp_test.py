@@ -19,14 +19,12 @@ from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.distributions import bernoulli as bernoulli_lib
 from tensorflow_probability.python.distributions import dpp as dpp_lib
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
-tfpk = tfp.math.psd_kernels
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic as tfpk
 
 
 @contextlib.contextmanager
@@ -51,7 +49,7 @@ def _capture_bernoulli_samples():
 def kernel_over_unit_square(n_points, batch_shape=(), dtype=tf.float32):
   kernel = tfpk.ExponentiatedQuadratic(amplitude=tf.ones([], dtype),
                                        length_scale=0.1)
-  pts = tfd.Uniform(tf.zeros([2], dtype), tf.ones([2], dtype)).sample(
+  pts = uniform.Uniform(tf.zeros([2], dtype), tf.ones([2], dtype)).sample(
       tuple(batch_shape) + (n_points,), seed=test_util.test_seed())
   kernel_mat = kernel.matrix(pts, pts) + 1e-3 * tf.eye(n_points, dtype=dtype)
   eigvals, eigvecs = tf.linalg.eigh(kernel_mat)
@@ -104,7 +102,7 @@ class _DppTest(test_util.TestCase):
                  n_points):
     eigvals = tf.ones(eigvals_shape, dtype=self.param_dtype)
     eigvecs = tf.zeros(eigvecs_shape, dtype=self.param_dtype)
-    dpp = tfd.DeterminantalPointProcess(eigvals, eigvecs)
+    dpp = dpp_lib.DeterminantalPointProcess(eigvals, eigvecs)
 
     self.assertAllEqual(expected_batch_shape, dpp.batch_shape)
     self.assertAllEqual(expected_batch_shape, dpp.batch_shape_tensor())
@@ -155,7 +153,7 @@ class _DppTest(test_util.TestCase):
     eigvals = tf.ones(eigvals_shape, dtype=self.param_dtype)
     eigvecs = tf.eye(eigvecs_shape[-1], batch_shape=eigvecs_shape[:-2],
                      dtype=self.param_dtype)
-    dpp = tfd.DeterminantalPointProcess(eigvals, eigvecs)
+    dpp = dpp_lib.DeterminantalPointProcess(eigvals, eigvecs)
     with _capture_bernoulli_samples() as sampled_edpp_indices:
       dpp.sample(n_samples, seed=test_util.test_seed())
     self.assertLen(sampled_edpp_indices, 1)
@@ -167,7 +165,7 @@ class _DppTest(test_util.TestCase):
     _, eigvals, eigvecs = kernel_over_unit_square(n_points,
                                                   dtype=self.param_dtype)
     eigvals = tf.one_hot(1, n_points, dtype=self.param_dtype)
-    dpp = tfd.DeterminantalPointProcess(eigvals, eigvecs)
+    dpp = dpp_lib.DeterminantalPointProcess(eigvals, eigvecs)
     with _capture_bernoulli_samples() as sampled_edpp_indices:
       dpp.sample(batch_size, seed=test_util.test_seed())
     self.assertLen(sampled_edpp_indices, 1)
@@ -223,7 +221,7 @@ class _DppTest(test_util.TestCase):
     n_points = 20
     true_kernel, eigvals, eigvecs = self.evaluate(
         kernel_over_unit_square(n_points, dtype=self.param_dtype))
-    dpp = tfd.DeterminantalPointProcess(eigvals, eigvecs)
+    dpp = dpp_lib.DeterminantalPointProcess(eigvals, eigvecs)
     self.assertAllClose(
         true_kernel,
         dpp.l_ensemble_matrix(),
@@ -233,7 +231,7 @@ class _DppTest(test_util.TestCase):
     n_points = 20
     true_kernel, eigvals, eigvecs = kernel_over_unit_square(
         n_points, dtype=self.param_dtype)
-    dpp = tfd.DeterminantalPointProcess(eigvals, eigvecs)
+    dpp = dpp_lib.DeterminantalPointProcess(eigvals, eigvecs)
     marginal_kernel = tf.matmul(true_kernel,
                                 tf.linalg.inv(true_kernel + np.eye(n_points)))
     self.assertAllClose(
@@ -247,7 +245,7 @@ class _DppTest(test_util.TestCase):
   def testDppLogPDF(self, n_points):
     true_kernel, eigvals, eigvecs = self.evaluate(
         kernel_over_unit_square(n_points, dtype=self.param_dtype))
-    dpp = tfd.DeterminantalPointProcess(eigvals, eigvecs)
+    dpp = dpp_lib.DeterminantalPointProcess(eigvals, eigvecs)
     log_probs = []
     for i in range(2**n_points):  # n_points is small so we can enumerate sets.
       binary = bin(i)[2:]
@@ -268,7 +266,7 @@ class _DppTest(test_util.TestCase):
     n_points = 50
     _, eigvals, eigvecs = kernel_over_unit_square(n_points,
                                                   dtype=self.param_dtype)
-    dpp = tfd.DeterminantalPointProcess(eigvals, eigvecs)
+    dpp = dpp_lib.DeterminantalPointProcess(eigvals, eigvecs)
     n = 10
     samples = dpp.sample(n, seed=test_util.test_seed())
     self.assertEqual(samples.shape, (n, n_points))
@@ -277,7 +275,7 @@ class _DppTest(test_util.TestCase):
     n_points = 5
     _, eigvals, eigvecs = kernel_over_unit_square(n_points,
                                                   dtype=self.param_dtype)
-    dpp = tfd.DeterminantalPointProcess(eigvals, eigvecs)
+    dpp = dpp_lib.DeterminantalPointProcess(eigvals, eigvecs)
 
     n = 500
     samples, expected_marginals = self.evaluate(
@@ -292,7 +290,7 @@ class _DppTest(test_util.TestCase):
 
   def testEigvalsAsserts(self):
     with self.assertRaisesOpError(r'must be positive'):
-      dpp = tfd.DeterminantalPointProcess(
+      dpp = dpp_lib.DeterminantalPointProcess(
           tf.constant([1, 2, 3, 0.], dtype=self.param_dtype),
           tf.eye(4, dtype=self.param_dtype),
           validate_args=True)
@@ -300,14 +298,14 @@ class _DppTest(test_util.TestCase):
 
     v = tf.Variable(tf.constant([1, 2, -3, 4.], dtype=self.param_dtype))
     self.evaluate(v.initializer)
-    dpp = tfd.DeterminantalPointProcess(v, tf.eye(4, dtype=self.param_dtype),
-                                        validate_args=True)
+    dpp = dpp_lib.DeterminantalPointProcess(
+        v, tf.eye(4, dtype=self.param_dtype), validate_args=True)
     with self.assertRaisesOpError(r'must be positive'):
       self.evaluate(dpp.sample(seed=test_util.test_seed()))
 
   def testEigvecsAsserts(self):
     with self.assertRaisesOpError(r'must be orthonormal'):
-      dpp = tfd.DeterminantalPointProcess(
+      dpp = dpp_lib.DeterminantalPointProcess(
           tf.ones([4], dtype=self.param_dtype),
           tf.ones([4, 4], dtype=self.param_dtype) / 2,
           validate_args=True)
@@ -315,8 +313,8 @@ class _DppTest(test_util.TestCase):
 
     v = tf.Variable(tf.ones([4, 4], dtype=self.param_dtype) / 2)
     self.evaluate(v.initializer)
-    dpp = tfd.DeterminantalPointProcess(tf.ones([4], dtype=self.param_dtype), v,
-                                        validate_args=True)
+    dpp = dpp_lib.DeterminantalPointProcess(
+        tf.ones([4], dtype=self.param_dtype), v, validate_args=True)
     with self.assertRaisesOpError(r'must be orthonormal'):
       self.evaluate(dpp.sample(seed=test_util.test_seed()))
 
@@ -336,7 +334,7 @@ class _DppTest(test_util.TestCase):
     for n in 1, 5:
       @tf.function(jit_compile=True)
       def f(eigvals):
-        return tfd.DeterminantalPointProcess(eigvals, eigvecs).sample(
+        return dpp_lib.DeterminantalPointProcess(eigvals, eigvecs).sample(
             n, seed=test_util.test_seed())  # pylint: disable=cell-var-from-loop
       self.evaluate(f(eigvals))
 

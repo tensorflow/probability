@@ -15,7 +15,6 @@
 """Generalized Pareto distribution."""
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import generalized_pareto as generalized_pareto_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -26,6 +25,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic
 
 
 class GeneralizedPareto(distribution.AutoCompositeTensorDistribution):
@@ -240,7 +240,7 @@ class GeneralizedPareto(distribution.AutoCompositeTensorDistribution):
     # tfp_math.log1mexp(a) accurately computes log(1 - exp(-|a|)).  The negation
     # and the absolute value are fine here because the log survival function is
     # always non-positive.
-    return tfp_math.log1mexp(self._log_survival_function(x))
+    return generic.log1mexp(self._log_survival_function(x))
 
   def _z(self, x, scale):
     loc = tf.convert_to_tensor(self.loc)

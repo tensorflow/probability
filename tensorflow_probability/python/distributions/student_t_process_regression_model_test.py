@@ -15,7 +15,9 @@
 # Dependency imports
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import gaussian_process_regression_model as gprm
+from tensorflow_probability.python.distributions import student_t_process
+from tensorflow_probability.python.distributions import student_t_process_regression_model as stprm
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import psd_kernels
 
@@ -47,7 +49,7 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
           tf.linalg.set_diag(x, tf.linalg.diag_part(x) + 1.))
 
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
-    stprm = tfd.StudentTProcessRegressionModel(
+    dist = stprm.StudentTProcessRegressionModel(
         df=df,
         kernel=kernel,
         index_points=index_points,
@@ -59,11 +61,11 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     event_shape = [25]
     sample_shape = [7, 2]
 
-    self.assertIs(cholesky_fn, stprm.cholesky_fn)
+    self.assertIs(cholesky_fn, dist.cholesky_fn)
 
-    samples = stprm.sample(sample_shape, seed=test_util.test_seed())
-    self.assertAllEqual(stprm.batch_shape_tensor(), batch_shape)
-    self.assertAllEqual(stprm.event_shape_tensor(), event_shape)
+    samples = dist.sample(sample_shape, seed=test_util.test_seed())
+    self.assertAllEqual(dist.batch_shape_tensor(), batch_shape)
+    self.assertAllEqual(dist.event_shape_tensor(), event_shape)
     self.assertAllEqual(self.evaluate(samples).shape,
                         sample_shape + batch_shape + event_shape)
 
@@ -85,21 +87,22 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     observations = np.random.uniform(-1., 1., (3, 7)).astype(np.float64)
 
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
-    stprm = tfd.StudentTProcessRegressionModel(
+    dist = stprm.StudentTProcessRegressionModel(
         df=df,
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance)
-    gprm = tfd.GaussianProcessRegressionModel(
+    dist_gp = gprm.GaussianProcessRegressionModel(
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance)
 
-    self.assertAllClose(self.evaluate(stprm.mean()), self.evaluate(gprm.mean()))
+    self.assertAllClose(
+        self.evaluate(dist.mean()), self.evaluate(dist_gp.mean()))
 
   def testLogProbNearGPRM(self):
     # For large df, the log_prob calculations should be the same.
@@ -120,14 +123,14 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     observations = np.random.uniform(-1., 1., (3, 7)).astype(np.float64)
 
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
-    stprm = tfd.StudentTProcessRegressionModel(
+    dist = stprm.StudentTProcessRegressionModel(
         df=df,
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
         observations=observations,
         observation_noise_variance=observation_noise_variance)
-    gprm = tfd.GaussianProcessRegressionModel(
+    dist_gp = gprm.GaussianProcessRegressionModel(
         kernel=kernel,
         index_points=index_points,
         observation_index_points=observation_index_points,
@@ -137,8 +140,9 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     x = np.linspace(-3., 3., 25)
 
     self.assertAllClose(
-        self.evaluate(stprm.log_prob(x)),
-        self.evaluate(gprm.log_prob(x)), rtol=2e-5)
+        self.evaluate(dist.log_prob(x)),
+        self.evaluate(dist_gp.log_prob(x)),
+        rtol=2e-5)
 
   def testMeanVarianceAndCovariancePrecomputed(self):
     amplitude = np.array([1., 2.], np.float64).reshape([2, 1])
@@ -153,7 +157,7 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     index_points = np.random.uniform(-1., 1., (6, 2)).astype(np.float64)
 
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
-    stprm = tfd.StudentTProcessRegressionModel(
+    dist = stprm.StudentTProcessRegressionModel(
         df=df,
         kernel=kernel,
         index_points=index_points,
@@ -162,7 +166,7 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
-    precomputed_stprm = tfd.StudentTProcessRegressionModel.precompute_regression_model(
+    precomputed_dist = stprm.StudentTProcessRegressionModel.precompute_regression_model(
         df=df,
         kernel=kernel,
         index_points=index_points,
@@ -171,12 +175,14 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(precomputed_stprm.covariance()),
-                        self.evaluate(stprm.covariance()))
-    self.assertAllClose(self.evaluate(precomputed_stprm.variance()),
-                        self.evaluate(stprm.variance()))
-    self.assertAllClose(self.evaluate(precomputed_stprm.mean()),
-                        self.evaluate(stprm.mean()))
+    self.assertAllClose(
+        self.evaluate(precomputed_dist.covariance()),
+        self.evaluate(dist.covariance()))
+    self.assertAllClose(
+        self.evaluate(precomputed_dist.variance()),
+        self.evaluate(dist.variance()))
+    self.assertAllClose(
+        self.evaluate(precomputed_dist.mean()), self.evaluate(dist.mean()))
 
   @test_util.disable_test_for_backend(
       disable_numpy=True, disable_jax=True,
@@ -194,7 +200,7 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
 
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
 
-    precomputed_stprm = tfd.StudentTProcessRegressionModel.precompute_regression_model(
+    precomputed_dist = stprm.StudentTProcessRegressionModel.precompute_regression_model(
         df=3.,
         kernel=kernel,
         index_points=index_points,
@@ -203,26 +209,27 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
 
-    flat = tf.nest.flatten(precomputed_stprm, expand_composites=True)
+    flat = tf.nest.flatten(precomputed_dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(
-        precomputed_stprm, flat, expand_composites=True)
-    self.assertIsInstance(unflat, tfd.StudentTProcessRegressionModel)
+        precomputed_dist, flat, expand_composites=True)
+    self.assertIsInstance(unflat, stprm.StudentTProcessRegressionModel)
     # Check that we don't recompute the divisor matrix on flattening /
     # unflattening.
     self.assertIs(
-        precomputed_stprm.kernel.schur_complement._precomputed_divisor_matrix_cholesky,  # pylint:disable=line-too-long
+        precomputed_dist.kernel.schur_complement
+        ._precomputed_divisor_matrix_cholesky,  # pylint:disable=line-too-long
         unflat.kernel.schur_complement._precomputed_divisor_matrix_cholesky)
 
-    # TODO(b/196219597): Enable this test once STPRM works across TF function
+    # TODO(b/196219597): Enable this test once dist works across TF function
     # boundaries.
     # index_observations = np.random.uniform(-1., 1., (6,)).astype(np.float64)
     # @tf.function
     # def log_prob(d):
     #   return d.log_prob(index_observations)
 
-    # lp = self.evaluate(precomputed_stprm.log_prob(index_observations))
+    # lp = self.evaluate(precomputed_dist.log_prob(index_observations))
 
-    # self.assertAllClose(lp, self.evaluate(log_prob(precomputed_stprm)))
+    # self.assertAllClose(lp, self.evaluate(log_prob(precomputed_dist)))
     # self.assertAllClose(lp, self.evaluate(log_prob(unflat)))
 
   def testEmptyDataMatchesStPPrior(self):
@@ -235,21 +242,17 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     mean_fn = lambda x: x[:, 0]**2
 
     kernel = psd_kernels.ExponentiatedQuadratic(amp, len_scale)
-    stp = tfd.StudentTProcess(
-        df,
-        kernel,
-        index_points,
-        mean_fn=mean_fn,
-        validate_args=True)
+    stp = student_t_process.StudentTProcess(
+        df, kernel, index_points, mean_fn=mean_fn, validate_args=True)
 
-    stprm_nones = tfd.StudentTProcessRegressionModel(
+    dist_nones = stprm.StudentTProcessRegressionModel(
         df,
         kernel=kernel,
         index_points=index_points,
         mean_fn=mean_fn,
         validate_args=True)
 
-    stprm_zero_shapes = tfd.StudentTProcessRegressionModel(
+    dist_zero_shapes = stprm.StudentTProcessRegressionModel(
         df,
         kernel=kernel,
         index_points=index_points,
@@ -258,17 +261,17 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
         mean_fn=mean_fn,
         validate_args=True)
 
-    for stprm in [stprm_nones, stprm_zero_shapes]:
+    for dist in [dist_nones, dist_zero_shapes]:
+      self.assertAllClose(self.evaluate(stp.mean()), self.evaluate(dist.mean()))
       self.assertAllClose(
-          self.evaluate(stp.mean()), self.evaluate(stprm.mean()))
-      self.assertAllClose(self.evaluate(stp.covariance()),
-                          self.evaluate(stprm.covariance()))
-      self.assertAllClose(self.evaluate(stp.variance()),
-                          self.evaluate(stprm.variance()))
+          self.evaluate(stp.covariance()), self.evaluate(dist.covariance()))
+      self.assertAllClose(
+          self.evaluate(stp.variance()), self.evaluate(dist.variance()))
 
       observations = np.random.uniform(-1., 1., 10).astype(np.float64)
-      self.assertAllClose(self.evaluate(stp.log_prob(observations)),
-                          self.evaluate(stprm.log_prob(observations)))
+      self.assertAllClose(
+          self.evaluate(stp.log_prob(observations)),
+          self.evaluate(dist.log_prob(observations)))
 
   def testCopy(self):
     # 5 random index points in R^2
@@ -289,7 +292,7 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
     kernel_1 = psd_kernels.ExponentiatedQuadratic()
     kernel_2 = psd_kernels.ExpSinSquared()
 
-    stprm1 = tfd.StudentTProcessRegressionModel(
+    dist1 = stprm.StudentTProcessRegressionModel(
         df=5.,
         kernel=kernel_1,
         index_points=index_points_1,
@@ -297,14 +300,14 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
         observations=observations_1,
         mean_fn=mean_fn,
         validate_args=True)
-    stprm2 = stprm1.copy(
+    dist2 = dist1.copy(
         kernel=kernel_2,
         index_points=index_points_2,
         observation_index_points=observation_index_points_2,
         observations=observations_2)
 
-    precomputed_stprm1 = (
-        tfd.StudentTProcessRegressionModel.precompute_regression_model(
+    precomputed_dist1 = (
+        stprm.StudentTProcessRegressionModel.precompute_regression_model(
             df=5.,
             kernel=kernel_1,
             index_points=index_points_1,
@@ -312,25 +315,26 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
             observations=observations_1,
             mean_fn=mean_fn,
             validate_args=True))
-    precomputed_stprm2 = precomputed_stprm1.copy(index_points=index_points_2)
-    self.assertIs(precomputed_stprm1.mean_fn, precomputed_stprm2.mean_fn)
-    self.assertIs(precomputed_stprm1.kernel, precomputed_stprm2.kernel)
+    precomputed_dist2 = precomputed_dist1.copy(index_points=index_points_2)
+    self.assertIs(precomputed_dist1.mean_fn, precomputed_dist2.mean_fn)
+    self.assertIs(precomputed_dist1.kernel, precomputed_dist2.kernel)
 
     event_shape_1 = [5]
     event_shape_2 = [10]
 
-    self.assertIsInstance(stprm1.kernel.schur_complement.base_kernel,
+    self.assertIsInstance(dist1.kernel.schur_complement.base_kernel,
                           psd_kernels.ExponentiatedQuadratic)
-    self.assertIsInstance(stprm2.kernel.schur_complement.base_kernel,
+    self.assertIsInstance(dist2.kernel.schur_complement.base_kernel,
                           psd_kernels.ExpSinSquared)
-    self.assertAllEqual(self.evaluate(stprm1.batch_shape_tensor()),
-                        self.evaluate(stprm2.batch_shape_tensor()))
-    self.assertAllEqual(self.evaluate(stprm1.event_shape_tensor()),
-                        event_shape_1)
-    self.assertAllEqual(self.evaluate(stprm2.event_shape_tensor()),
-                        event_shape_2)
-    self.assertAllEqual(self.evaluate(stprm1.index_points), index_points_1)
-    self.assertAllEqual(self.evaluate(stprm2.index_points), index_points_2)
+    self.assertAllEqual(
+        self.evaluate(dist1.batch_shape_tensor()),
+        self.evaluate(dist2.batch_shape_tensor()))
+    self.assertAllEqual(
+        self.evaluate(dist1.event_shape_tensor()), event_shape_1)
+    self.assertAllEqual(
+        self.evaluate(dist2.event_shape_tensor()), event_shape_2)
+    self.assertAllEqual(self.evaluate(dist1.index_points), index_points_1)
+    self.assertAllEqual(self.evaluate(dist2.index_points), index_points_2)
 
   @test_util.disable_test_for_backend(
       disable_numpy=True,
@@ -349,7 +353,7 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
       return tf.linalg.cholesky(
           tf.linalg.set_diag(x, tf.linalg.diag_part(x) + 1.))
 
-    stprm = tfd.StudentTProcessRegressionModel(
+    dist = stprm.StudentTProcessRegressionModel(
         df=np.float64(5.),
         kernel=kernel,
         index_points=index_points,
@@ -358,25 +362,25 @@ class StudentTProcessRegressionModelTest(test_util.TestCase):
         observation_noise_variance=observation_noise_variance,
         cholesky_fn=cholesky_fn)
 
-    flat = tf.nest.flatten(stprm, expand_composites=True)
-    unflat = tf.nest.pack_sequence_as(stprm, flat, expand_composites=True)
-    self.assertIsInstance(unflat, tfd.StudentTProcessRegressionModel)
+    flat = tf.nest.flatten(dist, expand_composites=True)
+    unflat = tf.nest.pack_sequence_as(dist, flat, expand_composites=True)
+    self.assertIsInstance(unflat, stprm.StudentTProcessRegressionModel)
     # Check that we don't recompute the divisor matrix on flattening /
     # unflattening.
     self.assertIs(
-        stprm.kernel.schur_complement._precomputed_divisor_matrix_cholesky,
+        dist.kernel.schur_complement._precomputed_divisor_matrix_cholesky,
         unflat.kernel.schur_complement._precomputed_divisor_matrix_cholesky)
 
-    x = self.evaluate(stprm.sample(3, seed=test_util.test_seed()))
-    actual = self.evaluate(stprm.log_prob(x))
+    x = self.evaluate(dist.sample(3, seed=test_util.test_seed()))
+    actual = self.evaluate(dist.log_prob(x))
     self.assertAllClose(self.evaluate(unflat.log_prob(x)), actual)
 
-    # TODO(b/196219597): Enable this test once STPRM works across TF function
+    # TODO(b/196219597): Enable this test once dist works across TF function
     # boundaries.
     # @tf.function
     # def call_log_prob(d):
     #   return d.log_prob(x)
-    # self.assertAllClose(actual, call_log_prob(stprm))
+    # self.assertAllClose(actual, call_log_prob(dist))
     # self.assertAllClose(actual, call_log_prob(unflat))
 
 

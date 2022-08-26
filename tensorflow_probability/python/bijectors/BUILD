@@ -617,6 +617,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/math:special",
     ],
 )
 
@@ -798,6 +799,7 @@ multi_substrate_py_library(
     deps = [
         ":chain",
         ":fill_triangular",
+        ":shift",
         ":softplus",
         ":transform_diagonal",
         # tensorflow dep,
@@ -1069,7 +1071,7 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["absolute_value_test.py"],
     deps = [
-        ":bijectors",
+        ":absolute_value",
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -1610,10 +1612,11 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["ascending_test.py"],
     deps = [
+        ":ascending",
         ":bijector_test_util",
+        ":invert",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
     ],

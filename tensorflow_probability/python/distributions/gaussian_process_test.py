@@ -18,7 +18,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import gaussian_process
+from tensorflow_probability.python.distributions import gaussian_process_regression_model as gprm
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import psd_kernels
@@ -46,7 +50,7 @@ class _GaussianProcessTest(object):
       batched_index_points = tf1.placeholder_with_default(
           batched_index_points, shape=None)
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel,
         batched_index_points,
         observation_noise_variance=observation_noise_variance,
@@ -96,7 +100,7 @@ class _GaussianProcessTest(object):
 
     index_points = np.expand_dims(np.random.uniform(-1., 1., 10), -1)
 
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel,
         index_points,
         observation_noise_variance=observation_noise_variance,
@@ -120,7 +124,7 @@ class _GaussianProcessTest(object):
     mean_fn = lambda x: x[:, 0]**2
     kernel = psd_kernels.ExponentiatedQuadratic()
     index_points = np.expand_dims(np.random.uniform(-1., 1., 10), -1)
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel, index_points, mean_fn=mean_fn, validate_args=True)
     expected_mean = mean_fn(index_points)
     self.assertAllClose(expected_mean,
@@ -141,7 +145,7 @@ class _GaussianProcessTest(object):
     kernel_1 = psd_kernels.ExponentiatedQuadratic()
     kernel_2 = psd_kernels.ExpSinSquared()
 
-    gp1 = tfd.GaussianProcess(
+    gp1 = gaussian_process.GaussianProcess(
         kernel_1, index_points_1, mean_fn, jitter=1e-5, validate_args=True)
     gp2 = gp1.copy(index_points=index_points_2,
                    kernel=kernel_2)
@@ -181,7 +185,7 @@ class _GaussianProcessTest(object):
     jitter = np.float64(1e-4)
     observation_noise_variance = np.float64(3e-3)
 
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel=kernel,
         mean_fn=mean_fn,
         observation_noise_variance=observation_noise_variance,
@@ -217,23 +221,22 @@ class _GaussianProcessTest(object):
     self.assertIn("event_shape=[10]", repr(gp.copy(index_points=index_points)))
 
   def testMarginalHasCorrectTypes(self):
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(), validate_args=True)
 
     self.assertIsInstance(
         gp.get_marginal_distribution(
-            index_points=np.ones([1, 1], dtype=np.float32)),
-        tfd.Normal)
+            index_points=np.ones([1, 1], dtype=np.float32)), normal.Normal)
 
     self.assertIsInstance(
         gp.get_marginal_distribution(
             index_points=np.ones([10, 1], dtype=np.float32)),
-        tfd.MultivariateNormalLinearOperator)
+        mvn_linear_operator.MultivariateNormalLinearOperator)
 
   def testOneOfCholeskyAndMarginalFn(self):
     with self.assertRaises(ValueError):
       index_points = np.array([3., 4., 5.])[..., np.newaxis]
-      tfd.GaussianProcess(
+      gaussian_process.GaussianProcess(
           kernel=psd_kernels.ExponentiatedQuadratic(),
           index_points=index_points,
           marginal_fn=lambda x: x,
@@ -248,7 +251,7 @@ class _GaussianProcessTest(object):
     # Make sure the points are far away so that this is roughly diagonal.
     index_points = np.array([-100., -50., 50., 100])[..., np.newaxis]
 
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(),
         index_points=index_points,
         cholesky_fn=test_cholesky,
@@ -268,7 +271,7 @@ class _GaussianProcessTest(object):
         validate_args=False,
         allow_nan_stats=False,
         name="custom_marginal"):
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc=loc,
           scale_diag=tf.math.sqrt(tf.linalg.diag_part(covariance)),
           validate_args=validate_args,
@@ -277,7 +280,7 @@ class _GaussianProcessTest(object):
 
     index_points = np.expand_dims(np.random.uniform(-1., 1., 10), -1)
 
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(),
         index_points=index_points,
         marginal_fn=test_marginal_fn,
@@ -296,7 +299,7 @@ class _GaussianProcessTest(object):
 
     index_points = np.random.uniform(-1., 1., 10)[..., np.newaxis]
 
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel,
         index_points,
         observation_noise_variance=observation_noise_variance,
@@ -306,7 +309,7 @@ class _GaussianProcessTest(object):
     predictive_index_points = np.random.uniform(1., 2., 10)[..., np.newaxis]
     observations = np.linspace(1., 10., 10)
 
-    expected_gprm = tfd.GaussianProcessRegressionModel(
+    expected_gprm = gprm.GaussianProcessRegressionModel(
         kernel=kernel,
         observation_index_points=index_points,
         observations=observations,
@@ -341,9 +344,8 @@ class _GaussianProcessTest(object):
     amplitude = tf.convert_to_tensor(1.1)
     length_scale = tf.convert_to_tensor(0.9)
 
-    gp = tfd.GaussianProcess(
-        kernel=psd_kernels.ExponentiatedQuadratic(
-            amplitude, length_scale),
+    gp = gaussian_process.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
         index_points=index_points,
         mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
         observation_noise_variance=.05,
@@ -364,9 +366,8 @@ class _GaussianProcessTest(object):
     # For each batch member, check that the log_prob is the same as for a
     # GaussianProcess without the missing index points.
     for i in range(5):
-      gp_i = tfd.GaussianProcess(
-          kernel=psd_kernels.ExponentiatedQuadratic(
-              amplitude, length_scale),
+      gp_i = gaussian_process.GaussianProcess(
+          kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
           index_points=tf.gather(index_points, (~is_missing[i]).nonzero()[0]),
           mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
           observation_noise_variance=.05,
@@ -386,9 +387,8 @@ class _GaussianProcessTest(object):
     amplitude = tf.convert_to_tensor(1.1)
     length_scale = tf.convert_to_tensor(0.9)
 
-    gp = tfd.GaussianProcess(
-        kernel=psd_kernels.ExponentiatedQuadratic(
-            amplitude, length_scale),
+    gp = gaussian_process.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(amplitude, length_scale),
         index_points=index_points,
         mean_fn=lambda x: tf.reduce_mean(x, axis=-1),
         observation_noise_variance=.05,
@@ -405,7 +405,7 @@ class _GaussianProcessTest(object):
         gp.log_prob(x, is_missing=[[False, True], [True, True], [True, False]]))
 
   def testAlwaysYieldMultivariateNormal(self):
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(),
         index_points=tf.ones([5, 1, 2]),
         always_yield_multivariate_normal=False,
@@ -413,7 +413,7 @@ class _GaussianProcessTest(object):
     self.assertAllEqual([5], self.evaluate(gp.batch_shape_tensor()))
     self.assertAllEqual([], self.evaluate(gp.event_shape_tensor()))
 
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel=psd_kernels.ExponentiatedQuadratic(),
         index_points=tf.ones([5, 1, 2]),
         always_yield_multivariate_normal=True,
@@ -426,14 +426,13 @@ class _GaussianProcessTest(object):
       reason="Numpy has no notion of CompositeTensor/Pytree.")
   def testCompositeTensorOrPytree(self):
     index_points = np.random.uniform(-1., 1., 10)[..., np.newaxis]
-    gp = tfd.GaussianProcess(
-        kernel=psd_kernels.ExponentiatedQuadratic(),
-        index_points=index_points)
+    gp = gaussian_process.GaussianProcess(
+        kernel=psd_kernels.ExponentiatedQuadratic(), index_points=index_points)
 
     flat = tf.nest.flatten(gp, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(
         gp, flat, expand_composites=True)
-    self.assertIsInstance(unflat, tfd.GaussianProcess)
+    self.assertIsInstance(unflat, gaussian_process.GaussianProcess)
 
     x = self.evaluate(gp.sample(3, seed=test_util.test_seed()))
     actual = self.evaluate(gp.log_prob(x))

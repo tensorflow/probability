@@ -21,18 +21,19 @@ from scipy import special as sp_special
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import probit_bernoulli
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 def make_bernoulli(batch_shape, dtype=tf.int32):
   p = np.random.uniform(size=list(batch_shape))
   p = tf.constant(p, dtype=tf.float32)
-  return tfd.ProbitBernoulli(probs=p, dtype=dtype, validate_args=True)
+  return probit_bernoulli.ProbitBernoulli(
+      probs=p, dtype=dtype, validate_args=True)
 
 
 def entropy(p):
@@ -45,18 +46,18 @@ class ProbitBernoulliTest(test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.4]
-    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(p, self.evaluate(dist.probs))
 
   def testProbits(self):
     probits = [-42., 42.]
-    dist = tfd.ProbitBernoulli(probits=probits, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probits=probits, validate_args=True)
     self.assertAllClose(probits, self.evaluate(dist.probits))
     self.assertAllClose(
         sp_special.ndtr(probits), self.evaluate(dist.probs_parameter()))
 
     p = [0.01, 0.99, 0.42]
-    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(
         sp_special.ndtri(p), self.evaluate(dist.probits_parameter()))
 
@@ -64,18 +65,18 @@ class ProbitBernoulliTest(test_util.TestCase):
     invalid_ps = [1.01, 2.]
     for p in invalid_ps:
       with self.assertRaisesOpError('probs has components greater than 1'):
-        dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+        dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
         self.evaluate(dist.probs_parameter())
 
     invalid_ps = [-0.01, -3.]
     for p in invalid_ps:
       with self.assertRaisesOpError('x >= 0 did not hold'):
-        dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+        dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
         self.evaluate(dist.probs_parameter())
 
     valid_ps = [0.0, 0.5, 1.0]
     for p in valid_ps:
-      dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+      dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
       self.assertEqual(p, self.evaluate(dist.probs))  # Should not fail
 
   def testShapes(self):
@@ -109,11 +110,12 @@ class ProbitBernoulliTest(test_util.TestCase):
     self.assertEqual(dist64.dtype, dist64.mode().dtype)
 
   def testFloatMode(self):
-    dist = tfd.ProbitBernoulli(probs=.6, dtype=tf.float32, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(
+        probs=.6, dtype=tf.float32, validate_args=True)
     self.assertEqual(np.float32(1), self.evaluate(dist.mode()))
 
   def _testPmf(self, **kwargs):
-    dist = tfd.ProbitBernoulli(**kwargs)
+    dist = probit_bernoulli.ProbitBernoulli(**kwargs)
     # pylint: disable=bad-continuation
     xs = [
         0,
@@ -137,7 +139,7 @@ class ProbitBernoulliTest(test_util.TestCase):
 
   def testPmfCorrectBroadcastDynamicShape(self):
     p = tf1.placeholder_with_default([0.2, 0.3, 0.4], shape=None)
-    dist = tfd.ProbitBernoulli(probs=p)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p)
     event1 = [1, 0, 1]
     event2 = [[1, 0, 1]]
     self.assertAllClose(
@@ -147,7 +149,7 @@ class ProbitBernoulliTest(test_util.TestCase):
 
   def testPmfInvalid(self):
     p = [0.1, 0.2, 0.7]
-    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
     with self.assertRaisesOpError('must be non-negative.'):
       self.evaluate(dist.prob([1, 1, -1]))
     with self.assertRaisesOpError('Elements cannot exceed 1.'):
@@ -165,11 +167,13 @@ class ProbitBernoulliTest(test_util.TestCase):
         np.float32(samps) * np.log(np.float32(p)) +
         (1 - np.float32(samps)) * np.log(1 - np.float32(p)),
         self.evaluate(
-            tfd.ProbitBernoulli(probs=p, validate_args=False).log_prob(samps)))
+            probit_bernoulli.ProbitBernoulli(
+                probs=p, validate_args=False).log_prob(samps)))
 
   def testBroadcasting(self):
     probs = lambda p: tf1.placeholder_with_default(p, shape=None)
-    dist = lambda p: tfd.ProbitBernoulli(probs=probs(p), validate_args=True)
+    dist = lambda p: probit_bernoulli.ProbitBernoulli(  # pylint: disable=g-long-lambda
+        probs=probs(p), validate_args=True)
     self.assertAllClose(np.log(0.5), self.evaluate(dist(0.5).log_prob(1)))
     self.assertAllClose(
         np.log([0.5, 0.5, 0.5]), self.evaluate(dist(0.5).log_prob([1, 1, 1])))
@@ -178,34 +182,36 @@ class ProbitBernoulliTest(test_util.TestCase):
 
   def testPmfShapes(self):
     probs = lambda p: tf1.placeholder_with_default(p, shape=None)
-    dist = lambda p: tfd.ProbitBernoulli(probs=probs(p), validate_args=True)
+    dist = lambda p: probit_bernoulli.ProbitBernoulli(  # pylint: disable=g-long-lambda
+        probs=probs(p), validate_args=True)
     self.assertEqual(
         2, len(self.evaluate(dist([[0.5], [0.5]]).log_prob(1)).shape))
 
-    dist = tfd.ProbitBernoulli(probs=0.5, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=0.5, validate_args=True)
     self.assertEqual(2, len(self.evaluate(dist.log_prob([[1], [1]])).shape))
 
-    dist = tfd.ProbitBernoulli(probs=0.5, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=0.5, validate_args=True)
     self.assertAllEqual([], dist.log_prob(1).shape)
     self.assertAllEqual([1], dist.log_prob([1]).shape)
     self.assertAllEqual([2, 1], dist.log_prob([[1], [1]]).shape)
 
-    dist = tfd.ProbitBernoulli(probs=[[0.5], [0.5]], validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(
+        probs=[[0.5], [0.5]], validate_args=True)
     self.assertAllEqual([2, 1], dist.log_prob(1).shape)
 
   def testBoundaryConditions(self):
-    dist = tfd.ProbitBernoulli(probs=1.0, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=1.0, validate_args=True)
     self.assertAllClose(-np.inf, self.evaluate(dist.log_prob(0)))
     self.assertAllClose([0], [self.evaluate(dist.log_prob(1))])
 
   def testEntropyNoBatch(self):
     p = 0.2
-    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(self.evaluate(dist.entropy()), entropy(p))
 
   def testEntropyWithBatch(self):
     p = [[0.1, 0.7], [0.2, 0.6]]
-    dist = tfd.ProbitBernoulli(probs=p, validate_args=False)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=False)
     self.assertAllClose(
         self.evaluate(dist.entropy()),
         [[entropy(0.1), entropy(0.7)], [entropy(0.2),
@@ -213,7 +219,7 @@ class ProbitBernoulliTest(test_util.TestCase):
 
   def testSampleN(self):
     p = [0.2, 0.6]
-    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
     n = 100000
     samples = dist.sample(n, seed=test_util.test_seed())
     tensorshape_util.set_shape(samples, [n, 2])
@@ -228,7 +234,8 @@ class ProbitBernoulliTest(test_util.TestCase):
     self.assertEqual(set([0, 1]), set(sample_values.flatten()))
     # In this test we're just interested in verifying there isn't a crash
     # owing to mismatched types. b/30940152
-    dist = tfd.ProbitBernoulli(np.log([.2, .4]), validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(
+        np.log([.2, .4]), validate_args=True)
     x = dist.sample(1, seed=test_util.test_seed())
     self.assertAllEqual((1, 2), tensorshape_util.as_list(x.shape))
 
@@ -237,17 +244,16 @@ class ProbitBernoulliTest(test_util.TestCase):
       'JAX does not return None for gradients.')
   def testNotReparameterized(self):
     p = tf.constant([0.2, 0.6])
-    _, grad_p = tfp.math.value_and_gradient(
-        lambda x: tfd.ProbitBernoulli(  # pylint: disable=g-long-lambda
-            probs=x,
-            validate_args=True).sample(
+    _, grad_p = gradient.value_and_gradient(
+        lambda x: probit_bernoulli.ProbitBernoulli(  # pylint: disable=g-long-lambda
+            probs=x, validate_args=True).sample(
                 100, seed=test_util.test_seed()),
         p)
     self.assertIsNone(grad_p)
 
   def testSampleDeterministicScalarVsVector(self):
     p = [0.2, 0.6]
-    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
     n = 1000
     def _seed(seed=None):
       seed = test_util.test_seed() if seed is None else seed
@@ -267,13 +273,13 @@ class ProbitBernoulliTest(test_util.TestCase):
 
   def testMean(self):
     p = np.array([[0.2, 0.7], [0.5, 0.4]], dtype=np.float32)
-    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllEqual(self.evaluate(dist.mean()), p)
 
   def testVarianceAndStd(self):
     var = lambda p: p * (1. - p)
     p = [[0.2, 0.7], [0.5, 0.4]]
-    dist = tfd.ProbitBernoulli(probs=p, validate_args=True)
+    dist = probit_bernoulli.ProbitBernoulli(probs=p, validate_args=True)
     self.assertAllClose(
         self.evaluate(dist.variance()),
         np.array([[var(0.2), var(0.7)], [var(0.5), var(0.4)]],
@@ -289,10 +295,10 @@ class ProbitBernoulliTest(test_util.TestCase):
     a_p = np.array([0.6] * batch_size, dtype=np.float32)
     b_p = np.array([0.4] * batch_size, dtype=np.float32)
 
-    a = tfd.ProbitBernoulli(probs=a_p, validate_args=True)
-    b = tfd.ProbitBernoulli(probs=b_p, validate_args=True)
+    a = probit_bernoulli.ProbitBernoulli(probs=a_p, validate_args=True)
+    b = probit_bernoulli.ProbitBernoulli(probs=b_p, validate_args=True)
 
-    kl = tfd.kl_divergence(a, b)
+    kl = kullback_leibler.kl_divergence(a, b)
     kl_val = self.evaluate(kl)
 
     kl_expected = (a_p * np.log(a_p / b_p) + (1. - a_p) * np.log(
@@ -303,7 +309,7 @@ class ProbitBernoulliTest(test_util.TestCase):
 
   def testParamTensorFromProbits(self):
     x = tf.constant([-1., 0.5, 1.])
-    d = tfd.ProbitBernoulli(probits=x, validate_args=True)
+    d = probit_bernoulli.ProbitBernoulli(probits=x, validate_args=True)
     self.assertAllClose(
         *self.evaluate([tf.math.ndtri(d.prob(1.)),
                         d.probits_parameter()]),
@@ -314,7 +320,7 @@ class ProbitBernoulliTest(test_util.TestCase):
 
   def testParamTensorFromProbs(self):
     x = tf.constant([0.1, 0.5, 0.4])
-    d = tfd.ProbitBernoulli(probs=x, validate_args=True)
+    d = probit_bernoulli.ProbitBernoulli(probs=x, validate_args=True)
     self.assertAllClose(
         *self.evaluate([tf.math.ndtri(d.prob(1.)),
                         d.probits_parameter()]),
@@ -331,7 +337,7 @@ class ProbitBernoulliFromVariableTest(test_util.TestCase):
   def testGradientProbits(self):
     x = tf.Variable([-1., 1])
     self.evaluate(x.initializer)
-    d = tfd.ProbitBernoulli(probits=x, validate_args=True)
+    d = probit_bernoulli.ProbitBernoulli(probits=x, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([0, 1])
     g = tape.gradient(loss, d.trainable_variables)
@@ -342,7 +348,7 @@ class ProbitBernoulliFromVariableTest(test_util.TestCase):
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7])
     self.evaluate(x.initializer)
-    d = tfd.ProbitBernoulli(probs=x, validate_args=True)
+    d = probit_bernoulli.ProbitBernoulli(probs=x, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([0, 1])
     g = tape.gradient(loss, d.trainable_variables)
@@ -351,7 +357,7 @@ class ProbitBernoulliFromVariableTest(test_util.TestCase):
 
   def testAssertionsProbs(self):
     x = tf.Variable([0.1, 0.7, 0.0])
-    d = tfd.ProbitBernoulli(probs=x, validate_args=True)
+    d = probit_bernoulli.ProbitBernoulli(probs=x, validate_args=True)
     self.evaluate(x.initializer)
     self.evaluate(d.entropy())
     with tf.control_dependencies([x.assign([0.1, -0.7, 0.0])]):

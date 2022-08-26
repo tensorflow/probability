@@ -18,13 +18,12 @@ import numpy as np
 from scipy import stats as sp_stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import laplace
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,12 +32,12 @@ class LaplaceTest(test_util.TestCase):
   def testLaplaceShape(self):
     loc = tf.constant([3.0] * 5)
     scale = tf.constant(11.0)
-    laplace = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
+    dist = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
 
-    self.assertEqual(self.evaluate(laplace.batch_shape_tensor()), (5,))
-    self.assertEqual(laplace.batch_shape, tf.TensorShape([5]))
-    self.assertAllEqual(self.evaluate(laplace.event_shape_tensor()), [])
-    self.assertEqual(laplace.event_shape, tf.TensorShape([]))
+    self.assertEqual(self.evaluate(dist.batch_shape_tensor()), (5,))
+    self.assertEqual(dist.batch_shape, tf.TensorShape([5]))
+    self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
+    self.assertEqual(dist.event_shape, tf.TensorShape([]))
 
   def testLaplaceLogPDF(self):
     batch_size = 6
@@ -47,13 +46,13 @@ class LaplaceTest(test_util.TestCase):
     loc_v = 2.0
     scale_v = 3.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
-    laplace = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
-    log_pdf = laplace.log_prob(x)
+    dist = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
+    log_pdf = dist.log_prob(x)
     self.assertEqual(log_pdf.shape, (6,))
     expected_log_pdf = sp_stats.laplace.logpdf(x, loc_v, scale=scale_v)
     self.assertAllClose(self.evaluate(log_pdf), expected_log_pdf)
 
-    pdf = laplace.prob(x)
+    pdf = dist.prob(x)
     self.assertEqual(pdf.shape, (6,))
     self.assertAllClose(self.evaluate(pdf), np.exp(expected_log_pdf))
 
@@ -64,12 +63,12 @@ class LaplaceTest(test_util.TestCase):
     loc_v = np.array([2.0, 4.0])
     scale_v = np.array([3.0, 4.0])
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    laplace = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
-    log_pdf = laplace.log_prob(x)
+    dist = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
+    log_pdf = dist.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
     self.assertEqual(log_pdf.shape, (6, 2))
 
-    pdf = laplace.prob(x)
+    pdf = dist.prob(x)
     pdf_values = self.evaluate(pdf)
     self.assertEqual(pdf.shape, (6, 2))
     expected_log_pdf = sp_stats.laplace.logpdf(x, loc_v, scale=scale_v)
@@ -83,12 +82,12 @@ class LaplaceTest(test_util.TestCase):
     loc_v = np.array([2.0, 4.0])
     scale_v = 3.0
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    laplace = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
-    log_pdf = laplace.log_prob(x)
+    dist = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
+    log_pdf = dist.log_prob(x)
     log_pdf_values = self.evaluate(log_pdf)
     self.assertEqual(log_pdf.shape, (6, 2))
 
-    pdf = laplace.prob(x)
+    pdf = dist.prob(x)
     pdf_values = self.evaluate(pdf)
     self.assertEqual(pdf.shape, (6, 2))
     expected_log_pdf = sp_stats.laplace.logpdf(x, loc_v, scale=scale_v)
@@ -103,9 +102,9 @@ class LaplaceTest(test_util.TestCase):
     scale_v = 3.0
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    laplace = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
+    dist = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
 
-    cdf = laplace.cdf(x)
+    cdf = dist.cdf(x)
     self.assertEqual(cdf.shape, (6,))
     expected_cdf = sp_stats.laplace.cdf(x, loc_v, scale=scale_v)
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
@@ -118,9 +117,9 @@ class LaplaceTest(test_util.TestCase):
     scale_v = 3.0
     x = np.array([-2.5, 2.5, -4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    laplace = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
+    dist = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
 
-    cdf = laplace.log_cdf(x)
+    cdf = dist.log_cdf(x)
     self.assertEqual(cdf.shape, (6,))
     expected_cdf = sp_stats.laplace.logcdf(x, loc_v, scale=scale_v)
     self.assertAllClose(self.evaluate(cdf), expected_cdf)
@@ -132,7 +131,7 @@ class LaplaceTest(test_util.TestCase):
              samplers.uniform([10], minval=.1, maxval=.9,
                               seed=test_util.test_seed())],
             axis=0))
-    d = tfd.Laplace(loc=1., scale=1.3, validate_args=True)
+    d = laplace.Laplace(loc=1., scale=1.3, validate_args=True)
     vals = d.quantile(qs)
     self.assertAllClose([-np.inf, np.inf], vals[:2])
     self.assertAllClose(qs[2:], d.cdf(vals[2:]))
@@ -145,9 +144,9 @@ class LaplaceTest(test_util.TestCase):
     scale_v = 3.0
     x = np.array([-2.5, 2.5, -4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    laplace = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
+    dist = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
 
-    sf = laplace.log_survival_function(x)
+    sf = dist.log_survival_function(x)
     self.assertEqual(sf.shape, (6,))
     expected_sf = sp_stats.laplace.logsf(x, loc_v, scale=scale_v)
     self.assertAllClose(self.evaluate(sf), expected_sf)
@@ -155,41 +154,41 @@ class LaplaceTest(test_util.TestCase):
   def testLaplaceMean(self):
     loc_v = np.array([1.0, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = tfd.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
-    self.assertEqual(laplace.mean().shape, (3,))
+    dist = laplace.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
+    self.assertEqual(dist.mean().shape, (3,))
     expected_means = sp_stats.laplace.mean(loc_v, scale=scale_v)
-    self.assertAllClose(self.evaluate(laplace.mean()), expected_means)
+    self.assertAllClose(self.evaluate(dist.mean()), expected_means)
 
   def testLaplaceMode(self):
     loc_v = np.array([0.5, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = tfd.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
-    self.assertEqual(laplace.mode().shape, (3,))
-    self.assertAllClose(self.evaluate(laplace.mode()), loc_v)
+    dist = laplace.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
+    self.assertEqual(dist.mode().shape, (3,))
+    self.assertAllClose(self.evaluate(dist.mode()), loc_v)
 
   def testLaplaceVariance(self):
     loc_v = np.array([1.0, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = tfd.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
-    self.assertEqual(laplace.variance().shape, (3,))
+    dist = laplace.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
+    self.assertEqual(dist.variance().shape, (3,))
     expected_variances = sp_stats.laplace.var(loc_v, scale=scale_v)
-    self.assertAllClose(self.evaluate(laplace.variance()), expected_variances)
+    self.assertAllClose(self.evaluate(dist.variance()), expected_variances)
 
   def testLaplaceStd(self):
     loc_v = np.array([1.0, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = tfd.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
-    self.assertEqual(laplace.stddev().shape, (3,))
+    dist = laplace.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
+    self.assertEqual(dist.stddev().shape, (3,))
     expected_stddev = sp_stats.laplace.std(loc_v, scale=scale_v)
-    self.assertAllClose(self.evaluate(laplace.stddev()), expected_stddev)
+    self.assertAllClose(self.evaluate(dist.stddev()), expected_stddev)
 
   def testLaplaceEntropy(self):
     loc_v = np.array([1.0, 3.0, 2.5])
     scale_v = np.array([1.0, 4.0, 5.0])
-    laplace = tfd.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
-    self.assertEqual(laplace.entropy().shape, (3,))
+    dist = laplace.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
+    self.assertEqual(dist.entropy().shape, (3,))
     expected_entropy = sp_stats.laplace.entropy(loc_v, scale=scale_v)
-    self.assertAllClose(self.evaluate(laplace.entropy()), expected_entropy)
+    self.assertAllClose(self.evaluate(dist.entropy()), expected_entropy)
 
   def testLaplaceSample(self):
     loc_v = 4.0
@@ -197,8 +196,8 @@ class LaplaceTest(test_util.TestCase):
     loc = tf.constant(loc_v)
     scale = tf.constant(scale_v)
     n = 100000
-    laplace = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
-    samples = laplace.sample(n, seed=test_util.test_seed())
+    dist = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
     self.assertEqual(sample_values.shape, (n,))
@@ -218,18 +217,19 @@ class LaplaceTest(test_util.TestCase):
   def testLaplaceFullyReparameterized(self):
     loc = tf.constant(4.0)
     scale = tf.constant(3.0)
-    _, [grad_loc, grad_scale] = tfp.math.value_and_gradient(
-        lambda l, s: tfd.Laplace(loc=l, scale=s, validate_args=True).sample(  # pylint: disable=g-long-lambda
-            100, seed=test_util.test_seed()), [loc, scale])
+    _, [grad_loc, grad_scale] = gradient.value_and_gradient(
+        lambda l, s: laplace.Laplace(loc=l, scale=s, validate_args=True).sample(  # pylint: disable=g-long-lambda
+            100, seed=test_util.test_seed()),
+        [loc, scale])
     self.assertIsNotNone(grad_loc)
     self.assertIsNotNone(grad_scale)
 
   def testLaplaceSampleMultiDimensional(self):
     loc_v = np.array([np.arange(1, 101, dtype=np.float32)])  # 1 x 100
     scale_v = np.array([np.arange(1, 11, dtype=np.float32)]).T  # 10 x 1
-    laplace = tfd.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
+    dist = laplace.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
     n = 10000
-    samples = laplace.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n, 10, 100))
     self.assertEqual(sample_values.shape, (n, 10, 100))
@@ -262,10 +262,11 @@ class LaplaceTest(test_util.TestCase):
     return ks < 0.02
 
   def testLaplacePdfOfSampleMultiDims(self):
-    laplace = tfd.Laplace(loc=[7., 11.], scale=[[5.], [6.]], validate_args=True)
+    dist = laplace.Laplace(
+        loc=[7., 11.], scale=[[5.], [6.]], validate_args=True)
     num = 50000
-    samples = laplace.sample(num, seed=test_util.test_seed())
-    pdfs = laplace.prob(samples)
+    samples = dist.sample(num, seed=test_util.test_seed())
+    pdfs = dist.prob(samples)
     sample_vals, pdf_vals = self.evaluate([samples, pdfs])
     self.assertEqual(samples.shape, (num, 2, 2))
     self.assertEqual(pdfs.shape, (num, 2, 2))
@@ -300,21 +301,19 @@ class LaplaceTest(test_util.TestCase):
     loc_v = tf.constant(0.0, name='loc')
     scale_v = tf.constant(-1.0, name='scale')
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      laplace = tfd.Laplace(
-          loc=loc_v, scale=scale_v, validate_args=True)
-      self.evaluate(laplace.mean())
+      dist = laplace.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
+      self.evaluate(dist.mean())
 
     loc_v = tf.constant(1.0, name='loc')
     scale_v = tf.constant(0.0, name='scale')
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      laplace = tfd.Laplace(
-          loc=loc_v, scale=scale_v, validate_args=True)
-      self.evaluate(laplace.mean())
+      dist = laplace.Laplace(loc=loc_v, scale=scale_v, validate_args=True)
+      self.evaluate(dist.mean())
 
     scale = tf.Variable([1., 2., -3.])
     self.evaluate(scale.initializer)
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      d = tfd.Laplace(loc=0, scale=scale, validate_args=True)
+      d = laplace.Laplace(loc=0, scale=scale, validate_args=True)
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testLaplaceLaplaceKL(self):
@@ -326,15 +325,15 @@ class LaplaceTest(test_util.TestCase):
     b_loc = np.array([[0.4] * event_size] * batch_size, dtype=np.float32)
     b_scale = np.array([[0.2] * event_size] * batch_size, dtype=np.float32)
 
-    a = tfd.Laplace(loc=a_loc, scale=a_scale, validate_args=True)
-    b = tfd.Laplace(loc=b_loc, scale=b_scale, validate_args=True)
+    a = laplace.Laplace(loc=a_loc, scale=a_scale, validate_args=True)
+    b = laplace.Laplace(loc=b_loc, scale=b_scale, validate_args=True)
 
     distance = tf.abs(a_loc - b_loc)
     ratio = a_scale / b_scale
     true_kl = (-tf.math.log(ratio) - 1 + distance / b_scale +
                ratio * tf.exp(-distance / a_scale))
 
-    kl = tfd.kl_divergence(a, b)
+    kl = kullback_leibler.kl_divergence(a, b)
 
     x = a.sample(int(1e4), seed=test_util.test_seed())
     kl_samples = a.log_prob(x) - b.log_prob(x)
@@ -343,7 +342,7 @@ class LaplaceTest(test_util.TestCase):
     self.assertAllClose(kl_, true_kl_, atol=1e-5, rtol=1e-5)
     self.assertAllMeansClose(kl_samples_, true_kl_, axis=0, atol=0., rtol=1e-1)
 
-    zero_kl = tfd.kl_divergence(a, a)
+    zero_kl = kullback_leibler.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(true_kl), zero_kl])
     self.assertAllEqual(true_zero_kl_, zero_kl_)
 
@@ -351,7 +350,7 @@ class LaplaceTest(test_util.TestCase):
   def testGradientThroughParams(self):
     loc = tf.Variable([-5., 0., 5.])
     scale = tf.Variable(2.)
-    d = tfd.Laplace(loc=loc, scale=scale, validate_args=True)
+    d = laplace.Laplace(loc=loc, scale=scale, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 3.])
     grad = tape.gradient(loss, d.trainable_variables)
@@ -360,17 +359,17 @@ class LaplaceTest(test_util.TestCase):
 
   def testAssertsPositiveScaleAfterMutation(self):
     scale = tf.Variable([1., 2., 3.])
-    d = tfd.Laplace(loc=0., scale=scale, validate_args=True)
+    d = laplace.Laplace(loc=0., scale=scale, validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
       with tf.control_dependencies([scale.assign([1., 2., -3.])]):
-        self.evaluate(tfd.Laplace(loc=0., scale=1.).kl_divergence(d))
+        self.evaluate(laplace.Laplace(loc=0., scale=1.).kl_divergence(d))
 
   def testAssertParamsAreFloats(self):
     loc = tf.convert_to_tensor(0, dtype=tf.int32)
     scale = tf.convert_to_tensor(1, dtype=tf.int32)
     with self.assertRaisesRegexp(ValueError, 'Expected floating point'):
-      tfd.Laplace(loc=loc, scale=scale)
+      laplace.Laplace(loc=loc, scale=scale)
 
 
 if __name__ == '__main__':

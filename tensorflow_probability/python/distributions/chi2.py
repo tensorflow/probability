@@ -17,7 +17,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
@@ -28,6 +27,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 
 
 __all__ = [
@@ -136,7 +136,7 @@ class Chi2(distribution.AutoCompositeTensorDistribution):
     return tf.math.igamma(0.5 * self.df, 0.5 * x)
 
   def _quantile(self, p):
-    return 2. * tfp_math.igammainv(0.5 * self.df, p)
+    return 2. * special.igammainv(0.5 * self.df, p)
 
   def _entropy(self):
     concentration = 0.5 * self.df

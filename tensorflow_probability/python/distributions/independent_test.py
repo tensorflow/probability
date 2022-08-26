@@ -24,12 +24,19 @@ import numpy as np
 from scipy import stats as sp_stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import log_prob_ratio
+from tensorflow_probability.python.distributions import logistic
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 JAX_MODE = False
 
@@ -45,8 +52,8 @@ class IndependentDistributionTest(test_util.TestCase):
   def testSampleAndLogProbUnivariate(self):
     loc = np.float32([-1., 1])
     scale = np.float32([0.1, 0.5])
-    ind = tfd.Independent(
-        distribution=tfd.Normal(loc=loc, scale=scale),
+    ind = independent.Independent(
+        distribution=normal.Normal(loc=loc, scale=scale),
         reinterpreted_batch_ndims=1,
         validate_args=True)
 
@@ -66,8 +73,8 @@ class IndependentDistributionTest(test_util.TestCase):
   def testSampleAndLogProbMultivariate(self):
     loc = np.float32([[-1., 1], [1, -1]])
     scale = np.float32([1., 0.5])
-    ind = tfd.Independent(
-        distribution=tfd.MultivariateNormalDiag(
+    ind = independent.Independent(
+        distribution=mvn_diag.MultivariateNormalDiag(
             loc=loc, scale_identity_multiplier=scale),
         reinterpreted_batch_ndims=1,
         validate_args=True)
@@ -87,8 +94,8 @@ class IndependentDistributionTest(test_util.TestCase):
         expected_log_prob_x, actual_log_prob_x, rtol=1e-6, atol=0.)
 
   def testCdfMultivariate(self):
-    ind = tfd.Independent(
-        distribution=tfd.Normal(loc=tf.zeros([3]), scale=1.),
+    ind = independent.Independent(
+        distribution=normal.Normal(loc=tf.zeros([3]), scale=1.),
         reinterpreted_batch_ndims=1,
         validate_args=True)
 
@@ -105,8 +112,8 @@ class IndependentDistributionTest(test_util.TestCase):
     loc = np.float32([[-1., 1], [1, -1]])
     scale = np.float32([1., 0.5])
     n_samp = 1e4
-    ind = tfd.Independent(
-        distribution=tfd.MultivariateNormalDiag(
+    ind = independent.Independent(
+        distribution=mvn_diag.MultivariateNormalDiag(
             loc=loc, scale_identity_multiplier=scale),
         reinterpreted_batch_ndims=1,
         validate_args=True)
@@ -152,8 +159,8 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertAllClose(loc, actual_mode_, rtol=1e-6, atol=0.)
 
   def testEventNdimsIsStaticWhenPossible(self):
-    ind = tfd.Independent(
-        distribution=tfd.Normal(
+    ind = independent.Independent(
+        distribution=normal.Normal(
             loc=tf1.placeholder_with_default([2.], shape=None),
             scale=tf1.placeholder_with_default(1., shape=None)),
         reinterpreted_batch_ndims=1,
@@ -163,44 +170,48 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertEqual(tensorshape_util.rank(ind.event_shape), 1)
 
   def testKLRaises(self):
-    ind1 = tfd.Independent(
-        distribution=tfd.Normal(
+    ind1 = independent.Independent(
+        distribution=normal.Normal(
             loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5])),
         reinterpreted_batch_ndims=1,
         validate_args=True)
-    ind2 = tfd.Independent(
-        distribution=tfd.Normal(
-            loc=np.float32(-1), scale=np.float32(0.5)),
-        reinterpreted_batch_ndims=0, validate_args=True)
+    ind2 = independent.Independent(
+        distribution=normal.Normal(loc=np.float32(-1), scale=np.float32(0.5)),
+        reinterpreted_batch_ndims=0,
+        validate_args=True)
 
     with self.assertRaisesRegexp(
         ValueError, 'Event shapes do not match'):
-      tfd.kl_divergence(ind1, ind2)
+      kullback_leibler.kl_divergence(ind1, ind2)
 
-    ind1 = tfd.Independent(
-        distribution=tfd.Normal(
+    ind1 = independent.Independent(
+        distribution=normal.Normal(
             loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5])),
-        reinterpreted_batch_ndims=1, validate_args=True)
-    ind2 = tfd.Independent(
-        distribution=tfd.MultivariateNormalDiag(
+        reinterpreted_batch_ndims=1,
+        validate_args=True)
+    ind2 = independent.Independent(
+        distribution=mvn_diag.MultivariateNormalDiag(
             loc=np.float32([-1., 1]), scale_diag=np.float32([0.1, 0.5])),
-        reinterpreted_batch_ndims=0, validate_args=True)
+        reinterpreted_batch_ndims=0,
+        validate_args=True)
 
     with self.assertRaisesRegexp(
         NotImplementedError, 'different event shapes'):
-      tfd.kl_divergence(ind1, ind2)
+      kullback_leibler.kl_divergence(ind1, ind2)
 
   def testKlWithDynamicShapes(self):
-    dist1 = tfd.Independent(
-        tfd.Normal(loc=np.zeros((4, 5, 2, 3)), scale=1., validate_args=True),
-        reinterpreted_batch_ndims=2, validate_args=True)
+    dist1 = independent.Independent(
+        normal.Normal(loc=np.zeros((4, 5, 2, 3)), scale=1., validate_args=True),
+        reinterpreted_batch_ndims=2,
+        validate_args=True)
 
     loc2 = tf.Variable(np.zeros((4, 5, 2, 3)), shape=tf.TensorShape(None))
     scale2 = tf.Variable(np.ones([]), shape=tf.TensorShape(None))
     ndims2 = tf.Variable(2, trainable=False, shape=tf.TensorShape(None))
-    dist2 = tfd.Independent(
-        tfd.Normal(loc=loc2, scale=scale2, validate_args=True),
-        reinterpreted_batch_ndims=ndims2, validate_args=True)
+    dist2 = independent.Independent(
+        normal.Normal(loc=loc2, scale=scale2, validate_args=True),
+        reinterpreted_batch_ndims=ndims2,
+        validate_args=True)
 
     self.evaluate([v.initializer for v in dist1.variables]
                   + [v.initializer for v in dist2.variables])
@@ -212,60 +223,60 @@ class IndependentDistributionTest(test_util.TestCase):
         self.evaluate(dist1.kl_divergence(dist2))
 
   def testKLScalarToMultivariate(self):
-    normal1 = tfd.Normal(
+    normal1 = normal.Normal(
         loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5]))
-    ind1 = tfd.Independent(distribution=normal1, reinterpreted_batch_ndims=1,
-                           validate_args=True)
+    ind1 = independent.Independent(
+        distribution=normal1, reinterpreted_batch_ndims=1, validate_args=True)
 
-    normal2 = tfd.Normal(
+    normal2 = normal.Normal(
         loc=np.float32([-3., 3]), scale=np.float32([0.3, 0.3]))
-    ind2 = tfd.Independent(distribution=normal2, reinterpreted_batch_ndims=1,
-                           validate_args=True)
+    ind2 = independent.Independent(
+        distribution=normal2, reinterpreted_batch_ndims=1, validate_args=True)
 
-    normal_kl = tfd.kl_divergence(normal1, normal2)
-    ind_kl = tfd.kl_divergence(ind1, ind2)
+    normal_kl = kullback_leibler.kl_divergence(normal1, normal2)
+    ind_kl = kullback_leibler.kl_divergence(ind1, ind2)
     self.assertAllClose(
         self.evaluate(tf.reduce_sum(normal_kl, axis=-1)),
         self.evaluate(ind_kl))
 
   def testKLIdentity(self):
-    normal1 = tfd.Normal(
+    normal1 = normal.Normal(
         loc=np.float32([-1., 1]), scale=np.float32([0.1, 0.5]))
     # This is functionally just a wrapper around normal1,
     # and doesn't change any outputs.
-    ind1 = tfd.Independent(distribution=normal1, reinterpreted_batch_ndims=0,
-                           validate_args=True)
+    ind1 = independent.Independent(
+        distribution=normal1, reinterpreted_batch_ndims=0, validate_args=True)
 
-    normal2 = tfd.Normal(
+    normal2 = normal.Normal(
         loc=np.float32([-3., 3]), scale=np.float32([0.3, 0.3]))
     # This is functionally just a wrapper around normal2,
     # and doesn't change any outputs.
-    ind2 = tfd.Independent(distribution=normal2, reinterpreted_batch_ndims=0,
-                           validate_args=True)
+    ind2 = independent.Independent(
+        distribution=normal2, reinterpreted_batch_ndims=0, validate_args=True)
 
-    normal_kl = tfd.kl_divergence(normal1, normal2)
-    ind_kl = tfd.kl_divergence(ind1, ind2)
+    normal_kl = kullback_leibler.kl_divergence(normal1, normal2)
+    ind_kl = kullback_leibler.kl_divergence(ind1, ind2)
     self.assertAllClose(
         self.evaluate(normal_kl), self.evaluate(ind_kl))
 
   def testKLMultivariateToMultivariate(self):
     # (1, 1, 2) batch of MVNDiag
-    mvn1 = tfd.MultivariateNormalDiag(
+    mvn1 = mvn_diag.MultivariateNormalDiag(
         loc=np.float32([[[[-1., 1, 3.], [2., 4., 3.]]]]),
         scale_diag=np.float32([[[0.2, 0.1, 5.], [2., 3., 4.]]]))
-    ind1 = tfd.Independent(distribution=mvn1, reinterpreted_batch_ndims=2,
-                           validate_args=True)
+    ind1 = independent.Independent(
+        distribution=mvn1, reinterpreted_batch_ndims=2, validate_args=True)
 
     # (1, 1, 2) batch of MVNDiag
-    mvn2 = tfd.MultivariateNormalDiag(
+    mvn2 = mvn_diag.MultivariateNormalDiag(
         loc=np.float32([[[[-2., 3, 2.], [1., 3., 2.]]]]),
         scale_diag=np.float32([[[0.1, 0.5, 3.], [1., 2., 1.]]]))
 
-    ind2 = tfd.Independent(distribution=mvn2, reinterpreted_batch_ndims=2,
-                           validate_args=True)
+    ind2 = independent.Independent(
+        distribution=mvn2, reinterpreted_batch_ndims=2, validate_args=True)
 
-    mvn_kl = tfd.kl_divergence(mvn1, mvn2)
-    ind_kl = tfd.kl_divergence(ind1, ind2)
+    mvn_kl = kullback_leibler.kl_divergence(mvn1, mvn2)
+    ind_kl = kullback_leibler.kl_divergence(ind1, ind2)
     self.assertAllClose(
         self.evaluate(tf.reduce_sum(mvn_kl, axis=[-1, -2])),
         self.evaluate(ind_kl))
@@ -282,8 +293,8 @@ class IndependentDistributionTest(test_util.TestCase):
 
     logits_ph = tf1.placeholder_with_default(
         logits, shape=logits.shape if static_shape else None)
-    ind = tfd.Independent(
-        distribution=tfd.Bernoulli(logits=logits_ph), validate_args=True)
+    ind = independent.Independent(
+        distribution=bernoulli.Bernoulli(logits=logits_ph), validate_args=True)
     x = ind.sample(sample_shape, seed=test_util.test_seed())
     log_prob_x = ind.log_prob(x)
     [
@@ -329,7 +340,8 @@ class IndependentDistributionTest(test_util.TestCase):
     rank(underlying.batch_shape)-1 to take over, which we don't want in the
     slice case.
     """
-    d = tfd.Independent(tfd.Bernoulli(logits=0), validate_args=True)
+    d = independent.Independent(
+        bernoulli.Bernoulli(logits=0), validate_args=True)
     self.assertAllEqual([], d[...].batch_shape)
     self.assertAllEqual([], d[...].event_shape)
     self.assertAllEqual([1], d[tf.newaxis].batch_shape)
@@ -340,22 +352,24 @@ class IndependentDistributionTest(test_util.TestCase):
     self.assertAllEqual([], d[tf.newaxis, ..., tf.newaxis].event_shape)
 
   def testSlicingGeneral(self):
-    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([5, 6])),
-                        validate_args=True)
+    d = independent.Independent(
+        bernoulli.Bernoulli(logits=tf.zeros([5, 6])), validate_args=True)
     self.assertAllEqual([5], d.batch_shape)
     self.assertAllEqual([6], d.event_shape)
     self.assertAllEqual([1, 5], d[tf.newaxis].batch_shape)
     self.assertAllEqual([6], d[tf.newaxis].event_shape)
 
-    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([4, 5, 6])),
-                        validate_args=True)
+    d = independent.Independent(
+        bernoulli.Bernoulli(logits=tf.zeros([4, 5, 6])), validate_args=True)
     self.assertAllEqual([4], d.batch_shape)
     self.assertAllEqual([5, 6], d.event_shape)
     self.assertAllEqual([1, 3], d[tf.newaxis, ..., :3].batch_shape)
     self.assertAllEqual([5, 6], d[tf.newaxis, ..., :3].event_shape)
 
-    d = tfd.Independent(tfd.Bernoulli(logits=tf.zeros([4, 5, 6])),
-                        reinterpreted_batch_ndims=1, validate_args=True)
+    d = independent.Independent(
+        bernoulli.Bernoulli(logits=tf.zeros([4, 5, 6])),
+        reinterpreted_batch_ndims=1,
+        validate_args=True)
     self.assertAllEqual([4, 5], d.batch_shape)
     self.assertAllEqual([6], d.event_shape)
     self.assertAllEqual([1, 4, 3], d[tf.newaxis, ..., :3].batch_shape)
@@ -364,12 +378,12 @@ class IndependentDistributionTest(test_util.TestCase):
   def testSlicingSubclasses(self):
     self.skipTest('b/183457779')
 
-    class IndepBern1d(tfd.Independent):
+    class IndepBern1d(independent.Independent):
 
       def __init__(self, logits):
-        super(IndepBern1d, self).__init__(tfd.Bernoulli(logits=logits,
-                                                        dtype=tf.float32),
-                                          reinterpreted_batch_ndims=1)
+        super(IndepBern1d, self).__init__(
+            bernoulli.Bernoulli(logits=logits, dtype=tf.float32),
+            reinterpreted_batch_ndims=1)
         self._parameters = {'logits': logits}
 
     d = IndepBern1d(tf.zeros([4, 5, 6]))
@@ -391,9 +405,10 @@ class IndependentDistributionTest(test_util.TestCase):
     loc = tf.Variable(np.zeros((4, 5, 2, 3)), shape=tf.TensorShape(None))
     scale = tf.Variable(np.ones([]), shape=tf.TensorShape(None))
     ndims = tf.Variable(2, trainable=False, shape=tf.TensorShape(None))
-    dist = tfd.Independent(
-        tfd.Logistic(loc=loc, scale=scale),
-        reinterpreted_batch_ndims=ndims, validate_args=True)
+    dist = independent.Independent(
+        logistic.Logistic(loc=loc, scale=scale),
+        reinterpreted_batch_ndims=ndims,
+        validate_args=True)
     with tf.GradientTape() as tape:
       loss = -dist.log_prob(np.zeros((4, 5, 2, 3)))
     grad = tape.gradient(loss, dist.trainable_variables)
@@ -406,9 +421,10 @@ class IndependentDistributionTest(test_util.TestCase):
     scale = tfp_hps.defer_and_count_usage(
         tf.Variable(np.ones([]), shape=tf.TensorShape(None)))
     ndims = tf.Variable(1, trainable=False, shape=tf.TensorShape(None))
-    dist = tfd.Independent(
-        tfd.Logistic(loc=loc, scale=scale, validate_args=True),
-        reinterpreted_batch_ndims=ndims, validate_args=True)
+    dist = independent.Independent(
+        logistic.Logistic(loc=loc, scale=scale, validate_args=True),
+        reinterpreted_batch_ndims=ndims,
+        validate_args=True)
 
     # TODO(b/140579567): All methods of `dist` may require four concretizations
     # of parameters `loc` and `scale`:
@@ -451,9 +467,10 @@ class IndependentDistributionTest(test_util.TestCase):
         tf.Variable(np.zeros((5, 2, 3)), shape=tf.TensorShape(None)))
     scale = tfp_hps.defer_and_count_usage(
         tf.Variable(np.ones([]), shape=tf.TensorShape(None)))
-    dist = tfd.Independent(
-        tfd.Logistic(loc=loc, scale=scale, validate_args=True),
-        reinterpreted_batch_ndims=None, validate_args=True)
+    dist = independent.Independent(
+        logistic.Logistic(loc=loc, scale=scale, validate_args=True),
+        reinterpreted_batch_ndims=None,
+        validate_args=True)
 
     for method in ('event_shape_tensor', 'mean', 'variance'):
       with tfp_hps.assert_no_excessive_var_usage(method, max_permissible=4):
@@ -499,9 +516,10 @@ class IndependentDistributionTest(test_util.TestCase):
 
     loc = tf.Variable(np.zeros((4, 5, 2, 3)), shape=tf.TensorShape(None))
     scale = tf.Variable(np.ones([]), shape=tf.TensorShape(None))
-    dist = tfd.Independent(
-        tfd.Logistic(loc=loc, scale=scale),
-        reinterpreted_batch_ndims=None, validate_args=True)
+    dist = independent.Independent(
+        logistic.Logistic(loc=loc, scale=scale),
+        reinterpreted_batch_ndims=None,
+        validate_args=True)
 
     self.assertAllEqual((4,), dist.batch_shape_tensor())
 
@@ -519,15 +537,18 @@ class IndependentDistributionTest(test_util.TestCase):
       maybe_jit = tf.function(jit_compile=True)
     stream = test_util.test_seed_stream()
     n = 20_000
-    samps = tfd.Poisson(rate=1.).sample(n, seed=stream())
-    log_rate = tf.fill([n], tfd.Normal(0, .2).sample(seed=stream()))
-    pois = tfd.Poisson(log_rate=log_rate)
-    lp_fn = maybe_jit(tfd.Independent(pois, reinterpreted_batch_ndims=1,
-                                      experimental_use_kahan_sum=True).log_prob)
+    samps = poisson.Poisson(rate=1.).sample(n, seed=stream())
+    log_rate = tf.fill([n], normal.Normal(0, .2).sample(seed=stream()))
+    pois = poisson.Poisson(log_rate=log_rate)
+    lp_fn = maybe_jit(
+        independent.Independent(
+            pois, reinterpreted_batch_ndims=1,
+            experimental_use_kahan_sum=True).log_prob)
     lp = lp_fn(samps)
-    pois64 = tfd.Poisson(log_rate=tf.cast(log_rate, tf.float64))
-    lp64 = tfd.Independent(pois64, reinterpreted_batch_ndims=1).log_prob(
-        tf.cast(samps, tf.float64))
+    pois64 = poisson.Poisson(log_rate=tf.cast(log_rate, tf.float64))
+    lp64 = independent.Independent(
+        pois64,
+        reinterpreted_batch_ndims=1).log_prob(tf.cast(samps, tf.float64))
     # Evaluate together to ensure we use the same samples.
     lp, lp64 = self.evaluate((tf.cast(lp, tf.float64), lp64))
     # Fails ~75% CPU, 1-75% GPU --vary_seed runs w/o experimental_use_kahan_sum.
@@ -550,22 +571,22 @@ class IndependentDistributionTest(test_util.TestCase):
 
     stream = test_util.test_seed_stream()
     n = 20_000
-    samps = tfd.Exponential(rate=1.).sample(n, seed=stream())
-    rate = tf.fill([n], tfd.LogNormal(0, .2).sample(seed=stream()))
-    exp = tfd.Exponential(rate=rate)
+    samps = exponential.Exponential(rate=1.).sample(n, seed=stream())
+    rate = tf.fill([n], lognormal.LogNormal(0, .2).sample(seed=stream()))
+    exp = exponential.Exponential(rate=rate)
     ldj32_fn = maybe_jit(
         functools.partial(
             ldj_fn,
-            dist=tfd.Independent(
+            dist=independent.Independent(
                 exp,
                 reinterpreted_batch_ndims=1,
                 experimental_use_kahan_sum=True),
         ))
     ldj32 = ldj32_fn(samps)
-    exp64 = tfd.Exponential(rate=tf.cast(rate, tf.float64))
+    exp64 = exponential.Exponential(rate=tf.cast(rate, tf.float64))
     ldj64 = ldj_fn(
         tf.cast(samps, tf.float64),
-        dist=tfd.Independent(exp64, reinterpreted_batch_ndims=1))
+        dist=independent.Independent(exp64, reinterpreted_batch_ndims=1))
     # Evaluate together to ensure we use the same samples.
     ldj32, ldj64 = self.evaluate((ldj32, ldj64))
     self.assertAllCloseNested(ldj64, ldj32, rtol=0., atol=.002)
@@ -573,29 +594,34 @@ class IndependentDistributionTest(test_util.TestCase):
   def testLargeLogProbDiff(self):
     b = 15
     n = 5_000
-    d0 = tfd.Independent(tfd.Normal(tf.fill([b, n], 0.), tf.fill([n], .1)),
-                         reinterpreted_batch_ndims=1,
-                         experimental_use_kahan_sum=True)
-    d1 = tfd.Independent(tfd.Normal(tf.fill([b, n], 1e-5), tf.fill([n], .1)),
-                         reinterpreted_batch_ndims=1,
-                         experimental_use_kahan_sum=True)
+    d0 = independent.Independent(
+        normal.Normal(tf.fill([b, n], 0.), tf.fill([n], .1)),
+        reinterpreted_batch_ndims=1,
+        experimental_use_kahan_sum=True)
+    d1 = independent.Independent(
+        normal.Normal(tf.fill([b, n], 1e-5), tf.fill([n], .1)),
+        reinterpreted_batch_ndims=1,
+        experimental_use_kahan_sum=True)
     strm = test_util.test_seed_stream()
     x0 = self.evaluate(  # overdispersed
-        tfd.Normal(0, 2).sample([b, n], seed=strm()))
+        normal.Normal(0, 2).sample([b, n], seed=strm()))
     x1 = self.evaluate(  # overdispersed, perturbed
-        x0 + tfd.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
-    d0_64 = d0.copy(distribution=tfd.Normal(
-        tf.cast(d0.distribution.loc, tf.float64),
-        tf.cast(d0.distribution.scale, tf.float64)))
-    d1_64 = d1.copy(distribution=tfd.Normal(
-        tf.cast(d1.distribution.loc, tf.float64),
-        tf.cast(d1.distribution.scale, tf.float64)))
+        x0 + normal.Normal(0, 1e-6).sample(x0.shape, seed=strm()))
+    d0_64 = d0.copy(
+        distribution=normal.Normal(
+            tf.cast(d0.distribution.loc, tf.float64),
+            tf.cast(d0.distribution.scale, tf.float64)))
+    d1_64 = d1.copy(
+        distribution=normal.Normal(
+            tf.cast(d1.distribution.loc, tf.float64),
+            tf.cast(d1.distribution.scale, tf.float64)))
     self.assertNotAllZero(d0.log_prob(x0) < -1_000_000)
     self.assertAllClose(
         d0_64.log_prob(tf.cast(x0, tf.float64)) -
         d1_64.log_prob(tf.cast(x1, tf.float64)),
-        tfp.experimental.distributions.log_prob_ratio(d0, x0, d1, x1),
-        rtol=0., atol=0.01)
+        log_prob_ratio.log_prob_ratio(d0, x0, d1, x1),
+        rtol=0.,
+        atol=0.01)
     # In contrast: the below fails consistently w/ errors around 0.5-1.0
     # self.assertAllClose(
     #     d0_64.log_prob(tf.cast(x0, tf.float64)) -

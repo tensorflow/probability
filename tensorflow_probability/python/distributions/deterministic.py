@@ -20,7 +20,9 @@ import abc
 import six
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import pad
+from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.internal import assert_util
@@ -164,11 +166,11 @@ class _BaseDeterministic(distribution.AutoCompositeTensorDistribution):
     """The bijector maps a zero-dimensional null Tensor input to `self.loc`."""
     # The shape of the pulled back null tensor will be `self.loc.shape + (0,)`.
     # First we pad to a tensor of zeros with shape `self.loc.shape + (1,)`.
-    pad_zero = tfb.Pad([(1, 0)])
+    pad_zero = pad.Pad([(1, 0)])
     # Next, we squeeze to a tensor of zeros with shape matching `self.loc`.
-    zeros_squeezed = tfb.Reshape([], event_shape_in=[1])(pad_zero)
+    zeros_squeezed = reshape.Reshape([], event_shape_in=[1])(pad_zero)
     # Finally, we shift the zeros by `self.loc`.
-    return tfb.Shift(self.loc)(zeros_squeezed)
+    return shift.Shift(self.loc)(zeros_squeezed)
 
   def _parameter_control_dependencies(self, is_init):
     assertions = []

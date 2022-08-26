@@ -29,7 +29,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
-from tensorflow_probability.python.math import generic as tfp_math
+from tensorflow_probability.python.math import generic
 
 __all__ = [
     'ExponentiallyModifiedGaussian',
@@ -189,7 +189,7 @@ class ExponentiallyModifiedGaussian(
     u = rate * x_centralized
     v = rate * scale
     vsquared = tf.square(v)
-    return tfp_math.log_sub_exp(
+    return generic.log_sub_exp(
         special_math.log_ndtr(x_centralized / scale),
         -u + vsquared / 2. + special_math.log_ndtr((u - vsquared) / v))
 

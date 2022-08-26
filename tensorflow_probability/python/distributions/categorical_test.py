@@ -20,21 +20,23 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.util import deferred_tensor
 
 
 def make_categorical(batch_shape, num_classes, dtype=tf.int32):
   logits = -50. + tf.random.uniform(
       list(batch_shape) + [num_classes], minval=-10, maxval=10,
       dtype=tf.float32, seed=test_util.test_seed())
-  return tfd.Categorical(logits, dtype=dtype, validate_args=True)
+  return categorical.Categorical(logits, dtype=dtype, validate_args=True)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -42,14 +44,14 @@ class CategoricalTest(test_util.TestCase):
 
   def testP(self):
     p = [0.2, 0.8]
-    dist = tfd.Categorical(probs=p, validate_args=True)
+    dist = categorical.Categorical(probs=p, validate_args=True)
     self.assertAllClose(p, self.evaluate(dist.probs))
     self.assertAllEqual([2], dist.probs.shape)
 
   def testLogits(self):
     p = np.array([0.2, 0.8], dtype=np.float32)
     logits = np.log(p) - 50.
-    dist = tfd.Categorical(logits=logits, validate_args=True)
+    dist = categorical.Categorical(logits=logits, validate_args=True)
     self.assertAllEqual([2], dist.logits.shape)
     self.assertAllClose(logits, self.evaluate(dist.logits))
 
@@ -112,7 +114,7 @@ class CategoricalTest(test_util.TestCase):
   def testUnknownShape(self):
     logits = lambda l: tf1.placeholder_with_default(  # pylint: disable=g-long-lambda
         np.float32(l), shape=None)
-    sample = lambda l: tfd.Categorical(  # pylint: disable=g-long-lambda
+    sample = lambda l: categorical.Categorical(  # pylint: disable=g-long-lambda
         logits=logits(l), validate_args=True).sample(seed=test_util.test_seed())
     # Will sample class 1.
     sample_value = self.evaluate(sample([-1000.0, 1000.0]))
@@ -125,12 +127,14 @@ class CategoricalTest(test_util.TestCase):
 
   def testPMFWithBatch(self):
     histograms = np.array([[0.2, 0.8], [0.6, 0.4]])
-    dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
     self.assertAllClose([0.2, 0.4], self.evaluate(dist.prob([0, 1])))
 
   def testPMFNoBatch(self):
     histograms = np.array([0.2, 0.8])
-    dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
     self.assertAllClose(0.2, self.evaluate(dist.prob(0)))
 
   def testCDFWithDynamicEventShapeKnownNdims(self):
@@ -139,7 +143,9 @@ class CategoricalTest(test_util.TestCase):
     make_ph = tf1.placeholder_with_default
     histograms = lambda h: make_ph(np.float32(h), shape=(batch_size, None))
     event = lambda e: make_ph(np.float32(e), shape=(batch_size,))
-    dist = lambda h: tfd.Categorical(probs=histograms(h), validate_args=True)
+    dist = lambda h: categorical.Categorical(  # pylint: disable=g-long-lambda
+        probs=histograms(h),
+        validate_args=True)
     cdf_op = lambda h, e: dist(h).cdf(event(e))
 
     # Feed values in with different shapes...
@@ -172,7 +178,7 @@ class CategoricalTest(test_util.TestCase):
     event_ph = tf1.placeholder_with_default(events, shape=None)
     histograms_ph = tf1.placeholder_with_default(
         histograms, shape=None)
-    dist = tfd.Categorical(probs=histograms_ph, validate_args=True)
+    dist = categorical.Categorical(probs=histograms_ph, validate_args=True)
     cdf_op = dist.cdf(event_ph)
 
     actual_cdf = self.evaluate(cdf_op)
@@ -186,7 +192,7 @@ class CategoricalTest(test_util.TestCase):
     # Note we're testing events outside [0, K-1].
     event = [0, 3, -1, 10]
     expected_cdf = [0.2, 0.8, 0.0, 1.0]
-    dist = tfd.Categorical(probs=histograms, validate_args=False)
+    dist = categorical.Categorical(probs=histograms, validate_args=False)
     cdf_op = dist.cdf(event)
 
     self.assertAllClose(expected_cdf, self.evaluate(cdf_op))
@@ -199,7 +205,7 @@ class CategoricalTest(test_util.TestCase):
     # Note we're testing events outside [0, K-1].
     event = [-1., 10., 2.0, 2.5]
     expected_cdf = [0.0, 1.0, 0.6, 0.6]
-    dist = tfd.Categorical(
+    dist = categorical.Categorical(
         probs=histograms, dtype=tf.float32, validate_args=False)
     cdf_op = dist.cdf(event)
 
@@ -209,7 +215,7 @@ class CategoricalTest(test_util.TestCase):
     histogram = [0.1, 0.2, 0.3, 0.4]
     event = 2
     expected_cdf = 0.6
-    dist = tfd.Categorical(probs=histogram, validate_args=True)
+    dist = categorical.Categorical(probs=histogram, validate_args=True)
     cdf_op = dist.cdf(event)
 
     self.assertAlmostEqual(expected_cdf, self.evaluate(cdf_op))
@@ -225,7 +231,7 @@ class CategoricalTest(test_util.TestCase):
         [1, 1],
         [2, 2]
     ]
-    dist = tfd.Categorical(probs=histograms, validate_args=True)
+    dist = categorical.Categorical(probs=histograms, validate_args=True)
 
     # We test that the probabilities are correctly broadcasted over the
     # additional leading batch dimension of size 3.
@@ -276,11 +282,11 @@ class CategoricalTest(test_util.TestCase):
 
     cat_params_tf = tf.constant(cat_params_py)
     disc_event_tf = tf.constant(disc_event_py)
-    cat = tfd.Categorical(probs=cat_params_tf, validate_args=True)
+    cat = categorical.Categorical(probs=cat_params_tf, validate_args=True)
 
     normal_params_tf = tf.constant(normal_params_py)
     real_event_tf = tf.constant(real_event_py)
-    norm = tfd.Normal(loc=normal_params_tf, scale=1.0)
+    norm = normal.Normal(loc=normal_params_tf, scale=1.0)
 
     # Check that normal and categorical have the same broadcasting behaviour.
     to_run = {
@@ -307,7 +313,7 @@ class CategoricalTest(test_util.TestCase):
 
   def testLogPMF(self):
     logits = np.log(np.array([[0.2, 0.8], [0.6, 0.4]])) - 50.
-    dist = tfd.Categorical(logits, validate_args=True)
+    dist = categorical.Categorical(logits, validate_args=True)
     self.assertAllClose(np.log(np.array([0.2, 0.4])),
                         self.evaluate(dist.log_prob([0, 1])))
     self.assertAllClose(np.log(np.array([0.2, 0.4])),
@@ -315,14 +321,14 @@ class CategoricalTest(test_util.TestCase):
 
   def testEntropyNoBatch(self):
     logits = np.log(np.array([0.2, 0.8])) - 50.
-    dist = tfd.Categorical(logits, validate_args=True)
+    dist = categorical.Categorical(logits, validate_args=True)
     self.assertAllClose(-(0.2 * np.log(0.2) + 0.8 * np.log(0.8)),
                         self.evaluate(dist.entropy()),
                         atol=0, rtol=1e-5)
 
   def testEntropyWithBatch(self):
     logits = np.log(np.array([[0.2, 0.8], [0.6, 0.4]])) - 50.
-    dist = tfd.Categorical(logits, validate_args=True)
+    dist = categorical.Categorical(logits, validate_args=True)
     self.assertAllClose([-(0.2 * np.log(0.2) + 0.8 * np.log(0.8)),
                          -(0.6 * np.log(0.6) + 0.4 * np.log(0.4))],
                         self.evaluate(dist.entropy()),
@@ -337,15 +343,15 @@ class CategoricalTest(test_util.TestCase):
       return -tf.reduce_sum(probabilities * log_probabilities, axis=-1)
 
     def categorical_entropy_fn(logits):
-      categorical_distribution = tfd.Categorical(
+      categorical_distribution = categorical.Categorical(
           logits=logits, validate_args=True)
       return categorical_distribution.entropy()
 
     # works
     logits = tf.constant([[1., 2., 3.], [2., 5., 1.]])
-    true_entropy, true_entropy_g = tfp.math.value_and_gradient(
+    true_entropy, true_entropy_g = gradient.value_and_gradient(
         true_entropy_fn, [logits])
-    categorical_entropy, categorical_entropy_g = tfp.math.value_and_gradient(
+    categorical_entropy, categorical_entropy_g = gradient.value_and_gradient(
         categorical_entropy_fn, [logits])
 
     res = self.evaluate({'true_entropy': true_entropy,
@@ -362,20 +368,20 @@ class CategoricalTest(test_util.TestCase):
 
     def get_entropy_fn(logit):
       logits = [logit, tf.constant(-np.inf, dtype=tf.float32)]
-      categorical_distribution = tfd.Categorical(
+      categorical_distribution = categorical.Categorical(
           logits=logits, validate_args=True)
       return categorical_distribution.entropy()
 
     logit = 0.
 
-    categorical_entropy, categorical_entropy_g = tfp.math.value_and_gradient(
+    categorical_entropy, categorical_entropy_g = gradient.value_and_gradient(
         get_entropy_fn, logit)
     self.assertAllClose(categorical_entropy, 0.)
     self.assertAllClose(categorical_entropy_g, 0.)
 
   def testEntropyWithZeroProbabilities(self):
     probs = np.array([[0, 0.5, 0.5], [0, 1, 0]])
-    dist = tfd.Categorical(probs=probs, validate_args=True)
+    dist = categorical.Categorical(probs=probs, validate_args=True)
     dist_entropy = dist.entropy()
 
     ans = [-(0.5*np.log(0.5) + 0.5*np.log(0.5)), -(np.log(1))]
@@ -383,7 +389,7 @@ class CategoricalTest(test_util.TestCase):
 
   def testEntropyWithNegInfLogits(self):
     probs = np.array([[0, 0.5, 0.5], [0, 1, 0]])
-    dist = tfd.Categorical(logits=np.log(probs), validate_args=True)
+    dist = categorical.Categorical(logits=np.log(probs), validate_args=True)
     dist_entropy = dist.entropy()
 
     ans = [-(0.5*np.log(0.5) + 0.5*np.log(0.5)), -(np.log(1))]
@@ -395,7 +401,7 @@ class CategoricalTest(test_util.TestCase):
         [-1e7] * num_categories,
         [-1e8] * num_categories,
         [-1e9] * num_categories], dtype=np.float32)
-    dist = tfd.Categorical(logits=logits, validate_args=True)
+    dist = categorical.Categorical(logits=logits, validate_args=True)
     dist_entropy = dist.entropy()
 
     ans = [np.log(num_categories)] * 3
@@ -403,7 +409,8 @@ class CategoricalTest(test_util.TestCase):
 
   def testSample(self):
     histograms = np.array([[[0.2, 0.8], [0.4, 0.6]]])
-    dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
     n = 10000
     samples = dist.sample(n, seed=test_util.test_seed())
     tensorshape_util.set_shape(samples, [n, 1, 2])
@@ -418,7 +425,8 @@ class CategoricalTest(test_util.TestCase):
 
   def testSampleWithSampleShape(self):
     histograms = np.array([[[0.2, 0.8], [0.4, 0.6]]])
-    dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
     samples = dist.sample((100, 100), seed=test_util.test_seed())
     prob = dist.prob(samples)
     prob_val = self.evaluate(prob)
@@ -432,9 +440,9 @@ class CategoricalTest(test_util.TestCase):
       'JAX does not return None for gradients.')
   def testNotReparameterized(self):
     p = tf.constant([0.3, 0.3, 0.4])
-    _, grad_p = tfp.math.value_and_gradient(
+    _, grad_p = gradient.value_and_gradient(
         # pylint: disable=g-long-lambda
-        lambda x: tfd.Categorical(x, validate_args=True).sample(
+        lambda x: categorical.Categorical(x, validate_args=True).sample(
             100, seed=test_util.test_seed()),
         p)
     self.assertIsNone(grad_p)
@@ -442,7 +450,8 @@ class CategoricalTest(test_util.TestCase):
   def testLogPMFBroadcasting(self):
     # 1 x 2 x 2
     histograms = np.array([[[0.2, 0.8], [0.4, 0.6]]])
-    dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
 
     prob = dist.prob(1)
     self.assertAllClose([[0.8, 0.6]], self.evaluate(prob))
@@ -469,7 +478,7 @@ class CategoricalTest(test_util.TestCase):
   def testLogPMFShape(self):
     # shape [1, 2, 2]
     histograms = np.array([[[0.2, 0.8], [0.4, 0.6]]])
-    dist = tfd.Categorical(tf.math.log(histograms), validate_args=True)
+    dist = categorical.Categorical(tf.math.log(histograms), validate_args=True)
 
     log_prob = dist.log_prob([0, 1])
     self.assertEqual(2, tensorshape_util.rank(log_prob.shape))
@@ -481,7 +490,7 @@ class CategoricalTest(test_util.TestCase):
 
   def testLogPMFShapeNoBatch(self):
     histograms = np.array([0.2, 0.8])
-    dist = tfd.Categorical(tf.math.log(histograms), validate_args=True)
+    dist = categorical.Categorical(tf.math.log(histograms), validate_args=True)
 
     log_prob = dist.log_prob(0)
     self.assertEqual(0, tensorshape_util.rank(log_prob.shape))
@@ -493,7 +502,8 @@ class CategoricalTest(test_util.TestCase):
 
   def testMode(self):
     histograms = np.array([[[0.2, 0.8], [0.6, 0.4]]])
-    dist = tfd.Categorical(tf.math.log(histograms) - 50., validate_args=True)
+    dist = categorical.Categorical(
+        tf.math.log(histograms) - 50., validate_args=True)
     self.assertAllEqual([[1, 0]], self.evaluate(dist.mode()))
 
   def testCategoricalCategoricalKL(self):
@@ -507,13 +517,13 @@ class CategoricalTest(test_util.TestCase):
         a_logits = np.random.randn(batch_size, categories)
         b_logits = np.random.randn(batch_size, categories)
 
-        a = tfd.Categorical(logits=a_logits, validate_args=True)
-        b = tfd.Categorical(logits=b_logits, validate_args=True)
+        a = categorical.Categorical(logits=a_logits, validate_args=True)
+        b = categorical.Categorical(logits=b_logits, validate_args=True)
 
-        kl = tfd.kl_divergence(a, b)
+        kl = kullback_leibler.kl_divergence(a, b)
         kl_val = self.evaluate(kl)
         # Make sure KL(a||a) is 0
-        kl_same = self.evaluate(tfd.kl_divergence(a, a))
+        kl_same = self.evaluate(kullback_leibler.kl_divergence(a, a))
 
         prob_a = np_softmax(a_logits)
         prob_b = np_softmax(b_logits)
@@ -532,17 +542,17 @@ class CategoricalTest(test_util.TestCase):
        dict(logits=[np.log(0.2), np.log(0.2), np.log(0.6)])),
   )
   def testCategoricalCategoricalKLExtreme(self, kwargs1, kwargs2):
-    a = tfd.Categorical(**kwargs1)
-    kl = tfd.kl_divergence(a, a)
+    a = categorical.Categorical(**kwargs1)
+    kl = kullback_leibler.kl_divergence(a, a)
     kl_val = self.evaluate(kl)
     self.assertEqual(kl_val, 0.0)
 
-    b = tfd.Categorical(**kwargs2)
-    kl = tfd.kl_divergence(a, b)
+    b = categorical.Categorical(**kwargs2)
+    kl = kullback_leibler.kl_divergence(a, b)
     kl_val = self.evaluate(kl)
     self.assertAllClose(kl_val, np.log(0.5) - 0.5 * (np.log(0.2) + np.log(0.6)))
 
-    kl = tfd.kl_divergence(b, a)
+    kl = kullback_leibler.kl_divergence(b, a)
     kl_val = self.evaluate(kl)
     self.assertEqual(kl_val, np.inf)
 
@@ -555,21 +565,21 @@ class CategoricalTest(test_util.TestCase):
   )
   def testCategoricalCategoricalKLExtremeGrad(self, a_logits, b_logits):
     def get_kl_fn(a_logits, b_logits):
-      a = tfd.Categorical(logits=a_logits)
-      b = tfd.Categorical(logits=b_logits)
+      a = categorical.Categorical(logits=a_logits)
+      b = categorical.Categorical(logits=b_logits)
       return a.kl_divergence(b)
 
-    kl, grads = tfp.math.value_and_gradient(
+    kl, grads = gradient.value_and_gradient(
         get_kl_fn, a_logits, b_logits)
     # We get the expected answer when clipping the -inf.
-    expected_kl, expected_grads = tfp.math.value_and_gradient(
+    expected_kl, expected_grads = gradient.value_and_gradient(
         get_kl_fn, np.maximum(-10000, a_logits), np.maximum(-10000, b_logits))
     self.assertAllClose(kl, expected_kl)
     self.assertAllClose(grads, expected_grads)
 
   def testParamTensorFromLogits(self):
     x = tf.constant([-1., 0.5, 1.])
-    d = tfd.Categorical(logits=x, validate_args=True)
+    d = categorical.Categorical(logits=x, validate_args=True)
     self.assertAllClose(
         *self.evaluate([x, d.logits_parameter()]),
         atol=0, rtol=1e-4)
@@ -581,7 +591,7 @@ class CategoricalTest(test_util.TestCase):
 
   def testParamTensorFromProbs(self):
     x = tf.constant([0.1, 0.5, 0.4])
-    d = tfd.Categorical(probs=x, validate_args=True)
+    d = categorical.Categorical(probs=x, validate_args=True)
     self.assertAllClose(
         *self.evaluate([tf.math.log(x), d.logits_parameter()]),
         atol=0, rtol=1e-4)
@@ -596,7 +606,7 @@ class CategoricalFromVariableTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testGradientLogits(self):
     x = tf.Variable([-1., 0., 1])
-    d = tfd.Categorical(logits=x, validate_args=True)
+    d = categorical.Categorical(logits=x, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([0, 2])
     g = tape.gradient(loss, d.trainable_variables)
@@ -606,7 +616,7 @@ class CategoricalFromVariableTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testGradientProbs(self):
     x = tf.Variable([0.1, 0.7, 0.2])
-    d = tfd.Categorical(probs=x, validate_args=True)
+    d = categorical.Categorical(probs=x, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([0, 2])
     g = tape.gradient(loss, d.trainable_variables)
@@ -616,15 +626,15 @@ class CategoricalFromVariableTest(test_util.TestCase):
   def testAssertionsProbs(self):
     x = tf.Variable([0.1, 0.7, 0.0])
     with self.assertRaisesOpError('Argument `probs` must sum to 1.'):
-      d = tfd.Categorical(probs=x, validate_args=True)
+      d = categorical.Categorical(probs=x, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.entropy())
 
   def testAssertionsLogits(self):
-    x = tfp.util.TransformedVariable(0., tfb.Identity(), shape=None)
+    x = deferred_tensor.TransformedVariable(0., identity.Identity(), shape=None)
     with self.assertRaisesRegexp(
         ValueError, 'Argument `logits` must have rank at least 1.'):
-      d = tfd.Categorical(logits=x, validate_args=True)
+      d = categorical.Categorical(logits=x, validate_args=True)
       self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.entropy())
 

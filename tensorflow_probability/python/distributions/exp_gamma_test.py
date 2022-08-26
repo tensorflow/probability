@@ -20,14 +20,14 @@ from scipy import special as sp_special
 from scipy import stats as sp_stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import exp as tfb
 from tensorflow_probability.python.distributions import exp_gamma as exp_gamma_lib
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import kullback_leibler
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -36,7 +36,8 @@ class ExpGammaTest(test_util.TestCase):
   def testShape(self):
     concentration = tf.constant([3.0] * 5)
     rate = tf.constant(11.0)
-    d = tfd.ExpGamma(concentration=concentration, rate=rate, validate_args=True)
+    d = exp_gamma_lib.ExpGamma(
+        concentration=concentration, rate=rate, validate_args=True)
 
     self.assertEqual(self.evaluate(d.batch_shape_tensor()), (5,))
     self.assertEqual(d.batch_shape, tf.TensorShape([5]))
@@ -48,12 +49,13 @@ class ExpGammaTest(test_util.TestCase):
     concentration = tf.constant([2.0] * batch_size)
     rate = tf.constant([3.0] * batch_size)
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
-    d = tfd.ExpGamma(concentration=concentration, rate=rate, validate_args=True)
+    d = exp_gamma_lib.ExpGamma(
+        concentration=concentration, rate=rate, validate_args=True)
     log_pdf = d.log_prob(x)
     self.assertEqual(log_pdf.shape, (6,))
     pdf = d.prob(x)
     self.assertEqual(pdf.shape, (6,))
-    oracle_d = tfb.Log()(tfd.Gamma(concentration=concentration, rate=rate))
+    oracle_d = tfb.Log()(gamma.Gamma(concentration=concentration, rate=rate))
     expected_log_pdf = oracle_d.log_prob(x)
     expected_pdf = oracle_d.prob(x)
     self.assertAllClose(log_pdf, expected_log_pdf)
@@ -64,10 +66,12 @@ class ExpGammaTest(test_util.TestCase):
                         shape=tf.TensorShape([None, 16, 16, 1]))
     self.evaluate(param.initializer)
     samples = self.evaluate(
-        tfd.ExpGamma(param, rate=param).sample(seed=test_util.test_seed()))
+        exp_gamma_lib.ExpGamma(param,
+                               rate=param).sample(seed=test_util.test_seed()))
     self.assertEqual(samples.shape, (8, 16, 16, 1))
     samples = self.evaluate(
-        tfd.ExpGamma(param, log_rate=param).sample(seed=test_util.test_seed()))
+        exp_gamma_lib.ExpGamma(
+            param, log_rate=param).sample(seed=test_util.test_seed()))
     self.assertEqual(samples.shape, (8, 16, 16, 1))
 
   def testLogPDFMultidimensional(self):
@@ -75,8 +79,9 @@ class ExpGammaTest(test_util.TestCase):
     concentration = tf.constant([[2.0, 4.0]] * batch_size)
     rate = tf.constant([[3.0, 4.0]] * batch_size)
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    d = tfd.ExpGamma(concentration=concentration, rate=rate, validate_args=True)
-    d_lr = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
+        concentration=concentration, rate=rate, validate_args=True)
+    d_lr = exp_gamma_lib.ExpGamma(
         concentration=concentration,
         log_rate=tf.math.log(rate),
         validate_args=True)
@@ -84,7 +89,7 @@ class ExpGammaTest(test_util.TestCase):
     self.assertEqual(log_pdf.shape, (6, 2))
     pdf = d.prob(x)
     self.assertEqual(pdf.shape, (6, 2))
-    oracle_d = tfb.Log()(tfd.Gamma(concentration=concentration, rate=rate))
+    oracle_d = tfb.Log()(gamma.Gamma(concentration=concentration, rate=rate))
     expected_log_pdf = oracle_d.log_prob(x)
     expected_pdf = oracle_d.prob(x)
     self.assertAllClose(log_pdf, expected_log_pdf)
@@ -97,14 +102,14 @@ class ExpGammaTest(test_util.TestCase):
     concentration = tf.constant([[2.0, 4.0]] * batch_size)
     rate = tf.constant(3.0)
     x = np.array([[2.5, 2.5, 4.0, 0.1, 1.0, 2.0]], dtype=np.float32).T
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration, rate=rate, validate_args=True)
     log_pdf = d.log_prob(x)
     self.assertEqual(log_pdf.shape, (6, 2))
     pdf = d.prob(x)
     self.assertEqual(pdf.shape, (6, 2))
 
-    oracle_d = tfb.Log()(tfd.Gamma(concentration=concentration, rate=rate))
+    oracle_d = tfb.Log()(gamma.Gamma(concentration=concentration, rate=rate))
     expected_log_pdf = oracle_d.log_prob(x)
     expected_pdf = oracle_d.prob(x)
     self.assertAllClose(log_pdf, expected_log_pdf)
@@ -116,15 +121,16 @@ class ExpGammaTest(test_util.TestCase):
     rate = tf.constant([3.0] * batch_size)
     x = np.array([2.5, 2.5, 4.0, 0.1, 1.0, 2.0], dtype=np.float32)
 
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration, rate=rate, validate_args=True)
-    d_lr = tfd.ExpGamma(
-        concentration=concentration, log_rate=tf.math.log(rate),
+    d_lr = exp_gamma_lib.ExpGamma(
+        concentration=concentration,
+        log_rate=tf.math.log(rate),
         validate_args=True)
     cdf = d.cdf(x)
     self.assertEqual(cdf.shape, (6,))
-    expected_cdf = tfb.Log()(tfd.Gamma(concentration=concentration,
-                                       rate=rate)).cdf(x)
+    expected_cdf = tfb.Log()(gamma.Gamma(
+        concentration=concentration, rate=rate)).cdf(x)
     self.assertAllClose(cdf, expected_cdf)
     self.assertAllClose(d_lr.cdf(x), expected_cdf)
 
@@ -134,25 +140,27 @@ class ExpGammaTest(test_util.TestCase):
         1., 12., batch_size).astype(np.float32)[..., np.newaxis]
     rate = np.linspace(3., 18., batch_size).astype(np.float32)[..., np.newaxis]
     x = np.linspace(0., 1., 13).astype(np.float32)
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration, rate=rate, validate_args=True)
-    d_lr = tfd.ExpGamma(
-        concentration=concentration, log_rate=tf.math.log(rate),
+    d_lr = exp_gamma_lib.ExpGamma(
+        concentration=concentration,
+        log_rate=tf.math.log(rate),
         validate_args=True)
     quantile = d.quantile(x)
     self.assertEqual(quantile.shape, (6, 13))
-    expected_quantile = tfb.Log()(tfd.Gamma(concentration=concentration,
-                                            rate=rate)).quantile(x)
+    expected_quantile = tfb.Log()(gamma.Gamma(
+        concentration=concentration, rate=rate)).quantile(x)
     self.assertAllClose(quantile, expected_quantile)
     self.assertAllClose(d_lr.quantile(x), expected_quantile)
 
   def testMean(self):
     concentration_v = np.array([1.0, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
-    d_lr = tfd.ExpGamma(
-        concentration=concentration_v, log_rate=np.log(rate_v),
+    d_lr = exp_gamma_lib.ExpGamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
         validate_args=True)
     self.assertEqual(d.mean().shape, (3,))
     expected_means = sp_stats.loggamma.mean(concentration_v,
@@ -163,10 +171,11 @@ class ExpGammaTest(test_util.TestCase):
   def testVariance(self):
     concentration_v = np.array([1.0, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
-    d_lr = tfd.ExpGamma(
-        concentration=concentration_v, log_rate=np.log(rate_v),
+    d_lr = exp_gamma_lib.ExpGamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
         validate_args=True)
     self.assertEqual(d.variance().shape, (3,))
     expected_variances = sp_stats.loggamma.var(concentration_v,
@@ -177,10 +186,11 @@ class ExpGammaTest(test_util.TestCase):
   def testStd(self):
     concentration_v = np.array([1.0, 3.0, 2.5])
     rate_v = np.array([1.0, 4.0, 5.0])
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
-    d_lr = tfd.ExpGamma(
-        concentration=concentration_v, log_rate=np.log(rate_v),
+    d_lr = exp_gamma_lib.ExpGamma(
+        concentration=concentration_v,
+        log_rate=np.log(rate_v),
         validate_args=True)
     self.assertEqual(d.stddev().shape, (3,))
     expected_stddev = sp_stats.loggamma.std(concentration_v,
@@ -194,7 +204,7 @@ class ExpGammaTest(test_util.TestCase):
     concentration = tf.constant(concentration_v)
     rate = tf.constant(rate_v)
     n = 100000
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration, rate=rate, validate_args=True)
     samples = d.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
@@ -216,7 +226,8 @@ class ExpGammaTest(test_util.TestCase):
     concentration = tf.constant(concentration_v)
     rate = tf.constant(rate_v)
     n = 100000
-    d = tfd.ExpGamma(concentration=concentration, rate=rate, validate_args=True)
+    d = exp_gamma_lib.ExpGamma(
+        concentration=concentration, rate=rate, validate_args=True)
     samples = d.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (n,))
@@ -232,33 +243,33 @@ class ExpGammaTest(test_util.TestCase):
         atol=.15)
 
   def testSampleNonPositiveParameters(self):
-    d = tfd.ExpGamma([1., 2.], 1., validate_args=False)
+    d = exp_gamma_lib.ExpGamma([1., 2.], 1., validate_args=False)
     seed_stream = test_util.test_seed_stream()
     samples = self.evaluate(d.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllFinite(samples)
 
-    d = tfd.ExpGamma([0., 2.], 1., validate_args=False)
+    d = exp_gamma_lib.ExpGamma([0., 2.], 1., validate_args=False)
     samples = self.evaluate(d.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([s == -np.inf for s in samples], [True, False])
 
-    d = tfd.ExpGamma([-0.001, 2.], 1., validate_args=False)
+    d = exp_gamma_lib.ExpGamma([-0.001, 2.], 1., validate_args=False)
     samples = self.evaluate(d.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([np.isnan(s) for s in samples], [True, False])
 
-    d = tfd.ExpGamma([1., -1.], 1., validate_args=False)
+    d = exp_gamma_lib.ExpGamma([1., -1.], 1., validate_args=False)
     samples = self.evaluate(d.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllEqual([np.isnan(s) for s in samples], [False, True])
 
-    d = tfd.ExpGamma([1., 2.], 0., validate_args=False)
+    d = exp_gamma_lib.ExpGamma([1., 2.], 0., validate_args=False)
     samples = self.evaluate(d.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllPositiveInf(samples)
 
-    d = tfd.ExpGamma([1., 2.], -1., validate_args=False)
+    d = exp_gamma_lib.ExpGamma([1., 2.], -1., validate_args=False)
     samples = self.evaluate(d.sample(seed=seed_stream()))
     self.assertEqual(samples.shape, (2,))
     self.assertAllNan(samples)
@@ -267,9 +278,12 @@ class ExpGammaTest(test_util.TestCase):
   def testFullyReparameterized(self):
     concentration = tf.constant(4.0)
     rate = tf.constant(3.0)
-    _, [grad_concentration, grad_rate] = tfp.math.value_and_gradient(
-        lambda a, b: tfd.ExpGamma(concentration=a, rate=b, validate_args=True).  # pylint: disable=g-long-lambda
-        sample(100, seed=test_util.test_seed()), [concentration, rate])
+    _, [grad_concentration, grad_rate] = gradient.value_and_gradient(
+        lambda a, b: exp_gamma_lib.ExpGamma(  # pylint: disable=g-long-lambda
+            concentration=a,
+            rate=b,
+            validate_args=True).sample(100, seed=test_util.test_seed()),
+        [concentration, rate])
     self.assertIsNotNone(grad_concentration)
     self.assertIsNotNone(grad_rate)
 
@@ -284,18 +298,19 @@ class ExpGammaTest(test_util.TestCase):
     num_samples = int(1e5)
 
     def tfp_exp_gamma(a, b):
-      return tfd.ExpGamma(concentration=a, rate=b, validate_args=True).sample(
-          num_samples, seed=test_util.test_seed())
+      return exp_gamma_lib.ExpGamma(
+          concentration=a, rate=b, validate_args=True).sample(
+              num_samples, seed=test_util.test_seed())
 
     _, [grad_concentration, grad_rate] = self.evaluate(
-        tfp.math.value_and_gradient(tfp_exp_gamma, [concentration_v, rate_v]))
+        gradient.value_and_gradient(tfp_exp_gamma, [concentration_v, rate_v]))
 
     def tf_exp_gamma(a, b):
       return tf.math.log(tf.random.gamma(
           shape=[num_samples], alpha=a, beta=b, seed=test_util.test_seed()))
 
     _, [grad_concentration_tf, grad_rate_tf] = self.evaluate(
-        tfp.math.value_and_gradient(tf_exp_gamma, [concentration_v, rate_v]))
+        gradient.value_and_gradient(tf_exp_gamma, [concentration_v, rate_v]))
 
     self.assertEqual(grad_concentration.shape, grad_concentration_tf.shape)
     self.assertEqual(grad_rate.shape, grad_rate_tf.shape)
@@ -316,11 +331,12 @@ class ExpGammaTest(test_util.TestCase):
 
     def tfp_exp_gamma(a, b):
       return tf.math.square(
-          tfd.ExpGamma(concentration=a, rate=b, validate_args=True).sample(
-              num_samples, seed=test_util.test_seed()))
+          exp_gamma_lib.ExpGamma(concentration=a, rate=b,
+                                 validate_args=True).sample(
+                                     num_samples, seed=test_util.test_seed()))
 
     _, [grad_concentration, grad_rate] = self.evaluate(
-        tfp.math.value_and_gradient(tfp_exp_gamma, [concentration_v, rate_v]))
+        gradient.value_and_gradient(tfp_exp_gamma, [concentration_v, rate_v]))
 
     def tf_exp_gamma(a, b):
       return tf.math.square(tf.math.log(tf.random.gamma(
@@ -330,7 +346,7 @@ class ExpGammaTest(test_util.TestCase):
           seed=test_util.test_seed())))
 
     _, [grad_concentration_tf, grad_rate_tf] = self.evaluate(
-        tfp.math.value_and_gradient(tf_exp_gamma, [concentration_v, rate_v]))
+        gradient.value_and_gradient(tf_exp_gamma, [concentration_v, rate_v]))
 
     self.assertEqual(grad_concentration.shape, grad_concentration_tf.shape)
     self.assertEqual(grad_rate.shape, grad_rate_tf.shape)
@@ -343,7 +359,7 @@ class ExpGammaTest(test_util.TestCase):
         [np.arange(1, n_concentration + 1, dtype=np.float32)])  # 1 x 50
     n_rate = 10
     rate_v = np.array([np.arange(1, n_rate + 1, dtype=np.float32)]).T  # 10 x 1
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration_v, rate=rate_v, validate_args=True)
 
     n = 10000
@@ -372,7 +388,7 @@ class ExpGammaTest(test_util.TestCase):
 
   def _kstest(self, concentration, rate, samples):
     # Uses the Kolmogorov-Smirnov test for goodness of fit.
-    oracle_dist = tfd.ExpGamma(concentration=concentration, rate=rate)
+    oracle_dist = exp_gamma_lib.ExpGamma(concentration=concentration, rate=rate)
     ks, _ = sp_stats.kstest(
         samples,
         lambda x: self.evaluate(oracle_dist.cdf(x)))
@@ -380,7 +396,7 @@ class ExpGammaTest(test_util.TestCase):
     return ks < 0.02
 
   def testPdfOfSampleMultiDims(self):
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=[7., 11.], rate=[[5.], [6.]], validate_args=True)
     num = 50000
     samples = d.sample(num, seed=test_util.test_seed())
@@ -415,13 +431,13 @@ class ExpGammaTest(test_util.TestCase):
     concentration_v = tf.constant(0.0, name='concentration')
     rate_v = tf.constant(1.0, name='rate')
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
-      d = tfd.ExpGamma(
+      d = exp_gamma_lib.ExpGamma(
           concentration=concentration_v, rate=rate_v, validate_args=True)
       self.evaluate(d.mean())
     concentration_v = tf.constant(1.0, name='concentration')
     rate_v = tf.constant(0.0, name='rate')
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
-      d = tfd.ExpGamma(
+      d = exp_gamma_lib.ExpGamma(
           concentration=concentration_v, rate=rate_v, validate_args=True)
       self.evaluate(d.mean())
 
@@ -433,15 +449,15 @@ class ExpGammaTest(test_util.TestCase):
     rate1 = np.array([0.5, 1., 1.5, 2., 2.5, 3.])
 
     # Build graph.
-    g0 = tfd.ExpGamma(
+    g0 = exp_gamma_lib.ExpGamma(
         concentration=concentration0, rate=rate0, validate_args=True)
-    g0lr = tfd.ExpGamma(
+    g0lr = exp_gamma_lib.ExpGamma(
         concentration=concentration0,
         log_rate=np.log(rate0),
         validate_args=True)
-    g1 = tfd.ExpGamma(
+    g1 = exp_gamma_lib.ExpGamma(
         concentration=concentration1, rate=rate1, validate_args=True)
-    g1lr = tfd.ExpGamma(
+    g1lr = exp_gamma_lib.ExpGamma(
         concentration=concentration1,
         log_rate=np.log(rate1),
         validate_args=True)
@@ -449,7 +465,7 @@ class ExpGammaTest(test_util.TestCase):
     for d0, d1 in (g0, g1), (g0lr, g1), (g0, g1lr), (g0lr, g1lr):
       x = d0.sample(int(1e4), seed=test_util.test_seed())
       kl_samples = d0.log_prob(x) - d1.log_prob(x)
-      kl_actual = tfd.kl_divergence(d0, d1)
+      kl_actual = kullback_leibler.kl_divergence(d0, d1)
 
       # Execute graph.
       [kl_samples_, kl_actual_] = self.evaluate([kl_samples, kl_actual])
@@ -471,7 +487,8 @@ class ExpGammaTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testGradientThroughConcentration(self):
     concentration = tf.Variable(3.)
-    d = tfd.ExpGamma(concentration=concentration, rate=5., validate_args=True)
+    d = exp_gamma_lib.ExpGamma(
+        concentration=concentration, rate=5., validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
     grad = tape.gradient(loss, d.trainable_variables)
@@ -483,14 +500,15 @@ class ExpGammaTest(test_util.TestCase):
     concentration = tf.Variable([1., 2., -3.])
     self.evaluate(concentration.initializer)
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
-      d = tfd.ExpGamma(
+      d = exp_gamma_lib.ExpGamma(
           concentration=concentration, rate=[5.], validate_args=True)
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveConcentrationAfterMutation(self):
     concentration = tf.Variable([1., 2., 3.])
     self.evaluate(concentration.initializer)
-    d = tfd.ExpGamma(concentration=concentration, rate=[5.], validate_args=True)
+    d = exp_gamma_lib.ExpGamma(
+        concentration=concentration, rate=[5.], validate_args=True)
     self.evaluate(d.sample(seed=test_util.test_seed()))
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
       with tf.control_dependencies([concentration.assign([1., 2., -3.])]):
@@ -499,7 +517,7 @@ class ExpGammaTest(test_util.TestCase):
   @test_util.tf_tape_safety_test
   def testGradientThroughRate(self):
     rate = tf.Variable(3.)
-    d = tfd.ExpGamma(concentration=1., rate=rate, validate_args=True)
+    d = exp_gamma_lib.ExpGamma(concentration=1., rate=rate, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob([1., 2., 4.])
     grad = tape.gradient(loss, d.trainable_variables)
@@ -510,13 +528,15 @@ class ExpGammaTest(test_util.TestCase):
     rate = tf.Variable([1., 2., -3.])
     self.evaluate(rate.initializer)
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
-      d = tfd.ExpGamma(concentration=[5.], rate=rate, validate_args=True)
+      d = exp_gamma_lib.ExpGamma(
+          concentration=[5.], rate=rate, validate_args=True)
       self.evaluate(d.sample(seed=test_util.test_seed()))
 
   def testAssertsPositiveRateAfterMutation(self):
     rate = tf.Variable([1., 2., 3.])
     self.evaluate(rate.initializer)
-    d = tfd.ExpGamma(concentration=[3.], rate=rate, validate_args=True)
+    d = exp_gamma_lib.ExpGamma(
+        concentration=[3.], rate=rate, validate_args=True)
     self.evaluate(d.sample(seed=test_util.test_seed()))
     with self.assertRaisesOpError('Argument `rate` must be positive.'):
       with tf.control_dependencies([rate.assign([1., 2., -3.])]):
@@ -540,7 +560,7 @@ class GammaSamplingTest(test_util.TestCase):
     if not tf.executing_eagerly(): return  # jit_compile is eager-only.
     concentration = np.exp(np.random.rand(4, 3).astype(np.float32))
     rate = np.exp(np.random.rand(4, 3).astype(np.float32))
-    dist = tfd.ExpGamma(
+    dist = exp_gamma_lib.ExpGamma(
         concentration=concentration, rate=rate, validate_args=True)
     # Verify the compile succeeds going all the way through the distribution.
     self.evaluate(
@@ -557,7 +577,7 @@ class GammaSamplingTest(test_util.TestCase):
                 discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
         num_samples)
 
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration, rate=rate, validate_args=True)
     samples = d.sample(num_samples, seed=test_util.test_seed())
     self.evaluate(
@@ -586,7 +606,7 @@ class GammaSamplingTest(test_util.TestCase):
                 discrepancy=0.04, false_fail_rate=1e-9, false_pass_rate=1e-9)),
         num_samples)
 
-    d = tfd.ExpGamma(
+    d = exp_gamma_lib.ExpGamma(
         concentration=concentration, rate=rate, validate_args=True)
     samples = d.sample(num_samples, seed=test_util.test_seed())
     self.evaluate(
@@ -636,11 +656,12 @@ class GammaSamplingTest(test_util.TestCase):
     num_samples = 2
 
     def gen_samples(concentration, rate):
-      return tf.math.exp(tfd.ExpGamma(concentration, rate).sample(
-          num_samples, seed=test_util.test_seed()))
+      return tf.math.exp(
+          exp_gamma_lib.ExpGamma(concentration, rate).sample(
+              num_samples, seed=test_util.test_seed()))
 
     samples, [concentration_grad, rate_grad] = self.evaluate(
-        tfp.math.value_and_gradient(gen_samples, [concentration, rate]))
+        gradient.value_and_gradient(gen_samples, [concentration, rate]))
     self.assertEqual(samples.shape, (num_samples, concentration_n, rate_n))
     self.assertEqual(concentration_grad.shape, concentration.shape)
     self.assertEqual(rate_grad.shape, rate.shape)

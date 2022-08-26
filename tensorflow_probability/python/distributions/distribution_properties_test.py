@@ -34,15 +34,18 @@ from hypothesis import strategies as hps
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import expm1
+from tensorflow_probability.python.bijectors import normal_cdf
+from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math.psd_kernels import hypothesis_testlib as kernel_hps
 
 
@@ -192,7 +195,7 @@ class FittingTest(test_util.TestCase):
         validate_args=True,
         **tf.nest.pack_sequence_as(parameters, flat_params)).log_prob(x)
     lp_mle, grads = self.evaluate(
-        tfp_math.value_and_gradient(lp_fn, flat_params))
+        gradient.value_and_gradient(lp_fn, flat_params))
 
     # Likelihood of MLE params should be higher than of the original params.
     self.assertAllGreaterEqual(
@@ -258,7 +261,7 @@ class TestDiscreteDistributions(test_util.TestCase):
     # Softplus bijector.
     if 'dtype' in dist.parameters:
       dist = dist.copy(dtype=tf.float32)
-    bij = tfb.Softplus()
+    bij = softplus.Softplus()
     transformed_dist = tfd.TransformedDistribution(dist, bijector=bij)
 
     seed = test_util.test_seed()
@@ -484,7 +487,7 @@ class ParameterPropertiesTest(test_util.TestCase):
 
 
 def _all_shapes(thing):
-  if isinstance(thing, (tfd.Distribution, tfb.Bijector)):
+  if isinstance(thing, (tfd.Distribution, bijector.Bijector)):
     # pylint: disable=g-complex-comprehension
     answer = [s for _, param in thing.parameters.items()
               for s in _all_shapes(param)]
@@ -661,8 +664,8 @@ class DistributionSlicingTest(test_util.TestCase):
     # TODO(b/140229057): This test should pass.
     dist = tfd.Chi(df=np.float32(27.744131) * np.ones((4,)).astype(np.float32))
     dist = tfd.TransformedDistribution(
-        bijector=tfb.NormalCDF(), distribution=dist)
-    dist = tfb.Expm1()(dist)
+        bijector=normal_cdf.NormalCDF(), distribution=dist)
+    dist = expm1.Expm1()(dist)
     samps = 1.7182817 + tf.zeros_like(dist.sample(seed=test_util.test_seed()))
     self.assertAllClose(dist.log_prob(samps)[0], dist[0].log_prob(samps[0]))
 

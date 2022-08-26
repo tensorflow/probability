@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import kullback_leibler
@@ -34,6 +33,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import special
 from tensorflow_probability.python.util.deferred_tensor import DeferredTensor
 
 __all__ = [
@@ -304,7 +304,7 @@ class Gamma(distribution.AutoCompositeTensorDistribution):
     return distribution_util.extend_cdf_outside_support(x, cdf, low=0.)
 
   def _quantile(self, p):
-    return tfp_math.igammainv(self.concentration, p) / self._rate_parameter()
+    return special.igammainv(self.concentration, p) / self._rate_parameter()
 
   def _entropy(self):
     concentration = tf.convert_to_tensor(self.concentration)

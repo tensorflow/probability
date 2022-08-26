@@ -23,8 +23,18 @@ from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import dirichlet
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import mixture
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -61,7 +71,7 @@ def _mixture_stddev_np(pi_vector, mu_vector, sigma_vector):
 def _test_capture_mvndiag_sample_outputs():
   """Use monkey-patching to capture the output of an MVNDiag sample."""
   data_container = []
-  true_mvndiag_sample = tfd.MultivariateNormalDiag.sample
+  true_mvndiag_sample = mvn_diag.MultivariateNormalDiag.sample
 
   def _capturing_mvndiag_sample(
       self, sample_shape=(), seed=None, name='sample', **kwargs):
@@ -69,16 +79,16 @@ def _test_capture_mvndiag_sample_outputs():
     data_container.append(samples)
     return samples
 
-  tfd.MultivariateNormalDiag.sample = _capturing_mvndiag_sample
+  mvn_diag.MultivariateNormalDiag.sample = _capturing_mvndiag_sample
   yield data_container
-  tfd.MultivariateNormalDiag.sample = true_mvndiag_sample
+  mvn_diag.MultivariateNormalDiag.sample = true_mvndiag_sample
 
 
 @contextlib.contextmanager
 def _test_capture_normal_sample_outputs():
   """Use monkey-patching to capture the output of an Normal sample."""
   data_container = []
-  true_normal_sample = tfd.Normal.sample
+  true_normal_sample = normal.Normal.sample
 
   def _capturing_normal_sample(
       self, sample_shape=(), seed=None, name='sample', **kwargs):
@@ -86,16 +96,16 @@ def _test_capture_normal_sample_outputs():
     data_container.append(samples)
     return samples
 
-  tfd.Normal.sample = _capturing_normal_sample
+  normal.Normal.sample = _capturing_normal_sample
   yield data_container
-  tfd.Normal.sample = true_normal_sample
+  normal.Normal.sample = true_normal_sample
 
 
 @contextlib.contextmanager
 def _test_capture_categorical_sample_outputs():
   """Use monkey-patching to capture the output of an Normal sample."""
   data_container = []
-  true_categorical_sample = tfd.Categorical.sample
+  true_categorical_sample = categorical.Categorical.sample
 
   def _capturing_categorical_sample(
       self, sample_shape=(), seed=None, name='sample', **kwargs):
@@ -103,9 +113,9 @@ def _test_capture_categorical_sample_outputs():
     data_container.append(samples)
     return samples
 
-  tfd.Categorical.sample = _capturing_categorical_sample
+  categorical.Categorical.sample = _capturing_categorical_sample
   yield data_container
-  tfd.Categorical.sample = true_categorical_sample
+  categorical.Categorical.sample = true_categorical_sample
 
 
 def make_univariate_mixture(batch_shape, num_components):
@@ -114,13 +124,12 @@ def make_univariate_mixture(batch_shape, num_components):
   logits = -50. + tf.random.uniform(
       tf.concat((batch_shape, [num_components]), axis=0),
       -1, 1, dtype=tf.float32, seed=seed_stream())
-  components = [
-      tfd.Normal(loc=tf.random.normal(batch_shape, seed=seed_stream()),
-                 scale=10 * tf.random.uniform(batch_shape, seed=seed_stream()))
-      for _ in range(num_components)
-  ]
-  cat = tfd.Categorical(logits, dtype=tf.int32)
-  return tfd.Mixture(cat, components, validate_args=True)
+  components = [normal.Normal(  # pylint: disable=g-complex-comprehension
+      loc=tf.random.normal(batch_shape, seed=seed_stream()),
+      scale=10 * tf.random.uniform(batch_shape, seed=seed_stream()))
+                for _ in range(num_components)]
+  cat = categorical.Categorical(logits, dtype=tf.int32)
+  return mixture.Mixture(cat, components, validate_args=True)
 
 
 def make_multivariate_mixture(batch_shape, num_components, event_shape,
@@ -146,12 +155,12 @@ def make_multivariate_mixture(batch_shape, num_components, event_shape,
         batch_and_event_shape, seed=seed_stream())
     tensorshape_util.set_shape(loc, static_batch_and_event_shape)
     tensorshape_util.set_shape(scale_diag, static_batch_and_event_shape)
-    return tfd.MultivariateNormalDiag(
+    return mvn_diag.MultivariateNormalDiag(
         loc=loc, scale_diag=scale_diag, validate_args=True)
 
   components = [create_component() for _ in range(num_components)]
-  cat = tfd.Categorical(logits, dtype=tf.int32)
-  return tfd.Mixture(cat, components, validate_args=True)
+  cat = categorical.Categorical(logits, dtype=tf.int32)
+  return mixture.Mixture(cat, components, validate_args=True)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -182,20 +191,20 @@ class MixtureTest(test_util.TestCase):
   def testBrokenShapesStatic(self):
     with self.assertRaisesWithPredicateMatch(ValueError,
                                              r'cat.num_classes != len'):
-      tfd.Mixture(
-          tfd.Categorical([0.1, 0.5]),  # 2 classes
-          [tfd.Normal(loc=1.0, scale=2.0)],
+      mixture.Mixture(
+          categorical.Categorical([0.1, 0.5]),  # 2 classes
+          [normal.Normal(loc=1.0, scale=2.0)],
           validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         ValueError, r'components\[1\] batch shape must be compatible'):
       # The value error is raised because the batch shapes of the
       # Normals are not equal.  One is a scalar, the other is a
       # vector of size (2,).
-      tfd.Mixture(
-          tfd.Categorical([-0.5, 0.5]),  # scalar batch
+      mixture.Mixture(
+          categorical.Categorical([-0.5, 0.5]),  # scalar batch
           [
-              tfd.Normal(loc=1.0, scale=2.0),  # scalar dist
-              tfd.Normal(loc=[1.0, 1.0], scale=[2.0, 2.0])
+              normal.Normal(loc=1.0, scale=2.0),  # scalar dist
+              normal.Normal(loc=[1.0, 1.0], scale=[2.0, 2.0])
           ],
           validate_args=True)
 
@@ -204,8 +213,9 @@ class MixtureTest(test_util.TestCase):
   def testBrokenShapeUnknownCategories(self):
     with self.assertRaisesWithPredicateMatch(ValueError, r'Could not infer'):
       cat_logits = tf.Variable([[13., 19.]], shape=[1, None], dtype=tf.float32)
-      tfd.Mixture(
-          tfd.Categorical(cat_logits), [tfd.Normal(loc=[1.0], scale=[2.0])],
+      mixture.Mixture(
+          categorical.Categorical(cat_logits),
+          [normal.Normal(loc=[1.0], scale=[2.0])],
           validate_args=True)
 
   @test_util.jax_disable_test_missing_functionality(
@@ -218,34 +228,32 @@ class MixtureTest(test_util.TestCase):
 
     with self.assertRaisesWithPredicateMatch(
         tf.errors.InvalidArgumentError, 'batch shape must match cat'):
-      d = tfd.Mixture(
-          tfd.Categorical([0.1, 0.2]), [
-              tfd.Normal(loc=d0_param, scale=d0_param),
-              tfd.Normal(loc=d1_param, scale=d1_param)
+      d = mixture.Mixture(
+          categorical.Categorical([0.1, 0.2]), [
+              normal.Normal(loc=d0_param, scale=d0_param),
+              normal.Normal(loc=d1_param, scale=d1_param)
           ],
           validate_args=True)
       self.evaluate([d.sample(seed=test_util.test_seed())])
 
   def testBrokenTypes(self):
     with self.assertRaisesWithPredicateMatch(TypeError, 'Categorical'):
-      tfd.Mixture(None, [], validate_args=True)
-    cat = tfd.Categorical([0.3, 0.2])
+      mixture.Mixture(None, [], validate_args=True)
+    cat = categorical.Categorical([0.3, 0.2])
     # components must be a list of distributions
     with self.assertRaisesWithPredicateMatch(
         TypeError, 'all .* must be Distribution instances'):
-      tfd.Mixture(cat, [None], validate_args=True)
+      mixture.Mixture(cat, [None], validate_args=True)
     with self.assertRaisesWithPredicateMatch(TypeError, 'same dtype'):
-      tfd.Mixture(
+      mixture.Mixture(
           cat, [
-              tfd.Normal(loc=[1.0], scale=[2.0]),
-              tfd.Normal(loc=[np.float16(1.0)], scale=[np.float16(2.0)]),
+              normal.Normal(loc=[1.0], scale=[2.0]),
+              normal.Normal(loc=[np.float16(1.0)], scale=[np.float16(2.0)]),
           ],
           validate_args=True)
     with self.assertRaisesWithPredicateMatch(ValueError, 'non-empty list'):
-      tfd.Mixture(
-          tfd.Categorical([0.3, 0.2]),
-          None,
-          validate_args=True)
+      mixture.Mixture(
+          categorical.Categorical([0.3, 0.2]), None, validate_args=True)
 
     # TODO(ebrevdo): once distribution Domains have been added, add a
     # test to ensure that the domains of the distributions in a
@@ -385,11 +393,11 @@ class MixtureTest(test_util.TestCase):
     component_devs = np.float32([0.05, 2.33])
     ground_truth_stddev = 5.3120805
 
-    mixture_dist = tfd.Mixture(
-        cat=tfd.Categorical(probs=cat_probs),
+    mixture_dist = mixture.Mixture(
+        cat=categorical.Categorical(probs=cat_probs),
         components=[
-            tfd.Normal(loc=component_means[0], scale=component_devs[0]),
-            tfd.Normal(loc=component_means[1], scale=component_devs[1]),
+            normal.Normal(loc=component_means[0], scale=component_devs[0]),
+            normal.Normal(loc=component_means[1], scale=component_devs[1]),
         ],
         validate_args=True)
     mix_dev = mixture_dist.stddev()
@@ -538,26 +546,20 @@ class MixtureTest(test_util.TestCase):
     n = 100
     seed = test_util.test_seed()
     components = [
-        tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
+        normal.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
-    cat = tfd.Categorical(logits, dtype=tf.int32, name='cat1')
-    dist1 = tfd.Mixture(
-        cat,
-        components,
-        name='mixture1',
-        validate_args=True)
+    cat = categorical.Categorical(logits, dtype=tf.int32, name='cat1')
+    dist1 = mixture.Mixture(
+        cat, components, name='mixture1', validate_args=True)
     tf.random.set_seed(seed)
     samples1 = self.evaluate(dist1.sample(n, seed=seed))
 
     components2 = [
-        tfd.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
+        normal.Normal(loc=mu, scale=sigma) for mu, sigma in zip(mus, sigmas)
     ]
-    cat2 = tfd.Categorical(logits, dtype=tf.int32, name='cat2')
-    dist2 = tfd.Mixture(
-        cat2,
-        components2,
-        name='mixture2',
-        validate_args=True)
+    cat2 = categorical.Categorical(logits, dtype=tf.int32, name='cat2')
+    dist2 = mixture.Mixture(
+        cat2, components2, name='mixture2', validate_args=True)
     tf.random.set_seed(seed)
     samples2 = self.evaluate(dist2.sample(n, seed=seed))
 
@@ -698,19 +700,18 @@ class MixtureTest(test_util.TestCase):
       e_x = np.exp(x - np.max(x))
       return e_x / e_x.sum()
 
-    # Construct the tfd.Mixture object.
+    # Construct the mixture.Mixture object.
     mixture_weights = _scalar_univariate_softmax(mixture_weight_logits)
     means = [np.random.uniform(low=-10, high=10, size=()).astype(np.float32)
              for _ in range(n_components)]
     sigmas = [np.ones(shape=(), dtype=np.float32) for _ in range(n_components)]
-    cat_tf = tfd.Categorical(probs=mixture_weights)
+    cat_tf = categorical.Categorical(probs=mixture_weights)
     components_tf = [
-        tfd.Normal(loc=mu, scale=sigma) for (mu, sigma) in zip(means, sigmas)
+        normal.Normal(loc=mu, scale=sigma)
+        for (mu, sigma) in zip(means, sigmas)
     ]
-    mixture_tf = tfd.Mixture(
-        cat=cat_tf,
-        components=components_tf,
-        validate_args=True)
+    mixture_tf = mixture.Mixture(
+        cat=cat_tf, components=components_tf, validate_args=True)
 
     # These are two test cases to verify.
     xs_to_check = [
@@ -749,14 +750,13 @@ class MixtureTest(test_util.TestCase):
              for _ in range(n_components)]
     sigmas = [np.ones(shape=psize, dtype=np.float32)
               for _ in range(n_components)]
-    cat_tf = tfd.Categorical(probs=mixture_weights)
+    cat_tf = categorical.Categorical(probs=mixture_weights)
     components_tf = [
-        tfd.Normal(loc=mu, scale=sigma) for (mu, sigma) in zip(means, sigmas)
+        normal.Normal(loc=mu, scale=sigma)
+        for (mu, sigma) in zip(means, sigmas)
     ]
-    mixture_tf = tfd.Mixture(
-        cat=cat_tf,
-        components=components_tf,
-        validate_args=True)
+    mixture_tf = mixture.Mixture(
+        cat=cat_tf, components=components_tf, validate_args=True)
 
     xs_to_check = [
         np.array([1.0, 5.9, -3, 0.0, 0.0], dtype=np.float32),
@@ -786,9 +786,10 @@ class MixtureTest(test_util.TestCase):
     Mixture's use of dynamic partition requires `random_gamma` correctly returns
     an empty `Tensor`.
     """
-    gm = tfd.Mixture(
-        cat=tfd.Categorical(probs=[.3, .7]),
-        components=[tfd.Gamma(1., 2.), tfd.Gamma(2., 1.)],
+    gm = mixture.Mixture(
+        cat=categorical.Categorical(probs=[.3, .7]),
+        components=[gamma.Gamma(1., 2.),
+                    gamma.Gamma(2., 1.)],
         validate_args=True)
     x_ = self.evaluate(gm.sample(seed=test_util.test_seed()))
     self.assertAllEqual([], x_.shape)
@@ -803,11 +804,13 @@ class MixtureTest(test_util.TestCase):
                       shape=tf.TensorShape(None))
     scale = tf.Variable(1., dtype=tf.float32, shape=tf.TensorShape(None))
 
-    dist = tfd.Mixture(
-        tfd.Categorical(logits=logits),
-        components=[tfd.Dirichlet(concentration),
-                    tfd.MultivariateNormalDiag(
-                        loc=loc, scale_identity_multiplier=scale)],
+    dist = mixture.Mixture(
+        categorical.Categorical(logits=logits),
+        components=[
+            dirichlet.Dirichlet(concentration),
+            mvn_diag.MultivariateNormalDiag(
+                loc=loc, scale_identity_multiplier=scale)
+        ],
         validate_args=True)
 
     with tf.GradientTape() as tape:
@@ -830,11 +833,14 @@ class MixtureTest(test_util.TestCase):
         tf.Variable(1., dtype=tf.float32,
                     shape=tf.TensorShape(None), name='scale'))
 
-    dist = tfd.Mixture(
-        tfd.Categorical(logits=logits),
-        components=[tfd.Dirichlet(concentration),
-                    tfd.Independent(tfd.Normal(loc=loc, scale=scale),
-                                    reinterpreted_batch_ndims=1)],
+    dist = mixture.Mixture(
+        categorical.Categorical(logits=logits),
+        components=[
+            dirichlet.Dirichlet(concentration),
+            independent.Independent(
+                normal.Normal(loc=loc, scale=scale),
+                reinterpreted_batch_ndims=1)
+        ],
         validate_args=True)
 
     for method in ('batch_shape_tensor', 'event_shape_tensor',
@@ -872,11 +878,11 @@ class MixtureBenchmark(tf.test.Benchmark):
     with tf1.Session(config=config, graph=tf.Graph()) as sess:
       tf.random.set_seed(0)
       with tf.device('/device:GPU:0' if use_gpu else '/cpu:0'):
-        mixture = create_distribution(
+        dist = create_distribution(
             num_components=num_components,
             batch_size=batch_size,
             num_features=num_features)
-        sample_op = mixture.sample(sample_size, seed=test_util.test_seed()).op
+        sample_op = dist.sample(sample_size, seed=test_util.test_seed()).op
         sess.run(tf1.global_variables_initializer())
         reported = self.run_op_benchmark(
             sess,
@@ -895,7 +901,8 @@ class MixtureBenchmark(tf.test.Benchmark):
         2, 'mvn_diag\tuse_gpu\tcomponents\tbatch\tfeatures\tsample\twall_time')
 
     def create_distribution(batch_size, num_components, num_features):
-      cat = tfd.Categorical(logits=np.random.randn(batch_size, num_components))
+      cat = categorical.Categorical(
+          logits=np.random.randn(batch_size, num_components))
       mus = [
           tf.Variable(np.random.randn(batch_size, num_features))
           for _ in range(num_components)
@@ -905,12 +912,9 @@ class MixtureBenchmark(tf.test.Benchmark):
           for _ in range(num_components)
       ]
       components = list(
-          tfd.MultivariateNormalDiag(loc=mu, scale_diag=sigma)
+          mvn_diag.MultivariateNormalDiag(loc=mu, scale_diag=sigma)
           for (mu, sigma) in zip(mus, sigmas))
-      return tfd.Mixture(
-          cat,
-          components,
-          validate_args=True)
+      return mixture.Mixture(cat, components, validate_args=True)
 
     for use_gpu in False, True:
       if use_gpu and not tf.test.is_gpu_available():
@@ -937,7 +941,8 @@ class MixtureBenchmark(tf.test.Benchmark):
       return np.stack([np.dot(np.transpose(z), z) for z in x])
 
     def create_distribution(batch_size, num_components, num_features):
-      cat = tfd.Categorical(logits=np.random.randn(batch_size, num_components))
+      cat = categorical.Categorical(
+          logits=np.random.randn(batch_size, num_components))
       mus = [
           tf.Variable(np.random.randn(batch_size, num_features))
           for _ in range(num_components)
@@ -948,13 +953,10 @@ class MixtureBenchmark(tf.test.Benchmark):
           for _ in range(num_components)
       ]
       components = list(
-          tfd.MultivariateNormalTriL(
+          mvn_tril.MultivariateNormalTriL(
               loc=mu, scale_tril=tf.linalg.cholesky(sigma))
           for (mu, sigma) in zip(mus, sigmas))
-      return tfd.Mixture(
-          cat,
-          components,
-          validate_args=True)
+      return mixture.Mixture(cat, components, validate_args=True)
 
     for use_gpu in False, True:
       if use_gpu and not tf.test.is_gpu_available():
@@ -974,19 +976,21 @@ class MixtureBenchmark(tf.test.Benchmark):
 
 
 class SamplerBackwardCompatibilityTest(test_util.TestCase):
-  """Since `cat` must be tfd.Categorical, we check only components."""
+  """Since `cat` must be categorical.Categorical, we check only components."""
 
   @test_util.jax_disable_test_missing_functionality('stateful random')
   @test_util.numpy_disable_test_missing_functionality('stateful random')
   def testStatefulComponentDist(self):
 
-    class StatefulNormal(tfd.Distribution):
+    class StatefulNormal(distribution.Distribution):
 
       def __init__(self, loc):
         self._loc = tf.convert_to_tensor(loc)
         super(StatefulNormal, self).__init__(
-            dtype=tf.float32, reparameterization_type=tfd.FULLY_REPARAMETERIZED,
-            validate_args=False, allow_nan_stats=False)
+            dtype=tf.float32,
+            reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
+            validate_args=False,
+            allow_nan_stats=False)
 
       def _batch_shape(self):
         return self._loc.shape
@@ -998,9 +1002,9 @@ class SamplerBackwardCompatibilityTest(test_util.TestCase):
         return self._loc + tf.random.normal(
             tf.concat([[n], tf.shape(self._loc)], axis=0), seed=seed)
 
-    mix = tfd.Mixture(
-        cat=tfd.Categorical(logits=[0., 0]),
-        components=[tfd.HalfNormal(scale=2.),
+    mix = mixture.Mixture(
+        cat=categorical.Categorical(logits=[0., 0]),
+        components=[half_normal.HalfNormal(scale=2.),
                     StatefulNormal(loc=3.)])
     with warnings.catch_warnings(record=True) as triggered:
       self.evaluate(mix.sample(seed=test_util.test_seed()))

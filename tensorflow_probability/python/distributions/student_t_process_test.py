@@ -18,7 +18,9 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import multivariate_student_t as mvst
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import student_t_process
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math import psd_kernels
@@ -50,7 +52,7 @@ class _StudentTProcessTest(object):
       batched_index_points = tf1.placeholder_with_default(
           batched_index_points, shape=None)
     kernel = psd_kernels.ExponentiatedQuadratic(amplitude, length_scale)
-    tp = tfd.StudentTProcess(
+    tp = student_t_process.StudentTProcess(
         df,
         kernel,
         batched_index_points,
@@ -100,7 +102,7 @@ class _StudentTProcessTest(object):
 
     index_points = np.expand_dims(np.random.uniform(-1., 1., 10), -1)
 
-    tp = tfd.StudentTProcess(
+    tp = student_t_process.StudentTProcess(
         df=df,
         kernel=kernel,
         index_points=index_points,
@@ -123,7 +125,7 @@ class _StudentTProcessTest(object):
     mean_fn = lambda x: x[:, 0]**2
     kernel = psd_kernels.ExponentiatedQuadratic()
     index_points = np.expand_dims(np.random.uniform(-1., 1., 10), -1)
-    tp = tfd.StudentTProcess(
+    tp = student_t_process.StudentTProcess(
         df=3.,
         kernel=kernel,
         index_points=index_points,
@@ -148,7 +150,7 @@ class _StudentTProcessTest(object):
     kernel_1 = psd_kernels.ExponentiatedQuadratic()
     kernel_2 = psd_kernels.ExpSinSquared()
 
-    tp1 = tfd.StudentTProcess(
+    tp1 = student_t_process.StudentTProcess(
         df=3.,
         kernel=kernel_1,
         index_points=index_points_1,
@@ -196,7 +198,7 @@ class _StudentTProcessTest(object):
     mean_fn = lambda x: x[:, 0]**2
     jitter = np.float64(1e-4)
 
-    tp = tfd.StudentTProcess(
+    tp = student_t_process.StudentTProcess(
         df=np.float64(3.),
         kernel=kernel,
         mean_fn=mean_fn,
@@ -227,18 +229,17 @@ class _StudentTProcessTest(object):
       tp.mean()
 
   def testMarginalHasCorrectTypes(self):
-    tp = tfd.StudentTProcess(
+    tp = student_t_process.StudentTProcess(
         df=3., kernel=psd_kernels.ExponentiatedQuadratic(), validate_args=True)
 
     self.assertIsInstance(
         tp.get_marginal_distribution(
-            index_points=np.ones([1, 1], dtype=np.float32)),
-        tfd.StudentT)
+            index_points=np.ones([1, 1], dtype=np.float32)), student_t.StudentT)
 
     self.assertIsInstance(
         tp.get_marginal_distribution(
             index_points=np.ones([10, 1], dtype=np.float32)),
-        tfd.MultivariateStudentTLinearOperator)
+        mvst.MultivariateStudentTLinearOperator)
 
 
 @test_util.test_all_tf_execution_regimes

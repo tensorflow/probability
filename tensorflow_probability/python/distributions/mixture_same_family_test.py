@@ -18,23 +18,30 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import dirichlet
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import logistic
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
   def testSampleAndLogProbUnivariateShapes(self):
-    gm = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
+    gm = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(
             probs=self._build_tensor([0.3, 0.7])),
-        components_distribution=tfd.Normal(
+        components_distribution=normal.Normal(
             loc=self._build_tensor([-1., 1]),
             scale=self._build_tensor([0.1, 0.5])),
         validate_args=True)
@@ -44,10 +51,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     self.assertAllEqual([4, 5], self._shape(log_prob_x))
 
   def testSampleAndLogProbBatch(self):
-    gm = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
+    gm = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(
             probs=self._build_tensor([[0.3, 0.7]])),
-        components_distribution=tfd.Normal(
+        components_distribution=normal.Normal(
             loc=self._build_tensor([[-1., 1]]),
             scale=self._build_tensor([[0.1, 0.5]])),
         validate_args=True)
@@ -59,9 +66,9 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
   def testSampleAndLogProbShapesBroadcastMix(self):
     mix_probs = self._build_tensor([.3, .7])
     bern_probs = self._build_tensor([[.4, .6], [.25, .75]])
-    bm = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(probs=mix_probs),
-        components_distribution=tfd.Bernoulli(probs=bern_probs),
+    bm = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(probs=mix_probs),
+        components_distribution=bernoulli.Bernoulli(probs=bern_probs),
         validate_args=True)
     x = bm.sample([4, 5], seed=test_util.test_seed())
     log_prob_x = bm.log_prob(x)
@@ -104,10 +111,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
         self.evaluate, gm, radius=1., center=[1., -1], rtol=0.02)
 
   def testLogCdf(self):
-    gm = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
+    gm = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(
             probs=self._build_tensor([0.3, 0.7])),
-        components_distribution=tfd.Normal(
+        components_distribution=normal.Normal(
             loc=self._build_tensor([-1., 1]),
             scale=self._build_tensor([0.1, 0.5])),
         validate_args=True)
@@ -144,12 +151,11 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     self.assertAllClose(cov_.diagonal(), var_, atol=0.)
 
   def testPosteriorMarginal(self):
-    bm = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
+    bm = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(
             probs=self._build_tensor([0.1, 0.9])),
-        components_distribution=tfd.Categorical(
-            probs=self._build_tensor([[.2, .3, .5],
-                                      [.7, .2, .1]])),
+        components_distribution=categorical.Categorical(
+            probs=self._build_tensor([[.2, .3, .5], [.7, .2, .1]])),
         validate_args=True)
     marginal_dist = bm.posterior_marginal(self._build_tensor([0., 1., 2.]))
     marginals = self.evaluate(marginal_dist.probs_parameter())
@@ -169,10 +175,11 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
         test_util.test_seed(sampler_type='stateless'), n=3)
     logits = self.evaluate(samplers.normal([3, 1, 5], seed=logits_seed))
     loc = self.evaluate(samplers.normal([1, 4, 5, 2], seed=loc_seed))
-    dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=self._build_tensor(logits)),
-        components_distribution=tfd.Independent(
-            tfd.Logistic(loc=self._build_tensor(loc), scale=1.),
+    dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(
+            logits=self._build_tensor(logits)),
+        components_distribution=independent.Independent(
+            logistic.Logistic(loc=self._build_tensor(loc), scale=1.),
             reinterpreted_batch_ndims=1),
         validate_args=True)
     self.assertAllEqual(dist.batch_shape_tensor(), [3, 4])
@@ -190,12 +197,13 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
         dist.posterior_marginal(x).logits_parameter())
     self.assertAllEqual(marginals_logits.shape, [2, 1, 3, 4, 5])
 
-    fully_broadcast_dist = tfd.MixtureSameFamily(
-        mixture_distribution=(dist.mixture_distribution
-                              ._broadcast_parameters_with_batch_shape([3, 4])),
-        components_distribution=(dist.components_distribution
-                                 ._broadcast_parameters_with_batch_shape(
-                                     [3, 4, 5])),
+    fully_broadcast_dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=(
+            dist.mixture_distribution._broadcast_parameters_with_batch_shape(
+                [3, 4])),
+        components_distribution=(
+            dist.components_distribution._broadcast_parameters_with_batch_shape(
+                [3, 4, 5])),
         validate_args=True)
     self.assertAllEqual(
         fully_broadcast_dist.mixture_distribution.batch_shape_tensor(),
@@ -209,10 +217,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     self.assertAllClose(x_lp, fully_broadcast_dist.log_prob(x))
 
   def testBroadcastBatchDimensionsAreIndependent(self):
-    mixture = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(probs=[0.5, 0.5]),
-        components_distribution=tfd.Normal(loc=[[0., 10.], [0., 10.]],
-                                           scale=0.1))
+    mixture = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(probs=[0.5, 0.5]),
+        components_distribution=normal.Normal(
+            loc=[[0., 10.], [0., 10.]], scale=0.1))
     samples = self.evaluate(mixture.sample(sample_shape=(1000,),
                                            seed=test_util.test_seed()))
     # If mixture components across the batch are independent, we'll sample from
@@ -225,11 +233,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
         4.)
 
   def testPosteriorMode(self):
-    gm = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
-            probs=self._build_tensor([[0.5, 0.5],
-                                      [0.01, 0.99]])),
-        components_distribution=tfd.Normal(
+    gm = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(
+            probs=self._build_tensor([[0.5, 0.5], [0.01, 0.99]])),
+        components_distribution=normal.Normal(
             loc=self._build_tensor([[-1., 1.], [-1., 1.]]),
             scale=self._build_tensor(1.)))
     mode = gm.posterior_mode(
@@ -239,10 +246,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
   def testReparameterizationOfNonReparameterizedComponents(self):
     with self.assertRaises(ValueError):
-      tfd.MixtureSameFamily(
-          mixture_distribution=tfd.Categorical(
+      mixture_same_family.MixtureSameFamily(
+          mixture_distribution=categorical.Categorical(
               logits=self._build_tensor([-0.3, 0.4])),
-          components_distribution=tfd.Bernoulli(
+          components_distribution=bernoulli.Bernoulli(
               logits=self._build_tensor([0.1, -0.1])),
           reparameterize=True,
           validate_args=True)
@@ -253,9 +260,9 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
       return
 
     def sample(logits):
-      mixture = tfd.MixtureSameFamily(
-          mixture_distribution=tfd.Categorical(logits=logits),
-          components_distribution=tfd.Normal(
+      mixture = mixture_same_family.MixtureSameFamily(
+          mixture_distribution=categorical.Categorical(logits=logits),
+          components_distribution=normal.Normal(
               loc=self._build_tensor([[0.4, 0.25]]),
               scale=self._build_tensor([[0.1, 0.5]])),
           reparameterize=True,
@@ -266,8 +273,8 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     logits = self._build_tensor([[0.1, 0.5]])
 
     with self.assertRaises(LookupError):
-      _, grad = tfp.math.value_and_gradient(
-          lambda x: tfp.math.value_and_gradient(sample, x)[1], logits)
+      _, grad = gradient.value_and_gradient(
+          lambda x: gradient.value_and_gradient(sample, x)[1], logits)
       self.evaluate(grad)
 
   def _testMixtureReparameterizationGradients(
@@ -293,16 +300,16 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
       elif function == 'mean':
         return mixture.mean() + 0 * mixture.variance()
 
-    _, actual = tfp.math.value_and_gradient(sample_estimate, parameters)
-    _, expected = tfp.math.value_and_gradient(exact, parameters)
+    _, actual = gradient.value_and_gradient(sample_estimate, parameters)
+    _, expected = gradient.value_and_gradient(exact, parameters)
     self.assertAllClose(actual, expected, atol=0.1, rtol=0.2)
 
   @test_util.numpy_disable_gradient_test
   def testReparameterizationGradientsNormalScalarComponents(self):
     def mixture_func(logits, loc, scale):
-      return tfd.MixtureSameFamily(
-          mixture_distribution=tfd.Categorical(logits=logits),
-          components_distribution=tfd.Normal(loc=loc, scale=scale),
+      return mixture_same_family.MixtureSameFamily(
+          mixture_distribution=categorical.Categorical(logits=logits),
+          components_distribution=normal.Normal(loc=loc, scale=scale),
           reparameterize=True,
           validate_args=True)
 
@@ -318,10 +325,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
   @test_util.numpy_disable_gradient_test
   def testReparameterizationGradientsNormalVectorComponents(self):
     def mixture_func(logits, loc, scale):
-      return tfd.MixtureSameFamily(
-          mixture_distribution=tfd.Categorical(logits=logits),
-          components_distribution=tfd.Independent(
-              tfd.Normal(loc=loc, scale=scale), reinterpreted_batch_ndims=1),
+      return mixture_same_family.MixtureSameFamily(
+          mixture_distribution=categorical.Categorical(logits=logits),
+          components_distribution=independent.Independent(
+              normal.Normal(loc=loc, scale=scale), reinterpreted_batch_ndims=1),
           reparameterize=True,
           validate_args=True)
 
@@ -337,10 +344,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
   @test_util.numpy_disable_gradient_test
   def testReparameterizationGradientsNormalMatrixComponents(self):
     def mixture_func(logits, loc, scale):
-      return tfd.MixtureSameFamily(
-          mixture_distribution=tfd.Categorical(logits=logits),
-          components_distribution=tfd.Independent(
-              tfd.Normal(loc=loc, scale=scale), reinterpreted_batch_ndims=2),
+      return mixture_same_family.MixtureSameFamily(
+          mixture_distribution=categorical.Categorical(logits=logits),
+          components_distribution=independent.Independent(
+              normal.Normal(loc=loc, scale=scale), reinterpreted_batch_ndims=2),
           reparameterize=True,
           validate_args=True)
 
@@ -357,9 +364,9 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
   @test_util.numpy_disable_gradient_test
   def testReparameterizationGradientsExponentialScalarComponents(self):
     def mixture_func(logits, rate):
-      return tfd.MixtureSameFamily(
-          mixture_distribution=tfd.Categorical(logits=logits),
-          components_distribution=tfd.Exponential(rate=rate),
+      return mixture_same_family.MixtureSameFamily(
+          mixture_distribution=categorical.Categorical(logits=logits),
+          components_distribution=exponential.Exponential(rate=rate),
           reparameterize=True,
           validate_args=True)
 
@@ -373,9 +380,9 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
 
   def testDeterministicSampling(self):
     seed = test_util.test_seed()
-    dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=[0., 0.]),
-        components_distribution=tfd.Normal(loc=[0., 200.], scale=[1., 1.]),
+    dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(logits=[0., 0.]),
+        components_distribution=normal.Normal(loc=[0., 200.], scale=[1., 1.]),
         validate_args=True)
     tf.random.set_seed(seed)
     sample_1 = self.evaluate(dist.sample([100], seed=seed))
@@ -388,9 +395,9 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     logits = self._build_variable([1., 2., 3.])
     loc = self._build_variable([0., 0., 0])
     scale = self._build_variable(1.)
-    dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=logits),
-        components_distribution=tfd.Logistic(loc=loc, scale=scale),
+    dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(logits=logits),
+        components_distribution=logistic.Logistic(loc=loc, scale=scale),
         validate_args=True)
     with tf.GradientTape() as tape:
       loss = -dist.log_prob([5., 4.])
@@ -401,10 +408,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     logits = self._build_variable(np.zeros((4, 4, 5)))
     loc = self._build_variable(np.zeros((4, 4, 5, 2, 3)))
     scale = self._build_variable(1.)
-    dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=logits),
-        components_distribution=tfd.Independent(
-            tfd.Logistic(loc=loc, scale=scale),
+    dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(logits=logits),
+        components_distribution=independent.Independent(
+            logistic.Logistic(loc=loc, scale=scale),
             reinterpreted_batch_ndims=self._build_tensor(2, dtype=np.int32)),
         validate_args=True)
     with tf.GradientTape() as tape:
@@ -421,9 +428,10 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     concentration = tfp_hps.defer_and_count_usage(
         self._build_variable(np.zeros((5, 3)), static_rank=True,
                              name='concentration'))
-    dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=logits),
-        components_distribution=tfd.Dirichlet(concentration=concentration),
+    dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(logits=logits),
+        components_distribution=dirichlet.Dirichlet(
+            concentration=concentration),
         validate_args=True)
 
     # Many methods use mixture_distribution and components_distribution at most
@@ -475,10 +483,11 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
         np.zeros(5), name='loc', static_rank=True))
     scale = tfp_hps.defer_and_count_usage(self._build_variable(
         1., name='scale', static_rank=True))
-    dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=logits),
-        components_distribution=tfd.Logistic(loc=loc, scale=scale),
-        reparameterize=True, validate_args=True)
+    dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(logits=logits),
+        components_distribution=logistic.Logistic(loc=loc, scale=scale),
+        reparameterize=True,
+        validate_args=True)
 
     # TODO(b/140579567): With reparameterization, there are additional reads of
     # the parameters of the underlying mixture and components distributions when
@@ -501,11 +510,13 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
     logits = self._build_variable(np.zeros(5), static_rank=True)
     loc = self._build_variable(np.zeros((4, 5, 2, 3)), static_rank=True)
     scale = self._build_variable(1., static_rank=True)
-    dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=logits),
-        components_distribution=tfd.Independent(
-            tfd.Logistic(loc=loc, scale=scale), reinterpreted_batch_ndims=2),
-        reparameterize=True, validate_args=True)
+    dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(logits=logits),
+        components_distribution=independent.Independent(
+            logistic.Logistic(loc=loc, scale=scale),
+            reinterpreted_batch_ndims=2),
+        reparameterize=True,
+        validate_args=True)
     with tf.GradientTape() as tape:
       loss = tf.reduce_sum(dist.sample(2, seed=test_util.test_seed()))
     grad = tape.gradient(loss, dist.trainable_variables)
@@ -519,21 +530,20 @@ class _MixtureSameFamilyTest(test_util.VectorDistributionTestHelpers):
       return self.evaluate(tf.shape(x))
 
   def _build_mvndiag_mixture(self, probs, loc, scale_identity_multiplier):
-    components_distribution = tfd.MultivariateNormalDiag(
+    components_distribution = mvn_diag.MultivariateNormalDiag(
         loc=self._build_tensor(loc),
-        scale_identity_multiplier=self._build_tensor(
-            scale_identity_multiplier))
+        scale_identity_multiplier=self._build_tensor(scale_identity_multiplier))
 
     # Use a no-op `Independent` wrapper to possibly create dynamic ndims.
-    wrapped_components_distribution = tfd.Independent(
+    wrapped_components_distribution = independent.Independent(
         components_distribution,
         reinterpreted_batch_ndims=self._build_tensor(0, dtype=np.int32))
     # Lambda ensures that the covariance fn sees `self=components_distribution`.
     wrapped_components_distribution._covariance = (
         lambda: components_distribution.covariance())  # pylint: disable=unnecessary-lambda
 
-    gm = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
+    gm = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(
             probs=self._build_tensor(probs)),
         components_distribution=wrapped_components_distribution,
         validate_args=True)
@@ -582,10 +592,11 @@ class MixtureSameFamilyTestDynamic32(
     logits = self._build_variable(np.zeros(5))
     loc = self._build_variable(np.zeros((4, 5, 2, 3)), static_rank=True)
     scale = self._build_variable(1.)
-    dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(logits=logits),
-        components_distribution=tfd.Independent(
-            tfd.Logistic(loc=loc, scale=scale), reinterpreted_batch_ndims=2),
+    dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(logits=logits),
+        components_distribution=independent.Independent(
+            logistic.Logistic(loc=loc, scale=scale),
+            reinterpreted_batch_ndims=2),
         validate_args=True)
 
     self.evaluate([v.initializer for v in [logits, loc, scale]])

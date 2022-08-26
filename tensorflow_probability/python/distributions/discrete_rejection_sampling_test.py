@@ -19,12 +19,9 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.distributions import discrete_rejection_sampling
+from tensorflow_probability.python.distributions import geometric
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -35,10 +32,14 @@ class DiscreteRejectionSamplingTest(test_util.TestCase):
     n = int(5e5)
 
     probs = np.float32([0.7, 0.8, 0.3, 0.2])
-    geometric = tfd.Geometric(probs=probs)
+    dist = geometric.Geometric(probs=probs)
     x = discrete_rejection_sampling.log_concave_rejection_sampler(
-        mode=geometric.mode(), prob_fn=geometric.prob, dtype=geometric.dtype,
-        sample_shape=[n], distribution_minimum=0, seed=seed)
+        mode=dist.mode(),
+        prob_fn=dist.prob,
+        dtype=dist.dtype,
+        sample_shape=[n],
+        distribution_minimum=0,
+        seed=seed)
 
     x = x + 1  ## scipy.stats.geom is 1-indexed instead of 0-indexed.
     sample_mean, sample_variance = tf.nn.moments(x=x, axes=0)

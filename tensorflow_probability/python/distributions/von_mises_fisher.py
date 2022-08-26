@@ -18,7 +18,6 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import invert as invert_bijector
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
@@ -36,6 +35,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import bessel
 
 
 __all__ = ['VonMisesFisher']
@@ -215,7 +215,7 @@ class VonMisesFisher(distribution.AutoCompositeTensorDistribution):
                          tf.ones_like(concentration))
     safe_lognorm = ((event_dim / 2 - 1) * tf.math.log(safe_conc) -
                     (event_dim / 2) * np.log(2 * np.pi) -
-                    tfp_math.log_bessel_ive(event_dim / 2 - 1, safe_conc) -
+                    bessel.log_bessel_ive(event_dim / 2 - 1, safe_conc) -
                     tf.abs(safe_conc))
     log_nsphere_surface_area = (
         np.log(2.) + (event_dim / 2) * np.log(np.pi) -
@@ -264,7 +264,7 @@ class VonMisesFisher(distribution.AutoCompositeTensorDistribution):
     safe_conc = tf.where(concentration > 0, concentration,
                          tf.ones_like(concentration))
     safe_mean = mean_direction * (
-        tfp_math.bessel_iv_ratio(
+        bessel.bessel_iv_ratio(
             event_dimension / 2., safe_conc)[..., tf.newaxis])
     return tf.where(
         concentration[..., tf.newaxis] > 0.,
@@ -281,7 +281,7 @@ class VonMisesFisher(distribution.AutoCompositeTensorDistribution):
         mean_direction)[0], self.dtype)
     safe_conc = tf.where(concentration > 0, concentration,
                          tf.ones_like(concentration))[..., tf.newaxis]
-    h = tfp_math.bessel_iv_ratio(event_dimension / 2, safe_conc)
+    h = bessel.bessel_iv_ratio(event_dimension / 2, safe_conc)
     intermediate = (
         tf.matmul(mean_direction[..., :, tf.newaxis],
                   mean_direction[..., tf.newaxis, :]) *
@@ -307,7 +307,7 @@ class VonMisesFisher(distribution.AutoCompositeTensorDistribution):
     # subtract it. This is because in TFP, we have the convention that we
     # normalize our distributions p(x) by a constant 1 / Z. Taking the log
     # gives us a negative sign.
-    entropy = -concentration * tfp_math.bessel_iv_ratio(
+    entropy = -concentration * bessel.bessel_iv_ratio(
         event_dimension / 2., concentration) + self._log_normalization(
             concentration=concentration)
 

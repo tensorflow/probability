@@ -18,13 +18,12 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import kullback_leibler
+from tensorflow_probability.python.distributions import logitnormal as ln_lib
+from tensorflow_probability.python.distributions import normal
 
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
-ln_lib = tfd.logitnormal
 
 
 def logit_normal_trapezoid_rule(loc, scale):
@@ -47,14 +46,14 @@ def logit_normal_trapezoid_rule(loc, scale):
 
 def logit_normal_mean_trapezoid(loc, scale):
   """Brute-force the mean of LogitNormal(loc, scale) by quadrature."""
-  dist = tfd.Normal(loc, scale)
+  dist = normal.Normal(loc, scale)
   grid, compute = logit_normal_trapezoid_rule(loc, scale)
   return compute(tf.sigmoid(grid) * dist.prob(grid))
 
 
 def logit_normal_variance_trapezoid(loc, scale):
   """Brute-force the variance of LogitNormal(loc, scale) by quadrature."""
-  dist = tfd.Normal(loc, scale)
+  dist = normal.Normal(loc, scale)
   grid, compute = logit_normal_trapezoid_rule(loc, scale)
   probs = dist.prob(grid)
   sigmoids = tf.sigmoid(grid)
@@ -67,17 +66,17 @@ class LogitNormalTest(test_util.TestCase):
 
   def testLogitNormalMeanApprox(self):
     loc, scale = [-1.5, 0., 1.5], 0.4
-    dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
+    dist = ln_lib.LogitNormal(loc=loc, scale=scale, validate_args=True)
     x = dist.sample(int(10e3), seed=test_util.test_seed())
     [x_, mean_approx_] = self.evaluate([x, dist.mean_approx()])
     self.assertAllMeansClose(x_, mean_approx_, axis=0, atol=1e-4, rtol=0.01)
 
   def testLogitNormalMeanLogProbApprox(self):
     loc, scale = [-1.5, 0., 1.5], 0.4
-    dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
+    dist = ln_lib.LogitNormal(loc=loc, scale=scale, validate_args=True)
     x = dist.sample(int(10e3), seed=test_util.test_seed())
     y = tf.constant([0., 0.1, 0.5, 1.], dist.dtype)[:, tf.newaxis]
-    samples = tfd.Bernoulli(probs=x).log_prob(y[..., tf.newaxis])
+    samples = bernoulli.Bernoulli(probs=x).log_prob(y[..., tf.newaxis])
     [samples_, mean_approx_, mean_approx_default_] = self.evaluate([
         samples, dist.mean_log_prob_approx(y), dist.mean_log_prob_approx()])
     self.assertAllMeansClose(
@@ -90,7 +89,7 @@ class LogitNormalTest(test_util.TestCase):
     loc = tf.random.uniform(shape=[30], seed=seed_stream())
     scale = tf.random.uniform(
         minval=0.1, maxval=5., shape=[30], seed=seed_stream())
-    dist = tfd.LogitNormal(loc=loc, scale=scale, validate_args=True)
+    dist = ln_lib.LogitNormal(loc=loc, scale=scale, validate_args=True)
     x = dist.sample(int(10e3), seed=test_util.test_seed())
     variance_sample = tf.math.reduce_variance(x, axis=0)
     [variance_sample_, variance_approx_] = self.evaluate([
@@ -115,8 +114,10 @@ class LogitNormalTest(test_util.TestCase):
   def testLogitNormalMeanAndVariance(self):
     locs, scales = tf.meshgrid(tf.linspace(-10.0, 10.0, 10),
                                tf.exp(tf.linspace(-3.0, 3.0, 10)))
-    dist = tfd.LogitNormal(
-        loc=locs, scale=scales, validate_args=True,
+    dist = ln_lib.LogitNormal(
+        loc=locs,
+        scale=scales,
+        validate_args=True,
         gauss_hermite_scale_limit=1.,
         num_probit_terms_approx=6)
     means = dist.mean_approx()
@@ -133,15 +134,15 @@ class LogitNormalTest(test_util.TestCase):
     mu_b = np.array([-3.0] * batch_size)
     sigma_b = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
 
-    ln_a = tfd.LogitNormal(loc=mu_a, scale=sigma_a, validate_args=True)
-    ln_b = tfd.LogitNormal(loc=mu_b, scale=sigma_b, validate_args=True)
+    ln_a = ln_lib.LogitNormal(loc=mu_a, scale=sigma_a, validate_args=True)
+    ln_b = ln_lib.LogitNormal(loc=mu_b, scale=sigma_b, validate_args=True)
 
-    kl = tfd.kl_divergence(ln_a, ln_b)
+    kl = kullback_leibler.kl_divergence(ln_a, ln_b)
     kl_val = self.evaluate(kl)
 
-    normal_a = tfd.Normal(loc=mu_a, scale=sigma_a, validate_args=True)
-    normal_b = tfd.Normal(loc=mu_b, scale=sigma_b, validate_args=True)
-    kl_expected_from_normal = tfd.kl_divergence(normal_a, normal_b)
+    normal_a = normal.Normal(loc=mu_a, scale=sigma_a, validate_args=True)
+    normal_b = normal.Normal(loc=mu_b, scale=sigma_b, validate_args=True)
+    kl_expected_from_normal = kullback_leibler.kl_divergence(normal_a, normal_b)
 
     kl_expected_from_formula = ((mu_a - mu_b)**2 / (2 * sigma_b**2) + 0.5 * (
         (sigma_a**2 / sigma_b**2) - 1 - 2 * np.log(sigma_a / sigma_b)))
@@ -158,7 +159,7 @@ class LogitNormalTest(test_util.TestCase):
 
     # TODO(b/144948687) Avoid `nan` at boundary. Ideally we'd do this test:
 #   def testPdfAtBoundary(self):
-#     dist = tfd.LogitNormal(loc=[-5., 3.], scale=[[1., 2.], [3., 2.]],
+#     dist = ln_lib.LogitNormal(loc=[-5., 3.], scale=[[1., 2.], [3., 2.]],
 #                            validate_args=True)
 #     pdf_at_boundary = self.evaluate(dist.prob(0.))
 #     self.assertAllEqual(pdf_at_boundary, np.zeros_like(pdf_at_boundary))
@@ -167,7 +168,7 @@ class LogitNormalTest(test_util.TestCase):
 #     self.assertAllNegativeInf(log_pdf_at_boundary)
 
   def testAssertValidSample(self):
-    dist = tfd.LogitNormal(loc=0., scale=3., validate_args=True)
+    dist = ln_lib.LogitNormal(loc=0., scale=3., validate_args=True)
     self.evaluate(dist.prob([.1, .3, .6]))
     self.evaluate(dist.prob([.2, .3, .5]))
     # Either condition can trigger.
@@ -179,7 +180,7 @@ class LogitNormalTest(test_util.TestCase):
   def testSupportBijectorOutsideRange(self):
     mu = np.array([1., 2., 3.])
     sigma = np.array([2., 4., 1.2])
-    dist = tfd.LogitNormal(mu, sigma, validate_args=True)
+    dist = ln_lib.LogitNormal(mu, sigma, validate_args=True)
     eps = 1e-6
     x = np.array([-2.3, -eps, 1. + eps, 1.4])
     bijector_inverse_x = dist.experimental_default_event_space_bijector(

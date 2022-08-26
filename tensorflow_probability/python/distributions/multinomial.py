@@ -16,7 +16,6 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softmax_centered as softmax_centered_bijector
 from tensorflow_probability.python.distributions import binomial
 from tensorflow_probability.python.distributions import categorical as categorical_lib
@@ -30,6 +29,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 
 __all__ = [
@@ -259,7 +259,7 @@ class Multinomial(
         if self._logits is None else tf.math.log_softmax(self._logits))
     log_unnorm_prob = tf.reduce_sum(
         tf.math.multiply_no_nan(log_p, counts), axis=-1)
-    neg_log_normalizer = tfp_math.log_combinations(self.total_count, counts)
+    neg_log_normalizer = generic.log_combinations(self.total_count, counts)
     return log_unnorm_prob + neg_log_normalizer
 
   def _mean(self):

@@ -16,11 +16,9 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python import distributions as tfd
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 def _set_seed(seed):

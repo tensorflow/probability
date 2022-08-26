@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import identity as identity_bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
@@ -31,6 +30,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 from tensorflow_probability.python.math.numeric import log1psquare
 
 
@@ -95,7 +95,7 @@ def log_prob(x, df, loc, scale):
   log_unnormalized_prob = -0.5 * (df + 1.) * log1psquare(y)
   log_normalization = (
       tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
-      0.5 * np.log(np.pi) + tfp_math.log_gamma_difference(0.5, 0.5 * df))
+      0.5 * np.log(np.pi) + special.log_gamma_difference(0.5, 0.5 * df))
   return log_unnormalized_prob - log_normalization
 
 
@@ -116,7 +116,7 @@ def cdf(x, df, loc, scale):
   """
   y = (x - loc) / tf.abs(scale)
   x_t = df / (y**2. + df)
-  neg_cdf = 0.5 * tfp_math.betainc(0.5 * df, 0.5, x_t)
+  neg_cdf = 0.5 * special.betainc(0.5 * df, 0.5, x_t)
   return tf.where(y < 0., neg_cdf, 1. - neg_cdf)
 
 
@@ -137,7 +137,7 @@ def entropy(df, scale, batch_shape, dtype):
   v = tf.ones(batch_shape, dtype=dtype)
   u = v * df
   return (tf.math.log(tf.abs(scale)) + 0.5 * tf.math.log(df) +
-          tfp_math.lbeta(u / 2., v / 2.) + 0.5 * (df + 1.) *
+          special.lbeta(u / 2., v / 2.) + 0.5 * (df + 1.) *
           (tf.math.digamma(0.5 * (df + 1.)) - tf.math.digamma(0.5 * df)))
 
 

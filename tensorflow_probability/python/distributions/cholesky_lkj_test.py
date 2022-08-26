@@ -18,13 +18,17 @@
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import cholesky_outer_product
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import square
+from tensorflow_probability.python.distributions import cholesky_lkj
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import lkj
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import transformed_distribution
 
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,7 +37,7 @@ tfd = tfp.distributions
 class CholeskyLKJTest(test_util.TestCase):
 
   def testDtypePreservation(self, dtype):
-    dist = tfd.CholeskyLKJ(2, dtype([1.]))
+    dist = cholesky_lkj.CholeskyLKJ(2, dtype([1.]))
     x = dist.sample(seed=test_util.test_seed())
     lp = dist.log_prob(x)
     self.assertEqual(dtype, x.dtype)
@@ -80,8 +84,9 @@ class CholeskyLKJTest(test_util.TestCase):
       # We change variables again to lower triangular L; where LL^T = \Sigma.
       # This is just inverse of the tfb.CholeskyOuterProduct bijector.
       cholesky_sigma_sample = tf.linalg.cholesky(sigma_sample)
-      cholesky_sigma_log_prob = sigma_log_prob + tfb.Invert(
-          tfb.CholeskyOuterProduct()).inverse_log_det_jacobian(
+      cholesky_sigma_log_prob = sigma_log_prob + invert.Invert(
+          cholesky_outer_product.CholeskyOuterProduct(
+          )).inverse_log_det_jacobian(
               cholesky_sigma_sample, event_ndims=2)
 
       # Change of variables to R, A; where L = RA; R is diagonal matrix
@@ -113,9 +118,10 @@ class CholeskyLKJTest(test_util.TestCase):
 
       # We start with a distribution on SPD matrices given by the product of
       # LKJ and Exponential random variables.
-      lkj_exponential_covariance_dist = tfd.JointDistributionSequential([
-          tfd.Sample(tfd.Exponential(rate=rate), sample_shape=dimension),
-          tfd.LKJ(dimension=dimension, concentration=concentration)
+      lkj_exponential_covariance_dist = jds.JointDistributionSequential([
+          sample.Sample(
+              exponential.Exponential(rate=rate), sample_shape=dimension),
+          lkj.LKJ(dimension=dimension, concentration=concentration)
       ])
       x = self.evaluate(
           lkj_exponential_covariance_dist.sample(
@@ -131,12 +137,13 @@ class CholeskyLKJTest(test_util.TestCase):
       # We now show that the transformation resulted in a distribution which
       # factors as the product of a rayleigh (the square root of an exponential)
       # and a CholeskyLKJ distribution with the same parameters as the LKJ.
-      rayleigh_dist = tfd.TransformedDistribution(
-          bijector=tfb.Invert(tfb.Square()),
-          distribution=tfd.Exponential(rate=rate))
-      cholesky_lkj_rayleigh_dist = tfd.JointDistributionSequential([
-          tfd.Sample(rayleigh_dist, sample_shape=dimension),
-          tfd.CholeskyLKJ(dimension=dimension, concentration=concentration)
+      rayleigh_dist = transformed_distribution.TransformedDistribution(
+          bijector=invert.Invert(square.Square()),
+          distribution=exponential.Exponential(rate=rate))
+      cholesky_lkj_rayleigh_dist = jds.JointDistributionSequential([
+          sample.Sample(rayleigh_dist, sample_shape=dimension),
+          cholesky_lkj.CholeskyLKJ(
+              dimension=dimension, concentration=concentration)
       ])
       self.assertAllClose(
           self.evaluate(transformed_log_prob),
@@ -144,25 +151,25 @@ class CholeskyLKJTest(test_util.TestCase):
           rtol=1e-3 if dtype == np.float32 else 1e-6)
 
   def testDimensionGuard(self, dtype):
-    testee_lkj = tfd.CholeskyLKJ(
+    testee_lkj = cholesky_lkj.CholeskyLKJ(
         dimension=3, concentration=dtype([1., 4.]))
     with self.assertRaisesRegexp(ValueError, 'dimension mismatch'):
       testee_lkj.log_prob(tf.eye(4))
 
   def testZeroDimension(self, dtype):
-    testee_lkj = tfd.CholeskyLKJ(
+    testee_lkj = cholesky_lkj.CholeskyLKJ(
         dimension=0, concentration=dtype([1., 4.]), validate_args=True)
     results = testee_lkj.sample(sample_shape=[4, 3], seed=test_util.test_seed())
     self.assertEqual(results.shape, [4, 3, 2, 0, 0])
 
   def testOneDimension(self, dtype):
-    testee_lkj = tfd.CholeskyLKJ(
+    testee_lkj = cholesky_lkj.CholeskyLKJ(
         dimension=1, concentration=dtype([1., 4.]), validate_args=True)
     results = testee_lkj.sample(sample_shape=[4, 3], seed=test_util.test_seed())
     self.assertEqual(results.shape, [4, 3, 2, 1, 1])
 
   def testValidateLowerTriangularInput(self, dtype):
-    testee_lkj = tfd.CholeskyLKJ(
+    testee_lkj = cholesky_lkj.CholeskyLKJ(
         dimension=2, concentration=dtype(4.), validate_args=True)
     with self.assertRaisesOpError('must be lower triangular'):
       self.evaluate(testee_lkj.log_prob(dtype([[1., 1.], [1., 1.]])))
@@ -170,7 +177,7 @@ class CholeskyLKJTest(test_util.TestCase):
   def testValidateConcentration(self, dtype):
     dimension = 3
     concentration = tf.Variable(0.5, dtype=dtype)
-    d = tfd.CholeskyLKJ(dimension, concentration, validate_args=True)
+    d = cholesky_lkj.CholeskyLKJ(dimension, concentration, validate_args=True)
     with self.assertRaisesOpError('Argument `concentration` must be >= 1.'):
       self.evaluate([v.initializer for v in d.variables])
       self.evaluate(d.sample(seed=test_util.test_seed()))
@@ -178,7 +185,7 @@ class CholeskyLKJTest(test_util.TestCase):
   def testValidateConcentrationAfterMutation(self, dtype):
     dimension = 3
     concentration = tf.Variable(1.5, dtype=dtype)
-    d = tfd.CholeskyLKJ(dimension, concentration, validate_args=True)
+    d = cholesky_lkj.CholeskyLKJ(dimension, concentration, validate_args=True)
     self.evaluate([v.initializer for v in d.variables])
     with self.assertRaisesOpError('Argument `concentration` must be >= 1.'):
       with tf.control_dependencies([concentration.assign(0.5)]):

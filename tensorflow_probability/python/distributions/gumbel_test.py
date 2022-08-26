@@ -20,11 +20,10 @@ from scipy import stats
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import gumbel
+from tensorflow_probability.python.distributions import kullback_leibler
 
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 class _GumbelTest(object):
@@ -37,43 +36,43 @@ class _GumbelTest(object):
   def testGumbelShape(self):
     loc = np.array([3.0] * 5, dtype=self._dtype)
     scale = np.array([3.0] * 5, dtype=self._dtype)
-    gumbel = tfd.Gumbel(loc=loc, scale=scale, validate_args=True)
+    dist = gumbel.Gumbel(loc=loc, scale=scale, validate_args=True)
 
-    self.assertEqual((5,), self.evaluate(gumbel.batch_shape_tensor()))
-    self.assertEqual(tf.TensorShape([5]), gumbel.batch_shape)
-    self.assertAllEqual([], self.evaluate(gumbel.event_shape_tensor()))
-    self.assertEqual(tf.TensorShape([]), gumbel.event_shape)
+    self.assertEqual((5,), self.evaluate(dist.batch_shape_tensor()))
+    self.assertEqual(tf.TensorShape([5]), dist.batch_shape)
+    self.assertAllEqual([], self.evaluate(dist.event_shape_tensor()))
+    self.assertEqual(tf.TensorShape([]), dist.event_shape)
 
   def testInvalidScale(self):
     scale = [-.01, 0., 2.]
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      gumbel = tfd.Gumbel(loc=0., scale=scale, validate_args=True)
-      self.evaluate(gumbel.mean())
+      dist = gumbel.Gumbel(loc=0., scale=scale, validate_args=True)
+      self.evaluate(dist.mean())
 
     scale = tf.Variable([.01])
     self.evaluate(scale.initializer)
-    gumbel = tfd.Gumbel(loc=0., scale=scale, validate_args=True)
-    self.assertIs(scale, gumbel.scale)
-    self.evaluate(gumbel.mean())
+    dist = gumbel.Gumbel(loc=0., scale=scale, validate_args=True)
+    self.assertIs(scale, dist.scale)
+    self.evaluate(dist.mean())
     with tf.control_dependencies([scale.assign([-.01])]):
       with self.assertRaisesOpError('Argument `scale` must be positive.'):
-        self.evaluate(gumbel.mean())
+        self.evaluate(dist.mean())
 
   def testGumbelLogPdf(self):
     batch_size = 6
     loc = np.array([0.] * batch_size, dtype=self._dtype)
     scale = np.array([3.] * batch_size, dtype=self._dtype)
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=self._dtype)
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
-    log_pdf = gumbel.log_prob(self.make_tensor(x))
+    log_pdf = dist.log_prob(self.make_tensor(x))
     self.assertAllClose(
         stats.gumbel_r.logpdf(x, loc=loc, scale=scale),
         self.evaluate(log_pdf))
 
-    pdf = gumbel.prob(x)
+    pdf = dist.prob(x)
     self.assertAllClose(
         stats.gumbel_r.pdf(x, loc=loc, scale=scale), self.evaluate(pdf))
 
@@ -83,15 +82,15 @@ class _GumbelTest(object):
     scale = np.array([1.0], dtype=self._dtype)
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=self._dtype).T
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
-    log_pdf = gumbel.log_prob(self.make_tensor(x))
+    log_pdf = dist.log_prob(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_pdf), stats.gumbel_r.logpdf(x, loc=loc, scale=scale))
 
-    pdf = gumbel.prob(self.make_tensor(x))
+    pdf = dist.prob(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(pdf), stats.gumbel_r.pdf(x, loc=loc, scale=scale))
 
@@ -101,16 +100,16 @@ class _GumbelTest(object):
     scale = np.array([3.] * batch_size, dtype=self._dtype)
     x = np.array([2., 3., 4., 5., 6., 7.], dtype=self._dtype)
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    log_cdf = gumbel.log_cdf(self.make_tensor(x))
+    log_cdf = dist.log_cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_cdf), stats.gumbel_r.logcdf(x, loc=loc, scale=scale))
 
-    cdf = gumbel.cdf(self.make_tensor(x))
+    cdf = dist.cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(cdf), stats.gumbel_r.cdf(x, loc=loc, scale=scale))
 
@@ -120,17 +119,17 @@ class _GumbelTest(object):
     scale = np.array([1.0], dtype=self._dtype)
     x = np.array([[2., 3., 4., 5., 6., 7.]], dtype=self._dtype).T
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    log_cdf = gumbel.log_cdf(self.make_tensor(x))
+    log_cdf = dist.log_cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(log_cdf),
         stats.gumbel_r.logcdf(x, loc=loc, scale=scale))
 
-    cdf = gumbel.cdf(self.make_tensor(x))
+    cdf = dist.cdf(self.make_tensor(x))
     self.assertAllClose(
         self.evaluate(cdf),
         stats.gumbel_r.cdf(x, loc=loc, scale=scale))
@@ -140,62 +139,63 @@ class _GumbelTest(object):
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self._dtype)
     scale = np.array([1.0], dtype=self._dtype)
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
-    self.assertAllClose(self.evaluate(gumbel.mean()),
-                        stats.gumbel_r.mean(loc=loc, scale=scale))
+    self.assertAllClose(
+        self.evaluate(dist.mean()), stats.gumbel_r.mean(loc=loc, scale=scale))
 
   def testGumbelVariance(self):
     batch_size = 6
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self._dtype)
     scale = np.array([1.0], dtype=self._dtype)
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(gumbel.variance()),
-                        stats.gumbel_r.var(loc=loc, scale=scale))
+    self.assertAllClose(
+        self.evaluate(dist.variance()),
+        stats.gumbel_r.var(loc=loc, scale=scale))
 
   def testGumbelStd(self):
     batch_size = 6
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self._dtype)
     scale = np.array([1.0], dtype=self._dtype)
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(gumbel.stddev()),
-                        stats.gumbel_r.std(loc=loc, scale=scale))
+    self.assertAllClose(
+        self.evaluate(dist.stddev()), stats.gumbel_r.std(loc=loc, scale=scale))
 
   def testGumbelMode(self):
     batch_size = 6
     loc = np.array([[2.0, 4.0, 5.0]] * batch_size, dtype=self._dtype)
     scale = np.array([1.0], dtype=self._dtype)
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    self.assertAllClose(self.evaluate(gumbel.mode()), self.evaluate(gumbel.loc))
+    self.assertAllClose(self.evaluate(dist.mode()), self.evaluate(dist.loc))
 
   def testGumbelSample(self):
     loc = self._dtype(4.0)
     scale = self._dtype(1.0)
     n = int(100e3)
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    samples = gumbel.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual((n,), sample_values.shape)
     self.assertAllClose(
@@ -211,12 +211,12 @@ class _GumbelTest(object):
     scale = np.array([1.0, 0.8, 0.5], dtype=self._dtype)
     n = int(1e5)
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    samples = gumbel.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         stats.gumbel_r.mean(loc=loc, scale=scale),
@@ -230,12 +230,12 @@ class _GumbelTest(object):
     scale = np.array([1.0, 0.8, 0.5], dtype=self._dtype)
     n = int(1e5)
 
-    gumbel = tfd.Gumbel(
+    dist = gumbel.Gumbel(
         loc=self.make_tensor(loc),
         scale=self.make_tensor(scale),
         validate_args=True)
 
-    samples = gumbel.sample(n, seed=test_util.test_seed())
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertAllClose(
         stats.gumbel_r.var(loc=loc, scale=scale),
@@ -255,8 +255,8 @@ class _GumbelTest(object):
     b_loc = b_loc.reshape((1, 1, len(b_loc), 1))
     b_scale = b_scale.reshape((1, 1, 1, len(b_scale)))
 
-    a = tfd.Gumbel(loc=a_loc, scale=a_scale, validate_args=True)
-    b = tfd.Gumbel(loc=b_loc, scale=b_scale, validate_args=True)
+    a = gumbel.Gumbel(loc=a_loc, scale=a_scale, validate_args=True)
+    b = gumbel.Gumbel(loc=b_loc, scale=b_scale, validate_args=True)
 
     true_kl = (np.log(b_scale) - np.log(a_scale)
                + np.euler_gamma * (a_scale / b_scale - 1.)
@@ -265,7 +265,7 @@ class _GumbelTest(object):
                                                          + 1.))
                + (a_loc - b_loc) / b_scale)
 
-    kl = tfd.kl_divergence(a, b)
+    kl = kullback_leibler.kl_divergence(a, b)
 
     x = a.sample(int(1e5), seed=test_util.test_seed())
     kl_sample = tf.reduce_mean(a.log_prob(x) - b.log_prob(x), axis=0)
@@ -295,7 +295,7 @@ class _GumbelTest(object):
     self.assertAllClose(true_kl, kl_, atol=1e-15, rtol=1e-12)
     self.assertAllClose(true_kl, kl_sample_, atol=0.0, rtol=1e-1)
 
-    zero_kl = tfd.kl_divergence(a, a)
+    zero_kl = kullback_leibler.kl_divergence(a, a)
     true_zero_kl_, zero_kl_ = self.evaluate([tf.zeros_like(zero_kl), zero_kl])
     # TODO(b/157595661): Investigate why this tolerance is needed.
     self.assertAllClose(true_zero_kl_, zero_kl_, atol=1e-15)

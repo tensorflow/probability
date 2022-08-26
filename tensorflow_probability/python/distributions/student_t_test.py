@@ -21,11 +21,10 @@ import numpy as np
 from scipy import stats as sp_stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -40,7 +39,7 @@ class StudentTTest(test_util.TestCase):
     mu_v = 7.
     sigma_v = 8.
     t = np.array([-2.5, 2.5, 8., 0., -1., 2.], dtype=np.float32)
-    student = tfd.StudentT(df, loc=mu, scale=-sigma, validate_args=True)
+    student = student_t.StudentT(df, loc=mu, scale=-sigma, validate_args=True)
 
     log_pdf = student.log_prob(t)
     self.assertEquals(log_pdf.shape, (6,))
@@ -66,7 +65,7 @@ class StudentTTest(test_util.TestCase):
     mu_v = np.array([3., -3.])
     sigma_v = np.array([np.sqrt(10.), np.sqrt(15.)])
     t = np.array([[-2.5, 2.5, 4., 0., -1., 2.]], dtype=np.float32).T
-    student = tfd.StudentT(df, loc=mu, scale=sigma, validate_args=True)
+    student = student_t.StudentT(df, loc=mu, scale=sigma, validate_args=True)
     log_pdf = student.log_prob(t)
     log_pdf_values = self.evaluate(log_pdf)
     self.assertEqual(log_pdf.shape, (6, 2))
@@ -90,7 +89,7 @@ class StudentTTest(test_util.TestCase):
     mu_v = 7.
     sigma_v = 8.
     t = np.array([-2.5, 2.5, 8., 0., -1., 2.], dtype=np.float32)
-    student = tfd.StudentT(df, loc=mu, scale=sigma, validate_args=True)
+    student = student_t.StudentT(df, loc=mu, scale=sigma, validate_args=True)
 
     log_cdf = student.log_cdf(t)
     self.assertEquals(log_cdf.shape, (6,))
@@ -112,7 +111,8 @@ class StudentTTest(test_util.TestCase):
     df_v = np.array([[2., 3., 7.]])  # 1x3
     mu_v = np.array([[1., -1, 0]])  # 1x3
     sigma_v = np.array([[1., -2., 3.]]).T  # transposed => 3x1
-    student = tfd.StudentT(df=df_v, loc=mu_v, scale=sigma_v, validate_args=True)
+    student = student_t.StudentT(
+        df=df_v, loc=mu_v, scale=sigma_v, validate_args=True)
     ent = student.entropy()
     ent_values = self.evaluate(ent)
 
@@ -136,7 +136,7 @@ class StudentTTest(test_util.TestCase):
     mu_v = 3.
     sigma_v = np.sqrt(10.)
     n = tf.constant(200000)
-    student = tfd.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
+    student = student_t.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
     samples = student.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     n_val = 200000
@@ -155,12 +155,12 @@ class StudentTTest(test_util.TestCase):
     seed = test_util.test_seed()
 
     tf.random.set_seed(seed)
-    student = tfd.StudentT(
+    student = student_t.StudentT(
         df=df, loc=mu, scale=sigma, name='student_t1', validate_args=True)
     samples1 = self.evaluate(student.sample(n, seed=seed))
 
     tf.random.set_seed(seed)
-    student2 = tfd.StudentT(
+    student2 = student_t.StudentT(
         df=df, loc=mu, scale=sigma, name='student_t2', validate_args=True)
     samples2 = self.evaluate(student2.sample(n, seed=seed))
 
@@ -170,7 +170,7 @@ class StudentTTest(test_util.TestCase):
     df_v = [1e-1, 1e-5, 1e-10, 1e-20]
     df = tf.constant(df_v)
     n = tf.constant(200000)
-    student = tfd.StudentT(df=df, loc=1., scale=1., validate_args=True)
+    student = student_t.StudentT(df=df, loc=1., scale=1., validate_args=True)
     samples = student.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     n_val = 200000
@@ -187,7 +187,7 @@ class StudentTTest(test_util.TestCase):
     mu_v = [3., -3.]
     sigma_v = [np.sqrt(10.), np.sqrt(15.)]
     n = tf.constant(200000)
-    student = tfd.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
+    student = student_t.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
     samples = student.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
     self.assertEqual(samples.shape, (200000, batch_size, 2))
@@ -238,23 +238,26 @@ class StudentTTest(test_util.TestCase):
           37, seed=test_util.test_seed()).shape, (37, 3,))
 
     _check(
-        tfd.StudentT(df=[
-            2.,
-            3.,
-            4.,
-        ], loc=2., scale=1., validate_args=True))
+        student_t.StudentT(
+            df=[
+                2.,
+                3.,
+                4.,
+            ], loc=2., scale=1., validate_args=True))
     _check(
-        tfd.StudentT(df=7., loc=[
-            2.,
-            3.,
-            4.,
-        ], scale=1., validate_args=True))
+        student_t.StudentT(
+            df=7., loc=[
+                2.,
+                3.,
+                4.,
+            ], scale=1., validate_args=True))
     _check(
-        tfd.StudentT(df=7., loc=3., scale=[
-            2.,
-            3.,
-            4.,
-        ], validate_args=True))
+        student_t.StudentT(
+            df=7., loc=3., scale=[
+                2.,
+                3.,
+                4.,
+            ], validate_args=True))
 
   def testBroadcastingPdfArgs(self):
 
@@ -272,23 +275,26 @@ class StudentTTest(test_util.TestCase):
       _assert_shape(student, xs, (3, 3))
 
     _check(
-        tfd.StudentT(df=[
-            2.,
-            3.,
-            4.,
-        ], loc=2., scale=1., validate_args=True))
+        student_t.StudentT(
+            df=[
+                2.,
+                3.,
+                4.,
+            ], loc=2., scale=1., validate_args=True))
     _check(
-        tfd.StudentT(df=7., loc=[
-            2.,
-            3.,
-            4.,
-        ], scale=1., validate_args=True))
+        student_t.StudentT(
+            df=7., loc=[
+                2.,
+                3.,
+                4.,
+            ], scale=1., validate_args=True))
     _check(
-        tfd.StudentT(df=7., loc=3., scale=[
-            2.,
-            3.,
-            4.,
-        ], validate_args=True))
+        student_t.StudentT(
+            df=7., loc=3., scale=[
+                2.,
+                3.,
+                4.,
+            ], validate_args=True))
 
     def _check2d(student):
       _assert_shape(student, 2., (1, 3))
@@ -300,23 +306,26 @@ class StudentTTest(test_util.TestCase):
       _assert_shape(student, xs, (3, 3))
 
     _check2d(
-        tfd.StudentT(df=[[
-            2.,
-            3.,
-            4.,
-        ]], loc=2., scale=1., validate_args=True))
+        student_t.StudentT(
+            df=[[
+                2.,
+                3.,
+                4.,
+            ]], loc=2., scale=1., validate_args=True))
     _check2d(
-        tfd.StudentT(df=7., loc=[[
-            2.,
-            3.,
-            4.,
-        ]], scale=1., validate_args=True))
+        student_t.StudentT(
+            df=7., loc=[[
+                2.,
+                3.,
+                4.,
+            ]], scale=1., validate_args=True))
     _check2d(
-        tfd.StudentT(df=7., loc=3., scale=[[
-            2.,
-            3.,
-            4.,
-        ]], validate_args=True))
+        student_t.StudentT(
+            df=7., loc=3., scale=[[
+                2.,
+                3.,
+                4.,
+            ]], validate_args=True))
 
     def _check2d_rows(student):
       _assert_shape(student, 2., (3, 1))
@@ -328,25 +337,25 @@ class StudentTTest(test_util.TestCase):
       _assert_shape(student, xs, (3, 1))
 
     _check2d_rows(
-        tfd.StudentT(
+        student_t.StudentT(
             df=[[2.], [3.], [4.]], loc=2., scale=1., validate_args=True))
     _check2d_rows(
-        tfd.StudentT(
+        student_t.StudentT(
             df=7., loc=[[2.], [3.], [4.]], scale=1., validate_args=True))
     _check2d_rows(
-        tfd.StudentT(
+        student_t.StudentT(
             df=7., loc=3., scale=[[2.], [3.], [4.]], validate_args=True))
 
   def testMeanAllowNanStatsIsFalseWorksWhenAllBatchMembersAreDefined(self):
     mu = [1., 3.3, 4.4]
-    student = tfd.StudentT(
+    student = student_t.StudentT(
         df=[3., 5., 7.], loc=mu, scale=[3., 2., 1.], validate_args=True)
     mean = self.evaluate(student.mean())
     self.assertAllClose([1., 3.3, 4.4], mean)
 
   def testMeanAllowNanStatsIsFalseRaisesWhenBatchMemberIsUndefined(self):
     mu = [1., 3.3, 4.4]
-    student = tfd.StudentT(
+    student = student_t.StudentT(
         df=[0.5, 5., 7.],
         loc=mu,
         scale=[3., 2., 1.],
@@ -358,7 +367,7 @@ class StudentTTest(test_util.TestCase):
   def testMeanAllowNanStatsIsTrueReturnsNaNForUndefinedBatchMembers(self):
     mu = [-2, 0., 1., 3.3, 4.4]
     sigma = [5., 4., 3., 2., 1.]
-    student = tfd.StudentT(
+    student = student_t.StudentT(
         df=[0.5, 1., 3., 5., 7.],
         loc=mu,
         scale=sigma,
@@ -373,7 +382,7 @@ class StudentTTest(test_util.TestCase):
     df = [0.5, 1.5, 3., 5., 7.]
     mu = [-2, 0., 1., 3.3, 4.4]
     sigma = [5., 4., 3., 2., 1.]
-    student = tfd.StudentT(
+    student = student_t.StudentT(
         df=df, loc=mu, scale=sigma, allow_nan_stats=True, validate_args=True)
     var = self.evaluate(student.variance())
     # Past versions of scipy differed from our preferred behavior for undefined
@@ -392,7 +401,7 @@ class StudentTTest(test_util.TestCase):
     df = [1.5, 3., 5., 7.]
     mu = [0., 1., 3.3, 4.4]
     sigma = [4., 3., 2., 1.]
-    student = tfd.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
+    student = student_t.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
     var = self.evaluate(student.variance())
 
     expected_var = [
@@ -402,13 +411,13 @@ class StudentTTest(test_util.TestCase):
 
   def testVarianceAllowNanStatsFalseRaisesForUndefinedBatchMembers(self):
     # df <= 1 ==> variance not defined
-    student = tfd.StudentT(
+    student = student_t.StudentT(
         df=1., loc=0., scale=1., allow_nan_stats=False, validate_args=True)
     with self.assertRaisesOpError('x < y'):
       self.evaluate(student.variance())
 
     # df <= 1 ==> variance not defined
-    student = tfd.StudentT(
+    student = student_t.StudentT(
         df=0.5, loc=0., scale=1., allow_nan_stats=False, validate_args=True)
     with self.assertRaisesOpError('x < y'):
       self.evaluate(student.variance())
@@ -418,7 +427,7 @@ class StudentTTest(test_util.TestCase):
     df = [3.5, 5., 3., 5., 7.]
     mu = [-2.2]
     sigma = [5., 4., 3., 2., 1.]
-    student = tfd.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
+    student = student_t.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
     # Test broadcast of mu across shape of df/sigma
     stddev = self.evaluate(student.stddev())
     mu *= len(df)
@@ -432,13 +441,13 @@ class StudentTTest(test_util.TestCase):
     df = [0.5, 1., 3]
     mu = [-1, 0., 1]
     sigma = [5., 4., 3.]
-    student = tfd.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
+    student = student_t.StudentT(df=df, loc=mu, scale=sigma, validate_args=True)
     # Test broadcast of mu across shape of df/sigma
     mode = self.evaluate(student.mode())
     self.assertAllClose([-1., 0, 1], mode)
 
   def testPdfOfSample(self):
-    student = tfd.StudentT(df=3., loc=np.pi, scale=1., validate_args=True)
+    student = student_t.StudentT(df=3., loc=np.pi, scale=1., validate_args=True)
     num = 20000
     samples = student.sample(num, seed=test_util.test_seed())
     pdfs = student.prob(samples)
@@ -462,15 +471,19 @@ class StudentTTest(test_util.TestCase):
     df = tf.constant(2.0)
     mu = tf.constant(1.0)
     sigma = tf.constant(3.0)
-    _, [grad_df, grad_mu, grad_sigma] = tfp.math.value_and_gradient(
-        lambda d, m, s: tfd.StudentT(df=d, loc=m, scale=s, validate_args=True).  # pylint: disable=g-long-lambda
-        sample(100, seed=test_util.test_seed()), [df, mu, sigma])
+    _, [grad_df, grad_mu, grad_sigma] = gradient.value_and_gradient(
+        lambda d, m, s: student_t.StudentT(  # pylint: disable=g-long-lambda
+            df=d,
+            loc=m,
+            scale=s,
+            validate_args=True).sample(100, seed=test_util.test_seed()),
+        [df, mu, sigma])
     self.assertIsNotNone(grad_df)
     self.assertIsNotNone(grad_mu)
     self.assertIsNotNone(grad_sigma)
 
   def testPdfOfSampleMultiDims(self):
-    student = tfd.StudentT(
+    student = student_t.StudentT(
         df=[7., 11.], loc=[[5.], [6.]], scale=3., validate_args=True)
     self.assertAllEqual([], student.event_shape)
     self.assertAllEqual([], self.evaluate(student.event_shape_tensor()))
@@ -509,7 +522,7 @@ class StudentTTest(test_util.TestCase):
 
   def testNegativeDofFails(self):
     with self.assertRaisesOpError(r'`df` must be positive'):
-      student = tfd.StudentT(
+      student = student_t.StudentT(
           df=[2, -5.], loc=0., scale=1., validate_args=True, name='S')
       self.evaluate(student.mean())
 
@@ -518,7 +531,7 @@ class StudentTTest(test_util.TestCase):
     df = tf.Variable([[17.3], [14.]])
     loc = tf.Variable([[-5., 0., 5.]])
     scale = tf.Variable(2.)
-    d = tfd.StudentT(df=df, loc=loc, scale=scale, validate_args=True)
+    d = student_t.StudentT(df=df, loc=loc, scale=scale, validate_args=True)
     with tf.GradientTape() as tape:
       loss = -d.log_prob(np.ones((2, 3)))
     grad = tape.gradient(loss, d.trainable_variables)
@@ -530,7 +543,7 @@ class StudentTTest(test_util.TestCase):
     loc = tf.Variable(0, dtype=tf.int32)
     scale = tf.Variable(1, dtype=tf.int32)
     with self.assertRaisesRegexp(ValueError, 'Expected floating point'):
-      tfd.StudentT(df=df, loc=loc, scale=scale, validate_args=True)
+      student_t.StudentT(df=df, loc=loc, scale=scale, validate_args=True)
 
 
 if __name__ == '__main__':

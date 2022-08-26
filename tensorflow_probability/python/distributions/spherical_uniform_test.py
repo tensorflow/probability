@@ -18,8 +18,10 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python import stats as tfp_stats
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import spherical_uniform
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import test_util
@@ -58,49 +60,51 @@ class _SphericalUniformTest(object):
     self.assertAllClose(np.exp(log_prob), 1. / true_sphere_surface_area)
 
     # For sampling, let's check the marginals. x_i**2 ~ Beta(0.5, d - 1 / 2)
-    beta_dist = tfp.distributions.Beta(
-        self.dtype(0.5),
-        self.dtype((dim - 1.) / 2.))
+    beta_dist = beta.Beta(self.dtype(0.5), self.dtype((dim - 1.) / 2.))
     for i in range(dim):
       self.evaluate(
           st.assert_true_cdf_equal_by_dkwm(
               samples[..., i] ** 2, cdf=beta_dist.cdf, false_fail_rate=1e-9))
 
   def testSampleAndPdfConsistency2d(self):
-    uniform = tfp.distributions.SphericalUniform(
+    uniform = spherical_uniform.SphericalUniform(
         dimension=2,
         batch_shape=[2],
         dtype=self.dtype,
-        validate_args=True, allow_nan_stats=False)
+        validate_args=True,
+        allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(uniform)
 
   def testSampleAndPdfConsistency3d(self):
-    uniform = tfp.distributions.SphericalUniform(
+    uniform = spherical_uniform.SphericalUniform(
         dimension=3,
         batch_shape=[2],
         dtype=self.dtype,
-        validate_args=True, allow_nan_stats=False)
+        validate_args=True,
+        allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(uniform)
 
   def testSampleAndPdfConsistency4d(self):
-    uniform = tfp.distributions.SphericalUniform(
+    uniform = spherical_uniform.SphericalUniform(
         dimension=4,
         batch_shape=[2],
         dtype=self.dtype,
-        validate_args=True, allow_nan_stats=False)
+        validate_args=True,
+        allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(uniform)
 
   def testSampleAndPdfConsistency5d(self):
-    uniform = tfp.distributions.SphericalUniform(
+    uniform = spherical_uniform.SphericalUniform(
         dimension=5,
         batch_shape=[2],
         dtype=self.dtype,
-        validate_args=True, allow_nan_stats=False)
+        validate_args=True,
+        allow_nan_stats=False)
     self.VerifySampleAndPdfConsistency(uniform)
 
   def VerifyMean(self, dim):
     num_samples = int(7e4)
-    uniform = tfp.distributions.SphericalUniform(
+    uniform = spherical_uniform.SphericalUniform(
         batch_shape=[2, 1],
         dimension=dim,
         dtype=self.dtype,
@@ -138,15 +142,15 @@ class _SphericalUniformTest(object):
 
   def VerifyCovariance(self, dim):
     num_samples = int(6e4)
-    uniform = tfp.distributions.SphericalUniform(
+    uniform = spherical_uniform.SphericalUniform(
         batch_shape=[2, 1],
         dimension=dim,
         dtype=self.dtype,
         validate_args=True,
         allow_nan_stats=False)
     samples = uniform.sample(num_samples, seed=test_util.test_seed())
-    sample_cov = tfp.stats.covariance(samples, sample_axis=0)
-    sample_variance = tfp.stats.variance(samples, sample_axis=0)
+    sample_cov = tfp_stats.covariance(samples, sample_axis=0)
+    sample_variance = tfp_stats.variance(samples, sample_axis=0)
     true_cov, sample_cov, sample_variance = self.evaluate([
         uniform.covariance(), sample_cov, sample_variance])
     self.assertAllClose(
@@ -165,7 +169,7 @@ class _SphericalUniformTest(object):
     self.VerifyCovariance(dim=10)
 
   def VerifyEntropy(self, dim):
-    uniform = tfp.distributions.SphericalUniform(
+    uniform = spherical_uniform.SphericalUniform(
         dimension=dim,
         batch_shape=tuple(),
         dtype=self.dtype,
@@ -191,7 +195,7 @@ class _SphericalUniformTest(object):
     self.VerifyEntropy(dim=10)
 
   def testAssertValidSample(self):
-    uniform = tfp.distributions.SphericalUniform(
+    uniform = spherical_uniform.SphericalUniform(
         dimension=4,
         batch_shape=tuple(),
         dtype=self.dtype,
@@ -203,7 +207,7 @@ class _SphericalUniformTest(object):
       self.evaluate(uniform.prob(x))
 
   def testBatchShape(self):
-    uniform = tfp.distributions.SphericalUniform(
+    uniform = spherical_uniform.SphericalUniform(
         dimension=4,
         batch_shape=[2, 1],
         dtype=self.dtype,
@@ -216,11 +220,8 @@ class _SphericalUniformTest(object):
     self.assertEqual([2, 5], log_prob.shape)
 
   def testSupportBijectorOutsideRange(self):
-    dist = tfp.distributions.SphericalUniform(
-        dimension=3,
-        batch_shape=tuple(),
-        dtype=self.dtype,
-        validate_args=True)
+    dist = spherical_uniform.SphericalUniform(
+        dimension=3, batch_shape=tuple(), dtype=self.dtype, validate_args=True)
 
     x = np.array([1., 0.2, 0.3], dtype=self.dtype)
     with self.assertRaisesOpError('must sum to `1`'):

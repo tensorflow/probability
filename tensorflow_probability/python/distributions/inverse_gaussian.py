@@ -18,7 +18,6 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import chain as chain_bijector
 from tensorflow_probability.python.bijectors import exp as exp_bijector
 from tensorflow_probability.python.bijectors import scale as scale_bijector
@@ -36,6 +35,7 @@ from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import special_math
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 __all__ = [
     'InverseGaussian',
@@ -254,7 +254,7 @@ def _random_inverse_gaussian_no_gradient(shape, loc, concentration, seed):
   sqrt1pm1_arg = 4 * concentration / (loc * sampled_chi2)  # 2 / w above
   safe_sqrt1pm1_arg = tf.where(sqrt1pm1_arg < np.inf, sqrt1pm1_arg, 1.0)
   denominator = 1.0 + tf.sqrt(safe_sqrt1pm1_arg + 1.0)
-  ratio = tfp_math.sqrt1pm1(safe_sqrt1pm1_arg) / denominator
+  ratio = generic.sqrt1pm1(safe_sqrt1pm1_arg) / denominator
   sampled = loc * tf.where(sqrt1pm1_arg < np.inf, ratio, 1.0)  # x above
   return tf.where(sampled_uniform <= loc / (loc + sampled),
                   sampled, tf.square(loc) / sampled)
@@ -354,4 +354,3 @@ def _random_inverse_gaussian_jvp(shape, primals, tangents):
 def _random_inverse_gaussian_gradient(
     shape, loc, concentration, seed):
   return _random_inverse_gaussian_no_gradient(shape, loc, concentration, seed)
-

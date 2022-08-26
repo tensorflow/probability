@@ -63,7 +63,7 @@ class DummyMatrixTransform(tfb.Bijector):
     return tf.linalg.det(x)
 
 
-class _ChooseLocation(tfp.bijectors.Bijector):
+class _ChooseLocation(tfb.Bijector):
   """A Bijector which chooses between one of two location parameters."""
 
   def __init__(self, loc, name='ChooseLocation'):

@@ -18,12 +18,10 @@ from scipy import stats
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import half_cauchy
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 class _HalfCauchyTest(object):
@@ -36,7 +34,7 @@ class _HalfCauchyTest(object):
         name=name)
 
   def _test_param_shapes(self, sample_shape, expected):
-    param_shapes = tfd.HalfCauchy.param_shapes(sample_shape)
+    param_shapes = half_cauchy.HalfCauchy.param_shapes(sample_shape)
     loc_shape, scale_shape = param_shapes['loc'], param_shapes['scale']
     self.assertAllEqual(expected, self.evaluate(loc_shape))
     self.assertAllEqual(expected, self.evaluate(scale_shape))
@@ -45,11 +43,13 @@ class _HalfCauchyTest(object):
     self.assertAllEqual(
         expected,
         self.evaluate(
-            tf.shape(tfd.HalfCauchy(loc, scale, validate_args=True).sample(
-                seed=test_util.test_seed()))))
+            tf.shape(
+                half_cauchy.HalfCauchy(
+                    loc, scale,
+                    validate_args=True).sample(seed=test_util.test_seed()))))
 
   def _test_param_static_shapes(self, sample_shape, expected):
-    param_shapes = tfd.HalfCauchy.param_static_shapes(sample_shape)
+    param_shapes = half_cauchy.HalfCauchy.param_static_shapes(sample_shape)
     loc_shape, scale_shape = param_shapes['loc'], param_shapes['scale']
     self.assertEqual(expected, loc_shape)
     self.assertEqual(expected, scale_shape)
@@ -69,34 +69,33 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default([0.] * batch_size, name='loc')
     scale = self._create_placeholder_with_default(
         [1.] * batch_size, name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
 
     if self.use_static_shape or tf.executing_eagerly():
       expected_batch_shape = tf.TensorShape([batch_size])
     else:
       expected_batch_shape = tf.TensorShape(None)
 
-    self.assertEqual(
-        self.evaluate(half_cauchy.batch_shape_tensor()), (batch_size,))
-    self.assertEqual(half_cauchy.batch_shape, expected_batch_shape)
-    self.assertAllEqual(self.evaluate(half_cauchy.event_shape_tensor()), [])
-    self.assertEqual(half_cauchy.event_shape, tf.TensorShape([]))
+    self.assertEqual(self.evaluate(dist.batch_shape_tensor()), (batch_size,))
+    self.assertEqual(dist.batch_shape, expected_batch_shape)
+    self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
+    self.assertEqual(dist.event_shape, tf.TensorShape([]))
 
   def testHalfCauchyShapeBroadcast(self):
     loc = self._create_placeholder_with_default([0., 1.], name='loc')
     scale = self._create_placeholder_with_default(
         [[1.], [2.], [3.]], name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
 
     if self.use_static_shape or tf.executing_eagerly():
       expected_batch_shape = tf.TensorShape([3, 2])
     else:
       expected_batch_shape = tf.TensorShape(None)
 
-    self.assertAllEqual(self.evaluate(half_cauchy.batch_shape_tensor()), (3, 2))
-    self.assertAllEqual(half_cauchy.batch_shape, expected_batch_shape)
-    self.assertAllEqual(self.evaluate(half_cauchy.event_shape_tensor()), [])
-    self.assertEqual(half_cauchy.event_shape, tf.TensorShape([]))
+    self.assertAllEqual(self.evaluate(dist.batch_shape_tensor()), (3, 2))
+    self.assertAllEqual(dist.batch_shape, expected_batch_shape)
+    self.assertAllEqual(self.evaluate(dist.event_shape_tensor()), [])
+    self.assertEqual(dist.event_shape, tf.TensorShape([]))
 
   def testHalfCauchyInvalidScale(self):
     invalid_scales = [0., -0.01, -2.]
@@ -104,8 +103,8 @@ class _HalfCauchyTest(object):
     for scale_ in invalid_scales:
       scale = self._create_placeholder_with_default(scale_, name='scale')
       with self.assertRaisesOpError('Condition x > 0'):
-        half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
-        self.evaluate(half_cauchy.entropy())
+        dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
+        self.evaluate(dist.entropy())
 
   def testHalfCauchyPdf(self):
     batch_size = 6
@@ -116,10 +115,9 @@ class _HalfCauchyTest(object):
         [scale_] * batch_size, name='scale')
     x_ = [2., 3., 3.1, 4., 5., 6.]
     x = self._create_placeholder_with_default(x_, name='x')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
-    for tfp_f, scipy_f in [
-        (half_cauchy.prob, stats.halfcauchy.pdf),
-        (half_cauchy.log_prob, stats.halfcauchy.logpdf)]:
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
+    for tfp_f, scipy_f in [(dist.prob, stats.halfcauchy.pdf),
+                           (dist.log_prob, stats.halfcauchy.logpdf)]:
       tfp_res = tfp_f(x)
       if self.use_static_shape or tf.executing_eagerly():
         expected_shape = tf.TensorShape((batch_size,))
@@ -136,12 +134,12 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default([-1, 0., 1.1], name='loc')
     scale = self._create_placeholder_with_default(
         [1.] * batch_size, name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
     x_vals = [[-1.1, 1., 2.],
               [0., -1., 2.],
               [0., 1., 1.09]]
     for x_ in x_vals:
-      for f in [half_cauchy.prob, half_cauchy.log_prob]:
+      for f in [dist.prob, dist.log_prob]:
         with self.assertRaisesOpError('must be greater than'):
           x = self._create_placeholder_with_default(x_, name='x')
           self.evaluate(f(x))
@@ -153,12 +151,11 @@ class _HalfCauchyTest(object):
     scale_ = [0.1, 1., 2.5]
     scale = self._create_placeholder_with_default(
         [scale_] * batch_size, name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
     x_ = [[2.], [3.1], [4.], [5.], [6.], [7.]]
     x = self._create_placeholder_with_default(x_, name='x')
-    for tfp_f, scipy_f in [
-        (half_cauchy.prob, stats.halfcauchy.pdf),
-        (half_cauchy.log_prob, stats.halfcauchy.logpdf)]:
+    for tfp_f, scipy_f in [(dist.prob, stats.halfcauchy.pdf),
+                           (dist.log_prob, stats.halfcauchy.logpdf)]:
       tfp_res = tfp_f(x)
       if self.use_static_shape or tf.executing_eagerly():
         expected_shape = tf.TensorShape((batch_size, 3))
@@ -176,12 +173,11 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default(loc_, name='loc')
     scale_ = [0.1]
     scale = self._create_placeholder_with_default(scale_, name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
     x_ = [[2.], [3.1], [4.], [5.], [6.], [7.]]
     x = self._create_placeholder_with_default(x_, name='x')
-    for tfp_f, scipy_f in [
-        (half_cauchy.prob, stats.halfcauchy.pdf),
-        (half_cauchy.log_prob, stats.halfcauchy.logpdf)]:
+    for tfp_f, scipy_f in [(dist.prob, stats.halfcauchy.pdf),
+                           (dist.log_prob, stats.halfcauchy.logpdf)]:
       tfp_res = tfp_f(x)
       if self.use_static_shape or tf.executing_eagerly():
         expected_shape = tf.TensorShape((6, 3))
@@ -202,10 +198,9 @@ class _HalfCauchyTest(object):
         [scale_] * batch_size, name='scale')
     x_ = [2., 3., 3.1, 4., 5., 6.]
     x = self._create_placeholder_with_default(x_, name='x')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
-    for tfp_f, scipy_f in [
-        (half_cauchy.cdf, stats.halfcauchy.cdf),
-        (half_cauchy.log_cdf, stats.halfcauchy.logcdf)]:
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
+    for tfp_f, scipy_f in [(dist.cdf, stats.halfcauchy.cdf),
+                           (dist.log_cdf, stats.halfcauchy.logcdf)]:
       tfp_res = tfp_f(x)
       if self.use_static_shape or tf.executing_eagerly():
         expected_shape = tf.TensorShape((batch_size,))
@@ -222,12 +217,12 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default([-1, 0., 1.1], name='loc')
     scale = self._create_placeholder_with_default(
         [1.] * batch_size, name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
     x_vals = [[-1.1, 1., 2.],
               [0., -1., 2.],
               [0., 1., 1.09]]
     for x_ in x_vals:
-      for f in [half_cauchy.cdf, half_cauchy.log_cdf]:
+      for f in [dist.cdf, dist.log_cdf]:
         with self.assertRaisesOpError('must be greater than'):
           x = self._create_placeholder_with_default(x_, name='x')
           self.evaluate(f(x))
@@ -239,12 +234,11 @@ class _HalfCauchyTest(object):
     scale_ = [0.1, 1., 2.5]
     scale = self._create_placeholder_with_default(
         [scale_] * batch_size, name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
     x_ = [[2.], [3.1], [4.], [5.], [6.], [7.]]
     x = self._create_placeholder_with_default(x_, name='x')
-    for tfp_f, scipy_f in [
-        (half_cauchy.cdf, stats.halfcauchy.cdf),
-        (half_cauchy.log_cdf, stats.halfcauchy.logcdf)]:
+    for tfp_f, scipy_f in [(dist.cdf, stats.halfcauchy.cdf),
+                           (dist.log_cdf, stats.halfcauchy.logcdf)]:
       tfp_res = tfp_f(x)
       if self.use_static_shape or tf.executing_eagerly():
         expected_shape = tf.TensorShape((batch_size, 3))
@@ -262,12 +256,11 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default(loc_, name='loc')
     scale_ = [0.1]
     scale = self._create_placeholder_with_default(scale_, name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
     x_ = [[2.], [3.1], [4.], [5.], [6.], [7.]]
     x = self._create_placeholder_with_default(x_, name='x')
-    for tfp_f, scipy_f in [
-        (half_cauchy.cdf, stats.halfcauchy.cdf),
-        (half_cauchy.log_cdf, stats.halfcauchy.logcdf)]:
+    for tfp_f, scipy_f in [(dist.cdf, stats.halfcauchy.cdf),
+                           (dist.log_cdf, stats.halfcauchy.logcdf)]:
       tfp_res = tfp_f(x)
       if self.use_static_shape or tf.executing_eagerly():
         expected_shape = tf.TensorShape((6, 3))
@@ -283,42 +276,42 @@ class _HalfCauchyTest(object):
     batch_size = 3
     loc = self._create_placeholder_with_default([0.] * batch_size, name='loc')
     scale = self._create_placeholder_with_default(1., name='scale')
-    half_cauchy = tfd.HalfCauchy(
+    dist = half_cauchy.HalfCauchy(
         loc, scale, allow_nan_stats=False, validate_args=True)
     with self.assertRaisesRegexp(ValueError, 'is undefined'):
-      self.evaluate(half_cauchy.mean())
+      self.evaluate(dist.mean())
 
-    half_cauchy = tfd.HalfCauchy(
+    dist = half_cauchy.HalfCauchy(
         loc, scale, allow_nan_stats=True, validate_args=True)
-    self.assertAllNan(half_cauchy.mean())
+    self.assertAllNan(dist.mean())
 
   def testHalfCauchyVariance(self):
     batch_size = 3
     loc = self._create_placeholder_with_default([0.] * batch_size, name='loc')
     scale = self._create_placeholder_with_default(1., name='scale')
 
-    half_cauchy = tfd.HalfCauchy(
+    dist = half_cauchy.HalfCauchy(
         loc, scale, allow_nan_stats=False, validate_args=True)
     with self.assertRaisesRegexp(ValueError, 'is undefined'):
-      self.evaluate(half_cauchy.variance())
+      self.evaluate(dist.variance())
 
-    half_cauchy = tfd.HalfCauchy(
+    dist = half_cauchy.HalfCauchy(
         loc, scale, allow_nan_stats=True, validate_args=True)
-    self.assertAllNan(half_cauchy.variance())
+    self.assertAllNan(dist.variance())
 
   def testHalfCauchyStddev(self):
     batch_size = 3
     loc = self._create_placeholder_with_default([0.] * batch_size, name='loc')
     scale = self._create_placeholder_with_default(1., name='scale')
 
-    half_cauchy = tfd.HalfCauchy(
+    dist = half_cauchy.HalfCauchy(
         loc, scale, allow_nan_stats=False, validate_args=True)
     with self.assertRaisesRegexp(ValueError, 'is undefined'):
-      self.evaluate(half_cauchy.stddev())
+      self.evaluate(dist.stddev())
 
-    half_cauchy = tfd.HalfCauchy(
+    dist = half_cauchy.HalfCauchy(
         loc, scale, allow_nan_stats=True, validate_args=True)
-    self.assertAllNan(half_cauchy.stddev())
+    self.assertAllNan(dist.stddev())
 
   def testHalfCauchyEntropy(self):
     batch_size = 6
@@ -327,8 +320,8 @@ class _HalfCauchyTest(object):
     scale_ = 3.
     scale = self._create_placeholder_with_default(
         [scale_] * batch_size, name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
-    entropy = half_cauchy.entropy()
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
+    entropy = dist.entropy()
     if self.use_static_shape or tf.executing_eagerly():
       expected_shape = tf.TensorShape((batch_size,))
     else:
@@ -346,10 +339,10 @@ class _HalfCauchyTest(object):
     scale_ = 3.
     scale = self._create_placeholder_with_default(
         [scale_] * batch_size, name='scale')
-    half_cauchy = tfd.HalfCauchy(loc, scale, validate_args=True)
+    dist = half_cauchy.HalfCauchy(loc, scale, validate_args=True)
     p_ = np.linspace(0.000001, 0.999999, batch_size).astype(self.dtype)
     p = self._create_placeholder_with_default(p_, name='prob')
-    quantile = half_cauchy.quantile(p)
+    quantile = dist.quantile(p)
     if self.use_static_shape or tf.executing_eagerly():
       expected_shape = tf.TensorShape((batch_size,))
     else:
@@ -367,8 +360,8 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default([loc_] * batch_size, name='loc')
     scale = self._create_placeholder_with_default(scale_, name='scale')
     n = int(1e5)
-    half_cauchy = tfd.HalfCauchy(loc=loc, scale=scale, validate_args=True)
-    samples = half_cauchy.sample(n, seed=test_util.test_seed())
+    dist = half_cauchy.HalfCauchy(loc=loc, scale=scale, validate_args=True)
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     self.assertEqual(sample_values.shape, (n, batch_size))
@@ -377,10 +370,10 @@ class _HalfCauchyTest(object):
                         atol=0., rtol=1e-2)
 
     expected_shape = tf.TensorShape([n]).concatenate(
-        tf.TensorShape(self.evaluate(half_cauchy.batch_shape_tensor())))
+        tf.TensorShape(self.evaluate(dist.batch_shape_tensor())))
     self.assertAllEqual(expected_shape, sample_values.shape)
 
-    expected_shape = tf.TensorShape([n]).concatenate(half_cauchy.batch_shape)
+    expected_shape = tf.TensorShape([n]).concatenate(dist.batch_shape)
     self.assertEqual(expected_shape, samples.shape)
 
   def testHalfCauchySampleMultidimensionalMedian(self):
@@ -392,8 +385,8 @@ class _HalfCauchyTest(object):
         [scale_] * batch_size, name='scale')
     n_ = [int(1e5), 2]
     n = tf.convert_to_tensor(n_, dtype=tf.int32, name='n')
-    half_cauchy = tfd.HalfCauchy(loc=loc, scale=scale, validate_args=True)
-    samples = half_cauchy.sample(n, seed=test_util.test_seed())
+    dist = half_cauchy.HalfCauchy(loc=loc, scale=scale, validate_args=True)
+    samples = dist.sample(n, seed=test_util.test_seed())
     sample_values = self.evaluate(samples)
 
     self.assertAllEqual(sample_values.shape, n_ + [batch_size, 2])
@@ -405,10 +398,10 @@ class _HalfCauchyTest(object):
                         atol=1e-1)
 
     expected_shape = tf.TensorShape(n_).concatenate(
-        tf.TensorShape(self.evaluate(half_cauchy.batch_shape_tensor())))
+        tf.TensorShape(self.evaluate(dist.batch_shape_tensor())))
     self.assertAllEqual(expected_shape, sample_values.shape)
 
-    expected_shape = (tf.TensorShape(n_).concatenate(half_cauchy.batch_shape))
+    expected_shape = (tf.TensorShape(n_).concatenate(dist.batch_shape))
     self.assertAllEqual(expected_shape, samples.shape)
 
   @test_util.numpy_disable_gradient_test
@@ -417,16 +410,18 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default(loc_, name='loc')
     scale = self._create_placeholder_with_default(2., name='scale')
     x = loc - 0.1
-    _, grads = self.evaluate(tfp.math.value_and_gradient(
-        lambda loc, scale, x: tfd.HalfCauchy(loc, scale).prob(x),
-        [loc, scale, x]))
+    _, grads = self.evaluate(
+        gradient.value_and_gradient(
+            lambda loc, scale, x: half_cauchy.HalfCauchy(loc, scale).prob(x),
+            [loc, scale, x]))
     self.assertAllClose(
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
 
-    _, grads = self.evaluate(tfp.math.value_and_gradient(
-        lambda loc, scale, x: tfd.HalfCauchy(loc, scale).log_prob(x),
-        [loc, scale, x]))
+    _, grads = self.evaluate(
+        gradient.value_and_gradient(
+            lambda loc, scale, x: half_cauchy.HalfCauchy(loc, scale).log_prob(  # pylint: disable=g-long-lambda
+                x), [loc, scale, x]))
     self.assertAllClose(
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
@@ -437,16 +432,18 @@ class _HalfCauchyTest(object):
     loc = self._create_placeholder_with_default(loc_, name='loc')
     scale = self._create_placeholder_with_default(2., name='scale')
     x = loc - 0.1
-    _, grads = self.evaluate(tfp.math.value_and_gradient(
-        lambda loc, scale, x: tfd.HalfCauchy(loc, scale).cdf(x),
-        [loc, scale, x]))
+    _, grads = self.evaluate(
+        gradient.value_and_gradient(
+            lambda loc, scale, x: half_cauchy.HalfCauchy(loc, scale).cdf(x),
+            [loc, scale, x]))
     self.assertAllClose(
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
 
-    _, grads = self.evaluate(tfp.math.value_and_gradient(
-        lambda loc, scale, x: tfd.HalfCauchy(loc, scale).log_cdf(x),
-        [loc, scale, x]))
+    _, grads = self.evaluate(
+        gradient.value_and_gradient(
+            lambda loc, scale, x: half_cauchy.HalfCauchy(loc, scale).log_cdf(x),
+            [loc, scale, x]))
     self.assertAllClose(
         grads,
         [np.zeros_like(loc_), 0., np.zeros_like(loc_)])
@@ -462,13 +459,13 @@ class _HalfCauchyTest(object):
     # survival_function, log_survival_function are all computed based on
     # log_cdf. So none of these functions have a finite gradient at `x = loc`.
     for func in [
-        lambda loc, scale, x: tfd.HalfCauchy(  # pylint: disable=g-long-lambda
+        lambda loc, scale, x: half_cauchy.HalfCauchy(  # pylint: disable=g-long-lambda
             loc, scale, validate_args=True).prob(x),
-        lambda loc, scale, x: tfd.HalfCauchy(  # pylint: disable=g-long-lambda
+        lambda loc, scale, x: half_cauchy.HalfCauchy(  # pylint: disable=g-long-lambda
             loc, scale, validate_args=True).log_prob(x),
     ]:
       value, grads = self.evaluate(
-          tfp.math.value_and_gradient(func, [loc, scale, x]))
+          gradient.value_and_gradient(func, [loc, scale, x]))
       self.assertAllFinite(value)
       for grad in grads:
         self.assertAllFinite(grad)
@@ -484,7 +481,7 @@ class _HalfCauchyTest(object):
     def get_half_cauchy_func(func_name):
       def half_cauchy_func(loc, scale, x):
         return getattr(
-            tfd.HalfCauchy(loc, scale, validate_args=True), func_name)(
+            half_cauchy.HalfCauchy(loc, scale, validate_args=True), func_name)(
                 x)
 
       return half_cauchy_func
@@ -499,13 +496,14 @@ class _HalfCauchyTest(object):
     ]:
       func = get_half_cauchy_func(func_name)
       value, grads = self.evaluate(
-          tfp.math.value_and_gradient(func, [loc, scale, x]))
+          gradient.value_and_gradient(func, [loc, scale, x]))
       self.assertAllFinite(value)
       for grad in grads:
         self.assertAllFinite(grad)
 
   def testSupportBijectorOutsideRange(self):
-    dist = tfd.HalfCauchy(loc=[-3., 2., 5.4], scale=2., validate_args=True)
+    dist = half_cauchy.HalfCauchy(
+        loc=[-3., 2., 5.4], scale=2., validate_args=True)
     with self.assertRaisesOpError('must be greater than or equal to 0'):
       self.evaluate(dist.experimental_default_event_space_bijector().inverse(
           [-4.2, 2. - 1e-6, 5.1]))

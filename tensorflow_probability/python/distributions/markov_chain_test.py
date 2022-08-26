@@ -18,8 +18,9 @@ from absl.testing import parameterized
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.bijectors import split
 from tensorflow_probability.python.distributions import log_prob_ratio
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
@@ -294,63 +295,78 @@ class MarkovChainBijectorTest(test_util.TestCase):
 
   # pylint: disable=g-long-lambda
   @parameterized.named_parameters(
-      dict(testcase_name='deterministic_prior',
-           prior_fn=lambda: tfd.Deterministic([-100., 0., 100.]),
-           transition_fn=lambda _, x: tfd.Normal(loc=x, scale=1.)),
-      dict(testcase_name='deterministic_transition',
-           prior_fn=lambda: tfd.Normal(loc=[-100., 0., 100.], scale=1.),
-           transition_fn=lambda _, x: tfd.Deterministic(x)),
-      dict(testcase_name='fully_deterministic',
-           prior_fn=lambda: tfd.Deterministic([-100., 0., 100.]),
-           transition_fn=lambda _, x: tfd.Deterministic(x)),
-      dict(testcase_name='mvn_diag',
-           prior_fn=(
-               lambda: tfd.MultivariateNormalDiag(loc=[[2.], [2.]],
-                                                  scale_diag=[1.])),
-           transition_fn=lambda _, x: tfd.VectorDeterministic(x)),
-      dict(testcase_name='docstring_dirichlet',
-           prior_fn=lambda: tfd.JointDistributionNamedAutoBatched(
-               {'probs': tfd.Dirichlet([1., 1.])}),
-           transition_fn=lambda _, x: tfd.JointDistributionNamedAutoBatched(
-               {'probs': tfd.MultivariateNormalDiag(loc=x['probs'],
-                                                    scale_diag=[0.1, 0.1])},
-               batch_ndims=ps.rank(x['probs']))),
-      dict(testcase_name='uniform_step',
-           prior_fn=lambda: tfd.Exponential(tf.ones([4, 1])),
-           transition_fn=lambda _, x: tfd.Uniform(low=x, high=x + 1.)),
-      dict(testcase_name='joint_distribution',
-           prior_fn=lambda: tfd.JointDistributionNamedAutoBatched(
-               batch_ndims=2,
-               model={
-                   'a': tfd.Gamma(tf.zeros([5]), 1.),
-                   'b': lambda a: (
-                       tfb.Reshape(
-                           event_shape_in=[4, 3],
-                           event_shape_out=[2, 3, 2])(
-                               tfd.Independent(
-                                   tfd.Normal(
-                                       loc=tf.zeros([5, 4, 3]),
-                                       scale=a[..., tf.newaxis, tf.newaxis]),
-                                   reinterpreted_batch_ndims=2)))}),
-           transition_fn=lambda _, x: tfd.JointDistributionNamedAutoBatched(
-               batch_ndims=ps.rank_from_shape(x['a'].shape),
-               model={'a': tfd.Normal(loc=x['a'], scale=1.),
-                      'b': lambda a: tfd.Deterministic(
-                          x['b'] + a[..., tf.newaxis, tf.newaxis, tf.newaxis])})
-           ),
-      dict(testcase_name='nested_chain',
-           prior_fn=lambda: tfd.MarkovChain(
-               initial_state_prior=tfb.Split(2)(
-                   tfd.MultivariateNormalDiag(0., [1., 2.])),
-               transition_fn=lambda _, x: tfb.Split(2)(
-                   tfd.MultivariateNormalDiag(x[0], [1., 2.])),
-               num_steps=6),
-           transition_fn=(
-               lambda _, x: tfd.JointDistributionSequentialAutoBatched(
-                   [
-                       tfd.MultivariateNormalDiag(x[0], [1.]),
-                       tfd.MultivariateNormalDiag(x[1], [1.])],
-                   batch_ndims=ps.rank(x[0])))))
+      dict(
+          testcase_name='deterministic_prior',
+          prior_fn=lambda: tfd.Deterministic([-100., 0., 100.]),
+          transition_fn=lambda _, x: tfd.Normal(loc=x, scale=1.)),
+      dict(
+          testcase_name='deterministic_transition',
+          prior_fn=lambda: tfd.Normal(loc=[-100., 0., 100.], scale=1.),
+          transition_fn=lambda _, x: tfd.Deterministic(x)),
+      dict(
+          testcase_name='fully_deterministic',
+          prior_fn=lambda: tfd.Deterministic([-100., 0., 100.]),
+          transition_fn=lambda _, x: tfd.Deterministic(x)),
+      dict(
+          testcase_name='mvn_diag',
+          prior_fn=(lambda: tfd.MultivariateNormalDiag(
+              loc=[[2.], [2.]], scale_diag=[1.])),
+          transition_fn=lambda _, x: tfd.VectorDeterministic(x)),
+      dict(
+          testcase_name='docstring_dirichlet',
+          prior_fn=lambda: tfd.JointDistributionNamedAutoBatched(
+              {'probs': tfd.Dirichlet([1., 1.])}),
+          transition_fn=lambda _, x: tfd.JointDistributionNamedAutoBatched(
+              {
+                  'probs':
+                      tfd.MultivariateNormalDiag(
+                          loc=x['probs'], scale_diag=[0.1, 0.1])
+              },
+              batch_ndims=ps.rank(x['probs']))),
+      dict(
+          testcase_name='uniform_step',
+          prior_fn=lambda: tfd.Exponential(tf.ones([4, 1])),
+          transition_fn=lambda _, x: tfd.Uniform(low=x, high=x + 1.)),
+      dict(
+          testcase_name='joint_distribution',
+          prior_fn=lambda: tfd.JointDistributionNamedAutoBatched(
+              batch_ndims=2,
+              model={
+                  'a':
+                      tfd.Gamma(tf.zeros([5]), 1.),
+                  'b':
+                      lambda a: (reshape.Reshape(
+                          event_shape_in=[4, 3], event_shape_out=[2, 3, 2])
+                                 (tfd.Independent(
+                                     tfd.Normal(
+                                         loc=tf.zeros([5, 4, 3]),
+                                         scale=a[..., tf.newaxis, tf.newaxis]),
+                                     reinterpreted_batch_ndims=2)))
+              }),
+          transition_fn=lambda _, x: tfd.JointDistributionNamedAutoBatched(
+              batch_ndims=ps.rank_from_shape(x['a'].shape),
+              model={
+                  'a':
+                      tfd.Normal(loc=x['a'], scale=1.),
+                  'b':
+                      lambda a: tfd.Deterministic(x['b'] + a[
+                          ..., tf.newaxis, tf.newaxis, tf.newaxis])
+              })),
+      dict(
+          testcase_name='nested_chain',
+          prior_fn=lambda: tfd.MarkovChain(
+              initial_state_prior=split.Split(2)
+              (tfd.MultivariateNormalDiag(0., [1., 2.])),
+              transition_fn=lambda _, x: split.Split(2)
+              (tfd.MultivariateNormalDiag(x[0], [1., 2.])),
+              num_steps=6),
+          transition_fn=(
+              lambda _, x: tfd.JointDistributionSequentialAutoBatched(
+                  [
+                      tfd.MultivariateNormalDiag(x[0], [1.]),
+                      tfd.MultivariateNormalDiag(x[1], [1.])
+                  ],
+                  batch_ndims=ps.rank(x[0])))))
   # pylint: enable=g-long-lambda
   def test_default_bijector(self, prior_fn, transition_fn):
     chain = tfd.MarkovChain(initial_state_prior=prior_fn(),

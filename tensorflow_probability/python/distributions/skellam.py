@@ -16,7 +16,6 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import poisson as poisson_lib
@@ -28,6 +27,7 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import bessel
 
 
 __all__ = [
@@ -193,7 +193,7 @@ class Skellam(
     y = tf.where(
         tf.math.equal(r1, 0.) & tf.math.equal(r2, 0.),
         numpy_dtype(0.), y)
-    y = y + tfp_math.log_bessel_ive(
+    y = y + bessel.log_bessel_ive(
         safe_x, 2. * tf.math.sqrt(r1 * r2)) - tf.math.square(
             tf.math.sqrt(r1) - tf.math.sqrt(r2))
     y = tf.where(tf.math.equal(x, safe_x), y, numpy_dtype(-np.inf))

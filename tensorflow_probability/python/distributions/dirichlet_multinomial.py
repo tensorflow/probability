@@ -16,7 +16,6 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.distributions import distribution
 from tensorflow_probability.python.distributions import gamma as gamma_lib
@@ -30,6 +29,7 @@ from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 
 
 __all__ = [
@@ -289,7 +289,7 @@ class DirichletMultinomial(
     ordered_prob = (
         tf.math.lbeta(concentration + counts) -
         tf.math.lbeta(concentration))
-    return ordered_prob + tfp_math.log_combinations(
+    return ordered_prob + generic.log_combinations(
         self.total_count, counts)
 
   @distribution_util.AppendDocstring(_dirichlet_multinomial_sample_note)

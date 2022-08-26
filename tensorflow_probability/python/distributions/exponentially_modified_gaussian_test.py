@@ -21,16 +21,16 @@ import math
 import numpy as np
 from scipy import stats as sp_stats
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import exponentially_modified_gaussian as emg
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 class _ExponentiallyModifiedGaussianTest(object):
 
   def _test_param_shapes(self, sample_shape, expected):
-    param_shapes = tfd.ExponentiallyModifiedGaussian.param_shapes(sample_shape)
+    param_shapes = emg.ExponentiallyModifiedGaussian.param_shapes(sample_shape)
     mu_shape, sigma_shape, lambda_shape = param_shapes['loc'], param_shapes[
         'scale'], param_shapes['rate']
     self.assertAllEqual(expected, self.evaluate(mu_shape))
@@ -43,12 +43,12 @@ class _ExponentiallyModifiedGaussianTest(object):
         expected,
         self.evaluate(
             tf.shape(
-                tfd.ExponentiallyModifiedGaussian(
+                emg.ExponentiallyModifiedGaussian(
                     mu, sigma, rate,
                     validate_args=True).sample(seed=test_util.test_seed()))))
 
   def _test_param_static_shapes(self, sample_shape, expected):
-    param_shapes = tfd.ExponentiallyModifiedGaussian.param_static_shapes(
+    param_shapes = emg.ExponentiallyModifiedGaussian.param_static_shapes(
         sample_shape)
     mu_shape, sigma_shape, lambda_shape = param_shapes['loc'], param_shapes[
         'scale'], param_shapes['rate']
@@ -62,7 +62,7 @@ class _ExponentiallyModifiedGaussianTest(object):
   def testSampleLikeArgsGetDistDType(self):
     zero = dtype_util.as_numpy_dtype(self.dtype)(0.)
     one = dtype_util.as_numpy_dtype(self.dtype)(1.)
-    dist = tfd.ExponentiallyModifiedGaussian(zero, one, one)
+    dist = emg.ExponentiallyModifiedGaussian(zero, one, one)
     self.assertEqual(self.dtype, dist.dtype)
     for method in ('log_prob', 'prob', 'log_cdf', 'cdf',
                    'log_survival_function', 'survival_function'):
@@ -84,7 +84,7 @@ class _ExponentiallyModifiedGaussianTest(object):
     sigma = tf.constant([math.sqrt(10.0)] * batch_size, dtype=self.dtype)
     rate = tf.constant([2.] * batch_size, dtype=self.dtype)
     x = np.array([-2.5, 2.5, 4.0, 0.0, -1.0, 2.0], dtype=self.dtype)
-    exgaussian = tfd.ExponentiallyModifiedGaussian(
+    exgaussian = emg.ExponentiallyModifiedGaussian(
         loc=mu, scale=sigma, rate=rate, validate_args=True)
 
     log_pdf = exgaussian.log_prob(x)
@@ -121,7 +121,7 @@ class _ExponentiallyModifiedGaussianTest(object):
         [[math.sqrt(10.0), math.sqrt(15.0)]] * batch_size, dtype=self.dtype)
     rate = tf.constant([[2., 3.]] * batch_size, dtype=self.dtype)
     x = np.array([[-2.5, 2.5, 4.0, 0.0, -1.0, 2.0]], dtype=self.dtype).T
-    exgaussian = tfd.ExponentiallyModifiedGaussian(
+    exgaussian = emg.ExponentiallyModifiedGaussian(
         loc=mu, scale=sigma, rate=rate, validate_args=True)
 
     log_pdf = exgaussian.log_prob(x)
@@ -160,7 +160,7 @@ class _ExponentiallyModifiedGaussianTest(object):
     rate = self._rng.rand(batch_size) + 1.0
     x = np.linspace(-8.0, 8.0, batch_size).astype(self.dtype)
 
-    exgaussian = tfd.ExponentiallyModifiedGaussian(
+    exgaussian = emg.ExponentiallyModifiedGaussian(
         loc=mu, scale=sigma, rate=rate, validate_args=True)
     cdf = exgaussian.log_cdf(x)
     self.assertAllEqual(
@@ -179,14 +179,14 @@ class _ExponentiallyModifiedGaussianTest(object):
 
     def make_fn(attr):
       x = np.array([-100., -20., -5., 0., 5., 20., 100.]).astype(self.dtype)
-      return lambda m, s, l: getattr(     # pylint: disable=g-long-lambda
-          tfd.ExponentiallyModifiedGaussian(
+      return lambda m, s, l: getattr(  # pylint: disable=g-long-lambda
+          emg.ExponentiallyModifiedGaussian(
               loc=m, scale=s, rate=l, validate_args=True), attr)(
                   x)
 
     for attr in ['cdf', 'log_prob']:
       value, grads = self.evaluate(
-          tfp.math.value_and_gradient(
+          gradient.value_and_gradient(
               make_fn(attr), [
                   tf.constant(0, self.dtype),
                   tf.constant(1, self.dtype),
@@ -198,7 +198,7 @@ class _ExponentiallyModifiedGaussianTest(object):
 
   def testNegativeSigmaFails(self):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      exgaussian = tfd.ExponentiallyModifiedGaussian(
+      exgaussian = emg.ExponentiallyModifiedGaussian(
           loc=[tf.constant(1., dtype=self.dtype)],
           scale=[tf.constant(-5., dtype=self.dtype)],
           rate=[tf.constant(1., dtype=self.dtype)],
@@ -210,7 +210,7 @@ class _ExponentiallyModifiedGaussianTest(object):
     mu = tf.constant([-3.0] * 5, dtype=self.dtype)
     sigma = tf.constant(11.0, dtype=self.dtype)
     rate = tf.constant(6.0, dtype=self.dtype)
-    exgaussian = tfd.ExponentiallyModifiedGaussian(
+    exgaussian = emg.ExponentiallyModifiedGaussian(
         loc=mu, scale=sigma, rate=rate, validate_args=True)
 
     self.assertEqual(self.evaluate(exgaussian.batch_shape_tensor()), [5])
@@ -220,7 +220,7 @@ class _ExponentiallyModifiedGaussianTest(object):
 
   def testVariableScale(self):
     x = tf.Variable(1., dtype=self.dtype)
-    d = tfd.ExponentiallyModifiedGaussian(
+    d = emg.ExponentiallyModifiedGaussian(
         loc=tf.constant(0., dtype=self.dtype),
         scale=x,
         rate=tf.constant(1., dtype=self.dtype),
@@ -233,7 +233,7 @@ class _ExponentiallyModifiedGaussianTest(object):
 
   def testIncompatibleArgShapes(self):
     with self.assertRaisesRegexp(Exception, r'compatible shapes'):
-      d = tfd.ExponentiallyModifiedGaussian(
+      d = emg.ExponentiallyModifiedGaussian(
           loc=tf.zeros([2, 3], dtype=self.dtype),
           scale=tf.ones([4, 1], dtype=self.dtype),
           rate=tf.ones([2, 3], dtype=self.dtype),
