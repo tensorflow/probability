@@ -19,9 +19,8 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import spectral_mixture
 
 
 @test_util.test_all_tf_execution_regimes
@@ -56,11 +55,8 @@ class SpectralMixtureTest(test_util.TestCase):
         minval=1., maxval=2., seed=seed_stream())
     logits, locs, scales = self.evaluate([logits, locs, scales])
 
-    k = tfp.math.psd_kernels.SpectralMixture(
-        logits,
-        locs=locs,
-        scales=scales,
-        feature_ndims=feature_ndims)
+    k = spectral_mixture.SpectralMixture(
+        logits, locs=locs, scales=scales, feature_ndims=feature_ndims)
     shape = [dims] * feature_ndims
     for _ in range(5):
       x = np.random.uniform(-1, 1, size=shape).astype(np.float32)
@@ -83,7 +79,7 @@ class SpectralMixtureTest(test_util.TestCase):
     self.assertAllClose(kernel_matrix, self.evaluate(k.matrix(x, x)), rtol=1e-4)
 
   def testShapesAreCorrect(self):
-    k = tfp.math.psd_kernels.SpectralMixture(
+    k = spectral_mixture.SpectralMixture(
         logits=np.ones([6, 7], np.float32),
         locs=np.ones([9, 1, 1, 7, 3], np.float32),
         scales=np.ones([2, 1, 7, 3], np.float32))
@@ -102,7 +98,7 @@ class SpectralMixtureTest(test_util.TestCase):
 
   def testValidateArgs(self):
     with self.assertRaisesOpError('must be positive'):
-      k = tfp.math.psd_kernels.SpectralMixture(
+      k = spectral_mixture.SpectralMixture(
           logits=np.ones([7], np.float32),
           locs=np.ones([7, 1], np.float32),
           scales=-np.ones([7, 1], np.float32),
@@ -115,11 +111,8 @@ class SpectralMixtureTest(test_util.TestCase):
     logits = tf.Variable(np.ones([7], np.float32))
     locs = tf.Variable(np.ones([7, 1], np.float32))
     scales = tf.Variable(np.ones([7, 1], np.float32))
-    k = tfp.math.psd_kernels.SpectralMixture(
-        logits=logits,
-        locs=locs,
-        scales=scales,
-        validate_args=True)
+    k = spectral_mixture.SpectralMixture(
+        logits=logits, locs=locs, scales=scales, validate_args=True)
     self.evaluate([v.initializer for v in k.variables])
 
     with self.assertRaisesOpError('must be positive'):

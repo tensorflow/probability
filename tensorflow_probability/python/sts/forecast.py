@@ -16,7 +16,10 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.experimental import util as tfe_util
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -186,7 +189,7 @@ def one_step_predictive(model, observed_time_series, parameter_samples,
         means=observation_means[..., 0],
         variances=observation_covs[..., 0, 0])
     if timesteps_are_event_shape:
-      predictive_dist = tfd.Independent(
+      predictive_dist = independent.Independent(
           predictive_dist, reinterpreted_batch_ndims=1)
     return predictive_dist
 
@@ -350,7 +353,7 @@ def forecast(model,
             parameter_samples[param.name],
             0, -(1 + _prefer_static_event_ndims(param.prior)))
         for param in model.parameters}
-    forecast_prior = tfd.MultivariateNormalTriL(
+    forecast_prior = mvn_tril.MultivariateNormalTriL(
         loc=dist_util.move_dimension(predictive_mean, 0, -2),
         scale_tril=tf.linalg.cholesky(
             dist_util.move_dimension(predictive_cov, 0, -3)))
@@ -398,8 +401,8 @@ def forecast(model,
     if num_posterior_draws is None:
       num_posterior_draws = (
           dist_util.prefer_static_value(forecast_ssm.batch_shape_tensor()[-1]))
-    return tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
+    return mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(
             logits=tf.zeros([num_posterior_draws], dtype=forecast_ssm.dtype)),
         components_distribution=forecast_ssm)
 
@@ -538,6 +541,6 @@ def impute_missing_values(model,
         means=observation_means[..., 0],
         variances=observation_covs[..., 0, 0])
     if timesteps_are_event_shape:
-      imputed_values_dist = tfd.Independent(
+      imputed_values_dist = independent.Independent(
           imputed_values_dist, reinterpreted_batch_ndims=1)
     return imputed_values_dist

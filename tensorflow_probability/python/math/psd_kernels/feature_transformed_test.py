@@ -18,8 +18,11 @@
 from absl.testing import parameterized
 import numpy as np
 
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import scale_matvec_diag
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels import feature_transformed
 from tensorflow_probability.python.math.psd_kernels.internal import util
 
 
@@ -51,10 +54,10 @@ class _FeatureTransformedTest(test_util.TestCase):
   def testValuesAreCorrectIdentity(self, feature_ndims, dims):
     amplitude = self.dtype(5.)
     length_scale = self.dtype(0.2)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
-    identity_transformed_kernel = tfp.math.psd_kernels.FeatureTransformed(
+    identity_transformed_kernel = feature_transformed.FeatureTransformed(
         kernel,
         transformation_fn=lambda x, feature_ndims, param_expansion_ndims: x)
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
@@ -74,17 +77,17 @@ class _FeatureTransformedTest(test_util.TestCase):
   def testValuesAreCorrectScalarTransform(self, feature_ndims, dims):
     amplitude = self.dtype(5.)
     length_scale = self.dtype(0.2)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
-    bij = tfp.bijectors.Scale(scale=self.dtype(2.))
+    bij = scale.Scale(scale=self.dtype(2.))
     # Flat multiplication by 2.
     def scale_transform(x, feature_ndims, param_expansion_ndims):
       del feature_ndims, param_expansion_ndims
       return bij.forward(x)
 
-    scale_transformed_kernel = tfp.math.psd_kernels.FeatureTransformed(
+    scale_transformed_kernel = feature_transformed.FeatureTransformed(
         kernel, transformation_fn=scale_transform)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
@@ -104,19 +107,19 @@ class _FeatureTransformedTest(test_util.TestCase):
   def testValuesAreCorrectVectorTransform(self, feature_ndims, dims):
     amplitude = self.dtype(5.)
     length_scale = self.dtype(0.2)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
     scale_diag = np.random.uniform(-1, 1, size=(dims,)).astype(self.dtype)
-    bij = tfp.bijectors.ScaleMatvecDiag(scale_diag=scale_diag)
+    bij = scale_matvec_diag.ScaleMatvecDiag(scale_diag=scale_diag)
 
     # Scaling the last dimension.
     def vector_transform(x, feature_ndims, param_expansion_ndims):
       del feature_ndims, param_expansion_ndims
       return bij.forward(x)
 
-    vector_transformed_kernel = tfp.math.psd_kernels.FeatureTransformed(
+    vector_transformed_kernel = feature_transformed.FeatureTransformed(
         kernel, transformation_fn=vector_transform)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
@@ -143,7 +146,7 @@ class _FeatureTransformedTest(test_util.TestCase):
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     length_scale = np.random.uniform(
         low=1., high=10., size=[1, 2]).astype(self.dtype)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
@@ -159,7 +162,7 @@ class _FeatureTransformedTest(test_util.TestCase):
           start=-2)
       return diag * x
 
-    vector_transformed_kernel = tfp.math.psd_kernels.FeatureTransformed(
+    vector_transformed_kernel = feature_transformed.FeatureTransformed(
         kernel, transformation_fn=vector_transform)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)

@@ -19,9 +19,9 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math.psd_kernels import exponential_curve
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,19 +33,19 @@ class ExponentialCurveTest(test_util.TestCase):
   def testBatchShape(self):
     concentration = np.random.uniform(2, 3., size=[3, 1, 2]).astype(np.float32)
     rate = np.random.uniform(2, 3., size=[1, 3, 1]).astype(np.float32)
-    k = tfp.math.psd_kernels.ExponentialCurve(concentration, rate)
+    k = exponential_curve.ExponentialCurve(concentration, rate)
     self.assertAllEqual(tf.TensorShape([3, 3, 2]), k.batch_shape)
     self.assertAllEqual([3, 3, 2], self.evaluate(k.batch_shape_tensor()))
 
   def testValidateArgs(self):
     with self.assertRaisesOpError('concentration must be positive'):
-      k = tfp.math.psd_kernels.ExponentialCurve(
+      k = exponential_curve.ExponentialCurve(
           concentration=-1., rate=1., validate_args=True)
       self.evaluate(k.apply([[1.]], [[1.]]))
 
     if not tf.executing_eagerly():
       with self.assertRaisesOpError('rate must be positive'):
-        k = tfp.math.psd_kernels.ExponentialCurve(
+        k = exponential_curve.ExponentialCurve(
             concentration=1., rate=-1., validate_args=True)
         self.evaluate(k.apply([[1.]], [[1.]]))
 
@@ -61,7 +61,7 @@ class ExponentialCurveTest(test_util.TestCase):
     rate = np.array(.2, dtype=dtype)
 
     rng = test_util.test_np_rng()
-    k = tfp.math.psd_kernels.ExponentialCurve(concentration, rate)
+    k = exponential_curve.ExponentialCurve(concentration, rate)
     for _ in range(5):
       x = rng.uniform(0, 2, size=[batch_size, 3]).astype(dtype)
       y = rng.uniform(0, 2, size=[batch_size, 1]).astype(dtype)
@@ -72,7 +72,7 @@ class ExponentialCurveTest(test_util.TestCase):
           self.evaluate(k.apply(x, y)))
 
   def testShapesAreCorrect(self):
-    k = tfp.math.psd_kernels.ExponentialCurve(concentration=1., rate=1.)
+    k = exponential_curve.ExponentialCurve(concentration=1., rate=1.)
 
     x = np.ones([4, 1], np.float32)
     y = np.ones([5, 1], np.float32)
@@ -81,7 +81,7 @@ class ExponentialCurveTest(test_util.TestCase):
     self.assertAllEqual(
         k.matrix(tf.stack([x] * 2), tf.stack([y] * 2)).shape, [2, 4, 5])
 
-    k = tfp.math.psd_kernels.ExponentialCurve(
+    k = exponential_curve.ExponentialCurve(
         concentration=np.ones([2, 1, 1], np.float32),
         rate=np.ones([1, 3, 1], np.float32))
     self.assertAllEqual(
@@ -97,13 +97,13 @@ class ExponentialCurveTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def testGradsAtIdenticalInputsAreNotNaN(self):
-    k = tfp.math.psd_kernels.ExponentialCurve(concentration=1., rate=1.)
+    k = exponential_curve.ExponentialCurve(concentration=1., rate=1.)
     x = tf.constant(np.arange(3 * 5, dtype=np.float32).reshape(15, 1))
 
     grads = [
-        tfp.math.value_and_gradient(
-            lambda x: k.apply(x, x)[i], x)[1]  # pylint: disable=cell-var-from-loop
-        for i in range(3)]
+        gradient.value_and_gradient(lambda x: k.apply(x, x)[i], x)[1]  # pylint: disable=cell-var-from-loop
+        for i in range(3)
+    ]
 
     self.assertAllNotNan(self.evaluate(grads))
 

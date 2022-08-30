@@ -16,8 +16,13 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import tanh
+from tensorflow_probability.python.distributions import linear_gaussian_ssm as lgssm
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -27,7 +32,7 @@ from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
 
-class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+class AutoregressiveStateSpaceModel(lgssm.LinearGaussianStateSpaceModel):
   """State space model for an autoregressive process.
 
   A state space model (SSM) posits a set of latent (unobserved) variables that
@@ -184,15 +189,17 @@ class AutoregressiveStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
       super(AutoregressiveStateSpaceModel, self).__init__(
           num_timesteps=num_timesteps,
           transition_matrix=make_ar_transition_matrix(coefficients),
-          transition_noise=tfd.MultivariateNormalDiag(
-              scale_diag=tf.stack([level_scale] +
-                                  [tf.zeros_like(level_scale)] * (
-                                      self.order - 1), axis=-1)),
-          observation_matrix=tf.concat([tf.ones([1, 1], dtype=dtype),
-                                        tf.zeros([1, self.order - 1],
-                                                 dtype=dtype)],
+          transition_noise=mvn_diag.MultivariateNormalDiag(
+              scale_diag=tf.stack(
+                  [level_scale] + [tf.zeros_like(level_scale)] *
+                  (self.order - 1),
+                  axis=-1)),
+          observation_matrix=tf.concat([
+              tf.ones([1, 1], dtype=dtype),
+              tf.zeros([1, self.order - 1], dtype=dtype)
+          ],
                                        axis=-1),
-          observation_noise=tfd.MultivariateNormalDiag(
+          observation_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
           initial_state_prior=initial_state_prior,
           name=name,
@@ -350,11 +357,11 @@ class Autoregressive(StructuralTimeSeries):
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if coefficients_prior is None:
-        coefficients_prior = tfd.MultivariateNormalDiag(
+        coefficients_prior = mvn_diag.MultivariateNormalDiag(
             scale_diag=batch_ones)
       if level_scale_prior is None:
-        level_scale_prior = tfd.LogNormal(
-            loc=tf.math.log(0.05 *  observed_stddev), scale=3.)
+        level_scale_prior = lognormal.LogNormal(
+            loc=tf.math.log(0.05 * observed_stddev), scale=3.)
 
       if (coefficients_prior.event_shape.is_fully_defined() and
           order != coefficients_prior.event_shape[0]):
@@ -362,7 +369,7 @@ class Autoregressive(StructuralTimeSeries):
             coefficients_prior.event_shape[0], order))
 
       if initial_state_prior is None:
-        initial_state_prior = tfd.MultivariateNormalDiag(
+        initial_state_prior = mvn_diag.MultivariateNormalDiag(
             loc=observed_initial[..., tf.newaxis] * batch_ones,
             scale_diag=(tf.abs(observed_initial) +
                         observed_stddev)[..., tf.newaxis] * batch_ones)
@@ -373,15 +380,17 @@ class Autoregressive(StructuralTimeSeries):
       self._initial_state_prior = initial_state_prior
 
       if coefficient_constraining_bijector is None:
-        coefficient_constraining_bijector = tfb.Tanh()
+        coefficient_constraining_bijector = tanh.Tanh()
       super(Autoregressive, self).__init__(
           parameters=[
-              Parameter('coefficients',
-                        coefficients_prior,
+              Parameter('coefficients', coefficients_prior,
                         coefficient_constraining_bijector),
-              Parameter('level_scale', level_scale_prior,
-                        tfb.Chain([tfb.Scale(scale=observed_stddev),
-                                   tfb.Softplus(low=dtype_util.eps(dtype))]))
+              Parameter(
+                  'level_scale', level_scale_prior,
+                  chain.Chain([
+                      scale.Scale(scale=observed_stddev),
+                      softplus.Softplus(low=dtype_util.eps(dtype))
+                  ]))
           ],
           latent_size=order,
           init_parameters=init_parameters,

@@ -19,9 +19,8 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import parabolic
 
 
 @test_util.test_all_tf_execution_regimes
@@ -29,10 +28,10 @@ class ParabolicTest(test_util.TestCase):
 
   @test_util.numpy_disable_test_missing_functionality('dtype checks')
   def testMismatchedFloatTypesAreBad(self):
-    tfp.math.psd_kernels.Parabolic(1, 1)  # Should be OK (float32 fallback).
-    tfp.math.psd_kernels.Parabolic(np.float32(1.), 1.)  # Should be OK.
+    parabolic.Parabolic(1, 1)  # Should be OK (float32 fallback).
+    parabolic.Parabolic(np.float32(1.), 1.)  # Should be OK.
     with self.assertRaises(TypeError):
-      tfp.math.psd_kernels.Parabolic(np.float32(1.), np.float64(1.))
+      parabolic.Parabolic(np.float32(1.), np.float64(1.))
 
   @parameterized.parameters(
       {'feature_ndims': 1, 'dims': 3},
@@ -46,7 +45,7 @@ class ParabolicTest(test_util.TestCase):
     length_scale = .2
 
     np.random.seed(42)
-    k = tfp.math.psd_kernels.Parabolic(amplitude, length_scale, feature_ndims)
+    k = parabolic.Parabolic(amplitude, length_scale, feature_ndims)
     shape = [dims] * feature_ndims
     for _ in range(5):
       x = np.random.uniform(-1, 1, size=shape).astype(np.float32)
@@ -57,19 +56,17 @@ class ParabolicTest(test_util.TestCase):
           self.evaluate(k.apply(x, y)))
 
   def testEpanechnikov(self):
-    k = tfp.math.psd_kernels.Parabolic()
+    k = parabolic.Parabolic()
     self.assertAllClose(.75, k.matrix([[0.]], [[0.]])[0, 0])
     self.assertAllEqual([0., 0.], k.matrix([[0.]], [[1.], [-1.]])[0])
     self.assertAllEqual([0., 0.], k.matrix([[0.]], [[1.1], [-1.1]])[0])
 
   def testNoneShapes(self):
-    k = tfp.math.psd_kernels.Parabolic(
-        amplitude=np.reshape(np.arange(12.), [2, 3, 2]))
+    k = parabolic.Parabolic(amplitude=np.reshape(np.arange(12.), [2, 3, 2]))
     self.assertAllEqual((2, 3, 2), k.batch_shape)
 
   def testShapesAreCorrect(self):
-    k = tfp.math.psd_kernels.Parabolic(
-        amplitude=1., length_scale=1.)
+    k = parabolic.Parabolic(amplitude=1., length_scale=1.)
 
     x = np.ones([4, 3], np.float32)
     y = np.ones([5, 3], np.float32)
@@ -79,7 +76,7 @@ class ParabolicTest(test_util.TestCase):
         [2, 4, 5],
         k.matrix(tf.stack([x]*2), tf.stack([y]*2)).shape)
 
-    k = tfp.math.psd_kernels.Parabolic(
+    k = parabolic.Parabolic(
         amplitude=np.ones([2, 1, 1], np.float32),
         length_scale=np.ones([1, 3, 1], np.float32))
     self.assertAllEqual(
@@ -95,23 +92,22 @@ class ParabolicTest(test_util.TestCase):
 
   def testValidateArgs(self):
     with self.assertRaisesOpError('must be positive'):
-      k = tfp.math.psd_kernels.Parabolic(-1., 1., validate_args=True)
+      k = parabolic.Parabolic(-1., 1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
     with self.assertRaisesOpError('must be positive'):
-      tfp.math.psd_kernels.Parabolic(2., -2., validate_args=True)
+      parabolic.Parabolic(2., -2., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
     # But `None`'s are ok
-    k = tfp.math.psd_kernels.Parabolic(None, None, validate_args=True)
+    k = parabolic.Parabolic(None, None, validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
 
   @test_util.jax_disable_variable_test
   def testValidateVariableArgs(self):
     amplitude = tf.Variable(1.)
     length_scale = tf.Variable(1.)
-    k = tfp.math.psd_kernels.Parabolic(amplitude, length_scale,
-                                       validate_args=True)
+    k = parabolic.Parabolic(amplitude, length_scale, validate_args=True)
     self.evaluate([v.initializer for v in k.variables])
 
     with self.assertRaisesOpError('must be positive'):

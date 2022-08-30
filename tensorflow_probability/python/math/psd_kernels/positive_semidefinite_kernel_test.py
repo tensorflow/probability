@@ -22,8 +22,8 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
 from tensorflow_probability.python.math.psd_kernels.internal import util as kernels_util
@@ -41,14 +41,13 @@ PARAMS_2 = np.array([1., 2.]).astype(np.float32)
 PARAMS_21 = np.array([[1.], [2.]]).astype(np.float32)
 
 
-class IncompletelyDefinedKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel
-                               ):
+class IncompletelyDefinedKernel(psd_kernel.PositiveSemidefiniteKernel):
 
   def __init__(self):
     super(IncompletelyDefinedKernel, self).__init__(feature_ndims=1)
 
 
-class TestKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
+class TestKernel(psd_kernel.PositiveSemidefiniteKernel):
   """A PositiveSemidefiniteKernel implementation just for testing purposes.
 
   k(x, y) = m * sum(x + y)
@@ -67,7 +66,7 @@ class TestKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
 
   @classmethod
   def _parameter_properties(cls, dtype):
-    return dict(multiplier=tfp.util.ParameterProperties())
+    return dict(multiplier=parameter_properties.ParameterProperties())
 
   @property
   def multiplier(self):
@@ -175,7 +174,7 @@ class PositiveSemidefiniteKernelTest(test_util.TestCase):
       ('Negative feature_ndims', -3))
   def testFeatureNdimsExceptions(self, feature_ndims):
 
-    class FeatureNdimsKernel(tfp.math.psd_kernels.PositiveSemidefiniteKernel):
+    class FeatureNdimsKernel(psd_kernel.PositiveSemidefiniteKernel):
 
       def __init__(self):
         super(FeatureNdimsKernel, self).__init__(feature_ndims)

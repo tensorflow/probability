@@ -19,9 +19,9 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import LocalLevelStateSpaceModel
+from tensorflow_probability.python.sts.components.local_level import LocalLevelStateSpaceModel
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,7 +33,7 @@ class _LocalLevelStateSpaceModelTest(object):
     ssm = LocalLevelStateSpaceModel(
         num_timesteps=5,
         level_scale=0.5,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder([1.])))
 
     lp = ssm.log_prob(y[..., np.newaxis])
@@ -43,7 +43,7 @@ class _LocalLevelStateSpaceModelTest(object):
   def test_stats(self):
     # Build a model with expected initial scale 0.
     level_scale = self._build_placeholder(1.0)
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=self._build_placeholder([0.]),
         scale_diag=self._build_placeholder([1.]))
 
@@ -67,7 +67,7 @@ class _LocalLevelStateSpaceModelTest(object):
 
     level_scale = self._build_placeholder(
         np.exp(np.random.randn(*batch_shape)))
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         scale_diag=self._build_placeholder([1.]))
 
     ssm = LocalLevelStateSpaceModel(
@@ -85,7 +85,7 @@ class _LocalLevelStateSpaceModelTest(object):
 
     level_scale = self._build_placeholder(2 * np.ones(batch_shape))
     observation_noise_scale = self._build_placeholder(1.)
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=self._build_placeholder([-3]),
         scale_diag=self._build_placeholder([1.]))
 

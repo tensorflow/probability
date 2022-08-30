@@ -19,10 +19,10 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import DynamicLinearRegression
-from tensorflow_probability.python.sts import DynamicLinearRegressionStateSpaceModel
+from tensorflow_probability.python.sts.components.dynamic_regression import DynamicLinearRegression
+from tensorflow_probability.python.sts.components.dynamic_regression import DynamicLinearRegressionStateSpaceModel
 
 
 class _DynamicLinearRegressionStateSpaceModelTest(object):
@@ -39,7 +39,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
     initial_state_loc = self._build_placeholder(
         np.random.randn(*(batch_shape + [num_features])))
     initial_state_scale = tf.zeros_like(initial_state_loc)
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=initial_state_loc, scale_diag=initial_state_scale)
 
     ssm = DynamicLinearRegressionStateSpaceModel(
@@ -69,7 +69,7 @@ class _DynamicLinearRegressionStateSpaceModelTest(object):
     design_matrix = self._build_placeholder(
         np.random.randn(*(batch_shape + [num_timesteps, num_features])))
 
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=initial_state_loc, scale_diag=initial_state_scale)
 
     ssm = DynamicLinearRegressionStateSpaceModel(

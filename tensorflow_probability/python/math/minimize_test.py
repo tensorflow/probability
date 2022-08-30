@@ -20,11 +20,12 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python import optimizer
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math.minimize import minimize
+from tensorflow_probability.python.math.minimize import minimize_stateless
 
 JAX_MODE = False
 
@@ -58,9 +59,11 @@ class MinimizeTests(test_util.TestCase):
       return {'loss': traceable_quantities.loss, 'x': x,
               'sqdiff': (x - target_x)**2}
 
-    results = tfp.math.minimize(loss_fn, num_steps=100,
-                                optimizer=_get_adam_optimizer(0.1),
-                                trace_fn=trace_fn)
+    results = minimize(
+        loss_fn,
+        num_steps=100,
+        optimizer=_get_adam_optimizer(0.1),
+        trace_fn=trace_fn)
     self.evaluate(tf1.global_variables_initializer())
     results_ = self.evaluate(results)
     self.assertAllClose(results_['x'][0], init_x, atol=0.5)
@@ -71,10 +74,11 @@ class MinimizeTests(test_util.TestCase):
   def test_can_trace_all_traceable_quantities(self):
     x = tf.Variable(5.0)
     trace_fn = lambda traceable_quantities: traceable_quantities
-    results = tfp.math.minimize(loss_fn=lambda: tf.reduce_sum((x - 1.0)**2),
-                                num_steps=10,
-                                optimizer=_get_adam_optimizer(0.1),
-                                trace_fn=trace_fn)
+    results = minimize(
+        loss_fn=lambda: tf.reduce_sum((x - 1.0)**2),
+        num_steps=10,
+        optimizer=_get_adam_optimizer(0.1),
+        trace_fn=trace_fn)
     self.evaluate(tf1.global_variables_initializer())
     self.evaluate(results)
 
@@ -85,9 +89,11 @@ class MinimizeTests(test_util.TestCase):
     y = tf.Variable(2.)
     loss_fn = lambda: tf.reduce_sum((x - y)**2)
 
-    loss = tfp.math.minimize(loss_fn, num_steps=100,
-                             optimizer=_get_adam_optimizer(0.1),
-                             trainable_variables=[x])
+    loss = minimize(
+        loss_fn,
+        num_steps=100,
+        optimizer=_get_adam_optimizer(0.1),
+        trainable_variables=[x])
     with tf.control_dependencies([loss]):
       final_x = tf.identity(x)
       final_y = tf.identity(y)
@@ -105,7 +111,7 @@ class MinimizeTests(test_util.TestCase):
         [5., 3.], shape=None))
 
     num_steps = 10
-    losses, grads = tfp.math.minimize(
+    losses, grads = minimize(
         loss_fn=lambda: (x - 2.)**2,
         num_steps=num_steps,
         # TODO(b/137299119) Replace with TF2 optimizer.
@@ -127,7 +133,7 @@ class MinimizeTests(test_util.TestCase):
     num_steps = 23
 
     # Check that we preserve static shapes with static `num_steps`.
-    losses = tfp.math.minimize(
+    losses = minimize(
         loss_fn=lambda: (x - 2.)**2,
         num_steps=num_steps,
         optimizer=_get_adam_optimizer(0.1))
@@ -139,7 +145,7 @@ class MinimizeTests(test_util.TestCase):
     num_steps_ = 23
     num_steps = tf1.placeholder_with_default(num_steps_, shape=[])
 
-    losses = tfp.math.minimize(
+    losses = minimize(
         loss_fn=lambda: (x - 2.)**2,
         num_steps=num_steps,
         optimizer=_get_adam_optimizer(0.1))
@@ -164,11 +170,12 @@ class MinimizeTests(test_util.TestCase):
         lambda tq:  # pylint: disable=g-long-lambda
         (tq.loss, tq.convergence_criterion_state.average_decrease_in_loss))
     atol = 0.1
-    results = tfp.math.minimize(
-        loss_fn, num_steps=100,
+    results = minimize(
+        loss_fn,
+        num_steps=100,
         optimizer=_get_sgd_optimizer(0.1),
-        convergence_criterion=(
-            tfp.optimizer.convergence_criteria.LossNotDecreasing(atol=atol)),
+        convergence_criterion=(optimizer.convergence_criteria.LossNotDecreasing(
+            atol=atol)),
         trace_fn=trace_fn,
         return_full_length_trace=False)
     self.evaluate(tf1.global_variables_initializer())
@@ -195,11 +202,12 @@ class MinimizeTests(test_util.TestCase):
     batch_convergence_reduce_fn = (
         lambda has_converged: tf.reduce_mean(  # pylint: disable=g-long-lambda
             tf.cast(has_converged, tf.float32)) > target_portion_converged)
-    results = tfp.math.minimize(
-        loss_fn, num_steps=200,
+    results = minimize(
+        loss_fn,
+        num_steps=200,
         optimizer=_get_adam_optimizer(1.0),
-        convergence_criterion=(
-            tfp.optimizer.convergence_criteria.LossNotDecreasing(atol=0.1)),
+        convergence_criterion=(optimizer.convergence_criteria.LossNotDecreasing(
+            atol=0.1)),
         batch_convergence_reduce_fn=batch_convergence_reduce_fn,
         trace_fn=lambda traceable: traceable.has_converged,
         return_full_length_trace=False)
@@ -221,7 +229,7 @@ class MinimizeTests(test_util.TestCase):
 
     x = tf.Variable(init_x)
     loss_fn = lambda: tf.reduce_sum((x - target_x)**2)
-    optimizer = _get_adam_optimizer(0.1)
+    opt = _get_adam_optimizer(0.1)
     num_steps = 100
 
     # This test verifies that it works to compile the entire optimization loop,
@@ -229,13 +237,13 @@ class MinimizeTests(test_util.TestCase):
     # compiles an optimization step.
     @tf.function(jit_compile=True)
     def do_minimization(return_full_length_trace):
-      return tfp.math.minimize(
+      return minimize(
           loss_fn=loss_fn,
           num_steps=num_steps,
-          optimizer=optimizer,
+          optimizer=opt,
           trace_fn=lambda ms: (ms.loss, ms.has_converged),
           convergence_criterion=(
-              tfp.optimizer.convergence_criteria.LossNotDecreasing(atol=0.1)),
+              optimizer.convergence_criteria.LossNotDecreasing(atol=0.1)),
           return_full_length_trace=return_full_length_trace)
 
     trace = do_minimization(return_full_length_trace=True)
@@ -259,7 +267,7 @@ class MinimizeTests(test_util.TestCase):
       self.skipTest('XLA test does not make sense without tf.function')
 
     x = tf.Variable(0.)
-    optimizer = _get_sgd_optimizer(0.1)
+    opt = _get_sgd_optimizer(0.1)
 
     # Define a 'loss' that returns a constant value indicating
     # whether it is executing in an XLA context.
@@ -277,25 +285,25 @@ class MinimizeTests(test_util.TestCase):
           break
       return not_using_xla + (x - x)
 
-    xla_losses = tfp.math.minimize(
+    xla_losses = minimize(
         loss_fn=xla_detecting_loss_fn,
         num_steps=1,
-        optimizer=optimizer,
+        optimizer=opt,
         jit_compile=True)
     self.evaluate(tf1.global_variables_initializer())
     self.assertAllClose(xla_losses, [using_xla])
 
-    non_xla_losses = tfp.math.minimize(
+    non_xla_losses = minimize(
         loss_fn=xla_detecting_loss_fn,
         num_steps=1,
-        optimizer=optimizer,
+        optimizer=opt,
         jit_compile=False)
     self.assertAllClose(non_xla_losses, [not_using_xla])
 
   @test_util.jax_disable_variable_test
   def test_jit_compiled_optimization_makes_progress(self):
     x = tf.Variable([5., 3.])
-    losses = tfp.math.minimize(
+    losses = minimize(
         loss_fn=lambda: tf.reduce_sum((x - 2.)**2),
         num_steps=10,
         optimizer=_get_adam_optimizer(0.1),
@@ -308,18 +316,14 @@ class MinimizeTests(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def test_deterministic_results_with_seed(self):
     stochastic_loss_fn = lambda seed: tf.random.stateless_normal([], seed=seed)
-    optimizer = _get_sgd_optimizer(1e-3)
+    opt = _get_sgd_optimizer(1e-3)
     seed = test_util.test_seed(sampler_type='stateless')
     losses1 = self.evaluate(
-        tfp.math.minimize(loss_fn=stochastic_loss_fn,
-                          num_steps=10,
-                          optimizer=optimizer,
-                          seed=seed))
+        minimize(
+            loss_fn=stochastic_loss_fn, num_steps=10, optimizer=opt, seed=seed))
     losses2 = self.evaluate(
-        tfp.math.minimize(loss_fn=stochastic_loss_fn,
-                          num_steps=10,
-                          optimizer=optimizer,
-                          seed=seed))
+        minimize(
+            loss_fn=stochastic_loss_fn, num_steps=10, optimizer=opt, seed=seed))
     self.assertAllEqual(losses1, losses2)
     # Make sure we got different samples at each step.
     self.assertAllGreater(tf.abs(losses1[1:] - losses1[:-1]), 1e-4)
@@ -359,11 +363,12 @@ class MinimizeStatelessTests(test_util.TestCase):
               'sqdiff': (traceable_quantities.parameters - target_x)**2}
 
     final_x, results = self.evaluate(
-        tfp.math.minimize_stateless(loss_fn,
-                                    init=init_x,
-                                    num_steps=100,
-                                    optimizer=StatelessSGD(0.05),
-                                    trace_fn=trace_fn))
+        minimize_stateless(
+            loss_fn,
+            init=init_x,
+            num_steps=100,
+            optimizer=StatelessSGD(0.05),
+            trace_fn=trace_fn))
     self.assertAllClose(results['x'][0], init_x, atol=0.5)
     self.assertAllClose(results['x'][-1], final_x)
     self.assertAllClose(results['x'][-1], target_x, atol=0.2)
@@ -371,12 +376,12 @@ class MinimizeStatelessTests(test_util.TestCase):
 
   def test_updates_optimizer_state(self):
     final_x, losses = self.evaluate(
-        tfp.math.minimize_stateless(lambda x: x**2,
-                                    init=10.,
-                                    num_steps=3,
-                                    optimizer=StatelessSGD(
-                                        learning_rate=1.0,
-                                        decay_learning_rate=True)))
+        minimize_stateless(
+            lambda x: x**2,
+            init=10.,
+            num_steps=3,
+            optimizer=StatelessSGD(learning_rate=1.0,
+                                   decay_learning_rate=True)))
     # The loss has gradient `2 * x`, so with decaying learning rate the
     # optimization path should be:
     # step   x    loss   decayed_learning_rate   grad    new_x
@@ -394,7 +399,7 @@ class MinimizeStatelessTests(test_util.TestCase):
     import optax  # pylint: disable=g-import-not-at-top
     target_x = np.array([3., 4.]).astype(np.float32)
     final_x, losses = self.evaluate(
-        tfp.math.minimize_stateless(
+        minimize_stateless(
             lambda x: tf.reduce_sum((x - target_x)**2),
             init=np.array([0., 0.]).astype(np.float32),
             num_steps=100,
@@ -410,10 +415,10 @@ class MinimizeStatelessTests(test_util.TestCase):
     NormalParameters = collections.namedtuple('NormalParameters',
                                               ['loc', 'scale'])
     def loss_fn(loc, scale):
-      return -tf.reduce_sum(tfd.Normal(loc, scale).log_prob([-1., 1.]))
+      return -tf.reduce_sum(normal.Normal(loc, scale).log_prob([-1., 1.]))
 
     final_x, _ = self.evaluate(
-        tfp.math.minimize_stateless(
+        minimize_stateless(
             loss_fn,
             init=NormalParameters(loc=-1., scale=0.1),
             num_steps=250,
@@ -427,10 +432,8 @@ class MinimizeStatelessTests(test_util.TestCase):
     target_x = np.array([3., 4.]).astype(np.float32)
     loss_fn = lambda x: (x - target_x)**2
     final_x, losses = self.evaluate(
-        tfp.math.minimize_stateless(loss_fn,
-                                    init=init_x,
-                                    num_steps=100,
-                                    optimizer=StatelessSGD(0.05)))
+        minimize_stateless(
+            loss_fn, init=init_x, num_steps=100, optimizer=StatelessSGD(0.05)))
     self.assertAllClose(final_x, target_x, atol=0.2)
     self.assertAllClose(losses[0], [9., 16.], atol=0.5)
     self.assertAllClose(losses[-1], [0., 0.], atol=0.1)
@@ -446,7 +449,7 @@ class MinimizeStatelessTests(test_util.TestCase):
               'x': traceable_quantities.parameters,
               'sqdiff': (traceable_quantities.parameters - target_x)**2}
 
-    _, results = tfp.math.minimize_stateless(
+    _, results = minimize_stateless(
         loss_fn,
         init=init_x,
         num_steps=100,
@@ -462,7 +465,7 @@ class MinimizeStatelessTests(test_util.TestCase):
 
     num_steps = 10
     final_x, (losses, grads) = self.evaluate(
-        tfp.math.minimize_stateless(
+        minimize_stateless(
             loss_fn=lambda x: (x - 2.)**2,
             # Create a parameter (and thus loss) with dynamic shape.
             init=tf1.placeholder_with_default([5., 3.], shape=None),
@@ -477,7 +480,7 @@ class MinimizeStatelessTests(test_util.TestCase):
   def test_preserves_static_num_steps(self):
     num_steps = 23
     # Check that we preserve static shapes with static `num_steps`.
-    _, losses = tfp.math.minimize_stateless(
+    _, losses = minimize_stateless(
         loss_fn=lambda x: (x - 2.)**2,
         init=tf.constant([5., 3.]),
         num_steps=num_steps,
@@ -490,7 +493,7 @@ class MinimizeStatelessTests(test_util.TestCase):
     num_steps = tf1.placeholder_with_default(num_steps_, shape=[])
 
     final_x, losses = self.evaluate(
-        tfp.math.minimize_stateless(
+        minimize_stateless(
             loss_fn=lambda x: (x - 2.)**2,
             init=tf.constant([5., 3.]),
             num_steps=num_steps,
@@ -511,14 +514,13 @@ class MinimizeStatelessTests(test_util.TestCase):
         (tq.loss, tq.convergence_criterion_state.average_decrease_in_loss))
     atol = 0.1
     _, (losses, moving_average_decreases) = self.evaluate(
-        tfp.math.minimize_stateless(
+        minimize_stateless(
             loss_fn,
             init=init_x,
             num_steps=100,
             optimizer=StatelessSGD(0.1),
             convergence_criterion=(
-                tfp.optimizer.convergence_criteria.LossNotDecreasing(
-                    atol=atol)),
+                optimizer.convergence_criteria.LossNotDecreasing(atol=atol)),
             trace_fn=trace_fn,
             return_full_length_trace=False))
     self.assertLess(moving_average_decreases[-1], atol)
@@ -531,33 +533,34 @@ class MinimizeStatelessTests(test_util.TestCase):
     self.assertGreater(losses[0] - losses[1], 1e-4)
 
   def test_jit_compiled_optimization_makes_progress(self):
-    _, losses = self.evaluate(tfp.math.minimize_stateless(
-        loss_fn=lambda x: tf.reduce_sum((x - 2.)**2),
-        init=tf.constant([5., 3.]),
-        num_steps=10,
-        optimizer=StatelessSGD(0.1),
-        jit_compile=True))
+    _, losses = self.evaluate(
+        minimize_stateless(
+            loss_fn=lambda x: tf.reduce_sum((x - 2.)**2),
+            init=tf.constant([5., 3.]),
+            num_steps=10,
+            optimizer=StatelessSGD(0.1),
+            jit_compile=True))
     # Final loss should be lower than initial loss.
     self.assertAllGreater(losses[0], losses[-1])
 
   def test_deterministic_results_with_seed(self):
     stochastic_loss_fn = (
         lambda x, seed: (x - x) + tf.random.stateless_normal([], seed=seed))
-    optimizer = StatelessSGD(1e-3)
+    opt = StatelessSGD(1e-3)
     seed = test_util.test_seed(sampler_type='stateless')
     _, losses1 = self.evaluate(
-        tfp.math.minimize_stateless(
+        minimize_stateless(
             loss_fn=stochastic_loss_fn,
             init=0.,
             num_steps=10,
-            optimizer=optimizer,
+            optimizer=opt,
             seed=seed))
     _, losses2 = self.evaluate(
-        tfp.math.minimize_stateless(
+        minimize_stateless(
             loss_fn=stochastic_loss_fn,
             init=0.,
             num_steps=10,
-            optimizer=optimizer,
+            optimizer=opt,
             seed=seed))
     self.assertAllEqual(losses1, losses2)
     # Make sure we got different samples at each step.

@@ -76,8 +76,8 @@ multi_substrate_py_test(
         ":positive_semidefinite_kernel",
         # absl/testing:parameterized dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
@@ -103,10 +103,12 @@ multi_substrate_py_test(
     srcs = ["changepoint_test.py"],
     jax_size = "medium",
     deps = [
+        ":changepoint",
+        ":exponentiated_quadratic",
+        ":matern",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -117,6 +119,7 @@ multi_substrate_py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -128,10 +131,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["exponentiated_quadratic_test.py"],
     deps = [
+        ":exponentiated_quadratic",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -143,6 +146,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -154,10 +158,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["exp_sin_squared_test.py"],
     deps = [
+        ":exp_sin_squared",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -169,6 +173,7 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math:bessel",
@@ -183,11 +188,12 @@ multi_substrate_py_test(
     jax_size = "medium",
     shard_count = 4,
     deps = [
+        ":matern",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -197,6 +203,7 @@ multi_substrate_py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -208,10 +215,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["parabolic_test.py"],
     deps = [
+        ":parabolic",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -223,7 +230,11 @@ multi_substrate_py_library(
         ":positive_semidefinite_kernel",
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
 )
@@ -233,10 +244,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["rational_quadratic_test.py"],
     deps = [
+        ":rational_quadratic",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -247,6 +258,7 @@ multi_substrate_py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -259,11 +271,12 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["polynomial_test.py"],
     deps = [
+        ":polynomial",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -289,11 +302,13 @@ multi_substrate_py_test(
     srcs = ["schur_complement_test.py"],
     jax_size = "large",
     deps = [
+        ":exponentiated_quadratic",
+        ":schur_complement",
         # absl/testing:parameterized dep,
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -321,10 +336,10 @@ multi_substrate_py_test(
     srcs = ["spectral_mixture_test.py"],
     jax_size = "medium",
     deps = [
+        ":spectral_mixture",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -335,6 +350,7 @@ multi_substrate_py_library(
     deps = [
         ":feature_transformed",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
@@ -347,10 +363,11 @@ multi_substrate_py_test(
     srcs = ["feature_scaled_test.py"],
     jax_size = "medium",
     deps = [
+        ":exponentiated_quadratic",
+        ":feature_scaled",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -372,10 +389,13 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["feature_transformed_test.py"],
     deps = [
+        ":exponentiated_quadratic",
+        ":feature_transformed",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:scale_matvec_diag",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -397,10 +417,11 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["kumaraswamy_transformed_test.py"],
     deps = [
+        ":exponentiated_quadratic",
+        ":kumaraswamy_transformed",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -446,6 +467,8 @@ multi_substrate_py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/internal:parameter_properties",
     ],
 )
 
@@ -453,10 +476,11 @@ multi_substrate_py_test(
     name = "pointwise_exponential_test",
     srcs = ["pointwise_exponential_test.py"],
     deps = [
+        ":matern",
+        ":parabolic",
         ":pointwise_exponential",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -467,6 +491,7 @@ multi_substrate_py_library(
     deps = [
         ":positive_semidefinite_kernel",
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:softplus",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
@@ -481,7 +506,7 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )

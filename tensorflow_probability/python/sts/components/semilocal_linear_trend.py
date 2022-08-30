@@ -16,8 +16,16 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import tanh
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -26,7 +34,8 @@ from tensorflow_probability.python.sts.structural_time_series import Parameter
 from tensorflow_probability.python.sts.structural_time_series import StructuralTimeSeries
 
 
-class SemiLocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+class SemiLocalLinearTrendStateSpaceModel(
+    linear_gaussian_ssm.LinearGaussianStateSpaceModel):
   """State space model for a semi-local linear trend.
 
   A state space model (SSM) posits a set of latent (unobserved) variables that
@@ -189,9 +198,8 @@ class SemiLocalLinearTrendStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
               autoregressive_coef),
           transition_noise=semilocal_linear_trend_transition_noise(
               level_scale, slope_mean, slope_scale, autoregressive_coef),
-          observation_matrix=tf.constant(
-              [[1., 0.]], dtype=dtype),
-          observation_noise=tfd.MultivariateNormalDiag(
+          observation_matrix=tf.constant([[1., 0.]], dtype=dtype),
+          observation_noise=mvn_diag.MultivariateNormalDiag(
               scale_diag=observation_noise_scale[..., tf.newaxis]),
           initial_state_prior=initial_state_prior,
           name=name,
@@ -272,9 +280,7 @@ def semilocal_linear_trend_transition_noise(level_scale,
   bias = tf.stack([tf.zeros_like(broadcast_ones),
                    slope_mean * (1 - autoregressive_coef) * broadcast_ones],
                   axis=-1)
-  return tfd.MultivariateNormalDiag(
-      loc=bias,
-      scale_diag=scale_diag)
+  return mvn_diag.MultivariateNormalDiag(loc=bias, scale_diag=scale_diag)
 
 
 class SemiLocalLinearTrend(StructuralTimeSeries):
@@ -376,23 +382,22 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if level_scale_prior is None:
-        level_scale_prior = tfd.LogNormal(
+        level_scale_prior = lognormal.LogNormal(
             loc=tf.math.log(.01 * observed_stddev), scale=2.)
       if slope_mean_prior is None:
-        slope_mean_prior = tfd.Normal(loc=0.,
-                                      scale=observed_stddev)
+        slope_mean_prior = normal.Normal(loc=0., scale=observed_stddev)
       if slope_scale_prior is None:
-        slope_scale_prior = tfd.LogNormal(
+        slope_scale_prior = lognormal.LogNormal(
             loc=tf.math.log(.01 * observed_stddev), scale=2.)
       if autoregressive_coef_prior is None:
-        autoregressive_coef_prior = tfd.Normal(
+        autoregressive_coef_prior = normal.Normal(
             loc=0., scale=tf.ones_like(observed_initial))
       if initial_level_prior is None:
-        initial_level_prior = tfd.Normal(
+        initial_level_prior = normal.Normal(
             loc=observed_initial,
             scale=tf.abs(observed_initial) + observed_stddev)
       if initial_slope_prior is None:
-        initial_slope_prior = tfd.Normal(loc=0., scale=observed_stddev)
+        initial_slope_prior = normal.Normal(loc=0., scale=observed_stddev)
 
       dtype = dtype_util.common_dtype([level_scale_prior,
                                        slope_scale_prior,
@@ -400,29 +405,30 @@ class SemiLocalLinearTrend(StructuralTimeSeries):
                                        initial_level_prior,
                                        initial_slope_prior])
 
-      self._initial_state_prior = tfd.MultivariateNormalDiag(
-          loc=tf.stack(
-              [initial_level_prior.mean(),
-               initial_slope_prior.mean()
-              ], axis=-1),
-          scale_diag=tf.stack([
-              initial_level_prior.stddev(),
-              initial_slope_prior.stddev()
-          ], axis=-1))
+      self._initial_state_prior = mvn_diag.MultivariateNormalDiag(
+          loc=tf.stack([initial_level_prior.mean(),
+                        initial_slope_prior.mean()],
+                       axis=-1),
+          scale_diag=tf.stack(
+              [initial_level_prior.stddev(),
+               initial_slope_prior.stddev()],
+              axis=-1))
 
       # Constrain the support of the autoregressive coefficient.
       if constrain_ar_coef_stationary and constrain_ar_coef_positive:
-        autoregressive_coef_bijector = tfb.Sigmoid()   # support in (0, 1)
+        autoregressive_coef_bijector = sigmoid.Sigmoid()  # support in (0, 1)
       elif constrain_ar_coef_positive:
-        autoregressive_coef_bijector = tfb.Softplus()  # support in (0, infty)
+        autoregressive_coef_bijector = softplus.Softplus(
+        )  # support in (0, infty)
       elif constrain_ar_coef_stationary:
-        autoregressive_coef_bijector = tfb.Tanh()      # support in (-1, 1)
+        autoregressive_coef_bijector = tanh.Tanh()  # support in (-1, 1)
       else:
-        autoregressive_coef_bijector = tfb.Identity()  # unconstrained
+        autoregressive_coef_bijector = identity.Identity()  # unconstrained
 
-      stddev_preconditioner = tfb.Scale(scale=observed_stddev)
-      scaled_softplus = tfb.Chain([stddev_preconditioner,
-                                   tfb.Softplus(low=dtype_util.eps(dtype))])
+      stddev_preconditioner = scale.Scale(scale=observed_stddev)
+      scaled_softplus = chain.Chain(
+          [stddev_preconditioner,
+           softplus.Softplus(low=dtype_util.eps(dtype))])
       super(SemiLocalLinearTrend, self).__init__(
           parameters=[
               Parameter('level_scale', level_scale_prior, scaled_softplus),

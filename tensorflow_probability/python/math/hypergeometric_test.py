@@ -23,7 +23,7 @@ from scipy import special as scipy_special
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.math import hypergeometric as tfp_math
+from tensorflow_probability.python.math import hypergeometric
 
 
 class Hyp2F1Test(test_util.TestCase):
@@ -55,8 +55,8 @@ class Hyp2F1Test(test_util.TestCase):
         [int(1e4)], seed=seed_stream(),
         minval=z_lower, maxval=z_upper, dtype=dtype)
 
-    hyp2f1, a, b, c, z = self.evaluate([
-        tfp_math.hyp2f1_small_argument(a, b, c, z), a, b, c, z])
+    hyp2f1, a, b, c, z = self.evaluate(
+        [hypergeometric.hyp2f1_small_argument(a, b, c, z), a, b, c, z])
     expected = comparison_hyp2f1(a, b, c, z)
     self.assertAllClose(hyp2f1, expected, rtol=rtol)
 
@@ -74,7 +74,7 @@ class Hyp2F1Test(test_util.TestCase):
     z = tf.zeros(z_shape, dtype=tf.float32)
     broadcast_shape = functools.reduce(
         tf.broadcast_dynamic_shape, [a_shape, b_shape, c_shape, z_shape])
-    hyp2f1 = tfp_math.hyp2f1_small_argument(a, b, c, z)
+    hyp2f1 = hypergeometric.hyp2f1_small_argument(a, b, c, z)
     broadcast_shape = self.evaluate(broadcast_shape)
     self.assertAllEqual(hyp2f1.shape, broadcast_shape)
 
@@ -87,8 +87,8 @@ class Hyp2F1Test(test_util.TestCase):
     b = self.GenParam(-10., 10., dtype, seed_stream())
     # Ensure c > a + b so the evaluation is defined.
     c = a + b + 1.
-    hyp2f1, a, b, c = self.evaluate([
-        tfp_math.hyp2f1_small_argument(a, b, c, dtype(1.)), a, b, c])
+    hyp2f1, a, b, c = self.evaluate(
+        [hypergeometric.hyp2f1_small_argument(a, b, c, dtype(1.)), a, b, c])
     scipy_hyp2f1 = scipy_special.hyp2f1(a, b, c, dtype(1.))
     self.assertAllClose(hyp2f1, scipy_hyp2f1, rtol=rtol)
 
@@ -206,7 +206,7 @@ class Hyp2F1Test(test_util.TestCase):
     c = tf.constant([9.9,], dtype=np.float64)[..., tf.newaxis]
     z = tf.constant([0.1], dtype=np.float64)
     err = self.compute_max_gradient_error(
-        functools.partial(tfp_math.hyp2f1_small_argument, a, b, c), [z])
+        functools.partial(hypergeometric.hyp2f1_small_argument, a, b, c), [z])
     self.assertLess(err, 2e-4)
 
 

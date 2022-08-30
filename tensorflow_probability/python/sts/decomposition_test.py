@@ -19,9 +19,14 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.sts import decomposition
+from tensorflow_probability.python.sts.components import local_linear_trend
+from tensorflow_probability.python.sts.components import seasonal
+from tensorflow_probability.python.sts.components import sum as sum_lib
+from tensorflow_probability.python.sts.forecast import forecast
+from tensorflow_probability.python.sts.internal import missing_values_util
 
 
 tfl = tf.linalg
@@ -42,15 +47,15 @@ class _DecompositionTest(test_util.TestCase):
         rng.randn(*(param_batch_shape + [num_timesteps])))
 
     # Build an STS model with multiple components
-    day_of_week = tfp.sts.Seasonal(
+    day_of_week = seasonal.Seasonal(
         num_seasons=7,
         observed_time_series=observed_time_series,
         name='day_of_week')
-    local_linear_trend = tfp.sts.LocalLinearTrend(
-        observed_time_series=observed_time_series,
-        name='local_linear_trend')
-    model = tfp.sts.Sum(components=[day_of_week, local_linear_trend],
-                        observed_time_series=observed_time_series)
+    llt = local_linear_trend.LocalLinearTrend(
+        observed_time_series=observed_time_series, name='local_linear_trend')
+    model = sum_lib.Sum(
+        components=[day_of_week, llt],
+        observed_time_series=observed_time_series)
 
     # Sample test params from the prior (faster than posterior samples).
     param_samples = [p.prior.sample([num_posterior_draws], seed=seed())
@@ -65,7 +70,7 @@ class _DecompositionTest(test_util.TestCase):
         num_timesteps=num_timesteps,
         param_batch_shape=param_batch_shape)
 
-    component_dists = tfp.sts.decompose_by_component(
+    component_dists = decomposition.decompose_by_component(
         model,
         observed_time_series=observed_time_series,
         parameter_samples=param_samples)
@@ -84,11 +89,10 @@ class _DecompositionTest(test_util.TestCase):
     is_missing = [True, True, False, False, True, False, False, True]
     nans = np.zeros([num_timesteps], dtype=self.dtype)
     nans[is_missing] = np.nan
-    masked_time_series = tfp.sts.MaskedTimeSeries(
-        time_series=observed_time_series + nans,
-        is_missing=is_missing)
+    masked_time_series = missing_values_util.MaskedTimeSeries(
+        time_series=observed_time_series + nans, is_missing=is_missing)
 
-    component_dists = tfp.sts.decompose_by_component(
+    component_dists = decomposition.decompose_by_component(
         model,
         observed_time_series=masked_time_series,
         parameter_samples=param_samples)
@@ -107,12 +111,10 @@ class _DecompositionTest(test_util.TestCase):
         param_batch_shape=param_batch_shape)
 
     num_steps_forecast = 7
-    forecast_dist = tfp.sts.forecast(model, observed_time_series,
-                                     param_samples, num_steps_forecast)
-    component_forecasts = tfp.sts.decompose_forecast_by_component(
-        model,
-        forecast_dist=forecast_dist,
-        parameter_samples=param_samples)
+    forecast_dist = forecast(model, observed_time_series, param_samples,
+                             num_steps_forecast)
+    component_forecasts = decomposition.decompose_forecast_by_component(
+        model, forecast_dist=forecast_dist, parameter_samples=param_samples)
 
     self._check_component_shapes_helper(
         model, component_forecasts,

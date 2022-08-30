@@ -19,9 +19,9 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels import feature_scaled
 
 
 def _numpy_exp_quad(amplitude, length_scale, x, y, feature_ndims):
@@ -48,11 +48,10 @@ class _FeatureScaledTest(test_util.TestCase):
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
     # Use 3 feature_ndims.
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude, inner_length_scale, feature_ndims=3)
     scale_diag = tf.ones([20, 1, 2, 1, 1, 1])
-    ard_kernel = tfp.math.psd_kernels.FeatureScaled(
-        kernel, scale_diag=scale_diag)
+    ard_kernel = feature_scaled.FeatureScaled(kernel, scale_diag=scale_diag)
     self.assertAllEqual([20, 10, 2], ard_kernel.batch_shape)
     self.assertAllEqual(
         [20, 10, 2], self.evaluate(ard_kernel.batch_shape_tensor()))
@@ -69,18 +68,15 @@ class _FeatureScaledTest(test_util.TestCase):
     amplitude = np.random.uniform(
         low=1., high=10., size=[10, 2]).astype(self.dtype)
     inner_length_scale = self.dtype(1.)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude,
-        length_scale=inner_length_scale,
-        feature_ndims=feature_ndims)
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale=inner_length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
     # Batch shape [3, 1, 2].
     length_scale = np.random.uniform(
         2, 5, size=([3, 1, 2] + input_shape)).astype(self.dtype)
 
-    ard_kernel = tfp.math.psd_kernels.FeatureScaled(
-        kernel, scale_diag=length_scale)
+    ard_kernel = feature_scaled.FeatureScaled(kernel, scale_diag=length_scale)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
     y = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
@@ -121,24 +117,19 @@ class _FeatureScaledTest(test_util.TestCase):
         low=1., high=10., size=[10, 2]).astype(self.dtype)
 
     inner_length_scale = self.dtype(1.)
-    kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
-        amplitude,
-        length_scale=inner_length_scale,
-        feature_ndims=feature_ndims)
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale=inner_length_scale, feature_ndims=feature_ndims)
     input_shape = [dims] * feature_ndims
 
     # Batch shape [3, 1, 2].
     inverse_length_scale = np.random.uniform(
         2, 5, size=([3, 1, 2] + input_shape)).astype(self.dtype)
 
-    ard_kernel = tfp.math.psd_kernels.FeatureScaled(
-        kernel,
-        scale_diag=None,
-        inverse_scale_diag=inverse_length_scale)
+    ard_kernel = feature_scaled.FeatureScaled(
+        kernel, scale_diag=None, inverse_scale_diag=inverse_length_scale)
 
-    ard_kernel_ls = tfp.math.psd_kernels.FeatureScaled(
-        kernel,
-        scale_diag=1. / inverse_length_scale)
+    ard_kernel_ls = feature_scaled.FeatureScaled(
+        kernel, scale_diag=1. / inverse_length_scale)
 
     x = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)
     y = np.random.uniform(-1, 1, size=input_shape).astype(self.dtype)

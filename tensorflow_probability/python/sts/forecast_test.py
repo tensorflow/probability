@@ -19,9 +19,13 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.sts import fitting
+from tensorflow_probability.python.sts import forecast
+from tensorflow_probability.python.sts.components import seasonal
+from tensorflow_probability.python.sts.components import sum as sum_lib
+from tensorflow_probability.python.sts.internal import missing_values_util
 
 JAX_MODE = False
 
@@ -32,17 +36,18 @@ class _ForecastTest(object):
                    prior_batch_shape=(),
                    initial_effect_prior_scale=1.,
                    constant_offset=None):
-    seasonal = tfp.sts.Seasonal(
+    model = seasonal.Seasonal(
         num_seasons=4,
         observed_time_series=observed_time_series,
-        initial_effect_prior=tfd.Normal(
+        initial_effect_prior=normal.Normal(
             loc=self._build_tensor(np.zeros(prior_batch_shape)),
             scale=self._build_tensor(initial_effect_prior_scale)),
         constrain_mean_effect_to_zero=False,  # Simplifies analysis.
         name='seasonal')
-    return tfp.sts.Sum(components=[seasonal],
-                       constant_offset=constant_offset,
-                       observed_time_series=observed_time_series)
+    return sum_lib.Sum(
+        components=[model],
+        constant_offset=constant_offset,
+        observed_time_series=observed_time_series)
 
   def test_one_step_predictive_correctness(self):
     observed_time_series_ = np.array([1., -1., -3., 4., 0.5, 2., 1., 3.])
@@ -61,7 +66,7 @@ class _ForecastTest(object):
 
     @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
     def _run():
-      onestep_dist = tfp.sts.one_step_predictive(
+      onestep_dist = forecast.one_step_predictive(
           model,
           observed_time_series,
           timesteps_are_event_shape=False,
@@ -106,7 +111,7 @@ class _ForecastTest(object):
 
     @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
     def _run():
-      d = tfp.sts.one_step_predictive(
+      d = forecast.one_step_predictive(
           model,
           observed_time_series,
           timesteps_are_event_shape=False,
@@ -139,10 +144,12 @@ class _ForecastTest(object):
 
     @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
     def _run():
-      forecast_dist = tfp.sts.forecast(model, observed_time_series,
-                                       parameter_samples=params,
-                                       num_steps_forecast=8,
-                                       include_observation_noise=True)
+      forecast_dist = forecast.forecast(
+          model,
+          observed_time_series,
+          parameter_samples=params,
+          num_steps_forecast=8,
+          include_observation_noise=True)
       return forecast_dist.mean()[..., 0], forecast_dist.stddev()[..., 0]
     forecast_mean, forecast_scale = _run()
 
@@ -165,10 +172,12 @@ class _ForecastTest(object):
     self.assertAllClose(forecast_scale, expected_forecast_scale)
 
     # Also test forecasting the noise-free function.
-    forecast_dist = tfp.sts.forecast(model, observed_time_series,
-                                     parameter_samples=params,
-                                     num_steps_forecast=8,
-                                     include_observation_noise=False)
+    forecast_dist = forecast.forecast(
+        model,
+        observed_time_series,
+        parameter_samples=params,
+        num_steps_forecast=8,
+        include_observation_noise=False)
     forecast_mean = forecast_dist.mean()[..., 0]
     forecast_scale = forecast_dist.stddev()[..., 0]
 
@@ -193,15 +202,18 @@ class _ForecastTest(object):
     observed_time_series = self._build_tensor(np.random.randn(
         *(batch_shape + [num_timesteps])))
     model = self._build_model(observed_time_series)
-    samples, _ = tfp.sts.fit_with_hmc(
-        model, observed_time_series,
+    samples, _ = fitting.fit_with_hmc(
+        model,
+        observed_time_series,
         num_results=num_results,
         num_warmup_steps=2,
         num_variational_steps=2)
 
-    forecast_dist = tfp.sts.forecast(model, observed_time_series,
-                                     parameter_samples=samples,
-                                     num_steps_forecast=num_steps_forecast)
+    forecast_dist = forecast.forecast(
+        model,
+        observed_time_series,
+        parameter_samples=samples,
+        num_steps_forecast=num_steps_forecast)
 
     forecast_mean = forecast_dist.mean()[..., 0]
     forecast_scale = forecast_dist.stddev()[..., 0]
@@ -239,9 +251,11 @@ class _ForecastTest(object):
 
     @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
     def _run():
-      d = tfp.sts.forecast(model, observed_time_series,
-                           parameter_samples=prior_samples,
-                           num_steps_forecast=num_steps_forecast)
+      d = forecast.forecast(
+          model,
+          observed_time_series,
+          parameter_samples=prior_samples,
+          num_steps_forecast=num_steps_forecast)
       d_mean = d.mean()
       # NOTE: `d` is wrapped by `JitPublicMethods`, and thus cannot currently
       # be returned from a `tf.function`-ed function.
@@ -264,7 +278,7 @@ class _ForecastTest(object):
     observed_time_series_ = np.random.randn(num_timesteps)
     is_missing_ = np.random.randn(num_timesteps) > 0
     observed_time_series_[is_missing_] = np.nan
-    observed_time_series = tfp.sts.MaskedTimeSeries(
+    observed_time_series = missing_values_util.MaskedTimeSeries(
         self._build_tensor(observed_time_series_),
         is_missing=self._build_tensor(is_missing_, dtype=np.bool_))
 
@@ -273,9 +287,11 @@ class _ForecastTest(object):
         param.prior.sample(num_param_samples, seed=test_util.test_seed())
         for param in model.parameters]
 
-    forecast_dist = tfp.sts.forecast(model, observed_time_series,
-                                     parameter_samples=prior_samples,
-                                     num_steps_forecast=num_steps_forecast)
+    forecast_dist = forecast.forecast(
+        model,
+        observed_time_series,
+        parameter_samples=prior_samples,
+        num_steps_forecast=num_steps_forecast)
 
     forecast_mean_, forecast_stddev_ = self.evaluate((
         forecast_dist.mean(),
@@ -283,9 +299,8 @@ class _ForecastTest(object):
     self.assertTrue(np.all(np.isfinite(forecast_mean_)))
     self.assertTrue(np.all(np.isfinite(forecast_stddev_)))
 
-    onestep_dist = tfp.sts.one_step_predictive(
-        model, observed_time_series,
-        parameter_samples=prior_samples)
+    onestep_dist = forecast.one_step_predictive(
+        model, observed_time_series, parameter_samples=prior_samples)
     onestep_mean_, onestep_stddev_ = self.evaluate((
         onestep_dist.mean(),
         onestep_dist.stddev()))
@@ -296,7 +311,7 @@ class _ForecastTest(object):
     num_timesteps = 7
     time_series_with_nans = self._build_tensor(
         [-1., 1., np.nan, 2.4, np.nan, np.nan, 2.])
-    observed_time_series = tfp.sts.MaskedTimeSeries(
+    observed_time_series = missing_values_util.MaskedTimeSeries(
         time_series=time_series_with_nans,
         is_missing=tf.math.is_nan(time_series_with_nans))
 
@@ -319,11 +334,15 @@ class _ForecastTest(object):
 
     @tf.function(autograph=False, jit_compile=tf.executing_eagerly())
     def _run():
-      imputed_series_dist = tfp.sts.impute_missing_values(
-          model, observed_time_series, parameter_samples,
+      imputed_series_dist = forecast.impute_missing_values(
+          model,
+          observed_time_series,
+          parameter_samples,
           timesteps_are_event_shape=False)
-      imputed_noisy_series_dist = tfp.sts.impute_missing_values(
-          model, observed_time_series, parameter_samples,
+      imputed_noisy_series_dist = forecast.impute_missing_values(
+          model,
+          observed_time_series,
+          parameter_samples,
           timesteps_are_event_shape=False,
           include_observation_noise=True)
       mean, stddev = imputed_series_dist.mean(), imputed_series_dist.stddev()

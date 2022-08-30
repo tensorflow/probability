@@ -18,13 +18,20 @@
 
 import pandas as pd
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.optimizer.convergence_criteria import successive_gradients_are_uncorrelated
 from tensorflow_probability.python.sts import default_model
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.sts import fitting
+from tensorflow_probability.python.sts import regularization
+from tensorflow_probability.python.sts.components import local_linear_trend
+from tensorflow_probability.python.sts.components import seasonal
+from tensorflow_probability.python.sts.components import semilocal_linear_trend
+from tensorflow_probability.python.sts.components import sum as sum_lib
+from tensorflow_probability.python.sts.forecast import forecast
+from tensorflow_probability.python.vi import optimization
 
 
 class DefaultModelTests(test_util.TestCase):
@@ -48,22 +55,23 @@ class DefaultModelTests(test_util.TestCase):
     model = default_model.build_default_model(
         self._build_test_series(shape=[168 * 2], freq=pd.DateOffset(hours=1)))
 
-    self.assertIsInstance(model, tfp.sts.Sum)
+    self.assertIsInstance(model, sum_lib.Sum)
     self.assertLen(model.components, 3)
-    self.assertIsInstance(model.components[0], tfp.sts.LocalLinearTrend)
-    self.assertIsInstance(model.components[1], tfp.sts.Seasonal)
+    self.assertIsInstance(model.components[0],
+                          local_linear_trend.LocalLinearTrend)
+    self.assertIsInstance(model.components[1], seasonal.Seasonal)
     self.assertContainsSubsequence(model.components[1].name, 'HOUR_OF_DAY')
-    self.assertIsInstance(model.components[2], tfp.sts.Seasonal)
+    self.assertIsInstance(model.components[2], seasonal.Seasonal)
     self.assertContainsSubsequence(model.components[2].name, 'DAY_OF_WEEK')
 
   def test_explicit_base_component(self):
     series = self._build_test_series(shape=[48], freq=pd.DateOffset(hours=1))
     model = default_model.build_default_model(
         series,
-        base_component=tfp.sts.SemiLocalLinearTrend(
-            level_scale_prior=tfd.Exponential(5.),
-            slope_scale_prior=tfd.Exponential(0.1),
-            slope_mean_prior=tfd.Normal(0., 100.),
+        base_component=semilocal_linear_trend.SemiLocalLinearTrend(
+            level_scale_prior=exponential.Exponential(5.),
+            slope_scale_prior=exponential.Exponential(0.1),
+            slope_mean_prior=normal.Normal(0., 100.),
             constrain_ar_coef_positive=True,
             constrain_ar_coef_stationary=True,
             observed_time_series=series))
@@ -90,7 +98,7 @@ class DefaultModelTests(test_util.TestCase):
                               '2020-01-05', '2020-01-06', '2020-01-07',
                               '2020-01-10', '2020-01-11', '2020-01-12',
                               '2020-01-13', '2020-01-14']))
-    series = tfp.sts.regularize_series(series)
+    series = regularization.regularize_series(series)
     self.assertLen(series, 14)
 
     # Default model captures day-of-week effects with a LocalLinearTrend
@@ -99,23 +107,24 @@ class DefaultModelTests(test_util.TestCase):
     self.assertLen(model.components, 2)
 
     # Fit the model using variational inference.
-    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(model)
-    _ = tfp.vi.fit_surrogate_posterior(
+    surrogate_posterior = fitting.build_factored_surrogate_posterior(model)
+    _ = optimization.fit_surrogate_posterior(
         target_log_prob_fn=model.joint_distribution(series).log_prob,
         surrogate_posterior=surrogate_posterior,
         optimizer=tf.optimizers.Adam(0.1),
         num_steps=1000,
-        convergence_criterion=(tfp.optimizer.convergence_criteria.
-                               SuccessiveGradientsAreUncorrelated(
+        convergence_criterion=(successive_gradients_are_uncorrelated
+                               .SuccessiveGradientsAreUncorrelated(
                                    window_size=15, min_num_steps=50)),
         jit_compile=True)
 
     # Forecast the next week.
     parameter_samples = surrogate_posterior.sample(50)
-    forecast_dist = tfp.sts.forecast(model,
-                                     observed_time_series=series,
-                                     parameter_samples=parameter_samples,
-                                     num_steps_forecast=7)
+    forecast_dist = forecast(
+        model,
+        observed_time_series=series,
+        parameter_samples=parameter_samples,
+        num_steps_forecast=7)
     # Strip trailing unit dimension from LinearGaussianStateSpaceModel events.
     self.evaluate(
         [v.initializer for v in surrogate_posterior.trainable_variables])

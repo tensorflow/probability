@@ -21,9 +21,8 @@ from absl.testing import parameterized
 import numpy as np
 import pandas as pd
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.sts import regularization
 
 
 _TRUTH_REGULARIZE_2SEC = pd.DataFrame([0., 1., 2., np.nan, 3.],
@@ -93,7 +92,7 @@ class RegularizationTest(test_util.TestCase):
     dt_idx = pd.to_datetime(datetimes)
     test_series = pd.DataFrame(np.arange(len(dt_idx)), index=dt_idx,
                                columns=['value']).sort_index()
-    regularized_series = tfp.sts.regularize_series(test_series)
+    regularized_series = regularization.regularize_series(test_series)
     self.assertTrue(regularized_series.equals(expected))
 
   @parameterized.named_parameters(
@@ -114,7 +113,7 @@ class RegularizationTest(test_util.TestCase):
     test_series_with_missing_points = pd.concat([
         test_series_no_freq.iloc[:2],
         test_series_no_freq.iloc[5:]], axis=0)
-    regularized_series = tfp.sts.regularize_series(
+    regularized_series = regularization.regularize_series(
         test_series_with_missing_points)
     # Check that the inferred frequency produces the same dates as the true
     # frequency. We avoid checking the inferred frequency directly in order
@@ -131,9 +130,8 @@ class RegularizationTest(test_util.TestCase):
     ])
     test_series = pd.DataFrame(
         np.arange(4), index=dt_idx, columns=['value']).sort_index()
-    regularized_data = tfp.sts.regularize_series(
-        test_series,
-        frequency=pd.DateOffset(seconds=2))
+    regularized_data = regularization.regularize_series(
+        test_series, frequency=pd.DateOffset(seconds=2))
     self.assertEqual(regularized_data.index.freq, pd.DateOffset(seconds=2))
 
   def test_values_at_duplicate_indices_are_summed(self):
@@ -146,7 +144,7 @@ class RegularizationTest(test_util.TestCase):
                               '2014-01-03',
                               '2014-01-04']),
         columns=['value'])
-    regularized_data = tfp.sts.regularize_series(test_series)
+    regularized_data = regularization.regularize_series(test_series)
     self.assertLen(regularized_data.values, 4)
     self.assertEqual(regularized_data.values[0, 0], 1)
     self.assertEqual(regularized_data.values[1, 0], 5)
@@ -172,7 +170,7 @@ class RegularizationTest(test_util.TestCase):
        ValueError))
   def test_check_data(self, test_data, exception_type):
     with self.assertRaises(exception_type):
-      tfp.sts.regularize_series(test_data)
+      regularization.regularize_series(test_data)
 
   def test_regularized_series_max_length(self):
     test_data = pd.DataFrame(
@@ -184,7 +182,7 @@ class RegularizationTest(test_util.TestCase):
         )
     with self.assertRaisesRegex(ValueError,
                                 'would exceed the maximum series length'):
-      tfp.sts.regularize_series(test_data, max_series_length=50000)
+      regularization.regularize_series(test_data, max_series_length=50000)
 
   def test_accepts_series(self):
     test_data = pd.Series(
@@ -192,7 +190,7 @@ class RegularizationTest(test_util.TestCase):
         index=pd.to_datetime(['2014-01-01',
                               '2014-01-02',
                               '2014-01-04']))
-    regularized_series = tfp.sts.regularize_series(test_data)
+    regularized_series = regularization.regularize_series(test_data)
     self.assertIsInstance(regularized_series, pd.Series)
     self.assertLen(regularized_series, 4)
 
@@ -201,7 +199,7 @@ class RegularizationTest(test_util.TestCase):
         [[1., 7.], [2., 8.], [4., 10.]],
         columns=['series1', 'series2'],
         index=pd.to_datetime(['2014-01-01', '2014-01-02', '2014-01-04']))
-    regularized_series = tfp.sts.regularize_series(test_data)
+    regularized_series = regularization.regularize_series(test_data)
     self.assertIsInstance(regularized_series, pd.DataFrame)
     self.assertAllEqual(regularized_series.shape, [4, 2])
     self.assertAllEqual(regularized_series.index,

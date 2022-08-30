@@ -16,8 +16,14 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import tanh
+from tensorflow_probability.python.distributions import linear_gaussian_ssm as lgssm
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 
@@ -37,11 +43,10 @@ __all__ = [
 def _pad_mvn_with_trailing_zeros(mvn, num_zeros):
   zeros = tf.zeros([num_zeros], dtype=mvn.dtype)
   return sts_util.factored_joint_mvn(
-      [mvn,
-       tfd.MultivariateNormalDiag(loc=zeros, scale_diag=zeros)])
+      [mvn, mvn_diag.MultivariateNormalDiag(loc=zeros, scale_diag=zeros)])
 
 
-class IntegratedStateSpaceModel(tfd.LinearGaussianStateSpaceModel):
+class IntegratedStateSpaceModel(lgssm.LinearGaussianStateSpaceModel):
   """Integrates (/cumsums) a noise-free state space model.
 
   The integrated model represents the cumulative sum of sequences sampled from
@@ -263,14 +268,14 @@ class AutoregressiveIntegratedMovingAverage(StructuralTimeSeries):
       # Heuristic default priors. Overriding these may dramatically
       # change inference performance and results.
       if ar_coefficients_prior is None:
-        ar_coefficients_prior = tfd.MultivariateNormalDiag(
+        ar_coefficients_prior = mvn_diag.MultivariateNormalDiag(
             scale_diag=batch_ones * ps.ones([ar_order]))
       if ma_coefficients_prior is None:
-        ma_coefficients_prior = tfd.MultivariateNormalDiag(
+        ma_coefficients_prior = mvn_diag.MultivariateNormalDiag(
             scale_diag=batch_ones * ps.ones([ma_order]))
       if level_scale_prior is None:
-        level_scale_prior = tfd.LogNormal(
-            loc=tf.math.log(0.05 *  observed_stddev), scale=3.)
+        level_scale_prior = lognormal.LogNormal(
+            loc=tf.math.log(0.05 * observed_stddev), scale=3.)
 
       if (ar_coefficients_prior.event_shape.is_fully_defined() and
           ar_order != ar_coefficients_prior.event_shape[0]):
@@ -285,13 +290,13 @@ class AutoregressiveIntegratedMovingAverage(StructuralTimeSeries):
 
       latent_size = ps.maximum(ar_order, ma_order + 1) + integration_degree
       if initial_state_prior is None:
-        initial_state_prior = tfd.MultivariateNormalDiag(
+        initial_state_prior = mvn_diag.MultivariateNormalDiag(
             loc=sts_util.pad_tensor_with_trailing_zeros(
                 observed_initial[..., tf.newaxis] * batch_ones,
                 num_zeros=latent_size - 1),
             scale_diag=sts_util.pad_tensor_with_trailing_zeros(
-                (tf.abs(observed_initial) +
-                 observed_stddev)[..., tf.newaxis] * batch_ones,
+                (tf.abs(observed_initial) + observed_stddev)[..., tf.newaxis] *
+                batch_ones,
                 num_zeros=latent_size - 1))
 
       self._ar_order = ar_order
@@ -305,32 +310,32 @@ class AutoregressiveIntegratedMovingAverage(StructuralTimeSeries):
       parameters = []
       if ar_order > 0:
         parameters.append(
-            Parameter('ar_coefficients',
-                      ar_coefficients_prior,
-                      (ar_coefficient_constraining_bijector
-                       if ar_coefficient_constraining_bijector
-                       else tfb.Tanh())))
+            Parameter('ar_coefficients', ar_coefficients_prior,
+                      (ar_coefficient_constraining_bijector if
+                       ar_coefficient_constraining_bijector else tanh.Tanh())))
       if ma_order > 0:
         parameters.append(
-            Parameter('ma_coefficients',
-                      ma_coefficients_prior,
+            Parameter('ma_coefficients', ma_coefficients_prior,
                       (ma_coefficient_constraining_bijector
-                       if ma_coefficient_constraining_bijector
-                       else tfb.Identity())))
+                       if ma_coefficient_constraining_bijector else
+                       identity.Identity())))
       if level_drift_prior is not None:
         parameters.append(
             Parameter(
-                'level_drift',
-                level_drift_prior,
-                tfb.Chain([
-                    tfb.Scale(scale=observed_stddev),
-                    (level_drift_prior.
-                     experimental_default_event_space_bijector())])))
+                'level_drift', level_drift_prior,
+                chain.Chain([
+                    scale.Scale(scale=observed_stddev),
+                    (level_drift_prior
+                     .experimental_default_event_space_bijector())
+                ])))
       super(AutoregressiveIntegratedMovingAverage, self).__init__(
           parameters=parameters + [
-              Parameter('level_scale', level_scale_prior,
-                        tfb.Chain([tfb.Scale(scale=observed_stddev),
-                                   tfb.Softplus(low=dtype_util.eps(dtype))]))
+              Parameter(
+                  'level_scale', level_scale_prior,
+                  chain.Chain([
+                      scale.Scale(scale=observed_stddev),
+                      softplus.Softplus(low=dtype_util.eps(dtype))
+                  ]))
           ],
           latent_size=latent_size,
           init_parameters=init_parameters,
@@ -358,11 +363,11 @@ class AutoregressiveIntegratedMovingAverage(StructuralTimeSeries):
       if integration_steps_remaining == 0:
         return initial_state_prior
       dtype = initial_state_prior.dtype
-      return tfd.MultivariateNormalDiag(
-          loc=tf.zeros(
-              [self.latent_size - integration_steps_remaining], dtype=dtype),
-          scale_diag=tf.ones(
-              [self.latent_size - integration_steps_remaining], dtype=dtype))
+      return mvn_diag.MultivariateNormalDiag(
+          loc=tf.zeros([self.latent_size - integration_steps_remaining],
+                       dtype=dtype),
+          scale_diag=tf.ones([self.latent_size - integration_steps_remaining],
+                             dtype=dtype))
 
     arma_kwargs = dict(linear_gaussian_ssm_kwargs,
                        **(param_map if param_map else {}))

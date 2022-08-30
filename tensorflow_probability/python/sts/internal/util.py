@@ -19,7 +19,10 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions.mvn_linear_operator import MultivariateNormalLinearOperator
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps
@@ -187,12 +190,13 @@ def sum_mvns(distributions):
   """
 
   with tf.name_scope('sum_mvns'):
-    if all([isinstance(mvn, tfd.MultivariateNormalDiag)
-            for mvn in distributions]):
-      return tfd.MultivariateNormalDiag(
+    if all([
+        isinstance(mvn, mvn_diag.MultivariateNormalDiag)
+        for mvn in distributions
+    ]):
+      return mvn_diag.MultivariateNormalDiag(
           loc=sum([mvn.mean() for mvn in distributions]),
-          scale_diag=tf.sqrt(sum([
-              mvn.scale.diag**2 for mvn in distributions])))
+          scale_diag=tf.sqrt(sum([mvn.scale.diag**2 for mvn in distributions])))
     else:
       raise NotImplementedError(
           'Sums of distributions other than MultivariateNormalDiag are not '
@@ -401,12 +405,12 @@ def mix_over_posterior_draws(means, variances):
   with tf.name_scope('mix_over_posterior_draws'):
     num_posterior_draws = ps.shape(means)[0]
 
-    component_observations = tfd.Normal(
+    component_observations = normal.Normal(
         loc=dist_util.move_dimension(means, 0, -1),
         scale=tf.sqrt(dist_util.move_dimension(variances, 0, -1)))
 
-    return tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
+    return mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(
             logits=tf.zeros([num_posterior_draws],
                             dtype=component_observations.dtype)),
         components_distribution=component_observations)

@@ -78,10 +78,11 @@ multi_substrate_py_test(
     srcs = ["bessel_test.py"],
     shard_count = 7,
     deps = [
+        ":bessel",
+        ":gradient",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -103,9 +104,10 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["custom_gradient_test.py"],
     deps = [
+        "gradient",
+        ":custom_gradient",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -127,9 +129,9 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["gram_schmidt_test.py"],
     deps = [
+        ":gram_schmidt",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
     ],
@@ -157,10 +159,15 @@ multi_substrate_py_test(
     srcs = ["generic_test.py"],
     shard_count = 3,
     deps = [
+        ":generic",
+        ":gradient",
+        ":linalg",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:mixture_same_family",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:distribute_test_lib",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -183,9 +190,11 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["gradient_test.py"],
     deps = [
+        ":gradient",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:kullback_leibler",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -214,7 +223,6 @@ multi_substrate_py_test(
         # mpmath dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/math:hypergeometric",
     ],
@@ -237,8 +245,8 @@ multi_substrate_py_test(
     name = "integration_test",
     srcs = ["integration_test.py"],
     deps = [
+        ":integration",
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:test_util",
         # tensorflow/compiler/jit dep,
@@ -265,6 +273,8 @@ multi_substrate_py_test(
     srcs = ["interpolation_test.py"],
     jax_size = "medium",
     deps = [
+        ":gradient",
+        ":interpolation",
         # numpy dep,
         # scipy dep,
         # tensorflow dep,
@@ -298,14 +308,20 @@ multi_substrate_py_test(
     shard_count = 5,
     tags = ["hypothesis"],
     deps = [
+        ":gradient",
+        ":linalg",
+        ":math",
         # absl/testing:parameterized dep,
         # hypothesis dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:exp",
+        "//tensorflow_probability/python/bijectors:fill_scale_tril",
+        "//tensorflow_probability/python/experimental/linalg",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensorshape_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:matern",
     ],
 )
 
@@ -315,9 +331,9 @@ multi_substrate_py_library(
         "minimize.py",
     ],
     deps = [
+        ":gradient",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/internal:assert_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:loop_util",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -330,11 +346,13 @@ multi_substrate_py_test(
     srcs = ["minimize_test.py"],
     numpy_tags = ["notap"],
     deps = [
+        ":minimize",
         # numpy dep,
         # optax dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/optimizer",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
@@ -358,10 +376,11 @@ multi_substrate_py_test(
         "numeric_test.py",
     ],
     deps = [
+        ":gradient",
+        ":numeric",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -382,11 +401,12 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["diag_jacobian_test.py"],
     jax_size = "medium",
-    numpy_tags = ["notap"],
     deps = [
+        ":diag_jacobian",
+        ":gradient",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_tril",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -409,9 +429,12 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["root_search_test.py"],
     deps = [
+        ":root_search",
         # scipy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/internal:distribution_util",
+        "//tensorflow_probability/python/internal:samplers",
+        "//tensorflow_probability/python/internal:special_math",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -432,9 +455,9 @@ py_test(
     size = "small",
     srcs = ["sparse_test.py"],
     deps = [
+        ":sparse",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -455,9 +478,11 @@ multi_substrate_py_test(
     srcs = ["scan_associative_test.py"],
     shard_count = 4,
     deps = [
+        ":gradient",
         ":scan_associative",
         # numpy dep,
-        "//tensorflow_probability",
+        # tensorflow dep,
+        "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
@@ -483,11 +508,15 @@ multi_substrate_py_test(
     srcs = ["special_test.py"],
     shard_count = 10,
     deps = [
+        ":gradient",
+        ":special",
         # absl/testing:parameterized dep,
         # mpmath dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:half_cauchy",
+        "//tensorflow_probability/python/distributions:half_normal",
+        "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

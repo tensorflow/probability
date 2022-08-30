@@ -62,9 +62,17 @@ import six
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import sts
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import square
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import distribution
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import inverse_gamma
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_linear_operator
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
 from tensorflow_probability.python.experimental import distributions as tfde
 from tensorflow_probability.python.experimental.sts_gibbs import dynamic_spike_and_slab
@@ -72,8 +80,12 @@ from tensorflow_probability.python.experimental.sts_gibbs import spike_and_slab
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import samplers
-from tensorflow_probability.python.sts import components as sts_components
+from tensorflow_probability.python.sts.components import local_level
+from tensorflow_probability.python.sts.components import local_linear_trend
+from tensorflow_probability.python.sts.components import regression
+from tensorflow_probability.python.sts.components import sum as sum_lib
 from tensorflow_probability.python.sts.internal import util as sts_util
 
 JAX_MODE = False
@@ -97,21 +109,21 @@ GibbsSamplerState.__new__.__defaults__ = (
 
 
 # TODO(b/151571025): revert to `tfd.InverseGamma` once its sampler is XLA-able.
-class XLACompilableInverseGamma(tfd.InverseGamma):
+class XLACompilableInverseGamma(inverse_gamma.InverseGamma):
 
   def _sample_n(self, n, seed=None):
-    return 1. / tfd.Gamma(
+    return 1. / gamma.Gamma(
         concentration=self.concentration, rate=self.scale).sample(
             n, seed=seed)
 
 
-class DummySpikeAndSlabPrior(tfd.Distribution):
+class DummySpikeAndSlabPrior(distribution.Distribution):
   """Dummy prior on sparse regression weights."""
 
   def __init__(self, dtype=tf.float32):
     super().__init__(
         dtype=dtype,
-        reparameterization_type=tfd.FULLY_REPARAMETERIZED,
+        reparameterization_type=reparameterization.FULLY_REPARAMETERIZED,
         validate_args=False,
         allow_nan_stats=True,
         name='dummy_spike_and_slab_prior')
@@ -128,10 +140,10 @@ class DummySpikeAndSlabPrior(tfd.Distribution):
     return []
 
   def _default_event_space_bijector(self):
-    return tfb.Identity()
+    return identity.Identity()
 
 
-class SpikeAndSlabSparseLinearRegression(sts_components.LinearRegression):
+class SpikeAndSlabSparseLinearRegression(regression.LinearRegression):
   """Dummy component for sparse regression with a spike-and-slab prior."""
 
   def __init__(self,
@@ -160,15 +172,16 @@ class SpikeAndSlabSparseLinearRegression(sts_components.LinearRegression):
 
 
 def _tile_normal_to_mvn_diag(normal_dist, dim):
-  return tfd.MultivariateNormalDiag(
+  return mvn_diag.MultivariateNormalDiag(
       loc=normal_dist.loc[..., tf.newaxis],
       scale_diag=(normal_dist.scale[..., tf.newaxis] *
                   tf.ones([dim], dtype=normal_dist.scale.dtype)))
 
 
 def _is_multivariate_normal(dist):
-  return (isinstance(dist, tfd.MultivariateNormalLinearOperator) or isinstance(
-      dist, tfde.MultivariateNormalPrecisionFactorLinearOperator))
+  return (
+      isinstance(dist, mvn_linear_operator.MultivariateNormalLinearOperator) or
+      isinstance(dist, tfde.MultivariateNormalPrecisionFactorLinearOperator))
 
 
 def build_model_for_gibbs_fitting(observed_time_series,
@@ -244,7 +257,7 @@ def build_model_for_gibbs_fitting(observed_time_series,
           'Design matrix is None thus weights_prior should not be defined, '
           'as it will not be used.')
 
-  if isinstance(weights_prior, tfd.Normal):
+  if isinstance(weights_prior, normal.Normal):
     # Canonicalize scalar normal priors as diagonal MVNs.
     # design_matrix must be defined, otherwise we threw an exception earlier.
     if isinstance(design_matrix, tf.linalg.LinearOperator):
@@ -254,25 +267,27 @@ def build_model_for_gibbs_fitting(observed_time_series,
     weights_prior = _tile_normal_to_mvn_diag(weights_prior, num_features)
   elif weights_prior is not None and not _is_multivariate_normal(weights_prior):
     raise ValueError('Weights prior must be a normal distribution or `None`.')
-  if not isinstance(level_variance_prior, tfd.InverseGamma):
+  if not isinstance(level_variance_prior, inverse_gamma.InverseGamma):
     raise ValueError(
         'Level variance prior must be an inverse gamma distribution.')
   if (slope_variance_prior is not None and
-      not isinstance(slope_variance_prior, tfd.InverseGamma)):
+      not isinstance(slope_variance_prior, inverse_gamma.InverseGamma)):
     raise ValueError(
         'Slope variance prior must be an inverse gamma distribution; got: {}.'
         .format(slope_variance_prior))
-  if not isinstance(observation_noise_variance_prior, tfd.InverseGamma):
+  if not isinstance(observation_noise_variance_prior,
+                    inverse_gamma.InverseGamma):
     raise ValueError('Observation noise variance prior must be an inverse '
                      'gamma distribution.')
 
-  sqrt = tfb.Invert(tfb.Square())  # Converts variance priors to scale priors.
+  sqrt = invert.Invert(
+      square.Square())  # Converts variance priors to scale priors.
   components = []
 
   # Level or trend component.
   if slope_variance_prior:
     components.append(
-        sts.LocalLinearTrend(
+        local_linear_trend.LocalLinearTrend(
             observed_time_series=observed_time_series,
             level_scale_prior=sqrt(level_variance_prior),
             slope_scale_prior=sqrt(slope_variance_prior),
@@ -280,7 +295,7 @@ def build_model_for_gibbs_fitting(observed_time_series,
             name='local_linear_trend'))
   else:
     components.append(
-        sts.LocalLevel(
+        local_level.LocalLevel(
             observed_time_series=observed_time_series,
             level_scale_prior=sqrt(level_variance_prior),
             initial_level_prior=initial_level_prior,
@@ -298,11 +313,11 @@ def build_model_for_gibbs_fitting(observed_time_series,
             name='sparse_regression'))
   else:
     components.append(
-        sts.LinearRegression(
+        regression.LinearRegression(
             design_matrix=design_matrix,
             weights_prior=weights_prior,
             name='regression'))
-  model = sts.Sum(
+  model = sum_lib.Sum(
       components,
       observed_time_series=observed_time_series,
       observation_noise_scale_prior=sqrt(observation_noise_variance_prior),
@@ -404,7 +419,7 @@ def fit_with_gibbs_sampling(model,
   # the slope_scale is always zero.
   initial_slope_scale = 0.
   initial_slope = 0.
-  if isinstance(model.components[0], sts.LocalLinearTrend):
+  if isinstance(model.components[0], local_linear_trend.LocalLinearTrend):
     initial_slope_scale = 1. * tf.ones(batch_shape, dtype=dtype)
     initial_slope = tf.zeros(level_slope_shape, dtype=dtype)
 
@@ -465,7 +480,7 @@ def model_parameter_samples_from_gibbs_samples(model, gibbs_samples):
                      'for Gibbs sampling must be created using the '
                      'method `build_model_for_gibbs_fitting`.')
 
-  if isinstance(model.components[0], sts.LocalLinearTrend):
+  if isinstance(model.components[0], local_linear_trend.LocalLinearTrend):
     return (gibbs_samples.observation_noise_scale, gibbs_samples.level_scale,
             gibbs_samples.slope_scale, gibbs_samples.weights)
   else:
@@ -618,10 +633,10 @@ def one_step_predictive(model,
               variance_from_level + variance_from_slope))
 
   num_posterior_draws = prefer_static.shape(y_mean)[0]
-  return tfd.MixtureSameFamily(
-      mixture_distribution=tfd.Categorical(
+  return mixture_same_family.MixtureSameFamily(
+      mixture_distribution=categorical.Categorical(
           logits=tf.zeros([num_posterior_draws], dtype=y_mean.dtype)),
-      components_distribution=tfd.Normal(
+      components_distribution=normal.Normal(
           loc=dist_util.move_dimension(y_mean, 0, -1),
           scale=dist_util.move_dimension(y_scale, 0, -1)))
 
@@ -718,13 +733,13 @@ def _resample_latents(observed_residuals,
 
   num_timesteps = prefer_static.shape(observed_residuals)[-1]
   if slope_scale is None:
-    ssm = sts.LocalLevelStateSpaceModel(
+    ssm = local_level.LocalLevelStateSpaceModel(
         num_timesteps=num_timesteps,
         initial_state_prior=initial_state_prior,
         observation_noise_scale=observation_noise_scale,
         level_scale=level_scale)
   else:
-    ssm = sts.LocalLinearTrendStateSpaceModel(
+    ssm = local_linear_trend.LocalLinearTrendStateSpaceModel(
         num_timesteps=num_timesteps,
         initial_state_prior=initial_state_prior,
         observation_noise_scale=observation_noise_scale,
@@ -821,19 +836,21 @@ def _build_sampler_loop_body(model,
   if JAX_MODE and experimental_use_dynamic_cholesky:
     raise ValueError('Dynamic Cholesky decomposition not supported in JAX')
   level_component = model.components[0]
-  if not (isinstance(level_component, sts.LocalLevel) or
-          isinstance(level_component, sts.LocalLinearTrend)):
-    raise ValueError('Expected the first model component to be an instance of '
-                     '`tfp.sts.LocalLevel` or `tfp.sts.LocalLinearTrend`; '
-                     'instead saw {}'.format(level_component))
-  model_has_slope = isinstance(level_component, sts.LocalLinearTrend)
+  if not (isinstance(level_component, local_level.LocalLevel) or
+          isinstance(level_component, local_linear_trend.LocalLinearTrend)):
+    raise ValueError(
+        'Expected the first model component to be an instance of '
+        '`tfp.sts.LocalLevel` or `tfp.local_linear_trend.LocalLinearTrend`; '
+        'instead saw {}'.format(level_component))
+  model_has_slope = isinstance(level_component,
+                               local_linear_trend.LocalLinearTrend)
 
   # TODO(kloveless): When we add support for more flexible models, remove
   # this assumption.
   regression_component = (None if len(model.components) != 2 else
                           model.components[1])
   if regression_component:
-    if not (isinstance(regression_component, sts.LinearRegression) or
+    if not (isinstance(regression_component, regression.LinearRegression) or
             isinstance(regression_component,
                        SpikeAndSlabSparseLinearRegression)):
       raise ValueError(

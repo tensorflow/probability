@@ -103,6 +103,7 @@ multi_substrate_py_library(
     name = "optimization",
     srcs = ["optimization.py"],
     deps = [
+        ":csiszar_divergence",
         # numpy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/distributions",

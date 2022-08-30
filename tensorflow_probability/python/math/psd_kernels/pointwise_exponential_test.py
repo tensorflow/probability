@@ -16,16 +16,18 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import matern
+from tensorflow_probability.python.math.psd_kernels import parabolic
+from tensorflow_probability.python.math.psd_kernels import pointwise_exponential
 
 
 @test_util.test_all_tf_execution_regimes
 class PointwiseExponentialTest(test_util.TestCase):
 
   def testValuesAreCorrect(self):
-    original_kernel = tfp.math.psd_kernels.Parabolic()
-    exponential_kernel = tfp.math.psd_kernels.PointwiseExponential(
+    original_kernel = parabolic.Parabolic()
+    exponential_kernel = pointwise_exponential.PointwiseExponential(
         original_kernel)
     x1 = [[1.0]]
     x2 = [[2.0]]
@@ -39,9 +41,9 @@ class PointwiseExponentialTest(test_util.TestCase):
   def testBatchShape(self):
     amplitude = np.random.uniform(2, 3., size=[3, 1, 2]).astype(np.float32)
     length_scale = np.random.uniform(2, 3., size=[1, 3, 1]).astype(np.float32)
-    original_kernel = tfp.math.psd_kernels.GeneralizedMatern(
+    original_kernel = matern.GeneralizedMatern(
         df=np.pi, amplitude=amplitude, length_scale=length_scale)
-    exponential_kernel = tfp.math.psd_kernels.PointwiseExponential(
+    exponential_kernel = pointwise_exponential.PointwiseExponential(
         original_kernel)
     self.assertAllEqual(original_kernel.batch_shape,
                         exponential_kernel.batch_shape)

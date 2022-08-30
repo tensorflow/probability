@@ -19,9 +19,9 @@ from absl import flags
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.ode import bdf
 
 flags.DEFINE_string('test_device', None,
                     'TensorFlow device on which to place operators under test')
@@ -45,7 +45,7 @@ def linear(solver, jacobian_diag_part, initial_state):
   return results.times, results.states
 
 
-@parameterized.named_parameters([('bdf', tfp.math.ode.BDF)])
+@parameterized.named_parameters([('bdf', bdf.BDF)])
 class XLATest(test_util.TestCase):
 
   def test_linear(self, solver):

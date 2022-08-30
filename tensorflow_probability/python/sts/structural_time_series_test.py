@@ -17,8 +17,11 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import laplace
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
@@ -28,6 +31,7 @@ from tensorflow_probability.python.sts import DynamicLinearRegression
 from tensorflow_probability.python.sts import LinearRegression
 from tensorflow_probability.python.sts import LocalLevel
 from tensorflow_probability.python.sts import LocalLinearTrend
+from tensorflow_probability.python.sts import MaskedTimeSeries
 from tensorflow_probability.python.sts import Seasonal
 from tensorflow_probability.python.sts import SemiLocalLinearTrend
 from tensorflow_probability.python.sts import SmoothSeasonal
@@ -51,12 +55,12 @@ class _StructuralTimeSeriesTests(object):
     full_batch_loc = self._build_placeholder(
         np.random.randn(*batch_shape))
 
-    partial_scale_prior = tfd.LogNormal(
+    partial_scale_prior = lognormal.LogNormal(
         loc=partial_batch_loc, scale=tf.ones_like(partial_batch_loc))
-    full_scale_prior = tfd.LogNormal(
+    full_scale_prior = lognormal.LogNormal(
         loc=full_batch_loc, scale=tf.ones_like(full_batch_loc))
-    loc_prior = tfd.Normal(loc=partial_batch_loc,
-                           scale=tf.ones_like(partial_batch_loc))
+    loc_prior = normal.Normal(
+        loc=partial_batch_loc, scale=tf.ones_like(partial_batch_loc))
 
     linear_trend = LocalLinearTrend(level_scale_prior=full_scale_prior,
                                     slope_scale_prior=full_scale_prior,
@@ -83,22 +87,22 @@ class _StructuralTimeSeriesTests(object):
                         expected_broadcast_batch_shape)
 
   def test_addition_raises_error_with_no_observed_time_series(self):
-    c1 = tfp.sts.LocalLevel(level_scale_prior=tfd.Normal(0., 1.),
-                            initial_level_prior=tfd.Normal(0., 1.))
-    c2 = tfp.sts.LocalLevel(level_scale_prior=tfd.Normal(0., 0.1),
-                            initial_level_prior=tfd.Normal(1., 2.))
+    c1 = LocalLevel(
+        level_scale_prior=normal.Normal(0., 1.),
+        initial_level_prior=normal.Normal(0., 1.))
+    c2 = LocalLevel(
+        level_scale_prior=normal.Normal(0., 0.1),
+        initial_level_prior=normal.Normal(1., 2.))
     with self.assertRaisesRegex(
         ValueError, 'Could not automatically create a `Sum` component'):
       c1 + c2  # pylint: disable=pointless-statement
 
   def test_adding_two_sums(self):
     observed_time_series = self._build_placeholder([1., 2., 3., 4., 5.])
-    s1 = tfp.sts.Sum(
-        [tfp.sts.LocalLevel(observed_time_series=observed_time_series)],
-        observed_time_series=observed_time_series)
-    s2 = tfp.sts.Sum(
-        [tfp.sts.LocalLinearTrend(observed_time_series=observed_time_series)],
-        observed_time_series=observed_time_series)
+    s1 = Sum([LocalLevel(observed_time_series=observed_time_series)],
+             observed_time_series=observed_time_series)
+    s2 = Sum([LocalLinearTrend(observed_time_series=observed_time_series)],
+             observed_time_series=observed_time_series)
     s3 = s1 + s2
     self.assertLen(s3.components, 2)
 
@@ -123,8 +127,9 @@ class _StructuralTimeSeriesTests(object):
 
     with self.assertRaisesRegex(
         ValueError, 'Cannot add Sum components'):
-      s1.copy(observation_noise_scale_prior=tfd.Normal(  # pylint: disable=expression-not-assigned
-          self._build_placeholder(0.), self._build_placeholder(1.))) + s2
+      s1.copy(  # pylint: disable=expression-not-assigned
+          observation_noise_scale_prior=normal.Normal(
+              self._build_placeholder(0.), self._build_placeholder(1.))) + s2
 
   def _build_placeholder(self, ndarray, dtype=None):
     """Convert a numpy array to a TF placeholder.
@@ -175,7 +180,7 @@ class _StsTestHarness(object):
     model = self._build_sts()
 
     dummy_param_vals = [p.prior.sample(seed=seed) for p in model.parameters]
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=-2. + tf.zeros([model.latent_size]),
         scale_diag=3. * tf.ones([model.latent_size]))
 
@@ -222,8 +227,8 @@ class _StsTestHarness(object):
     log_joint_fn = model.joint_log_prob(
         observed_time_series=np.float32(
             np.random.standard_normal([num_timesteps, 1])))
-    lp_seed1, lp_seed2 = tfp.random.split_seed(seed, n=2)
-    seeds = tfp.random.split_seed(lp_seed1, n=len(model.parameters))
+    lp_seed1, lp_seed2 = samplers.split_seed(seed, n=2)
+    seeds = samplers.split_seed(lp_seed1, n=len(model.parameters))
     lp = self.evaluate(
         log_joint_fn(*[p.prior.sample(seed=seed) for seed, p in zip(
             seeds, model.parameters)]))
@@ -242,7 +247,7 @@ class _StsTestHarness(object):
     # We alternate full_batch_shape, partial_batch_shape in sequence so that in
     # a model with only one parameter, that parameter is constructed with full
     # batch shape.
-    seeds = tfp.random.split_seed(lp_seed2, n=len(model.parameters))
+    seeds = samplers.split_seed(lp_seed2, n=len(model.parameters))
     batch_shaped_parameters_ = self.evaluate([
         p.prior.sample(sample_shape=full_batch_shape if (i % 2 == 0)
                        else partial_batch_shape, seed=seed)
@@ -277,14 +282,14 @@ class _StsTestHarness(object):
         [1.0, 2.0, -1000., 0.4, np.nan, 1000., 4.2, np.inf]).astype(np.float32)
     observation_mask = np.array(
         [False, False, True, False, True, True, False, True]).astype(np.bool_)
-    masked_time_series = tfp.sts.MaskedTimeSeries(observed_time_series,
-                                                  is_missing=observation_mask)
+    masked_time_series = MaskedTimeSeries(
+        observed_time_series, is_missing=observation_mask)
 
     model = self._build_sts(observed_time_series=masked_time_series)
 
     log_joint_fn = model.joint_log_prob(
         observed_time_series=masked_time_series)
-    seeds = tfp.random.split_seed(seed, n=len(model.parameters))
+    seeds = samplers.split_seed(seed, n=len(model.parameters))
     lp = self.evaluate(
         log_joint_fn(*[p.prior.sample(seed=seed) for seed, p in zip(
             seeds, model.parameters)]))
@@ -370,7 +375,7 @@ class _StsTestHarness(object):
     # The initial state prior should also have the appropriate batch shape.
     # To test this, we build the ssm and test that it has a consistent
     # broadcast batch shape.
-    seeds = tfp.random.split_seed(seed, n=len(model.parameters))
+    seeds = samplers.split_seed(seed, n=len(model.parameters))
     param_samples = [p.prior.sample(seed=seed) for seed, p in zip(
         seeds, model.parameters)]
     ssm = model.make_state_space_model(
@@ -387,11 +392,11 @@ class _StsTestHarness(object):
   def test_add_component(self):
     model = self._build_sts(
         observed_time_series=np.array([1., 2., 3.], np.float32))
-    new_component = tfp.sts.LocalLevel(name='LocalLevel2')
+    new_component = LocalLevel(name='LocalLevel2')
     sum_model = model + new_component
     ledom_mus = new_component + model  # `sum_model` backwards.
-    self.assertIsInstance(sum_model, tfp.sts.Sum)
-    self.assertIsInstance(ledom_mus, tfp.sts.Sum)
+    self.assertIsInstance(sum_model, Sum)
+    self.assertIsInstance(ledom_mus, Sum)
     self.assertEqual(sum_model.components[-1], new_component)
     self.assertEqual(ledom_mus.components[0], new_component)
     self.assertEqual(set([p.name for p in sum_model.parameters]),
@@ -399,7 +404,7 @@ class _StsTestHarness(object):
     # If we built a new Sum component (rather than extending an existing one),
     # we should have passed an observed_time_series so that we get reasonable
     # default priors.
-    if not isinstance(model, tfp.sts.Sum):
+    if not isinstance(model, Sum):
       self.assertIsNotNone(sum_model.init_parameters['observed_time_series'])
       self.assertIsNotNone(ledom_mus.init_parameters['observed_time_series'])
 
@@ -428,7 +433,7 @@ class ARMATest(test_util.TestCase, _StsTestHarness):
         ar_order=3,
         ma_order=1,
         integration_degree=0,
-        level_drift_prior=tfd.Normal(loc=one, scale=one),
+        level_drift_prior=normal.Normal(loc=one, scale=one),
         observed_time_series=observed_time_series,
         **kwargs)
 
@@ -495,14 +500,16 @@ class SeasonalWithMultipleStepsAndNoiseTest(test_util.TestCase,
                                             _StsTestHarness):
 
   def _build_sts(self, observed_time_series=None, **kwargs):
-    day_of_week = tfp.sts.Seasonal(num_seasons=7,
-                                   num_steps_per_season=24,
-                                   allow_drift=False,
-                                   observed_time_series=observed_time_series,
-                                   name='day_of_week')
-    return tfp.sts.Sum(components=[day_of_week],
-                       observed_time_series=observed_time_series,
-                       **kwargs)
+    day_of_week = Seasonal(
+        num_seasons=7,
+        num_steps_per_season=24,
+        allow_drift=False,
+        observed_time_series=observed_time_series,
+        name='day_of_week')
+    return Sum(
+        components=[day_of_week],
+        observed_time_series=observed_time_series,
+        **kwargs)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -533,9 +540,9 @@ class SmoothSeasonalWithNoDriftTest(test_util.TestCase, _StsTestHarness):
                                      allow_drift=False,
                                      observed_time_series=observed_time_series)
     # The test harness doesn't like models with no parameters, so wrap with Sum.
-    return tfp.sts.Sum([smooth_seasonal],
-                       observed_time_series=observed_time_series,
-                       **kwargs)
+    return Sum([smooth_seasonal],
+               observed_time_series=observed_time_series,
+               **kwargs)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -559,7 +566,7 @@ class LinearRegressionTest(test_util.TestCase, _StsTestHarness):
     max_timesteps = 100
     num_features = 3
 
-    prior = tfd.Sample(tfd.Laplace(0., 1.), sample_shape=[num_features])
+    prior = sample.Sample(laplace.Laplace(0., 1.), sample_shape=[num_features])
 
     # LinearRegression components don't currently take an `observed_time_series`
     # argument, so they can't infer a prior batch shape. This means we have to
@@ -571,8 +578,9 @@ class LinearRegressionTest(test_util.TestCase, _StsTestHarness):
               observed_time_series))
       batch_shape = tf.shape(observed_time_series_tensor)[:-2]
       dtype = dtype_util.as_numpy_dtype(observed_time_series_tensor.dtype)
-      prior = tfd.Sample(tfd.Laplace(tf.zeros(batch_shape, dtype=dtype), 1.),
-                         sample_shape=[num_features])
+      prior = sample.Sample(
+          laplace.Laplace(tf.zeros(batch_shape, dtype=dtype), 1.),
+          sample_shape=[num_features])
 
     regression = LinearRegression(
         design_matrix=np.random.randn(

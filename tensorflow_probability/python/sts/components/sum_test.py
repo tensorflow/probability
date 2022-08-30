@@ -21,11 +21,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import linear_gaussian_ssm
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import AdditiveStateSpaceModel
-from tensorflow_probability.python.sts import LocalLinearTrendStateSpaceModel
+from tensorflow_probability.python.sts.components.local_linear_trend import LocalLinearTrendStateSpaceModel
+from tensorflow_probability.python.sts.components.sum import AdditiveStateSpaceModel
 
 
 tfl = tf.linalg
@@ -45,7 +46,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
         level_scale=0.3,
         slope_scale=0.6,
         observation_noise_scale=0.1,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder([1., 1.])))
 
     additive_ssm = AdditiveStateSpaceModel([local_ssm])
@@ -110,7 +111,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
         num_timesteps=num_timesteps,
         level_scale=level_scale,
         slope_scale=slope_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=self._build_placeholder([initial_level, initial_slope]),
             scale_diag=self._build_placeholder([1., 1.])))
 
@@ -120,7 +121,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
         num_timesteps=num_timesteps,
         level_scale=second_level_scale,
         slope_scale=0.,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=self._build_placeholder([second_initial_level, 0.]),
             scale_diag=self._build_placeholder([1., 0.])))
 
@@ -134,11 +135,10 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
         level_scale=np.float32(np.sqrt(level_scale**2 + second_level_scale**2)),
         slope_scale=np.float32(slope_scale),
         observation_noise_scale=observation_noise_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             loc=self._build_placeholder(
                 [initial_level + second_initial_level, initial_slope + 0.]),
-            scale_diag=self._build_placeholder(
-                np.sqrt([2., 1.]))))
+            scale_diag=self._build_placeholder(np.sqrt([2., 1.]))))
 
     # Test that both models behave equivalently.
     additive_mean = additive_ssm.mean()
@@ -260,17 +260,16 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
     initial_state_prior_diag = np.exp(np.random.randn(2))
 
     # First build the model in which we let AdditiveSSM do the broadcasting.
-    batchless_ssm = tfd.LinearGaussianStateSpaceModel(
+    batchless_ssm = linear_gaussian_ssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=self._build_placeholder(transition_matrix),
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(transition_noise_diag)),
         observation_matrix=self._build_placeholder(observation_matrix),
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(observation_noise_diag)),
-        initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=self._build_placeholder(initial_state_prior_diag))
-    )
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
+            scale_diag=self._build_placeholder(initial_state_prior_diag)))
     another_ssm = self._dummy_model(num_timesteps=num_timesteps,
                                     latent_size=4,
                                     batch_shape=[3])
@@ -280,21 +279,21 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
     # Next try doing our own broadcasting explicitly.
     broadcast_vector = np.ones([3, 1])
     broadcast_matrix = np.ones([3, 1, 1])
-    batch_ssm = tfd.LinearGaussianStateSpaceModel(
+    batch_ssm = linear_gaussian_ssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
-        transition_matrix=self._build_placeholder(
-            transition_matrix * broadcast_matrix),
-        transition_noise=tfd.MultivariateNormalDiag(
-            scale_diag=self._build_placeholder(
-                transition_noise_diag * broadcast_vector)),
-        observation_matrix=self._build_placeholder(
-            observation_matrix * broadcast_matrix),
-        observation_noise=tfd.MultivariateNormalDiag(
-            scale_diag=self._build_placeholder(
-                observation_noise_diag * broadcast_vector)),
-        initial_state_prior=tfd.MultivariateNormalDiag(
-            scale_diag=self._build_placeholder(
-                initial_state_prior_diag * broadcast_vector)))
+        transition_matrix=self._build_placeholder(transition_matrix *
+                                                  broadcast_matrix),
+        transition_noise=mvn_diag.MultivariateNormalDiag(
+            scale_diag=self._build_placeholder(transition_noise_diag *
+                                               broadcast_vector)),
+        observation_matrix=self._build_placeholder(observation_matrix *
+                                                   broadcast_matrix),
+        observation_noise=mvn_diag.MultivariateNormalDiag(
+            scale_diag=self._build_placeholder(observation_noise_diag *
+                                               broadcast_vector)),
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
+            scale_diag=self._build_placeholder(initial_state_prior_diag *
+                                               broadcast_vector)))
     manual_additive_ssm = AdditiveStateSpaceModel([batch_ssm, another_ssm])
 
     # Both additive SSMs define the same model, so they should give the same
@@ -376,7 +375,7 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
 
     # If we override the initial state prior with an unbatched prior, the
     # resulting AdditiveSSM should not have batch dimensions.
-    unbatched_initial_state_prior = tfd.MultivariateNormalDiag(
+    unbatched_initial_state_prior = mvn_diag.MultivariateNormalDiag(
         scale_diag=self._build_placeholder(np.ones([latent_size])))
     additive_ssm = AdditiveStateSpaceModel(
         [ssm], initial_state_prior=unbatched_initial_state_prior)
@@ -414,20 +413,22 @@ class _AdditiveStateSpaceModelTest(test_util.TestCase):
         if initial_state_prior_batch_shape is not None else batch_shape)
     dtype = dtype if dtype is not None else self.dtype
 
-    return tfd.LinearGaussianStateSpaceModel(
+    return linear_gaussian_ssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
-        transition_matrix=self._build_placeholder(np.eye(latent_size),
-                                                  dtype=dtype),
-        transition_noise=tfd.MultivariateNormalDiag(
+        transition_matrix=self._build_placeholder(
+            np.eye(latent_size), dtype=dtype),
+        transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=np.ones(batch_shape + [latent_size]).astype(dtype)),
-        observation_matrix=self._build_placeholder(np.random.standard_normal(
-            batch_shape + [observation_size, latent_size]), dtype=dtype),
-        observation_noise=tfd.MultivariateNormalDiag(
+        observation_matrix=self._build_placeholder(
+            np.random.standard_normal(batch_shape +
+                                      [observation_size, latent_size]),
+            dtype=dtype),
+        observation_noise=mvn_diag.MultivariateNormalDiag(
             loc=self._build_placeholder(
                 np.ones(batch_shape + [observation_size]), dtype=dtype),
             scale_diag=self._build_placeholder(
                 np.ones(batch_shape + [observation_size]), dtype=dtype)),
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(
                 np.ones(initial_state_prior_batch_shape + [latent_size]),
                 dtype=dtype)))

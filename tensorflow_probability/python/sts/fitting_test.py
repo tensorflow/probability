@@ -20,9 +20,16 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.sts import fitting
+from tensorflow_probability.python.sts.components import local_linear_trend
+from tensorflow_probability.python.sts.components import seasonal
+from tensorflow_probability.python.sts.components import sum as sum_lib
+from tensorflow_probability.python.sts.internal import missing_values_util
+from tensorflow_probability.python.vi import csiszar_divergence
+from tensorflow_probability.python.vi import optimization
 
 JAX_MODE = False
 
@@ -30,15 +37,15 @@ JAX_MODE = False
 class _VariationalInferenceTests(object):
 
   def _build_model(self, observed_time_series):
-    day_of_week = tfp.sts.Seasonal(
+    day_of_week = seasonal.Seasonal(
         num_seasons=7,
         observed_time_series=observed_time_series,
         name='day_of_week')
-    local_linear_trend = tfp.sts.LocalLinearTrend(
-        observed_time_series=observed_time_series,
-        name='local_linear_trend')
-    return tfp.sts.Sum(components=[day_of_week, local_linear_trend],
-                       observed_time_series=observed_time_series)
+    llt = local_linear_trend.LocalLinearTrend(
+        observed_time_series=observed_time_series, name='local_linear_trend')
+    return sum_lib.Sum(
+        components=[day_of_week, llt],
+        observed_time_series=observed_time_series)
 
   @test_util.disable_test_for_backend(
       disable_jax=True, reason='No variables in JAX backend.')
@@ -51,9 +58,9 @@ class _VariationalInferenceTests(object):
 
     model = self._build_model(observed_time_series)
 
-    variational_posterior = tfp.sts.build_factored_surrogate_posterior(
+    variational_posterior = fitting.build_factored_surrogate_posterior(
         model, batch_shape=num_inits)
-    loss_curve = tfp.vi.fit_surrogate_posterior(
+    loss_curve = optimization.fit_surrogate_posterior(
         model.joint_distribution(observed_time_series).log_prob,
         surrogate_posterior=variational_posterior,
         sample_size=3,
@@ -77,13 +84,13 @@ class _VariationalInferenceTests(object):
 
     model = self._build_model(observed_time_series)
     seed = test_util.test_seed(sampler_type='stateless')
-    init_seed, fit_seed = tfp.random.split_seed(seed, n=2)
+    init_seed, fit_seed = samplers.split_seed(seed, n=2)
 
     init_fn, build_surrogate_fn = (
-        tfp.sts.build_factored_surrogate_posterior_stateless(
+        fitting.build_factored_surrogate_posterior_stateless(
             model, batch_shape=num_inits))
     jd = model.joint_distribution(observed_time_series=observed_time_series)
-    _, loss_curve = tfp.vi.fit_surrogate_posterior_stateless(
+    _, loss_curve = optimization.fit_surrogate_posterior_stateless(
         jd.log_prob,
         build_surrogate_posterior_fn=build_surrogate_fn,
         initial_parameters=init_fn(init_seed),
@@ -107,14 +114,14 @@ class _VariationalInferenceTests(object):
 
     model = self._build_model(observed_time_series)
 
-    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+    surrogate_posterior = fitting.build_factored_surrogate_posterior(
         model=model)
     self.assertLen(surrogate_posterior.trainable_variables,
                    len(model.parameters) * 2)  # Loc and scale for each param.
 
     @tf.function(autograph=False)  # Ensure the loss is computed efficiently
     def loss_fn(sample_size=3):
-      return tfp.vi.monte_carlo_variational_loss(
+      return csiszar_divergence.monte_carlo_variational_loss(
           model.joint_distribution(observed_time_series).log_prob,
           surrogate_posterior,
           sample_size=sample_size)
@@ -141,9 +148,9 @@ class _VariationalInferenceTests(object):
     observed_time_series = self._build_tensor(
         -1e8 + 1e6 * np.random.randn(num_timesteps))
     model = self._build_model(observed_time_series)
-    surrogate_posterior = tfp.sts.build_factored_surrogate_posterior(
+    surrogate_posterior = fitting.build_factored_surrogate_posterior(
         model=model)
-    variational_loss = tfp.vi.monte_carlo_variational_loss(
+    variational_loss = csiszar_divergence.monte_carlo_variational_loss(
         target_log_prob_fn=model.joint_distribution(
             observed_time_series).log_prob,
         surrogate_posterior=surrogate_posterior)
@@ -192,15 +199,15 @@ class VariationalInferenceTestsDynamic32(test_util.TestCase,
 class _HMCTests(object):
 
   def _build_model(self, observed_time_series):
-    day_of_week = tfp.sts.Seasonal(
+    day_of_week = seasonal.Seasonal(
         num_seasons=7,
         observed_time_series=observed_time_series,
         name='day_of_week')
-    local_linear_trend = tfp.sts.LocalLinearTrend(
-        observed_time_series=observed_time_series,
-        name='local_linear_trend')
-    return tfp.sts.Sum(components=[day_of_week, local_linear_trend],
-                       observed_time_series=observed_time_series)
+    llt = local_linear_trend.LocalLinearTrend(
+        observed_time_series=observed_time_series, name='local_linear_trend')
+    return sum_lib.Sum(
+        components=[day_of_week, llt],
+        observed_time_series=observed_time_series)
 
   @test_util.disable_test_for_backend(
       disable_jax=True, reason='No variables in JAX backend.')
@@ -210,7 +217,7 @@ class _HMCTests(object):
     observed_time_series = self._build_tensor(np.random.randn(
         *(batch_shape + [num_timesteps])))
     model = self._build_model(observed_time_series)
-    samples, kernel_results = tfp.sts.fit_with_hmc(
+    samples, kernel_results = fitting.fit_with_hmc(
         model,
         observed_time_series,
         num_results=4,
@@ -247,13 +254,13 @@ class _HMCTests(object):
     # threaded through the HMC (and VI) APIs.
     observed_time_series_ = np.random.randn(
         *(batch_shape + [num_timesteps]))
-    observed_time_series = tfp.sts.MaskedTimeSeries(
+    observed_time_series = missing_values_util.MaskedTimeSeries(
         self._build_tensor(observed_time_series_),
         is_missing=self._build_tensor([False, True, False, False, True],
                                       dtype=np.bool_))
 
     model = self._build_model(observed_time_series)
-    samples, kernel_results = tfp.sts.fit_with_hmc(
+    samples, kernel_results = fitting.fit_with_hmc(
         model,
         observed_time_series,
         num_results=num_results,
@@ -338,7 +345,7 @@ class HMCTestsStatic32(test_util.TestCase, _HMCTests):
     observed_time_series = self._build_tensor(np.random.randn(
         *(batch_shape + [num_timesteps])))
     model = self._build_model(observed_time_series)
-    samples, _ = tfp.sts.fit_with_hmc(
+    samples, _ = fitting.fit_with_hmc(
         model,
         observed_time_series,
         num_results=num_results,

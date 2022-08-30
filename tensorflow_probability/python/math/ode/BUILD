@@ -33,6 +33,8 @@ multi_substrate_py_library(
     name = "base",
     srcs = ["base.py"],
     deps = [
+        ":runge_kutta_util",
+        ":util",
         # six dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:custom_gradient",
@@ -133,10 +135,12 @@ multi_substrate_py_test(
     srcs = ["ode_test.py"],
     shard_count = 10,
     deps = [
+        ":base",
+        ":bdf",
+        ":dormand_prince",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -151,10 +155,10 @@ py_test(
         "nozapfhahn",
     ],
     deps = [
+        ":bdf",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
@@ -171,10 +175,10 @@ py_test(
         "requires-gpu-nvidia",
     ],
     deps = [
+        ":bdf",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],

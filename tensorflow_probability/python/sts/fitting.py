@@ -19,13 +19,13 @@ import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import mcmc
-from tensorflow_probability.python import vi
 from tensorflow_probability.python.experimental import vi as experimental_vi
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.sts.internal import util as sts_util
+from tensorflow_probability.python.vi import optimization
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
 
@@ -464,7 +464,7 @@ def fit_with_hmc(model,
       if variational_optimizer is None:
         variational_optimizer = tf1.train.AdamOptimizer(
             learning_rate=0.1)  # TODO(b/137299119) Replace with TF2 optimizer.
-      loss_curve = vi.fit_surrogate_posterior(
+      loss_curve = optimization.fit_surrogate_posterior(
           target_log_prob_fn,
           variational_posterior,
           sample_size=variational_sample_size,

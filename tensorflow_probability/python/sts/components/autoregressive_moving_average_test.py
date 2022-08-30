@@ -19,14 +19,11 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import AutoregressiveMovingAverageStateSpaceModel
-from tensorflow_probability.python.sts import AutoregressiveStateSpaceModel
-
-tfd = tfp.distributions
+from tensorflow_probability.python.sts.components.autoregressive import AutoregressiveStateSpaceModel
+from tensorflow_probability.python.sts.components.autoregressive_moving_average import AutoregressiveMovingAverageStateSpaceModel
 
 
 def arma_explicit_logp(y, ar_coefs, ma_coefs, level_scale):
@@ -78,27 +75,27 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
         num_timesteps=num_timesteps,
         coefficients=coefficients_order1,
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=[level_scale]))
     ar2_ssm = AutoregressiveStateSpaceModel(
         num_timesteps=num_timesteps,
         coefficients=coefficients_order2,
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=[level_scale, 1.]))
     arma1_ssm = AutoregressiveMovingAverageStateSpaceModel(
         num_timesteps=num_timesteps,
         ar_coefficients=coefficients_order1,
         ma_coefficients=np.array([0.]).astype(self.dtype),
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=[level_scale, 1.]))
     arma2_ssm = AutoregressiveMovingAverageStateSpaceModel(
         num_timesteps=num_timesteps,
         ar_coefficients=coefficients_order2,
         ma_coefficients=np.array([0.]).astype(self.dtype),
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=[level_scale, 1.]))
 
     ar1_lp, arma1_lp, ar2_lp, arma2_lp = (
@@ -129,7 +126,7 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
         ar_coefficients=ar_coefficients_,
         ma_coefficients=ma_coefficients_,
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=[level_scale, 0., 0.]))
 
     lp = ssm.log_prob(observed_time_series[..., tf.newaxis])
@@ -152,7 +149,7 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
         ar_coefficients=coefficients,
         ma_coefficients=coefficients,
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(np.ones([order]))))
     if self.use_static_shape:
       self.assertAllEqual(tensorshape_util.as_list(ssm.batch_shape),
@@ -177,9 +174,8 @@ class _AutoregressiveMovingAverageStateSpaceModelTest(test_util.TestCase):
         level_drift=0.,
         level_scale=0.1,
         observation_noise_scale=0.,
-        initial_state_prior=tfd.MultivariateNormalDiag(
-            loc=tf.zeros([3]),
-            scale_diag=tf.ones([3])))
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
+            loc=tf.zeros([3]), scale_diag=tf.ones([3])))
     seed = test_util.test_seed(sampler_type='stateless')
     sample_no_drift = self.evaluate(ssm_no_drift.sample(seed=seed)[..., 0])
     ssm_with_drift = ssm_no_drift.copy(level_drift=level_drift)

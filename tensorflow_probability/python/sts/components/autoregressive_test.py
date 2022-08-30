@@ -19,11 +19,12 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.sts import AutoregressiveStateSpaceModel
-from tensorflow_probability.python.sts import LocalLevelStateSpaceModel
+from tensorflow_probability.python.sts.components.autoregressive import AutoregressiveStateSpaceModel
+from tensorflow_probability.python.sts.components.local_level import LocalLevelStateSpaceModel
 
 
 def ar_explicit_logp(y, coefs, level_scale):
@@ -38,11 +39,11 @@ def ar_explicit_logp(y, coefs, level_scale):
     zero_padded_y = np.zeros([num_coefs])
     zero_padded_y[num_coefs - i:num_coefs] = y[:i]
     pred_y = np.dot(zero_padded_y, coefs[::-1])
-    lp += tfd.Normal(pred_y, level_scale).log_prob(y[i])
+    lp += normal.Normal(pred_y, level_scale).log_prob(y[i])
 
   for i in range(num_coefs, len(y)):
     pred_y = np.dot(y[i - num_coefs:i], coefs[::-1])
-    lp += tfd.Normal(pred_y, level_scale).log_prob(y[i])
+    lp += normal.Normal(pred_y, level_scale).log_prob(y[i])
 
   return lp
 
@@ -68,19 +69,19 @@ class _AutoregressiveStateSpaceModelTest(test_util.TestCase):
         num_timesteps=num_timesteps,
         coefficients=coefficients_order1,
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=[level_scale]))
     ar2_ssm = AutoregressiveStateSpaceModel(
         num_timesteps=num_timesteps,
         coefficients=coefficients_order2,
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=[level_scale, 1.]))
 
     local_level_ssm = LocalLevelStateSpaceModel(
         num_timesteps=num_timesteps,
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=[level_scale]))
 
     ar1_lp, ar2_lp, ll_lp = self.evaluate(
@@ -107,7 +108,7 @@ class _AutoregressiveStateSpaceModelTest(test_util.TestCase):
         num_timesteps=num_timesteps,
         coefficients=coefficients_,
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=[level_scale, 0.]))
 
     lp = ssm.log_prob(observed_time_series[..., tf.newaxis])
@@ -129,7 +130,7 @@ class _AutoregressiveStateSpaceModelTest(test_util.TestCase):
         num_timesteps=10,
         coefficients=coefficients,
         level_scale=level_scale,
-        initial_state_prior=tfd.MultivariateNormalDiag(
+        initial_state_prior=mvn_diag.MultivariateNormalDiag(
             scale_diag=self._build_placeholder(np.ones([order]))))
     if self.use_static_shape:
       self.assertAllEqual(

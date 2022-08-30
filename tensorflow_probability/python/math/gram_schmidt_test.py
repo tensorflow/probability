@@ -17,9 +17,9 @@ import numpy as np
 import scipy.linalg as scipy_linalg
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.gram_schmidt import gram_schmidt
 
 
 def gs_numpy(mat):
@@ -44,17 +44,18 @@ class GramSchmidtTest(test_util.TestCase):
         tf.random.normal([dim, n_vectors], seed=test_util.test_seed()))
     matrix = tf.constant(np_matrix)
 
-    self.assertAllClose(gs_numpy(np_matrix), tfp.math.gram_schmidt(matrix))
+    self.assertAllClose(gs_numpy(np_matrix), gram_schmidt(matrix))
 
-    self.assertAllClose(gs_numpy(np_matrix)[:, :7],
-                        tfp.math.gram_schmidt(matrix, 7)[:, :7])
+    self.assertAllClose(
+        gs_numpy(np_matrix)[:, :7],
+        gram_schmidt(matrix, 7)[:, :7])
 
   def testGramSchmidtOrthonormal(self):
     """Checks that all vectors form an orthonormal basis."""
     dim, n_vectors = 10, 5
     vectors = tf.random.normal([dim, n_vectors], seed=test_util.test_seed())
 
-    ortho = self.evaluate(tfp.math.gram_schmidt(vectors))
+    ortho = self.evaluate(gram_schmidt(vectors))
 
     for i in range(n_vectors):
       self.assertAllClose(
@@ -69,7 +70,7 @@ class GramSchmidtTest(test_util.TestCase):
     dim = 200
     mat = tf.eye(200, dtype=tf.float64) * 1e-5 + scipy_linalg.hilbert(dim)
     mat = tf.math.l2_normalize(mat, axis=-1)
-    ortho = tfp.math.gram_schmidt(mat)
+    ortho = gram_schmidt(mat)
     xtx = tf.matmul(ortho, ortho, transpose_a=True)
     self.assertAllClose(
         0., tf.linalg.norm(tf.eye(dim, dtype=tf.float64) - xtx,
@@ -77,9 +78,9 @@ class GramSchmidtTest(test_util.TestCase):
 
   def testXLA(self):
     self.skip_if_no_xla()
-    gs = tf.function(tfp.math.gram_schmidt, jit_compile=True)
+    gs = tf.function(gram_schmidt, jit_compile=True)
     mat = self.evaluate(tf.random.normal([10, 5], seed=test_util.test_seed()))
-    self.assertAllClose(gs(mat), tfp.math.gram_schmidt(mat))
+    self.assertAllClose(gs(mat), gram_schmidt(mat))
 
   def testBatched(self):
     shp = (5, 13, 7)
@@ -87,7 +88,7 @@ class GramSchmidtTest(test_util.TestCase):
     mat = tf.constant(mat_numpy)
     self.assertAllClose(
         np.vectorize(gs_numpy, signature='(d,n)->(d,n)')(mat_numpy),
-        tfp.math.gram_schmidt(mat))
+        gram_schmidt(mat))
 
   def testBatch1UnknownInnermost(self):
     shp = (1, 13, 7)
@@ -95,7 +96,7 @@ class GramSchmidtTest(test_util.TestCase):
     mat = tf.constant(mat_numpy)
     @tf.function
     def f(n):
-      return tfp.math.gram_schmidt(mat[..., :n])
+      return gram_schmidt(mat[..., :n])
     self.assertAllClose(
         np.vectorize(gs_numpy, signature='(d,n)->(d,n)')(mat_numpy[..., :4]),
         f(tf.constant(4)))
@@ -111,8 +112,7 @@ class GramSchmidtTest(test_util.TestCase):
     # The two are identical up to sign.
     self.assertAllClose(
         tf.math.abs(tf.linalg.qr(mat).q)[..., :n_vecs],
-        tf.math.abs(
-            tfp.math.gram_schmidt(mat, n_vecs))[..., :n_vecs],
+        tf.math.abs(gram_schmidt(mat, n_vecs))[..., :n_vecs],
         rtol=1e-5)
 
 

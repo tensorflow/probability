@@ -20,9 +20,9 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math.psd_kernels import polynomial
 
 
 @test_util.test_all_tf_execution_regimes
@@ -33,7 +33,7 @@ class PolynomialTest(test_util.TestCase):
       disable_numpy=True, reason='DType mismatch not caught in numpy.')
   def test_mismatched_float_types_are_bad(self):
     with self.assertRaises(TypeError):
-      tfp.math.psd_kernels.Polynomial(
+      polynomial.Polynomial(
           bias_amplitude=np.float32(1.),
           slope_amplitude=np.float64(1.),
           shift=0.,
@@ -41,37 +41,35 @@ class PolynomialTest(test_util.TestCase):
 
   def testFloat32Fallback(self):
     # Should be OK (float32 fallback).
-    self.polynomial = tfp.math.psd_kernels.Polynomial(
+    self.polynomial = polynomial.Polynomial(
         bias_amplitude=0, slope_amplitude=1, shift=0, exponent=1)
     # Should be OK.
-    tfp.math.psd_kernels.Polynomial(
+    polynomial.Polynomial(
         bias_amplitude=np.float32(1.),
-        slope_amplitude=1., shift=0., exponent=1.)
+        slope_amplitude=1.,
+        shift=0.,
+        exponent=1.)
 
   def testValidateArgsNonPositiveAreBad(self):
     with self.assertRaisesOpError('`bias_amplitude` must be non-negative'):
-      k = tfp.math.psd_kernels.Polynomial(
-          bias_amplitude=-1., validate_args=True)
+      k = polynomial.Polynomial(bias_amplitude=-1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
     with self.assertRaisesOpError('`slope_amplitude` must be non-negative'):
-      k = tfp.math.psd_kernels.Polynomial(
-          slope_amplitude=-1., validate_args=True)
+      k = polynomial.Polynomial(slope_amplitude=-1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
     with self.assertRaisesOpError('`exponent` must be positive'):
-      k = tfp.math.psd_kernels.Polynomial(exponent=-1., validate_args=True)
+      k = polynomial.Polynomial(exponent=-1., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
     with self.assertRaisesOpError(
         '`slope_amplitude` and `bias_amplitude` can not both be zero.'):
-      k = tfp.math.psd_kernels.Polynomial(
-          bias_amplitude=0.,
-          slope_amplitude=0.,
-          validate_args=True)
+      k = polynomial.Polynomial(
+          bias_amplitude=0., slope_amplitude=0., validate_args=True)
       self.evaluate(k.apply([1.], [1.]))
 
   def testExponentInteger(self):
     with self.assertRaisesOpError('`exponent` must be an integer.'):
-      k = tfp.math.psd_kernels.Polynomial(
+      k = polynomial.Polynomial(
           bias_amplitude=1.,
           slope_amplitude=1.,
           exponent=1.5,
@@ -79,21 +77,18 @@ class PolynomialTest(test_util.TestCase):
       self.evaluate(k.apply([1.], [1.]))
 
     # No error
-    k = tfp.math.psd_kernels.Polynomial(
-        bias_amplitude=1.,
-        slope_amplitude=1.,
-        exponent=3.,
-        validate_args=True)
+    k = polynomial.Polynomial(
+        bias_amplitude=1., slope_amplitude=1., exponent=3., validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
 
   def testShifttNonPositiveIsOk(self):
     # No exception expected
-    k = tfp.math.psd_kernels.Polynomial(shift=-1., validate_args=True)
+    k = polynomial.Polynomial(shift=-1., validate_args=True)
     self.evaluate(k.apply([1.], [1.]))
 
   def testValidateArgsNoneIsOk(self):
     # No exception expected
-    k = tfp.math.psd_kernels.Polynomial(
+    k = polynomial.Polynomial(
         bias_amplitude=None,
         slope_amplitude=None,
         shift=None,
@@ -102,7 +97,7 @@ class PolynomialTest(test_util.TestCase):
     self.evaluate(k.apply([[1.]], [[1.]]))
 
   def testNoneShapes(self):
-    k = tfp.math.psd_kernels.Polynomial(
+    k = polynomial.Polynomial(
         bias_amplitude=np.reshape(np.arange(12.), [2, 3, 2]))
     self.assertAllEqual([2, 3, 2], k.batch_shape)
 
@@ -144,7 +139,7 @@ class PolynomialTest(test_util.TestCase):
           shape=[2, 1]))
   def testBatchShape(self, bias_amplitude, slope_amplitude,
                      shift, exponent, shape):
-    k = tfp.math.psd_kernels.Polynomial(
+    k = polynomial.Polynomial(
         bias_amplitude=bias_amplitude,
         slope_amplitude=slope_amplitude,
         shift=shift,
@@ -155,7 +150,7 @@ class PolynomialTest(test_util.TestCase):
 
   def testFloat32(self):
     # No exception expected
-    k = tfp.math.psd_kernels.Polynomial(
+    k = polynomial.Polynomial(
         bias_amplitude=0.,
         slope_amplitude=1.,
         shift=0.,
@@ -167,7 +162,7 @@ class PolynomialTest(test_util.TestCase):
 
   def testFloat64(self):
     # No exception expected
-    k = tfp.math.psd_kernels.Polynomial(
+    k = polynomial.Polynomial(
         bias_amplitude=np.float64(0.),
         slope_amplitude=np.float64(1.),
         shift=np.float64(0.),
@@ -194,7 +189,7 @@ class PolynomialTest(test_util.TestCase):
       ))
   def testShapesAreCorrectApply(self, feature_ndims,
                                 x_shape, y_shape, apply_shape):
-    k = tfp.math.psd_kernels.Polynomial(
+    k = polynomial.Polynomial(
         bias_amplitude=0.,
         slope_amplitude=1.,
         shift=0.,
@@ -229,7 +224,7 @@ class PolynomialTest(test_util.TestCase):
       ))
   def testShapesAreCorrectMatrix(self, feature_ndims,
                                  x_shape, y_shape, matrix_shape):
-    k = tfp.math.psd_kernels.Polynomial(
+    k = polynomial.Polynomial(
         bias_amplitude=0.,
         slope_amplitude=1.,
         shift=0.,
@@ -240,7 +235,7 @@ class PolynomialTest(test_util.TestCase):
     self.assertAllEqual(matrix_shape, k.matrix(x, y).shape)
 
   def testShapesAreCorrectBroadcast(self):
-    k = tfp.math.psd_kernels.Polynomial(
+    k = polynomial.Polynomial(
         bias_amplitude=np.ones([2, 1, 1], np.float32),
         slope_amplitude=np.ones([1, 3, 1], np.float32))
     self.assertAllEqual(
@@ -259,7 +254,7 @@ class PolynomialTest(test_util.TestCase):
     slope_amplitude = 0.5
     shift = 1.
     exponent = 2
-    k = tfp.math.psd_kernels.Polynomial(
+    k = polynomial.Polynomial(
         bias_amplitude=bias_amplitude,
         slope_amplitude=slope_amplitude,
         shift=shift,
@@ -279,11 +274,10 @@ class LinearTest(test_util.TestCase):
 
   def testIsPolynomial(self):
     # Linear kernel is subclass of Polynomial kernel
-    self.assertIsInstance(tfp.math.psd_kernels.Linear(),
-                          tfp.math.psd_kernels.Polynomial)
+    self.assertIsInstance(polynomial.Linear(), polynomial.Polynomial)
 
   def testValuesAreCorrect(self):
-    k = tfp.math.psd_kernels.Linear()
+    k = polynomial.Linear()
     x = np.random.uniform(-1, 1, size=[5, 3]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
     self.assertAllClose(x.dot(y.T), self.evaluate(k.matrix(x, y)))
@@ -295,12 +289,12 @@ class ConstantTest(test_util.TestCase):
 
   def testBatchShape(self):
     constant = tf.ones([5, 2, 3], dtype=tf.float32)
-    k = tfp.math.psd_kernels.Constant(constant=constant)
+    k = polynomial.Constant(constant=constant)
     self.assertAllEqual([5, 2, 3], k.batch_shape)
 
   def testValuesAreCorrect(self):
     val = 0.1
-    k = tfp.math.psd_kernels.Constant(constant=val)
+    k = polynomial.Constant(constant=val)
     x = np.random.uniform(-1, 1, size=[5, 3]).astype(np.float32)
     y = np.random.uniform(-1, 1, size=[4, 3]).astype(np.float32)
     self.assertAllClose(np.full((5, 4), val), self.evaluate(k.matrix(x, y)))
@@ -308,10 +302,10 @@ class ConstantTest(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   def testGradsAreNotNone(self):
     val = 0.1
-    k = tfp.math.psd_kernels.Constant(constant=val)
+    k = polynomial.Constant(constant=val)
     x = tf.constant([5.], dtype=np.float32)
     value, grads = self.evaluate(
-        tfp.math.value_and_gradient(lambda x: k.apply(x, x), x))
+        gradient.value_and_gradient(lambda x: k.apply(x, x), x))
     self.assertAllClose(value, val)
     self.assertAllClose(grads[0], 0.0)
 
