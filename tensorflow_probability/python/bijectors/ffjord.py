@@ -19,7 +19,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import prefer_static
-from tensorflow_probability.python.math import diag_jacobian
+from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow_probability.python.math.ode import dormand_prince
 
 
@@ -124,7 +124,7 @@ def trace_jacobian_exact(ode_fn, state_shape, dtype):
     state, _ = state_log_det_jac
     ode_fn_with_time = lambda x: ode_fn(time, x, **kwargs)
     batch_shape = [prefer_static.size0(state)]
-    state_time_derivative, diag_jac = diag_jacobian.diag_jacobian(
+    state_time_derivative, diag_jac = diag_jacobian(
         xs=state, fn=ode_fn_with_time, sample_shape=batch_shape)
     # tfp_math.diag_jacobian returns lists
     if isinstance(state_time_derivative, list):
