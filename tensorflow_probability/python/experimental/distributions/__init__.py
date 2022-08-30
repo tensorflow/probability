@@ -14,6 +14,7 @@
 # ============================================================================
 """TensorFlow Probability experimental distributions package."""
 
+from tensorflow_probability.python.distributions.inflated import inflated_factory
 from tensorflow_probability.python.distributions.log_prob_ratio import log_prob_ratio
 from tensorflow_probability.python.experimental.distributions import marginal_fns
 from tensorflow_probability.python.experimental.distributions.importance_resample import ImportanceResample
@@ -25,6 +26,7 @@ from tensorflow_probability.python.experimental.distributions.mvn_precision_fact
 
 
 __all__ = [
+    'inflated_factory',
     'log_prob_ratio',
     'IncrementLogProb',
     'JointDistributionPinned',

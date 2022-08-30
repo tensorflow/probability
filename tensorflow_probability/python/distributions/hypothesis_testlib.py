@@ -48,7 +48,7 @@ TF2_UNFRIENDLY_DISTS = (
     'MultivariateNormalDiag',
     'MultivariateNormalFullCovariance',
     'MultivariateNormalTriL',
-)
+    )
 
 # SPECIAL_DISTS are distributions that should not be drawn by
 # `base_distributions`, because they are parameterized by one or more
@@ -63,6 +63,7 @@ SPECIAL_DISTS = (
     'Distribution',  # Base class; not a distribution at all
     'Empirical',  # Base distribution with custom instantiation; (has strategy)
     'HiddenMarkovModel',
+    'Inflated',
     'JointDistribution',
     'JointDistributionCoroutine',
     'JointDistributionCoroutineAutoBatched',
@@ -89,8 +90,7 @@ SPECIAL_DISTS = (
     'TransformedDistribution',  # (has strategy)
     'QuantizedDistribution',  # (has strategy)
     'VariationalGaussianProcess',  # PSDKernel strategy not implemented.
-    'WishartLinearOperator'
-)
+    'WishartLinearOperator')
 
 
 # MUTEX_PARAMS are mutually exclusive parameters that cannot be drawn together
@@ -716,6 +716,15 @@ def base_distributions(draw,
   elif dist_name == 'IncrementLogProb':
     return draw(
         increment_log_probs(
+            batch_shape=batch_shape,
+            enable_vars=enable_vars,
+            validate_args=validate_args))
+  elif dist_name == 'ZeroInflatedNegativeBinomial':
+    # We need a custom strategy for ZeroInflatedNegativeBinomial because
+    # it currently isn't able to handle parameters with non-identical
+    # batch dimensions.
+    return draw(
+        zero_inflated_negative_binomial(
             batch_shape=batch_shape,
             enable_vars=enable_vars,
             validate_args=validate_args))
@@ -1496,6 +1505,54 @@ def mixtures(draw,
     msg = ('Mixture strategy generated a bad batch shape for {}, should have'
            ' been {}.').format(result_dist, batch_shape)
     raise AssertionError(msg)
+  return result_dist
+
+
+@hps.composite
+def zero_inflated_negative_binomial(draw,
+                                    batch_shape=None,
+                                    enable_vars=False,
+                                    validate_args=True):
+  """Strategy for drawing a ZeroInflatedNegativeBinomial."""
+  if batch_shape is None:
+    batch_shape = draw(tfp_hps.shapes())
+
+  dtype = np.float32
+
+  inflated_loc_probs_strategy = tfp_hps.constrained_tensors(
+      constraint_fn=tf.math.sigmoid,
+      shape=tensorshape_util.as_list(batch_shape))
+  inflated_loc_probs = draw(
+      tfp_hps.maybe_variable(
+          inflated_loc_probs_strategy,
+          enable_vars=enable_vars,
+          dtype=dtype,
+          name='inflated_loc_probs'))
+
+  total_count_strategy = tfp_hps.constrained_tensors(
+      constraint_fn=tfp_hps.softplus_plus_eps(),
+      shape=tensorshape_util.as_list(batch_shape))
+  total_count = draw(
+      tfp_hps.maybe_variable(
+          total_count_strategy,
+          enable_vars=enable_vars,
+          dtype=dtype,
+          name='total_count'))
+
+  # Constrain probs away from 0 to avoid immense samples.
+  # See b/178842153.
+  logits_strategy = tfp_hps.constrained_tensors(
+      constraint_fn=lambda x: tf.minimum(x, 15.),
+      shape=tensorshape_util.as_list(batch_shape))
+  logits = draw(
+      tfp_hps.maybe_variable(
+          logits_strategy, enable_vars=enable_vars, dtype=dtype, name='logits'))
+
+  result_dist = tfd.ZeroInflatedNegativeBinomial(
+      inflated_loc_probs=inflated_loc_probs,
+      total_count=total_count,
+      logits=logits,
+      validate_args=validate_args)
   return result_dist
 
 

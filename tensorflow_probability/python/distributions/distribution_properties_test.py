@@ -63,6 +63,10 @@ INSTANTIABLE_BUT_NOT_SLICABLE = (
     'BatchReshape',
     'IncrementLogProb',
     'Sample',  # TODO(b/204210361)
+    # ZeroInflatedNegativeBinomial doesn't like parameters with
+    # mismatched batch sizes, and the distribution sampler used in
+    # testDistributions creates those.
+    'ZeroInflatedNegativeBinomial',
 )
 
 

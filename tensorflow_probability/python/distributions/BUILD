@@ -82,6 +82,7 @@ multi_substrate_py_library(
         ":hidden_markov_model",
         ":horseshoe",
         ":independent",
+        ":inflated",
         ":inverse_gamma",
         ":inverse_gaussian",
         ":johnson_su",
@@ -997,6 +998,25 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/math:special",
+    ],
+)
+
+multi_substrate_py_library(
+    name = "inflated",
+    srcs = ["inflated.py"],
+    deps = [
+        ":categorical",
+        ":deterministic",
+        ":distribution",
+        ":mixture",
+        ":negative_binomial",
+        # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:sigmoid",
+        "//tensorflow_probability/python/internal:auto_composite_tensor",
+        "//tensorflow_probability/python/internal:dtype_util",
+        "//tensorflow_probability/python/internal:parameter_properties",
+        "//tensorflow_probability/python/internal:tensor_util",
+        "//tensorflow_probability/python/util:deferred_tensor",
     ],
 )
 
@@ -3169,6 +3189,16 @@ multi_substrate_py_test(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/internal:test_util",
+    ],
+)
+
+multi_substrate_py_test(
+    name = "inflated_test",
+    srcs = ["inflated_test.py"],
+    deps = [
+        # numpy dep,
+        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

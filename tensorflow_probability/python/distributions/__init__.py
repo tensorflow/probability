@@ -61,6 +61,8 @@ from tensorflow_probability.python.distributions.half_student_t import HalfStude
 from tensorflow_probability.python.distributions.hidden_markov_model import HiddenMarkovModel
 from tensorflow_probability.python.distributions.horseshoe import Horseshoe
 from tensorflow_probability.python.distributions.independent import Independent
+from tensorflow_probability.python.distributions.inflated import Inflated
+from tensorflow_probability.python.distributions.inflated import ZeroInflatedNegativeBinomial
 from tensorflow_probability.python.distributions.inverse_gamma import InverseGamma
 from tensorflow_probability.python.distributions.inverse_gaussian import InverseGaussian
 from tensorflow_probability.python.distributions.johnson_su import JohnsonSU
@@ -208,6 +210,7 @@ __all__ = [
     'Horseshoe',
     'Independent',
     'independent_joint_distribution_from_structure',
+    'Inflated',
     'InverseGamma',
     'InverseGaussian',
     'JohnsonSU',
@@ -289,5 +292,6 @@ __all__ = [
     'Weibull',
     'WishartLinearOperator',
     'WishartTriL',
+    'ZeroInflatedNegativeBinomial',
     'Zipf',
 ]
