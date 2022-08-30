@@ -15,8 +15,8 @@
 """Sinh bijector."""
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.math import generic
 
 
 __all__ = [
@@ -65,4 +65,4 @@ class Sinh(bijector.AutoCompositeTensorBijector):
   # implement _inverse_log_det_jacobian because directly using
   # `-0.5 * math.log1psquare(y)` has lower numerical precision.
   def _forward_log_det_jacobian(self, x):
-    return tfp_math.log_cosh(x)
+    return generic.log_cosh(x)

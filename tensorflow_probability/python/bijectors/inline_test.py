@@ -19,7 +19,7 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import inline
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -29,45 +29,45 @@ class InlineBijectorTest(test_util.TestCase):
   """Tests correctness of the inline constructed bijector."""
 
   def testBijector(self):
-    inline = tfb.Inline(
+    bijector = inline.Inline(
         forward_fn=tf.exp,
         inverse_fn=tf.math.log,
         inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
         forward_min_event_ndims=0,
         name='exp')
 
-    self.assertStartsWith(inline.name, 'exp')
+    self.assertStartsWith(bijector.name, 'exp')
     x = [[[1., 2.], [3., 4.], [5., 6.]]]
     y = np.exp(x)
-    self.assertAllClose(y, self.evaluate(inline.forward(x)))
-    self.assertAllClose(x, self.evaluate(inline.inverse(y)))
+    self.assertAllClose(y, self.evaluate(bijector.forward(x)))
+    self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
     self.assertAllClose(
         -np.sum(np.log(y), axis=-1),
-        self.evaluate(inline.inverse_log_det_jacobian(y, event_ndims=1)))
+        self.evaluate(bijector.inverse_log_det_jacobian(y, event_ndims=1)))
     self.assertAllClose(
-        self.evaluate(-inline.inverse_log_det_jacobian(y, event_ndims=1)),
-        self.evaluate(inline.forward_log_det_jacobian(x, event_ndims=1)))
+        self.evaluate(-bijector.inverse_log_det_jacobian(y, event_ndims=1)),
+        self.evaluate(bijector.forward_log_det_jacobian(x, event_ndims=1)))
 
   def testIsIncreasing(self):
-    inline = tfb.Inline(
+    bijector = inline.Inline(
         forward_fn=tf.exp,
         inverse_fn=tf.math.log,
         inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
         forward_min_event_ndims=0,
         is_increasing=True,
         name='exp')
-    self.assertAllEqual(True, inline._internal_is_increasing())
-    inline = tfb.Inline(
+    self.assertAllEqual(True, bijector._internal_is_increasing())
+    bijector = inline.Inline(
         forward_fn=lambda x: tf.exp(x) * [1., -1],
         inverse_fn=lambda y: tf.math.log(y * [1., -1]),
         inverse_log_det_jacobian_fn=lambda y: -tf.math.log(y),
         forward_min_event_ndims=0,
         is_increasing=lambda: [True, False],
         name='exp')
-    self.assertAllEqual([True, False], inline._internal_is_increasing())
+    self.assertAllEqual([True, False], bijector._internal_is_increasing())
 
   def testShapeGetters(self):
-    bijector = tfb.Inline(
+    bijector = inline.Inline(
         forward_event_shape_tensor_fn=lambda x: tf.concat((x, [1]), 0),
         forward_event_shape_fn=lambda x: tensorshape_util.as_list(x) + [1],
         inverse_event_shape_tensor_fn=lambda x: x[:-1],

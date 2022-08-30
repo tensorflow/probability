@@ -19,8 +19,8 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import iterated_sigmoid_centered
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.math.gradient import batch_jacobian
@@ -31,7 +31,7 @@ class _IteratedSigmoidCenteredBijectorTest(object):
   """Tests correctness of Stick breaking transformation."""
 
   def testBijectorVector(self):
-    iterated_sigmoid = tfb.IteratedSigmoidCentered()
+    iterated_sigmoid = iterated_sigmoid_centered.IteratedSigmoidCentered()
     self.assertStartsWith(iterated_sigmoid.name, "iterated_sigmoid")
     x = self.dtype([[0., 0., 0.], -np.log([1 / 3., 1 / 2., 1.])])
     y = self.dtype([[0.25, 0.25, 0.25, 0.25], [0.5, 0.25, 0.125, 0.125]])
@@ -52,7 +52,7 @@ class _IteratedSigmoidCenteredBijectorTest(object):
         rtol=1e-7)
 
   def testBijectorUnknownShape(self):
-    iterated_sigmoid = tfb.IteratedSigmoidCentered()
+    iterated_sigmoid = iterated_sigmoid_centered.IteratedSigmoidCentered()
     self.assertStartsWith(iterated_sigmoid.name, "iterated_sigmoid")
     x_ = self.dtype([[0., 0., 0.], -np.log([1 / 3., 1 / 2., 1.])])
     y_ = self.dtype([[0.25, 0.25, 0.25, 0.25], [0.5, 0.25, 0.125, 0.125]])
@@ -77,7 +77,8 @@ class _IteratedSigmoidCenteredBijectorTest(object):
   def testShapeGetters(self):
     x = tf.TensorShape([4])
     y = tf.TensorShape([5])
-    bijector = tfb.IteratedSigmoidCentered(validate_args=True)
+    bijector = iterated_sigmoid_centered.IteratedSigmoidCentered(
+        validate_args=True)
     self.assertAllEqual(y, bijector.forward_event_shape(x))
     self.assertAllEqual(
         tensorshape_util.as_list(y),
@@ -90,7 +91,7 @@ class _IteratedSigmoidCenteredBijectorTest(object):
             bijector.inverse_event_shape_tensor(tensorshape_util.as_list(y))))
 
   def testBijectiveAndFinite(self):
-    iterated_sigmoid = tfb.IteratedSigmoidCentered()
+    iterated_sigmoid = iterated_sigmoid_centered.IteratedSigmoidCentered()
 
     # Grid of points in [-30, 30] x [-30, 30].
     x = np.mgrid[-30:30:0.5, -30:30:0.5].reshape(2, -1).T  # pylint: disable=invalid-slice-index
@@ -108,7 +109,7 @@ class _IteratedSigmoidCenteredBijectorTest(object):
   @test_util.jax_disable_test_missing_functionality(
       "https://github.com/google/jax/issues/1212")
   def testJacobianConsistent(self):
-    bijector = tfb.IteratedSigmoidCentered()
+    bijector = iterated_sigmoid_centered.IteratedSigmoidCentered()
     x = tf.constant((60 * np.random.rand(10) - 30).reshape(5, 2))
     jacobian_matrix = batch_jacobian(bijector.forward, x)
     # In our case, y[-1] is determined by all the other y, so we can drop it

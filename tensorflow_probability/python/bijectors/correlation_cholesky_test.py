@@ -21,8 +21,10 @@ import itertools
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import bijector as bijector_lib
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import correlation_cholesky
+from tensorflow_probability.python.bijectors import fill_triangular
 from tensorflow_probability.python.distributions import beta
 from tensorflow_probability.python.distributions import cholesky_lkj
 from tensorflow_probability.python.distributions import lkj
@@ -37,7 +39,7 @@ from tensorflow_probability.python.mcmc import transformed_kernel
 # Bijector for converting the image of CorrelationCholesky bijector to
 # unconstrained space; by only considering the strictly lower triangular entries
 # of the output matrices.
-class OutputToUnconstrained(tfb.Bijector):
+class OutputToUnconstrained(bijector_lib.Bijector):
 
   def __init__(self, name='output_to_unconstrained'):
     parameters = dict(locals())
@@ -55,7 +57,7 @@ class OutputToUnconstrained(tfb.Bijector):
     # lower triangular entries.
     n = x.shape[-1]
     t = tf.linalg.band_part(x[..., 1:, :-1], num_lower=n - 1, num_upper=0)
-    return tfb.FillTriangular().inverse(t)
+    return fill_triangular.FillTriangular().inverse(t)
 
   def _inverse_log_det_jacobian(self, y):
     return tf.zeros_like(y[..., 0])
@@ -71,7 +73,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         np.array([[1., 0., 0., 0.], [0.707107, 0.707107, 0., 0.],
                   [-0.666667, 0.666667, 0.333333, 0.], [0.5, -0.5, 0.7, 0.1]]))
 
-    b = tfb.CorrelationCholesky()
+    b = correlation_cholesky.CorrelationCholesky()
 
     y_ = self.evaluate(b.forward(x))
     self.assertAllClose(y, y_, atol=1e-5, rtol=1e-5)
@@ -97,7 +99,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
          [-0.833333, 0.5, 0.166667, 0.166667]],
     ])
 
-    b = tfb.CorrelationCholesky()
+    b = correlation_cholesky.CorrelationCholesky()
 
     y_ = self.evaluate(b.forward(x))
     self.assertAllClose(y, y_, atol=1e-5, rtol=1e-5)
@@ -118,7 +120,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
     x_shape = tf.TensorShape([5, 4, 6])
     y_shape = tf.TensorShape([5, 4, 4, 4])
 
-    b = tfb.CorrelationCholesky(validate_args=True)
+    b = correlation_cholesky.CorrelationCholesky(validate_args=True)
 
     x = tf.ones(shape=x_shape, dtype=tf.float32)
     y_ = b.forward(x)
@@ -144,7 +146,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
 
   def testShapeError(self):
 
-    b = tfb.FillTriangular(validate_args=True)
+    b = fill_triangular.FillTriangular(validate_args=True)
 
     x_shape_bad = tf.TensorShape([5, 4, 7])
     with self.assertRaisesRegexp(ValueError, 'is not a triangular number'):
@@ -180,7 +182,8 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         step_size=0.3)
 
     kernel = transformed_kernel.TransformedTransitionKernel(
-        inner_kernel=inner_kernel, bijector=tfb.CorrelationCholesky())
+        inner_kernel=inner_kernel,
+        bijector=correlation_cholesky.CorrelationCholesky())
 
     num_chains = 10
     num_total_samples = 30000
@@ -229,7 +232,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def testTheoreticalFldj(self):
-    bijector = tfb.CorrelationCholesky()
+    bijector = correlation_cholesky.CorrelationCholesky()
     x = np.linspace(-50, 50, num=30).reshape(5, 6).astype(np.float64)
     y = self.evaluate(bijector.forward(x))
     bijector_test_util.assert_bijective_and_finite(
@@ -265,7 +268,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
         v.initializer for v in (x, y, forward_event_ndims, inverse_event_ndims)
     ])
 
-    bijector = tfb.CorrelationCholesky()
+    bijector = correlation_cholesky.CorrelationCholesky()
     self.assertAllClose(
         y_, self.evaluate(bijector.forward(x)), atol=1e-5, rtol=1e-5)
     self.assertAllClose(
@@ -279,7 +282,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
 
   @parameterized.parameters(itertools.product([2, 3, 4, 5, 6, 7], [1., 2., 3.]))
   def testBijectiveWithLKJSamples(self, dimension, concentration):
-    bijector = tfb.CorrelationCholesky()
+    bijector = correlation_cholesky.CorrelationCholesky()
     lkj_dist = lkj.LKJ(
         dimension=dimension,
         concentration=np.float64(concentration),
@@ -301,7 +304,7 @@ class CorrelationCholeskyBijectorTest(test_util.TestCase):
   @parameterized.parameters(itertools.product([2, 3, 4, 5, 6, 7], [1., 2., 3.]))
   @test_util.numpy_disable_gradient_test
   def testJacobianWithLKJSamples(self, dimension, concentration):
-    bijector = tfb.CorrelationCholesky()
+    bijector = correlation_cholesky.CorrelationCholesky()
     lkj_dist = lkj.LKJ(
         dimension=dimension,
         concentration=np.float64(concentration),

@@ -16,10 +16,11 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.internal import cache_util
 from tensorflow_probability.python.internal import prefer_static
+from tensorflow_probability.python.math import diag_jacobian
+from tensorflow_probability.python.math.ode import dormand_prince
 
 
 # TODO(b/144156734) Consider moving trace estimators to stand alone module.
@@ -123,7 +124,7 @@ def trace_jacobian_exact(ode_fn, state_shape, dtype):
     state, _ = state_log_det_jac
     ode_fn_with_time = lambda x: ode_fn(time, x, **kwargs)
     batch_shape = [prefer_static.size0(state)]
-    state_time_derivative, diag_jac = tfp_math.diag_jacobian(
+    state_time_derivative, diag_jac = diag_jacobian.diag_jacobian(
         xs=state, fn=ode_fn_with_time, sample_shape=batch_shape)
     # tfp_math.diag_jacobian returns lists
     if isinstance(state_time_derivative, list):
@@ -310,7 +311,7 @@ class FFJORD(bijector.Bijector):
       self._final_time = final_time
       self._ode_solve_fn = ode_solve_fn
       if self._ode_solve_fn is None:
-        self._ode_solver = tfp_math.ode.DormandPrince()
+        self._ode_solver = dormand_prince.DormandPrince()
         self._ode_solve_fn = self._ode_solver.solve
       self._trace_augmentation_fn = trace_augmentation_fn
       self._state_time_derivative_fn = state_time_derivative_fn

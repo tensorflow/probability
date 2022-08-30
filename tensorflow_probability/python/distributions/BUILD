@@ -4510,6 +4510,7 @@ py_test(
         # numpy dep,
         # six dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/experimental/util:composite_tensor",
         "//tensorflow_probability/python/internal:hypothesis_testlib",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:test_util",

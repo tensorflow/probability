@@ -16,7 +16,9 @@
 
 # Dependency imports
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import fill_scale_tril
+from tensorflow_probability.python.bijectors import softplus
 from tensorflow_probability.python.internal import test_util
 
 
@@ -30,8 +32,7 @@ class FillScaleTriLBijectorTest(test_util.TestCase):
     y = np.float32(np.array([[np.exp(2) + shift, 0.],
                              [.5, np.exp(-1) + shift]]))
 
-    b = tfb.FillScaleTriL(
-        diag_bijector=tfb.Exp(), diag_shift=shift)
+    b = fill_scale_tril.FillScaleTriL(diag_bijector=exp.Exp(), diag_shift=shift)
 
     y_ = self.evaluate(b.forward(x))
     self.assertAllClose(y, y_, rtol=1e-4)
@@ -45,8 +46,8 @@ class FillScaleTriLBijectorTest(test_util.TestCase):
     # event size 6 to specify 3x3 triangular matrices.
     batch_shape = [2, 1]
     x = np.random.randn(*(batch_shape + [6])).astype(np.float32)
-    b = tfb.FillScaleTriL(
-        diag_bijector=tfb.Softplus(), diag_shift=3.14159)
+    b = fill_scale_tril.FillScaleTriL(
+        diag_bijector=softplus.Softplus(), diag_shift=3.14159)
     y = self.evaluate(b.forward(x))
     self.assertAllEqual(y.shape, batch_shape + [3, 3])
 

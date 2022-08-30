@@ -19,8 +19,8 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import gompertz_cdf
 from tensorflow_probability.python.internal import test_util
 
 
@@ -31,7 +31,7 @@ class GompertzCDF(test_util.TestCase):
   def testBijector(self):
     concentration = 0.3
     rate = 1.
-    bijector = tfb.GompertzCDF(
+    bijector = gompertz_cdf.GompertzCDF(
         concentration=concentration, rate=rate, validate_args=True)
     self.assertStartsWith(bijector.name, "gompertz")
     x = np.array([[[0.1], [0.5], [1.4], [3.]]], dtype=np.float32)
@@ -51,11 +51,15 @@ class GompertzCDF(test_util.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.GompertzCDF(concentration=0.2, rate=0.2), lower_x=1., upper_x=10.,
-        eval_func=self.evaluate, rtol=0.05)
+        gompertz_cdf.GompertzCDF(concentration=0.2, rate=0.2),
+        lower_x=1.,
+        upper_x=10.,
+        eval_func=self.evaluate,
+        rtol=0.05)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.GompertzCDF(concentration=1., rate=0.01, validate_args=True)
+    bijector = gompertz_cdf.GompertzCDF(
+        concentration=1., rate=0.01, validate_args=True)
     x = np.logspace(-10, 2, num=10).astype(np.float32)
     y = np.linspace(0.01, 0.99, num=10).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
@@ -64,7 +68,7 @@ class GompertzCDF(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def testVariableConcentration(self):
     x = tf.Variable(1.)
-    b = tfb.GompertzCDF(concentration=x, rate=1., validate_args=True)
+    b = gompertz_cdf.GompertzCDF(concentration=x, rate=1., validate_args=True)
     self.evaluate(x.initializer)
     self.assertIs(x, b.concentration)
     self.assertEqual((), self.evaluate(b.forward(1.)).shape)
@@ -75,7 +79,7 @@ class GompertzCDF(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def testVariableRate(self):
     x = tf.Variable(1.)
-    b = tfb.GompertzCDF(concentration=1., rate=x, validate_args=True)
+    b = gompertz_cdf.GompertzCDF(concentration=1., rate=x, validate_args=True)
     self.evaluate(x.initializer)
     self.assertIs(x, b.rate)
     self.assertEqual((), self.evaluate(b.forward(1.)).shape)

@@ -20,8 +20,11 @@ from absl.testing import parameterized
 import numpy as np
 from scipy import special
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import chain
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.bijectors import sigmoid
 from tensorflow_probability.python.internal import test_util
 
 
@@ -30,11 +33,11 @@ class SigmoidBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = (1 + exp(-X))^-1 transformation."""
 
   def testBijector(self):
-    self.assertStartsWith(tfb.Sigmoid().name, 'sigmoid')
+    self.assertStartsWith(sigmoid.Sigmoid().name, 'sigmoid')
     x = np.linspace(-10., 10., 100).reshape([2, 5, 10]).astype(np.float32)
     y = special.expit(x)
     ildj = -np.log(y) - np.log1p(-y)
-    bijector = tfb.Sigmoid()
+    bijector = sigmoid.Sigmoid()
     self.assertAllClose(
         y, self.evaluate(bijector.forward(x)), atol=0., rtol=1e-2)
     self.assertAllClose(
@@ -50,7 +53,10 @@ class SigmoidBijectorTest(test_util.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.Sigmoid(), lower_x=-7., upper_x=7., eval_func=self.evaluate,
+        sigmoid.Sigmoid(),
+        lower_x=-7.,
+        upper_x=7.,
+        eval_func=self.evaluate,
         rtol=.1)
 
   def testBijectiveAndFinite(self):
@@ -58,7 +64,12 @@ class SigmoidBijectorTest(test_util.TestCase):
     eps = 1e-3
     y = np.linspace(eps, 1. - eps, 100).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
-        tfb.Sigmoid(), x, y, eval_func=self.evaluate, event_ndims=0, atol=0.,
+        sigmoid.Sigmoid(),
+        x,
+        y,
+        eval_func=self.evaluate,
+        event_ndims=0,
+        atol=0.,
         rtol=1e-4)
 
 
@@ -70,10 +81,13 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
     low = np.array([[-3.], [0.], [5.]]).astype(np.float32)
     high = 12.
 
-    bijector = tfb.Sigmoid(low=low, high=high, validate_args=True)
+    bijector = sigmoid.Sigmoid(low=low, high=high, validate_args=True)
 
-    equivalent_bijector = tfb.Chain([
-        tfb.Shift(shift=low), tfb.Scale(scale=high-low), tfb.Sigmoid()])
+    equivalent_bijector = chain.Chain([
+        shift.Shift(shift=low),
+        scale.Scale(scale=high - low),
+        sigmoid.Sigmoid()
+    ])
 
     x = [[[1., 2., -5., -0.3]]]
     y = self.evaluate(equivalent_bijector.forward(x))
@@ -97,10 +111,13 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
     low = -0.08587775
     high = 0.12498104
 
-    bijector = tfb.Sigmoid(low=low, high=high, validate_args=True)
+    bijector = sigmoid.Sigmoid(low=low, high=high, validate_args=True)
 
-    equivalent_bijector = tfb.Chain([
-        tfb.Shift(shift=low), tfb.Scale(scale=high-low), tfb.Sigmoid()])
+    equivalent_bijector = chain.Chain([
+        shift.Shift(shift=low),
+        scale.Scale(scale=high - low),
+        sigmoid.Sigmoid()
+    ])
 
     self.assertAllLessEqual(self.evaluate(bijector.forward(x)), high)
 
@@ -112,7 +129,7 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
   def testScalarCongruency(self):
     low = -2.
     high = 5.
-    bijector = tfb.Sigmoid(low=low, high=high, validate_args=True)
+    bijector = sigmoid.Sigmoid(low=low, high=high, validate_args=True)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-5., upper_x=3.5, eval_func=self.evaluate,
         rtol=0.05)
@@ -120,7 +137,7 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
   def testBijectiveAndFinite(self):
     low = -5.
     high = 8.
-    bijector = tfb.Sigmoid(low=low, high=high, validate_args=True)
+    bijector = sigmoid.Sigmoid(low=low, high=high, validate_args=True)
     x = np.linspace(-10, 10, num=100).astype(np.float32)
     eps = 1e-6
     y = np.linspace(low + eps, high - eps, num=100).astype(np.float32)
@@ -132,7 +149,7 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
     high = np.array([1., 2., 3.], dtype=np.float32)
 
     with self.assertRaisesOpError('not defined when `low` >= `high`'):
-      bijector = tfb.Sigmoid(low=low, high=high, validate_args=True)
+      bijector = sigmoid.Sigmoid(low=low, high=high, validate_args=True)
       self.evaluate(bijector.forward(3.))
 
   def testEdgeCaseRequiringClipping(self):
@@ -142,7 +159,7 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
         0.010499111, 100, dtype=np.float32)[:, np.newaxis]
     self.assertAllEqual([100, 1], hi.shape)
     xs = test_util.floats_near(9.814646, 100, dtype=np.float32)
-    bijector = tfb.Sigmoid(low=lo, high=hi, validate_args=True)
+    bijector = sigmoid.Sigmoid(low=lo, high=hi, validate_args=True)
     answers = bijector.forward(xs)
     self.assertAllEqual([100, 100], answers.shape)
     for ans1, hi1 in zip(self.evaluate(answers), hi):
@@ -160,7 +177,7 @@ class ShiftedScaledSigmoidBijectorTest(test_util.TestCase):
 
     @tf.function(autograph=False, jit_compile=do_compile)
     def fn(x):
-      return tf.math.log(tfb.Sigmoid().forward(x))
+      return tf.math.log(sigmoid.Sigmoid().forward(x))
 
     vals = fn(x)
     true_vals = -np.log1p(np.exp(-x))

@@ -18,8 +18,8 @@
 
 from absl.testing import parameterized
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import sinh
 from tensorflow_probability.python.internal import test_util
 
 
@@ -28,11 +28,11 @@ class SinhBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = sinh(X) transformation."""
 
   def testBijector(self):
-    self.assertStartsWith(tfb.Sinh().name, "sinh")
+    self.assertStartsWith(sinh.Sinh().name, "sinh")
     x = np.linspace(-50., 50., 100).reshape([2, 5, 10]).astype(np.float64)
     y = np.sinh(x)
     ildj = -0.5 * np.log1p(np.square(y))
-    bijector = tfb.Sinh()
+    bijector = sinh.Sinh()
     self.assertAllClose(
         y, self.evaluate(bijector.forward(x)), atol=0., rtol=1e-2)
     self.assertAllClose(
@@ -48,12 +48,16 @@ class SinhBijectorTest(test_util.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.Sinh(), lower_x=-7., upper_x=7., eval_func=self.evaluate,
-        n=int(1e4), rtol=.5)
+        sinh.Sinh(),
+        lower_x=-7.,
+        upper_x=7.,
+        eval_func=self.evaluate,
+        n=int(1e4),
+        rtol=.5)
 
   @parameterized.parameters(np.float32, np.float64)
   def testBijectiveAndFinite(self, dtype):
-    bijector = tfb.Sinh(validate_args=True)
+    bijector = sinh.Sinh(validate_args=True)
     # Use bounds that are very large to check that the transformation remains
     # bijective. We stray away from the largest/smallest value to avoid issues
     # at the boundary since XLA sinh will return `inf` for the largest value.

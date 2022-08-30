@@ -20,9 +20,14 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions
+from tensorflow_probability.python.bijectors import batch_normalization
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import reshape
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import test_util
 
 
@@ -65,7 +70,7 @@ class BatchNormTest(test_util.TestCase,
     # minibatch that it normalized (instead of moving average assignment).
     layer = tf.keras.layers.BatchNormalization(
         axis=event_dims, momentum=0., epsilon=0.)
-    batch_norm = tfb.BatchNormalization(
+    batch_norm = batch_normalization.BatchNormalization(
         batchnorm_layer=layer, training=training)
     # Minibatch statistics are saved only after norm_x has been computed.
     norm_x = batch_norm.inverse(x)
@@ -145,20 +150,18 @@ class BatchNormTest(test_util.TestCase,
   def testLogProb(self, event_shape, event_dims, training, layer_cls):
     training = tf1.placeholder_with_default(training, (), "training")
     layer = layer_cls(axis=event_dims, epsilon=0.)
-    batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
-                                        training=training)
-    base_dist = distributions.MultivariateNormalDiag(
+    batch_norm = batch_normalization.BatchNormalization(
+        batchnorm_layer=layer, training=training)
+    base_dist = mvn_diag.MultivariateNormalDiag(
         loc=np.zeros(np.prod(event_shape), dtype=np.float32))
     # Reshape the events.
     if isinstance(event_shape, int):
       event_shape = [event_shape]
-    base_dist = distributions.TransformedDistribution(
+    base_dist = transformed_distribution.TransformedDistribution(
         distribution=base_dist,
-        bijector=tfb.Reshape(event_shape_out=event_shape))
-    dist = distributions.TransformedDistribution(
-        distribution=base_dist,
-        bijector=batch_norm,
-        validate_args=True)
+        bijector=reshape.Reshape(event_shape_out=event_shape))
+    dist = transformed_distribution.TransformedDistribution(
+        distribution=base_dist, bijector=batch_norm, validate_args=True)
     samples = dist.sample(int(1e5))
     # No volume distortion since training=False, bijector is initialized
     # to the identity transformation.
@@ -177,10 +180,10 @@ class BatchNormTest(test_util.TestCase,
     dims = 4
     training = tf1.placeholder_with_default(False, (), "training")
     layer = layer_cls(epsilon=0.)
-    batch_norm = tfb.BatchNormalization(batchnorm_layer=layer,
-                                        training=training)
-    dist = distributions.TransformedDistribution(
-        distribution=distributions.Sample(distributions.Normal(0., 1.), [dims]),
+    batch_norm = batch_normalization.BatchNormalization(
+        batchnorm_layer=layer, training=training)
+    dist = transformed_distribution.TransformedDistribution(
+        distribution=sample.Sample(normal.Normal(0., 1.), [dims]),
         bijector=batch_norm,
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
@@ -199,10 +202,11 @@ class BatchNormTest(test_util.TestCase,
     dims = 4
     training = tf1.placeholder_with_default(False, (), "training")
     layer = layer_cls(epsilon=0.)
-    batch_norm = tfb.Invert(
-        tfb.BatchNormalization(batchnorm_layer=layer, training=training))
-    dist = distributions.TransformedDistribution(
-        distribution=distributions.Sample(distributions.Normal(0., 1.), [dims]),
+    batch_norm = invert.Invert(
+        batch_normalization.BatchNormalization(
+            batchnorm_layer=layer, training=training))
+    dist = transformed_distribution.TransformedDistribution(
+        distribution=sample.Sample(normal.Normal(0., 1.), [dims]),
         bijector=batch_norm,
         validate_args=True)
     self.run_test_sample_consistent_log_prob(
@@ -218,9 +222,9 @@ class BatchNormTest(test_util.TestCase,
     # tf1.layers.BatchNormalization() here.
     layer = None
 
-    dist = distributions.TransformedDistribution(
-        distribution=distributions.Sample(distributions.Normal(0., 1.), [1]),
-        bijector=tfb.BatchNormalization(batchnorm_layer=layer),
+    dist = transformed_distribution.TransformedDistribution(
+        distribution=sample.Sample(normal.Normal(0., 1.), [1]),
+        bijector=batch_normalization.BatchNormalization(batchnorm_layer=layer),
         validate_args=True)
 
     x_ = tf.keras.Input(shape=(1,))
@@ -240,7 +244,7 @@ class BatchNormTest(test_util.TestCase,
     channels = 10
     x = np.random.uniform(size=[nbatch, channels]).astype(np.float32)
 
-    bijector = tfb.BatchNormalization(training=False)
+    bijector = batch_normalization.BatchNormalization(training=False)
     bijector.batchnorm.build(x.shape)
     self.evaluate([v.initializer for v in bijector.variables])
 

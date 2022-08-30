@@ -20,8 +20,10 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import transpose
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -52,7 +54,7 @@ class _TransposeBijectorTest(object):
       actual_y = tf1.placeholder_with_default(actual_y_, shape=None)
       perm = tf1.placeholder_with_default(perm_, shape=[3])
 
-    bijector = tfb.Transpose(perm=perm, validate_args=True)
+    bijector = transpose.Transpose(perm=perm, validate_args=True)
     y = bijector.forward(actual_x)
     x = bijector.inverse(actual_y)
     fldj = bijector.forward_log_det_jacobian(x, event_ndims=3)
@@ -89,7 +91,7 @@ class _TransposeBijectorTest(object):
       actual_y = tf1.placeholder_with_default(actual_y_, shape=None)
       rightmost_transposed_ndims = tf.constant(rightmost_transposed_ndims_)
 
-    bijector = tfb.Transpose(
+    bijector = transpose.Transpose(
         rightmost_transposed_ndims=rightmost_transposed_ndims,
         validate_args=True)
     y = bijector.forward(actual_x)
@@ -109,10 +111,10 @@ class _TransposeBijectorTest(object):
     msg = '`perm` must be a valid permutation vector.'
     if self.is_static or tf.executing_eagerly():
       with self.assertRaisesRegexp(ValueError, msg):
-        bijector = tfb.Transpose(perm=[1, 2], validate_args=True)
+        bijector = transpose.Transpose(perm=[1, 2], validate_args=True)
     else:
       with self.assertRaisesOpError(msg):
-        bijector = tfb.Transpose(
+        bijector = transpose.Transpose(
             perm=tf1.placeholder_with_default([1, 2], shape=[2]),
             validate_args=True)
         self.evaluate(bijector.forward([[0, 1]]))
@@ -120,14 +122,14 @@ class _TransposeBijectorTest(object):
   def testInvalidEventNdimsException(self):
     msg = '`rightmost_transposed_ndims` must be non-negative.'
     with self.assertRaisesRegexp(ValueError, msg):
-      tfb.Transpose(rightmost_transposed_ndims=-1, validate_args=True)
+      transpose.Transpose(rightmost_transposed_ndims=-1, validate_args=True)
 
   def testTransformedDist(self):
-    d = tfd.Independent(tfd.Normal(tf.zeros([4, 3, 2]), 1), 3)
-    dt = tfb.Transpose([1, 0])(d)
+    d = independent.Independent(normal.Normal(tf.zeros([4, 3, 2]), 1), 3)
+    dt = transpose.Transpose([1, 0])(d)
     self.assertEqual((4, 3, 2), d.event_shape)
     self.assertEqual((4, 2, 3), dt.event_shape)
-    dt = tfb.Invert(tfb.Transpose([1, 0, 2]))(d)
+    dt = invert.Invert(transpose.Transpose([1, 0, 2]))(d)
     self.assertEqual((4, 3, 2), d.event_shape)
     self.assertEqual((3, 4, 2), dt.event_shape)
 
@@ -141,7 +143,7 @@ class _TransposeBijectorTest(object):
         perm = tf.convert_to_tensor(value=perm)
         if not self.is_static:
           perm = tf1.placeholder_with_default(perm, shape=perm.shape)
-      return tfb.Transpose(
+      return transpose.Transpose(
           perm, rightmost_transposed_ndims=rightmost_transposed_ndims)
 
     for is_shape_static, shape, shape_t in [
@@ -193,7 +195,7 @@ class _TransposeBijectorTest(object):
     ])
     self.assertAllEqual([2, None, None], tf.get_static_value(
         perm, partial=True))
-    b = tfb.Transpose(perm)
+    b = transpose.Transpose(perm)
     self.assertAllEqual([8, 5, None, None],
                         b.forward_event_shape([8, 7, 6, 5]).as_list())
     self.assertAllEqual([8, None, None, 7],
@@ -206,7 +208,7 @@ class _TransposeBijectorTest(object):
         tf.constant(1)
     ])
     self.assertAllEqual([2, None, 1], tf.get_static_value(perm, partial=True))
-    b = tfb.Transpose(perm)
+    b = transpose.Transpose(perm)
     self.assertAllEqual([8, 5, 7, 6], b.forward_event_shape([8, 7, 6, 5]))
     self.assertAllEqual([8, 6, 5, 7], b.inverse_event_shape([8, 7, 6, 5]))
 
@@ -214,8 +216,8 @@ class _TransposeBijectorTest(object):
     message = '`rightmost_transposed_ndims` must be non-negative'
     with self.assertRaisesRegexp(Exception, message):
       ndims = np.int32(-3)
-      bijector = tfb.Transpose(rightmost_transposed_ndims=ndims,
-                               validate_args=True)
+      bijector = transpose.Transpose(
+          rightmost_transposed_ndims=ndims, validate_args=True)
       x = np.random.randn(4, 2, 3)
       _ = self.evaluate(bijector.forward(x))
 
@@ -223,7 +225,7 @@ class _TransposeBijectorTest(object):
     message = '`perm` must be a valid permutation vector'
     with self.assertRaisesRegexp(Exception, message):
       permutation = np.int32([1, 0, 1])
-      bijector = tfb.Transpose(perm=permutation, validate_args=True)
+      bijector = transpose.Transpose(perm=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)
       _ = self.evaluate(bijector.forward(x))
 
@@ -232,7 +234,7 @@ class _TransposeBijectorTest(object):
     permutation = tf.Variable(np.int32([1, 0, 1]))
     self.evaluate(permutation.initializer)
     with self.assertRaisesRegexp(Exception, message):
-      bijector = tfb.Transpose(perm=permutation, validate_args=True)
+      bijector = transpose.Transpose(perm=permutation, validate_args=True)
       x = np.random.randn(4, 2, 3)
       _ = self.evaluate(bijector.forward(x))
 
@@ -240,7 +242,7 @@ class _TransposeBijectorTest(object):
     message = '`perm` must be a valid permutation vector'
     permutation = tf.Variable(np.int32([1, 0, 2]))
     self.evaluate(permutation.initializer)
-    bijector = tfb.Transpose(perm=permutation, validate_args=True)
+    bijector = transpose.Transpose(perm=permutation, validate_args=True)
     with self.assertRaisesRegexp(Exception, message):
       with tf.control_dependencies([permutation.assign([1, 0, 1])]):
         x = np.random.randn(4, 2, 3)

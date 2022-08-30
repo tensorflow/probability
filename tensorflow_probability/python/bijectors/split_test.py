@@ -20,7 +20,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import split
 
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
@@ -43,7 +43,7 @@ class _SplitBijectorTest(object):
       self, num_or_size_splits, expected_split_sizes, shape_in, axis):
     """Do a basic sanity check of forward, inverse, jacobian."""
     num_or_size_splits = self.build_input(num_or_size_splits)
-    bijector = tfb.Split(num_or_size_splits, axis=axis, validate_args=True)
+    bijector = split.Split(num_or_size_splits, axis=axis, validate_args=True)
 
     self.assertStartsWith(bijector.name, 'split')
     x = np.random.rand(*shape_in)
@@ -81,7 +81,7 @@ class _SplitBijectorTest(object):
 
   def testCompositeTensor(self):
     split_sizes = self.build_input([1, 2, 2])
-    bijector = tfb.Split(split_sizes, validate_args=True)
+    bijector = split.Split(split_sizes, validate_args=True)
     x = tf.ones([3, 2, 5])
     flat = tf.nest.flatten(bijector, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(bijector, flat, expand_composites=True)
@@ -92,12 +92,12 @@ class _SplitBijectorTest(object):
   def testAssertRaisesNonVectorSplitSizes(self):
     split_sizes = self.build_input([[1, 2, 2]])
     with self.assertRaisesRegexp(ValueError, 'must be an integer or 1-D'):
-      tfb.Split(split_sizes, validate_args=True)
+      split.Split(split_sizes, validate_args=True)
 
   def testAssertRaisesWrongNumberOfOutputs(self):
     split_sizes = self.build_input([5, 3, -1])
     y = [np.random.rand(2, i) for i in [5, 3, 1, 2]]
-    bijector = tfb.Split(split_sizes, validate_args=True)
+    bijector = split.Split(split_sizes, validate_args=True)
     with self.assertRaisesRegexp(
         ValueError, "don't have the same sequence length"):
       self.evaluate(bijector.inverse(y))
@@ -105,14 +105,14 @@ class _SplitBijectorTest(object):
   def testAssertRaisesNumSplitsNonDivisible(self):
     num_splits = 3
     x = np.random.rand(4, 5, 6)
-    bijector = tfb.Split(num_splits, axis=-2, validate_args=True)
+    bijector = split.Split(num_splits, axis=-2, validate_args=True)
     with self.assertRaisesRegexp(ValueError, 'number of splits'):
       self.evaluate(bijector.forward(x))
 
   def testAssertRaisesWrongNumSplits(self):
     num_splits = 4
     y = [np.random.rand(2, 3)] * 3
-    bijector = tfb.Split(num_splits, validate_args=True)
+    bijector = split.Split(num_splits, validate_args=True)
     with self.assertRaisesRegexp(
         ValueError, "don't have the same sequence length"):
       self.evaluate(bijector.inverse(y))
@@ -121,20 +121,20 @@ class _SplitBijectorTest(object):
   def _testAssertRaisesMultipleUnknownSplitSizes(self):
     split_sizes = self.build_input([-1, 4, -1, 8])
     with self.assertRaisesError('must have at most one'):
-      bijector = tfb.Split(split_sizes, validate_args=True)
+      bijector = split.Split(split_sizes, validate_args=True)
       self.evaluate(bijector.forward(tf.zeros((3, 14))))
 
   def _testAssertRaisesNegativeSplitSizes(self):
     split_sizes = self.build_input([-2, 3, 5])
     with self.assertRaisesError('must be either non-negative integers or'):
-      bijector = tfb.Split(split_sizes, validate_args=True)
+      bijector = split.Split(split_sizes, validate_args=True)
       self.evaluate(bijector.forward(tf.zeros((4, 10))))
 
   def _testAssertRaisesMismatchedInputShape(self):
     split_sizes = self.build_input([5, 3, 4])
     x = tf.Variable(tf.zeros((3, 10)), shape=None)
     self.evaluate(x.initializer)
-    bijector = tfb.Split(split_sizes, validate_args=True)
+    bijector = split.Split(split_sizes, validate_args=True)
     with self.assertRaisesError('size of the input along `axis`'):
       self.evaluate(bijector.forward(x))
 
@@ -142,14 +142,14 @@ class _SplitBijectorTest(object):
     split_sizes = self.build_input([-1, 2, 3])
     x = tf.Variable(tf.zeros((2, 4)), shape=None)
     self.evaluate(x.initializer)
-    bijector = tfb.Split(split_sizes, validate_args=True)
+    bijector = split.Split(split_sizes, validate_args=True)
     with self.assertRaisesError('size of the input along `axis`'):
       self.evaluate(bijector.forward(x))
 
   def _testAssertRaisesMismatchedOutputShapes(self):
     split_sizes = self.build_input([5, -1, 3])
     y = [np.random.rand(3, 1, i) for i in [6, 2, 3]]
-    bijector = tfb.Split(split_sizes, validate_args=True)
+    bijector = split.Split(split_sizes, validate_args=True)
     if tf.get_static_value(split_sizes) is not None:
       with self.assertRaisesError('does not match expected `split_size`'):
         self.evaluate(bijector.inverse(y))
@@ -204,7 +204,7 @@ class SplitBijectorTestStatic(test_util.TestCase, _SplitBijectorTest):
     shape_in_static = tf.TensorShape([total_size, 2])
     shape_out_static = [
         tf.TensorShape([d, 2]) for d in expected_split_sizes]
-    bijector = tfb.Split(
+    bijector = split.Split(
         num_or_size_splits=num_or_size_splits, axis=-2, validate_args=True)
 
     # Test that forward_ and inverse_event_shape are correct when
@@ -321,7 +321,7 @@ class SplitBijectorTestDynamic(test_util.TestCase, _SplitBijectorTest):
     shape_in_static = tf.TensorShape([total_size, 2])
     shape_out_static = [
         tf.TensorShape([d, 2]) for d in expected_split_sizes]
-    bijector = tfb.Split(
+    bijector = split.Split(
         num_or_size_splits=split_sizes, axis=-2, validate_args=True)
 
     output_shape = [[None, 2]] * 3
@@ -347,7 +347,7 @@ class SplitBijectorTestDynamic(test_util.TestCase, _SplitBijectorTest):
     split_sizes = tf1.placeholder_with_default([-1, 2, 1], shape=[None])
     with self.assertRaisesRegexp(
         ValueError, 'must have a statically-known number of elements'):
-      tfb.Split(num_or_size_splits=split_sizes, validate_args=True)
+      split.Split(num_or_size_splits=split_sizes, validate_args=True)
 
   def testAssertRaisesTooSmallInputShape(self):
     self._testAssertRaisesTooSmallInputShape()

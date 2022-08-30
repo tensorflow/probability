@@ -21,14 +21,12 @@ from absl import logging
 import hypothesis.strategies as hps
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.distributions import lkj
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensorshape_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 SPECIAL_BIJECTORS = [
     'Composition',
@@ -480,7 +478,7 @@ def distribution_filter_for(bijector):
       # The isinstance check will be redundant when the
       # `distribution_eligilibility_filter_for` above has been used, but we keep
       # it here for safety.
-      return isinstance(dist, tfd.LKJ) and dist.input_output_cholesky
+      return isinstance(dist, lkj.LKJ) and dist.input_output_cholesky
   else:
     additional_check = lambda dist: True
 

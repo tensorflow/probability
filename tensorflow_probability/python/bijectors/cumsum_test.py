@@ -19,8 +19,8 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import cumsum
 from tensorflow_probability.python.internal import test_util
 
 
@@ -31,10 +31,10 @@ class _CumsumBijectorTest(test_util.TestCase):
   def testInvalidAxis(self):
     with self.assertRaisesRegexp(ValueError,
                                  r'Argument `axis` must be negative.*'):
-      tfb.Cumsum(axis=0, validate_args=True)
+      cumsum.Cumsum(axis=0, validate_args=True)
     with self.assertRaisesRegexp(TypeError,
                                  r'Argument `axis` is not an `int` type\.*'):
-      tfb.Cumsum(axis=-1., validate_args=True)
+      cumsum.Cumsum(axis=-1., validate_args=True)
 
   def testBijector(self):
     self._checkBijectorInAllDims(np.arange(5.))
@@ -42,7 +42,7 @@ class _CumsumBijectorTest(test_util.TestCase):
     self._checkBijectorInAllDims(np.reshape([np.arange(5.)] * 4, [5, 2, 2]))
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.Cumsum(validate_args=True)
+    bijector = cumsum.Cumsum(validate_args=True)
     x = np.linspace(-10, 10, num=10).astype(np.float32)
     y = np.cumsum(x, axis=-1)
     bijector_test_util.assert_bijective_and_finite(
@@ -62,7 +62,7 @@ class _CumsumBijectorTest(test_util.TestCase):
     """Helper for `testBijector`."""
     x = self._build_tensor(x)
     for axis in range(-self.evaluate(tf.rank(x)), 0):
-      bijector = tfb.Cumsum(axis=axis, validate_args=True)
+      bijector = cumsum.Cumsum(axis=axis, validate_args=True)
       self.assertStartsWith(bijector.name, 'cumsum')
 
       y = tf.cumsum(x, axis=axis)
@@ -74,7 +74,7 @@ class _CumsumBijectorTest(test_util.TestCase):
     event_ndims = len(x.shape) - 1
     self.assertGreaterEqual(event_ndims, 1)
 
-    bijector = tfb.Cumsum(axis=-event_ndims, validate_args=True)
+    bijector = cumsum.Cumsum(axis=-event_ndims, validate_args=True)
     fldj = bijector.forward_log_det_jacobian(
         self._build_tensor(x), event_ndims=event_ndims)
     fldj_theoretical = bijector_test_util.get_fldj_theoretical(

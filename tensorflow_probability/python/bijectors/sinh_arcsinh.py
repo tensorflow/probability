@@ -16,13 +16,14 @@
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import softplus as softplus_bijector
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.math import numeric
 
 __all__ = [
     'SinhArcsinh',
@@ -146,8 +147,8 @@ class SinhArcsinh(bijector.AutoCompositeTensorBijector):
     multiplier = self._output_multiplier(tailweight)
     y = y / multiplier
 
-    return (tfp_math.log_cosh(tf.asinh(y) / tailweight - self.skewness) -
-            0.5 * tfp_math.log1psquare(y) -
+    return (generic.log_cosh(tf.asinh(y) / tailweight - self.skewness) -
+            0.5 * numeric.log1psquare(y) -
             tf.math.log(tailweight) - tf.math.log(multiplier))
 
   def _forward_log_det_jacobian(self, x):
@@ -159,8 +160,8 @@ class SinhArcsinh(bijector.AutoCompositeTensorBijector):
 
     tailweight = tf.convert_to_tensor(self.tailweight)
 
-    return (tfp_math.log_cosh((tf.asinh(x) + self.skewness) * tailweight) -
-            0.5 * tfp_math.log1psquare(x) +
+    return (generic.log_cosh((tf.asinh(x) + self.skewness) * tailweight) -
+            0.5 * numeric.log1psquare(x) +
             tf.math.log(tailweight) +
             tf.math.log(self._output_multiplier(tailweight)))
 

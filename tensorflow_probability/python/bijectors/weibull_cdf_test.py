@@ -19,8 +19,8 @@
 import numpy as np
 from scipy import stats
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import weibull_cdf
 from tensorflow_probability.python.internal import test_util
 
 
@@ -31,7 +31,7 @@ class WeibullCDFBijectorTest(test_util.TestCase):
   def testBijector(self):
     scale = 5.
     concentration = 0.3
-    bijector = tfb.WeibullCDF(
+    bijector = weibull_cdf.WeibullCDF(
         scale=scale, concentration=concentration, validate_args=True)
     self.assertStartsWith(bijector.name, 'weibull')
     x = np.array([[[0.], [1.], [14.], [20.], [100.]]], dtype=np.float32)
@@ -53,20 +53,21 @@ class WeibullCDFBijectorTest(test_util.TestCase):
     # When concentration = 1., forward_log_det_jacobian should be finite at
     # zero.
     scale = np.logspace(0.1, 10., num=20).astype(np.float32)
-    bijector = tfb.WeibullCDF(scale, concentration=1.)
+    bijector = weibull_cdf.WeibullCDF(scale, concentration=1.)
     fldj = self.evaluate(bijector.forward_log_det_jacobian(0., event_ndims=0))
     self.assertAllEqual(np.ones_like(fldj, dtype=np.bool_), np.isfinite(fldj))
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.WeibullCDF(scale=20., concentration=0.3),
+        weibull_cdf.WeibullCDF(scale=20., concentration=0.3),
         lower_x=1.,
         upper_x=100.,
         eval_func=self.evaluate,
         rtol=0.05)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.WeibullCDF(scale=20., concentration=2., validate_args=True)
+    bijector = weibull_cdf.WeibullCDF(
+        scale=20., concentration=2., validate_args=True)
     x = np.linspace(1., 8., num=10).astype(np.float32)
     y = np.linspace(
         -np.expm1(-1 / 400.),
@@ -76,11 +77,11 @@ class WeibullCDFBijectorTest(test_util.TestCase):
 
   def testAsserts(self):
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
-      b = tfb.WeibullCDF(
+      b = weibull_cdf.WeibullCDF(
           concentration=1., scale=-1., validate_args=True)
       self.evaluate(b.forward(3.))
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):
-      b = tfb.WeibullCDF(
+      b = weibull_cdf.WeibullCDF(
           concentration=-1., scale=1., validate_args=True)
       self.evaluate(b.inverse(0.5))
 
@@ -88,7 +89,7 @@ class WeibullCDFBijectorTest(test_util.TestCase):
   def testVariableAssertsScale(self):
     concentration = tf.Variable(1.)
     scale = tf.Variable(1.)
-    b = tfb.WeibullCDF(
+    b = weibull_cdf.WeibullCDF(
         concentration=concentration, scale=scale, validate_args=True)
     self.evaluate([concentration.initializer, scale.initializer])
     with self.assertRaisesOpError('Argument `scale` must be positive.'):
@@ -99,7 +100,7 @@ class WeibullCDFBijectorTest(test_util.TestCase):
   def testVariableAssertsConcentration(self):
     concentration = tf.Variable(1.)
     scale = tf.Variable(1.)
-    b = tfb.WeibullCDF(
+    b = weibull_cdf.WeibullCDF(
         concentration=concentration, scale=scale, validate_args=True)
     self.evaluate([concentration.initializer, scale.initializer])
     with self.assertRaisesOpError('Argument `concentration` must be positive.'):

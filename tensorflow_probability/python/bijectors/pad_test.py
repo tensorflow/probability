@@ -17,7 +17,7 @@
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import pad
 from tensorflow_probability.python.internal import test_util
 
 
@@ -25,7 +25,7 @@ from tensorflow_probability.python.internal import test_util
 class PadBijectorTest(test_util.TestCase):
 
   def test_defaults(self):
-    b = tfb.Pad(validate_args=True)
+    b = pad.Pad(validate_args=True)
     y1 = b.forward([3., 4.])
     y2 = b.forward([[1., 2.], [3., 4.]])
     x1 = b.inverse([3., 4., 0.])
@@ -59,7 +59,7 @@ class PadBijectorTest(test_util.TestCase):
         [0., 0., 0., 0., 0., 0., 0., 0., 0.],
     ]]
 
-    b = tfb.Pad(paddings=[[1, 2], [3, 4]], validate_args=True)
+    b = pad.Pad(paddings=[[1, 2], [3, 4]], validate_args=True)
     y1 = b.forward(x1_actual)
     y2 = b.forward(x2_actual)
     x1 = b.inverse(y1_expected)
@@ -79,7 +79,7 @@ class PadBijectorTest(test_util.TestCase):
   @test_util.jax_disable_variable_test
   def test_variable_paddings(self):
     x = tf.Variable([[1, 2]])
-    b = tfb.Pad(paddings=x, validate_args=True)
+    b = pad.Pad(paddings=x, validate_args=True)
     y = b.forward([[1, 2]])
     self.evaluate(b.paddings.initializer)
     self.assertAllEqual([[0, 1, 2, 0, 0]], self.evaluate(y))
@@ -91,30 +91,31 @@ class PadBijectorTest(test_util.TestCase):
     if not tf.executing_eagerly():
       with self.assertRaisesWithPredicateMatch(
           NotImplementedError, 'Argument `axis` must be known statically.'):
-        tfb.Pad(axis=tf1.placeholder_with_default([-1], shape=None),
-                validate_args=True)
+        pad.Pad(
+            axis=tf1.placeholder_with_default([-1], shape=None),
+            validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         ValueError, 'Argument `axis` must be scalar or vector.'):
-      tfb.Pad(axis=[[-1]], validate_args=True)
+      pad.Pad(axis=[[-1]], validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         ValueError, 'Argument `axis` must be negative.'):
-      tfb.Pad(axis=0, validate_args=True)
+      pad.Pad(axis=0, validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         ValueError, 'Argument `axis` elements must be unique.'):
-      tfb.Pad(axis=[-1, -1], validate_args=True)
+      pad.Pad(axis=[-1, -1], validate_args=True)
 
   def test_paddings_exceptions(self):
     with self.assertRaisesWithPredicateMatch(
         ValueError, 'Argument `paddings` must be a vector of pairs.'):
-      tfb.Pad(paddings=-1, validate_args=True)
+      pad.Pad(paddings=-1, validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         ValueError, 'Argument `paddings` must be non-negative.'):
-      tfb.Pad(paddings=[[-1, 0]], validate_args=True)
+      pad.Pad(paddings=[[-1, 0]], validate_args=True)
     with self.assertRaisesWithPredicateMatch(
         ValueError,
         ('Arguments `axis` and `paddings` must have the same number '
          'of elements.')):
-      tfb.Pad(paddings=[[1, 0]], axis=[-2, -1], validate_args=True)
+      pad.Pad(paddings=[[1, 0]], axis=[-2, -1], validate_args=True)
 
     if tf.executing_eagerly():
       return
@@ -122,21 +123,27 @@ class PadBijectorTest(test_util.TestCase):
     with self.assertRaisesWithPredicateMatch(
         tf.errors.InvalidArgumentError,
         'Argument `paddings` must be a vector of pairs.'):
-      b = tfb.Pad(paddings=tf1.placeholder_with_default([[1]], shape=None),
-                  axis=-1, validate_args=True)
+      b = pad.Pad(
+          paddings=tf1.placeholder_with_default([[1]], shape=None),
+          axis=-1,
+          validate_args=True)
       self.evaluate(b.forward([0]))
     with self.assertRaisesWithPredicateMatch(
         tf.errors.InvalidArgumentError,
         'Argument `paddings` must be non-negative.'):
-      b = tfb.Pad(paddings=tf1.placeholder_with_default([[-1, 0]], shape=None),
-                  axis=-1, validate_args=True)
+      b = pad.Pad(
+          paddings=tf1.placeholder_with_default([[-1, 0]], shape=None),
+          axis=-1,
+          validate_args=True)
       self.evaluate(b.forward([0]))
     with self.assertRaisesWithPredicateMatch(
         tf.errors.InvalidArgumentError,
         ('Arguments `axis` and `paddings` must have the same number '
          'of elements.')):
-      b = tfb.Pad(paddings=tf1.placeholder_with_default([[1, 0]], shape=None),
-                  axis=[-2, -1], validate_args=True)
+      b = pad.Pad(
+          paddings=tf1.placeholder_with_default([[1, 0]], shape=None),
+          axis=[-2, -1],
+          validate_args=True)
       self.evaluate(b.forward([0]))
 
 

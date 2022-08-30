@@ -21,7 +21,7 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import soft_clip
 from tensorflow_probability.python.internal import test_util as tfp_test_util
 
 from tensorflow.python.framework import test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
@@ -51,7 +51,7 @@ class _SoftClipBijectorBase(tfp_test_util.TestCase):
     high_tensor = (tf.convert_to_tensor(high, self.dtype)
                    if high is not None else high)
     hinge_softness = tf.convert_to_tensor(hinge_softness, self.dtype)
-    b = tfb.SoftClip(low_tensor, high_tensor, hinge_softness)
+    b = soft_clip.SoftClip(low_tensor, high_tensor, hinge_softness)
     ys = self.evaluate(b.forward(xs))
     if low is not None:
       self.assertAllGreaterEqual(ys, low)
@@ -73,7 +73,7 @@ class _SoftClipBijectorBase(tfp_test_util.TestCase):
       low = tf.convert_to_tensor(low, self.dtype)
     if high is not None:
       high = tf.convert_to_tensor(high, self.dtype)
-    b = tfb.SoftClip(low, high, hinge_softness=0.01)
+    b = soft_clip.SoftClip(low, high, hinge_softness=0.01)
     ys = self.evaluate(b.forward(xs))
     self.assertAllClose(ys, xs)
     xs_inverted = self.evaluate(b.inverse(ys))
@@ -84,19 +84,19 @@ class _SoftClipBijectorBase(tfp_test_util.TestCase):
   def test_raises_exception_on_invalid_params(self):
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 'Argument `high` must be greater than `low`'):
-      b = tfb.SoftClip(5., 3., validate_args=True)
+      b = soft_clip.SoftClip(5., 3., validate_args=True)
 
     with self.assertRaisesOpError('Argument `high` must be greater than `low`'):
       low = tf.Variable(0.)
       self.evaluate(low.initializer)
-      b = tfb.SoftClip(low, 3., validate_args=True)
+      b = soft_clip.SoftClip(low, 3., validate_args=True)
       with tf.control_dependencies([low.assign(5.)]):
         self.evaluate(b.forward(4.))
 
   @tfp_test_util.jax_disable_test_missing_functionality('TF Exceptions')
   @tfp_test_util.numpy_disable_test_missing_functionality('TF Exceptions')
   def test_raises_exception_on_invalid_input(self):
-    b = tfb.SoftClip(3., 5., validate_args=True)
+    b = soft_clip.SoftClip(3., 5., validate_args=True)
     with self.assertRaisesRegex(tf.errors.InvalidArgumentError,
                                 'Input must be greater than `low`'):
       b.inverse(2.)
@@ -109,7 +109,7 @@ class _SoftClipBijectorBase(tfp_test_util.TestCase):
   @tfp_test_util.jax_disable_variable_test
   @tfp_test_util.numpy_disable_gradient_test
   def test_variable_gradients(self):
-    b = tfb.SoftClip(low=tf.Variable(2.), high=tf.Variable(6.))
+    b = soft_clip.SoftClip(low=tf.Variable(2.), high=tf.Variable(6.))
     with tf.GradientTape() as tape:
       y = b.forward(.1)
     self.assertAllNotNone(tape.gradient(y, b.trainable_variables))

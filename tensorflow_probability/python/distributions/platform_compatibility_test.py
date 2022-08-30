@@ -33,8 +33,8 @@ import six
 import tensorflow.compat.v2 as tf
 
 from tensorflow_probability.python import distributions as tfd
-from tensorflow_probability.python import experimental
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
+from tensorflow_probability.python.experimental.util import composite_tensor
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
@@ -409,7 +409,7 @@ class DistributionCompositeTensorTest(test_util.TestCase):
     hp.note('Drew samples {}'.format(sample1))
 
     # Sample from the distribution after composite tensoring
-    composite_dist = experimental.as_composite(dist)
+    composite_dist = composite_tensor.as_composite(dist)
     flat = tf.nest.flatten(composite_dist, expand_composites=True)
     unflat = tf.nest.pack_sequence_as(
         composite_dist, flat, expand_composites=True)

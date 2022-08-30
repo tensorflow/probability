@@ -15,8 +15,8 @@
 """Tests for GeneralizedPareto bijector."""
 
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import generalized_pareto
 from tensorflow_probability.python.internal import test_util
 
 
@@ -26,24 +26,35 @@ class GeneralizedParetoTest(test_util.TestCase):
 
   def testScalarCongruencyPositiveConcentration(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.GeneralizedPareto(
+        generalized_pareto.GeneralizedPareto(
             loc=1., scale=3., concentration=2., validate_args=True),
-        lower_x=-7., upper_x=7., eval_func=self.evaluate, rtol=.15)
+        lower_x=-7.,
+        upper_x=7.,
+        eval_func=self.evaluate,
+        rtol=.15)
 
   def testScalarCongruencyNegativeConcentration(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.GeneralizedPareto(
+        generalized_pareto.GeneralizedPareto(
             loc=1., scale=3., concentration=-5., validate_args=True),
-        lower_x=-7., upper_x=7., eval_func=self.evaluate, rtol=.1)
+        lower_x=-7.,
+        upper_x=7.,
+        eval_func=self.evaluate,
+        rtol=.1)
 
   def testBijectiveAndFinitePositiveConcentration(self):
     loc = 5.
     x = np.linspace(-10., 20., 20).astype(np.float32)
     y = np.linspace(loc + 1e-3, 20., 20).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
-        tfb.GeneralizedPareto(
+        generalized_pareto.GeneralizedPareto(
             loc=loc, scale=2., concentration=1., validate_args=True),
-        x, y, eval_func=self.evaluate, event_ndims=0, atol=1e-2, rtol=1e-2)
+        x,
+        y,
+        eval_func=self.evaluate,
+        event_ndims=0,
+        atol=1e-2,
+        rtol=1e-2)
 
   def testBijectiveAndFiniteNegativeConcentration(self):
     x = np.linspace(-10., 10., 20).astype(np.float32)
@@ -54,14 +65,21 @@ class GeneralizedParetoTest(test_util.TestCase):
     upper_bound = loc + scale / concentration
     y = np.linspace(loc + eps, upper_bound - eps, 20).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
-        tfb.GeneralizedPareto(
-            loc=loc, scale=scale, concentration=concentration,
+        generalized_pareto.GeneralizedPareto(
+            loc=loc,
+            scale=scale,
+            concentration=concentration,
             validate_args=True),
-        x, y, eval_func=self.evaluate, event_ndims=0, atol=1e-2, rtol=1e-2)
+        x,
+        y,
+        eval_func=self.evaluate,
+        event_ndims=0,
+        atol=1e-2,
+        rtol=1e-2)
 
   def testBijectorValues(self):
     x = [-1., 0., 1.]
-    bij = tfb.GeneralizedPareto(
+    bij = generalized_pareto.GeneralizedPareto(
         loc=[1., 2., 3.],
         scale=5.,
         concentration=[[-4., -6., -1.], [2., 4., 0.]],

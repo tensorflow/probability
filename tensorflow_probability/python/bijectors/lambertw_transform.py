@@ -52,7 +52,6 @@ the inverse of Tukey's h transformation as a special case. The Scientific World
 Journal.
 """
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.bijectors import bijector
 from tensorflow_probability.python.bijectors import chain
 from tensorflow_probability.python.bijectors import invert
@@ -63,6 +62,7 @@ from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
+from tensorflow_probability.python.math import special
 
 
 __all__ = [
@@ -102,7 +102,7 @@ def _w_delta_squared(z, delta):
   delta = tf.convert_to_tensor(delta, dtype=z.dtype)
   z = tf.broadcast_to(z,
                       ps.broadcast_shape(ps.shape(z), ps.shape(delta)))
-  wd = tf.sign(z) * tf.sqrt(tfp_math.lambertw(delta * z**2) / delta)
+  wd = tf.sign(z) * tf.sqrt(special.lambertw(delta * z**2) / delta)
   return tf.where(tf.equal(delta, 0.0), z, wd)
 
 
@@ -168,7 +168,7 @@ class _HeavyTailOnly(bijector.AutoCompositeTensorBijector):
     log_jacobian_term_nonzero = (
         tf.math.log(tf.abs(_w_delta_squared(y, delta=self._tailweight))) -
         tf.math.log(tf.abs(y)) -
-        tf.math.log(1. + tfp_math.lambertw(self._tailweight * y**2)))
+        tf.math.log(1. + special.lambertw(self._tailweight * y**2)))
     # If y = 0 the expression becomes log(0/0) - log(1 + 0), and the first term
     # equals log(1) = 0.  Hence, for y = 0 the whole expression equals 0.
     return tf.where(tf.equal(y, 0.0),

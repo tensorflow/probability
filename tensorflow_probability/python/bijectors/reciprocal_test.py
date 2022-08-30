@@ -19,8 +19,8 @@
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import reciprocal
 from tensorflow_probability.python.internal import test_util
 
 
@@ -41,7 +41,7 @@ class ReciprocalTest(test_util.TestCase):
           )
       )
   def testBijector(self, lower, upper):
-    bijector = tfb.Reciprocal()
+    bijector = reciprocal.Reciprocal()
     self.assertStartsWith(bijector.name, 'reciprocal')
     x = tf.linspace(lower, upper, 100)
     y = 1. / x
@@ -61,7 +61,7 @@ class ReciprocalTest(test_util.TestCase):
           )
       )
   def testScalarCongruency(self, lower_x, upper_x):
-    bijector = tfb.Reciprocal()
+    bijector = reciprocal.Reciprocal()
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=lower_x, upper_x=upper_x, eval_func=self.evaluate,
         rtol=0.2)
@@ -79,7 +79,7 @@ class ReciprocalTest(test_util.TestCase):
           )
       )
   def testBijectiveAndFinite(self, lower, upper):
-    bijector = tfb.Reciprocal()
+    bijector = reciprocal.Reciprocal()
     x = np.linspace(lower, upper, num=100).astype(np.float32)
     y = np.linspace(lower, upper, num=100).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(

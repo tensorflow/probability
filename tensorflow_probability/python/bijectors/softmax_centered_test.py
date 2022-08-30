@@ -19,8 +19,8 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import softmax_centered
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
 
@@ -33,7 +33,7 @@ class SoftmaxCenteredBijectorTest(test_util.TestCase):
   """Tests correctness of the Y = g(X) = exp(X) / sum(exp(X)) transformation."""
 
   def testBijectorVector(self):
-    softmax = tfb.SoftmaxCentered()
+    softmax = softmax_centered.SoftmaxCentered()
     self.assertStartsWith(softmax.name, 'softmax_centered')
     x = np.log([[2., 3, 4], [4., 8, 12]])
     y = [[0.2, 0.3, 0.4, 0.1], [0.16, 0.32, 0.48, 0.04]]
@@ -51,7 +51,7 @@ class SoftmaxCenteredBijectorTest(test_util.TestCase):
         rtol=1e-7)
 
   def testBijectorUnknownShape(self):
-    softmax = tfb.SoftmaxCentered()
+    softmax = softmax_centered.SoftmaxCentered()
     self.assertStartsWith(softmax.name, 'softmax_centered')
     x_ = np.log([[2., 3, 4], [4., 8, 12]]).astype(np.float32)
     y_ = np.array(
@@ -74,7 +74,7 @@ class SoftmaxCenteredBijectorTest(test_util.TestCase):
   def testShapeGetters(self):
     x = tf.TensorShape([4])
     y = tf.TensorShape([5])
-    bijector = tfb.SoftmaxCentered(validate_args=True)
+    bijector = softmax_centered.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(y, bijector.forward_event_shape(x))
     self.assertAllEqual(
         tensorshape_util.as_list(y),
@@ -89,7 +89,7 @@ class SoftmaxCenteredBijectorTest(test_util.TestCase):
   def testShapeGetersWithBatchShape(self):
     x = tf.TensorShape([2, 4])
     y = tf.TensorShape([2, 5])
-    bijector = tfb.SoftmaxCentered(validate_args=True)
+    bijector = softmax_centered.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(y, bijector.forward_event_shape(x))
     self.assertAllEqual(
         tensorshape_util.as_list(y),
@@ -104,14 +104,14 @@ class SoftmaxCenteredBijectorTest(test_util.TestCase):
   def testShapeGettersWithDynamicShape(self):
     x = tf1.placeholder_with_default([2, 4], shape=None)
     y = tf1.placeholder_with_default([2, 5], shape=None)
-    bijector = tfb.SoftmaxCentered(validate_args=True)
+    bijector = softmax_centered.SoftmaxCentered(validate_args=True)
     self.assertAllEqual(
         [2, 5], self.evaluate(bijector.forward_event_shape_tensor(x)))
     self.assertAllEqual(
         [2, 4], self.evaluate(bijector.inverse_event_shape_tensor(y)))
 
   def testBijectiveAndFinite(self):
-    softmax = tfb.SoftmaxCentered()
+    softmax = softmax_centered.SoftmaxCentered()
     x = np.linspace(-50, 50, num=10).reshape(5, 2).astype(np.float32)
     # Make y values on the simplex with a wide range.
     y_0 = np.ones(5).astype(np.float32)
@@ -124,7 +124,7 @@ class SoftmaxCenteredBijectorTest(test_util.TestCase):
         softmax, x, y, eval_func=self.evaluate, event_ndims=1)
 
   def testAssertsValidArgToInverse(self):
-    softmax = tfb.SoftmaxCentered(validate_args=True)
+    softmax = softmax_centered.SoftmaxCentered(validate_args=True)
     with self.assertRaisesOpError('must sum to `1`'):
       self.evaluate(softmax.inverse([0.03, 0.7, 0.4]))
 
@@ -137,7 +137,7 @@ class SoftmaxCenteredBijectorTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def testTheoreticalFldj(self):
-    softmax = tfb.SoftmaxCentered()
+    softmax = softmax_centered.SoftmaxCentered()
     x = np.linspace(-15, 15, num=10).reshape(5, 2).astype(np.float64)
 
     fldj = softmax.forward_log_det_jacobian(x, event_ndims=1)

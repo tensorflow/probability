@@ -18,8 +18,8 @@
 
 import numpy as np
 from scipy import stats
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import normal_cdf
 from tensorflow_probability.python.internal import test_util
 
 
@@ -28,7 +28,7 @@ class NormalCDFBijectorTest(test_util.TestCase):
   """Tests correctness of the NormalCDF bijector."""
 
   def testBijector(self):
-    bijector = tfb.NormalCDF(validate_args=True)
+    bijector = normal_cdf.NormalCDF(validate_args=True)
     self.assertStartsWith(bijector.name, "normal")
     x = np.array([[[-3.], [0.], [0.5], [4.2], [5.]]], dtype=np.float64)
     # Normal distribution
@@ -45,7 +45,7 @@ class NormalCDFBijectorTest(test_util.TestCase):
         rtol=1e-4)
 
   def testValidateArgs(self):
-    bijector = tfb.NormalCDF(validate_args=True)
+    bijector = normal_cdf.NormalCDF(validate_args=True)
     with self.assertRaisesOpError("must be greater than 0"):
       self.evaluate(bijector.inverse(-1.))
 
@@ -60,11 +60,14 @@ class NormalCDFBijectorTest(test_util.TestCase):
 
   def testScalarCongruency(self):
     bijector_test_util.assert_scalar_congruency(
-        tfb.NormalCDF(), lower_x=0., upper_x=1.,
-        eval_func=self.evaluate, rtol=0.02)
+        normal_cdf.NormalCDF(),
+        lower_x=0.,
+        upper_x=1.,
+        eval_func=self.evaluate,
+        rtol=0.02)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.NormalCDF(validate_args=True)
+    bijector = normal_cdf.NormalCDF(validate_args=True)
     x = np.linspace(-10., 10., num=10).astype(np.float32)
     y = np.linspace(0.1, 0.9, num=10).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(

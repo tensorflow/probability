@@ -18,10 +18,10 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import bijector_test_util
 from tensorflow_probability.python.bijectors import categorical_to_discrete
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -114,7 +114,8 @@ class CategoricalToDiscreteTest(test_util.TestCase):
       b = categorical_to_discrete.CategoricalToDiscrete(map_values=map_values,
                                                         validate_args=True)
       return tf.reduce_sum(b.forward([0, 1]))
-    grads = tfp.math.value_and_gradient(_func, [map_values])
+
+    grads = gradient.value_and_gradient(_func, [map_values])
     self.assertAllNotNone(grads)
 
   def testModifiedMapValuesIncreasingAssertion(self):

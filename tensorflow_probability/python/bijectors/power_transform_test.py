@@ -17,8 +17,8 @@
 # Dependency imports
 
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import power_transform
 from tensorflow_probability.python.internal import test_util
 
 
@@ -31,7 +31,7 @@ class PowerTransformBijectorTest(test_util.TestCase):
 
   def testBijector(self):
     c = 0.2
-    bijector = tfb.PowerTransform(power=c, validate_args=True)
+    bijector = power_transform.PowerTransform(power=c, validate_args=True)
     self.assertStartsWith(bijector.name, 'power_transform')
     x = np.array([[[-1.], [2.], [-5. + 1e-4]]])
     y = (1. + x * c)**(1. / c)
@@ -47,19 +47,19 @@ class PowerTransformBijectorTest(test_util.TestCase):
         atol=0.)
 
   def testScalarCongruency(self):
-    bijector = tfb.PowerTransform(power=0.2, validate_args=True)
+    bijector = power_transform.PowerTransform(power=0.2, validate_args=True)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-2., upper_x=1.5, eval_func=self.evaluate, rtol=0.05)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.PowerTransform(power=0.2, validate_args=True)
+    bijector = power_transform.PowerTransform(power=0.2, validate_args=True)
     x = np.linspace(-4.999, 10, num=10).astype(np.float32)
     y = np.logspace(0.001, 10, num=10).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
         bijector, x, y, eval_func=self.evaluate, event_ndims=0, rtol=1e-3)
 
   def testDtype(self):
-    bijector = tfb.PowerTransform(power=0.2, validate_args=True)
+    bijector = power_transform.PowerTransform(power=0.2, validate_args=True)
     x = self.make_input([-0.5, 1., 3.])
     y = self.make_input([0.3, 3., 1.2])
     self.assertIs(bijector.forward(x).dtype, x.dtype)

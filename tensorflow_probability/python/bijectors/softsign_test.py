@@ -17,8 +17,8 @@
 # Dependency imports
 
 import numpy as np
-from tensorflow_probability.python import bijectors as tfb
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.bijectors import softsign
 from tensorflow_probability.python.internal import test_util
 
 
@@ -34,7 +34,7 @@ class SoftsignBijectorTest(test_util.TestCase):
     return -2. * np.log1p(-np.abs(y))
 
   def testBijectorBounds(self):
-    bijector = tfb.Softsign(validate_args=True)
+    bijector = softsign.Softsign(validate_args=True)
     with self.assertRaisesOpError(">= -1"):
       self.evaluate(bijector.inverse(-3.))
     with self.assertRaisesOpError(">= -1"):
@@ -46,7 +46,7 @@ class SoftsignBijectorTest(test_util.TestCase):
       self.evaluate(bijector.inverse_log_det_jacobian(3., event_ndims=0))
 
   def testBijectorForwardInverse(self):
-    bijector = tfb.Softsign(validate_args=True)
+    bijector = softsign.Softsign(validate_args=True)
     self.assertStartsWith(bijector.name, "softsign")
     x = 2. * np.random.randn(2, 10)
     y = self._softsign(x)
@@ -55,7 +55,7 @@ class SoftsignBijectorTest(test_util.TestCase):
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsZero(self):
-    bijector = tfb.Softsign(validate_args=True)
+    bijector = softsign.Softsign(validate_args=True)
     y = np.random.rand(2, 10)
     # No reduction needed if event_dims = 0.
     ildj = self._softsign_ildj_before_reduction(y)
@@ -64,7 +64,7 @@ class SoftsignBijectorTest(test_util.TestCase):
         bijector.inverse_log_det_jacobian(y, event_ndims=0)))
 
   def testBijectorForwardInverseEventDimsOne(self):
-    bijector = tfb.Softsign(validate_args=True)
+    bijector = softsign.Softsign(validate_args=True)
     self.assertStartsWith(bijector.name, "softsign")
     x = 2. * np.random.randn(2, 10)
     y = self._softsign(x)
@@ -72,7 +72,7 @@ class SoftsignBijectorTest(test_util.TestCase):
     self.assertAllClose(x, self.evaluate(bijector.inverse(y)))
 
   def testBijectorLogDetJacobianEventDimsOne(self):
-    bijector = tfb.Softsign(validate_args=True)
+    bijector = softsign.Softsign(validate_args=True)
     y = np.random.rand(2, 10)
     ildj_before = self._softsign_ildj_before_reduction(y)
     ildj = np.sum(ildj_before, axis=1)
@@ -81,12 +81,12 @@ class SoftsignBijectorTest(test_util.TestCase):
             bijector.inverse_log_det_jacobian(y, event_ndims=1)))
 
   def testScalarCongruency(self):
-    bijector = tfb.Softsign(validate_args=True)
+    bijector = softsign.Softsign(validate_args=True)
     bijector_test_util.assert_scalar_congruency(
         bijector, lower_x=-20., upper_x=20., eval_func=self.evaluate, rtol=.05)
 
   def testBijectiveAndFinite(self):
-    bijector = tfb.Softsign(validate_args=True)
+    bijector = softsign.Softsign(validate_args=True)
     x = np.linspace(-20., 20., 100).astype(np.float32)
     y = np.linspace(-0.99, 0.99, 100).astype(np.float32)
     bijector_test_util.assert_bijective_and_finite(
