@@ -114,6 +114,8 @@ class _VonMisesTest(object):
     expected_prob = np.array([1. / (2. * np.pi)] * 6)
     self.assertAllClose(expected_prob, self.evaluate(prob))
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='CDF computation uses autograd')
   def testVonMisesCdf(self):
     locs_v = np.reshape(np.linspace(-10., 10., 20), [-1, 1, 1])
     concentrations_v = np.reshape(np.logspace(-3., 3., 20), [1, -1, 1])
@@ -126,6 +128,8 @@ class _VonMisesTest(object):
     expected_cdf = sp_stats.vonmises.cdf(x, concentrations_v, loc=locs_v)
     self.assertAllClose(expected_cdf, self.evaluate(cdf), atol=1e-4, rtol=1e-4)
 
+  @test_util.disable_test_for_backend(
+      disable_numpy=True, reason='CDF computation uses autograd')
   def testVonMisesCdfUniform(self):
     x = np.linspace(-np.pi, np.pi, 20)
     dist = von_mises.VonMises(
@@ -151,13 +155,13 @@ class _VonMisesTest(object):
       cdf = dist.cdf(x)
 
       self.assertLess(
-          tf1.test.compute_gradient_error(x, x.shape, cdf, cdf.shape), 1e-3)
+          tf1.test.compute_gradient_error(x, x.shape, cdf, cdf.shape), 1e-4)
       self.assertLess(
           tf1.test.compute_gradient_error(locs, locs.shape, cdf, cdf.shape),
-          1e-3)
+          1e-4)
       self.assertLess(
           tf1.test.compute_gradient_error(concentrations, concentrations.shape,
-                                          cdf, cdf.shape), 1e-3)
+                                          cdf, cdf.shape), 1e-4)
 
   @test_util.numpy_disable_gradient_test
   def testVonMisesCdfGradientSimple(self):
@@ -185,10 +189,10 @@ class _VonMisesTest(object):
          - von_mises.VonMises(loc, concentration,
                               validate_args=True).cdf(x - eps)) / (2 * eps))
 
-    self.assertAlmostEqual(dcdf_dloc, dcdf_dloc_diff, places=3)
+    self.assertAlmostEqual(dcdf_dloc, dcdf_dloc_diff, places=4)
     self.assertAlmostEqual(
-        dcdf_dconcentration, dcdf_dconcentration_diff, places=3)
-    self.assertAlmostEqual(dcdf_dx, dcdf_dx_diff, places=3)
+        dcdf_dconcentration, dcdf_dconcentration_diff, places=4)
+    self.assertAlmostEqual(dcdf_dx, dcdf_dx_diff, places=4)
 
   def testVonMisesEntropy(self):
     locs_v = np.array([-2., -1., 0.3, 3.2]).reshape([-1, 1])

@@ -220,7 +220,6 @@ XLA_LOGPROB_RTOL.update({
     'SigmoidBeta': 5e-4,
     'StudentT': 1e-5,
     'TruncatedCauchy': 5e-5,
-    'VonMises': 2e-2,  # TODO(b/160000258):
     'VonMisesFisher': 5e-3,
     'WishartTriL': 1e-5,
 })
