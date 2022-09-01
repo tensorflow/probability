@@ -25,6 +25,7 @@ from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.math import psd_kernels
 
 
@@ -449,6 +450,31 @@ class _GaussianProcessTest(object):
 @test_util.test_all_tf_execution_regimes
 class GaussianProcessStaticTest(_GaussianProcessTest, test_util.TestCase):
   is_static = True
+
+  @test_util.numpy_disable_gradient_test
+  def test_gradient(self):
+    x_obs = normal.Normal(0., 1.).sample((10, 6), seed=test_util.test_seed())
+    y_obs = tf.reduce_sum(x_obs, axis=-1)
+
+    def loss(length_scales):
+      kernel = psd_kernels.MaternFiveHalves(amplitude=tf.math.sqrt(1e-2))
+      kernel = psd_kernels.FeatureScaled(
+          kernel, scale_diag=tf.math.sqrt(length_scales))
+      return gaussian_process.GaussianProcess(
+          kernel,
+          index_points=x_obs,
+          observation_noise_variance=1.,
+      ).log_prob(y_obs)
+
+    lscales = tf.convert_to_tensor([11.67385626, 0.21246016, 0.0215677,
+                                    0.08823962, 0.22416186, 0.06885594])
+
+    def _grad(lscales):
+      return gradient.value_and_gradient(loss, lscales)[1]
+
+    self.assertAllClose(_grad(lscales),
+                        tf.function(_grad, jit_compile=True)(lscales),
+                        atol=0.01)
 
 
 @test_util.test_all_tf_execution_regimes
