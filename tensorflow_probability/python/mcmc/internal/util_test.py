@@ -22,7 +22,8 @@ import warnings
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal import util
 
@@ -182,7 +183,7 @@ class GradientTest(test_util.TestCase):
   def testGradientWorksDespiteBijectorCaching(self):
     x = tf.constant(2.)
     fn_result, grads = util.maybe_call_fn_and_grads(
-        lambda x_: tfd.LogNormal(loc=0., scale=1.).log_prob(x_), x)
+        lambda x_: lognormal.LogNormal(loc=0., scale=1.).log_prob(x_), x)
     self.assertAllEqual(False, fn_result is None)
     self.assertAllEqual([False], [g is None for g in grads])
 
@@ -192,7 +193,7 @@ class GradientTest(test_util.TestCase):
     # graph mode.
     if not tf.executing_eagerly():
       self.skipTest('Gradients get None values in graph mode.')
-    d = tfd.MultivariateNormalTriL(scale_tril=tf.eye(2))
+    d = mvn_tril.MultivariateNormalTriL(scale_tril=tf.eye(2))
     x = d.sample(seed=test_util.test_seed())
     fn_result, grads = util.maybe_call_fn_and_grads(d.log_prob, x)
     self.assertAllEqual(False, fn_result is None)

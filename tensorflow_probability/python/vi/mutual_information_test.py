@@ -17,11 +17,9 @@
 import numpy as np
 import scipy
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.internal import test_util as tfp_test_util
-
-mi = tfp.vi.mutual_information
-tfd = tfp.distributions
+from tensorflow_probability.python.vi import mutual_information as mi
 
 
 LOWER_BOUND_MIN_GAP = 0.3
@@ -48,9 +46,9 @@ class MutualInformationTest(tfp_test_util.TestCase):
     mean = rho * x
     stddev = tf.sqrt(1. - tf.square(rho))
     y = mean + stddev * eps
-    conditional_dist = tfd.MultivariateNormalDiag(
+    conditional_dist = mvn_diag.MultivariateNormalDiag(
         mean, scale_identity_multiplier=stddev)
-    marginal_dist = tfd.MultivariateNormalDiag(tf.zeros(dim), tf.ones(dim))
+    marginal_dist = mvn_diag.MultivariateNormalDiag(tf.zeros(dim), tf.ones(dim))
 
     # The conditional_scores has its shape [y_batch_dim, distibution_batch_dim]
     # as the `lower_bound_info_nce` requires `scores[i, j] = f(x[i], y[j])

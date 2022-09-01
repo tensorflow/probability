@@ -19,9 +19,9 @@ import numpy as np
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.optimizer import proximal_hessian_sparse
 
 
 class _ProximalHessianTest(object):
@@ -99,7 +99,7 @@ class _ProximalHessianTest(object):
           batch_shape + [n], dtype=self.dtype) + hessian_middle_per_batch
       return grad, hessian_outer, hessian_middle
 
-    w, is_converged, num_iter = tfp.optimizer.proximal_hessian_sparse_minimize(
+    w, is_converged, num_iter = proximal_hessian_sparse.minimize(
         _grad_and_hessian_unregularized_loss_fn,
         x_start=tf.zeros(batch_shape + [n], dtype=self.dtype),
         l1_regularizer=1e-2,
@@ -147,7 +147,7 @@ class _ProximalHessianTest(object):
       hessian_middle = 2. * tf.ones_like(a)
       return grad, hessian_outer, hessian_middle
 
-    w, is_converged, num_iter = tfp.optimizer.proximal_hessian_sparse_minimize(
+    w, is_converged, num_iter = proximal_hessian_sparse.minimize(
         _grad_and_hessian_unregularized_loss_fn,
         x_start=tf.zeros_like(a_, dtype=self.dtype),
         l1_regularizer=0.,
@@ -170,7 +170,7 @@ class _ProximalHessianTest(object):
     # but in this simple case we do -- explanation below).
     #
     # Since l1_regularizer = 0, the soft threshold operator is actually the
-    # identity operator, hence the `proximal_hessian_sparse_minimize` algorithm
+    # identity operator, hence the `minimize` algorithm
     # becomes literally coordinatewise Newton's method being used to find the
     # zeros of grad Loss(x), which in this case is a linear function of x. Hence
     # Newton's method should find the exact correct answer in 1 sweep.  At the
@@ -190,7 +190,7 @@ class _ProximalHessianTest(object):
       hessian_middle = 2. * tf.ones_like(a)
       return grad, hessian_outer, hessian_middle
 
-    w, is_converged, num_iter = tfp.optimizer.proximal_hessian_sparse_minimize(
+    w, is_converged, num_iter = proximal_hessian_sparse.minimize(
         _grad_and_hessian_unregularized_loss_fn,
         x_start=tf.zeros_like(a_, dtype=self.dtype),
         l1_regularizer=0.,

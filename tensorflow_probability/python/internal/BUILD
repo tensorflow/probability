@@ -607,6 +607,7 @@ multi_substrate_py_test(
         # optax dep,
         # tensorflow dep,
         "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:test_util",
         "//tensorflow_probability/python/internal:trainable_state_util",
     ],

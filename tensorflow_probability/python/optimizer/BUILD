@@ -54,6 +54,7 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/math:diag_jacobian",
     ],
 )
 
@@ -61,11 +62,17 @@ multi_substrate_py_test(
     name = "sgld_test",
     size = "medium",
     srcs = ["sgld_test.py"],
+    disabled_substrates = [
+        "numpy",
+        "jax",
+    ],
     deps = [
+        ":sgld",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_tril",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:diag_jacobian",
     ],
 )
 
@@ -75,17 +82,20 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/internal:assert_util",
+        "//tensorflow_probability/python/internal:distribution_util",
     ],
 )
 
 multi_substrate_py_test(
     name = "variational_sgd_test",
     srcs = ["variational_sgd_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
+    disabled_substrates = [
+        "numpy",
+        "jax",
+    ],
     deps = [
+        ":variational_sgd",
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -96,7 +106,9 @@ multi_substrate_py_library(
     deps = [
         ":bfgs_utils",
         # tensorflow dep,
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/optimizer/linesearch",
     ],
 )
 
@@ -108,11 +120,13 @@ multi_substrate_py_test(
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
+        ":bfgs",
+        ":bfgs_utils",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
@@ -134,11 +148,13 @@ multi_substrate_py_test(
     numpy_tags = ["notap"],
     shard_count = 5,
     deps = [
+        ":bfgs_utils",
+        ":lbfgs",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
@@ -150,6 +166,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
+        "//tensorflow_probability/python/optimizer/linesearch:hager_zhang",
     ],
 )
 
@@ -168,9 +185,9 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["nelder_mead_test.py"],
     deps = [
+        ":nelder_mead",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
@@ -182,7 +199,7 @@ multi_substrate_py_library(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/distributions:categorical",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/util",
     ],
@@ -192,12 +209,14 @@ multi_substrate_py_test(
     name = "differential_evolution_test",
     size = "medium",
     srcs = ["differential_evolution_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
+    disabled_substrates = [
+        "numpy",
+        "jax",
+    ],
     deps = [
+        ":differential_evolution",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -210,18 +229,21 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/math:generic",
+        "//tensorflow_probability/python/math:linalg",
     ],
 )
 
 multi_substrate_py_test(
     name = "proximal_hessian_sparse_test",
     srcs = ["proximal_hessian_sparse_test.py"],
-    jax_tags = ["notap"],
-    numpy_tags = ["notap"],
+    disabled_substrates = [
+        "numpy",
+        "jax",
+    ],
     deps = [
+        ":proximal_hessian_sparse",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

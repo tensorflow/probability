@@ -44,6 +44,7 @@ multi_substrate_py_library(
     srcs = ["slice_sampler_utils.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/distributions:bernoulli",
         "//tensorflow_probability/python/distributions:gamma",
     ],
 )
@@ -70,7 +71,9 @@ multi_substrate_py_test(
         ":util",
         # absl/testing:parameterized dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -94,7 +97,6 @@ multi_substrate_py_test(
         ":leapfrog_integrator",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
     ],

@@ -19,8 +19,8 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import diagnostic
 from tensorflow_probability.python.mcmc.diagnostic import _reduce_variance
 
 
@@ -43,7 +43,7 @@ class _EffectiveSampleSizeTest(object):
       filter_beyond_positive_pairs=False):
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
-    ess = tfp.mcmc.effective_sample_size(
+    ess = diagnostic.effective_sample_size(
         x,
         filter_threshold=filter_threshold,
         filter_beyond_lag=filter_beyond_lag,
@@ -189,7 +189,7 @@ class _EffectiveSampleSizeTest(object):
     filter_beyond_lag = [(None, 5), {'foo': None, 'bar': 5}]
 
     # See other tests for reasoning on tolerance.
-    ess = tfp.mcmc.effective_sample_size(
+    ess = diagnostic.effective_sample_size(
         states,
         filter_threshold=filter_threshold,
         filter_beyond_lag=filter_beyond_lag)
@@ -211,13 +211,13 @@ class _EffectiveSampleSizeTest(object):
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    ess_none_none = tfp.mcmc.effective_sample_size(
+    ess_none_none = diagnostic.effective_sample_size(
         x, filter_threshold=None, filter_beyond_lag=None)
-    ess_none_200 = tfp.mcmc.effective_sample_size(
+    ess_none_200 = diagnostic.effective_sample_size(
         x, filter_threshold=None, filter_beyond_lag=200)
-    ess_neg2_200 = tfp.mcmc.effective_sample_size(
+    ess_neg2_200 = diagnostic.effective_sample_size(
         x, filter_threshold=-2., filter_beyond_lag=200)
-    ess_neg2_none = tfp.mcmc.effective_sample_size(
+    ess_neg2_none = diagnostic.effective_sample_size(
         x, filter_threshold=-2., filter_beyond_lag=None)
     [ess_none_none_, ess_none_200_, ess_neg2_200_,
      ess_neg2_none_] = self.evaluate(
@@ -237,11 +237,11 @@ class _EffectiveSampleSizeTest(object):
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    ess_1_9 = tfp.mcmc.effective_sample_size(
+    ess_1_9 = diagnostic.effective_sample_size(
         x, filter_threshold=1., filter_beyond_lag=9)
-    ess_1_none = tfp.mcmc.effective_sample_size(
+    ess_1_none = diagnostic.effective_sample_size(
         x, filter_threshold=1., filter_beyond_lag=None)
-    ess_none_9 = tfp.mcmc.effective_sample_size(
+    ess_none_9 = diagnostic.effective_sample_size(
         x, filter_threshold=1., filter_beyond_lag=9)
     ess_1_9_, ess_1_none_, ess_none_9_ = self.evaluate(
         [ess_1_9, ess_1_none, ess_none_9])
@@ -260,17 +260,17 @@ class _EffectiveSampleSizeTest(object):
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    ess_true_37 = tfp.mcmc.effective_sample_size(
+    ess_true_37 = diagnostic.effective_sample_size(
         x,
         filter_beyond_positive_pairs=True,
         filter_threshold=None,
         filter_beyond_lag=37)
-    ess_true_none = tfp.mcmc.effective_sample_size(
+    ess_true_none = diagnostic.effective_sample_size(
         x,
         filter_beyond_positive_pairs=True,
         filter_threshold=None,
         filter_beyond_lag=None)
-    ess_false_37 = tfp.mcmc.effective_sample_size(
+    ess_false_37 = diagnostic.effective_sample_size(
         x,
         filter_beyond_positive_pairs=False,
         filter_threshold=None,
@@ -292,8 +292,7 @@ class _EffectiveSampleSizeTest(object):
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
 
-    ess = tfp.mcmc.effective_sample_size(
-        x, filter_beyond_positive_pairs=True)
+    ess = diagnostic.effective_sample_size(x, filter_beyond_positive_pairs=True)
     ess_ = self.evaluate(ess)
 
     self.assertGreater(ess_, 100.)
@@ -304,12 +303,12 @@ class _EffectiveSampleSizeTest(object):
     x_ = np.random.randn(500, 4).astype(np.float32)
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
-    ess_per_chain = tfp.mcmc.effective_sample_size(x)
+    ess_per_chain = diagnostic.effective_sample_size(x)
     cross_chain_dims = 1
     if not self.use_static_shape:
       cross_chain_dims = tf1.placeholder_with_default(
           cross_chain_dims, shape=[])
-    ess_cross_chain = tfp.mcmc.effective_sample_size(
+    ess_cross_chain = diagnostic.effective_sample_size(
         x, cross_chain_dims=cross_chain_dims)
     ess_per_chain_, ess_cross_chain_ = self.evaluate(
         [ess_per_chain, ess_cross_chain])
@@ -327,7 +326,7 @@ class _EffectiveSampleSizeTest(object):
     if not self.use_static_shape:
       cross_chain_dims = tf1.placeholder_with_default(
           cross_chain_dims, shape=[])
-    ess_cross_chain = tfp.mcmc.effective_sample_size(
+    ess_cross_chain = diagnostic.effective_sample_size(
         x, cross_chain_dims=cross_chain_dims)
     ess_cross_chain_ = self.evaluate(ess_cross_chain)
 
@@ -337,8 +336,9 @@ class _EffectiveSampleSizeTest(object):
     x_ = np.random.randn(500, 2, 2).astype(np.float32)
     x = tf1.placeholder_with_default(
         x_, shape=x_.shape if self.use_static_shape else None)
-    ess_per_chain = tfp.mcmc.effective_sample_size(x)
-    ess_cross_chain = tfp.mcmc.effective_sample_size(x, cross_chain_dims=[1, 2])
+    ess_per_chain = diagnostic.effective_sample_size(x)
+    ess_cross_chain = diagnostic.effective_sample_size(
+        x, cross_chain_dims=[1, 2])
     ess_per_chain_, ess_cross_chain_ = self.evaluate(
         [ess_per_chain, ess_cross_chain])
 
@@ -351,12 +351,12 @@ class _EffectiveSampleSizeTest(object):
     y_ = np.random.randn(500, 4).astype(np.float32)
     y = tf1.placeholder_with_default(
         y_, shape=y_.shape if self.use_static_shape else None)
-    ess_per_chain = tfp.mcmc.effective_sample_size([x, y])
-    ess_cross_chain = tfp.mcmc.effective_sample_size([x, y],
-                                                     cross_chain_dims=[
-                                                         [1, 2],
-                                                         1,
-                                                     ])
+    ess_per_chain = diagnostic.effective_sample_size([x, y])
+    ess_cross_chain = diagnostic.effective_sample_size([x, y],
+                                                       cross_chain_dims=[
+                                                           [1, 2],
+                                                           1,
+                                                       ])
     ess_per_chain_, ess_cross_chain_ = self.evaluate(
         [ess_per_chain, ess_cross_chain])
 
@@ -374,10 +374,8 @@ class _EffectiveSampleSizeTest(object):
           cross_chain_dims, shape=[])
     with self.assertRaisesRegexp(Exception, 'there must be > 1 chain'):
       self.evaluate(
-          tfp.mcmc.effective_sample_size(
-              x,
-              cross_chain_dims=cross_chain_dims,
-              validate_args=True))
+          diagnostic.effective_sample_size(
+              x, cross_chain_dims=cross_chain_dims, validate_args=True))
 
 
 @test_util.test_all_tf_execution_regimes
@@ -409,10 +407,11 @@ class _PotentialScaleReductionTest(object):
   def testWithManualComputation(self):
     # 5 samples from 3 independent Markov chains
     chain_state = np.arange(15, dtype=np.float32).reshape((5, 3))
-    rhat = self.evaluate(tfp.mcmc.potential_scale_reduction(
-        chains_states=chain_state,
-        independent_chain_ndims=1,
-    ))
+    rhat = self.evaluate(
+        diagnostic.potential_scale_reduction(
+            chains_states=chain_state,
+            independent_chain_ndims=1,
+        ))
     # manual computation with numpy operations
     b_div_n = np.var(np.mean(chain_state, axis=0), ddof=1)
     w = np.mean(np.var(chain_state, axis=0, ddof=1))
@@ -425,12 +424,12 @@ class _PotentialScaleReductionTest(object):
   def testIntegerSamples(self):
     # 5 samples from 3 independent Markov chains
     int_chain_state = np.arange(15, dtype=np.int64).reshape((5, 3))
-    int_rhat = tfp.mcmc.potential_scale_reduction(
+    int_rhat = diagnostic.potential_scale_reduction(
         chains_states=int_chain_state,
         independent_chain_ndims=1,
     )
     float_chain_state = np.arange(15, dtype=np.float64).reshape((5, 3))
-    float_rhat = tfp.mcmc.potential_scale_reduction(
+    float_rhat = diagnostic.potential_scale_reduction(
         chains_states=float_chain_state,
         independent_chain_ndims=1,
     )
@@ -452,8 +451,11 @@ class _PotentialScaleReductionTest(object):
     offset = np.array([1., -1., 2.]).reshape(3, 1)
     state_1 = np.random.randn(n_samples, 3, 4) + offset
 
-    rhat = tfp.mcmc.potential_scale_reduction(
-        chains_states={'pass': state_0, 'fail': state_1},
+    rhat = diagnostic.potential_scale_reduction(
+        chains_states={
+            'pass': state_0,
+            'fail': state_1
+        },
         independent_chain_ndims=1)
 
     self.assertIsInstance(rhat, dict)
@@ -477,7 +479,7 @@ class _PotentialScaleReductionTest(object):
     state = tf1.placeholder_with_default(
         state_, shape=state_.shape if self.use_static_shape else None)
 
-    rhat = tfp.mcmc.potential_scale_reduction(
+    rhat = diagnostic.potential_scale_reduction(
         state,
         independent_chain_ndims=independent_chain_ndims,
         split_chains=split_chains)
@@ -598,7 +600,7 @@ class _PotentialScaleReductionTest(object):
         input_, shape=input_.shape if self.use_static_shape else None)
     with self.assertRaisesError('Must provide at least 2 samples'):
       self.evaluate(
-          tfp.mcmc.potential_scale_reduction(
+          diagnostic.potential_scale_reduction(
               # Require at least 2 samples...have only 1
               x,
               independent_chain_ndims=1,
@@ -610,7 +612,7 @@ class _PotentialScaleReductionTest(object):
         input_, shape=input_.shape if self.use_static_shape else None)
     with self.assertRaisesError('Must provide at least 4 samples'):
       self.evaluate(
-          tfp.mcmc.potential_scale_reduction(
+          diagnostic.potential_scale_reduction(
               # Require at least 4 samples...have only 3
               x,
               independent_chain_ndims=1,
@@ -631,7 +633,7 @@ class PotentialScaleReductionStaticTest(test_util.TestCase,
 
   def testIndependentNdimsLessThanOneRaises(self):
     with self.assertRaisesRegexp(ValueError, 'independent_chain_ndims'):
-      tfp.mcmc.potential_scale_reduction(
+      diagnostic.potential_scale_reduction(
           np.random.rand(2, 3, 4), independent_chain_ndims=0)
 
 

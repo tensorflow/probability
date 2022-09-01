@@ -17,9 +17,9 @@
 import numpy as np
 from scipy.stats import special_ortho_group
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.optimizer import nelder_mead
 
 
 @test_util.test_all_tf_execution_regimes
@@ -35,10 +35,9 @@ class NelderMeadTest(test_util.TestCase):
           scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     start = tf.constant([0.6, 0.8])
-    results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        quadratic,
-        initial_vertex=start,
-        func_tolerance=1e-12))
+    results = self.evaluate(
+        nelder_mead.minimize(
+            quadratic, initial_vertex=start, func_tolerance=1e-12))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -51,11 +50,12 @@ class NelderMeadTest(test_util.TestCase):
           scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     initial_simplex = tf.constant([[0.6, 0.8], [5.0, 4.1], [-1.4, -3.2]])
-    results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        quadratic,
-        initial_simplex=initial_simplex,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=True))
+    results = self.evaluate(
+        nelder_mead.minimize(
+            quadratic,
+            initial_simplex=initial_simplex,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=True))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -69,12 +69,13 @@ class NelderMeadTest(test_util.TestCase):
 
     initial_vertex = tf.constant([1.29, -0.88])
     step_sizes = tf.constant([0.2, 1.3])
-    results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        quadratic,
-        initial_vertex=initial_vertex,
-        step_sizes=step_sizes,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=True))
+    results = self.evaluate(
+        nelder_mead.minimize(
+            quadratic,
+            initial_vertex=initial_vertex,
+            step_sizes=step_sizes,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=True))
 
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
@@ -91,11 +92,12 @@ class NelderMeadTest(test_util.TestCase):
           scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        quadratic,
-        initial_vertex=start,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=True))
+    results = self.evaluate(
+        nelder_mead.minimize(
+            quadratic,
+            initial_vertex=start,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=True))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -114,11 +116,12 @@ class NelderMeadTest(test_util.TestCase):
       return value
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        quadratic,
-        initial_vertex=start,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=False))
+    results = self.evaluate(
+        nelder_mead.minimize(
+            quadratic,
+            initial_vertex=start,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=False))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -135,11 +138,12 @@ class NelderMeadTest(test_util.TestCase):
       return tf.reduce_sum(y * yp) / 2
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        quadratic,
-        initial_vertex=start,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=False))
+    results = self.evaluate(
+        nelder_mead.minimize(
+            quadratic,
+            initial_vertex=start,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=False))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
@@ -150,11 +154,12 @@ class NelderMeadTest(test_util.TestCase):
       return tf.sqrt(tf.reduce_sum(x**2, axis=-1))
 
     start = tf.constant([1.2, 0.4, -1.8, 2.9])
-    results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        sqrt_quad,
-        initial_vertex=start,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=True))
+    results = self.evaluate(
+        nelder_mead.minimize(
+            sqrt_quad,
+            initial_vertex=start,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=True))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -165,10 +170,9 @@ class NelderMeadTest(test_util.TestCase):
       return tf.reduce_sum(tf.abs(x), axis=-1)
 
     start = tf.constant([0.6, 1.8, -4.3], dtype=tf.float64)
-    results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        abs_func,
-        initial_vertex=start,
-        func_tolerance=1e-12))
+    results = self.evaluate(
+        nelder_mead.minimize(
+            abs_func, initial_vertex=start, func_tolerance=1e-12))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
@@ -197,11 +201,12 @@ class NelderMeadTest(test_util.TestCase):
       return tf.cast(fv, x.dtype)
 
     start = tf.constant([-1.0, 1.0])
-    results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        rosenbrock,
-        initial_vertex=start,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=False))
+    results = self.evaluate(
+        nelder_mead.minimize(
+            rosenbrock,
+            initial_vertex=start,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=False))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, [1.0, 1.0], 1e-5)
 
@@ -215,7 +220,7 @@ class NelderMeadTest(test_util.TestCase):
 
     start = tf.constant([-1.0, 1.0])
     results = tf.function(
-        tfp.optimizer.nelder_mead_minimize, jit_compile=True)(
+        nelder_mead.minimize, jit_compile=True)(
             rosenbrock,
             initial_vertex=start,
             func_tolerance=1e-12,
@@ -250,16 +255,18 @@ class NelderMeadTest(test_util.TestCase):
       return -f1 * f2
 
     start = tf.constant([1.3, 2.2], dtype=tf.float64)
-    results_non_batch = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        easom,
-        initial_vertex=start,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=False))
-    results_batch = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        easom,
-        initial_vertex=start,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=True))
+    results_non_batch = self.evaluate(
+        nelder_mead.minimize(
+            easom,
+            initial_vertex=start,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=False))
+    results_batch = self.evaluate(
+        nelder_mead.minimize(
+            easom,
+            initial_vertex=start,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=True))
     self.assertTrue(results_batch.converged)
     self.assertEqual(results_batch.converged, results_non_batch.converged)
     self.assertArrayNear(results_batch.position,
@@ -293,10 +300,9 @@ class NelderMeadTest(test_util.TestCase):
 
     def get_results():
       start = tf.constant(start_position)
-      results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-          rastrigin,
-          initial_vertex=start,
-          func_tolerance=1e-12))
+      results = self.evaluate(
+          nelder_mead.minimize(
+              rastrigin, initial_vertex=start, func_tolerance=1e-12))
       return results
 
     res1, res2 = get_results(), get_results()
@@ -338,11 +344,12 @@ class NelderMeadTest(test_util.TestCase):
     start = tf.constant([0.1, 1.0])
     # First evaluate without any iteration bounds to find the number of
     # iterations it takes to converge.
-    unbounded_results = self.evaluate(tfp.optimizer.nelder_mead_minimize(
-        beale,
-        initial_vertex=start,
-        func_tolerance=1e-12,
-        batch_evaluate_objective=False))
+    unbounded_results = self.evaluate(
+        nelder_mead.minimize(
+            beale,
+            initial_vertex=start,
+            func_tolerance=1e-12,
+            batch_evaluate_objective=False))
     # Check that this converged.
     self.assertTrue(unbounded_results.converged)
     minimum = [3, 0.5]
@@ -351,7 +358,7 @@ class NelderMeadTest(test_util.TestCase):
     # Next we evaluate this with exactly the number of iterations it should
     # take and assert it converges.
     bounded_converged_results = self.evaluate(
-        tfp.optimizer.nelder_mead_minimize(
+        nelder_mead.minimize(
             beale,
             initial_vertex=start,
             func_tolerance=1e-12,
@@ -363,12 +370,12 @@ class NelderMeadTest(test_util.TestCase):
     # Next, we reduce the number of allowed iterations to be one less than
     # needed and check that it doesn't converge.
     bounded_unconverged_results = self.evaluate(
-        tfp.optimizer.nelder_mead_minimize(
+        nelder_mead.minimize(
             beale,
             initial_vertex=start,
             func_tolerance=1e-12,
             batch_evaluate_objective=False,
-            max_iterations=unbounded_results.num_iterations-1))
+            max_iterations=unbounded_results.num_iterations - 1))
     self.assertFalse(bounded_unconverged_results.converged)
     self.assertEqual(bounded_unconverged_results.num_iterations,
                      unbounded_results.num_iterations-1)

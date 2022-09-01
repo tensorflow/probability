@@ -16,10 +16,9 @@
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.optimizer import variational_sgd
 from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -34,7 +33,7 @@ class VariationalSGDTest(test_util.TestCase):
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.53
-        sgd_opt = tfp.optimizer.VariationalSGD(
+        sgd_opt = variational_sgd.VariationalSGD(
             1,
             1,
             preconditioner_decay_rate=decay_rate,
@@ -73,13 +72,13 @@ class VariationalSGDTest(test_util.TestCase):
         decay_rate = 0.5
         batch_size = 2
         total_num_examples = 10
-        optimizer = tfp.optimizer.VariationalSGD(
+        optimizer = variational_sgd.VariationalSGD(
             batch_size,
             total_num_examples,
             max_learning_rate=1.0,
             burnin_max_learning_rate=3.0,
             preconditioner_decay_rate=decay_rate)
-        optimizer2 = tfp.optimizer.VariationalSGD(
+        optimizer2 = variational_sgd.VariationalSGD(
             batch_size,
             total_num_examples,
             max_learning_rate=1.0,
@@ -133,7 +132,7 @@ class VariationalSGDTest(test_util.TestCase):
         decay_rate = 0.5
         batch_size = 2
         total_num_examples = 10
-        optimizer = tfp.optimizer.VariationalSGD(
+        optimizer = variational_sgd.VariationalSGD(
             batch_size,
             total_num_examples,
             max_learning_rate=lrate,
@@ -163,7 +162,7 @@ class VariationalSGDTest(test_util.TestCase):
         var0 = tf.Variable([1.1, 2.1], dtype=tf.float32)
         grads0 = tf.constant([0.1, 0.1], dtype=tf.float32)
         decay_rate = 0.53
-        sgd_optimizer = tfp.optimizer.VariationalSGD(
+        sgd_optimizer = variational_sgd.VariationalSGD(
             1,
             1,
             preconditioner_decay_rate=decay_rate,
@@ -204,7 +203,7 @@ class VariationalSGDTest(test_util.TestCase):
         decay_rate = 0.5
         batch_size = 2
         total_num_examples = 10
-        optimizer = tfp.optimizer.VariationalSGD(
+        optimizer = variational_sgd.VariationalSGD(
             batch_size,
             total_num_examples,
             max_learning_rate=lrate,
@@ -250,7 +249,7 @@ class VariationalSGDTest(test_util.TestCase):
   def testGradWrtRef(self):
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        opt = tfp.optimizer.VariationalSGD(1, 1, max_learning_rate=1.0)
+        opt = variational_sgd.VariationalSGD(1, 1, max_learning_rate=1.0)
         values = [1.0, 3.0]
         vars_ = [tf.Variable([v], dtype=dtype) for v in values]
         loss = lambda: vars_[0] + vars_[1]  # pylint: disable=cell-var-from-loop
@@ -270,7 +269,7 @@ class VariationalSGDTest(test_util.TestCase):
         decay_rate = 0.1
         batch_size = 2
         total_num_examples = 10
-        sgd_optimizer = tfp.optimizer.VariationalSGD(
+        sgd_optimizer = variational_sgd.VariationalSGD(
             batch_size,
             total_num_examples,
             max_learning_rate=3.0,
@@ -318,7 +317,7 @@ class VariationalSGDTest(test_util.TestCase):
         decay_rate = 0.1
         batch_size = 2
         total_num_examples = 10
-        sgd_optimizer = tfp.optimizer.VariationalSGD(
+        sgd_optimizer = variational_sgd.VariationalSGD(
             batch_size,
             total_num_examples,
             max_learning_rate=3.0,

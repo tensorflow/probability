@@ -19,10 +19,10 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import test_util
-from tensorflow_probability.python.math import diag_jacobian
+from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
+from tensorflow_probability.python.optimizer import sgld
 
 from tensorflow.python.framework import test_util as tf_test_util  # pylint: disable=g-direct-tensorflow-import,g-import-not-at-top
 
@@ -41,7 +41,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
         grads0 = tf.constant([0.1, 0.1], dtype=dtype)
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.53
-        sgd_optimizer = tfp.optimizer.StochasticGradientLangevinDynamics(
+        sgd_optimizer = sgld.StochasticGradientLangevinDynamics(
             3., preconditioner_decay_rate=decay_rate)
         sgd_op = sgd_optimizer.apply_gradients(
             zip([grads0, grads1], [var0, var1]))
@@ -83,11 +83,11 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
         gradsa = tf.constant([0.1, 0.1], dtype=dtype)
         gradsb = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.5
-        sgd_optimizer = tfp.optimizer.StochasticGradientLangevinDynamics(
+        sgd_optimizer = sgld.StochasticGradientLangevinDynamics(
             3., preconditioner_decay_rate=decay_rate)
         sgd_op = sgd_optimizer.apply_gradients(
             zip([grads0, grads1], [var0, var1]))
-        sgd_optimizer2 = tfp.optimizer.StochasticGradientLangevinDynamics(
+        sgd_optimizer2 = sgld.StochasticGradientLangevinDynamics(
             3., preconditioner_decay_rate=decay_rate)
         sgd_op2 = sgd_optimizer2.apply_gradients(
             zip([gradsa, gradsb], [vara, varb]))
@@ -137,10 +137,10 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         lrate = tf.constant(3.0)
         decay_rate = 0.5
-        sgd_op = tfp.optimizer.StochasticGradientLangevinDynamics(
-            lrate, preconditioner_decay_rate=tf.constant(
-                decay_rate)).apply_gradients(
-                    zip([grads0, grads1], [var0, var1]))
+        sgd_op = sgld.StochasticGradientLangevinDynamics(
+            lrate,
+            preconditioner_decay_rate=tf.constant(decay_rate)).apply_gradients(
+                zip([grads0, grads1], [var0, var1]))
         self.evaluate(tf1.global_variables_initializer())
         # Fetch params to validate initial values
         self.assertAllCloseAccordingToType([1.1, 2.1], self.evaluate(var0))
@@ -168,7 +168,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
 
     for dtype in [tf.half, tf.float32, tf.float64]:
       with self.cached_session():
-        opt = tfp.optimizer.StochasticGradientLangevinDynamics(3.0)
+        opt = sgld.StochasticGradientLangevinDynamics(3.0)
         values = [1., 3.]
         vars_ = [tf.Variable([v], dtype=dtype) for v in values]
         loss = lambda: vars_[0] + vars_[1]  # pylint: disable=cell-var-from-loop
@@ -186,7 +186,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
         var0 = tf.Variable([1.1, 2.1], dtype=tf.float32)
         grads0 = tf.constant([0.1, 0.1], dtype=tf.float32)
         decay_rate = 0.53
-        sgd_optimizer = tfp.optimizer.StochasticGradientLangevinDynamics(
+        sgd_optimizer = sgld.StochasticGradientLangevinDynamics(
             3.,
             preconditioner_decay_rate=decay_rate,
             burnin=tf.constant(10, dtype=burnin_dtype))
@@ -216,7 +216,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
         grads1 = tf.constant([0.01, 0.01], dtype=dtype)
         decay_rate = 0.1
 
-        sgd_opt = tfp.optimizer.StochasticGradientLangevinDynamics(
+        sgd_opt = sgld.StochasticGradientLangevinDynamics(
             3., preconditioner_decay_rate=decay_rate)
         sgd_opt.iterations = step
         sgd_op = sgd_opt.apply_gradients(zip([grads0, grads1], [var0, var1]))
@@ -260,7 +260,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
             tf.constant([0.01], shape=[1, 1], dtype=dtype),
             tf.constant([1]), tf.constant([2, 1]))
         decay_rate = 0.9
-        sgd_op = tfp.optimizer.StochasticGradientLangevinDynamics(
+        sgd_op = sgld.StochasticGradientLangevinDynamics(
             3., preconditioner_decay_rate=decay_rate).apply_gradients(
                 zip([grads0, grads1], [var0, var1]))
         self.evaluate(tf1.global_variables_initializer())
@@ -293,7 +293,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
       true_cov = dtype([[1, 0.25, 0.25], [0.25, 1, 0.25], [0.25, 0.25, 1]])
       # Target distribution is defined through the Cholesky decomposition
       chol = tf.linalg.cholesky(true_cov)
-      target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+      target = mvn_tril.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
       var_1 = tf.Variable(name='var_1', initial_value=[1., 1.])
       var_2 = tf.Variable(name='var_2', initial_value=[1.])
 
@@ -301,7 +301,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
 
       # Set up the learning rate and the optimizer
       learning_rate = .5
-      optimizer_kernel = tfp.optimizer.StochasticGradientLangevinDynamics(
+      optimizer_kernel = sgld.StochasticGradientLangevinDynamics(
           learning_rate=learning_rate, burnin=1)
 
       # Target function
@@ -379,7 +379,7 @@ class StochasticGradientLangevinDynamicsOptimizerTest(test_util.TestCase):
           power=1.)
 
       # Set up the optimizer
-      optimizer_kernel = tfp.optimizer.StochasticGradientLangevinDynamics(
+      optimizer_kernel = sgld.StochasticGradientLangevinDynamics(
           learning_rate=learning_rate, preconditioner_decay_rate=0.99)
       optimizer_kernel.iterations = global_step
       optimizer = optimizer_kernel.minimize(loss_fn, var_list=[var_1, var_2])

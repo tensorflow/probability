@@ -14,21 +14,38 @@
 # ============================================================================
 """Tests of the No U-Turn Sampler."""
 
-# Dependency imports
-
 from absl.testing import parameterized
+
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
+from tensorflow_probability.python.distributions import sigmoid_beta
+from tensorflow_probability.python.distributions import student_t
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.mcmc import diagnostic
+from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as duassa
+from tensorflow_probability.python.mcmc import nuts
+from tensorflow_probability.python.mcmc import sample
+from tensorflow_probability.python.mcmc import transformed_kernel
+from tensorflow_probability.python.stats import sample_stats
 
 JAX_MODE = False
 
@@ -40,20 +57,19 @@ def run_nuts_chain(event_size, batch_size, num_steps, initial_state=None,
     seed = test_util.test_seed()
   def target_log_prob_fn(event):
     with tf.name_scope('nuts_test_target_log_prob'):
-      return tfd.MultivariateNormalDiag(
-          tf.zeros(event_size),
-          scale_identity_multiplier=1.).log_prob(event)
+      return mvn_diag.MultivariateNormalDiag(
+          tf.zeros(event_size), scale_identity_multiplier=1.).log_prob(event)
 
   if initial_state is None:
     initial_state = tf.zeros([batch_size, event_size])
 
-  kernel = tfp.mcmc.NoUTurnSampler(
+  kernel = nuts.NoUTurnSampler(
       target_log_prob_fn,
       step_size=[0.3],
       unrolled_leapfrog_steps=2,
       max_tree_depth=4)
 
-  chain_state, leapfrogs_taken = tfp.mcmc.sample_chain(
+  chain_state, leapfrogs_taken = sample.sample_chain(
       num_results=num_steps,
       num_burnin_steps=0,
       # Intentionally pass a list argument to test that singleton lists are
@@ -83,17 +99,17 @@ def assert_univariate_target_conservation(test, target_d, step_size):
 
   @tf.function(autograph=False)
   def run_chain():
-    nuts = tfp.mcmc.NoUTurnSampler(
+    kernel = nuts.NoUTurnSampler(
         target_d.log_prob,
         step_size=step_size,
         max_tree_depth=3,
         unrolled_leapfrog_steps=2)
-    result = tfp.mcmc.sample_chain(
+    result = sample.sample_chain(
         num_results=num_steps,
         num_burnin_steps=0,
         current_state=initialization,
         trace_fn=None,
-        kernel=nuts,
+        kernel=kernel,
         seed=strm())
     return result
 
@@ -116,8 +132,9 @@ def assert_univariate_target_conservation(test, target_d, step_size):
 
 def assert_mvn_target_conservation(event_size, batch_size, **kwargs):
   strm = test_util.test_seed_stream()
-  initialization = tfd.MultivariateNormalDiag(
-      loc=tf.zeros(event_size)).sample(batch_size, seed=strm())
+  initialization = mvn_diag.MultivariateNormalDiag(
+      loc=tf.zeros(event_size)).sample(
+          batch_size, seed=strm())
   samples, _ = run_nuts_chain(
       event_size, batch_size, num_steps=1,
       initial_state=initialization, **kwargs)
@@ -152,17 +169,14 @@ class NutsTest(test_util.TestCase):
     @tf.function(autograph=False)
     def sample_from_banana():
       def banana_model():
-        x0 = yield tfd.JointDistributionCoroutine.Root(tfd.Normal(0., 10.))
-        _ = yield tfd.Normal(0.03 * (tf.square(x0) - 100.), 1.)
-      banana = tfd.JointDistributionCoroutine(banana_model)
-      kernel = tfp.mcmc.NoUTurnSampler(banana.log_prob,
-                                       step_size=0.35)
+        x0 = yield jdc.JointDistributionCoroutine.Root(normal.Normal(0., 10.))
+        _ = yield normal.Normal(0.03 * (tf.square(x0) - 100.), 1.)
+
+      banana = jdc.JointDistributionCoroutine(banana_model)
+      kernel = nuts.NoUTurnSampler(banana.log_prob, step_size=0.35)
       trace_fn = lambda _, pkr: pkr.log_accept_ratio
-      return tfp.mcmc.sample_chain(50,
-                                   [0., 0.],
-                                   kernel=kernel,
-                                   trace_fn=trace_fn,
-                                   seed=seed)[1]
+      return sample.sample_chain(
+          50, [0., 0.], kernel=kernel, trace_fn=trace_fn, seed=seed)[1]
     log_accept_ratio_trace = self.evaluate(sample_from_banana())
     self.assertAllGreater(log_accept_ratio_trace, -0.35)
 
@@ -175,10 +189,8 @@ class NutsTest(test_util.TestCase):
     self.assertAllEqual(s1, s2)
 
   def testCorrectReadWriteInstruction(self):
-    mocknuts = tfp.mcmc.NoUTurnSampler(
-        target_log_prob_fn=lambda x: x,
-        max_tree_depth=4,
-        step_size=1.)
+    mocknuts = nuts.NoUTurnSampler(
+        target_log_prob_fn=lambda x: x, max_tree_depth=4, step_size=1.)
 
     self.assertAllEqual(
         mocknuts._write_instruction,
@@ -203,19 +215,20 @@ class NutsTest(test_util.TestCase):
                   [0, 4]]))
 
   def testUnivariateNormalTargetConservation(self):
-    normal_dist = tfd.Normal(loc=1., scale=2.)
+    normal_dist = normal.Normal(loc=1., scale=2.)
     self.evaluate(assert_univariate_target_conservation(
         self, normal_dist, step_size=0.2))
 
   def testSigmoidBetaTargetConservation(self):
-    sigmoid_beta_dist = tfd.SigmoidBeta(concentration0=1., concentration1=2.)
+    sigmoid_beta_dist = sigmoid_beta.SigmoidBeta(
+        concentration0=1., concentration1=2.)
     self.evaluate(assert_univariate_target_conservation(
         self, sigmoid_beta_dist, step_size=0.2))
 
   def testBetaTargetConservation(self):
     # Not that we expect NUTS to do a good job without an unconstraining
     # bijector, but...
-    beta_dist = tfd.Beta(concentration0=1., concentration1=2.)
+    beta_dist = beta.Beta(concentration0=1., concentration1=2.)
     self.evaluate(assert_univariate_target_conservation(
         self, beta_dist, step_size=1e-3))
 
@@ -246,14 +259,13 @@ class NutsTest(test_util.TestCase):
     def run_two_chains(init0, init1):
 
       def log_prob0(x):
-        return tf.squeeze(tfd.Independent(
-            tfd.Normal(tf.range(6, dtype=tf.float32),
-                       tf.constant(1.)),
-            reinterpreted_batch_ndims=1).log_prob(x))
-      kernel0 = tfp.mcmc.NoUTurnSampler(
-          log_prob0,
-          step_size=0.3)
-      [results0] = tfp.mcmc.sample_chain(
+        return tf.squeeze(
+            independent.Independent(
+                normal.Normal(tf.range(6, dtype=tf.float32), tf.constant(1.)),
+                reinterpreted_batch_ndims=1).log_prob(x))
+
+      kernel0 = nuts.NoUTurnSampler(log_prob0, step_size=0.3)
+      [results0] = sample.sample_chain(
           num_results=num_steps,
           num_burnin_steps=10,
           current_state=init0,
@@ -263,18 +275,17 @@ class NutsTest(test_util.TestCase):
 
       def log_prob1(state0, state1, state2):
         return tf.squeeze(
-            tfd.Normal(tf.constant(0.), tf.constant(1.)).log_prob(state0)
-            + tfd.Independent(
-                tfd.Normal(tf.constant([1.]), tf.constant(1.)),
-                reinterpreted_batch_ndims=1).log_prob(state1)
-            + tfd.Independent(
-                tfd.Normal(tf.constant([[2., 3.], [4., 5.]]), tf.constant(1.)),
-                reinterpreted_batch_ndims=2).log_prob(state2)
-        )
-      kernel1 = tfp.mcmc.NoUTurnSampler(
-          log_prob1,
-          step_size=0.3)
-      results1_ = tfp.mcmc.sample_chain(
+            normal.Normal(tf.constant(0.), tf.constant(1.)).log_prob(state0) +
+            independent.Independent(
+                normal.Normal(tf.constant([1.]), tf.constant(1.)),
+                reinterpreted_batch_ndims=1).log_prob(state1) +
+            independent.Independent(
+                normal.Normal(
+                    tf.constant([[2., 3.], [4., 5.]]), tf.constant(1.)),
+                reinterpreted_batch_ndims=2).log_prob(state2))
+
+      kernel1 = nuts.NoUTurnSampler(log_prob1, step_size=0.3)
+      results1_ = sample.sample_chain(
           num_results=num_steps,
           num_burnin_steps=10,
           current_state=init1,
@@ -308,23 +319,21 @@ class NutsTest(test_util.TestCase):
     def run_chain_and_get_summary(mu, scale_tril, step_size, nsamples, state):
       def target_log_prob_fn(event):
         with tf.name_scope('nuts_test_target_log_prob'):
-          return tfd.MultivariateNormalTriL(
+          return mvn_tril.MultivariateNormalTriL(
               loc=tf.cast(mu, dtype=tf.float64),
               scale_tril=tf.cast(scale_tril, dtype=tf.float64)).log_prob(event)
 
-      nuts = tfp.mcmc.NoUTurnSampler(
-          target_log_prob_fn,
-          step_size=[step_size],
-          max_tree_depth=5)
+      kernel = nuts.NoUTurnSampler(
+          target_log_prob_fn, step_size=[step_size], max_tree_depth=5)
 
       def trace_fn(_, pkr):
         return (pkr.is_accepted, pkr.leapfrogs_taken)
 
-      [x], (is_accepted, leapfrogs_taken) = tfp.mcmc.sample_chain(
+      [x], (is_accepted, leapfrogs_taken) = sample.sample_chain(
           num_results=nsamples,
           num_burnin_steps=0,
           current_state=[tf.cast(state, dtype=tf.float64)],
-          kernel=nuts,
+          kernel=kernel,
           trace_fn=trace_fn,
           seed=strm())
 
@@ -332,7 +341,7 @@ class NutsTest(test_util.TestCase):
           tf.shape(x),
           # We'll average over samples (dim=0) and chains (dim=1).
           tf.reduce_mean(x, axis=[0, 1]),
-          tfp.stats.covariance(x, sample_axis=[0, 1]),
+          sample_stats.covariance(x, sample_axis=[0, 1]),
           leapfrogs_taken[is_accepted])
 
     sample_shape, sample_mean, sample_cov, leapfrogs_taken = self.evaluate(
@@ -367,18 +376,15 @@ class NutsTest(test_util.TestCase):
 
     @tf.function(autograph=False)
     def run_chain_and_get_estimation_error():
-      target_log_prob = tfd.MultivariateNormalTriL(
+      target_log_prob = mvn_tril.MultivariateNormalTriL(
           loc=mu, scale_tril=scale_tril).log_prob
-      nuts_kernel = tfp.mcmc.NoUTurnSampler(
-          target_log_prob,
-          step_size=tf.constant([sigma1, sigma2], dtype))
-      chain_state = tfp.mcmc.sample_chain(
+      nuts_kernel = nuts.NoUTurnSampler(
+          target_log_prob, step_size=tf.constant([sigma1, sigma2], dtype))
+      chain_state = sample.sample_chain(
           num_results=num_steps,
           num_burnin_steps=20,
           current_state=initial_state,
-          kernel=tfp.mcmc.DualAveragingStepSizeAdaptation(
-              nuts_kernel, 20, .8),
-
+          kernel=duassa.DualAveragingStepSizeAdaptation(nuts_kernel, 20, .8),
           seed=strm(),
           trace_fn=None)
       variance_est = tf.square(chain_state - mu)
@@ -389,14 +395,15 @@ class NutsTest(test_util.TestCase):
 
       expected = tf.reduce_mean(mcmc_samples, axis=[0, 1])
 
-      ess = tf.reduce_sum(tfp.mcmc.effective_sample_size(mcmc_samples), axis=0)
+      ess = tf.reduce_sum(
+          diagnostic.effective_sample_size(mcmc_samples), axis=0)
       avg_monte_carlo_standard_error = tf.reduce_mean(
           tf.math.reduce_std(mcmc_samples, axis=0),
           axis=0) / tf.sqrt(ess)
       scaled_error = (
           tf.abs(expected - true_param) / avg_monte_carlo_standard_error)
 
-      return tfd.Normal(
+      return normal.Normal(
           loc=tf.zeros([], dtype), scale=1.).survival_function(scaled_error)
 
     # Run chains, compute the error, and compute the probability of getting
@@ -420,13 +427,13 @@ class NutsTest(test_util.TestCase):
   def testDynamicShape(self, nsample, batch_size, nd, dynamic_shape):
     dtype = np.float32
 
-    kernel = tfp.mcmc.NoUTurnSampler(
-        target_log_prob_fn=tfd.Independent(
-            tfd.Normal(tf.zeros(nd, dtype=dtype), 1.), 1).log_prob,
+    kernel = nuts.NoUTurnSampler(
+        target_log_prob_fn=independent.Independent(
+            normal.Normal(tf.zeros(nd, dtype=dtype), 1.), 1).log_prob,
         step_size=.1)
     x_ = np.zeros([batch_size, nd], dtype=dtype)
     x = tf1.placeholder_with_default(x_, shape=dynamic_shape)
-    mcmc_trace_ = tfp.mcmc.sample_chain(
+    mcmc_trace_ = sample.sample_chain(
         num_results=nsample,
         current_state=x,
         kernel=kernel,
@@ -438,23 +445,22 @@ class NutsTest(test_util.TestCase):
   def testDivergence(self):
     """Neals funnel with large step size."""
     strm = test_util.test_seed_stream()
-    neals_funnel = tfd.JointDistributionSequential(
+    neals_funnel = jds.JointDistributionSequential(
         [
-            tfd.Normal(loc=0., scale=3.),  # b0
-            lambda y: tfd.Sample(  # pylint: disable=g-long-lambda
-                tfd.Normal(loc=0., scale=tf.math.exp(y / 2)),
+            normal.Normal(loc=0., scale=3.),  # b0
+            lambda y: sample_dist_lib.Sample(  # pylint: disable=g-long-lambda
+                normal.Normal(loc=0., scale=tf.math.exp(y / 2)),
                 sample_shape=9),
         ],
-        validate_args=True
-    )
+        validate_args=True)
 
     @tf.function(autograph=False)
     def run_chain_and_get_divergence():
       nchains = 5
       init_states = neals_funnel.sample(nchains, seed=strm())
-      _, has_divergence = tfp.mcmc.sample_chain(
+      _, has_divergence = sample.sample_chain(
           num_results=100,
-          kernel=tfp.mcmc.NoUTurnSampler(
+          kernel=nuts.NoUTurnSampler(
               target_log_prob_fn=lambda *args: neals_funnel.log_prob(args),
               step_size=[1., 1.]),
           current_state=init_states,
@@ -487,16 +493,16 @@ class NutsTest(test_util.TestCase):
     ], tf.float32)
 
     # Robust linear regression model
-    robust_lm = tfd.JointDistributionSequential(
+    robust_lm = jds.JointDistributionSequential(
         [
-            tfd.Normal(loc=0., scale=1.),  # b0
-            tfd.Normal(loc=0., scale=1.),  # b1
-            tfd.HalfNormal(5.),  # df
-            lambda df, b1, b0: tfd.Independent(  # pylint: disable=g-long-lambda
-                tfd.StudentT(  # Likelihood
+            normal.Normal(loc=0., scale=1.),  # b0
+            normal.Normal(loc=0., scale=1.),  # b1
+            half_normal.HalfNormal(5.),  # df
+            lambda df, b1, b0: independent.Independent(  # pylint: disable=g-long-lambda
+                student_t.StudentT(  # Likelihood
                     df=df[..., tf.newaxis],
-                    loc=(b0[..., tf.newaxis] +
-                         b1[..., tf.newaxis] * predictors[tf.newaxis]),
+                    loc=(b0[..., tf.newaxis] + b1[..., tf.newaxis] * predictors[
+                        tf.newaxis]),
                     scale=y_sigma)),
         ],
         validate_args=True)
@@ -517,37 +523,36 @@ class NutsTest(test_util.TestCase):
 
       # bijector to map contrained parameters to real
       unconstraining_bijectors = [
-          tfb.Identity(),
-          tfb.Identity(),
-          tfb.Exp(),
+          identity.Identity(),
+          identity.Identity(),
+          exp.Exp(),
       ]
 
       def trace_fn(_, pkr):
         return (pkr.inner_results.inner_results.step_size,
                 pkr.inner_results.inner_results.log_accept_ratio)
 
-      kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
-          tfp.mcmc.TransformedTransitionKernel(
-              inner_kernel=tfp.mcmc.NoUTurnSampler(
-                  target_log_prob_fn=log_prob,
-                  step_size=step_size0),
+      kernel = duassa.DualAveragingStepSizeAdaptation(
+          transformed_kernel.TransformedTransitionKernel(
+              inner_kernel=nuts.NoUTurnSampler(
+                  target_log_prob_fn=log_prob, step_size=step_size0),
               bijector=unconstraining_bijectors),
           target_accept_prob=.8,
           num_adaptation_steps=burnin,
       )
 
       # Sampling from the chain and get diagnostics
-      mcmc_trace, (step_size, log_accept_ratio) = tfp.mcmc.sample_chain(
+      mcmc_trace, (step_size, log_accept_ratio) = sample.sample_chain(
           num_results=number_of_steps,
           num_burnin_steps=burnin,
           current_state=[b0, b1, df],
           kernel=kernel,
           trace_fn=trace_fn,
           seed=strm())
-      rhat = tfp.mcmc.potential_scale_reduction(mcmc_trace)
+      rhat = diagnostic.potential_scale_reduction(mcmc_trace)
       return (
           [s[-1] for s in step_size],  # final step size
-          tf.math.exp(tfp.math.reduce_logmeanexp(log_accept_ratio)),
+          tf.math.exp(generic.reduce_logmeanexp(log_accept_ratio)),
           [tf.reduce_mean(rhat_) for rhat_ in rhat],  # average rhat
       )
 
@@ -569,16 +574,19 @@ class NutsTest(test_util.TestCase):
         average_rhat, np.ones_like(average_rhat), atol=0.05, rtol=0.05)
 
   def test_step_size_trace(self):
-    dist = tfd.Normal(0., 1.)
-    kernel = tfp.mcmc.NoUTurnSampler(dist.log_prob, step_size=1.)
-    _, _, fkr = tfp.mcmc.sample_chain(10, 0., kernel=kernel,
-                                      return_final_kernel_results=True,
-                                      seed=test_util.test_seed())
+    dist = normal.Normal(0., 1.)
+    kernel = nuts.NoUTurnSampler(dist.log_prob, step_size=1.)
+    _, _, fkr = sample.sample_chain(
+        10,
+        0.,
+        kernel=kernel,
+        return_final_kernel_results=True,
+        seed=test_util.test_seed())
     self.assertAlmostEqual(1., self.evaluate(fkr.step_size))
 
   def test_zero_sized_event(self):
     tlp_fn = lambda x, y: x[:, 0] + tf.pad(y, [[0, 0], [0, 1]])[:, 0]
-    kernel = tfp.mcmc.NoUTurnSampler(tlp_fn, step_size=0.1)
+    kernel = nuts.NoUTurnSampler(tlp_fn, step_size=0.1)
     xy = [tf.ones([1, 1]), tf.ones([1, 0])]
     results = kernel.bootstrap_results(xy)
     self.evaluate(kernel.one_step(xy, results, seed=test_util.test_seed())[0])
@@ -588,16 +596,16 @@ class NutsTest(test_util.TestCase):
 class DistributedNutsTest(distribute_test_lib.DistributedTest):
 
   def test_nuts_kernel_tracks_axis_names(self):
-    kernel = tfp.mcmc.NoUTurnSampler(
-        tfd.Normal(0, 1).log_prob, step_size=1.9)
+    kernel = nuts.NoUTurnSampler(normal.Normal(0, 1).log_prob, step_size=1.9)
     self.assertIsNone(kernel.experimental_shard_axis_names)
-    kernel = tfp.mcmc.NoUTurnSampler(
-        tfd.Normal(0, 1).log_prob, step_size=1.9,
+    kernel = nuts.NoUTurnSampler(
+        normal.Normal(0, 1).log_prob,
+        step_size=1.9,
         experimental_shard_axis_names=['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
-    kernel = tfp.mcmc.NoUTurnSampler(
-        tfd.Normal(0, 1).log_prob, step_size=1.9
-    ).experimental_with_shard_axes(['a'])
+    kernel = nuts.NoUTurnSampler(
+        normal.Normal(0, 1).log_prob,
+        step_size=1.9).experimental_with_shard_axes(['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
 
   def test_takes_same_number_leapfrog_steps_with_sharded_state(self):
@@ -606,12 +614,11 @@ class DistributedNutsTest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    kernel = tfp.mcmc.NoUTurnSampler(target_log_prob, step_size=1.9)
+    kernel = nuts.NoUTurnSampler(target_log_prob, step_size=1.9)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
 
     def run(seed):
@@ -634,12 +641,11 @@ class DistributedNutsTest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    kernel = tfp.mcmc.NoUTurnSampler(target_log_prob, step_size=1e-1)
+    kernel = nuts.NoUTurnSampler(target_log_prob, step_size=1e-1)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
 
     def run(seed):

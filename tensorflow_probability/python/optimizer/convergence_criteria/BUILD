@@ -78,9 +78,9 @@ multi_substrate_py_test(
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
+        ":loss_not_decreasing",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -92,9 +92,13 @@ multi_substrate_py_test(
     jax_tags = ["notap"],
     numpy_tags = ["notap"],
     deps = [
+        ":successive_gradients_are_uncorrelated",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/util:deferred_tensor",
+        "//tensorflow_probability/python/vi:csiszar_divergence",
     ],
 )

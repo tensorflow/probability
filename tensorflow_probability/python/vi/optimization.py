@@ -18,7 +18,8 @@ import functools
 
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
+from tensorflow_probability.python.math.minimize import minimize
+from tensorflow_probability.python.math.minimize import minimize_stateless
 from tensorflow_probability.python.vi import csiszar_divergence
 
 from tensorflow.python.util import deprecation  # pylint: disable=g-direct-tensorflow-import
@@ -378,7 +379,7 @@ def fit_surrogate_posterior_stateless(
         stopped_surrogate_posterior=stopped_surrogate_posterior,
         seed=seed)
 
-  return tfp_math.minimize_stateless(
+  return minimize_stateless(
       variational_loss_fn,
       init=initial_parameters,
       num_steps=num_steps,
@@ -748,12 +749,13 @@ def fit_surrogate_posterior(target_log_prob_fn,
         sample_size=sample_size,
         seed=seed)
 
-  return tfp_math.minimize(complete_variational_loss_fn,
-                           num_steps=num_steps,
-                           optimizer=optimizer,
-                           convergence_criterion=convergence_criterion,
-                           trace_fn=trace_fn,
-                           trainable_variables=trainable_variables,
-                           jit_compile=jit_compile,
-                           seed=seed,
-                           name=name)
+  return minimize(
+      complete_variational_loss_fn,
+      num_steps=num_steps,
+      optimizer=optimizer,
+      convergence_criterion=convergence_criterion,
+      trace_fn=trace_fn,
+      trainable_variables=trainable_variables,
+      jit_compile=jit_compile,
+      seed=seed,
+      name=name)

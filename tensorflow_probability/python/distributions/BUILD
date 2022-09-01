@@ -2284,6 +2284,7 @@ multi_substrate_py_library(
         ":kullback_leibler",
         # numpy dep,
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:invert",
         "//tensorflow_probability/python/bijectors:sigmoid",
         "//tensorflow_probability/python/bijectors:softmax_centered",
         "//tensorflow_probability/python/bijectors:square",

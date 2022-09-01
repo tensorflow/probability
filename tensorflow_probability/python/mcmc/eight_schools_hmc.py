@@ -19,9 +19,10 @@ import time
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-
-tfd = tfp.distributions
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import sample
 
 
 __all__ = [
@@ -34,16 +35,16 @@ __all__ = [
 def mvn(*args, **kwargs):
   """Convenience function to efficiently construct a MultivariateNormalDiag."""
   # Faster than using `tfd.MultivariateNormalDiag`.
-  return tfd.Independent(tfd.Normal(*args, **kwargs),
-                         reinterpreted_batch_ndims=1)
+  return independent.Independent(
+      normal.Normal(*args, **kwargs), reinterpreted_batch_ndims=1)
 
 
 def eight_schools_joint_log_prob(
     treatment_effects, treatment_stddevs,
     avg_effect, avg_stddev, school_effects_standard):
   """Eight-schools joint log-prob."""
-  rv_avg_effect = tfd.Normal(loc=0., scale=10.)
-  rv_avg_stddev = tfd.Normal(loc=5., scale=1.)
+  rv_avg_effect = normal.Normal(loc=0., scale=10.)
+  rv_avg_stddev = normal.Normal(loc=5., scale=1.)
   rv_school_effects_standard = mvn(
       loc=tf.zeros_like(school_effects_standard),
       scale=tf.ones_like(school_effects_standard))
@@ -82,9 +83,9 @@ def benchmark_eight_schools_hmc(
         avg_effect, avg_stddev, school_effects_standard)
 
   if tf.executing_eagerly():
-    sample_chain = tf.function(tfp.mcmc.sample_chain)
+    sample_chain = tf.function(sample.sample_chain)
   else:
-    sample_chain = tfp.mcmc.sample_chain
+    sample_chain = sample.sample_chain
 
   def computation():
     """The benchmark computation."""
@@ -96,7 +97,7 @@ def benchmark_eight_schools_hmc(
             tf.zeros([], name='init_avg_stddev'),
             tf.ones([num_schools], name='init_school_effects_standard'),
         ),
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=unnormalized_posterior_log_prob,
             step_size=step_size,
             num_leapfrog_steps=num_leapfrog_steps))

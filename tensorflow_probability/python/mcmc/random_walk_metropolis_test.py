@@ -19,12 +19,15 @@
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import cauchy
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import random_walk_metropolis
+from tensorflow_probability.python.mcmc import sample
 
 JAX_MODE = False
 
@@ -36,14 +39,15 @@ class RWMTest(test_util.TestCase):
     """Sampling from the Standard Normal Distribution."""
     dtype = np.float32
 
-    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
+    target = normal.Normal(loc=dtype(0), scale=dtype(1))
 
-    samples = tfp.mcmc.sample_chain(
+    samples = sample.sample_chain(
         num_results=2000,
         current_state=dtype(1),
-        kernel=tfp.mcmc.RandomWalkMetropolis(
+        kernel=random_walk_metropolis.RandomWalkMetropolis(
             target.log_prob,
-            new_state_fn=tfp.mcmc.random_walk_uniform_fn(scale=dtype(2.))),
+            new_state_fn=random_walk_metropolis.random_walk_uniform_fn(
+                scale=dtype(2.))),
         num_burnin_steps=500,
         trace_fn=None,
         seed=test_util.test_seed())
@@ -59,12 +63,11 @@ class RWMTest(test_util.TestCase):
     """Sampling from the Standard Normal Distribution with adaptation."""
     dtype = np.float32
 
-    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
-    samples = tfp.mcmc.sample_chain(
+    target = normal.Normal(loc=dtype(0), scale=dtype(1))
+    samples = sample.sample_chain(
         num_results=500,
         current_state=dtype([1] * 8),  # 8 parallel chains
-        kernel=tfp.mcmc.RandomWalkMetropolis(
-            target.log_prob),
+        kernel=random_walk_metropolis.RandomWalkMetropolis(target.log_prob),
         num_burnin_steps=500,
         trace_fn=None,
         seed=test_util.test_seed())
@@ -88,12 +91,12 @@ class RWMTest(test_util.TestCase):
     def target_log_prob(x):
       return -tf.reduce_sum(x**2) / 2
 
-    samples = tfp.mcmc.sample_chain(
+    samples = sample.sample_chain(
         num_results=500,
         current_state=np.float32([0.] * 4),  # 4 parallel chains
-        kernel=tfp.mcmc.RandomWalkMetropolis(
+        kernel=random_walk_metropolis.RandomWalkMetropolis(
             target_log_prob,
-            new_state_fn=tfp.mcmc.random_walk_normal_fn(scale_ph),
+            new_state_fn=random_walk_metropolis.random_walk_normal_fn(scale_ph),
         ),
         num_burnin_steps=500,
         trace_fn=None,
@@ -114,24 +117,24 @@ class RWMTest(test_util.TestCase):
     num_burnin_steps = 750
     num_chain_results = 400
 
-    target = tfd.Normal(loc=dtype(0), scale=dtype(1))
+    target = normal.Normal(loc=dtype(0), scale=dtype(1))
 
     def cauchy_new_state_fn(scale, dtype):
-      cauchy = tfd.Cauchy(loc=dtype(0), scale=dtype(scale))
+      dist = cauchy.Cauchy(loc=dtype(0), scale=dtype(scale))
       def _fn(state_parts, seed):
-        seeds = tfp.random.split_seed(
-            seed, n=len(state_parts), salt='rwmcauchy')
+        seeds = samplers.split_seed(seed, n=len(state_parts), salt='rwmcauchy')
         next_state_parts = [
-            state + cauchy.sample(state.shape, seed=part_seed)
-            for state, part_seed in zip(state_parts, seeds)]
+            state + dist.sample(state.shape, seed=part_seed)
+            for state, part_seed in zip(state_parts, seeds)
+        ]
         return next_state_parts
       return _fn
 
-    samples = tfp.mcmc.sample_chain(
+    samples = sample.sample_chain(
         num_results=num_chain_results,
         num_burnin_steps=num_burnin_steps,
         current_state=dtype([1] * 8),  # 8 parallel chains
-        kernel=tfp.mcmc.RandomWalkMetropolis(
+        kernel=random_walk_metropolis.RandomWalkMetropolis(
             target.log_prob,
             new_state_fn=cauchy_new_state_fn(scale=0.5, dtype=dtype)),
         trace_fn=None,
@@ -153,7 +156,7 @@ class RWMTest(test_util.TestCase):
     num_chains = 100
     # Target distribution is defined through the Cholesky decomposition
     chol = tf.linalg.cholesky(true_cov)
-    target = tfd.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
+    target = mvn_tril.MultivariateNormalTriL(loc=true_mean, scale_tril=chol)
 
     # Assume that the state is passed as a list of 1-d tensors `x` and `y`.
     # Then the target log-density is defined as follows:
@@ -168,10 +171,10 @@ class RWMTest(test_util.TestCase):
 
     # Run Random Walk Metropolis with normal proposal for `num_results`
     # iterations for `num_chains` independent chains:
-    states = tfp.mcmc.sample_chain(
+    states = sample.sample_chain(
         num_results=num_results,
         current_state=init_state,
-        kernel=tfp.mcmc.RandomWalkMetropolis(
+        kernel=random_walk_metropolis.RandomWalkMetropolis(
             target_log_prob_fn=target_log_prob),
         num_burnin_steps=200,
         num_steps_between_results=1,
@@ -190,15 +193,13 @@ class RWMTest(test_util.TestCase):
     self.assertAllClose(np.squeeze(sample_cov_), true_cov, atol=0.1, rtol=0.1)
 
   def testRWMIsCalibrated(self):
-    rwm = tfp.mcmc.RandomWalkMetropolis(
-        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
-    )
+    rwm = random_walk_metropolis.RandomWalkMetropolis(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,)
     self.assertTrue(rwm.is_calibrated)
 
   def testUncalibratedRWIsNotCalibrated(self):
-    uncal_rw = tfp.mcmc.UncalibratedRandomWalk(
-        target_log_prob_fn=lambda x: -tf.square(x) / 2.,
-    )
+    uncal_rw = random_walk_metropolis.UncalibratedRandomWalk(
+        target_log_prob_fn=lambda x: -tf.square(x) / 2.,)
     self.assertFalse(uncal_rw.is_calibrated)
 
 
@@ -206,16 +207,14 @@ class RWMTest(test_util.TestCase):
 class DistributedRWMTest(distribute_test_lib.DistributedTest):
 
   def test_rwm_kernel_tracks_axis_names(self):
-    kernel = tfp.mcmc.RandomWalkMetropolis(
-        tfd.Normal(0, 1).log_prob)
+    kernel = random_walk_metropolis.RandomWalkMetropolis(
+        normal.Normal(0, 1).log_prob)
     self.assertIsNone(kernel.experimental_shard_axis_names)
-    kernel = tfp.mcmc.RandomWalkMetropolis(
-        tfd.Normal(0, 1).log_prob,
-        experimental_shard_axis_names=['a'])
+    kernel = random_walk_metropolis.RandomWalkMetropolis(
+        normal.Normal(0, 1).log_prob, experimental_shard_axis_names=['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
-    kernel = tfp.mcmc.RandomWalkMetropolis(
-        tfd.Normal(0, 1).log_prob,
-    ).experimental_with_shard_axes(['a'])
+    kernel = random_walk_metropolis.RandomWalkMetropolis(
+        normal.Normal(0, 1).log_prob,).experimental_with_shard_axes(['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
 
   @test_util.numpy_disable_test_missing_functionality('No SPMD support.')
@@ -225,12 +224,11 @@ class DistributedRWMTest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    kernel = tfp.mcmc.RandomWalkMetropolis(target_log_prob)
+    kernel = random_walk_metropolis.RandomWalkMetropolis(target_log_prob)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
 
     def run(seed):
@@ -254,12 +252,11 @@ class DistributedRWMTest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    kernel = tfp.mcmc.RandomWalkMetropolis(target_log_prob)
+    kernel = random_walk_metropolis.RandomWalkMetropolis(target_log_prob)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
 
     def run(seed):

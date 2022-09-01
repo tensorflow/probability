@@ -19,8 +19,8 @@ import random
 from scipy import stats
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.stats import kendalls_tau
 
 
 @test_util.test_all_tf_execution_regimes
@@ -31,7 +31,7 @@ class KendallsTauTest(test_util.TestCase):
     x2 = [1, 4, 7, 1, 0]
     expected = stats.kendalltau(x1, x2)[0]
     res = self.evaluate(
-        tfp.stats.kendalls_tau(
+        kendalls_tau.kendalls_tau(
             tf.constant(x1, tf.float32), tf.constant(x2, tf.float32)))
     self.assertAllClose(expected, res, atol=1e-5)
 
@@ -40,7 +40,7 @@ class KendallsTauTest(test_util.TestCase):
     x2 = [0.1, 0.4, 0.7, 0.1, 0.0]
     expected = stats.kendalltau(x1, x2)[0]
     res = self.evaluate(
-        tfp.stats.kendalls_tau(
+        kendalls_tau.kendalls_tau(
             tf.constant(x1, tf.float32), tf.constant(x2, tf.float32)))
     self.assertAllClose(expected, res, atol=1e-5)
 
@@ -50,25 +50,25 @@ class KendallsTauTest(test_util.TestCase):
       right = random.sample(left, len(left))
       expected = stats.kendalltau(left, right)[0]
       res = self.evaluate(
-          tfp.stats.kendalls_tau(
+          kendalls_tau.kendalls_tau(
               tf.constant(left, tf.float32), tf.constant(right, tf.float32)))
       self.assertAllClose(expected, res, atol=1e-5)
 
   def test_kendall_tau_assert_all_ties_y_true(self):
     with self.assertRaises((ValueError, tf.errors.InvalidArgumentError)):
-      self.evaluate(tfp.stats.kendalls_tau([12, 12, 12], [1, 4, 7]))
+      self.evaluate(kendalls_tau.kendalls_tau([12, 12, 12], [1, 4, 7]))
 
   def test_kendall_tau_assert_all_ties_y_pred(self):
     with self.assertRaises((ValueError, tf.errors.InvalidArgumentError)):
-      self.evaluate(tfp.stats.kendalls_tau([1, 2, 3], [4, 4, 4]))
+      self.evaluate(kendalls_tau.kendalls_tau([1, 2, 3], [4, 4, 4]))
 
   def test_kendall_tau_assert_scalar(self):
     with self.assertRaises((ValueError, tf.errors.InvalidArgumentError)):
-      tfp.stats.kendalls_tau([1], [4])
+      kendalls_tau.kendalls_tau([1], [4])
 
   def test_kendall_tau_assert_unmatched(self):
     with self.assertRaises(ValueError):
-      tfp.stats.kendalls_tau([1, 2], [3, 4, 5])
+      kendalls_tau.kendalls_tau([1, 2], [3, 4, 5])
 
 
 if __name__ == '__main__':

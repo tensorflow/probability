@@ -23,12 +23,18 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
+from tensorflow_probability.python.experimental.mcmc import sharded
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import kernel as kernel_lib
+from tensorflow_probability.python.mcmc import sample
+from tensorflow_probability.python.mcmc import simple_step_size_adaptation as sssa
 
 JAX_MODE = False
 _RATE = 1.01
@@ -38,7 +44,7 @@ FakeMHKernelResults = collections.namedtuple(
     'FakeMHKernelResults', 'accepted_results, log_accept_ratio')
 
 
-class FakeMHKernel(tfp.mcmc.TransitionKernel):
+class FakeMHKernel(kernel_lib.TransitionKernel):
 
   def __init__(self,
                inner_kernel,
@@ -83,7 +89,7 @@ FakeSteppedKernelResults = collections.namedtuple('FakeSteppedKernelResults',
                                                   'step_size')
 
 
-class FakeSteppedKernel(tfp.mcmc.TransitionKernel):
+class FakeSteppedKernel(kernel_lib.TransitionKernel):
 
   def __init__(self, step_size, store_parameters_in_results=False,
                experimental_shard_axis_names=None):
@@ -116,7 +122,7 @@ FakeWrapperKernelResults = collections.namedtuple('FakeWrapperKernelResults',
                                                   'inner_results')
 
 
-class FakeWrapperKernel(tfp.mcmc.TransitionKernel):
+class FakeWrapperKernel(kernel_lib.TransitionKernel):
 
   def __init__(self, inner_kernel):
     self.parameters = dict(inner_kernel=inner_kernel)
@@ -147,7 +153,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
     kernel = FakeWrapperKernel(FakeSteppedKernel(step_size=0.5))
     self.assertFalse(
         kernel.inner_kernel.parameters['store_parameters_in_results'])
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         adaptation_rate=_RATE - 1. - 1.,
@@ -163,7 +169,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
             [tf.math.log(0.74),
              tf.math.log(0.76),
              tf.math.log(0.76)]))
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         adaptation_rate=_RATE - 1.,
@@ -187,7 +193,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
             [tf.math.log(0.24),
              tf.math.log(1.),
              tf.math.log(100.)]))
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         adaptation_rate=_RATE - 1.,
@@ -204,7 +210,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
 
   def testAdaptationSteps(self):
     kernel = FakeMHKernel(FakeSteppedKernel(step_size=0.1), log_accept_ratio=0.)
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=2,
         adaptation_rate=_RATE - 1.,
@@ -234,7 +240,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
             [tf.math.log(0.49),
              tf.math.log(0.49),
              tf.math.log(0.51)]))
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         adaptation_rate=_RATE - 1.,
@@ -258,7 +264,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
             [tf.math.log(0.74),
              tf.math.log(0.76),
              tf.math.log(0.76)]))
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         adaptation_rate=_RATE - 1.,
@@ -279,7 +285,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
         # Just over the target_accept_prob.
         log_accept_ratio=tf.math.log(0.76))
     kernel = FakeWrapperKernel(kernel)
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         adaptation_rate=_RATE - 1.,
@@ -299,7 +305,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
         FakeSteppedKernel(step_size=tf.constant([0.1, 0.2])),
         log_accept_ratio=tf.stack([tf.math.log(0.74),
                                    tf.math.log(0.76)]))
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         log_accept_prob_getter_fn=(
@@ -321,7 +327,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
         FakeSteppedKernel(step_size=tf.constant([0.1, 0.2])),
         log_accept_ratio=tf.stack([tf.math.log(0.74),
                                    tf.math.log(0.76)]))
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         log_accept_prob_getter_fn=(
@@ -343,20 +349,20 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
                             (0., r'`target_accept_prob` must be > 0.'),
                             (0.999, None),
                             (1., r'`target_accept_prob` must be < 1.'))
-  def testTargetAcceptanceProbChecks(self, target_accept_prob, message):
+  def testTargetAcceptanceProbChecks(self, target_accept_prob, messsage):
 
     def _impl():
       kernel = FakeMHKernel(
           FakeSteppedKernel(step_size=1.), log_accept_ratio=0.)
-      kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+      kernel = sssa.SimpleStepSizeAdaptation(
           kernel,
           num_adaptation_steps=1,
           target_accept_prob=target_accept_prob,
           validate_args=True)
       self.evaluate(kernel.bootstrap_results(tf.zeros(2)))
 
-    if message:
-      with self.assertRaisesOpError(message):
+    if messsage:
+      with self.assertRaisesOpError(messsage):
         _impl()
     else:
       _impl()
@@ -364,9 +370,9 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
   def testIsCalibrated(self):
     test_kernel = collections.namedtuple('TestKernel', 'is_calibrated')
     self.assertTrue(
-        tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(True), 1).is_calibrated)
+        sssa.SimpleStepSizeAdaptation(test_kernel(True), 1).is_calibrated)
     self.assertFalse(
-        tfp.mcmc.SimpleStepSizeAdaptation(test_kernel(False), 1).is_calibrated)
+        sssa.SimpleStepSizeAdaptation(test_kernel(False), 1).is_calibrated)
 
   def testCustomReduceFn(self):
     log_accept_ratio = tf.constant(
@@ -379,7 +385,7 @@ class SimpleStepSizeAdaptationTest(test_util.TestCase):
     kernel = FakeMHKernel(
         FakeSteppedKernel(step_size=old_step_size),
         log_accept_ratio=log_accept_ratio)
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         adaptation_rate=tf.constant(_RATE - 1., dtype=tf.float64),
@@ -403,22 +409,22 @@ class SimpleStepSizeAdaptationExampleTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test('HMC')
   def test_example(self):
-    target_log_prob_fn = tfd.Normal(loc=0., scale=1.).log_prob
+    target_log_prob_fn = normal.Normal(loc=0., scale=1.).log_prob
     num_burnin_steps = 500
     num_results = 500
     num_chains = 64
     step_size = 0.1
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         num_leapfrog_steps=2,
         step_size=step_size)
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         inner_kernel=kernel, num_adaptation_steps=int(num_burnin_steps * 0.8))
 
     @tf.function(autograph=False)
     def do_sampling():
-      _, log_accept_ratio = tfp.mcmc.sample_chain(
+      _, log_accept_ratio = sample.sample_chain(
           num_results=num_results,
           num_burnin_steps=num_burnin_steps,
           current_state=tf.zeros(num_chains),
@@ -428,8 +434,8 @@ class SimpleStepSizeAdaptationExampleTest(test_util.TestCase):
       return log_accept_ratio
 
     log_accept_ratio = do_sampling()
-    p_accept = tf.math.exp(tfp.math.reduce_logmeanexp(
-        tf.minimum(log_accept_ratio, 0.)))
+    p_accept = tf.math.exp(
+        generic.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
 
     self.assertAllClose(0.75, self.evaluate(p_accept), atol=0.15)
 
@@ -486,7 +492,7 @@ class SimpleStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
     kernel = FakeMHKernel(
         FakeSteppedKernel(step_size=old_step_size),
         log_accept_ratio=log_accept_ratio)
-    kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    kernel = sssa.SimpleStepSizeAdaptation(
         kernel,
         num_adaptation_steps=1,
         adaptation_rate=tf.constant(_RATE - 1., dtype=tf.float64),
@@ -502,7 +508,7 @@ class SimpleStepSizeAdaptationStaticBroadcastingTest(test_util.TestCase):
     self.assertAllClose(new_step_size, step_size)
 
   def testShouldPropagateShardAxisNames(self):
-    test_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    test_kernel = sssa.SimpleStepSizeAdaptation(
         FakeMHKernel(FakeSteppedKernel(step_size=1.), log_accept_ratio=0.),
         num_adaptation_steps=1)
     self.assertIsNone(test_kernel.experimental_shard_axis_names)
@@ -536,25 +542,25 @@ class DistributedSimpleStepSizeAdaptationTest(
       ('mean', reduce_mean),
       ('logmeanexp',
        functools.partial(
-           tfp.math.reduce_logmeanexp, experimental_allow_all_gather=True)))
+           generic.reduce_logmeanexp, experimental_allow_all_gather=True)))
   @test_util.numpy_disable_test_missing_functionality(
       'NumPy backend does not support distributed computation.')
   def test_kernel_can_shard_chains_across_devices(self, reduce_fn):
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + tfd.Sample(tfd.Normal(a, 1.), 4).log_prob(b))
+      return (normal.Normal(0., 1.).log_prob(a) +
+              sample_dist_lib.Sample(normal.Normal(a, 1.), 4).log_prob(b))
 
     def run(seed, log_accept_ratio):
-      kernel = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(target_log_prob,
-                                                          step_size=1e-2,
-                                                          num_leapfrog_steps=2)
+      kernel = hmc.UncalibratedHamiltonianMonteCarlo(
+          target_log_prob, step_size=1e-2, num_leapfrog_steps=2)
       kernel = FakeMHKernel(kernel, log_accept_ratio)
-      kernel = tfp.mcmc.SimpleStepSizeAdaptation(
-          kernel, 10, reduce_fn=reduce_fn,
+      kernel = sssa.SimpleStepSizeAdaptation(
+          kernel,
+          10,
+          reduce_fn=reduce_fn,
           experimental_reduce_chain_axis_names=self.axis_name)
-      sharded_kernel = tfp.experimental.mcmc.Sharded(kernel, self.axis_name)
+      sharded_kernel = sharded.Sharded(kernel, self.axis_name)
       init_seed, sample_seed = samplers.split_seed(seed)
       state_seeds = samplers.split_seed(init_seed)
       state = [
@@ -565,8 +571,10 @@ class DistributedSimpleStepSizeAdaptationTest(
       _, kr = sharded_kernel.one_step(state, kr, seed=sample_seed)
       return kr.new_step_size
 
-    seeds = self.shard_values(tf.stack(tfp.random.split_seed(
-        samplers.zeros_seed(), distribute_test_lib.NUM_DEVICES)), 0)
+    seeds = self.shard_values(
+        tf.stack(
+            samplers.split_seed(samplers.zeros_seed(),
+                                distribute_test_lib.NUM_DEVICES)), 0)
     log_accept_ratios = self.shard_values(tf.convert_to_tensor([
         -2., -1., 0., 1.
     ]))

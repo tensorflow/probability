@@ -19,9 +19,9 @@ from scipy.stats import special_ortho_group
 
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.optimizer import differential_evolution
 
 
 @test_util.test_all_tf_execution_regimes
@@ -37,11 +37,9 @@ class DifferentialEvolutionTest(test_util.TestCase):
           scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     start = tf.constant([0.6, 0.8])
-    results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
-        quadratic,
-        initial_position=start,
-        func_tolerance=1e-12,
-        seed=1234))
+    results = self.evaluate(
+        differential_evolution.minimize(
+            quadratic, initial_position=start, func_tolerance=1e-12, seed=1234))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -54,11 +52,12 @@ class DifferentialEvolutionTest(test_util.TestCase):
           scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     initial_population = tf.random.uniform([40, 2], seed=1243)
-    results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
-        quadratic,
-        initial_population=initial_population,
-        func_tolerance=1e-12,
-        seed=2484))
+    results = self.evaluate(
+        differential_evolution.minimize(
+            quadratic,
+            initial_population=initial_population,
+            func_tolerance=1e-12,
+            seed=2484))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -74,12 +73,13 @@ class DifferentialEvolutionTest(test_util.TestCase):
           scales * tf.math.squared_difference(x, minimum), axis=-1)
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
-        quadratic,
-        initial_position=start,
-        func_tolerance=1e-12,
-        max_iterations=400,
-        seed=9844))
+    results = self.evaluate(
+        differential_evolution.minimize(
+            quadratic,
+            initial_position=start,
+            func_tolerance=1e-12,
+            max_iterations=400,
+            seed=9844))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -101,12 +101,13 @@ class DifferentialEvolutionTest(test_util.TestCase):
       return tf.map_fn(quadratic_single, population)
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
-        objective_func,
-        initial_position=start,
-        func_tolerance=1e-12,
-        max_iterations=150,
-        seed=7393))
+    results = self.evaluate(
+        differential_evolution.minimize(
+            objective_func,
+            initial_position=start,
+            func_tolerance=1e-12,
+            max_iterations=150,
+            seed=7393))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -126,12 +127,13 @@ class DifferentialEvolutionTest(test_util.TestCase):
       return tf.map_fn(quadratic, population)
 
     start = tf.ones_like(minimum)
-    results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
-        objective_func,
-        initial_position=start,
-        func_tolerance=1e-12,
-        max_iterations=150,
-        seed=3321))
+    results = self.evaluate(
+        differential_evolution.minimize(
+            objective_func,
+            initial_position=start,
+            func_tolerance=1e-12,
+            max_iterations=150,
+            seed=3321))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
@@ -142,12 +144,13 @@ class DifferentialEvolutionTest(test_util.TestCase):
       return tf.sqrt(tf.reduce_sum(x**2, axis=-1))
 
     start = tf.constant([1.2, 0.4, -1.8, 2.9])
-    results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
-        sqrt_quad,
-        initial_position=start,
-        func_tolerance=1e-12,
-        max_iterations=200,
-        seed=1230))
+    results = self.evaluate(
+        differential_evolution.minimize(
+            sqrt_quad,
+            initial_position=start,
+            func_tolerance=1e-12,
+            max_iterations=200,
+            seed=1230))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-6)
 
@@ -158,12 +161,13 @@ class DifferentialEvolutionTest(test_util.TestCase):
       return tf.reduce_sum(tf.abs(x), axis=-1)
 
     start = tf.constant([0.6, 1.8, -4.3], dtype=tf.float64)
-    results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
-        abs_func,
-        initial_position=start,
-        func_tolerance=1e-12,
-        max_iterations=200,
-        seed=1212))
+    results = self.evaluate(
+        differential_evolution.minimize(
+            abs_func,
+            initial_position=start,
+            func_tolerance=1e-12,
+            max_iterations=200,
+            seed=1212))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, minimum, 1e-5)
 
@@ -192,12 +196,13 @@ class DifferentialEvolutionTest(test_util.TestCase):
       fv = (1 - x)**2 + 100 * (y - x**2)**2
       return fv
     start = (tf.constant(-1.0), tf.constant(1.0))
-    results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
-        rosenbrock,
-        initial_position=start,
-        func_tolerance=1e-12,
-        max_iterations=200,
-        seed=test_util.test_seed_stream()))
+    results = self.evaluate(
+        differential_evolution.minimize(
+            rosenbrock,
+            initial_position=start,
+            func_tolerance=1e-12,
+            max_iterations=200,
+            seed=test_util.test_seed_stream()))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, [1.0, 1.0], 1e-5)
 
@@ -226,11 +231,9 @@ class DifferentialEvolutionTest(test_util.TestCase):
       f2 = tf.exp(-tf.reduce_sum((z - np.pi)**2, axis=-1))
       return -f1 * f2
     start = tf.constant([1.3, 2.2], dtype=tf.float64)
-    results = self.evaluate(tfp.optimizer.differential_evolution_minimize(
-        easom,
-        initial_position=start,
-        func_tolerance=1e-12,
-        seed=47564))
+    results = self.evaluate(
+        differential_evolution.minimize(
+            easom, initial_position=start, func_tolerance=1e-12, seed=47564))
     self.assertTrue(results.converged)
     self.assertArrayNear(results.position, [np.pi, np.pi], 1e-5)
 

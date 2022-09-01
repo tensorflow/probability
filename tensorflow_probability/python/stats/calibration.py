@@ -22,10 +22,10 @@ long-term frequencies over the sampling distribution.
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensorshape_util
+from tensorflow_probability.python.math import generic
 from tensorflow_probability.python.stats import quantiles as quantiles_lib
 
 
@@ -343,8 +343,8 @@ def _make_flatten_unflatten_fns(batch_shape):
 
 
 def _reduce_log_l2_exp(loga, logb, axis=-1):
-  return tf.math.reduce_logsumexp(2. * tfp_math.log_sub_exp(loga, logb),
-                                  axis=axis)
+  return tf.math.reduce_logsumexp(
+      2. * generic.log_sub_exp(loga, logb), axis=axis)
 
 
 def expected_calibration_error_quantiles(

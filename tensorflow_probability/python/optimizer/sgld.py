@@ -19,7 +19,7 @@ import tensorflow.compat.v2 as tf
 from tensorflow_probability.python.internal import assert_util
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
-from tensorflow_probability.python.math import diag_jacobian
+from tensorflow_probability.python.math.diag_jacobian import diag_jacobian
 from tensorflow.python.training import training_ops
 
 

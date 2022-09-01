@@ -58,6 +58,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:independent",
         "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
         "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
+        "//tensorflow_probability/python/distributions:markov_chain",
         "//tensorflow_probability/python/distributions:sample",
         "//tensorflow_probability/python/distributions:transformed_distribution",
         "//tensorflow_probability/python/distributions:truncated_normal",

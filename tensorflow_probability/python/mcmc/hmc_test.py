@@ -26,17 +26,27 @@ from scipy import stats
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import softplus as softplus_lib
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import tensorshape_util
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import sample as sample_lib
+from tensorflow_probability.python.mcmc import simple_step_size_adaptation as sssa
+from tensorflow_probability.python.mcmc import transformed_kernel as transformed_kernel_lib
 from tensorflow_probability.python.mcmc.hmc import _compute_log_acceptance_correction
+from tensorflow_probability.python.util import deferred_tensor
 
 JAX_MODE = False
 
@@ -90,24 +100,24 @@ class HMCTest(test_util.TestCase):
     current_state = np.random.rand(4, 3, 2)
 
     seed = test_util.test_seed(sampler_type=sampler_type)
-    samples0, kernel_results0 = tfp.mcmc.sample_chain(
+    samples0, kernel_results0 = sample_lib.sample_chain(
         num_results=2 * num_results,
         num_steps_between_results=0,
         # Following args are identical to below.
         current_state=current_state,
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=log_gamma_log_prob,
             step_size=0.1,
             num_leapfrog_steps=2),
         num_burnin_steps=150,
         seed=_set_seed(seed, sampler_type=sampler_type))
 
-    samples1, kernel_results1 = tfp.mcmc.sample_chain(
+    samples1, kernel_results1 = sample_lib.sample_chain(
         num_results=num_results,
         num_steps_between_results=1,
         # Following args are identical to above.
         current_state=current_state,
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=log_gamma_log_prob,
             step_size=0.1,
             num_leapfrog_steps=2),
@@ -137,10 +147,10 @@ class HMCTest(test_util.TestCase):
       event_dims = ps.range(independent_chain_ndims, ps.rank(x))
       return self._log_gamma_log_prob(x, event_dims)
 
-    samples, kernel_results = tfp.mcmc.sample_chain(
+    samples, kernel_results = sample_lib.sample_chain(
         num_results=150,
         current_state=x,
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=log_gamma_log_prob,
             step_size=0.05,
             num_leapfrog_steps=2),
@@ -212,10 +222,10 @@ class HMCTest(test_util.TestCase):
     # Start multiple independent chains.
     initial_state = tf.convert_to_tensor([0.1] * num_chains)
 
-    states, kernel_results = tfp.mcmc.sample_chain(
+    states, kernel_results = sample_lib.sample_chain(
         num_results=num_results,
         current_state=initial_state,
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=log_prob,
             step_size=step_size,
             num_leapfrog_steps=num_leapfrog_steps),
@@ -295,19 +305,17 @@ class HMCTest(test_util.TestCase):
       return 1.1 * log_gamma_log_prob(x)
 
     seed_stream = test_util.test_seed_stream()
-    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=log_gamma_log_prob,
         step_size=0.4,
         num_leapfrog_steps=5)
-    sample, kernel_results = hmc.one_step(
+    sample, kernel_results = kernel.one_step(
         current_state=initial_draws,
-        previous_kernel_results=hmc.bootstrap_results(initial_draws),
+        previous_kernel_results=kernel.bootstrap_results(initial_draws),
         seed=seed_stream())
 
-    bad_hmc = tfp.mcmc.HamiltonianMonteCarlo(
-        target_log_prob_fn=fake_log_prob,
-        step_size=0.4,
-        num_leapfrog_steps=5)
+    bad_hmc = hmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=fake_log_prob, step_size=0.4, num_leapfrog_steps=5)
     bad_sample, bad_kernel_results = bad_hmc.one_step(
         current_state=initial_draws,
         previous_kernel_results=bad_hmc.bootstrap_results(initial_draws),
@@ -404,13 +412,13 @@ class HMCTest(test_util.TestCase):
       return tf.reduce_sum(per_element_potentials)
 
     initial_x = tf.linspace(0.01, 5, 10)
-    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=_unbounded_exponential_log_prob,
         step_size=2.,
         num_leapfrog_steps=5)
-    updated_x, kernel_results = hmc.one_step(
+    updated_x, kernel_results = kernel.one_step(
         current_state=initial_x,
-        previous_kernel_results=hmc.bootstrap_results(initial_x),
+        previous_kernel_results=kernel.bootstrap_results(initial_x),
         seed=test_util.test_seed())
     initial_x_, updated_x_, log_accept_ratio_ = self.evaluate(
         [initial_x, updated_x, kernel_results.log_accept_ratio])
@@ -432,13 +440,13 @@ class HMCTest(test_util.TestCase):
       return np.nan * tf.reduce_sum(x)
 
     initial_x = tf.linspace(0.01, 5, 10)
-    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=_nan_log_prob_with_nan_gradient,
         step_size=2.,
         num_leapfrog_steps=5)
-    updated_x, kernel_results = hmc.one_step(
+    updated_x, kernel_results = kernel.one_step(
         current_state=initial_x,
-        previous_kernel_results=hmc.bootstrap_results(initial_x),
+        previous_kernel_results=kernel.bootstrap_results(initial_x),
         seed=test_util.test_seed())
     initial_x_, updated_x_, log_accept_ratio_ = self.evaluate(
         [initial_x, updated_x, kernel_results.log_accept_ratio])
@@ -471,10 +479,10 @@ class HMCTest(test_util.TestCase):
   def testChainWorks(self, dtype):
     if JAX_MODE and dtype == np.float16:
       self.skipTest('No float16 in JAX')
-    states, kernel_results = tfp.mcmc.sample_chain(
+    states, kernel_results = sample_lib.sample_chain(
         num_results=10,
         current_state=np.zeros(5).astype(dtype),
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=lambda x: -tf.reduce_sum(x**2., axis=-1),
             step_size=0.01,
             num_leapfrog_steps=10),
@@ -503,10 +511,10 @@ class HMCTest(test_util.TestCase):
           axis=-1)
       return -0.5 * tf.reduce_sum(z**2., axis=-1)
 
-    states, kernel_results = tfp.mcmc.sample_chain(
+    states, kernel_results = sample_lib.sample_chain(
         num_results=num_results,
         current_state=[dtype(-2), dtype(2)],
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob,
             step_size=[1.23, 1.23],
             num_leapfrog_steps=2),
@@ -535,7 +543,7 @@ class HMCTest(test_util.TestCase):
                         atol=0., rtol=0.4)
 
   def testUncalibratedHMCPreservesStaticShape(self):
-    uncal_hmc = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(
+    uncal_hmc = hmc.UncalibratedHamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -tf.reduce_sum(x**2., axis=-1),
         step_size=0.5,
         num_leapfrog_steps=2)
@@ -550,30 +558,30 @@ class HMCTest(test_util.TestCase):
     self.assertAllEqual([3], r1.target_log_prob.shape)
 
   def testHMCPreservesStaticShape(self):
-    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -tf.reduce_sum(x**2., axis=-1),
         step_size=0.5,
         num_leapfrog_steps=2)
     x0 = tf.constant([[-1., 0.5],
                       [0., 0.],
                       [1., 1.25]])
-    r0 = hmc.bootstrap_results(x0)
-    x1, r1 = hmc.one_step(x0, r0, seed=test_util.test_seed())
+    r0 = kernel.bootstrap_results(x0)
+    x1, r1 = kernel.one_step(x0, r0, seed=test_util.test_seed())
     self.assertAllEqual([3, 2], x0.shape)
     self.assertAllEqual([3], r0.accepted_results.target_log_prob.shape)
     self.assertAllEqual([3, 2], x1.shape)
     self.assertAllEqual([3], r1.accepted_results.target_log_prob.shape)
 
   def testHMCIsCalibrated(self):
-    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -tf.square(x) / 2.,
         step_size=0.5,
         num_leapfrog_steps=2,
     )
-    self.assertTrue(hmc.is_calibrated)
+    self.assertTrue(kernel.is_calibrated)
 
   def testUncalibratedHMCIsNotCalibrated(self):
-    uncal_hmc = tfp.mcmc.UncalibratedHamiltonianMonteCarlo(
+    uncal_hmc = hmc.UncalibratedHamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -tf.square(x) / 2.,
         step_size=0.5,
         num_leapfrog_steps=2,
@@ -581,19 +589,19 @@ class HMCTest(test_util.TestCase):
     self.assertFalse(uncal_hmc.is_calibrated)
 
   def testAdaptiveParameters(self):
-    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -x**2.,
         step_size=0.5,
         num_leapfrog_steps=2,
         store_parameters_in_results=True)
     x0 = tf.zeros(2)
     seed_stream = test_util.test_seed_stream()
-    r0 = hmc.bootstrap_results(x0)
-    x1, r1 = hmc.one_step(x0, r0, seed=seed_stream())
+    r0 = kernel.bootstrap_results(x0)
+    x1, r1 = kernel.one_step(x0, r0, seed=seed_stream())
     r1_zero = r1._replace(
         accepted_results=r1.accepted_results._replace(
             step_size=tf.constant(0.)))
-    x2, r2 = hmc.one_step(x1, r1_zero, seed=seed_stream())
+    x2, r2 = kernel.one_step(x1, r1_zero, seed=seed_stream())
 
     r0_, r1_, r2_, x1_, x2_ = self.evaluate([r0, r1, r2, x1, x2])
 
@@ -611,7 +619,7 @@ class HMCTest(test_util.TestCase):
   def testWarnMutableParameters(self):
     warnings.simplefilter('always')
     with warnings.catch_warnings(record=True) as triggered:
-      tfp.mcmc.HamiltonianMonteCarlo(
+      hmc.HamiltonianMonteCarlo(
           target_log_prob_fn=lambda x: -x**2.,
           num_leapfrog_steps=tf.Variable(2.),
           step_size=tf.Variable(0.1),
@@ -621,19 +629,19 @@ class HMCTest(test_util.TestCase):
             for warning in triggered))
 
   def testSoftplusCreatedOutsideKernelDoesNotKillGradients(self):
-    softplus = tfp.bijectors.Softplus()
+    softplus = softplus_lib.Softplus()
     def target_log_prob_fn(x):
       x = softplus.forward(x)
       return -tf.reduce_sum(x**2., axis=-1)
 
-    hmc = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         step_size=0.5,
         num_leapfrog_steps=2)
     x0 = tf.constant([[-1., 0.5], [0., 0.], [1., 1.25]])
     # Simply calling hmc.bootstrap_results(x0) used to fail with
     #   ValueError: Encountered `None` gradient.
-    r0 = hmc.bootstrap_results(x0)
+    r0 = kernel.bootstrap_results(x0)
     # Also ensure eval doesn't crash things.
     self.evaluate(r0)
 
@@ -660,10 +668,10 @@ class HMCTest(test_util.TestCase):
               pkr.accepted_results.step_size,
       }
 
-    states, trace = tfp.mcmc.sample_chain(
+    states, trace = sample_lib.sample_chain(
         num_results=num_results,
         current_state=0.123,
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob,
             step_size=step_size_ph,
             num_leapfrog_steps=5,
@@ -706,16 +714,17 @@ class _LogCorrectionTest(object):
       return _fn
 
     # Use trick fun to get "current" results.
-    pkr = tfp.mcmc.HamiltonianMonteCarlo(
+    pkr = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=make_trick_fun(target_log_prob),
         step_size=1.,
         num_leapfrog_steps=1).bootstrap_results(x0)
 
     # Use trick fun to inject "proposed" results.
-    _, results = tfp.mcmc.HamiltonianMonteCarlo(
+    _, results = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=make_trick_fun(proposed_target_log_prob),
         step_size=1.,
-        num_leapfrog_steps=1).one_step(x0, pkr, seed=test_util.test_seed())
+        num_leapfrog_steps=1).one_step(
+            x0, pkr, seed=test_util.test_seed())
 
     [actual_log_accept_ratio_, actual_grads_target_log_prob_] = self.evaluate([
         results.log_accept_ratio,
@@ -794,30 +803,27 @@ class HMCHandlesLists(test_util.TestCase):
       dict(testcase_name='_f64', dtype=np.float64))
   def testStateParts(self, dtype):
     cast = lambda x: np.array(x, dtype)
-    dist_x = tfd.Normal(loc=cast(0), scale=cast(1))
-    dist_y = tfd.Independent(
-        tfd.Gamma(concentration=cast([1, 2]),
-                  rate=cast([0.5, 0.75])),
+    dist_x = normal.Normal(loc=cast(0), scale=cast(1))
+    dist_y = independent.Independent(
+        gamma.Gamma(concentration=cast([1, 2]), rate=cast([0.5, 0.75])),
         reinterpreted_batch_ndims=1)
     def target_log_prob(x, y):
       return dist_x.log_prob(x) + dist_y.log_prob(y)
     stream = test_util.test_seed_stream()
     x0 = [dist_x.sample(8, seed=_set_seed(stream())),  # 8 parallel chains
           dist_y.sample(8, seed=_set_seed(stream()))]
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
-        target_log_prob_fn=target_log_prob,
-        step_size=1.,
-        num_leapfrog_steps=1)
+    kernel = hmc.HamiltonianMonteCarlo(
+        target_log_prob_fn=target_log_prob, step_size=1., num_leapfrog_steps=1)
     # We are using bijectors to sample from a transformed density defined on
     # an unbounded domain. The samples returned are from the original bounded
     # domain.
     unconstraining_bijectors = [
-        tfb.Identity(),      # Maps R to R.
-        tfb.Exp(),           # Maps R to a positive real.
+        identity.Identity(),  # Maps R to R.
+        exp.Exp(),  # Maps R to a positive real.
     ]
-    transformed_kernel = tfp.mcmc.TransformedTransitionKernel(
+    transformed_kernel = transformed_kernel_lib.TransformedTransitionKernel(
         inner_kernel=kernel, bijector=unconstraining_bijectors)
-    samples = tfp.mcmc.sample_chain(
+    samples = sample_lib.sample_chain(
         num_results=1000,
         current_state=x0,
         kernel=transformed_kernel,
@@ -858,14 +864,14 @@ class HMCAdaptiveStepSize(test_util.TestCase):
     dtype = np.float32
 
     def target_log_prob_fn(x1, x2):
-      d = tfd.Normal(dtype(0.), dtype(1.))
+      d = normal.Normal(dtype(0.), dtype(1.))
       return d.log_prob(x1) + tf.reduce_sum(d.log_prob(x2))
 
-    samples, _ = tfp.mcmc.sample_chain(
+    samples, _ = sample_lib.sample_chain(
         num_results=num_results,
         num_burnin_steps=0,
         current_state=[dtype(x) for x in initial_state],
-        kernel=tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=hmc.HamiltonianMonteCarlo(
             target_log_prob_fn=target_log_prob_fn,
             num_leapfrog_steps=2,
             step_size=initial_step_sizes,
@@ -887,15 +893,14 @@ class HMCAdaptiveStepSize(test_util.TestCase):
 
     def target_log_prob_fn(x1, x2):
       return tf.reduce_sum(
-          tfd.Normal(dtype(0), dtype(1)).log_prob([x1, x2]),
-          axis=-1)
+          normal.Normal(dtype(0), dtype(1)).log_prob([x1, x2]), axis=-1)
 
-    _, kernel_results = tfp.mcmc.sample_chain(
+    _, kernel_results = sample_lib.sample_chain(
         num_results=num_results,
         num_burnin_steps=0,
         current_state=[dtype(x) for x in initial_state],
-        kernel=tfp.mcmc.SimpleStepSizeAdaptation(
-            tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=sssa.SimpleStepSizeAdaptation(
+            hmc.HamiltonianMonteCarlo(
                 target_log_prob_fn=target_log_prob_fn,
                 num_leapfrog_steps=2,
                 step_size=step_size,
@@ -920,13 +925,13 @@ class HMCAdaptiveStepSize(test_util.TestCase):
     num_adaptation_steps = 3
     initial_step_size = 1e-5
 
-    _, kernel_results = tfp.mcmc.sample_chain(
+    _, kernel_results = sample_lib.sample_chain(
         num_results=num_results,
         num_burnin_steps=0,
         current_state=tf.constant(0.),
-        kernel=tfp.mcmc.SimpleStepSizeAdaptation(
-            tfp.mcmc.HamiltonianMonteCarlo(
-                target_log_prob_fn=lambda x: tfd.Normal(0., 1.).log_prob(x),
+        kernel=sssa.SimpleStepSizeAdaptation(
+            hmc.HamiltonianMonteCarlo(
+                target_log_prob_fn=lambda x: normal.Normal(0., 1.).log_prob(x),
                 num_leapfrog_steps=2,
                 step_size=initial_step_size,
                 state_gradients_are_stopped=True),
@@ -966,7 +971,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
     return y[0], x, w[0]
 
   def make_weights_prior(self, dims, sigma):
-    return tfd.MultivariateNormalDiag(
+    return mvn_diag.MultivariateNormalDiag(
         loc=tf.zeros([dims], dtype=sigma.dtype),
         scale_identity_multiplier=sigma)
 
@@ -975,7 +980,7 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
       y_bar = tf.matmul(w[tf.newaxis], x)[0]
     else:
       y_bar = tf.matmul(w, x)
-    return tfd.Normal(loc=y_bar, scale=tf.ones_like(y_bar))  # [n]
+    return normal.Normal(loc=y_bar, scale=tf.ones_like(y_bar))  # [n]
 
   @test_util.jax_disable_variable_test
   def test_mcem_converges(self):
@@ -989,8 +994,8 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
                                        weights_prior_true_scale)
     logging.vlog(1, 'w0: %s', w0)
 
-    sigma = tfp.util.TransformedVariable(
-        name='sigma', initial_value=np.array(1, dtype), bijector=tfb.Exp())
+    sigma = deferred_tensor.TransformedVariable(
+        name='sigma', initial_value=np.array(1, dtype), bijector=exp.Exp())
 
     optimizer = tf.optimizers.SGD(learning_rate=0.01)
 
@@ -1020,12 +1025,12 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
                 pkr.inner_results.accepted_results.step_size)
 
       num_results = 2
-      weights, (log_accept_ratio, step_size) = tfp.mcmc.sample_chain(
+      weights, (log_accept_ratio, step_size) = sample_lib.sample_chain(
           num_results=num_results,
           num_burnin_steps=0,
           current_state=weights_chain_start,
-          kernel=tfp.mcmc.SimpleStepSizeAdaptation(
-              tfp.mcmc.HamiltonianMonteCarlo(
+          kernel=sssa.SimpleStepSizeAdaptation(
+              hmc.HamiltonianMonteCarlo(
                   target_log_prob_fn=unnormalized_posterior_log_prob,
                   num_leapfrog_steps=2,
                   step_size=step_size,
@@ -1041,8 +1046,8 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
       with tf.GradientTape() as tape:
         loss = -tf.reduce_mean(unnormalized_posterior_log_prob(weights))
 
-      avg_acceptance_ratio = tf.math.exp(tfp.math.reduce_logmeanexp(
-          tf.minimum(log_accept_ratio, 0.)))
+      avg_acceptance_ratio = tf.math.exp(
+          generic.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
 
       optimizer.apply_gradients([[
           tape.gradient(loss, sigma.pretransformed_input),
@@ -1104,12 +1109,12 @@ class HMCEMAdaptiveStepSize(test_util.TestCase):
 
     num_results = 1000
     num_burnin_steps = 100
-    _, [is_accepted, step_size] = tfp.mcmc.sample_chain(
+    _, [is_accepted, step_size] = sample_lib.sample_chain(
         num_results=num_results,
         num_burnin_steps=num_burnin_steps,
         current_state=tf.zeros([], dtype),
-        kernel=tfp.mcmc.SimpleStepSizeAdaptation(
-            tfp.mcmc.HamiltonianMonteCarlo(
+        kernel=sssa.SimpleStepSizeAdaptation(
+            hmc.HamiltonianMonteCarlo(
                 target_log_prob_fn=unnormalized_log_prob,
                 num_leapfrog_steps=2,
                 step_size=0.05),
@@ -1133,10 +1138,9 @@ class ReproducibleFromSeedTest(test_util.TestCase):
   """This test verifies kernel debugging."""
 
   def testReproducibleSingleStepStatelessSeed(self):
-    k = tfp.mcmc.HamiltonianMonteCarlo(tfd.Normal(0, 1).log_prob,
-                                       step_size=1.9,
-                                       num_leapfrog_steps=2)
-    states, trace = tfp.mcmc.sample_chain(
+    k = hmc.HamiltonianMonteCarlo(
+        normal.Normal(0, 1).log_prob, step_size=1.9, num_leapfrog_steps=2)
+    states, trace = sample_lib.sample_chain(
         100,
         current_state=tf.zeros([]),
         kernel=k,
@@ -1172,17 +1176,17 @@ class ReproducibleFromSeedTest(test_util.TestCase):
 class DistributedHMCTest(distribute_test_lib.DistributedTest):
 
   def test_hmc_kernel_tracks_axis_names(self):
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(tfd.Normal(0, 1).log_prob,
-                                            step_size=1.9,
-                                            num_leapfrog_steps=2)
+    kernel = hmc.HamiltonianMonteCarlo(
+        normal.Normal(0, 1).log_prob, step_size=1.9, num_leapfrog_steps=2)
     self.assertIsNone(kernel.experimental_shard_axis_names)
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(tfd.Normal(0, 1).log_prob,
-                                            step_size=1.9,
-                                            num_leapfrog_steps=2,
-                                            experimental_shard_axis_names=['a'])
+    kernel = hmc.HamiltonianMonteCarlo(
+        normal.Normal(0, 1).log_prob,
+        step_size=1.9,
+        num_leapfrog_steps=2,
+        experimental_shard_axis_names=['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
-        tfd.Normal(0, 1).log_prob, step_size=1.9,
+    kernel = hmc.HamiltonianMonteCarlo(
+        normal.Normal(0, 1).log_prob, step_size=1.9,
         num_leapfrog_steps=2).experimental_with_shard_axes(['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
 
@@ -1192,12 +1196,11 @@ class DistributedHMCTest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      dist = tfd.Normal(0., 1.)
+      dist = normal.Normal(0., 1.)
       return dist.log_prob(a) + dist.log_prob(b)
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
-                                            step_size=1.9,
-                                            num_leapfrog_steps=2)
+    kernel = hmc.HamiltonianMonteCarlo(
+        target_log_prob, step_size=1.9, num_leapfrog_steps=2)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
     def run(seed):
       state = [0., 0.]
@@ -1225,14 +1228,12 @@ class DistributedHMCTest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
-                                            step_size=1.9,
-                                            num_leapfrog_steps=2)
+    kernel = hmc.HamiltonianMonteCarlo(
+        target_log_prob, step_size=1.9, num_leapfrog_steps=2)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
 
     def run(seed):
@@ -1255,14 +1256,12 @@ class DistributedHMCTest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
-                                            step_size=1e-1,
-                                            num_leapfrog_steps=2)
+    kernel = hmc.HamiltonianMonteCarlo(
+        target_log_prob, step_size=1e-1, num_leapfrog_steps=2)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
 
     def run(seed):
