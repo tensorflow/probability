@@ -16,14 +16,11 @@
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental import nn as tfn
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
-tfn = tfp.experimental.nn
 
 
 class AffineMeanFieldNormal(tfn.Layer):
@@ -47,14 +44,14 @@ class AffineMeanFieldNormal(tfn.Layer):
     return self._bias
 
   def __call__(self, x):
-    if (isinstance(x, tfd.Independent) and
-        isinstance(x.distribution, tfd.Normal)):
+    if (isinstance(x, independent.Independent) and
+        isinstance(x.distribution, normal.Normal)):
       x = x.distribution.loc
     else:
       x = tf.convert_to_tensor(x, dtype_hint=tf.float32, name='x')
     y = self.bias + tf.matmul(x, self.kernel)
-    return tfd.Independent(tfd.Normal(loc=y, scale=1),
-                           reinterpreted_batch_ndims=1)
+    return independent.Independent(
+        normal.Normal(loc=y, scale=1), reinterpreted_batch_ndims=1)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -66,7 +63,7 @@ class LayerTest(test_util.TestCase):
     f = AffineMeanFieldNormal(output_size, input_size)
     x = tf.zeros([2, 1, input_size])
     y = f(x)
-    self.assertIsInstance(y, tfd.Independent)
+    self.assertIsInstance(y, independent.Independent)
     self.assertAllEqual((2, 1, output_size), y.distribution.loc.shape)
 
 
@@ -90,7 +87,7 @@ class SequentialTest(test_util.TestCase):
 
     x = tf.zeros([2, 1, input_size])
     y = model(x)
-    self.assertIsInstance(y, tfd.Independent)
+    self.assertIsInstance(y, independent.Independent)
     self.assertAllEqual((2, output_size), y.distribution.loc.shape)
 
   def test_summary(self):

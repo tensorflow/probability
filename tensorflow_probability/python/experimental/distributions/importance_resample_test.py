@@ -18,31 +18,34 @@ from absl.testing import parameterized
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.experimental.distributions import importance_resample
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
-tfed = tfp.experimental.distributions
+from tensorflow_probability.python.vi import csiszar_divergence
 
 
 @test_util.test_graph_and_eager_modes
 class ImportanceResampleTest(test_util.TestCase):
 
   def test_shapes_match_proposal_distribution(self):
-    target = tfd.MultivariateNormalTriL(loc=[-2., 1.],
-                                        scale_tril=[[1., 0.], [-3., 2.]])
+    target = mvn_tril.MultivariateNormalTriL(
+        loc=[-2., 1.], scale_tril=[[1., 0.], [-3., 2.]])
     # Proposal with batch shape.
-    proposal = tfd.Independent(
-        tfd.StudentT(df=2,
-                     loc=0.,
-                     scale=[[5., 2.],
-                            [1., 3.]]),
+    proposal = independent.Independent(
+        student_t.StudentT(df=2, loc=0., scale=[[5., 2.], [1., 3.]]),
         reinterpreted_batch_ndims=1)
 
     seed = test_util.test_seed(sampler_type='stateless')
-    resampled = tfed.ImportanceResample(
+    resampled = importance_resample.ImportanceResample(
         proposal,
         target_log_prob_fn=target.log_prob,
         importance_sample_size=10,
@@ -62,11 +65,10 @@ class ImportanceResampleTest(test_util.TestCase):
                         proposal.log_prob(xs).shape)
 
   def test_sample_size_one_reproduces_proposal_distribution(self):
-    target = tfd.Normal(loc=0., scale=1.)
-    proposal = tfd.Normal(loc=-4., scale=5.)
-    resampled = tfed.ImportanceResample(proposal,
-                                        target_log_prob_fn=target.log_prob,
-                                        importance_sample_size=1)
+    target = normal.Normal(loc=0., scale=1.)
+    proposal = normal.Normal(loc=-4., scale=5.)
+    resampled = importance_resample.ImportanceResample(
+        proposal, target_log_prob_fn=target.log_prob, importance_sample_size=1)
     xs = self.evaluate(
         resampled.sample(10000,
                          seed=test_util.test_seed(sampler_type='stateless')))
@@ -79,11 +81,10 @@ class ImportanceResampleTest(test_util.TestCase):
                         rtol=1e-4)
 
   def test_log_prob_is_stochastic_lower_bound(self):
-    target = tfd.Normal(loc=0., scale=2.)
-    proposal = tfd.StudentT(df=2, loc=-4., scale=5.)
-    resampled = tfed.ImportanceResample(proposal,
-                                        target_log_prob_fn=target.log_prob,
-                                        importance_sample_size=2)
+    target = normal.Normal(loc=0., scale=2.)
+    proposal = student_t.StudentT(df=2, loc=-4., scale=5.)
+    resampled = importance_resample.ImportanceResample(
+        proposal, target_log_prob_fn=target.log_prob, importance_sample_size=2)
     seed = test_util.test_seed(sampler_type='stateless')
     xs, lp_upper_bound = self.evaluate(
         resampled.experimental_sample_and_log_prob(500, seed=seed))
@@ -97,14 +98,12 @@ class ImportanceResampleTest(test_util.TestCase):
     seeds = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'), n=6)
 
-    target = tfd.Normal(loc=0., scale=2.)
-    proposal = tfd.StudentT(df=2, loc=-1., scale=3.)
-    resampled2 = tfed.ImportanceResample(proposal,
-                                         target_log_prob_fn=target.log_prob,
-                                         importance_sample_size=2)
-    resampled20 = tfed.ImportanceResample(proposal,
-                                          target_log_prob_fn=target.log_prob,
-                                          importance_sample_size=20)
+    target = normal.Normal(loc=0., scale=2.)
+    proposal = student_t.StudentT(df=2, loc=-1., scale=3.)
+    resampled2 = importance_resample.ImportanceResample(
+        proposal, target_log_prob_fn=target.log_prob, importance_sample_size=2)
+    resampled20 = importance_resample.ImportanceResample(
+        proposal, target_log_prob_fn=target.log_prob, importance_sample_size=20)
 
     xs = self.evaluate(target.sample(num_samples, seed=seeds[0]))
     xs2 = self.evaluate(resampled2.sample(num_samples, seed=seeds[1]))
@@ -123,11 +122,12 @@ class ImportanceResampleTest(test_util.TestCase):
 
   def test_log_prob_approaches_target_distribution(self):
     seed = test_util.test_seed(sampler_type='stateless')
-    target = tfd.Normal(loc=0., scale=2.)
-    proposal = tfd.StudentT(df=2, loc=-4., scale=5.)
-    resampled = tfed.ImportanceResample(proposal,
-                                        target_log_prob_fn=target.log_prob,
-                                        importance_sample_size=1000)
+    target = normal.Normal(loc=0., scale=2.)
+    proposal = student_t.StudentT(df=2, loc=-4., scale=5.)
+    resampled = importance_resample.ImportanceResample(
+        proposal,
+        target_log_prob_fn=target.log_prob,
+        importance_sample_size=1000)
 
     xs, target_lp = self.evaluate(
         target.experimental_sample_and_log_prob(100, seed=seed))
@@ -136,26 +136,23 @@ class ImportanceResampleTest(test_util.TestCase):
                         atol=0.1)
 
   def test_supports_joint_events(self):
-    root = tfd.JointDistributionCoroutine.Root
+    root = jdc.JointDistributionCoroutine.Root
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def target():
-      x = yield root(tfd.Normal(-1., 1.0, name='x'))
-      yield tfd.MultivariateNormalTriL(loc=(x + 2)[..., tf.newaxis],
-                                       scale_tril=[[0.5]],
-                                       name='y')
+      x = yield root(normal.Normal(-1., 1.0, name='x'))
+      yield mvn_tril.MultivariateNormalTriL(
+          loc=(x + 2)[..., tf.newaxis], scale_tril=[[0.5]], name='y')
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def proposal():
-      yield root(tfd.StudentT(df=2, loc=0., scale=2., name='x'))
+      yield root(student_t.StudentT(df=2, loc=0., scale=2., name='x'))
       yield root(
-          tfd.Independent(
-              tfd.StudentT(df=2, loc=[0.], scale=[2.]), 1, name='y'))
+          independent.Independent(
+              student_t.StudentT(df=2, loc=[0.], scale=[2.]), 1, name='y'))
 
-    resampled = tfed.ImportanceResample(
-        proposal,
-        target_log_prob_fn=target.log_prob,
-        importance_sample_size=5)
+    resampled = importance_resample.ImportanceResample(
+        proposal, target_log_prob_fn=target.log_prob, importance_sample_size=5)
     self.assertAllEqual(resampled.dtype, proposal.dtype)
     self.assertAllEqual(resampled.event_shape, proposal.event_shape)
 
@@ -182,11 +179,11 @@ class ImportanceResampleTest(test_util.TestCase):
       as_tensor = lambda x: tf1.placeholder_with_default(  # pylint: disable=g-long-lambda
           x, shape=[None for _ in tf.convert_to_tensor(x).shape])
 
-    resampled = tfed.ImportanceResample(
-        proposal_distribution=tfd.Normal(loc=as_tensor(0.),
-                                         scale=as_tensor(2.)),
-        target_log_prob_fn=tfd.Normal(loc=as_tensor([0., 0.]),
-                                      scale=as_tensor([1., 0.5])).log_prob,
+    resampled = importance_resample.ImportanceResample(
+        proposal_distribution=normal.Normal(
+            loc=as_tensor(0.), scale=as_tensor(2.)),
+        target_log_prob_fn=normal.Normal(
+            loc=as_tensor([0., 0.]), scale=as_tensor([1., 0.5])).log_prob,
         importance_sample_size=2,
         validate_args=True)
 
@@ -200,21 +197,23 @@ class ImportanceResampleTest(test_util.TestCase):
   def test_importance_resampled_surrogate_is_equivalent_to_iwae(self):
     importance_sample_size = 5
     sample_size = 1e4
-    target = tfd.MultivariateNormalTriL(loc=[1., -1.],
-                                        scale_tril=[[1., 0.], [-2., 0.2]])
-    proposal = tfd.MultivariateNormalDiag(loc=[0., 0.], scale_diag=[1., 1.])
+    target = mvn_tril.MultivariateNormalTriL(
+        loc=[1., -1.], scale_tril=[[1., 0.], [-2., 0.2]])
+    proposal = mvn_diag.MultivariateNormalDiag(
+        loc=[0., 0.], scale_diag=[1., 1.])
 
-    iwae_bound = self.evaluate(tfp.vi.monte_carlo_variational_loss(
-        target_log_prob_fn=target.log_prob,
-        surrogate_posterior=proposal,
-        importance_sample_size=5,
-        sample_size=sample_size,
-        seed=test_util.test_seed(sampler_type='stateless')))
+    iwae_bound = self.evaluate(
+        csiszar_divergence.monte_carlo_variational_loss(
+            target_log_prob_fn=target.log_prob,
+            surrogate_posterior=proposal,
+            importance_sample_size=5,
+            sample_size=sample_size,
+            seed=test_util.test_seed(sampler_type='stateless')))
 
     elbo_with_resampled_surrogate = self.evaluate(
-        tfp.vi.monte_carlo_variational_loss(
+        csiszar_divergence.monte_carlo_variational_loss(
             target_log_prob_fn=target.log_prob,
-            surrogate_posterior=tfed.ImportanceResample(
+            surrogate_posterior=importance_resample.ImportanceResample(
                 proposal,
                 target_log_prob_fn=target.log_prob,
                 importance_sample_size=importance_sample_size),
@@ -226,17 +225,18 @@ class ImportanceResampleTest(test_util.TestCase):
   def test_docstring_example_runs(self):
 
     def target_log_prob_fn(x):
-      prior = tfd.Normal(loc=0., scale=1.).log_prob(x)
-      likelihood = tfd.MixtureSameFamily(  # Multimodal likelihood.
-          mixture_distribution=tfd.Categorical(probs=[0.4, 0.6]),
-          components_distribution=tfd.Normal(loc=[-1., 1.], scale=0.1)
-          ).log_prob(x)
+      prior = normal.Normal(loc=0., scale=1.).log_prob(x)
+      # Multimodal likelihood.
+      likelihood = mixture_same_family.MixtureSameFamily(
+          mixture_distribution=categorical.Categorical(probs=[0.4, 0.6]),
+          components_distribution=normal.Normal(loc=[-1., 1.],
+                                                scale=0.1)).log_prob(x)
       return prior + likelihood
 
     # Use importance sampling to infer an approximate posterior.
     seed = test_util.test_seed(sampler_type='stateless')
-    approximate_posterior = tfed.ImportanceResample(
-        proposal_distribution=tfd.Normal(loc=0., scale=2.),
+    approximate_posterior = importance_resample.ImportanceResample(
+        proposal_distribution=normal.Normal(loc=0., scale=2.),
         target_log_prob_fn=target_log_prob_fn,
         importance_sample_size=3,
         stochastic_approximation_seed=seed)

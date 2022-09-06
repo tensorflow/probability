@@ -16,32 +16,38 @@
 from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import log_prob_ratio
+from tensorflow_probability.python.distributions import lognormal
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.experimental.distribute import joint_distribution as jd
 from tensorflow_probability.python.experimental.distribute import sharded
 from tensorflow_probability.python.internal import distribute_test_lib as test_lib
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
-
-Root = tfd.JointDistributionCoroutine.Root
+Root = jdc.JointDistributionCoroutine.Root
 
 
 def true_log_prob_fn(w, x, data):
-  return (tfd.Normal(0., 1.).log_prob(w) +
-          tfd.Sample(tfd.Normal(w, 1.), (test_lib.NUM_DEVICES, 1)).log_prob(x) +
-          tfd.Independent(tfd.Normal(x, 1.), 2).log_prob(data))
+  return (normal.Normal(0., 1.).log_prob(w) + sample_dist_lib.Sample(
+      normal.Normal(w, 1.), (test_lib.NUM_DEVICES, 1)).log_prob(x) +
+          independent.Independent(normal.Normal(x, 1.), 2).log_prob(data))
 
 
 def make_jd_sequential(axis_name):
   return jd.JointDistributionSequential([
-      tfd.Normal(0., 1.),
+      normal.Normal(0., 1.),
       lambda w: sharded.Sharded(  # pylint: disable=g-long-lambda
-          tfd.Sample(tfd.Normal(w, 1.), 1),
+          sample_dist_lib.Sample(normal.Normal(w, 1.), 1),
           shard_axis_name=axis_name),
       lambda x: sharded.Sharded(  # pylint: disable=g-long-lambda
-          tfd.Independent(tfd.Normal(x, 1.), 1),
+          independent.Independent(normal.Normal(x, 1.), 1),
           shard_axis_name=axis_name),
   ])
 
@@ -49,12 +55,12 @@ def make_jd_sequential(axis_name):
 def make_jd_named(axis_name):
   return jd.JointDistributionNamed(  # pylint: disable=g-long-lambda
       dict(
-          w=tfd.Normal(0., 1.),
+          w=normal.Normal(0., 1.),
           x=lambda w: sharded.Sharded(  # pylint: disable=g-long-lambda
-              tfd.Sample(tfd.Normal(w, 1.), 1),
+              sample_dist_lib.Sample(normal.Normal(w, 1.), 1),
               shard_axis_name=axis_name),
           data=lambda x: sharded.Sharded(  # pylint: disable=g-long-lambda
-              tfd.Independent(tfd.Normal(x, 1.), 1),
+              independent.Independent(normal.Normal(x, 1.), 1),
               shard_axis_name=axis_name),
       ))
 
@@ -62,11 +68,13 @@ def make_jd_named(axis_name):
 def make_jd_coroutine(axis_name):
 
   def model_coroutine():
-    w = yield Root(tfd.Normal(0., 1.))
+    w = yield Root(normal.Normal(0., 1.))
     x = yield sharded.Sharded(
-        tfd.Sample(tfd.Normal(w, 1.), 1), shard_axis_name=axis_name)
+        sample_dist_lib.Sample(normal.Normal(w, 1.), 1),
+        shard_axis_name=axis_name)
     yield sharded.Sharded(
-        tfd.Independent(tfd.Normal(x, 1.), 1), shard_axis_name=axis_name)
+        independent.Independent(normal.Normal(x, 1.), 1),
+        shard_axis_name=axis_name)
 
   return jd.JointDistributionCoroutine(model_coroutine)
 
@@ -112,7 +120,7 @@ class JointDistributionTest(test_lib.DistributedTest):
     def run(key):
       sample = dist.sample(seed=key)
       # The identity is to prevent reparameterization gradients from kicking in.
-      log_prob, (log_prob_grads,) = tfp.math.value_and_gradient(
+      log_prob, (log_prob_grads,) = gradient.value_and_gradient(
           dist.log_prob, (tf.nest.map_structure(tf.identity, sample),))
       return sample, log_prob, log_prob_grads
 
@@ -132,7 +140,7 @@ class JointDistributionTest(test_lib.DistributedTest):
       log_prob_grads = (log_prob_grads[0][0], log_prob_grads[1],
                         log_prob_grads[2])
 
-    true_log_prob, true_log_prob_grads = tfp.math.value_and_gradient(
+    true_log_prob, true_log_prob_grads = gradient.value_and_gradient(
         true_log_prob_fn, (w, x, data))
 
     self.assertAllClose(
@@ -150,7 +158,7 @@ class JointDistributionTest(test_lib.DistributedTest):
       log_prob = dist.log_prob(sample)
       return sample, log_prob
 
-    keys = tfp.random.split_seed(self.key, 2)
+    keys = samplers.split_seed(self.key, 2)
     samples = []
     unmapped_samples = []
     log_probs = []
@@ -179,14 +187,15 @@ class JointDistributionTest(test_lib.DistributedTest):
 
     def run_diff(x, y):
       def _lpr(x, y):
-        return tfp.experimental.distributions.log_prob_ratio(dist, x, dist, y)
-      return tfp.math.value_and_gradient(_lpr, [x, y])
+        return log_prob_ratio.log_prob_ratio(dist, x, dist, y)
+
+      return gradient.value_and_gradient(_lpr, [x, y])
 
     dist_lp_diff, dist_lp_diff_grad = self.per_replica_to_tensor(
         self.strategy_run(
             run_diff, tuple(tf.nest.map_structure(self.shard_values, samples))))
 
-    true_lp_diff, true_lp_diff_grad = tfp.math.value_and_gradient(
+    true_lp_diff, true_lp_diff_grad = gradient.value_and_gradient(
         true_diff, unmapped_samples)
 
     if isinstance(dist, jd.JointDistributionNamed):
@@ -219,39 +228,43 @@ class JointDistributionTest(test_lib.DistributedTest):
   def test_jd_has_correct_sample_path_gradients(self):
 
     def log_prob_fn(x_loc):
-      @tfd.JointDistributionCoroutine
-      def surrogate():
-        x = yield Root(tfd.Normal(x_loc, 1.))
-        y = yield tfd.Normal(x, 1.)
-        yield tfd.Sample(tfd.Normal(x + y, 1.), test_lib.NUM_DEVICES)
 
-      @tfd.JointDistributionCoroutine
+      @jdc.JointDistributionCoroutine
+      def surrogate():
+        x = yield Root(normal.Normal(x_loc, 1.))
+        y = yield normal.Normal(x, 1.)
+        yield sample_dist_lib.Sample(
+            normal.Normal(x + y, 1.), test_lib.NUM_DEVICES)
+
+      @jdc.JointDistributionCoroutine
       def model():
-        yield Root(tfd.Normal(1., 1.))
-        yield Root(tfd.Normal(1., 1.))
-        yield tfd.Sample(tfd.Normal(1., 1.), test_lib.NUM_DEVICES)
+        yield Root(normal.Normal(1., 1.))
+        yield Root(normal.Normal(1., 1.))
+        yield sample_dist_lib.Sample(
+            normal.Normal(1., 1.), test_lib.NUM_DEVICES)
       return tf.reduce_mean(
           model.log_prob(surrogate.sample(sample_shape=1e6, seed=self.key)))
 
-    true_log_prob, true_log_prob_grad = tfp.math.value_and_gradient(
+    true_log_prob, true_log_prob_grad = gradient.value_and_gradient(
         log_prob_fn, 0.)
 
     def run(seed):
       def sharded_log_prob_fn(x_loc):
         @jd.JointDistributionCoroutine
         def surrogate():
-          x = yield Root(tfd.Normal(x_loc, 1.))
-          y = yield tfd.Normal(x, 1.)
-          yield sharded.Sharded(tfd.Normal(x + y, 1.), self.axis_name)
+          x = yield Root(normal.Normal(x_loc, 1.))
+          y = yield normal.Normal(x, 1.)
+          yield sharded.Sharded(normal.Normal(x + y, 1.), self.axis_name)
 
         @jd.JointDistributionCoroutine
         def model():
-          yield Root(tfd.Normal(1., 1.))
-          yield Root(tfd.Normal(1., 1.))
-          yield sharded.Sharded(tfd.Normal(1., 1.), self.axis_name)
+          yield Root(normal.Normal(1., 1.))
+          yield Root(normal.Normal(1., 1.))
+          yield sharded.Sharded(normal.Normal(1., 1.), self.axis_name)
         return tf.reduce_mean(
             model.log_prob(surrogate.sample(sample_shape=1e6, seed=seed)))
-      sharded_log_prob, sharded_log_prob_grad = tfp.math.value_and_gradient(
+
+      sharded_log_prob, sharded_log_prob_grad = gradient.value_and_gradient(
           sharded_log_prob_fn, 0.)
       return sharded_log_prob, sharded_log_prob_grad
 
@@ -268,9 +281,9 @@ class JointDistributionTest(test_lib.DistributedTest):
     def run(seed):
       @jd.JointDistributionCoroutine
       def model():
-        yield Root(tfd.Normal(0., 1., name='x'))
-        yield tfd.Normal(0., 1., name='y')
-        yield sharded.Sharded(tfd.Normal(1., 1.), self.axis_name, name='z')
+        yield Root(normal.Normal(0., 1., name='x'))
+        yield normal.Normal(0., 1., name='y')
+        yield sharded.Sharded(normal.Normal(1., 1.), self.axis_name, name='z')
 
       sample = model.sample(seed=seed)
 
@@ -280,10 +293,8 @@ class JointDistributionTest(test_lib.DistributedTest):
       def lp_fn2(x, z):
         return model.log_prob(model.sample(value=(x, None, z), seed=seed))
 
-      lp_and_grad1 = tfp.math.value_and_gradient(
-          lp_fn1, [*sample])
-      (lp2, grad2) = tfp.math.value_and_gradient(
-          lp_fn2, [sample.x, sample.z])
+      lp_and_grad1 = gradient.value_and_gradient(lp_fn1, [*sample])
+      (lp2, grad2) = gradient.value_and_gradient(lp_fn2, [sample.x, sample.z])
       return lp_and_grad1, (lp2, grad2)
 
     (lp1, grad1), (lp2, grad2) = self.per_replica_to_tensor(
@@ -300,20 +311,23 @@ class JointDistributionTest(test_lib.DistributedTest):
 
     root = jd.JointDistributionCoroutine.Root
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def model():
-      x = yield root(tfd.LogNormal(0., 1., name='x'))
-      yield tfd.Sample(tfd.LogNormal(0., x), test_lib.NUM_DEVICES, name='y')
-      yield tfd.Sample(
-          tfb.Scale(2.)(tfd.Normal(0., 1.)), test_lib.NUM_DEVICES, name='z')
+      x = yield root(lognormal.LogNormal(0., 1., name='x'))
+      yield sample_dist_lib.Sample(
+          lognormal.LogNormal(0., x), test_lib.NUM_DEVICES, name='y')
+      yield sample_dist_lib.Sample(
+          scale.Scale(2.)(normal.Normal(0., 1.)),
+          test_lib.NUM_DEVICES,
+          name='z')
 
     @jd.JointDistributionCoroutine
     def sharded_model():
-      x = yield root(tfd.LogNormal(0., 1., name='x'))
+      x = yield root(lognormal.LogNormal(0., 1., name='x'))
       yield sharded.Sharded(
-          tfd.LogNormal(0., x), shard_axis_name=self.axis_name, name='y')
+          lognormal.LogNormal(0., x), shard_axis_name=self.axis_name, name='y')
       yield sharded.Sharded(
-          tfb.Scale(2.)(tfd.Normal(0., 1.)),
+          scale.Scale(2.)(normal.Normal(0., 1.)),
           shard_axis_name=self.axis_name,
           name='z')
 
@@ -330,14 +344,16 @@ class JointDistributionTest(test_lib.DistributedTest):
       fldj = bij.forward_log_det_jacobian(unconstrained_sample)
       return lp + fldj
 
-    true_lp, (true_g,) = tfp.math.value_and_gradient(
+    true_lp, (true_g,) = gradient.value_and_gradient(
         lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
-            model, unconstrained_sample), (unconstrained_sample,))
+            model, unconstrained_sample),
+        (unconstrained_sample,))
 
     def run(unconstrained_sample):
-      return tfp.math.value_and_gradient(
+      return gradient.value_and_gradient(
           lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
-              sharded_model, unconstrained_sample), (unconstrained_sample,))
+              sharded_model, unconstrained_sample),
+          (unconstrained_sample,))
 
     sharded_unconstrained_sample = unconstrained_sample._replace(
         y=self.shard_values(unconstrained_sample.y),
@@ -356,23 +372,24 @@ class JointDistributionTest(test_lib.DistributedTest):
   def test_default_event_space_bijector_interacting(self):
     root = jd.JointDistributionCoroutine.Root
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def model():
-      x = yield root(tfd.LogNormal(0., 1., name='x'))
+      x = yield root(lognormal.LogNormal(0., 1., name='x'))
       # Uniform's bijector depends on the global parameter.
-      yield tfd.Sample(tfd.Uniform(0., x), test_lib.NUM_DEVICES, name='y')
+      yield sample_dist_lib.Sample(
+          uniform.Uniform(0., x), test_lib.NUM_DEVICES, name='y')
       # TransformedDistribution's bijector explicitly depends on the global
       # parameter.
-      yield tfd.Sample(
-          tfb.Scale(x)(tfd.Normal(0., 1.)), test_lib.NUM_DEVICES, name='z')
+      yield sample_dist_lib.Sample(
+          scale.Scale(x)(normal.Normal(0., 1.)), test_lib.NUM_DEVICES, name='z')
 
     @jd.JointDistributionCoroutine
     def sharded_model():
-      x = yield root(tfd.LogNormal(0., 1., name='x'))
+      x = yield root(lognormal.LogNormal(0., 1., name='x'))
       yield sharded.Sharded(
-          tfd.Uniform(0., x), shard_axis_name=self.axis_name, name='y')
+          uniform.Uniform(0., x), shard_axis_name=self.axis_name, name='y')
       yield sharded.Sharded(
-          tfb.Scale(x)(tfd.Normal(0., 1.)),
+          scale.Scale(x)(normal.Normal(0., 1.)),
           shard_axis_name=self.axis_name,
           name='z')
 
@@ -389,14 +406,16 @@ class JointDistributionTest(test_lib.DistributedTest):
       fldj = bij.forward_log_det_jacobian(unconstrained_sample)
       return lp + fldj
 
-    true_lp, (true_g,) = tfp.math.value_and_gradient(
+    true_lp, (true_g,) = gradient.value_and_gradient(
         lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
-            model, unconstrained_sample), (unconstrained_sample,))
+            model, unconstrained_sample),
+        (unconstrained_sample,))
 
     def run(unconstrained_sample):
-      return tfp.math.value_and_gradient(
+      return gradient.value_and_gradient(
           lambda unconstrained_sample: unconstrained_lp(  # pylint: disable=g-long-lambda
-              sharded_model, unconstrained_sample), (unconstrained_sample,))
+              sharded_model, unconstrained_sample),
+          (unconstrained_sample,))
 
     sharded_unconstrained_sample = unconstrained_sample._replace(
         y=self.shard_values(unconstrained_sample.y),

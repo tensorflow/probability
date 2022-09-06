@@ -27,7 +27,7 @@ from tensorflow_probability.python.distributions import joint_distribution_seque
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import transformed_distribution
 
-from tensorflow_probability.python.experimental.mcmc import infer_trajectories
+from tensorflow_probability.python.experimental.mcmc.particle_filter import infer_trajectories
 
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps

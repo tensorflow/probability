@@ -21,8 +21,8 @@ from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import prefer_static as ps
-from tensorflow_probability.python.math import log_cumsum_exp
-from tensorflow_probability.python.math import value_and_gradient
+from tensorflow_probability.python.math.generic import log_cumsum_exp
+from tensorflow_probability.python.math.gradient import value_and_gradient
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
 
 __all__ = [

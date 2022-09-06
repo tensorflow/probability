@@ -46,9 +46,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
-        "//tensorflow_probability/python/math/psd_kernels:feature_transformed",
-        "//tensorflow_probability/python/math/psd_kernels:matern",
         "//tensorflow_probability/python/math/psd_kernels:positive_semidefinite_kernel",
         "//tensorflow_probability/python/math/psd_kernels/internal:util",
     ],
@@ -61,11 +58,12 @@ multi_substrate_py_test(
     shard_count = 4,
     tags = ["tf1-broken"],
     deps = [
+        ":additive_kernel",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
     ],
 )
 
@@ -86,10 +84,11 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["multitask_kernel_test.py"],
     deps = [
+        ":multitask_kernel",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
     ],
 )

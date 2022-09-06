@@ -18,16 +18,39 @@
 
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.bijectors import square
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import cauchy
+from tensorflow_probability.python.distributions import chi2
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import half_cauchy
+from tensorflow_probability.python.distributions import half_normal
 from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import laplace
+from tensorflow_probability.python.distributions import markov_chain
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import truncated_normal
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.experimental.util import trainable
 from tensorflow_probability.python.experimental.vi import automatic_structured_vi
 from tensorflow_probability.python.internal import custom_gradient
 from tensorflow_probability.python.internal import prefer_static as ps
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.math.minimize import minimize_stateless
+from tensorflow_probability.python.vi import optimization
 
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 JAX_MODE = False
 
@@ -62,7 +85,7 @@ class _TrainableASVISurrogate(object):
 
     prior_dist = self.make_prior_dist()
 
-    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
+    surrogate_posterior = automatic_structured_vi.build_asvi_surrogate_posterior(
         prior=prior_dist)
 
     # Test that the correct number of trainable variables are being tracked
@@ -92,7 +115,7 @@ class _TrainableASVISurrogate(object):
     prior_dist = self.make_prior_dist()
 
     surrogate_init_fn, surrogate_apply_fn = (
-        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(
+        automatic_structured_vi.build_asvi_surrogate_posterior_stateless(
             prior=prior_dist))
     raw_params = surrogate_init_fn(
         seed=test_util.test_seed(sampler_type='stateless'))
@@ -114,7 +137,7 @@ class _TrainableASVISurrogate(object):
     # Test that gradients are available wrt the variational parameters.
     posterior_sample = surrogate_posterior.sample(
         seed=test_util.test_seed(sampler_type='stateless'))
-    _, grad = tfp.math.value_and_gradient(
+    _, grad = gradient.value_and_gradient(
         lambda params: surrogate_apply_fn(params).log_prob(posterior_sample),
         [raw_params])
     self.assertTrue(
@@ -125,15 +148,15 @@ class _TrainableASVISurrogate(object):
   def test_initialization_is_deterministic_following_seed(self):
     prior_dist = self.make_prior_dist()
     seed = test_util.test_seed(sampler_type='stateless')
-    init_seed, sample_seed = tfp.random.split_seed(seed)
+    init_seed, sample_seed = samplers.split_seed(seed)
 
-    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
+    surrogate_posterior = automatic_structured_vi.build_asvi_surrogate_posterior(
         prior=prior_dist, seed=init_seed)
     self.evaluate(
         [v.initializer for v in surrogate_posterior.trainable_variables])
     posterior_sample = surrogate_posterior.sample(seed=sample_seed)
 
-    surrogate_posterior2 = tfp.experimental.vi.build_asvi_surrogate_posterior(
+    surrogate_posterior2 = automatic_structured_vi.build_asvi_surrogate_posterior(
         prior=prior_dist, seed=init_seed)
     self.evaluate(
         [v.initializer for v in surrogate_posterior2.trainable_variables])
@@ -151,19 +174,19 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
     def _prior_model_fn():
       innovation_noise = 0.1
       prior_loc = 0.
-      new = yield tfd.Normal(loc=prior_loc, scale=innovation_noise)
+      new = yield normal.Normal(loc=prior_loc, scale=innovation_noise)
       for _ in range(4):
-        new = yield tfd.Normal(loc=new, scale=innovation_noise)
+        new = yield normal.Normal(loc=new, scale=innovation_noise)
 
-    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
+    return jdab.JointDistributionCoroutineAutoBatched(_prior_model_fn)
 
   def make_likelihood_model(self, x, observation_noise):
 
     def _likelihood_model():
       for i in range(5):
-        yield tfd.Normal(loc=x[i], scale=observation_noise)
+        yield normal.Normal(loc=x[i], scale=observation_noise)
 
-    return tfd.JointDistributionCoroutineAutoBatched(_likelihood_model)
+    return jdab.JointDistributionCoroutineAutoBatched(_likelihood_model)
 
   def get_observations(self, prior_dist):
     observation_noise = 0.15
@@ -189,12 +212,12 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
 
     prior_dist = self.make_prior_dist()
     observations = self.get_observations(prior_dist)
-    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
+    surrogate_posterior = automatic_structured_vi.build_asvi_surrogate_posterior(
         prior=prior_dist)
     target_log_prob = self.get_target_log_prob(observations, prior_dist)
 
     # Test vi fit surrogate posterior works
-    losses = tfp.vi.fit_surrogate_posterior(
+    losses = optimization.fit_surrogate_posterior(
         target_log_prob,
         surrogate_posterior,
         num_steps=5,  # Don't optimize to completion.
@@ -222,7 +245,7 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
     prior_dist = self.make_prior_dist()
     observations = self.get_observations(prior_dist)
     init_fn, build_surrogate_posterior_fn = (
-        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(
+        automatic_structured_vi.build_asvi_surrogate_posterior_stateless(
             prior=prior_dist))
     target_log_prob = self.get_target_log_prob(observations, prior_dist)
 
@@ -233,7 +256,7 @@ class ASVISurrogatePosteriorTestBrownianMotion(test_util.TestCase,
       return tf.reduce_mean(q_lp - target_log_prob(*zs), axis=0)
 
     # Test vi fit surrogate posterior works
-    optimized_params, _ = tfp.math.minimize_stateless(
+    optimized_params, _ = minimize_stateless(
         loss_fn,
         init=init_fn(seed=test_util.test_seed()),
         num_steps=5,  # Don't optimize to completion.
@@ -253,15 +276,15 @@ class ASVISurrogatePosteriorTestEightSchools(test_util.TestCase,
                                     dtype=tf.float32)
     num_schools = ps.shape(treatment_effects)[-1]
 
-    return tfd.JointDistributionNamed({
+    return jdn.JointDistributionNamed({
         'avg_effect':
-            tfd.Normal(loc=0., scale=10., name='avg_effect'),
+            normal.Normal(loc=0., scale=10., name='avg_effect'),
         'log_stddev':
-            tfd.Normal(loc=5., scale=1., name='log_stddev'),
+            normal.Normal(loc=5., scale=1., name='log_stddev'),
         'school_effects':
             lambda log_stddev, avg_effect: (  # pylint: disable=g-long-lambda
-                tfd.Independent(
-                    tfd.Normal(
+                independent.Independent(
+                    normal.Normal(
                         loc=avg_effect[..., None] * tf.ones(num_schools),
                         scale=tf.exp(log_stddev[..., None]) * tf.ones(
                             num_schools),
@@ -276,15 +299,15 @@ class ASVISurrogatePosteriorTestEightSchoolsSample(test_util.TestCase,
 
   def make_prior_dist(self):
 
-    return tfd.JointDistributionNamed({
+    return jdn.JointDistributionNamed({
         'avg_effect':
-            tfd.Normal(loc=0., scale=10., name='avg_effect'),
+            normal.Normal(loc=0., scale=10., name='avg_effect'),
         'log_stddev':
-            tfd.Normal(loc=5., scale=1., name='log_stddev'),
+            normal.Normal(loc=5., scale=1., name='log_stddev'),
         'school_effects':
             lambda log_stddev, avg_effect: (  # pylint: disable=g-long-lambda
-                tfd.Sample(
-                    tfd.Normal(
+                sample.Sample(
+                    normal.Normal(
                         loc=avg_effect[..., None],
                         scale=tf.exp(log_stddev[..., None]),
                         name='school_effects'),
@@ -300,10 +323,10 @@ class ASVISurrogatePosteriorTestHalfNormal(test_util.TestCase,
 
     def _prior_model_fn():
       innovation_noise = 1.
-      yield tfd.HalfNormal(
+      yield half_normal.HalfNormal(
           scale=innovation_noise, validate_args=True, allow_nan_stats=False)
 
-    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
+    return jdab.JointDistributionCoroutineAutoBatched(_prior_model_fn)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -313,11 +336,11 @@ class ASVISurrogatePosteriorTestDiscreteLatent(
   def make_prior_dist(self):
 
     def _prior_model_fn():
-      a = yield tfd.Bernoulli(logits=0.5, name='a')
-      yield tfd.Normal(loc=2. * tf.cast(a, tf.float32) - 1.,
-                       scale=1., name='b')
+      a = yield bernoulli.Bernoulli(logits=0.5, name='a')
+      yield normal.Normal(
+          loc=2. * tf.cast(a, tf.float32) - 1., scale=1., name='b')
 
-    return tfd.JointDistributionCoroutineAutoBatched(_prior_model_fn)
+    return jdab.JointDistributionCoroutineAutoBatched(_prior_model_fn)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -332,29 +355,24 @@ class ASVISurrogatePosteriorTestNesting(test_util.TestCase,
   def make_prior_dist(self):
 
     def nested_model():
-      a = yield tfd.Sample(
-          tfd.Sample(
-              tfd.Normal(0., 1.),
-              sample_shape=4),
+      a = yield sample.Sample(
+          sample.Sample(normal.Normal(0., 1.), sample_shape=4),
           sample_shape=[2],
           name='a')
-      b = yield tfb.Sigmoid()(
-          tfb.Square()(
-              tfd.Exponential(rate=tf.exp(a))),
-          name='b')
+      b = yield sigmoid.Sigmoid()(
+          square.Square()(exponential.Exponential(rate=tf.exp(a))), name='b')
       # pylint: disable=g-long-lambda
-      yield tfd.JointDistributionSequential(
-          [tfd.Laplace(loc=a, scale=b),
-           lambda c1: tfd.Independent(
-               tfd.Beta(concentration1=1.,
-                        concentration0=tf.nn.softplus(c1)),
-               reinterpreted_batch_ndims=1),
-           lambda c1, c2: tfd.JointDistributionNamed({
-               'x': tfd.Gamma(concentration=tf.nn.softplus(c1), rate=c2)})
-           ], name='c')
+      yield jds.JointDistributionSequential([
+          laplace.Laplace(loc=a, scale=b), lambda c1: independent.Independent(
+              beta.Beta(concentration1=1., concentration0=tf.nn.softplus(c1)),
+              reinterpreted_batch_ndims=1),
+          lambda c1, c2: jdn.JointDistributionNamed(
+              {'x': gamma.Gamma(concentration=tf.nn.softplus(c1), rate=c2)})
+      ],
+                                            name='c')
       # pylint: enable=g-long-lambda
 
-    return tfd.JointDistributionCoroutineAutoBatched(nested_model)
+    return jdab.JointDistributionCoroutineAutoBatched(nested_model)
 
 
 @test_util.test_all_tf_execution_regimes
@@ -369,23 +387,23 @@ class ASVISurrogatePosteriorTestMarkovChain(test_util.TestCase,
     def stochastic_volatility_prior_fn():
       """Generative process for a stochastic volatility model."""
       persistence_of_volatility = 0.9
-      mean_log_volatility = yield tfd.Cauchy(
+      mean_log_volatility = yield cauchy.Cauchy(
           loc=0., scale=5., name='mean_log_volatility')
-      white_noise_shock_scale = yield tfd.HalfCauchy(
+      white_noise_shock_scale = yield half_cauchy.HalfCauchy(
           loc=0., scale=2., name='white_noise_shock_scale')
-      _ = yield tfd.MarkovChain(
-          initial_state_prior=tfd.Normal(
+      _ = yield markov_chain.MarkovChain(
+          initial_state_prior=normal.Normal(
               loc=mean_log_volatility,
-              scale=white_noise_shock_scale / tf.math.sqrt(
-                  tf.ones([]) - persistence_of_volatility**2)),
-          transition_fn=lambda _, x_t: tfd.Normal(  # pylint: disable=g-long-lambda
-              loc=persistence_of_volatility * (
-                  x_t -  mean_log_volatility) + mean_log_volatility,
+              scale=white_noise_shock_scale /
+              tf.math.sqrt(tf.ones([]) - persistence_of_volatility**2)),
+          transition_fn=lambda _, x_t: normal.Normal(  # pylint: disable=g-long-lambda
+              loc=persistence_of_volatility *
+              (x_t - mean_log_volatility) + mean_log_volatility,
               scale=white_noise_shock_scale),
           num_steps=num_timesteps,
           name='log_volatility')
 
-    return tfd.JointDistributionCoroutineAutoBatched(
+    return jdab.JointDistributionCoroutineAutoBatched(
         stochastic_volatility_prior_fn)
 
 
@@ -394,51 +412,49 @@ class TestASVISubstitutionAndSurrogateRules(test_util.TestCase):
 
   def test_default_substitutes_trainable_families(self):
 
-    @tfd.JointDistributionCoroutineAutoBatched
+    @jdab.JointDistributionCoroutineAutoBatched
     def model():
-      yield tfd.Sample(
-          tfd.Uniform(low=-2., high=7.),
-          sample_shape=[2],
-          name='a')
-      yield tfd.HalfNormal(1., name='b')
-      yield tfd.Exponential(rate=[1., 2.], name='c')
-      yield tfd.Chi2(df=3., name='d')
+      yield sample.Sample(
+          uniform.Uniform(low=-2., high=7.), sample_shape=[2], name='a')
+      yield half_normal.HalfNormal(1., name='b')
+      yield exponential.Exponential(rate=[1., 2.], name='c')
+      yield chi2.Chi2(df=3., name='d')
 
     init_fn, apply_fn = (
-        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(model))
+        automatic_structured_vi.build_asvi_surrogate_posterior_stateless(model))
     surrogate = apply_fn(init_fn(seed=test_util.test_seed()))
     self.assertAllEqualNested(model.event_shape, surrogate.event_shape)
 
     surrogate_dists, _ = surrogate.sample_distributions(
         seed=test_util.test_seed(sampler_type='stateless'))
-    self.assertIsInstance(surrogate_dists.a, independent._Independent)
+    self.assertIsInstance(surrogate_dists.a, independent.Independent)
     self.assertIsInstance(surrogate_dists.a.distribution,
-                          tfd.TransformedDistribution)
+                          transformed_distribution.TransformedDistribution)
     self.assertIsInstance(surrogate_dists.a.distribution.distribution,
-                          tfd.Beta)
-    self.assertIsInstance(surrogate_dists.b, tfd.TruncatedNormal)
-    self.assertIsInstance(surrogate_dists.c, tfd.Gamma)
-    self.assertIsInstance(surrogate_dists.d, tfd.Gamma)
+                          beta.Beta)
+    self.assertIsInstance(surrogate_dists.b, truncated_normal.TruncatedNormal)
+    self.assertIsInstance(surrogate_dists.c, gamma.Gamma)
+    self.assertIsInstance(surrogate_dists.d, gamma.Gamma)
 
   def test_can_specify_custom_substitution(self):
 
-    @tfd.JointDistributionCoroutineAutoBatched
+    @jdab.JointDistributionCoroutineAutoBatched
     def centered_horseshoe(ndims=100):
-      global_scale = yield tfd.HalfCauchy(
+      global_scale = yield half_cauchy.HalfCauchy(
           loc=0., scale=1., name='global_scale')
-      local_scale = yield tfd.HalfCauchy(
+      local_scale = yield half_cauchy.HalfCauchy(
           loc=0., scale=tf.ones([ndims]), name='local_scale')
-      yield tfd.Normal(
+      yield normal.Normal(
           loc=0., scale=tf.sqrt(global_scale * local_scale), name='weights')
 
     init_fn, apply_fn = (
-        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(
+        automatic_structured_vi.build_asvi_surrogate_posterior_stateless(
             centered_horseshoe,
-            prior_substitution_rules=tuple([
-                (tfd.HalfCauchy,
-                 lambda d: tfb.Softplus(1e-6)(  # pylint: disable=g-long-lambda
-                     tfd.Normal(loc=d.loc, scale=d.scale)))
-            ]) + automatic_structured_vi.ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES))
+            prior_substitution_rules=tuple([(
+                half_cauchy.HalfCauchy,
+                lambda d: softplus.Softplus(1e-6)(  # pylint: disable=g-long-lambda
+                    normal.Normal(loc=d.loc, scale=d.scale)))]) +
+            automatic_structured_vi.ASVI_DEFAULT_PRIOR_SUBSTITUTION_RULES))
 
     surrogate = apply_fn(init_fn(seed=test_util.test_seed()))
     self.assertAllEqualNested(centered_horseshoe.event_shape,
@@ -451,10 +467,10 @@ class TestASVISubstitutionAndSurrogateRules(test_util.TestCase):
     surrogate_dists, _ = surrogate.sample_distributions(
         seed=test_util.test_seed(sampler_type='stateless'))
     self.assertIsInstance(surrogate_dists.global_scale.distribution,
-                          tfd.Normal)
+                          normal.Normal)
     self.assertIsInstance(surrogate_dists.local_scale.distribution,
-                          tfd.Normal)
-    self.assertIsInstance(surrogate_dists.weights, tfd.Normal)
+                          normal.Normal)
+    self.assertIsInstance(surrogate_dists.weights, normal.Normal)
 
   def test_can_specify_custom_surrogate(self):
 
@@ -462,17 +478,16 @@ class TestASVISubstitutionAndSurrogateRules(test_util.TestCase):
         dist, build_nested_surrogate, sample_shape=None):
       del build_nested_surrogate  # Unused.
       del sample_shape  # Unused.
-      return tfp.experimental.util.make_trainable_stateless(
-          tfd.StudentT, batch_and_event_shape=dist.batch_shape)
+      return trainable.make_trainable_stateless(
+          student_t.StudentT, batch_and_event_shape=dist.batch_shape)
 
     init_fn, apply_fn = (
-        tfp.experimental.vi.build_asvi_surrogate_posterior_stateless(
-            tfd.Normal(2., scale=[3., 1.]),
-            surrogate_rules=(
-                (tfd.Normal, student_t_surrogate),
-                ) + automatic_structured_vi.ASVI_DEFAULT_SURROGATE_RULES))
+        automatic_structured_vi.build_asvi_surrogate_posterior_stateless(
+            normal.Normal(2., scale=[3., 1.]),
+            surrogate_rules=((normal.Normal, student_t_surrogate),) +
+            automatic_structured_vi.ASVI_DEFAULT_SURROGATE_RULES))
     surrogate = apply_fn(init_fn(seed=test_util.test_seed()))
-    self.assertIsInstance(surrogate, tfd.StudentT)
+    self.assertIsInstance(surrogate, student_t.StudentT)
 
 
 # TODO(kateslin): Add an ASVI surrogate posterior test for gamma distributions.

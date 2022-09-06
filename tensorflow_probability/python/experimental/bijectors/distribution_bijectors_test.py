@@ -19,17 +19,30 @@ import hypothesis as hp
 from hypothesis import strategies as hps
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.distributions import exponential
 from tensorflow_probability.python.distributions import hypothesis_testlib as dhps
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
+from tensorflow_probability.python.distributions import markov_chain
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.experimental.bijectors import distribution_bijectors
+from tensorflow_probability.python.experimental.vi import automatic_structured_vi
 from tensorflow_probability.python.internal import hypothesis_testlib as tfp_hps
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
+from tensorflow_probability.python.mcmc import nuts
+from tensorflow_probability.python.mcmc import sample
+from tensorflow_probability.python.mcmc import transformed_kernel
+from tensorflow_probability.python.vi import optimization
 
 JAX_MODE = False
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 PRECONDITIONING_FAILS_DISTS = (
     'Bates',  # CDF seems pretty crazy.
@@ -75,14 +88,14 @@ class DistributionBijectorsTest(test_util.TestCase):
 
     flat_event_shape = tf.nest.flatten(dist.event_shape_tensor())
     zs = [make_reference_values(s) for s in flat_event_shape]
-    lp_dist, grad_dist = tfp.math.value_and_gradient(
+    lp_dist, grad_dist = gradient.value_and_gradient(
         lambda *xs: dist.log_prob(tf.nest.pack_sequence_as(dist.dtype, xs)), zs)
 
     def reference_value_and_gradient(z, event_shape):
-      reference_dist = tfd.Independent(
-          tfd.Normal(loc=tf.zeros_like(z), scale=1.),
+      reference_dist = independent.Independent(
+          normal.Normal(loc=tf.zeros_like(z), scale=1.),
           reinterpreted_batch_ndims=ps.rank_from_shape(event_shape))
-      return tfp.math.value_and_gradient(reference_dist.log_prob, z)
+      return gradient.value_and_gradient(reference_dist.log_prob, z)
 
     reference_vals_and_grads = [
         reference_value_and_gradient(z, event_shape)
@@ -114,92 +127,96 @@ class DistributionBijectorsTest(test_util.TestCase):
             enable_vars=False,
             param_strategy_fn=_constrained_zeros_fn))
     try:
-      b = tfp.experimental.bijectors.make_distribution_bijector(dist)
+      b = distribution_bijectors.make_distribution_bijector(dist)
     except NotImplementedError:
       # Okay to fail as long as explicit error is raised.
       self.skipTest('Bijector not implemented.')
-    self.assertDistributionIsApproximatelyStandardNormal(tfb.Invert(b)(dist))
+    self.assertDistributionIsApproximatelyStandardNormal(invert.Invert(b)(dist))
 
   @test_util.numpy_disable_gradient_test
   def test_multivariate_normal(self):
-    d = tfd.MultivariateNormalTriL(
+    d = mvn_tril.MultivariateNormalTriL(
         loc=[4., 8.],
         scale_tril=tf.linalg.cholesky([[11., 0.099], [0.099, 0.1]]))
-    b = tfp.experimental.bijectors.make_distribution_bijector(d)
-    self.assertDistributionIsApproximatelyStandardNormal(tfb.Invert(b)(d))
+    b = distribution_bijectors.make_distribution_bijector(d)
+    self.assertDistributionIsApproximatelyStandardNormal(invert.Invert(b)(d))
 
   @test_util.numpy_disable_gradient_test
   def test_markov_chain(self):
-    d = tfd.MarkovChain(
-        initial_state_prior=tfd.Uniform(low=0., high=1.),
-        transition_fn=lambda _, x: tfd.Uniform(low=0., high=tf.nn.softplus(x)),
+    d = markov_chain.MarkovChain(
+        initial_state_prior=uniform.Uniform(low=0., high=1.),
+        transition_fn=lambda _, x: uniform.Uniform(  # pylint:disable=g-long-lambda
+            low=0., high=tf.nn.softplus(x)),
         num_steps=3)
-    b = tfp.experimental.bijectors.make_distribution_bijector(d)
+    b = distribution_bijectors.make_distribution_bijector(d)
     self.assertDistributionIsApproximatelyStandardNormal(
-        tfb.Invert(b)(d), rtol=1e-4)
+        invert.Invert(b)(d), rtol=1e-4)
 
   @test_util.numpy_disable_gradient_test
   def test_markov_chain_joint(self):
-    d = tfd.MarkovChain(
-        initial_state_prior=tfd.JointDistributionSequentialAutoBatched(
-            [tfd.Normal(0., 1.),
-             lambda x: tfd.Uniform(low=0., high=tf.exp(x))]),
+    d = markov_chain.MarkovChain(
+        initial_state_prior=jdab.JointDistributionSequentialAutoBatched([
+            normal.Normal(0., 1.),
+            lambda x: uniform.Uniform(low=0., high=tf.exp(x))
+        ]),
         transition_fn=(
-            lambda _, state: tfd.JointDistributionSequentialAutoBatched(  # pylint: disable=g-long-lambda
+            lambda _, state: jdab.JointDistributionSequentialAutoBatched(  # pylint: disable=g-long-lambda
                 batch_ndims=ps.rank(state[1]),
-                model=[tfd.Normal(state[1], 1.),
-                       lambda x: tfd.Uniform(low=0., high=tf.nn.softplus(x))])),
+                model=[
+                    normal.Normal(state[1], 1.), lambda x: uniform.Uniform(  # pylint:disable=g-long-lambda
+                        low=0., high=tf.nn.softplus(x))
+                ])),
         num_steps=10)
-    b = tfp.experimental.bijectors.make_distribution_bijector(d)
+    b = distribution_bijectors.make_distribution_bijector(d)
     self.assertDistributionIsApproximatelyStandardNormal(
-        tfb.Invert(b)(d), rtol=1e-4)
+        invert.Invert(b)(d), rtol=1e-4)
 
   @test_util.numpy_disable_gradient_test
   def test_nested_joint_distribution(self):
 
     def model():
-      x = yield tfd.Normal(loc=-2., scale=1.)
-      yield tfd.JointDistributionSequentialAutoBatched([
-          tfd.Uniform(low=1. - tf.exp(x),
-                      high=2. + tf.exp(x) + tf.nn.softplus(x)),
-          lambda v: tfd.Exponential(v)])  # pylint: disable=unnecessary-lambda
+      x = yield normal.Normal(loc=-2., scale=1.)
+      yield jdab.JointDistributionSequentialAutoBatched([
+          uniform.Uniform(
+              low=1. - tf.exp(x), high=2. + tf.exp(x) + tf.nn.softplus(x)),
+          lambda v: exponential.Exponential(v)  # pylint: disable=unnecessary-lambda
+      ])
 
-    dist = tfd.JointDistributionCoroutineAutoBatched(model)
-    b = tfp.experimental.bijectors.make_distribution_bijector(dist)
+    dist = jdab.JointDistributionCoroutineAutoBatched(model)
+    b = distribution_bijectors.make_distribution_bijector(dist)
     self.assertDistributionIsApproximatelyStandardNormal(
-        tfb.Invert(b)(dist), rtol=1e-4)
+        invert.Invert(b)(dist), rtol=1e-4)
 
   @test_util.numpy_disable_gradient_test
   @test_util.jax_disable_test_missing_functionality(
       'build_asvi_surrogate_posterior')
   def test_mcmc_funnel_docstring_example_runs(self):
 
-    @tfd.JointDistributionCoroutineAutoBatched
+    @jdab.JointDistributionCoroutineAutoBatched
     def model_with_funnel():
-      z = yield tfd.Normal(loc=-1., scale=2., name='z')
-      x = yield tfd.Normal(loc=[0.], scale=tf.exp(z), name='x')
-      yield tfd.Poisson(log_rate=x, name='y')
+      z = yield normal.Normal(loc=-1., scale=2., name='z')
+      x = yield normal.Normal(loc=[0.], scale=tf.exp(z), name='x')
+      yield poisson.Poisson(log_rate=x, name='y')
 
     pinned_model = model_with_funnel.experimental_pin(y=[1])
-    surrogate_posterior = tfp.experimental.vi.build_asvi_surrogate_posterior(
+    surrogate_posterior = automatic_structured_vi.build_asvi_surrogate_posterior(
         pinned_model)
 
-    tfp.vi.fit_surrogate_posterior(
+    optimization.fit_surrogate_posterior(
         pinned_model.unnormalized_log_prob,
         surrogate_posterior=surrogate_posterior,
         optimizer=tf.optimizers.Adam(0.01),
         sample_size=10,
         num_steps=1)
     bijector = (
-        tfp.experimental.bijectors.make_distribution_bijector(
-            surrogate_posterior))
+        distribution_bijectors.make_distribution_bijector(surrogate_posterior))
 
     @tf.function(autograph=False)
     def do_sample():
-      return tfp.mcmc.sample_chain(
-          kernel=tfp.mcmc.DualAveragingStepSizeAdaptation(
-              tfp.mcmc.TransformedTransitionKernel(
-                  tfp.mcmc.NoUTurnSampler(
+      return sample.sample_chain(
+          kernel=dassa.DualAveragingStepSizeAdaptation(
+              transformed_kernel.TransformedTransitionKernel(
+                  nuts.NoUTurnSampler(
                       pinned_model.unnormalized_log_prob, step_size=0.1),
                   bijector=bijector),
               num_adaptation_steps=5),

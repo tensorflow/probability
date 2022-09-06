@@ -20,11 +20,11 @@
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.experimental.linalg import linear_operator_psd_kernel
 from tensorflow_probability.python.internal import test_util
-
-tfpk = tfp.math.psd_kernels
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
+from tensorflow_probability.python.math.psd_kernels import polynomial
 
 
 def skip_if_no_xla(skip_test_fn):
@@ -37,22 +37,21 @@ def skip_if_no_xla(skip_test_fn):
 
 @test_util.test_all_tf_execution_regimes
 class LinearOperatorPSDKernelTest(test_util.TestCase):
-  """Tests for tfp.experimental.linalg.LinearOperatorPSDKernel."""
+  """Tests for linear_operator_psd_kernel.LinearOperatorPSDKernel."""
 
   def test_shape(self):
-    kernel = tfpk.ExponentiatedQuadratic(
-        amplitude=tf.random.uniform([17, 1, 1]),
-        feature_ndims=2)
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude=tf.random.uniform([17, 1, 1]), feature_ndims=2)
     x1 = tf.random.normal([1, 11, 5, 2, 13])
     x2 = tf.random.normal([7, 1, 3, 2, 13])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     self.assertAllEqual((17, 7, 11, 5, 3), linop.shape)
     self.assertAllEqual((17, 7, 11), linop.batch_shape)
 
   def test_diag_part(self):
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([7, 3, 5, 2])  # square matrix 5x5
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1)
     expected, actual = self.evaluate([
         tf.linalg.diag_part(kernel.matrix(x1, x1)),
         linop.diag_part()
@@ -60,7 +59,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     self.assertAllClose(expected, actual)
 
     x2 = tf.random.normal([3, 11, 2])  # wide matrix 5x11
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     expected, actual = self.evaluate([
         tf.linalg.diag_part(kernel.matrix(x1, x2)),
         linop.diag_part()
@@ -68,7 +67,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     self.assertAllClose(expected, actual)
 
     x2 = tf.random.normal([2, 2])  # tall matrix 5x2
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     expected, actual = self.evaluate([
         tf.linalg.diag_part(kernel.matrix(x1, x2)),
         linop.diag_part()
@@ -78,9 +77,9 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
   def test_diag_part_xla(self):
     skip_if_no_xla(self.skipTest)
     if not tf.executing_eagerly(): return  # jit_compile is eager-only.
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([7, 3, 5, 2])  # square matrix 5x5
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1)
     expected, actual = self.evaluate([
         tf.linalg.diag_part(kernel.matrix(x1, x1)),
         tf.function(linop.diag_part, jit_compile=True)()
@@ -88,7 +87,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     self.assertAllClose(expected, actual)
 
     x2 = tf.random.normal([3, 11, 2])  # wide matrix 5x11
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     expected, actual = self.evaluate([
         tf.linalg.diag_part(kernel.matrix(x1, x2)),
         tf.function(linop.diag_part, jit_compile=True)()
@@ -96,7 +95,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     self.assertAllClose(expected, actual)
 
     x2 = tf.random.normal([2, 2])  # tall matrix 5x2
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     expected, actual = self.evaluate([
         tf.linalg.diag_part(kernel.matrix(x1, x2)),
         tf.function(linop.diag_part, jit_compile=True)()
@@ -104,20 +103,20 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     self.assertAllClose(expected, actual)
 
   def test_row_scalar(self):
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([5, 2])
     x2 = tf.random.normal([7, 3, 5, 2])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     i = np.random.randint(0, 5)
     expected, actual = self.evaluate(
         [kernel.matrix(x1, x2)[..., i, :], linop.row(i)])
     self.assertAllClose(expected, actual)
 
   def test_row_batch(self):
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([7, 1, 5, 2])
     x2 = tf.random.normal([1, 3, 4, 2])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     i = np.random.randint(0, 5, size=(7, 3))
     cov = kernel.matrix(x1, x2)
     expected, actual = self.evaluate([
@@ -127,20 +126,20 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     self.assertAllClose(expected, actual)
 
   def test_col_scalar(self):
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([5, 2])
     x2 = tf.random.normal([7, 3, 5, 2])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     j = np.random.randint(0, 5)
     expected, actual = self.evaluate(
         [kernel.matrix(x1, x2)[..., j], linop.col(j)])
     self.assertAllClose(expected, actual)
 
   def test_col_batch(self):
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([3, 5, 2])
     x2 = tf.random.normal([7, 1, 4, 2])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     j = np.random.randint(0, 4, size=(7, 3))
     cov = kernel.matrix(x1, x2)
     transpose = tf.linalg.matrix_transpose
@@ -155,21 +154,21 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     self.assertAllClose(expected, actual)
 
   def test_matmul(self):
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([3, 2, 11])
     x2 = tf.random.normal([5, 1, 4, 11])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(kernel, x1, x2)
     cov = kernel.matrix(x1, x2)
     x = tf.random.normal([4, 3])
     expected, actual = self.evaluate([tf.matmul(cov, x), linop.matmul(x)])
     self.assertAllClose(expected, actual)
 
   def test_matmul_chunked(self):
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([3, 2, 11])
     x2 = tf.random.normal([5, 1, 14, 11])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2,
-                                                            num_matmul_parts=7)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(
+        kernel, x1, x2, num_matmul_parts=7)
     cov = kernel.matrix(x1, x2)
     x = tf.random.normal([14, 3])
     expected, actual = self.evaluate([tf.matmul(cov, x), linop.matmul(x)])
@@ -178,10 +177,10 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
   @parameterized.named_parameters(
       (dict(testcase_name='_{}chunk'.format(n), nchunks=n) for n in (2, 5)))
   def test_matmul_chunked_with_remainder(self, nchunks):
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([3, 2, 11])
     x2 = tf.random.normal([5, 1, 17, 11])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(
         kernel, x1, x2, num_matmul_parts=nchunks)
     cov = kernel.matrix(x1, x2)
     x = tf.random.normal([17, 3])
@@ -189,11 +188,11 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     self.assertAllClose(expected, actual)
 
   def test_matmul_chunked_grad(self):
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([5, 3])
     x2 = tf.random.normal([7, 3])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(kernel, x1, x2,
-                                                            num_matmul_parts=3)
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(
+        kernel, x1, x2, num_matmul_parts=3)
     x = tf.random.normal([7, 2])
     with tf.GradientTape() as tape:
       tape.watch((x1, x2, x))
@@ -216,10 +215,10 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
   def test_matmul_xla(self):
     skip_if_no_xla(self.skipTest)
     if not tf.executing_eagerly(): return  # jit_compile is eager-only.
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([5, 3])
     x2 = tf.random.normal([7, 3])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(
         kernel, x1, x2, num_matmul_parts=3)
     x = tf.random.normal([7, 2])
 
@@ -236,10 +235,10 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
   def test_matmul_grad_xla(self):
     skip_if_no_xla(self.skipTest)
     if not tf.executing_eagerly(): return  # jit_compile is eager-only.
-    kernel = tfpk.ExponentiatedQuadratic()
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic()
     x1 = tf.random.normal([5, 3])
     x2 = tf.random.normal([7, 3])
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(
         kernel, x1, x2, num_matmul_parts=3)
     x = tf.random.normal([7, 2])
 
@@ -272,8 +271,8 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
     feature_dim = 3
 
     def kernel_fn(eq_params, poly_params):
-      return (tfpk.ExponentiatedQuadratic(**eq_params) *
-              tfpk.Polynomial(**poly_params))
+      return (exponentiated_quadratic.ExponentiatedQuadratic(**eq_params) *
+              polynomial.Polynomial(**poly_params))
 
     kernel_args = (
         dict(length_scale=tf.random.uniform([], .5, 1.5, dtype=tf.float64),
@@ -284,7 +283,7 @@ class LinearOperatorPSDKernelTest(test_util.TestCase):
 
     x1 = tf.random.normal([5, feature_dim], dtype=tf.float64)
     x2 = tf.random.normal([7, feature_dim], dtype=tf.float64)
-    linop = tfp.experimental.linalg.LinearOperatorPSDKernel(
+    linop = linear_operator_psd_kernel.LinearOperatorPSDKernel(
         kernel_fn, x1, x2, kernel_args=kernel_args, num_matmul_parts=3)
     x = tf.random.normal([7, 2], dtype=tf.float64)
 

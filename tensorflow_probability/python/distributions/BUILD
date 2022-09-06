@@ -766,7 +766,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
-        "//tensorflow_probability/python/math/psd_kernels",
+        "//tensorflow_probability/python/math/psd_kernels:schur_complement",
         "//tensorflow_probability/python/util",
     ],
 )
@@ -1025,6 +1025,8 @@ multi_substrate_py_library(
     srcs = ["inverse_gaussian.py"],
     deps = [
         ":distribution",
+        ":inflated",
+        ":negative_binomial",
         ":normal",
         # numpy dep,
         # tensorflow dep,
@@ -1145,6 +1147,8 @@ multi_substrate_py_library(
     name = "joint_distribution_util",
     srcs = ["joint_distribution_util.py"],
     deps = [
+        ":independent",
+        ":joint_distribution_auto_batched",
         ":joint_distribution_named",
         ":joint_distribution_sequential",
         # tensorflow dep,
@@ -1420,7 +1424,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:parameter_properties",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
-        "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/util:seed_stream",
     ],
 )
@@ -2156,6 +2159,8 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:tensor_util",
         "//tensorflow_probability/python/internal:tensorshape_util",
+        "//tensorflow_probability/python/math/psd_kernels:positive_semidefinite_kernel",
+        "//tensorflow_probability/python/math/psd_kernels:schur_complement",
     ],
 )
 
@@ -2470,7 +2475,7 @@ multi_substrate_py_test(
         "//tensorflow_probability/python/bijectors:scale_matvec_tril",
         "//tensorflow_probability/python/internal:reparameterization",
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/math:linalg",
     ],
 )
 
@@ -3198,8 +3203,12 @@ multi_substrate_py_test(
     name = "inflated_test",
     srcs = ["inflated_test.py"],
     deps = [
+        ":inflated",
+        ":negative_binomial",
+        ":normal",
         # numpy dep,
-        "//tensorflow_probability",
+        # tensorflow dep,
+        "//tensorflow_probability/python/experimental/util",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -3230,7 +3239,7 @@ multi_substrate_py_test(
         # scipy dep,
         # tensorflow dep,
         "//tensorflow_probability/python/internal:test_util",
-        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 

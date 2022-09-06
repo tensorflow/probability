@@ -17,7 +17,23 @@
 from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import pad
+from tensorflow_probability.python.distributions import autoregressive
+from tensorflow_probability.python.distributions import beta_binomial
+from tensorflow_probability.python.distributions import dirichlet
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import multinomial
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.experimental import distribute
 from tensorflow_probability.python.experimental.mcmc import windowed_sampling
 from tensorflow_probability.python.internal import callable_util
@@ -26,12 +42,11 @@ from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.internal import unnest
+from tensorflow_probability.python.mcmc import diagnostic
 
 JAX_MODE = False
 
-tfb = tfp.bijectors
-tfd = tfp.distributions
-Root = tfd.JointDistributionCoroutine.Root
+Root = jdc.JointDistributionCoroutine.Root
 
 NUM_SCHOOLS = 8  # number of schools
 TREATMENT_EFFECTS = [28., 8, -3, 7, -1, 1, 18, 12]
@@ -40,50 +55,57 @@ TREATMENT_STDDEVS = [15., 10, 16, 11, 9, 11, 10, 18]
 
 def eight_schools_coroutine():
 
-  @tfd.JointDistributionCoroutine
+  @jdc.JointDistributionCoroutine
   def model():
-    avg_effect = yield Root(tfd.Normal(0., 5., name='avg_effect'))
-    avg_stddev = yield Root(tfd.HalfNormal(5., name='avg_stddev'))
+    avg_effect = yield Root(normal.Normal(0., 5., name='avg_effect'))
+    avg_stddev = yield Root(half_normal.HalfNormal(5., name='avg_stddev'))
     school_effects_std = yield Root(
-        tfd.Sample(tfd.Normal(0., 1.), NUM_SCHOOLS, name='school_effects_std'))
-    yield tfd.Independent(
-        tfd.Normal(loc=(avg_effect[..., tf.newaxis] +
-                        avg_stddev[..., tf.newaxis] * school_effects_std),
-                   scale=tf.constant(TREATMENT_STDDEVS)),
+        sample.Sample(
+            normal.Normal(0., 1.), NUM_SCHOOLS, name='school_effects_std'))
+    yield independent.Independent(
+        normal.Normal(
+            loc=(avg_effect[..., tf.newaxis] +
+                 avg_stddev[..., tf.newaxis] * school_effects_std),
+            scale=tf.constant(TREATMENT_STDDEVS)),
         reinterpreted_batch_ndims=1,
         name='treatment_effects')
   return model
 
 
 def eight_schools_sequential():
-  model = tfd.JointDistributionSequential([
-      tfd.Normal(0., 5., name='avg_effect'),
-      tfd.HalfNormal(5., name='avg_stddev'),
-      tfd.Sample(tfd.Normal(0., 1.), NUM_SCHOOLS, name='school_effects_std'),
+  model = jds.JointDistributionSequential([
+      normal.Normal(0., 5., name='avg_effect'),
+      half_normal.HalfNormal(5., name='avg_stddev'),
+      sample.Sample(
+          normal.Normal(0., 1.), NUM_SCHOOLS, name='school_effects_std'),
       # pylint: disable=g-long-lambda
-      lambda school_effects_std, avg_stddev, avg_effect: tfd.Independent(
-          tfd.Normal(loc=(avg_effect[..., tf.newaxis] +
-                          avg_stddev[..., tf.newaxis] * school_effects_std),
-                     scale=tf.constant(TREATMENT_STDDEVS)),
+      lambda school_effects_std, avg_stddev, avg_effect: independent.
+      Independent(
+          normal.Normal(
+              loc=(avg_effect[..., tf.newaxis] + avg_stddev[..., tf.newaxis] *
+                   school_effects_std),
+              scale=tf.constant(TREATMENT_STDDEVS)),
           reinterpreted_batch_ndims=1,
-          name='treatment_effects')])
+          name='treatment_effects')
+  ])
   # pylint: enable=g-long-lambda
   return model
 
 
 def eight_schools_named():
-  model = tfd.JointDistributionNamed(
+  model = jdn.JointDistributionNamed(
       dict(
-          avg_effect=tfd.Normal(0., 5., name='avg_effect'),
-          avg_stddev=tfd.HalfNormal(5., name='avg_stddev'),
-          school_effects_std=tfd.Sample(
-              tfd.Normal(0., 1.), NUM_SCHOOLS, name='school_effects_std'),
+          avg_effect=normal.Normal(0., 5., name='avg_effect'),
+          avg_stddev=half_normal.HalfNormal(5., name='avg_stddev'),
+          school_effects_std=sample.Sample(
+              normal.Normal(0., 1.), NUM_SCHOOLS, name='school_effects_std'),
           # pylint: disable=g-long-lambda
           treatment_effects=lambda school_effects_std, avg_stddev, avg_effect:
-          tfd.Independent(
-              tfd.Normal(loc=(avg_effect[..., tf.newaxis] +
-                              avg_stddev[..., tf.newaxis] * school_effects_std),
-                         scale=tf.constant(TREATMENT_STDDEVS)),
+          independent.Independent(
+              normal.Normal(
+                  loc=(avg_effect[..., tf.newaxis] + avg_stddev[..., tf.newaxis]
+                       * school_effects_std),
+                  scale=tf.constant(TREATMENT_STDDEVS)),
               reinterpreted_batch_ndims=1,
               name='treatment_effects')))
   # pylint: enable=g-long-lambda
@@ -91,20 +113,24 @@ def eight_schools_named():
 
 
 def eight_schools_nested():
-  model = tfd.JointDistributionNamed(
+  model = jdn.JointDistributionNamed(
       dict(
-          effect_and_stddev=tfd.JointDistributionSequential([
-              tfd.Normal(0., 5., name='avg_effect'),
-              tfd.HalfNormal(5., name='avg_stddev')], name='effect_and_stddev'),
-          school_effects_std=tfd.Sample(
-              tfd.Normal(0., 1.), NUM_SCHOOLS, name='school_effects_std'),
+          effect_and_stddev=jds.JointDistributionSequential(
+              [
+                  normal.Normal(0., 5., name='avg_effect'),
+                  half_normal.HalfNormal(5., name='avg_stddev')
+              ],
+              name='effect_and_stddev'),
+          school_effects_std=sample.Sample(
+              normal.Normal(0., 1.), NUM_SCHOOLS, name='school_effects_std'),
           # pylint: disable=g-long-lambda
           treatment_effects=lambda school_effects_std, effect_and_stddev:
-          tfd.Independent(
-              tfd.Normal(loc=(effect_and_stddev[0][..., tf.newaxis] +
-                              effect_and_stddev[1][..., tf.newaxis] *
-                              school_effects_std),
-                         scale=tf.constant(TREATMENT_STDDEVS)),
+          independent.Independent(
+              normal.Normal(
+                  loc=(effect_and_stddev[0][
+                      ..., tf.newaxis] + effect_and_stddev[1][..., tf.newaxis] *
+                       school_effects_std),
+                  scale=tf.constant(TREATMENT_STDDEVS)),
               reinterpreted_batch_ndims=1,
               name='treatment_effects')))
   # pylint: enable=g-long-lambda
@@ -147,11 +173,12 @@ def _gen_gaussian_updating_example(x_dim, y_dim, seed):
   scale_mat = samplers.normal((y_dim, x_dim), seed=seeds[3])
   y_shift = samplers.normal((y_dim,), seed=seeds[4])
 
-  @tfd.JointDistributionCoroutine
+  @jdc.JointDistributionCoroutine
   def model():
-    x = yield Root(tfd.MultivariateNormalDiag(
-        x_mean, scale_diag=x_scale_diag, name='x'))
-    yield tfd.MultivariateNormalDiag(
+    x = yield Root(
+        mvn_diag.MultivariateNormalDiag(
+            x_mean, scale_diag=x_scale_diag, name='x'))
+    yield mvn_diag.MultivariateNormalDiag(
         tf.linalg.matvec(scale_mat, x) + y_shift,
         scale_diag=y_scale_diag,
         name='y')
@@ -180,9 +207,13 @@ class WindowedSamplingTest(test_util.TestCase):
 
     @tf.function(autograph=False)
     def do_sample(seed):
-      return tfp.experimental.mcmc.windowed_adaptive_hmc(
-          3, model, num_leapfrog_steps=2, num_adaptation_steps=21,
-          seed=seed, **pins)
+      return windowed_sampling.windowed_adaptive_hmc(
+          3,
+          model,
+          num_leapfrog_steps=2,
+          num_adaptation_steps=21,
+          seed=seed,
+          **pins)
 
     draws, _ = do_sample(test_util.test_seed())
     self.evaluate(draws)
@@ -197,9 +228,13 @@ class WindowedSamplingTest(test_util.TestCase):
 
     @tf.function
     def do_sample(seed):
-      return tfp.experimental.mcmc.windowed_adaptive_nuts(
-          3, model, max_tree_depth=2, num_adaptation_steps=50,
-          seed=seed, **pins)
+      return windowed_sampling.windowed_adaptive_nuts(
+          3,
+          model,
+          max_tree_depth=2,
+          num_adaptation_steps=50,
+          seed=seed,
+          **pins)
 
     draws, _ = do_sample(test_util.test_seed())
     self.evaluate(draws)
@@ -210,16 +245,15 @@ class WindowedSamplingTest(test_util.TestCase):
 
     @tf.function
     def do_sample(seed):
-      return tfp.experimental.mcmc.windowed_adaptive_hmc(
-          400, model, num_leapfrog_steps=12, seed=seed,
-          **pins)
+      return windowed_sampling.windowed_adaptive_hmc(
+          400, model, num_leapfrog_steps=12, seed=seed, **pins)
 
     draws, _ = do_sample(test_util.test_seed())
     flat_draws = tf.nest.flatten(
         model.experimental_pin(**pins)._model_flatten(draws))
     max_scale_reduction = tf.reduce_max(
         tf.nest.map_structure(tf.reduce_max,
-                              tfp.mcmc.potential_scale_reduction(flat_draws)))
+                              diagnostic.potential_scale_reduction(flat_draws)))
     self.assertLess(self.evaluate(max_scale_reduction), 1.5)
 
   def test_nuts_samples_well(self):
@@ -228,16 +262,15 @@ class WindowedSamplingTest(test_util.TestCase):
 
     @tf.function
     def do_sample():
-      return tfp.experimental.mcmc.windowed_adaptive_nuts(
-          200, model, max_tree_depth=5, seed=test_util.test_seed(),
-          **pins)
+      return windowed_sampling.windowed_adaptive_nuts(
+          200, model, max_tree_depth=5, seed=test_util.test_seed(), **pins)
 
     draws, _ = do_sample()
     flat_draws = tf.nest.flatten(
         model.experimental_pin(**pins)._model_flatten(draws))
     max_scale_reduction = tf.reduce_max(
         tf.nest.map_structure(tf.reduce_max,
-                              tfp.mcmc.potential_scale_reduction(flat_draws)))
+                              diagnostic.potential_scale_reduction(flat_draws)))
     self.assertLess(self.evaluate(max_scale_reduction), 1.05)
 
   @parameterized.named_parameters(
@@ -259,8 +292,8 @@ class WindowedSamplingTest(test_util.TestCase):
       self.assertEqual(last_window, 50)
 
   def test_explicit_init(self):
-    sample_dist = tfd.JointDistributionSequential(
-        [tfd.HalfNormal(1., name=f'dist_{idx}') for idx in range(4)])
+    sample_dist = jds.JointDistributionSequential(
+        [half_normal.HalfNormal(1., name=f'dist_{idx}') for idx in range(4)])
 
     explicit_init = [tf.ones(20) for _ in range(3)]
     _, init, bijector, _, _, _ = windowed_sampling._setup_mcmc(
@@ -279,11 +312,12 @@ class WindowedSamplingTest(test_util.TestCase):
     # Compute everything in a function so it is consistent in graph mode
     @tf.function
     def do_sample():
-      jd_model = tfd.JointDistributionNamed({
-          'x': tfd.HalfNormal(1.),
-          'y': lambda x: tfd.Normal(0., x)})
+      jd_model = jdn.JointDistributionNamed({
+          'x': half_normal.HalfNormal(1.),
+          'y': lambda x: normal.Normal(0., x)
+      })
       init = {'x': tf.ones(64)}
-      return tfp.experimental.mcmc.windowed_adaptive_hmc(
+      return windowed_sampling.windowed_adaptive_hmc(
           10,
           jd_model,
           num_adaptation_steps=200,
@@ -298,14 +332,14 @@ class WindowedSamplingTest(test_util.TestCase):
 
   def test_valid_init(self):
 
-    class _HalfNormal(tfd.HalfNormal):
+    class _HalfNormal(half_normal.HalfNormal):
 
       def _default_event_space_bijector(self):
         # This bijector is intentionally mis-specified so that ~50% of
         # initialiations will fail.
-        return tfb.Identity(validate_args=self.validate_args)
+        return identity.Identity(validate_args=self.validate_args)
 
-    tough_dist = tfd.JointDistributionSequential(
+    tough_dist = jds.JointDistributionSequential(
         [_HalfNormal(scale=1., name=f'dist_{idx}') for idx in range(4)])
 
     # Twenty chains with three parameters gives a 1 / 2^60 chance of
@@ -319,9 +353,9 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertAllGreater(self.evaluate(init), 0.)
 
   def test_extra_pins_not_required(self):
-    model = tfd.JointDistributionSequential([
-        tfd.Normal(0., 1., name='x'),
-        lambda x: tfd.Normal(x, 1., name='y')
+    model = jds.JointDistributionSequential([
+        normal.Normal(0., 1., name='x'),
+        lambda x: normal.Normal(x, 1., name='y')
     ])
     pinned = model.experimental_pin(y=4.2)
 
@@ -344,7 +378,7 @@ class WindowedSamplingTest(test_util.TestCase):
       jd_model, true_var = _gen_gaussian_updating_example(
           x_dim, y_dim, stream())
       y_val = jd_model.sample(seed=stream()).y
-      _, trace = tfp.experimental.mcmc.windowed_adaptive_hmc(
+      _, trace = windowed_sampling.windowed_adaptive_hmc(
           1,
           jd_model,
           n_chains=1,
@@ -374,7 +408,7 @@ class WindowedSamplingTest(test_util.TestCase):
       jd_model, true_var = _gen_gaussian_updating_example(
           x_dim, y_dim, stream())
       y_val = jd_model.sample(seed=stream()).y
-      _, trace = tfp.experimental.mcmc.windowed_adaptive_nuts(
+      _, trace = windowed_sampling.windowed_adaptive_nuts(
           1,
           jd_model,
           n_chains=1,
@@ -392,8 +426,8 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertAllClose(true_var, final_scaling, rtol=0.1, atol=1e-3)
 
   def test_f64_step_size(self):
-    dist = tfd.JointDistributionSequential([
-        tfd.Normal(
+    dist = jds.JointDistributionSequential([
+        normal.Normal(
             tf.constant(0., dtype=tf.float64),
             tf.constant(1., dtype=tf.float64))
     ])
@@ -408,38 +442,44 @@ class WindowedSamplingTest(test_util.TestCase):
   def test_batch_of_problems_autobatched(self):
 
     def model_fn():
-      x = yield tfd.MultivariateNormalDiag(
+      x = yield mvn_diag.MultivariateNormalDiag(
           tf.zeros([10, 3]), tf.ones(3), name='x')
-      yield tfd.Multinomial(
-          logits=tfb.Pad([(0, 1)])(x), total_count=10, name='y')
+      yield multinomial.Multinomial(
+          logits=pad.Pad([(0, 1)])(x), total_count=10, name='y')
 
-    model = tfd.JointDistributionCoroutineAutoBatched(model_fn, batch_ndims=1)
+    model = jdab.JointDistributionCoroutineAutoBatched(model_fn, batch_ndims=1)
     samp = model.sample(seed=test_util.test_seed())
     self.assertEqual((10, 3), samp.x.shape)
     self.assertEqual((10, 4), samp.y.shape)
 
-    states, trace = self.evaluate(tfp.experimental.mcmc.windowed_adaptive_hmc(
-        2, model.experimental_pin(y=samp.y), num_leapfrog_steps=3,
-        num_adaptation_steps=100, init_step_size=tf.ones([10, 1]),
-        seed=test_util.test_seed()))
+    states, trace = self.evaluate(
+        windowed_sampling.windowed_adaptive_hmc(
+            2,
+            model.experimental_pin(y=samp.y),
+            num_leapfrog_steps=3,
+            num_adaptation_steps=100,
+            init_step_size=tf.ones([10, 1]),
+            seed=test_util.test_seed()))
     self.assertEqual((2, 64, 10, 3), states.x.shape)
     self.assertEqual((2, 10, 1), trace['step_size'].shape)
 
   def test_batch_of_problems_named(self):
 
     def mk_y(x):
-      return tfd.Multinomial(logits=tfb.Pad([(0, 1)])(x), total_count=10)
+      return multinomial.Multinomial(
+          logits=pad.Pad([(0, 1)])(x), total_count=10)
 
-    model = tfd.JointDistributionNamed(dict(
-        x=tfd.MultivariateNormalDiag(tf.zeros([10, 3]), tf.ones(3)),
-        y=mk_y))
+    model = jdn.JointDistributionNamed(
+        dict(
+            x=mvn_diag.MultivariateNormalDiag(tf.zeros([10, 3]), tf.ones(3)),
+            y=mk_y))
 
     samp = model.sample(seed=test_util.test_seed())
     self.assertEqual((10, 3), samp['x'].shape)
     self.assertEqual((10, 4), samp['y'].shape)
 
     states, trace = self.evaluate(
-        tfp.experimental.mcmc.windowed_adaptive_hmc(
+        windowed_sampling.windowed_adaptive_hmc(
             2,
             model.experimental_pin(y=samp['y']),
             num_leapfrog_steps=3,
@@ -450,7 +490,7 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertEqual((2, 10, 1), trace['step_size'].shape)
 
   def test_bijector(self):
-    dist = tfd.JointDistributionSequential([tfd.Dirichlet(tf.ones(2))])
+    dist = jds.JointDistributionSequential([dirichlet.Dirichlet(tf.ones(2))])
     bij, _ = windowed_sampling._get_flat_unconstraining_bijector(dist)
     draw = dist.sample(seed=test_util.test_seed())
     self.assertAllCloseNested(bij.inverse(bij(draw)), draw)
@@ -461,17 +501,21 @@ class WindowedSamplingTest(test_util.TestCase):
   def test_batches_of_chains(self, kind, n_chains):
 
     def model_fn():
-      x = yield tfd.MultivariateNormalDiag(
+      x = yield mvn_diag.MultivariateNormalDiag(
           tf.zeros(3), tf.ones(3), name='x')
-      yield tfd.Multinomial(
-          logits=tfb.Pad([(0, 1)])(x), total_count=10, name='y')
+      yield multinomial.Multinomial(
+          logits=pad.Pad([(0, 1)])(x), total_count=10, name='y')
 
-    model = tfd.JointDistributionCoroutineAutoBatched(model_fn, batch_ndims=1)
+    model = jdab.JointDistributionCoroutineAutoBatched(model_fn, batch_ndims=1)
     samp = model.sample(seed=test_util.test_seed())
-    states, trace = self.evaluate(tfp.experimental.mcmc.windowed_adaptive_hmc(
-        5, model.experimental_pin(y=samp.y), n_chains=n_chains,
-        num_leapfrog_steps=3, num_adaptation_steps=100,
-        seed=test_util.test_seed()))
+    states, trace = self.evaluate(
+        windowed_sampling.windowed_adaptive_hmc(
+            5,
+            model.experimental_pin(y=samp.y),
+            n_chains=n_chains,
+            num_leapfrog_steps=3,
+            num_adaptation_steps=100,
+            seed=test_util.test_seed()))
     if isinstance(n_chains, int):
       n_chains = [n_chains]
     self.assertEqual((5, *n_chains, 3), states.x.shape)
@@ -484,31 +528,31 @@ class WindowedSamplingTest(test_util.TestCase):
 
     n_features = 5
     n_timepoints = 100
-    features = tfd.Normal(0., 1.).sample([100, n_features],
-                                         test_util.test_seed())
+    features = normal.Normal(0., 1.).sample([100, n_features],
+                                            test_util.test_seed())
     ar_sigma = 1.
     rho = .25
 
-    @tfd.JointDistributionCoroutine
+    @jdc.JointDistributionCoroutine
     def jd_model():
-      beta = yield Root(tfd.Sample(tfd.Normal(0., 1.), n_features))
+      beta = yield Root(sample.Sample(normal.Normal(0., 1.), n_features))
       yhat = tf.einsum('ij,...j->...i', features, beta)
 
       def ar_fun(y):
         loc = tf.concat([tf.zeros_like(y[..., :1]), y[..., :-1]], axis=-1)
-        return tfd.Independent(
-            tfd.Normal(loc=loc * rho, scale=ar_sigma),
+        return independent.Independent(
+            normal.Normal(loc=loc * rho, scale=ar_sigma),
             reinterpreted_batch_ndims=1)
       # Autoregressive distribution defined as below introduce a batch shape:
       # TensorShape(None)
-      yield tfd.Autoregressive(
+      yield autoregressive.Autoregressive(
           distribution_fn=ar_fun,
           sample0=tf.zeros_like(yhat),
           num_steps=yhat.shape[-1],
           name='y')
 
     states, _ = self.evaluate(
-        tfp.experimental.mcmc.windowed_adaptive_nuts(
+        windowed_sampling.windowed_adaptive_nuts(
             2,
             jd_model,
             num_adaptation_steps=25,
@@ -517,15 +561,15 @@ class WindowedSamplingTest(test_util.TestCase):
     self.assertEqual((2, 3, n_timepoints), states.y.shape)
 
   @parameterized.named_parameters(
-      ('_nuts', tfp.experimental.mcmc.windowed_adaptive_nuts, {}),
-      ('_hmc', tfp.experimental.mcmc.windowed_adaptive_hmc, {
+      ('_nuts', windowed_sampling.windowed_adaptive_nuts, {}),
+      ('_hmc', windowed_sampling.windowed_adaptive_hmc, {
           'num_leapfrog_steps': 1
       }),
   )
   def test_f64_state(self, method, method_kwargs):
     states, _ = callable_util.get_output_spec(lambda: method(  # pylint: disable=g-long-lambda
         5,
-        tfd.Normal(tf.constant(0., tf.float64), 1.),
+        normal.Normal(tf.constant(0., tf.float64), 1.),
         n_chains=2,
         num_adaptation_steps=100,
         seed=test_util.test_seed(),
@@ -540,16 +584,18 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
   def test_supply_full_step_size(self):
     stream = test_util.test_seed_stream()
 
-    jd_model = tfd.JointDistributionNamed({
-        'a': tfd.Normal(0., 1.),
-        'b': tfd.MultivariateNormalDiag(
-            loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
+    jd_model = jdn.JointDistributionNamed({
+        'a':
+            normal.Normal(0., 1.),
+        'b':
+            mvn_diag.MultivariateNormalDiag(
+                loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
     })
 
     init_step_size = {'a': tf.reshape(tf.linspace(1., 2., 3), (3, 1)),
                       'b': tf.reshape(tf.linspace(1., 2., 9), (3, 3))}
 
-    _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_hmc(
+    _, actual_step_size = windowed_sampling.windowed_adaptive_hmc(
         1,
         jd_model,
         num_adaptation_steps=25,
@@ -569,14 +615,16 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
   def test_supply_partial_step_size(self):
     stream = test_util.test_seed_stream()
 
-    jd_model = tfd.JointDistributionNamed({
-        'a': tfd.Normal(0., 1.),
-        'b': tfd.MultivariateNormalDiag(
-            loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
+    jd_model = jdn.JointDistributionNamed({
+        'a':
+            normal.Normal(0., 1.),
+        'b':
+            mvn_diag.MultivariateNormalDiag(
+                loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
     })
 
     init_step_size = {'a': 1., 'b': 2.}
-    _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_hmc(
+    _, actual_step_size = windowed_sampling.windowed_adaptive_hmc(
         1,
         jd_model,
         num_adaptation_steps=25,
@@ -595,15 +643,17 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
   def test_supply_single_step_size(self):
     stream = test_util.test_seed_stream()
 
-    jd_model = tfd.JointDistributionNamed({
-        'a': tfd.Normal(0., 1.),
-        'b': tfd.MultivariateNormalDiag(
-            loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
+    jd_model = jdn.JointDistributionNamed({
+        'a':
+            normal.Normal(0., 1.),
+        'b':
+            mvn_diag.MultivariateNormalDiag(
+                loc=tf.zeros(3), scale_diag=tf.constant([1., 2., 3.]))
     })
 
     init_step_size = 1.
     _, traced_step_size = self.evaluate(
-        tfp.experimental.mcmc.windowed_adaptive_hmc(
+        windowed_sampling.windowed_adaptive_hmc(
             1,
             jd_model,
             num_adaptation_steps=25,
@@ -620,10 +670,11 @@ class WindowedSamplingStepSizeTest(test_util.TestCase):
   def test_sequential_step_size(self):
     stream = test_util.test_seed_stream()
 
-    jd_model = tfd.JointDistributionSequential(
-        [tfd.HalfNormal(scale=1., name=f'dist_{idx}') for idx in range(4)])
+    jd_model = jds.JointDistributionSequential([
+        half_normal.HalfNormal(scale=1., name=f'dist_{idx}') for idx in range(4)
+    ])
     init_step_size = [1., 2., 3.]
-    _, actual_step_size = tfp.experimental.mcmc.windowed_adaptive_nuts(
+    _, actual_step_size = windowed_sampling.windowed_adaptive_nuts(
         1,
         jd_model,
         num_adaptation_steps=25,
@@ -648,27 +699,29 @@ def _beta_binomial(trials):
     mean = mean[..., tf.newaxis]
     inverse_concentration = inverse_concentration[..., tf.newaxis]
 
-    beta_binomial = tfd.BetaBinomial(
+    bb = beta_binomial.BetaBinomial(
         total_count=trials,
         concentration0=(1 - mean) / inverse_concentration,
         concentration1=mean / inverse_concentration)
-    return tfd.Independent(beta_binomial, reinterpreted_batch_ndims=2)
+    return independent.Independent(bb, reinterpreted_batch_ndims=2)
 
   return _beta_binomial_distribution
 
 
 def get_joint_distribution(
     trials,
-    mean_prior=lambda: tfd.Uniform(0., 1.),
-    inverse_concentration_prior=lambda: tfd.HalfNormal(5.)):
+    mean_prior=lambda: uniform.Uniform(0., 1.),
+    inverse_concentration_prior=lambda: half_normal.HalfNormal(5.)):
   """Returns a joint distribution over parameters and successes."""
   param_shape = ps.shape(trials)[:1]
-  mean = tfd.Sample(mean_prior(), param_shape)
-  inverse_concentration = tfd.Sample(inverse_concentration_prior(), param_shape)
-  return tfd.JointDistributionNamed(
-      dict(mean=mean,
-           inverse_concentration=inverse_concentration,
-           successes=_beta_binomial(trials)),
+  mean = sample.Sample(mean_prior(), param_shape)
+  inverse_concentration = sample.Sample(inverse_concentration_prior(),
+                                        param_shape)
+  return jdn.JointDistributionNamed(
+      dict(
+          mean=mean,
+          inverse_concentration=inverse_concentration,
+          successes=_beta_binomial(trials)),
       name='jd')
 
 
@@ -680,8 +733,8 @@ class PrecompiledTest(test_util.TestCase):
     days = 3
 
     seed = test_util.test_seed()
-    trial_seed, value_seed = tfp.random.split_seed(seed)
-    self.trials = tfd.Poisson(100.).sample([arms, days], seed=trial_seed)
+    trial_seed, value_seed = samplers.split_seed(seed)
+    self.trials = poisson.Poisson(100.).sample([arms, days], seed=trial_seed)
     dist = get_joint_distribution(self.trials)
     self.true_values = dist.sample(seed=value_seed)
 
@@ -747,8 +800,8 @@ if JAX_MODE:
       days = 3
 
       seed = test_util.test_seed()
-      trial_seed, value_seed = tfp.random.split_seed(seed)
-      self.trials = tfd.Poisson(100.).sample([arms, days], seed=trial_seed)
+      trial_seed, value_seed = samplers.split_seed(seed)
+      self.trials = poisson.Poisson(100.).sample([arms, days], seed=trial_seed)
       dist = get_joint_distribution(self.trials)
       self.true_values = dist.sample(seed=value_seed)
 
@@ -759,11 +812,13 @@ if JAX_MODE:
       return {'num_leapfrog_steps': 3, 'store_parameters_in_results': True}
 
     def test_can_extract_shard_axis_names_from_model(self):
-      joint_dist = distribute.JointDistributionNamed(dict(
-          x=tfd.Normal(0., 1.),
-          y=lambda x: distribute.Sharded(tfd.Normal(x, 1.), self.axis_name),
-          z=lambda y: distribute.Sharded(tfd.Normal(y, 1.), self.axis_name)
-      ))
+      joint_dist = distribute.JointDistributionNamed(
+          dict(
+              x=normal.Normal(0., 1.),
+              y=lambda x: distribute.Sharded(  # pylint:disable=g-long-lambda
+                  normal.Normal(x, 1.), self.axis_name),
+              z=lambda y: distribute.Sharded(  # pylint:disable=g-long-lambda
+                  normal.Normal(y, 1.), self.axis_name)))
 
       def do():
         _, _, _, _, _, shard_axis_names = windowed_sampling._setup_mcmc(
@@ -779,11 +834,13 @@ if JAX_MODE:
     def test_data_sharding(self, kind):
       self.skip_if_no_xla()
 
-      joint_dist = distribute.JointDistributionNamed(dict(
-          x=tfd.Normal(0., 1.),
-          y=lambda x: distribute.Sharded(tfd.Normal(x, 1.), self.axis_name),
-          z=lambda y: distribute.Sharded(tfd.Normal(y, 1.), self.axis_name)
-      ))
+      joint_dist = distribute.JointDistributionNamed(
+          dict(
+              x=normal.Normal(0., 1.),
+              y=lambda x: distribute.Sharded(  # pylint:disable=g-long-lambda
+                  normal.Normal(x, 1.), self.axis_name),
+              z=lambda y: distribute.Sharded(  # pylint:disable=g-long-lambda
+                  normal.Normal(y, 1.), self.axis_name)))
 
       def do(seed, z):
         if kind == 'hmc':
@@ -818,11 +875,11 @@ if JAX_MODE:
     def test_chain_sharding(self, kind):
       self.skip_if_no_xla()
 
-      joint_dist = tfd.JointDistributionNamed(dict(
-          x=tfd.Normal(0., 1.),
-          y=lambda x: tfd.Sample(tfd.Normal(x, 1.), 4),
-          z=lambda y: tfd.Independent(tfd.Normal(y, 1.), 1)
-      ))
+      joint_dist = jdn.JointDistributionNamed(
+          dict(
+              x=normal.Normal(0., 1.),
+              y=lambda x: sample.Sample(normal.Normal(x, 1.), 4),
+              z=lambda y: independent.Independent(normal.Normal(y, 1.), 1)))
 
       def do(seed, z):
         if kind == 'hmc':

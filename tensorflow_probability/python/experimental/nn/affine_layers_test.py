@@ -21,15 +21,15 @@ from absl.testing import parameterized
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.bijectors import softmax_centered
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental import nn as tfn
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
-tfn = tfp.experimental.nn
+from tensorflow_probability.python.util import deferred_tensor
 
 
 class BnnEndToEnd(object):
@@ -54,20 +54,27 @@ class BnnEndToEnd(object):
 
     # 2  Specify Model
 
-    scale = tfp.util.TransformedVariable(1., tfb.Softplus())
-    bnn = tfn.Sequential([
-        tfn.ConvolutionVariationalReparameterization(
-            evidence_shape[-1], 32, filter_shape=7,
-            rank=2, strides=2, padding='same',
-            kernel_initializer=tfn.initializers.he_uniform(),
-            activation_fn=tf.nn.elu),        # [b, 14, 14, 32]
-        tfn.util.flatten_rightmost(ndims=3),  # [b, 14 * 14 * 32]
-        make_affine(
-            14 * 14 * 32, np.prod(target_shape) - 1),          # [b, 9]
-        lambda loc: tfb.SoftmaxCentered()(  # pylint: disable=g-long-lambda
-            tfd.Independent(tfd.Normal(loc, scale),
-                            reinterpreted_batch_ndims=1))  # [b, 10]
-    ], name='bayesian_autoencoder')
+    scale = deferred_tensor.TransformedVariable(1., softplus.Softplus())
+    bnn = tfn.Sequential(
+        [
+            tfn.ConvolutionVariationalReparameterization(
+                evidence_shape[-1],
+                32,
+                filter_shape=7,
+                rank=2,
+                strides=2,
+                padding='same',
+                kernel_initializer=tfn.initializers.he_uniform(),
+                activation_fn=tf.nn.elu),  # [b, 14, 14, 32]
+            tfn.util.flatten_rightmost(ndims=3),  # [b, 14 * 14 * 32]
+            make_affine(14 * 14 * 32,
+                        np.prod(target_shape) - 1),  # [b, 9]
+            lambda loc: softmax_centered.SoftmaxCentered()(  # pylint: disable=g-long-lambda
+                independent.Independent(
+                    normal.Normal(loc, scale), reinterpreted_batch_ndims=1)
+            )  # [b, 10]
+        ],
+        name='bayesian_autoencoder')
 
     self.evaluate([v.initializer for v in bnn.trainable_variables])
 
@@ -100,15 +107,17 @@ class AffineTest(test_util.TestCase):
                                 bias_batch_ndims=0,
                                 dtype=tf.float32):
 
-    kernel_dist = tfd.Independent(
-        tfd.Normal(tf.zeros(kernel_shape, dtype=dtype),
-                   tf.ones(kernel_shape, dtype=dtype)),
-        reinterpreted_batch_ndims=tf.size(kernel_shape)-kernel_batch_ndims)
+    kernel_dist = independent.Independent(
+        normal.Normal(
+            tf.zeros(kernel_shape, dtype=dtype),
+            tf.ones(kernel_shape, dtype=dtype)),
+        reinterpreted_batch_ndims=tf.size(kernel_shape) - kernel_batch_ndims)
 
-    bias_dist = tfd.Independent(
-        tfd.Normal(tf.zeros(bias_shape, dtype=dtype),
-                   tf.ones(bias_shape, dtype=dtype)),
-        reinterpreted_batch_ndims=tf.size(bias_shape)-bias_batch_ndims)
+    bias_dist = independent.Independent(
+        normal.Normal(
+            tf.zeros(bias_shape, dtype=dtype), tf.ones(bias_shape,
+                                                       dtype=dtype)),
+        reinterpreted_batch_ndims=tf.size(bias_shape) - bias_batch_ndims)
 
     wk = kernel_dist.sample(self.num_samples)
     wb = bias_dist.sample(self.num_samples)

@@ -18,13 +18,12 @@ from absl.testing import parameterized
 
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
 from tensorflow_probability.python.bijectors import bijector_test_util
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.experimental.bijectors import highway_flow
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
@@ -41,10 +40,8 @@ class HighwayFlowTests(test_util.TestCase):
                          maxval=1.,
                          seed=test_util.test_seed(sampler_type='stateless'))
 
-    bijector = tfp.experimental.bijectors.build_trainable_highway_flow(
-        width,
-        activation_fn=tf.nn.softplus,
-        seed=test_util.test_seed())
+    bijector = highway_flow.build_trainable_highway_flow(
+        width, activation_fn=tf.nn.softplus, seed=test_util.test_seed())
     self.evaluate([v.initializer for v in bijector.trainable_variables])
     self.assertStartsWith(bijector.name, 'highway_flow')
     self.assertAllClose(x, bijector.inverse(tf.identity(bijector.forward(x))))
@@ -60,7 +57,7 @@ class HighwayFlowTests(test_util.TestCase):
                          maxval=1.,
                          seed=test_util.test_seed(sampler_type='stateless'))
 
-    bijector = tfp.experimental.bijectors.build_trainable_highway_flow(
+    bijector = highway_flow.build_trainable_highway_flow(
         width, activation_fn=False, seed=test_util.test_seed())
     self.evaluate([v.initializer for v in bijector.trainable_variables])
     self.assertStartsWith(bijector.name, 'highway_flow')
@@ -78,7 +75,7 @@ class HighwayFlowTests(test_util.TestCase):
                          seed=test_util.test_seed(sampler_type='stateless'))
 
     # Test with gating half of the inputs
-    bijector = tfp.experimental.bijectors.build_trainable_highway_flow(
+    bijector = highway_flow.build_trainable_highway_flow(
         width,
         activation_fn=tf.nn.softplus,
         gate_first_n=2,
@@ -92,7 +89,7 @@ class HighwayFlowTests(test_util.TestCase):
             tf.identity(bijector.forward(x)), event_ndims=2))
 
     # Test with gating no inputs
-    bijector = tfp.experimental.bijectors.build_trainable_highway_flow(
+    bijector = highway_flow.build_trainable_highway_flow(
         width,
         activation_fn=tf.nn.softplus,
         gate_first_n=0,
@@ -109,12 +106,12 @@ class HighwayFlowTests(test_util.TestCase):
   def testResidualFractionGradientsWithCenteredDifference(self):
     width = 4
     batch_size = 3
-    target = tfd.MultivariateNormalDiag(
+    target = mvn_diag.MultivariateNormalDiag(
         loc=tf.zeros(width), scale_diag=tf.ones(width))
     x = tf.ones((batch_size, width))
 
     def fn(residual_fraction):
-      bijector = tfp.experimental.bijectors.HighwayFlow(
+      bijector = highway_flow.HighwayFlow(
           residual_fraction=residual_fraction,
           activation_fn=tf.nn.softplus,
           bias=tf.zeros(width),
@@ -123,7 +120,7 @@ class HighwayFlowTests(test_util.TestCase):
           gate_first_n=width)
       return tf.reduce_mean(target.log_prob(bijector.forward(x)))
 
-    _, auto_grad = tfp.math.value_and_gradient(fn, 0.5)
+    _, auto_grad = gradient.value_and_gradient(fn, 0.5)
 
     h = 1e-3
     y1 = fn(0.5 + h)
@@ -135,7 +132,7 @@ class HighwayFlowTests(test_util.TestCase):
   @test_util.numpy_disable_gradient_test
   def testTheoreticalFldj(self):
     width = 4
-    bijector = tfp.experimental.bijectors.build_trainable_highway_flow(
+    bijector = highway_flow.build_trainable_highway_flow(
         width,
         activation_fn=tf.nn.softplus,
         gate_first_n=2,
@@ -172,9 +169,9 @@ class HighwayFlowTests(test_util.TestCase):
                          seed=test_util.test_seed(sampler_type='stateless'))
 
     seed = test_util.test_seed(sampler_type='stateless')
-    bijector1 = tfp.experimental.bijectors.build_trainable_highway_flow(
+    bijector1 = highway_flow.build_trainable_highway_flow(
         width, activation_fn=tf.nn.softplus, seed=seed)
-    bijector2 = tfp.experimental.bijectors.build_trainable_highway_flow(
+    bijector2 = highway_flow.build_trainable_highway_flow(
         width, activation_fn=tf.nn.softplus, seed=seed)
     self.evaluate([v.initializer for v in bijector1.trainable_variables])
     self.evaluate([v.initializer for v in bijector2.trainable_variables])

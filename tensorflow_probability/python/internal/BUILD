@@ -594,6 +594,7 @@ multi_substrate_py_library(
     srcs = ["trainable_state_util.py"],
     deps = [
         ":samplers",
+        ":structural_tuple",
         # tensorflow dep,
     ],
 )

@@ -22,17 +22,29 @@ from absl.testing import parameterized
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import beta
+from tensorflow_probability.python.distributions import categorical
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import mixture
+from tensorflow_probability.python.distributions import mixture_same_family
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.distributions.internal import statistical_testing as st
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import compute_hmc_step_size
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import gen_make_transform_hmc_kernel_fn
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import make_rwmh_kernel_fn
+from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import sample_sequential_monte_carlo
 from tensorflow_probability.python.experimental.mcmc.sample_sequential_monte_carlo import simple_heuristic_tuning
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.mcmc import nuts
 
 
 def make_test_nuts_kernel_fn(target_log_prob_fn,
@@ -46,7 +58,7 @@ def make_test_nuts_kernel_fn(target_log_prob_fn,
       for x in init_state
   ]
   step_size = compute_hmc_step_size(scalings, state_std, max_tree_depth**2)
-  return tfp.mcmc.NoUTurnSampler(
+  return nuts.NoUTurnSampler(
       target_log_prob_fn=target_log_prob_fn,
       step_size=step_size,
       max_tree_depth=max_tree_depth)
@@ -58,9 +70,9 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
   def testCorrectStepSizeTransformedkernel(self):
     strm = test_util.test_seed_stream()
     scalings = .1
-    bijector = tfb.Sigmoid()
-    prior = tfd.Beta(.1, .1)
-    likelihood = tfd.Beta(5., 5.)
+    bijector = sigmoid.Sigmoid()
+    prior = beta.Beta(.1, .1)
+    likelihood = beta.Beta(5., 5.)
     init_state = [tf.clip_by_value(prior.sample(10000, seed=strm()),
                                    1e-5, 1.-1e-5)]
     make_transform_kernel_fn = gen_make_transform_hmc_kernel_fn(
@@ -93,28 +105,25 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
     mu = np.ones(nd) * .5
     component_loc = tf.cast(np.asarray([mu, -mu]), tf.float64)
 
-    proposal = tfd.Sample(tfd.Normal(tf.constant(0., tf.float64), 10.),
-                          sample_shape=nd)
+    proposal = sample.Sample(
+        normal.Normal(tf.constant(0., tf.float64), 10.), sample_shape=nd)
     init_state = proposal.sample(5000, seed=seed)
 
-    likelihood_dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(probs=mixture_weight),
-        components_distribution=tfd.MultivariateNormalDiag(
-            loc=component_loc,
-            scale_identity_multiplier=[.1, .2]))
+    likelihood_dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(probs=mixture_weight),
+        components_distribution=mvn_diag.MultivariateNormalDiag(
+            loc=component_loc, scale_identity_multiplier=[.1, .2]))
 
     # Uniform prior
     init_log_prob = tf.zeros_like(proposal.log_prob(init_state))
 
-    [
-        n_stage, final_state, _
-    ] = tfp.experimental.mcmc.sample_sequential_monte_carlo(
+    [n_stage, final_state, _] = sample_sequential_monte_carlo(
         lambda x: init_log_prob,
         likelihood_dist.log_prob,
         init_state,
         make_kernel_fn=make_kernel_fn,
-        tuning_fn=functools.partial(simple_heuristic_tuning,
-                                    optimal_accept=optimal_accept),
+        tuning_fn=functools.partial(
+            simple_heuristic_tuning, optimal_accept=optimal_accept),
         max_num_steps=50,
         seed=seed)
 
@@ -135,15 +144,13 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
     loc = tf.cast(np.asarray([mu, -mu]), tf.float64)
     component_loc = tf.repeat(loc[tf.newaxis, ...], n_batch, axis=0)
 
-    likelihood_dist = tfd.MixtureSameFamily(
-        mixture_distribution=tfd.Categorical(
-            probs=mixture_weight),
-        components_distribution=tfd.MultivariateNormalDiag(
-            loc=component_loc,
-            scale_identity_multiplier=[.1, .2]))
+    likelihood_dist = mixture_same_family.MixtureSameFamily(
+        mixture_distribution=categorical.Categorical(probs=mixture_weight),
+        components_distribution=mvn_diag.MultivariateNormalDiag(
+            loc=component_loc, scale_identity_multiplier=[.1, .2]))
 
-    proposal = tfd.Sample(tfd.Normal(tf.constant(0., tf.float64), 10.),
-                          sample_shape=nd)
+    proposal = sample.Sample(
+        normal.Normal(tf.constant(0., tf.float64), 10.), sample_shape=nd)
     init_state = proposal.sample([5000, n_batch], seed=seed)
     log_prob_fn = likelihood_dist.log_prob
     print(log_prob_fn(init_state).shape)
@@ -151,15 +158,13 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
     # Uniform prior
     init_log_prob = tf.zeros_like(log_prob_fn(init_state))
 
-    [
-        n_stage, final_state, _
-    ] = tfp.experimental.mcmc.sample_sequential_monte_carlo(
+    [n_stage, final_state, _] = sample_sequential_monte_carlo(
         lambda x: init_log_prob,
         log_prob_fn,
         init_state,
         make_kernel_fn=make_test_nuts_kernel_fn,
-        tuning_fn=functools.partial(simple_heuristic_tuning,
-                                    optimal_accept=0.8),
+        tuning_fn=functools.partial(
+            simple_heuristic_tuning, optimal_accept=0.8),
         max_num_steps=50,
         seed=seed)
 
@@ -198,37 +203,38 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
     hyper_mean = tf.cast(0, dtype)
     hyper_scale = tf.cast(2.5, dtype)
     # Generate model prior_log_prob_fn and likelihood_log_prob_fn.
-    prior_jd = tfd.JointDistributionSequential([
-        tfd.Normal(loc=hyper_mean, scale=hyper_scale),
-        tfd.Normal(loc=hyper_mean, scale=hyper_scale),
-        tfd.Normal(loc=hyper_mean, scale=hyper_scale),
-        tfd.HalfNormal(scale=tf.cast(.5, dtype)),
-        tfd.Uniform(low=tf.cast(0, dtype), high=.5),
-    ], validate_args=True)
+    prior_jd = jds.JointDistributionSequential([
+        normal.Normal(loc=hyper_mean, scale=hyper_scale),
+        normal.Normal(loc=hyper_mean, scale=hyper_scale),
+        normal.Normal(loc=hyper_mean, scale=hyper_scale),
+        half_normal.HalfNormal(scale=tf.cast(.5, dtype)),
+        uniform.Uniform(low=tf.cast(0, dtype), high=.5),
+    ],
+                                               validate_args=True)
 
     def likelihood_log_prob_fn(b0, b1, mu_out, sigma_out, weight):
-      return tfd.Independent(
-          tfd.Mixture(
-              tfd.Categorical(
+      return independent.Independent(
+          mixture.Mixture(
+              categorical.Categorical(
                   probs=tf.stack([
                       tf.repeat(1 - weight[..., tf.newaxis], 20, axis=-1),
                       tf.repeat(weight[..., tf.newaxis], 20, axis=-1)
                   ], -1)), [
-                      tfd.Normal(
+                      normal.Normal(
                           loc=b0[..., tf.newaxis] +
                           b1[..., tf.newaxis] * predictors,
                           scale=y_sigma),
-                      tfd.Normal(
+                      normal.Normal(
                           loc=mu_out[..., tf.newaxis],
                           scale=y_sigma + sigma_out[..., tf.newaxis])
                   ]), 1).log_prob(obs)
 
     unconstraining_bijectors = [
-        tfb.Identity(),
-        tfb.Identity(),
-        tfb.Identity(),
-        tfb.Softplus(),
-        tfb.Sigmoid(tf.constant(0., dtype), .5),
+        identity.Identity(),
+        identity.Identity(),
+        identity.Identity(),
+        softplus.Softplus(),
+        sigmoid.Sigmoid(tf.constant(0., dtype), .5),
     ]
     make_transform_hmc_kernel_fn = gen_make_transform_hmc_kernel_fn(
         unconstraining_bijectors, num_leapfrog_steps=5)
@@ -238,13 +244,13 @@ class SampleSequentialMonteCarloTest(test_util.TestCase):
       # Ensure we're really in graph mode.
       assert hasattr(tf.constant([]), 'graph')
 
-      return tfp.experimental.mcmc.sample_sequential_monte_carlo(
+      return sample_sequential_monte_carlo(
           prior_jd.log_prob,
           likelihood_log_prob_fn,
           prior_jd.sample([1000, 5], seed=seed),
           make_kernel_fn=make_transform_hmc_kernel_fn,
-          tuning_fn=functools.partial(simple_heuristic_tuning,
-                                      optimal_accept=.6),
+          tuning_fn=functools.partial(
+              simple_heuristic_tuning, optimal_accept=.6),
           min_num_steps=5,
           seed=seed)
 

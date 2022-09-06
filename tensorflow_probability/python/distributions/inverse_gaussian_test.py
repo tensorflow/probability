@@ -17,9 +17,9 @@ from scipy import misc as sp_misc
 from scipy import stats
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math as tfm
 from tensorflow_probability.python.distributions import inverse_gaussian
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import gradient
 
 
 def _scipy_invgauss(loc, concentration):
@@ -373,7 +373,7 @@ class _InverseGaussianTest(object):
   def testInverseGaussianFullyReparameterized(self):
     concentration = tf.constant(4.0)
     loc = tf.constant(3.0)
-    _, [grad_concentration, grad_loc] = tfm.value_and_gradient(
+    _, [grad_concentration, grad_loc] = gradient.value_and_gradient(
         lambda a, b: inverse_gaussian.InverseGaussian(a, b, validate_args=True).  # pylint: disable=g-long-lambda
         sample(100, seed=test_util.test_seed()),
         [concentration, loc])
@@ -393,7 +393,7 @@ class _InverseGaussianTest(object):
           2, seed=test_util.test_seed())
 
     samples, [loc_grad, concentration_grad] = self.evaluate(
-        tfm.value_and_gradient(gen_samples, [loc, concentration]))
+        gradient.value_and_gradient(gen_samples, [loc, concentration]))
     self.assertEqual(samples.shape, (2, 4, 3))
     self.assertEqual(concentration_grad.shape, concentration.shape)
     self.assertEqual(loc_grad.shape, loc.shape)

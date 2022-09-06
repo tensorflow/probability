@@ -74,7 +74,7 @@ from tensorflow_probability.python.distributions import mvn_diag
 from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import normal
 from tensorflow_probability.python.distributions import normal_conjugate_posteriors
-from tensorflow_probability.python.experimental import distributions as tfde
+from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvnpflo
 from tensorflow_probability.python.experimental.sts_gibbs import dynamic_spike_and_slab
 from tensorflow_probability.python.experimental.sts_gibbs import spike_and_slab
 from tensorflow_probability.python.internal import distribution_util as dist_util
@@ -181,7 +181,7 @@ def _tile_normal_to_mvn_diag(normal_dist, dim):
 def _is_multivariate_normal(dist):
   return (
       isinstance(dist, mvn_linear_operator.MultivariateNormalLinearOperator) or
-      isinstance(dist, tfde.MultivariateNormalPrecisionFactorLinearOperator))
+      isinstance(dist, mvnpflo.MultivariateNormalPrecisionFactorLinearOperator))
 
 
 def build_model_for_gibbs_fitting(observed_time_series,

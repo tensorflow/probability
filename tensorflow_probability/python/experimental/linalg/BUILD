@@ -15,13 +15,13 @@
 # Description:
 #   Experimental linear algebra tools.
 
-licenses(["notice"])
-
 load(
     "//tensorflow_probability/python:build_defs.bzl",
     "multi_substrate_py_library",
     "multi_substrate_py_test",
 )
+
+licenses(["notice"])
 
 package(
     default_visibility = [
@@ -70,10 +70,12 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     shard_count = 8,
     deps = [
+        ":linear_operator_interpolated_psd_kernel",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:matern",
+        "//tensorflow_probability/python/math/psd_kernels:polynomial",
         # tensorflow/compiler/jit dep,
     ],
 )
@@ -97,8 +99,10 @@ py_test(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/linalg:linear_operator_psd_kernel",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
+        "//tensorflow_probability/python/math/psd_kernels:polynomial",
         # tensorflow/compiler/jit dep,
     ],
 )
@@ -120,9 +124,9 @@ multi_substrate_py_test(
     size = "small",
     srcs = ["linear_operator_unitary_test.py"],
     deps = [
+        ":linear_operator_unitary",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

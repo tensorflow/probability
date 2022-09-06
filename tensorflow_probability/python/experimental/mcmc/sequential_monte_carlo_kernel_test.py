@@ -18,14 +18,14 @@ import functools
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
-from tensorflow_probability.python.experimental.mcmc import SequentialMonteCarlo
-from tensorflow_probability.python.experimental.mcmc import WeightedParticles
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental.mcmc import sequential_monte_carlo_kernel
+from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import SequentialMonteCarlo
+from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import weighted_resampling
+from tensorflow_probability.python.experimental.mcmc.sequential_monte_carlo_kernel import WeightedParticles
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 # TODO(davmre): add additional unit tests specific to the SMC kernel.
@@ -37,12 +37,12 @@ class _SequentialMonteCarloTest(test_util.TestCase):
   def test_steps_are_reproducible(self):
 
     def propose_and_update_log_weights_fn(_, weighted_particles, seed=None):
-      proposed_particles = tfd.Normal(
+      proposed_particles = normal.Normal(
           loc=weighted_particles.particles, scale=1.).sample(seed=seed)
       return WeightedParticles(
           particles=proposed_particles,
-          log_weights=weighted_particles.log_weights + tfd.Normal(
-              loc=-2.6, scale=0.1).log_prob(proposed_particles))
+          log_weights=weighted_particles.log_weights +
+          normal.Normal(loc=-2.6, scale=0.1).log_prob(proposed_particles))
 
     num_particles = 16
     initial_state = self.evaluate(
@@ -57,8 +57,8 @@ class _SequentialMonteCarloTest(test_util.TestCase):
         test_util.test_seed(sampler_type='stateless'), n=2)
     kernel = SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
-        resample_fn=tfp.experimental.mcmc.resample_systematic,
-        resample_criterion_fn=tfp.experimental.mcmc.ess_below_threshold)
+        resample_fn=weighted_resampling.resample_systematic,
+        resample_criterion_fn=sequential_monte_carlo_kernel.ess_below_threshold)
     state, results = kernel.one_step(
         state=initial_state,
         kernel_results=kernel.bootstrap_results(initial_state),
@@ -72,8 +72,8 @@ class _SequentialMonteCarloTest(test_util.TestCase):
     # Re-initialize and run the same steps with the same seed.
     kernel2 = SequentialMonteCarlo(
         propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
-        resample_fn=tfp.experimental.mcmc.resample_systematic,
-        resample_criterion_fn=tfp.experimental.mcmc.ess_below_threshold)
+        resample_fn=weighted_resampling.resample_systematic,
+        resample_criterion_fn=sequential_monte_carlo_kernel.ess_below_threshold)
     state2, results2 = kernel2.one_step(
         state=initial_state,
         kernel_results=kernel2.bootstrap_results(initial_state),
@@ -109,9 +109,9 @@ class _SequentialMonteCarloTest(test_util.TestCase):
                                           weighted_particles,
                                           transition_scale,
                                           seed=None):
-      proposal_dist = tfd.Normal(loc=weighted_particles.particles, scale=1.)
-      transition_dist = tfd.Normal(loc=weighted_particles.particles,
-                                   scale=transition_scale)
+      proposal_dist = normal.Normal(loc=weighted_particles.particles, scale=1.)
+      transition_dist = normal.Normal(
+          loc=weighted_particles.particles, scale=transition_scale)
       proposed_particles = proposal_dist.sample(seed=seed)
       return WeightedParticles(
           particles=proposed_particles,
@@ -132,7 +132,7 @@ class _SequentialMonteCarloTest(test_util.TestCase):
                                        seed=seeds[2])
       return results.accumulated_log_marginal_likelihood
 
-    _, grad_lp = tfp.math.value_and_gradient(marginal_logprob, 1.5)
+    _, grad_lp = gradient.value_and_gradient(marginal_logprob, 1.5)
     self.assertIsNotNone(grad_lp)
     self.assertNotAllZero(grad_lp)
 

@@ -18,12 +18,12 @@ import warnings
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import random
 from tensorflow_probability.python.experimental.mcmc import sample
 from tensorflow_probability.python.experimental.mcmc import sample_discarding_kernel
 from tensorflow_probability.python.experimental.mcmc import step
 from tensorflow_probability.python.experimental.mcmc import thinning_kernel
 from tensorflow_probability.python.experimental.mcmc import with_reductions
+from tensorflow_probability.python.internal import samplers
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
 
 
@@ -260,7 +260,7 @@ def sample_chain_with_burnin(
     if trace_fn is None:
       trace_fn = lambda *args: ()
 
-    burnin_seed, sampling_seed = random.split_seed(seed, n=2)
+    burnin_seed, sampling_seed = samplers.split_seed(seed, n=2)
 
     # Burn-in run
     chain_state, kr = step.step_kernel(

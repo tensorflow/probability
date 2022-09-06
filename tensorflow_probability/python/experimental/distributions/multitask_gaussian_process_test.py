@@ -24,18 +24,18 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-from tensorflow_probability.python import experimental as tfe
+from tensorflow_probability.python.distributions import gaussian_process
+from tensorflow_probability.python.experimental.distributions import multitask_gaussian_process
+from tensorflow_probability.python.experimental.distributions import multitask_gaussian_process_regression_model as mtgprm
+from tensorflow_probability.python.experimental.psd_kernels import multitask_kernel
 from tensorflow_probability.python.internal import dtype_util
 from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
-tfk = tfp.math.psd_kernels
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 
 
-class InefficientSeparable(tfe.psd_kernels.MultiTaskKernel):
+class InefficientSeparable(multitask_kernel.MultiTaskKernel):
   """A version of the Separable kernel that's inefficient."""
 
   def __init__(self,
@@ -102,10 +102,11 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         [1e-5, 1e-6, 1e-5], np.float32).reshape([1, 1, 3, 1])
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
-    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
-    multi_task_kernel = tfe.psd_kernels.Independent(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+    multi_task_kernel = multitask_kernel.Independent(
         num_tasks=3, base_kernel=kernel)
-    gp = tfe.distributions.MultiTaskGaussianProcess(
+    gp = multitask_gaussian_process.MultiTaskGaussianProcess(
         multi_task_kernel,
         batched_index_points,
         observation_noise_variance=observation_noise_variance,
@@ -133,18 +134,19 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
   def testBindingIndexPoints(self):
     amplitude = np.float64(0.5)
     length_scale = np.float64(2.)
-    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
     num_tasks = 3
-    multi_task_kernel = tfe.psd_kernels.Independent(
+    multi_task_kernel = multitask_kernel.Independent(
         num_tasks=num_tasks, base_kernel=kernel)
     mean_fn = lambda x: tf.stack([x[..., 0]] * num_tasks, axis=-1)
     observation_noise_variance = np.float64(1e-3)
-    mtgp = tfe.distributions.MultiTaskGaussianProcess(
+    mtgp = multitask_gaussian_process.MultiTaskGaussianProcess(
         kernel=multi_task_kernel,
         mean_fn=mean_fn,
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel=kernel,
         mean_fn=lambda x: x[..., 0],
         observation_noise_variance=observation_noise_variance,
@@ -189,13 +191,14 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         [1e-5, 1e-6, 1e-5], np.float32).reshape([1, 1, 3, 1])
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
-    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
-    multi_task_kernel = tfe.psd_kernels.Independent(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+    multi_task_kernel = multitask_kernel.Independent(
         num_tasks=3, base_kernel=kernel)
 
     mean_fn = lambda x: np.float32(0.)
 
-    gp = tfe.distributions.MultiTaskGaussianProcess(
+    gp = multitask_gaussian_process.MultiTaskGaussianProcess(
         multi_task_kernel,
         batched_index_points,
         mean_fn=mean_fn,
@@ -211,7 +214,7 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
 
     mean_fn = lambda x: tf.zeros([3], dtype=tf.float32)
 
-    gp = tfe.distributions.MultiTaskGaussianProcess(
+    gp = multitask_gaussian_process.MultiTaskGaussianProcess(
         multi_task_kernel,
         batched_index_points,
         mean_fn=mean_fn,
@@ -238,15 +241,16 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     observation_noise_variance = None
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
-    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
-    multi_task_kernel = tfe.psd_kernels.Independent(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+    multi_task_kernel = multitask_kernel.Independent(
         num_tasks=3, base_kernel=kernel)
-    multitask_gp = tfe.distributions.MultiTaskGaussianProcess(
+    multitask_gp = multitask_gaussian_process.MultiTaskGaussianProcess(
         multi_task_kernel,
         batched_index_points,
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel,
         batched_index_points,
         observation_noise_variance=0.,
@@ -275,10 +279,11 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     observation_noise_variance = np.float32(1e-5)
     batched_index_points = np.stack([index_points]*4)
     # ==> shape = [4, 9, 2]
-    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
-    multi_task_kernel = tfe.psd_kernels.Independent(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+    multi_task_kernel = multitask_kernel.Independent(
         num_tasks=3, base_kernel=kernel)
-    multitask_gp = tfe.distributions.MultiTaskGaussianProcess(
+    multitask_gp = multitask_gaussian_process.MultiTaskGaussianProcess(
         multi_task_kernel,
         batched_index_points,
         observation_noise_variance=observation_noise_variance,
@@ -297,7 +302,7 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     self.assertAllEqual(log_prob(observations).shape, [2, 4])
     self.assertAllEqual(sample().shape, [2, 4, 9, 3])
 
-    multitask_gp = tfe.distributions.MultiTaskGaussianProcess(
+    multitask_gp = multitask_gaussian_process.MultiTaskGaussianProcess(
         multi_task_kernel,
         batched_index_points,
         observation_noise_variance=None,
@@ -331,7 +336,8 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         [1e-3, 1e-2, 1e-1], np.float64).reshape([1, 1, 3, 1])
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
-    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
     # Ensure Symmetric + Strictly Diagonally Dominant -> Positive Definite.
     task_kernel_matrix = np.array([[6., 2., 3.],
                                    [2., 7., 4.],
@@ -339,10 +345,11 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
                                   dtype=np.float64)
     task_kernel_matrix_linop = tf.linalg.LinearOperatorFullMatrix(
         task_kernel_matrix)
-    multi_task_kernel = tfe.psd_kernels.Separable(
-        num_tasks=3, task_kernel_matrix_linop=task_kernel_matrix_linop,
+    multi_task_kernel = multitask_kernel.Separable(
+        num_tasks=3,
+        task_kernel_matrix_linop=task_kernel_matrix_linop,
         base_kernel=kernel)
-    multitask_gp = tfe.distributions.MultiTaskGaussianProcess(
+    multitask_gp = multitask_gaussian_process.MultiTaskGaussianProcess(
         multi_task_kernel,
         batched_index_points,
         observation_noise_variance=observation_noise_variance,
@@ -350,7 +357,7 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     naive_multi_task_kernel = InefficientSeparable(
         num_tasks=3, task_kernel_matrix_linop=task_kernel_matrix_linop,
         base_kernel=kernel)
-    actual_multitask_gp = tfe.distributions.MultiTaskGaussianProcess(
+    actual_multitask_gp = multitask_gaussian_process.MultiTaskGaussianProcess(
         naive_multi_task_kernel,
         batched_index_points,
         observation_noise_variance=observation_noise_variance,
@@ -391,15 +398,16 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
         [1e-5, 1e-6, 1e-5], np.float32).reshape([1, 1, 3, 1])
     batched_index_points = np.stack([index_points]*6)
     # ==> shape = [6, 25, 2]
-    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
-    multi_task_kernel = tfe.psd_kernels.Independent(
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
+    multi_task_kernel = multitask_kernel.Independent(
         num_tasks=3, base_kernel=kernel)
-    multitask_gp = tfe.distributions.MultiTaskGaussianProcess(
+    multitask_gp = multitask_gaussian_process.MultiTaskGaussianProcess(
         multi_task_kernel,
         batched_index_points,
         observation_noise_variance=observation_noise_variance,
         validate_args=True)
-    gp = tfd.GaussianProcess(
+    gp = gaussian_process.GaussianProcess(
         kernel,
         batched_index_points,
         observation_noise_variance=observation_noise_variance,
@@ -416,7 +424,8 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     amplitude = np.float64(.5)
     length_scale = np.float64(2.)
     observation_noise_variance = np.float64(3e-3)
-    kernel = tfk.ExponentiatedQuadratic(amplitude, length_scale)
+    kernel = exponentiated_quadratic.ExponentiatedQuadratic(
+        amplitude, length_scale)
     # Ensure Symmetric + Strictly Diagonally Dominant -> Positive Definite.
     task_kernel_matrix = np.array([[6., 2., 3.],
                                    [2., 7., 4.],
@@ -424,13 +433,14 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
                                   dtype=np.float64)
     task_kernel_matrix_linop = tf.linalg.LinearOperatorFullMatrix(
         task_kernel_matrix)
-    multi_task_kernel = tfe.psd_kernels.Separable(
-        num_tasks=3, task_kernel_matrix_linop=task_kernel_matrix_linop,
+    multi_task_kernel = multitask_kernel.Separable(
+        num_tasks=3,
+        task_kernel_matrix_linop=task_kernel_matrix_linop,
         base_kernel=kernel)
 
     index_points = np.random.uniform(-1., 1., 10)[..., np.newaxis]
 
-    mtgp = tfe.distributions.MultiTaskGaussianProcess(
+    mtgp = multitask_gaussian_process.MultiTaskGaussianProcess(
         multi_task_kernel,
         index_points,
         observation_noise_variance=observation_noise_variance,
@@ -439,7 +449,7 @@ class MultiTaskGaussianProcessTest(test_util.TestCase):
     predictive_index_points = np.random.uniform(1., 2., 10)[..., np.newaxis]
     observations = np.linspace(1., 10., 30).reshape(10, 3)
 
-    expected_mtgprm = tfe.distributions.MultiTaskGaussianProcessRegressionModel(
+    expected_mtgprm = mtgprm.MultiTaskGaussianProcessRegressionModel(
         kernel=multi_task_kernel,
         observation_index_points=index_points,
         observations=observations,

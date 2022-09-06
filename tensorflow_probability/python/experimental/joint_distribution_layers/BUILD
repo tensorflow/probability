@@ -56,12 +56,20 @@ multi_substrate_py_test(
     size = "medium",
     srcs = ["layers_test.py"],
     deps = [
+        ":layers",
         # absl/testing:parameterized dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:bijector",
+        "//tensorflow_probability/python/bijectors:real_nvp",
+        "//tensorflow_probability/python/bijectors:scale",
+        "//tensorflow_probability/python/bijectors:shift",
+        "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
+        "//tensorflow_probability/python/distributions:lognormal",
         "//tensorflow_probability/python/internal:custom_gradient",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 

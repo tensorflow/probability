@@ -16,11 +16,10 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental.mcmc import elliptical_slice_sampler
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
+from tensorflow_probability.python.mcmc import sample
 
 
 def normal_normal_posterior(
@@ -79,36 +78,34 @@ def normal_normal_posterior(
 class _EllipticalSliceSamplerTest(test_util.TestCase):
 
   def testSampleChainSeedReproducible(self):
-    normal_prior = tfd.Normal(5 * [[0., 0.]], 1.)
+    normal_prior = normal.Normal(5 * [[0., 0.]], 1.)
 
     def normal_sampler(seed):
       return normal_prior.sample(seed=seed)
 
     def normal_log_likelihood(state):
-      return tf.math.reduce_sum(
-          tfd.Normal(state, 2.).log_prob(0.),
-          axis=-1)
+      return tf.math.reduce_sum(normal.Normal(state, 2.).log_prob(0.), axis=-1)
 
     num_results = 10
     seed = test_util.test_seed()
 
     current_state = np.float32(np.random.rand(5, 2))
-    samples0 = tf.function(lambda: tfp.mcmc.sample_chain(  # pylint: disable=g-long-lambda
+    samples0 = tf.function(lambda: sample.sample_chain(  # pylint: disable=g-long-lambda
         num_results=2 * num_results,
         num_steps_between_results=0,
         current_state=current_state,
-        kernel=tfp.experimental.mcmc.EllipticalSliceSampler(
+        kernel=elliptical_slice_sampler.EllipticalSliceSampler(
             normal_sampler_fn=normal_sampler,
             log_likelihood_fn=normal_log_likelihood),
         num_burnin_steps=150,
         trace_fn=None,
         seed=seed))()
 
-    samples1 = tf.function(lambda: tfp.mcmc.sample_chain(  # pylint: disable=g-long-lambda
+    samples1 = tf.function(lambda: sample.sample_chain(  # pylint: disable=g-long-lambda
         num_results=num_results,
         num_steps_between_results=1,
         current_state=current_state,
-        kernel=tfp.experimental.mcmc.EllipticalSliceSampler(
+        kernel=elliptical_slice_sampler.EllipticalSliceSampler(
             normal_sampler_fn=normal_sampler,
             log_likelihood_fn=normal_log_likelihood),
         trace_fn=None,
@@ -131,7 +128,7 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
     data = self.dtype(np.random.randn(10, 2, 3))
 
     # Standard normal prior.
-    normal_prior = tfd.Normal(self.dtype(0.), prior_stddev)
+    normal_prior = normal.Normal(self.dtype(0.), prior_stddev)
 
     def normal_sampler(seed):
       return normal_prior.sample(seed=seed)
@@ -139,16 +136,16 @@ class _EllipticalSliceSamplerTest(test_util.TestCase):
     # 10 samples at 2 chains.
     def normal_log_likelihood(state):
       return tf.math.reduce_sum(
-          tfd.Normal(state, likelihood_stddev).log_prob(data),
+          normal.Normal(state, likelihood_stddev).log_prob(data),
           axis=[0, -1],
       )
 
-    kernel = tfp.experimental.mcmc.EllipticalSliceSampler(
+    kernel = elliptical_slice_sampler.EllipticalSliceSampler(
         normal_sampler_fn=normal_sampler,
         log_likelihood_fn=normal_log_likelihood,
     )
 
-    samples = tf.function(tfp.mcmc.sample_chain)(
+    samples = tf.function(sample.sample_chain)(
         num_results=int(3e4),
         current_state=self.dtype(np.random.randn(2, 3)),
         kernel=kernel,

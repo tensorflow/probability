@@ -19,9 +19,18 @@ from absl.testing import parameterized
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.experimental.mcmc import covariance_reducer
+from tensorflow_probability.python.experimental.mcmc import step
+from tensorflow_probability.python.experimental.mcmc import with_reductions
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import sample
+from tensorflow_probability.python.mcmc import simple_step_size_adaptation as sssa
+from tensorflow_probability.python.mcmc import transformed_kernel
 
 
 @test_util.test_all_tf_execution_regimes
@@ -30,7 +39,7 @@ class WithReductionsTest(test_util.TestCase):
   def test_simple_operation(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.TestReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=fake_reducer,
     )
@@ -46,7 +55,7 @@ class WithReductionsTest(test_util.TestCase):
   def test_boostrap_results(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.TestReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=fake_reducer,
     )
@@ -60,11 +69,11 @@ class WithReductionsTest(test_util.TestCase):
     fake_uncalibrated_kernel = test_fixtures.TestTransitionKernel(
         is_calibrated=False)
     fake_reducer = test_fixtures.TestReducer()
-    calibrated_reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    calibrated_reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_calibrated_kernel,
         reducer=fake_reducer,
     )
-    uncalibrated_reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    uncalibrated_reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_uncalibrated_kernel,
         reducer=fake_reducer,
     )
@@ -74,7 +83,7 @@ class WithReductionsTest(test_util.TestCase):
   def test_tf_while(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.TestReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=fake_reducer,
     )
@@ -106,7 +115,7 @@ class WithReductionsTest(test_util.TestCase):
         [test_fixtures.TestReducer(), test_fixtures.TestReducer()],
         [test_fixtures.TestReducer()]
     ]
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=nested_reducer,
     )
@@ -136,7 +145,7 @@ class WithReductionsTest(test_util.TestCase):
         [test_fixtures.NaiveMeanReducer(), test_fixtures.NaiveMeanReducer()],
         [test_fixtures.NaiveMeanReducer()]
     ]
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=nested_reducer,
     )
@@ -170,8 +179,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
   @parameterized.parameters(0, 1)
   def test_covariance_reducer(self, ddof):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(ddof=ddof)
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    cov_reducer = covariance_reducer.CovarianceReducer(ddof=ddof)
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=cov_reducer,
     )
@@ -194,8 +203,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
 
   def test_covariance_with_batching(self):
     fake_kernel = test_fixtures.TestTransitionKernel((9, 3))
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer(event_ndims=1)
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    cov_reducer = covariance_reducer.CovarianceReducer(event_ndims=1)
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=cov_reducer,
     )
@@ -212,8 +221,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
   @parameterized.parameters(0, 1)
   def test_variance_reducer(self, ddof):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    reducer = tfp.experimental.mcmc.VarianceReducer(ddof=ddof)
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    reducer = covariance_reducer.VarianceReducer(ddof=ddof)
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=reducer,
     )
@@ -240,27 +249,24 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     cov = [[0.36, 0.12, 0.06],
            [0.12, 0.29, -0.13],
            [0.06, -0.13, 0.26]]
-    target = tfp.distributions.MultivariateNormalTriL(
-        loc=mu, scale_tril=tf.linalg.cholesky(cov)
-    )
-    fake_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    target = mvn_tril.MultivariateNormalTriL(
+        loc=mu, scale_tril=tf.linalg.cholesky(cov))
+    fake_kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target.log_prob,
-        step_size=1/3,
-        num_leapfrog_steps=27
-    )
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+        step_size=1 / 3,
+        num_leapfrog_steps=27)
+    cov_reducer = covariance_reducer.CovarianceReducer()
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=cov_reducer,
     )
-    samples, _, kernel_results = tfp.mcmc.sample_chain(
+    samples, _, kernel_results = sample.sample_chain(
         num_results=20,
         current_state=tf.convert_to_tensor([1., 2., 3.]),
         kernel=reducer_kernel,
         trace_fn=None,
         return_final_kernel_results=True,
-        seed=test_util.test_seed(sampler_type='stateless')
-    )
+        seed=test_util.test_seed(sampler_type='stateless'))
     samples, mean, final_cov = self.evaluate([
         samples,
         kernel_results.reduction_results.cov_state.mean,
@@ -271,12 +277,12 @@ class CovarianceWithReductionsTest(test_util.TestCase):
 
   def test_covariance_with_step_kernel(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    cov_reducer = covariance_reducer.CovarianceReducer()
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=cov_reducer,
     )
-    chain_state, kernel_results = tfp.experimental.mcmc.step_kernel(
+    chain_state, kernel_results = step.step_kernel(
         num_steps=6,
         current_state=0.,
         kernel=reducer_kernel,
@@ -299,19 +305,19 @@ class CovarianceWithReductionsTest(test_util.TestCase):
   def test_covariance_before_transformation(self):
     fake_kernel = test_fixtures.TestTransitionKernel(
         target_log_prob_fn=lambda x: -x**2 / 2)
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    cov_reducer = covariance_reducer.CovarianceReducer()
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=cov_reducer,
     )
-    transformed_kernel = tfp.mcmc.TransformedTransitionKernel(
+    kernel = transformed_kernel.TransformedTransitionKernel(
         inner_kernel=reducer_kernel,
-        bijector=tfp.bijectors.Exp(),
+        bijector=exp.Exp(),
     )
-    samples, _, kernel_results = tfp.mcmc.sample_chain(
+    samples, _, kernel_results = sample.sample_chain(
         num_results=10,
         current_state=1.,
-        kernel=transformed_kernel,
+        kernel=kernel,
         trace_fn=None,
         return_final_kernel_results=True,
         seed=test_util.test_seed())
@@ -331,16 +337,16 @@ class CovarianceWithReductionsTest(test_util.TestCase):
   def test_covariance_after_transformation(self):
     fake_kernel = test_fixtures.TestTransitionKernel(
         target_log_prob_fn=lambda x: -x**2 / 2)
-    transformed_kernel = tfp.mcmc.TransformedTransitionKernel(
+    kernel = transformed_kernel.TransformedTransitionKernel(
         inner_kernel=fake_kernel,
-        bijector=tfp.bijectors.Exp(),
+        bijector=exp.Exp(),
     )
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
-        inner_kernel=transformed_kernel,
+    cov_reducer = covariance_reducer.CovarianceReducer()
+    reducer_kernel = with_reductions.WithReductions(
+        inner_kernel=kernel,
         reducer=cov_reducer,
     )
-    samples, _, kernel_results = tfp.mcmc.sample_chain(
+    samples, _, kernel_results = sample.sample_chain(
         num_results=10,
         current_state=1.,
         kernel=reducer_kernel,
@@ -361,22 +367,20 @@ class CovarianceWithReductionsTest(test_util.TestCase):
 
   @test_util.numpy_disable_gradient_test
   def test_nested_in_step_size_adaptation(self):
-    target_dist = tfp.distributions.MultivariateNormalDiag(
+    target_dist = mvn_diag.MultivariateNormalDiag(
         loc=[0., 0.], scale_diag=[1., 10.])
-    hmc_kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    hmc_kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_dist.log_prob,
         num_leapfrog_steps=27,
         step_size=10)
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
-        inner_kernel=hmc_kernel,
-        reducer=cov_reducer
-    )
-    step_adapted_kernel = tfp.mcmc.SimpleStepSizeAdaptation(
+    cov_reducer = covariance_reducer.CovarianceReducer()
+    reducer_kernel = with_reductions.WithReductions(
+        inner_kernel=hmc_kernel, reducer=cov_reducer)
+    step_adapted_kernel = sssa.SimpleStepSizeAdaptation(
         inner_kernel=reducer_kernel,
         adaptation_rate=0.8,
         num_adaptation_steps=9)
-    samples, _, kernel_results = tfp.mcmc.sample_chain(
+    samples, _, kernel_results = sample.sample_chain(
         num_results=10,
         current_state=tf.convert_to_tensor([0., 0.]),
         kernel=step_adapted_kernel,
@@ -401,8 +405,8 @@ class CovarianceWithReductionsTest(test_util.TestCase):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.TestReducer()
     mean_reducer = test_fixtures.NaiveMeanReducer()
-    cov_reducer = tfp.experimental.mcmc.CovarianceReducer()
-    reducer_kernel = tfp.experimental.mcmc.WithReductions(
+    cov_reducer = covariance_reducer.CovarianceReducer()
+    reducer_kernel = with_reductions.WithReductions(
         inner_kernel=fake_kernel,
         reducer=[[mean_reducer, cov_reducer], [fake_reducer]],
     )

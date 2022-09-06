@@ -17,8 +17,9 @@
 import collections
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import distributions
+from tensorflow_probability.python.distributions import mvn_linear_operator
 from tensorflow_probability.python.distributions import mvn_low_rank_update_linear_operator_covariance
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import dtype_util
 
@@ -236,7 +237,7 @@ def ensemble_kalman_filter_update(
     observation_size_is_static_and_scalar = (observation.shape[-1] == 1)
 
     if not isinstance(observation_particles_dist,
-                      distributions.MultivariateNormalLinearOperator):
+                      mvn_linear_operator.MultivariateNormalLinearOperator):
       raise ValueError('Expected `observation_fn` to return an instance of '
                        '`MultivariateNormalLinearOperator`')
 
@@ -423,7 +424,7 @@ def ensemble_kalman_filter_log_marginal_likelihood(
             f'When `perturbed_observations=True`, ensemble size ({n_ensemble}) '
             'must be at least one greater than the number of observations '
             f'({n_observations}), but it was not.')
-      observation_dist = distributions.MultivariateNormalTriL(
+      observation_dist = mvn_tril.MultivariateNormalTriL(
           loc=tf.reduce_mean(observation_particles, axis=0),
           # Cholesky(Cov(G(X) + η)), where Cov(..) is the ensemble covariance.
           scale_tril=tf.linalg.cholesky(_covariance(observation_particles)))
@@ -443,7 +444,7 @@ def ensemble_kalman_filter_log_marginal_likelihood(
         # predicted_observation = G(X),
         # and is shape [n_ensemble] + B.
         predicted_observations = observation_particles_dist.mean()
-        observation_dist = distributions.MultivariateNormalTriL(
+        observation_dist = mvn_tril.MultivariateNormalTriL(
             loc=tf.reduce_mean(predicted_observations, axis=0),  # ensemble mean
             # Cholesky(Cov(G(X)) + Γ), where Cov(..) is the ensemble covariance.
             scale_tril=tf.linalg.cholesky(

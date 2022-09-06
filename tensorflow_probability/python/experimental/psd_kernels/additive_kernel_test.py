@@ -21,10 +21,9 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
-from tensorflow_probability.python import experimental as tfe
+from tensorflow_probability.python.experimental.psd_kernels import additive_kernel
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math.psd_kernels import exponentiated_quadratic
 
 
 @test_util.test_all_tf_execution_regimes
@@ -32,10 +31,10 @@ class AdditiveKernelTest(test_util.TestCase):
 
   def testBatchShape(self):
     amplitudes = np.ones((4, 1, 1, 3), np.float32)
-    additive_inner_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    additive_inner_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude=np.ones([2, 1, 1], np.float32),
         length_scale=np.ones([1, 3, 1], np.float32))
-    kernel = tfe.psd_kernels.AdditiveKernel(
+    kernel = additive_kernel.AdditiveKernel(
         kernel=additive_inner_kernel, amplitudes=amplitudes)
     self.assertAllEqual(tf.TensorShape([4, 2, 3]), kernel.batch_shape)
     self.assertAllEqual([4, 2, 3], self.evaluate(kernel.batch_shape_tensor()))
@@ -53,7 +52,7 @@ class AdditiveKernelTest(test_util.TestCase):
         # Multiply the kernel values at the given indices together.
         prod_k = 1.
         for d in ind_i:
-          kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+          kernel = exponentiated_quadratic.ExponentiatedQuadratic(
               amplitude=1., length_scale=length_scale[..., d])
           if method == 'apply':
             prod_k *= kernel.apply(
@@ -84,9 +83,9 @@ class AdditiveKernelTest(test_util.TestCase):
         [dim],
         seed=test_util.test_seed(sampler_type='stateless'),
         minval=0., maxval=2., dtype=tf.float32)
-    inner_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    inner_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude=1., length_scale=length_scale)
-    kernel = tfe.psd_kernels.AdditiveKernel(
+    kernel = additive_kernel.AdditiveKernel(
         kernel=inner_kernel, amplitudes=amplitudes)
 
     x = tf.random.stateless_uniform(
@@ -121,9 +120,9 @@ class AdditiveKernelTest(test_util.TestCase):
         [dim],
         seed=test_util.test_seed(sampler_type='stateless'),
         minval=0., maxval=2., dtype=tf.float32)
-    inner_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    inner_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude=1., length_scale=length_scale)
-    kernel = tfe.psd_kernels.AdditiveKernel(
+    kernel = additive_kernel.AdditiveKernel(
         kernel=inner_kernel, amplitudes=amplitudes)
 
     x = tf.random.stateless_uniform(
@@ -155,9 +154,9 @@ class AdditiveKernelTest(test_util.TestCase):
             [input_shape[-1]],
             seed=test_util.test_seed(sampler_type='stateless'),
             minval=0., maxval=2., dtype=tf.float32))
-    inner_kernel = tfp.math.psd_kernels.ExponentiatedQuadratic(
+    inner_kernel = exponentiated_quadratic.ExponentiatedQuadratic(
         amplitude=1., length_scale=length_scale)
-    kernel = tfe.psd_kernels.AdditiveKernel(
+    kernel = additive_kernel.AdditiveKernel(
         kernel=inner_kernel, amplitudes=amplitudes)
 
     x = tf.random.stateless_uniform(

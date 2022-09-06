@@ -55,11 +55,12 @@ multi_substrate_py_test(
         "tf1-broken",
     ],
     deps = [
+        ":manual_special_functions",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 

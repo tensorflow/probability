@@ -19,13 +19,13 @@
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import wishart
+from tensorflow_probability.python.experimental.distributions import mvn_precision_factor_linop as mvnpflo
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_combinations
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
-tfd_e = tfp.experimental.distributions
+from tensorflow_probability.python.stats import sample_stats
 
 
 @test_util.test_all_tf_execution_regimes
@@ -46,7 +46,7 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
     # diagonally dominant, and we therefore test use of transpositions better.
     assert conditioning >= 1
 
-    scale_wishart = tfd.WishartLinearOperator(
+    scale_wishart = wishart.WishartLinearOperator(
         df=dtype(conditioning * event_size),
         scale=tf.linalg.LinearOperatorIdentity(event_size, dtype=dtype),
         input_output_cholesky=False,
@@ -92,10 +92,10 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
     else:
       loc = None
 
-    mvn_scale = tfd.MultivariateNormalTriL(
+    mvn_scale = mvn_tril.MultivariateNormalTriL(
         loc=loc, scale_tril=cov.cholesky().to_dense())
 
-    mvn_precision = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+    mvn_precision = mvnpflo.MultivariateNormalPrecisionFactorLinearOperator(
         loc=loc,
         precision_factor=precision_factor,
         precision=precision if use_precision else None,
@@ -125,8 +125,8 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
         'var': cov.diag_part(),
         'cov': cov.to_dense(),
         'samples': samples,
-        'sample_var': tfp.stats.variance(samples, sample_axis=0),
-        'sample_cov': tfp.stats.covariance(samples, sample_axis=0),
+        'sample_var': sample_stats.variance(samples, sample_axis=0),
+        'sample_cov': sample_stats.covariance(samples, sample_axis=0),
     })
 
     self.assertAllMeansClose(
@@ -153,9 +153,9 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
       if last_shape is not None:  # This is a `tf.Dimension` in tf1.
         last_shape = last_shape.value
       self.assertIsNone(last_shape)
-    dynamic_dist = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+    dynamic_dist = mvnpflo.MultivariateNormalPrecisionFactorLinearOperator(
         precision_factor=tf.linalg.LinearOperatorDiag(tf.ones_like(x)))
-    static_dist = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+    static_dist = mvnpflo.MultivariateNormalPrecisionFactorLinearOperator(
         precision_factor=tf.linalg.LinearOperatorDiag(tf.ones([7, 3])))
     in_ = tf.zeros([7, 3])
     self.assertAllClose(self.evaluate(dynamic_dist.log_prob(in_)),
@@ -180,9 +180,8 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
             dtype=dtype,
             seed=test_util.test_seed()))
 
-    mvn_precision = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
-        loc=loc,
-        precision_factor=precision_factor)
+    mvn_precision = mvnpflo.MultivariateNormalPrecisionFactorLinearOperator(
+        loc=loc, precision_factor=precision_factor)
     self.assertAllClose(mvn_precision.mean(), loc)
     self.assertAllClose(mvn_precision.mode(), loc)
 
@@ -207,7 +206,7 @@ class MVNPrecisionFactorLinOpTest(test_util.TestCase):
             dtype=dtype,
             seed=test_util.test_seed()))
 
-    mvn_precision = tfd_e.MultivariateNormalPrecisionFactorLinearOperator(
+    mvn_precision = mvnpflo.MultivariateNormalPrecisionFactorLinearOperator(
         loc=loc,
         precision_factor=precision_factor,
         precision=precision if use_precision else None)

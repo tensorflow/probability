@@ -20,7 +20,6 @@ import warnings
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import math
 from tensorflow_probability.python.bijectors import masked_autoregressive
 from tensorflow_probability.python.bijectors import scale_matvec_tril
 from tensorflow_probability.python.distributions import autoregressive
@@ -32,6 +31,7 @@ from tensorflow_probability.python.distributions import sample as sample_lib
 from tensorflow_probability.python.distributions import transformed_distribution
 from tensorflow_probability.python.internal import reparameterization
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.math import linalg
 
 
 @test_util.test_all_tf_execution_regimes
@@ -46,7 +46,7 @@ class AutoregressiveTest(test_util.VectorDistributionTestHelpers,
   def _random_scale_tril(self, event_size):
     n = np.int32(event_size * (event_size + 1) // 2)
     p = 2. * self._rng.random_sample(n).astype(np.float32) - 1.
-    return math.fill_triangular(0.25 * p)
+    return linalg.fill_triangular(0.25 * p)
 
   def _normal_fn(self, affine_bijector):
     def _fn(samples):

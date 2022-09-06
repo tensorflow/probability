@@ -39,6 +39,7 @@ multi_substrate_py_library(
         ":multitask_gaussian_process",
         ":multitask_gaussian_process_regression_model",
         ":mvn_precision_factor_linop",
+        "//tensorflow_probability/python/distributions:inflated",
         "//tensorflow_probability/python/distributions:log_prob_ratio",
     ],
 )
@@ -66,11 +67,20 @@ multi_substrate_py_test(
     srcs = ["importance_resample_test.py"],
     jax_size = "medium",
     deps = [
+        ":importance_resample",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:categorical",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
+        "//tensorflow_probability/python/distributions:mixture_same_family",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:student_t",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/vi:csiszar_divergence",
     ],
 )
 
@@ -82,6 +92,7 @@ multi_substrate_py_library(
         # tensorflow dep,
         "//tensorflow_probability/python/bijectors:identity",
         "//tensorflow_probability/python/distributions:distribution",
+        "//tensorflow_probability/python/distributions:log_prob_ratio",
         "//tensorflow_probability/python/internal:callable_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -94,10 +105,10 @@ multi_substrate_py_test(
     name = "increment_log_prob_test",
     srcs = ["increment_log_prob_test.py"],
     deps = [
+        ":increment_log_prob",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )
@@ -118,10 +129,28 @@ multi_substrate_py_test(
     jax_size = "large",
     shard_count = 13,
     deps = [
+        ":increment_log_prob",
+        ":joint_distribution_pinned",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:pad",
+        "//tensorflow_probability/python/distributions:beta",
+        "//tensorflow_probability/python/distributions:binomial",
+        "//tensorflow_probability/python/distributions:cholesky_lkj",
+        "//tensorflow_probability/python/distributions:gamma",
+        "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_auto_batched",
+        "//tensorflow_probability/python/distributions:joint_distribution_coroutine",
+        "//tensorflow_probability/python/distributions:joint_distribution_named",
+        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
+        "//tensorflow_probability/python/distributions:multinomial",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:sample",
+        "//tensorflow_probability/python/distributions:uniform",
+        "//tensorflow_probability/python/internal:structural_tuple",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:generic",
     ],
 )
 
@@ -142,8 +171,9 @@ multi_substrate_py_test(
     deps = [
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/experimental/distributions:marginal_fns",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math:gradient",
     ],
 )
 
@@ -169,9 +199,12 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental",
+        "//tensorflow_probability/python/distributions:gaussian_process",
+        "//tensorflow_probability/python/experimental/distributions:multitask_gaussian_process",
+        "//tensorflow_probability/python/experimental/distributions:multitask_gaussian_process_regression_model",
+        "//tensorflow_probability/python/experimental/psd_kernels:multitask_kernel",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
     ],
 )
 
@@ -196,9 +229,14 @@ multi_substrate_py_test(
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:gaussian_process_regression_model",
+        "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/experimental",
+        "//tensorflow_probability/python/experimental/distributions:multitask_gaussian_process_regression_model",
+        "//tensorflow_probability/python/experimental/psd_kernels:multitask_kernel",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/math/psd_kernels:exponentiated_quadratic",
     ],
 )
 
@@ -228,11 +266,14 @@ multi_substrate_py_test(
     timeout = "long",
     srcs = ["mvn_precision_factor_linop_test.py"],
     deps = [
+        ":mvn_precision_factor_linop",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/distributions:wishart",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_combinations",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/stats:sample_stats",
     ],
 )

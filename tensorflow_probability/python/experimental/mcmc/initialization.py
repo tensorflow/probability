@@ -17,8 +17,14 @@
 # Dependency imports
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import bijectors as tfb
-from tensorflow_probability.python import distributions as tfd
+from tensorflow_probability.python.bijectors import bijector
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import restructure
+from tensorflow_probability.python.distributions import batch_broadcast
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.experimental import distribute
 from tensorflow_probability.python.internal import batched_rejection_sampler as brs
 from tensorflow_probability.python.internal import nest_util
@@ -156,17 +162,18 @@ def init_near_unconstrained_zero(
           tf.convert_to_tensor, batch_shapes)
 
   # Interpret a structure of Bijectors as the joint multipart bijector.
-  if not isinstance(constraining_bijector, tfb.Bijector):
-    constraining_bijector = tfb.JointMap(constraining_bijector)
+  if not isinstance(constraining_bijector, bijector.Bijector):
+    constraining_bijector = joint_map.JointMap(constraining_bijector)
 
   # Actually initialize
   def one_term(event_shape, event_shape_tensor, batch_shape, batch_shape_tensor,
                dtype, shard_axes=None):
     if not tensorshape_util.is_fully_defined(event_shape):
       event_shape = event_shape_tensor
-    result = tfd.Sample(
-        tfd.Uniform(low=tf.constant(-2., dtype=dtype),
-                    high=tf.constant(2., dtype=dtype)),
+    result = sample_dist_lib.Sample(
+        uniform.Uniform(
+            low=tf.constant(-2., dtype=dtype),
+            high=tf.constant(2., dtype=dtype)),
         sample_shape=event_shape)
     if shard_axes:
       result = distribute.Sharded(result, shard_axes)
@@ -176,7 +183,7 @@ def init_near_unconstrained_zero(
     else:  # Only batch broadcast when batch ndims > 0.
       needs_bcast = bool(tensorshape_util.as_list(batch_shape))
     if needs_bcast:
-      result = tfd.BatchBroadcast(result, batch_shape)
+      result = batch_broadcast.BatchBroadcast(result, batch_shape)
     return result
 
   inv_shapes = constraining_bijector.inverse_event_shape(event_shapes)
@@ -196,9 +203,9 @@ def init_near_unconstrained_zero(
       batch_shapes, shard_axis_names)):
     dist = distribute.JointDistributionSequential(tf.nest.flatten(terms))
   else:
-    dist = tfd.JointDistributionSequential(tf.nest.flatten(terms))
-  unconstrained = tfb.pack_sequence_as(inv_shapes)(dist)
-  return tfd.TransformedDistribution(
+    dist = jds.JointDistributionSequential(tf.nest.flatten(terms))
+  unconstrained = restructure.pack_sequence_as(inv_shapes)(dist)
+  return transformed_distribution.TransformedDistribution(
       unconstrained, bijector=constraining_bijector)
 
 

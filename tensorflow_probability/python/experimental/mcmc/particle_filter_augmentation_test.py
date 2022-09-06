@@ -16,14 +16,15 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.experimental.mcmc import particle_filter
+from tensorflow_probability.python.experimental.mcmc import particle_filter_augmentation
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -32,17 +33,20 @@ class _ParticleFilterUtilTest(test_util.TestCase):
   def test_model_can_use_state_history(self):
 
     initial_state_prior = (
-        tfp.experimental.mcmc.augment_prior_with_state_history(
-            tfd.JointDistributionNamed({'x': tfd.Poisson(1.)}), history_size=2))
+        particle_filter_augmentation.augment_prior_with_state_history(
+            jdn.JointDistributionNamed({'x': poisson.Poisson(1.)}),
+            history_size=2))
 
     # Deterministic dynamics compute a Fibonacci sequence.
-    @tfp.experimental.mcmc.augment_with_state_history
+    @particle_filter_augmentation.augment_with_state_history
     def fibonacci_transition_fn(step, state_with_history):
       del step
-      return tfd.JointDistributionNamed(
-          {'x': tfd.Deterministic(
-              tf.reduce_sum(state_with_history.state_history['x'][..., -2:],
-                            axis=-1))})
+      return jdn.JointDistributionNamed({
+          'x':
+              deterministic.Deterministic(
+                  tf.reduce_sum(
+                      state_with_history.state_history['x'][..., -2:], axis=-1))
+      })
 
     # We'll observe the ratio of the current and previous state.
     def observe_ratio_of_last_two_states_fn(_, state_with_history):
@@ -51,7 +55,7 @@ class _ParticleFilterUtilTest(test_util.TestCase):
         ratio = state_with_history.state['x'] / (
             state_with_history.state_history['x'][..., -2]
             + 1e-6)  # Avoid division by 0.
-      return tfd.Normal(loc=ratio, scale=0.1)
+      return normal.Normal(loc=ratio, scale=0.1)
 
     # The ratios between successive terms of a Fibonacci sequence
     # should, in the limit, approach the golden ratio.
@@ -59,7 +63,7 @@ class _ParticleFilterUtilTest(test_util.TestCase):
     observed_ratios = np.array([golden_ratio] * 10).astype(self.dtype)
 
     trajectories_with_history, lps = self.evaluate(
-        tfp.experimental.mcmc.infer_trajectories(
+        particle_filter.infer_trajectories(
             observed_ratios,
             initial_state_prior=initial_state_prior,
             transition_fn=fibonacci_transition_fn,
@@ -83,23 +87,23 @@ class _ParticleFilterUtilTest(test_util.TestCase):
     self.assertAllGreaterEqual(trajectories['x'][0], 1.)
 
   def test_docstring_example_stochastic_fibonacci(self):
-    initial_state_prior = tfd.Poisson(5.)
+    initial_state_prior = poisson.Poisson(5.)
     initial_state_with_history_prior = (
-        tfp.experimental.mcmc.augment_prior_with_state_history(
+        particle_filter_augmentation.augment_prior_with_state_history(
             initial_state_prior, history_size=2))
 
     initial_state_with_history_prior.sample(8)
 
-    @tfp.experimental.mcmc.augment_with_state_history
+    @particle_filter_augmentation.augment_with_state_history
     def fibonacci_transition_fn(_, state_with_history):
       expected_next_element = tf.reduce_sum(
           state_with_history.state_history[:, -2:], axis=1)
-      return tfd.Poisson(rate=expected_next_element)
+      return poisson.Poisson(rate=expected_next_element)
 
     def observation_fn(_, state_with_history):
-      return tfd.Poisson(rate=state_with_history.state)
+      return poisson.Poisson(rate=state_with_history.state)
 
-    tfp.experimental.mcmc.infer_trajectories(
+    particle_filter.infer_trajectories(
         observations=tf.convert_to_tensor([4., 11., 16., 23., 40., 69., 100.]),
         initial_state_prior=initial_state_with_history_prior,
         transition_fn=fibonacci_transition_fn,
@@ -114,21 +118,20 @@ class _ParticleFilterUtilTest(test_util.TestCase):
 
     # Define an autoregressive model on observations. This ignores the
     # state entirely; it depends only on previous observations.
-    initial_state_prior = tfd.JointDistributionNamed(
-        {'dummy_state': tfd.Deterministic(0.)})
+    initial_state_prior = jdn.JointDistributionNamed(
+        {'dummy_state': deterministic.Deterministic(0.)})
     def dummy_transition_fn(_, state, **kwargs):
       del kwargs
-      return tfd.JointDistributionNamed(
-          tf.nest.map_structure(tfd.Deterministic, state))
+      return jdn.JointDistributionNamed(
+          tf.nest.map_structure(deterministic.Deterministic, state))
 
-    @tfp.experimental.mcmc.augment_with_observation_history(
-        observations=observations,
-        history_size=len(weights))
+    @particle_filter_augmentation.augment_with_observation_history(
+        observations=observations, history_size=len(weights))
     def autoregressive_observation_fn(step, _, observation_history=None):
       num_terms = prefer_static.minimum(step, len(weights))
       usable_weights = tf.convert_to_tensor(weights)[len(weights)-num_terms:]
       loc = tf.reduce_sum(usable_weights * observation_history)
-      return tfd.Normal(loc, 1.0)
+      return normal.Normal(loc, 1.0)
 
     # Manually compute the conditional log-probs of a series of observations
     # under the autoregressive model.
@@ -140,16 +143,17 @@ class _ParticleFilterUtilTest(test_util.TestCase):
           np.sum(observations[start_step : current_step] *
                  weights[len(weights)-context_length:]))
     expected_lps = self.evaluate(
-        tfd.Normal(expected_locs, scale=1.0).log_prob(observations))
+        normal.Normal(expected_locs, scale=1.0).log_prob(observations))
 
     # Check that the particle filter gives the same log-probs.
-    _, _, _, lps = self.evaluate(tfp.experimental.mcmc.particle_filter(
-        observations,
-        initial_state_prior=initial_state_prior,
-        transition_fn=dummy_transition_fn,
-        observation_fn=autoregressive_observation_fn,
-        num_particles=2,
-        seed=test_util.test_seed()))
+    _, _, _, lps = self.evaluate(
+        particle_filter.particle_filter(
+            observations,
+            initial_state_prior=initial_state_prior,
+            transition_fn=dummy_transition_fn,
+            observation_fn=autoregressive_observation_fn,
+            num_particles=2,
+            seed=test_util.test_seed()))
     self.assertAllClose(expected_lps, lps)
 
 

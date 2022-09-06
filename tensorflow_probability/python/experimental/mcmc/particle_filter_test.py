@@ -18,41 +18,53 @@ import functools
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import shift
+from tensorflow_probability.python.distributions import bernoulli
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import joint_distribution_auto_batched as jdab
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import linear_gaussian_ssm as lgssm
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.distributions import mvn_tril
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
+from tensorflow_probability.python.distributions import transformed_distribution
+from tensorflow_probability.python.distributions import uniform
+from tensorflow_probability.python.experimental.mcmc import particle_filter
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import test_util
-
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
 
 
 @test_util.test_all_tf_execution_regimes
 class _ParticleFilterTest(test_util.TestCase):
 
   def test_random_walk(self):
-    initial_state_prior = tfd.JointDistributionNamed({
-        'position': tfd.Deterministic(0.)})
+    initial_state_prior = jdn.JointDistributionNamed(
+        {'position': deterministic.Deterministic(0.)})
 
     # Biased random walk.
     def particle_dynamics(_, previous_state):
       state_shape = ps.shape(previous_state['position'])
-      return tfd.JointDistributionNamed({
-          'position': tfd.TransformedDistribution(
-              tfd.Bernoulli(probs=tf.fill(state_shape, 0.75),
-                            dtype=self.dtype),
-              tfb.Shift(previous_state['position']))})
+      return jdn.JointDistributionNamed({
+          'position':
+              transformed_distribution.TransformedDistribution(
+                  bernoulli.Bernoulli(
+                      probs=tf.fill(state_shape, 0.75), dtype=self.dtype),
+                  shift.Shift(previous_state['position']))
+      })
 
     # Completely uninformative observations allowing a test
     # of the pure dynamics.
     def particle_observations(_, state):
       state_shape = ps.shape(state['position'])
-      return tfd.Uniform(low=tf.fill(state_shape, -100.),
-                         high=tf.fill(state_shape, 100.))
+      return uniform.Uniform(
+          low=tf.fill(state_shape, -100.), high=tf.fill(state_shape, 100.))
 
     observations = tf.zeros((9,), dtype=self.dtype)
     trajectories, _ = self.evaluate(
-        tfp.experimental.mcmc.infer_trajectories(
+        particle_filter.infer_trajectories(
             observations=observations,
             initial_state_prior=initial_state_prior,
             transition_fn=particle_dynamics,
@@ -77,19 +89,23 @@ class _ParticleFilterTest(test_util.TestCase):
     num_timesteps = 40
 
     # Batch of priors on object 1D positions and velocities.
-    initial_state_prior = tfd.JointDistributionNamed({
-        'position': tfd.Normal(loc=0., scale=tf.ones(batch_shape)),
-        'velocity': tfd.Normal(loc=0., scale=tf.ones(batch_shape) * 0.1)})
+    initial_state_prior = jdn.JointDistributionNamed({
+        'position': normal.Normal(loc=0., scale=tf.ones(batch_shape)),
+        'velocity': normal.Normal(loc=0., scale=tf.ones(batch_shape) * 0.1)
+    })
 
     def transition_fn(_, previous_state):
-      return tfd.JointDistributionNamed({
-          'position': tfd.Normal(
-              loc=previous_state['position'] + previous_state['velocity'],
-              scale=0.1),
-          'velocity': tfd.Normal(loc=previous_state['velocity'], scale=0.01)})
+      return jdn.JointDistributionNamed({
+          'position':
+              normal.Normal(
+                  loc=previous_state['position'] + previous_state['velocity'],
+                  scale=0.1),
+          'velocity':
+              normal.Normal(loc=previous_state['velocity'], scale=0.01)
+      })
 
     def observation_fn(_, state):
-      return tfd.Normal(loc=state['position'], scale=0.1)
+      return normal.Normal(loc=state['position'], scale=0.1)
 
     # Batch of synthetic observations, .
     true_initial_positions = np.random.randn(*batch_shape).astype(self.dtype)
@@ -101,11 +117,9 @@ class _ParticleFilterTest(test_util.TestCase):
             self.dtype)[..., tf.newaxis, tf.newaxis] +
         true_initial_positions)
 
-    (particles,
-     log_weights,
-     parent_indices,
+    (particles, log_weights, parent_indices,
      incremental_log_marginal_likelihoods) = self.evaluate(
-         tfp.experimental.mcmc.particle_filter(
+         particle_filter.particle_filter(
              observations=observed_positions,
              initial_state_prior=initial_state_prior,
              transition_fn=transition_fn,
@@ -141,8 +155,7 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllLess((velocity_stddev[-1] - velocity_stddev[0]), 0.)
 
     trajectories = self.evaluate(
-        tfp.experimental.mcmc.reconstruct_trajectories(particles,
-                                                       parent_indices))
+        particle_filter.reconstruct_trajectories(particles, parent_indices))
     self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
                         trajectories['position'].shape)
     self.assertAllEqual([num_timesteps, num_particles] + batch_shape,
@@ -150,7 +163,7 @@ class _ParticleFilterTest(test_util.TestCase):
 
     # Verify that `infer_trajectories` also works on batches.
     trajectories, incremental_log_marginal_likelihoods = self.evaluate(
-        tfp.experimental.mcmc.infer_trajectories(
+        particle_filter.infer_trajectories(
             observations=observed_positions,
             initial_state_prior=initial_state_prior,
             transition_fn=transition_fn,
@@ -172,8 +185,7 @@ class _ParticleFilterTest(test_util.TestCase):
     parent_indices = tf.convert_to_tensor([[0, 1, 2], [0, 2, 1], [0, 2, 2]])
 
     trajectories = self.evaluate(
-        tfp.experimental.mcmc.reconstruct_trajectories(particles,
-                                                       parent_indices))
+        particle_filter.reconstruct_trajectories(particles, parent_indices))
     self.assertAllEqual(
         np.array([[1, 2, 2], [4, 6, 6], [7, 8, 9]]), trajectories)
 
@@ -185,41 +197,42 @@ class _ParticleFilterTest(test_util.TestCase):
     infection_rate = tf.convert_to_tensor(1.1)
     infectious_period = tf.convert_to_tensor(8.0)
 
-    initial_state_prior = tfd.JointDistributionNamed({
-        'susceptible': tfd.Deterministic(999.),
-        'infected': tfd.Deterministic(1.),
-        'new_infections': tfd.Deterministic(1.),
-        'new_recoveries': tfd.Deterministic(0.)})
+    initial_state_prior = jdn.JointDistributionNamed({
+        'susceptible': deterministic.Deterministic(999.),
+        'infected': deterministic.Deterministic(1.),
+        'new_infections': deterministic.Deterministic(1.),
+        'new_recoveries': deterministic.Deterministic(0.)
+    })
 
     # Dynamics model: new infections and recoveries are given by the SIR
     # model with Poisson noise.
     def infection_dynamics(_, previous_state):
-      new_infections = tfd.Poisson(
+      new_infections = poisson.Poisson(
           infection_rate * previous_state['infected'] *
           previous_state['susceptible'] / population_size)
-      new_recoveries = tfd.Poisson(previous_state['infected'] /
-                                   infectious_period)
+      new_recoveries = poisson.Poisson(previous_state['infected'] /
+                                       infectious_period)
 
       def susceptible(new_infections):
-        return tfd.Deterministic(
-            ps.maximum(
-                0., previous_state['susceptible'] - new_infections))
+        return deterministic.Deterministic(
+            ps.maximum(0., previous_state['susceptible'] - new_infections))
 
       def infected(new_infections, new_recoveries):
-        return tfd.Deterministic(
+        return deterministic.Deterministic(
             ps.maximum(
                 0.,
                 previous_state['infected'] + new_infections - new_recoveries))
 
-      return tfd.JointDistributionNamed({
+      return jdn.JointDistributionNamed({
           'new_infections': new_infections,
           'new_recoveries': new_recoveries,
           'susceptible': susceptible,
-          'infected': infected})
+          'infected': infected
+      })
 
     # Observation model: each day we detect new cases, noisily.
     def infection_observations(_, state):
-      return tfd.Poisson(state['infected'])
+      return poisson.Poisson(state['infected'])
 
     # pylint: disable=bad-whitespace
     observations = tf.convert_to_tensor([
@@ -230,7 +243,7 @@ class _ParticleFilterTest(test_util.TestCase):
     # pylint: enable=bad-whitespace
 
     trajectories, _ = self.evaluate(
-        tfp.experimental.mcmc.infer_trajectories(
+        particle_filter.infer_trajectories(
             observations=observations,
             initial_state_prior=initial_state_prior,
             transition_fn=infection_dynamics,
@@ -251,16 +264,18 @@ class _ParticleFilterTest(test_util.TestCase):
 
     # Define a system constrained primarily by observations, where proposing
     # from the dynamics would be a bad fit.
-    initial_state_prior = tfd.Normal(loc=0., scale=1e6)
+    initial_state_prior = normal.Normal(loc=0., scale=1e6)
     transition_fn = (
-        lambda _, previous_state: tfd.Normal(loc=previous_state, scale=1e6))
-    observation_fn = lambda _, state: tfd.Normal(loc=state, scale=0.1)
-    initial_state_proposal = tfd.Normal(loc=observations[0], scale=0.1)
-    proposal_fn = (lambda step, state: tfd.Normal(  # pylint: disable=g-long-lambda
-        loc=tf.ones_like(state) * observations[step + 1], scale=1.0))
+        lambda _, previous_state: normal.Normal(loc=previous_state, scale=1e6))
+    observation_fn = lambda _, state: normal.Normal(loc=state, scale=0.1)
+    initial_state_proposal = normal.Normal(loc=observations[0], scale=0.1)
+    proposal_fn = (
+        lambda step, state: normal.Normal(  # pylint: disable=g-long-lambda
+            loc=tf.ones_like(state) * observations[step + 1],
+            scale=1.0))
 
     trajectories, _ = self.evaluate(
-        tfp.experimental.mcmc.infer_trajectories(
+        particle_filter.infer_trajectories(
             observations=observations,
             initial_state_prior=initial_state_prior,
             transition_fn=transition_fn,
@@ -278,15 +293,15 @@ class _ParticleFilterTest(test_util.TestCase):
   def test_estimated_prob_approximates_true_prob(self):
 
     # Draw simulated data from a 2D linear Gaussian system.
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         loc=0., scale_diag=(1., 1.))
     transition_matrix = tf.convert_to_tensor([[1., -0.5], [0.4, -1.]])
-    transition_noise = tfd.MultivariateNormalTriL(
+    transition_noise = mvn_tril.MultivariateNormalTriL(
         loc=1., scale_tril=tf.convert_to_tensor([[0.3, 0], [-0.1, 0.2]]))
     observation_matrix = tf.convert_to_tensor([[0.1, 1.], [1., 0.2]])
-    observation_noise = tfd.MultivariateNormalTriL(
+    observation_noise = mvn_tril.MultivariateNormalTriL(
         loc=-0.3, scale_tril=tf.convert_to_tensor([[0.5, 0], [0.1, 0.5]]))
-    model = tfd.LinearGaussianStateSpaceModel(
+    model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=20,
         initial_state_prior=initial_state_prior,
         transition_matrix=transition_matrix,
@@ -303,14 +318,15 @@ class _ParticleFilterTest(test_util.TestCase):
     # pylint: disable=g-long-lambda
     (particles, log_weights, _,
      estimated_incremental_log_marginal_likelihoods) = self.evaluate(
-         tfp.experimental.mcmc.particle_filter(
+         particle_filter.particle_filter(
              observations=observations,
              initial_state_prior=initial_state_prior,
-             transition_fn=lambda _, previous_state: tfd.MultivariateNormalTriL(
+             transition_fn=lambda _, previous_state: mvn_tril.
+             MultivariateNormalTriL(
                  loc=transition_noise.loc + tf.linalg.matvec(
                      transition_matrix, previous_state),
                  scale_tril=transition_noise.scale_tril),
-             observation_fn=lambda _, state: tfd.MultivariateNormalTriL(
+             observation_fn=lambda _, state: mvn_tril.MultivariateNormalTriL(
                  loc=observation_noise.loc + tf.linalg.matvec(
                      observation_matrix, state),
                  scale_tril=observation_noise.scale_tril),
@@ -330,21 +346,22 @@ class _ParticleFilterTest(test_util.TestCase):
     # This particle filter has proposals different from the dynamics,
     # so internally it will use proposal weights in addition to observation
     # weights. It should still get the observation likelihood correct.
-    _, lps = self.evaluate(tfp.experimental.mcmc.infer_trajectories(
-        observation,
-        initial_state_prior=tfd.Normal(loc=0., scale=1.),
-        transition_fn=lambda _, x: tfd.Normal(loc=x, scale=1.),
-        observation_fn=lambda _, x: tfd.Normal(loc=x, scale=1.),
-        initial_state_proposal=tfd.Normal(loc=0., scale=5.),
-        proposal_fn=lambda _, x: tfd.Normal(loc=x, scale=5.),
-        num_particles=2048,
-        seed=test_util.test_seed()))
+    _, lps = self.evaluate(
+        particle_filter.infer_trajectories(
+            observation,
+            initial_state_prior=normal.Normal(loc=0., scale=1.),
+            transition_fn=lambda _, x: normal.Normal(loc=x, scale=1.),
+            observation_fn=lambda _, x: normal.Normal(loc=x, scale=1.),
+            initial_state_proposal=normal.Normal(loc=0., scale=5.),
+            proposal_fn=lambda _, x: normal.Normal(loc=x, scale=5.),
+            num_particles=2048,
+            seed=test_util.test_seed()))
 
     # Compare marginal likelihood against that
     # from the true (jointly normal) marginal distribution.
-    y1_marginal_dist = tfd.Normal(loc=0., scale=np.sqrt(1. + 1.))
+    y1_marginal_dist = normal.Normal(loc=0., scale=np.sqrt(1. + 1.))
     y2_conditional_dist = (
-        lambda y1: tfd.Normal(loc=y1 / 2., scale=np.sqrt(5. / 2.)))
+        lambda y1: normal.Normal(loc=y1 / 2., scale=np.sqrt(5. / 2.)))
     true_lps = tf.stack(
         [y1_marginal_dist.log_prob(observation[0]),
          y2_conditional_dist(observation[0]).log_prob(observation[1])],
@@ -353,36 +370,41 @@ class _ParticleFilterTest(test_util.TestCase):
     self.assertAllClose(true_lps, lps, atol=0.2)
 
   def test_can_step_dynamics_faster_than_observations(self):
-    initial_state_prior = tfd.JointDistributionNamed({
-        'position': tfd.Deterministic(1.),
-        'velocity': tfd.Deterministic(0.)
+    initial_state_prior = jdn.JointDistributionNamed({
+        'position': deterministic.Deterministic(1.),
+        'velocity': deterministic.Deterministic(0.)
     })
 
     # Use 100 steps between observations to integrate a simple harmonic
     # oscillator.
     dt = 0.01
     def simple_harmonic_motion_transition_fn(_, state):
-      return tfd.JointDistributionNamed({
-          'position': tfd.Normal(
-              loc=state['position'] + dt * state['velocity'], scale=dt*0.01),
-          'velocity': tfd.Normal(
-              loc=state['velocity'] - dt * state['position'], scale=dt*0.01)
+      return jdn.JointDistributionNamed({
+          'position':
+              normal.Normal(
+                  loc=state['position'] + dt * state['velocity'],
+                  scale=dt * 0.01),
+          'velocity':
+              normal.Normal(
+                  loc=state['velocity'] - dt * state['position'],
+                  scale=dt * 0.01)
       })
 
     def observe_position(_, state):
-      return tfd.Normal(loc=state['position'], scale=0.01)
+      return normal.Normal(loc=state['position'], scale=0.01)
 
-    particles, _, _, lps = self.evaluate(tfp.experimental.mcmc.particle_filter(
-        # 'Observing' the values we'd expect from a proper integrator should
-        # give high likelihood if our discrete approximation is good.
-        observations=tf.convert_to_tensor([tf.math.cos(0.),
-                                           tf.math.cos(1.)]),
-        initial_state_prior=initial_state_prior,
-        transition_fn=simple_harmonic_motion_transition_fn,
-        observation_fn=observe_position,
-        num_particles=1024,
-        num_transitions_per_observation=100,
-        seed=test_util.test_seed()))
+    particles, _, _, lps = self.evaluate(
+        particle_filter.particle_filter(
+            # 'Observing' the values we'd expect from a proper integrator should
+            # give high likelihood if our discrete approximation is good.
+            observations=tf.convert_to_tensor(
+                [tf.math.cos(0.), tf.math.cos(1.)]),
+            initial_state_prior=initial_state_prior,
+            transition_fn=simple_harmonic_motion_transition_fn,
+            observation_fn=observe_position,
+            num_particles=1024,
+            num_transitions_per_observation=100,
+            seed=test_util.test_seed()))
 
     self.assertLen(particles['position'], 101)
     self.assertAllClose(np.mean(particles['position'], axis=-1),
@@ -409,11 +431,11 @@ class _ParticleFilterTest(test_util.TestCase):
               'weights': weights}
 
     results = self.evaluate(
-        tfp.experimental.mcmc.particle_filter(
+        particle_filter.particle_filter(
             observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-            initial_state_prior=tfd.Normal(0., 1.),
-            transition_fn=lambda _, state: tfd.Normal(state, 1.),
-            observation_fn=lambda _, state: tfd.Normal(state, 1.),
+            initial_state_prior=normal.Normal(0., 1.),
+            transition_fn=lambda _, state: normal.Normal(state, 1.),
+            observation_fn=lambda _, state: normal.Normal(state, 1.),
             num_particles=1024,
             trace_fn=trace_fn,
             seed=test_util.test_seed()))
@@ -435,19 +457,16 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_step_indices_to_trace(self):
     num_particles = 1024
-    (particles_1_3,
-     log_weights_1_3,
-     parent_indices_1_3,
+    (particles_1_3, log_weights_1_3, parent_indices_1_3,
      incremental_log_marginal_likelihood_1_3) = self.evaluate(
-         tfp.experimental.mcmc.particle_filter(
+         particle_filter.particle_filter(
              observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-             initial_state_prior=tfd.Normal(0., 1.),
-             transition_fn=lambda _, state: tfd.Normal(state, 10.),
-             observation_fn=lambda _, state: tfd.Normal(state, 0.1),
+             initial_state_prior=normal.Normal(0., 1.),
+             transition_fn=lambda _, state: normal.Normal(state, 10.),
+             observation_fn=lambda _, state: normal.Normal(state, 0.1),
              num_particles=num_particles,
              trace_criterion_fn=lambda s, r: ps.logical_or(  # pylint: disable=g-long-lambda
-                 ps.equal(r.steps, 2),
-                 ps.equal(r.steps, 4)),
+                 ps.equal(r.steps, 2), ps.equal(r.steps, 4)),
              static_trace_allocation_size=2,
              seed=test_util.test_seed()))
     self.assertLen(particles_1_3, 2)
@@ -457,20 +476,19 @@ class _ParticleFilterTest(test_util.TestCase):
     means = np.sum(np.exp(log_weights_1_3) * particles_1_3, axis=1)
     self.assertAllClose(means, [3., 7.], atol=1.)
 
-    (final_particles,
-     final_log_weights,
-     final_cumulative_lp) = self.evaluate(
-         tfp.experimental.mcmc.particle_filter(
-             observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
-             initial_state_prior=tfd.Normal(0., 1.),
-             transition_fn=lambda _, state: tfd.Normal(state, 10.),
-             observation_fn=lambda _, state: tfd.Normal(state, 0.1),
-             num_particles=num_particles,
-             trace_fn=lambda s, r: (s.particles,  # pylint: disable=g-long-lambda
-                                    s.log_weights,
-                                    r.accumulated_log_marginal_likelihood),
-             trace_criterion_fn=None,
-             seed=test_util.test_seed()))
+    (final_particles, final_log_weights, final_cumulative_lp) = self.evaluate(
+        particle_filter.particle_filter(
+            observations=tf.convert_to_tensor([1., 3., 5., 7., 9.]),
+            initial_state_prior=normal.Normal(0., 1.),
+            transition_fn=lambda _, state: normal.Normal(state, 10.),
+            observation_fn=lambda _, state: normal.Normal(state, 0.1),
+            num_particles=num_particles,
+            trace_fn=lambda s, r: (  # pylint: disable=g-long-lambda
+                s.particles,
+                s.log_weights,
+                r.accumulated_log_marginal_likelihood),
+            trace_criterion_fn=None,
+            seed=test_util.test_seed()))
     self.assertLen(final_particles, num_particles)
     self.assertLen(final_log_weights, num_particles)
     self.assertEqual(final_cumulative_lp.shape, ())
@@ -479,24 +497,29 @@ class _ParticleFilterTest(test_util.TestCase):
 
   def test_warns_if_transition_distribution_has_unexpected_shape(self):
 
-    initial_state_prior = tfd.JointDistributionNamedAutoBatched(
-        {'sales': tfd.Deterministic(0.),
-         'inventory': tfd.Deterministic(1000.)})
+    initial_state_prior = jdab.JointDistributionNamedAutoBatched({
+        'sales': deterministic.Deterministic(0.),
+        'inventory': deterministic.Deterministic(1000.)
+    })
 
     # Inventory decreases by a Poisson RV 'sales', but is lower bounded at zero.
     def valid_transition_fn(_, particles):
-      return tfd.JointDistributionNamedAutoBatched(
-          {'sales': tfd.Poisson(10. * tf.ones_like(particles['inventory'])),
-           'inventory': lambda sales: tfd.Deterministic(  # pylint: disable=g-long-lambda
-               tf.maximum(0., particles['inventory'] - sales))},
+      return jdab.JointDistributionNamedAutoBatched(
+          {
+              'sales':
+                  poisson.Poisson(10. * tf.ones_like(particles['inventory'])),
+              'inventory':
+                  lambda sales: deterministic.Deterministic(  # pylint: disable=g-long-lambda
+                      tf.maximum(0., particles['inventory'] - sales))
+          },
           batch_ndims=1,
           validate_args=True)
 
     def dummy_observation_fn(_, state):
-      return tfd.Normal(state['inventory'], 1000.)
+      return normal.Normal(state['inventory'], 1000.)
 
     run_filter = functools.partial(
-        tfp.experimental.mcmc.particle_filter,
+        particle_filter.particle_filter,
         observations=tf.zeros([10]),
         initial_state_prior=initial_state_prior,
         observation_fn=dummy_observation_fn,
@@ -510,29 +533,42 @@ class _ParticleFilterTest(test_util.TestCase):
 
     # Check that broken transition functions raise exceptions.
     def transition_fn_broadcasts_over_particles(_, particles):
-      return tfd.JointDistributionNamed(
-          {'sales': tfd.Poisson(10.),  # Proposes same value for all particles.
-           'inventory': lambda sales: tfd.Deterministic(  # pylint: disable=g-long-lambda
-               tf.maximum(0., particles['inventory'] - sales))},
+      return jdn.JointDistributionNamed(
+          {
+              'sales':
+                  poisson.Poisson(10.
+                                 ),  # Proposes same value for all particles.
+              'inventory':
+                  lambda sales: deterministic.Deterministic(  # pylint: disable=g-long-lambda
+                      tf.maximum(0., particles['inventory'] - sales))
+          },
           validate_args=True)
 
     def transition_fn_partial_batch_shape(_, particles):
-      return tfd.JointDistributionNamed(
+      return jdn.JointDistributionNamed(
           # Using `Sample` ensures iid proposals for each particle, but not
           # per-particle log probs.
-          {'sales': tfd.Sample(tfd.Poisson(10.),
-                               ps.shape(particles['sales'])),
-           'inventory': lambda sales: tfd.Deterministic(  # pylint: disable=g-long-lambda
-               tf.maximum(0., particles['inventory'] - sales))},
+          {
+              'sales':
+                  sample_dist_lib.Sample(
+                      poisson.Poisson(10.), ps.shape(particles['sales'])),
+              'inventory':
+                  lambda sales: deterministic.Deterministic(  # pylint: disable=g-long-lambda
+                      tf.maximum(0., particles['inventory'] - sales))
+          },
           validate_args=True)
 
     def transition_fn_no_batch_shape(_, particles):
       # Autobatched JD defaults to treating num_particles as event shape, but
       # we need it to be batch shape to get per-particle logprobs.
-      return tfd.JointDistributionNamedAutoBatched(
-          {'sales': tfd.Poisson(10. * tf.ones_like(particles['inventory'])),
-           'inventory': lambda sales: tfd.Deterministic(  # pylint: disable=g-long-lambda
-               tf.maximum(0., particles['inventory'] - sales))},
+      return jdab.JointDistributionNamedAutoBatched(
+          {
+              'sales':
+                  poisson.Poisson(10. * tf.ones_like(particles['inventory'])),
+              'inventory':
+                  lambda sales: deterministic.Deterministic(  # pylint: disable=g-long-lambda
+                      tf.maximum(0., particles['inventory'] - sales))
+          },
           validate_args=True)
 
     with self.assertRaisesRegex(ValueError, 'transition distribution'):
@@ -563,16 +599,16 @@ class _ParticleFilterTest(test_util.TestCase):
   def test_marginal_likelihood_gradients_are_defined(self):
 
     def marginal_log_likelihood(level_scale, noise_scale):
-      _, _, _, lps = tfp.experimental.mcmc.particle_filter(
+      _, _, _, lps = particle_filter.particle_filter(
           observations=tf.convert_to_tensor([1., 2., 3., 4., 5.]),
-          initial_state_prior=tfd.Normal(loc=0, scale=1.),
-          transition_fn=lambda _, x: tfd.Normal(loc=x, scale=level_scale),
-          observation_fn=lambda _, x: tfd.Normal(loc=x, scale=noise_scale),
+          initial_state_prior=normal.Normal(loc=0, scale=1.),
+          transition_fn=lambda _, x: normal.Normal(loc=x, scale=level_scale),
+          observation_fn=lambda _, x: normal.Normal(loc=x, scale=noise_scale),
           num_particles=4,
           seed=test_util.test_seed())
       return tf.reduce_sum(lps)
 
-    _, grads = tfp.math.value_and_gradient(marginal_log_likelihood, 1.0, 1.0)
+    _, grads = gradient.value_and_gradient(marginal_log_likelihood, 1.0, 1.0)
     self.assertAllNotNone(grads)
     self.assertAllAssertsNested(self.assertNotAllZero, grads)
 

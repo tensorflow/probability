@@ -16,7 +16,9 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import chi2 as chi2_lib
+from tensorflow_probability.python.distributions import poisson
+from tensorflow_probability.python.distributions import uniform
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import _resample_using_log_points
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import _scatter_nd_batch
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample
@@ -26,9 +28,6 @@ from tensorflow_probability.python.experimental.mcmc.weighted_resampling import 
 from tensorflow_probability.python.experimental.mcmc.weighted_resampling import resample_systematic
 from tensorflow_probability.python.internal import distribution_util as dist_util
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
@@ -43,7 +42,7 @@ class _SMCResamplersTest(test_util.TestCase):
 
     num_probs = 50
     num_distributions = 3
-    unnormalized_probs = tfd.Uniform(
+    unnormalized_probs = uniform.Uniform(
         low=self.dtype(0),
         high=self.dtype(1.)).sample([num_distributions, num_probs], seed=strm)
     probs = unnormalized_probs / tf.reduce_sum(
@@ -74,7 +73,7 @@ class _SMCResamplersTest(test_util.TestCase):
     chi2 = tf.reduce_sum(
         (counts - expected_samples)**2 / expected_samples, axis=-1)
     self.assertAllLess(
-        tfd.Chi2(df=self.dtype(num_probs - 1)).cdf(chi2), 0.99995)
+        chi2_lib.Chi2(df=self.dtype(num_probs - 1)).cdf(chi2), 0.99995)
 
   def test_categorical_resampler_zero_final_class(self):
     if self.use_xla and tf.executing_eagerly():
@@ -126,7 +125,7 @@ class _SMCResamplersTest(test_util.TestCase):
     # values of the sample means.
     num_distributions = 3
     num_probs = 16
-    probs = tfd.Uniform(
+    probs = uniform.Uniform(
         low=self.dtype(0.0),
         high=self.dtype(1.0)).sample([num_distributions, num_probs], seed=strm)
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
@@ -170,7 +169,7 @@ class _SMCResamplersTest(test_util.TestCase):
     # values of the sample means.
     num_distributions = 3
     num_probs = 8
-    probs = tfd.Uniform(
+    probs = uniform.Uniform(
         low=self.dtype(0.0),
         high=self.dtype(1.0)).sample([num_distributions, num_probs], seed=strm)
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
@@ -212,7 +211,7 @@ class _SMCResamplersTest(test_util.TestCase):
     # values of the sample means.
     num_distributions = 3
     num_probs = 8
-    probs = tfd.Uniform(
+    probs = uniform.Uniform(
         low=self.dtype(0.0),
         high=self.dtype(1.0)).sample([num_distributions, num_probs], seed=strm)
     probs = probs / tf.reduce_sum(probs, axis=-1, keepdims=True)
@@ -275,7 +274,7 @@ class _SMCResamplersTest(test_util.TestCase):
 
   def resample_with_target_distribution(self):
     particles = np.linspace(0., 500., num=2500, dtype=np.float32)
-    log_weights = tfd.Poisson(20.).log_prob(particles)
+    log_weights = poisson.Poisson(20.).log_prob(particles)
 
     # Resample particles to target a Poisson(20.) distribution.
     new_particles, _, new_log_weights = resample(
@@ -290,9 +289,10 @@ class _SMCResamplersTest(test_util.TestCase):
 
     # Reweight the resampled particles to target a Poisson(30.) distribution.
     new_particles, _, new_log_weights = resample(
-        particles, log_weights,
+        particles,
+        log_weights,
         resample_fn=resample_systematic,
-        target_log_weights=tfd.Poisson(30).log_prob(particles),
+        target_log_weights=poisson.Poisson(30).log_prob(particles),
         seed=test_util.test_seed(sampler_type='stateless'))
     self.assertAllMeansClose(new_particles, 20., axis=0, atol=1e-2)
     self.assertAllClose(

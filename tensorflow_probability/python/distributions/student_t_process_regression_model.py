@@ -28,7 +28,8 @@ from tensorflow_probability.python.internal import parameter_properties
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import tensor_util
 from tensorflow_probability.python.internal import tensorshape_util
-from tensorflow_probability.python.math import psd_kernels as tfpk
+from tensorflow_probability.python.math.psd_kernels import positive_semidefinite_kernel as psd_kernel
+from tensorflow_probability.python.math.psd_kernels import schur_complement as schur_complement_lib
 
 
 __all__ = [
@@ -102,7 +103,7 @@ def _validate_observation_data(
               index_point_count, observation_count))
 
 
-class DampedSchurComplement(tfpk.AutoCompositeTensorPsdKernel):
+class DampedSchurComplement(psd_kernel.AutoCompositeTensorPsdKernel):
   """Schur complement kernel, damped by scalar factors.
 
   This kernel is the same as the SchurComplement kernel, except we multiply by
@@ -398,7 +399,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
         if _conditional_kernel is None:
           _conditional_kernel = DampedSchurComplement(
               df=df,
-              schur_complement=tfpk.SchurComplement(
+              schur_complement=schur_complement_lib.SchurComplement(
                   base_kernel=kernel,
                   fixed_inputs=self._observation_index_points,
                   diag_shift=observation_noise_variance),
@@ -606,7 +607,7 @@ class StudentTProcessRegressionModel(student_t_process.StudentTProcess):
 
       conditional_kernel = DampedSchurComplement(
           df=df,
-          schur_complement=tfpk.SchurComplement(
+          schur_complement=schur_complement_lib.SchurComplement(
               base_kernel=kernel,
               fixed_inputs=observation_index_points,
               diag_shift=observation_noise_variance),

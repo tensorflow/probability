@@ -16,9 +16,9 @@
 
 # Dependency imports
 
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python.experimental.mcmc import sample
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
+from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 
 
@@ -28,9 +28,9 @@ class RunTest(test_util.TestCase):
   def test_simple_reduction(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
-    seed1, seed2 = tfp.random.split_seed(
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
-    result = tfp.experimental.mcmc.sample_chain(
+    result = sample.sample_chain(
         num_results=5,
         current_state=0.,
         kernel=fake_kernel,
@@ -47,7 +47,7 @@ class RunTest(test_util.TestCase):
     self.assertEqual(10, kernel_results.counter_2)
 
     # Warm-restart the underlying kernel but not the reduction
-    result_2 = tfp.experimental.mcmc.sample_chain(
+    result_2 = sample.sample_chain(
         num_results=5,
         current_state=last_sample,
         kernel=fake_kernel,
@@ -67,9 +67,9 @@ class RunTest(test_util.TestCase):
   def test_reducer_warm_restart(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
-    seed1, seed2 = tfp.random.split_seed(
+    seed1, seed2 = samplers.split_seed(
         test_util.test_seed(sampler_type='stateless'))
-    result = tfp.experimental.mcmc.sample_chain(
+    result = sample.sample_chain(
         num_results=5,
         current_state=0.,
         kernel=fake_kernel,
@@ -87,7 +87,7 @@ class RunTest(test_util.TestCase):
 
     # Warm-restart the underlying kernel and the reduction using the provided
     # restart package
-    result_2 = tfp.experimental.mcmc.sample_chain(
+    result_2 = sample.sample_chain(
         num_results=5, seed=seed2, **result.resume_kwargs)
     last_sample_2, reduction_result_2, kernel_results_2 = self.evaluate([
         result_2.final_state, result_2.reduction_results,
@@ -101,7 +101,7 @@ class RunTest(test_util.TestCase):
   def test_tracing_a_reduction(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
     fake_reducer = test_fixtures.NaiveMeanReducer()
-    result = tfp.experimental.mcmc.sample_chain(
+    result = sample.sample_chain(
         num_results=5,
         current_state=0.,
         kernel=fake_kernel,
@@ -114,7 +114,7 @@ class RunTest(test_util.TestCase):
 
   def test_tracing_no_reduction(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    result = tfp.experimental.mcmc.sample_chain(
+    result = sample.sample_chain(
         num_results=5,
         current_state=0.,
         kernel=fake_kernel,

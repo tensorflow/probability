@@ -18,12 +18,14 @@
 import numpy as np
 
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental.mcmc import thermodynamic_integrals
 from tensorflow_probability.python.internal import broadcast_util as bu
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.mcmc import diagnostic
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import replica_exchange_mc
+from tensorflow_probability.python.mcmc import sample
 
 
 def make_inverse_temperatures(
@@ -85,9 +87,10 @@ class REMCThermodynamicIntegralsTest(test_util.TestCase):
     # normalized. In particular, there is a number `normalizing_const` such that
     #   posterior(z) = prior.prob(x) * likelihood.prob(x) / normalizing_const
     # is normalized.
-    prior = tfd.Normal(0., prior_scale)
-    likelihood = tfd.Normal(0., likelihood_scale)
-    posterior = tfd.Normal(0., (prior_scale**-2 + likelihood_scale**-2)**(-0.5))
+    prior = normal.Normal(0., prior_scale)
+    likelihood = normal.Normal(0., likelihood_scale)
+    posterior = normal.Normal(0.,
+                              (prior_scale**-2 + likelihood_scale**-2)**(-0.5))
 
     # Get a good step size, custom for every replica/batch member.
     bcast_inv_temperatures = bu.left_justified_expand_dims_to(
@@ -99,7 +102,7 @@ class REMCThermodynamicIntegralsTest(test_util.TestCase):
         # Broadcast over batch dims.
         tf.rank(likelihood_scale)
     )
-    tempered_posteriors = tfd.Normal(
+    tempered_posteriors = normal.Normal(
         0.,
         # One tempered posterior for every inverse_temperature.
         (prior_scale**-2 + bcast_inv_temperatures * likelihood_scale**-2
@@ -110,20 +113,20 @@ class REMCThermodynamicIntegralsTest(test_util.TestCase):
         tf.math.ceil(1.567 / tf.reduce_min(step_size)), tf.int32)
 
     def make_kernel_fn(target_log_prob_fn):
-      return tfp.mcmc.HamiltonianMonteCarlo(
+      return hmc.HamiltonianMonteCarlo(
           target_log_prob_fn=target_log_prob_fn,
           step_size=step_size,
           num_leapfrog_steps=num_leapfrog_steps,
       )
 
-    remc = tfp.mcmc.ReplicaExchangeMC(
+    remc = replica_exchange_mc.ReplicaExchangeMC(
         target_log_prob_fn=None,
         untempered_log_prob_fn=prior.log_prob,
         tempered_log_prob_fn=likelihood.log_prob,
         inverse_temperatures=inverse_temperatures,
         state_includes_replicas=False,
         make_kernel_fn=make_kernel_fn,
-        swap_proposal_fn=tfp.mcmc.even_odd_swap_proposal_fn(1.),
+        swap_proposal_fn=replica_exchange_mc.even_odd_swap_proposal_fn(1.),
     )
 
     def trace_fn(state, results):  # pylint: disable=unused-argument
@@ -148,7 +151,7 @@ class REMCThermodynamicIntegralsTest(test_util.TestCase):
     initial_sample_shape = [n_samples_per_chain] * iid_chain_ndims
 
     unused_replica_states, trace = self.evaluate(
-        tfp.mcmc.sample_chain(
+        sample.sample_chain(
             num_results=num_results,
             # Start at one of the modes, in order to make mode jumping necessary
             # if we want to pass test.
@@ -162,7 +165,7 @@ class REMCThermodynamicIntegralsTest(test_util.TestCase):
     # Tolerance depends on samples * replicas * number of (iid) chains.
     # ess.shape = [n_replica, ...]
     # We will sum over batch dims, then take min over replica.
-    ess = tfp.mcmc.effective_sample_size(trace['potential_energy'])
+    ess = diagnostic.effective_sample_size(trace['potential_energy'])
     if iid_chain_ndims:
       ess = tf.reduce_sum(ess, axis=tf.range(1, 1 + iid_chain_ndims))
     min_ess = self.evaluate(tf.reduce_min(ess))
@@ -180,7 +183,7 @@ class REMCThermodynamicIntegralsTest(test_util.TestCase):
     self.assertAllGreater(replica_mean_accept_prob, 0.5)
 
     integrals = self.evaluate(
-        tfp.experimental.mcmc.remc_thermodynamic_integrals(
+        thermodynamic_integrals.remc_thermodynamic_integrals(
             inverse_temperatures,
             trace['potential_energy'],
             iid_chain_ndims=iid_chain_ndims,

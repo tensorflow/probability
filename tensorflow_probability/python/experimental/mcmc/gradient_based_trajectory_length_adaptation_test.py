@@ -18,14 +18,24 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.distributions import half_normal
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample as sample_dist_lib
+from tensorflow_probability.python.experimental.mcmc import gradient_based_trajectory_length_adaptation as gbtla
+from tensorflow_probability.python.experimental.mcmc import preconditioned_hmc as phmc
 from tensorflow_probability.python.internal import distribute_lib
 from tensorflow_probability.python.internal import distribute_test_lib
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
+from tensorflow_probability.python.math import generic
+from tensorflow_probability.python.mcmc import dual_averaging_step_size_adaptation as dassa
+from tensorflow_probability.python.mcmc import hmc
+from tensorflow_probability.python.mcmc import sample
+from tensorflow_probability.python.mcmc import transformed_kernel
 
 JAX_MODE = False
 
@@ -33,7 +43,7 @@ JAX_MODE = False
 def snaper_criterion_dummy_direction(previous_state, *args, **kwargs):
   # Technically direction should be normalized, but omitting the normalization
   # term only rescales the criterion so we're fine.
-  return tfp.experimental.mcmc.snaper_criterion(
+  return gbtla.snaper_criterion(
       previous_state,
       *args,
       direction=tf.nest.map_structure(tf.ones_like, previous_state),
@@ -42,7 +52,7 @@ def snaper_criterion_dummy_direction(previous_state, *args, **kwargs):
 
 
 def snaper_criterion_2d_direction(previous_state, *args, **kwargs):
-  return tfp.experimental.mcmc.snaper_criterion(
+  return gbtla.snaper_criterion(
       previous_state,
       *args,
       direction=tf.constant([0., 1.], previous_state.dtype),
@@ -55,21 +65,22 @@ class GradientBasedTrajectoryLengthAdaptationTestGeneric(
     test_util.TestCase, parameterized.TestCase):
 
   def testForbiddenTransformedKernel(self):
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -x**2, step_size=0.1, num_leapfrog_steps=1)
-    kernel = tfp.mcmc.TransformedTransitionKernel(kernel, tfb.Identity())
+    kernel = transformed_kernel.TransformedTransitionKernel(
+        kernel, identity.Identity())
     with self.assertRaisesRegex(
         ValueError,
         'The inner kernel cannot contain a `TransformedTransitionKernel`'):
-      kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+      kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
           kernel, num_adaptation_steps=100)
 
   def testNestedStepSizeError(self):
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -x**2,
         step_size=[0.1],
         num_leapfrog_steps=1)
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         kernel, num_adaptation_steps=100)
     with self.assertRaisesRegex(ValueError, 'Step size must be a scalar'):
       kernel.bootstrap_results([1.])
@@ -80,18 +91,18 @@ class GradientBasedTrajectoryLengthAdaptationTestGeneric(
     step_size = tf1.placeholder_with_default(
         [0.1, 0.2], shape=[2] if use_static_shape else None)
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=lambda x: -x**2,
         step_size=step_size,
         num_leapfrog_steps=1)
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         kernel, num_adaptation_steps=100, validate_args=True)
     with self.assertRaisesRegex(Exception, 'Step size must be a scalar'):
       self.evaluate(kernel.bootstrap_results(tf.constant(1.)))
 
   @parameterized.named_parameters(
-      ('ChEESStaticShape', True, tfp.experimental.mcmc.chees_criterion),
-      ('ChEESDynamicShape', False, tfp.experimental.mcmc.chees_criterion),
+      ('ChEESStaticShape', True, gbtla.chees_criterion),
+      ('ChEESDynamicShape', False, gbtla.chees_criterion),
       ('SNAPERStaticShape', True, snaper_criterion_dummy_direction),
       ('SNAPERDynamicShape', False, snaper_criterion_dummy_direction),
   )
@@ -103,12 +114,12 @@ class GradientBasedTrajectoryLengthAdaptationTestGeneric(
     with self.assertRaisesRegex(Exception,
                                 'chees_criterion requires at least 2 chains'):
       self.evaluate(
-          tfp.experimental.mcmc.chees_criterion(
+          gbtla.chees_criterion(
               state, state, accept_prob, 1., validate_args=True))
 
   @parameterized.named_parameters(
-      ('ChEESStaticShape', True, tfp.experimental.mcmc.chees_criterion),
-      ('ChEESDynamicShape', False, tfp.experimental.mcmc.chees_criterion),
+      ('ChEESStaticShape', True, gbtla.chees_criterion),
+      ('ChEESDynamicShape', False, gbtla.chees_criterion),
       ('SNAPERStaticShape', True, snaper_criterion_dummy_direction),
       ('SNAPERDynamicShape', False, snaper_criterion_dummy_direction),
   )
@@ -128,9 +139,9 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     if tf.executing_eagerly() and not JAX_MODE:
       self.skipTest('Too slow for TF Eager.')
 
-    target = tfd.JointDistributionSequential([
-        tfd.Normal(0., tf.constant(20., dtype=self.dtype)),
-        tfd.HalfNormal(tf.constant(10., dtype=self.dtype)),
+    target = jds.JointDistributionSequential([
+        normal.Normal(0., tf.constant(20., dtype=self.dtype)),
+        half_normal.HalfNormal(tf.constant(10., dtype=self.dtype)),
     ])
 
     def target_log_prob_fn(*x):
@@ -142,19 +153,17 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     num_chains = 16
     step_size = 0.1
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         step_size=step_size,
         num_leapfrog_steps=1,
     )
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
-        kernel,
-        num_adaptation_steps=num_adaptation_steps,
-        validate_args=True)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
+        kernel, num_adaptation_steps=num_adaptation_steps, validate_args=True)
+    kernel = dassa.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=num_adaptation_steps)
-    kernel = tfp.mcmc.TransformedTransitionKernel(
-        kernel, [tfb.Identity(), tfb.Exp()])
+    kernel = transformed_kernel.TransformedTransitionKernel(
+        kernel, [identity.Identity(), exp.Exp()])
 
     def trace_fn(_, pkr):
       return (
@@ -167,7 +176,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     # The chain will be stepped for num_results + num_burnin_steps, adapting for
     # the first num_adaptation_steps.
     chain, [step_size, max_trajectory_length, log_accept_ratio] = (
-        tfp.mcmc.sample_chain(
+        sample.sample_chain(
             num_results=num_results,
             num_burnin_steps=num_burnin_steps,
             current_state=[
@@ -179,7 +188,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
             seed=test_util.test_seed(sampler_type='stateless')))
 
     p_accept = tf.math.exp(
-        tfp.math.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
+        generic.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
     mean_step_size = tf.reduce_mean(step_size)
     mean_max_trajectory_length = tf.reduce_mean(max_trajectory_length)
 
@@ -198,18 +207,19 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     state = np.array([[0.1, 0.2]], self.dtype)
     accept_prob = np.ones([], self.dtype)
     # This doesn't fail because state_mean is provided externally.
-    self.evaluate(tfp.experimental.mcmc.snaper_criterion(
-        state,
-        state,
-        accept_prob,
-        2.,
-        direction=tf.ones_like(state),
-        state_mean=state,
-        state_mean_weight=0.1,
-    ))
+    self.evaluate(
+        gbtla.snaper_criterion(
+            state,
+            state,
+            accept_prob,
+            2.,
+            direction=tf.ones_like(state),
+            state_mean=state,
+            state_mean_weight=0.1,
+        ))
 
   @parameterized.named_parameters(
-      ('ChEES', tfp.experimental.mcmc.chees_criterion),
+      ('ChEES', gbtla.chees_criterion),
       ('SNAPER', snaper_criterion_dummy_direction),
   )
   def testScalarState(self, criterion_fn):
@@ -217,12 +227,12 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     def target_log_prob_fn(x):
       return -x**2 / 2
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         step_size=0.1,
         num_leapfrog_steps=1,
     )
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=5,
         adaptation_rate=1.,
@@ -245,7 +255,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
                final_kernel_results.max_trajectory_length), 0.0005)
 
   @parameterized.named_parameters(
-      ('ChEES', tfp.experimental.mcmc.chees_criterion),
+      ('ChEES', gbtla.chees_criterion),
       ('SNAPER', snaper_criterion_dummy_direction),
   )
   def testTensorState(self, criterion_fn):
@@ -253,13 +263,13 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     def target_log_prob_fn(x):
       return -tf.reduce_mean(x**2, [-1, -2]) / 2
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         step_size=0.1,
         num_leapfrog_steps=1,
     )
     kernel = (
-        tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+        gbtla.GradientBasedTrajectoryLengthAdaptation(
             kernel,
             num_adaptation_steps=5,
             adaptation_rate=1.,
@@ -282,7 +292,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
                final_kernel_results.max_trajectory_length), 0.0005)
 
   @parameterized.named_parameters(
-      ('ChEES', tfp.experimental.mcmc.chees_criterion),
+      ('ChEES', gbtla.chees_criterion),
       ('SNAPER', snaper_criterion_dummy_direction),
   )
   def testListState(self, criterion_fn):
@@ -290,12 +300,12 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     def target_log_prob_fn(x, y):
       return -x**2 / 2 - y**2 / 2
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         step_size=0.1,
         num_leapfrog_steps=1,
     )
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=5,
         adaptation_rate=1.,
@@ -318,15 +328,15 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
                final_kernel_results.max_trajectory_length), 0.0005)
 
   @parameterized.named_parameters(
-      ('ChEES', tfp.experimental.mcmc.chees_rate_criterion),
+      ('ChEES', gbtla.chees_rate_criterion),
       ('SNAPER', snaper_criterion_2d_direction),
   )
   def testAdaptation(self, criterion_fn):
     if tf.executing_eagerly() and not JAX_MODE:
       self.skipTest('Too slow for TF Eager.')
 
-    target = tfd.Independent(
-        tfd.Normal(0., tf.constant([1., 10.], self.dtype)), 1)
+    target = independent.Independent(
+        normal.Normal(0., tf.constant([1., 10.], self.dtype)), 1)
 
     num_burnin_steps = 1000
     num_adaptation_steps = int(num_burnin_steps * 0.8)
@@ -334,17 +344,17 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     num_chains = 16
     step_size = 0.1
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target.log_prob,
         step_size=step_size,
         num_leapfrog_steps=1,
     )
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         kernel,
         num_adaptation_steps=num_adaptation_steps,
         criterion_fn=criterion_fn,
         validate_args=True)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = dassa.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=num_adaptation_steps)
 
     def trace_fn(_, pkr):
@@ -358,7 +368,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     # The chain will be stepped for num_results + num_burnin_steps, adapting for
     # the first num_adaptation_steps.
     chain, [step_size, max_trajectory_length, log_accept_ratio] = (
-        tfp.mcmc.sample_chain(
+        sample.sample_chain(
             num_results=num_results,
             num_burnin_steps=num_burnin_steps,
             current_state=tf.zeros([num_chains, 2], dtype=self.dtype),
@@ -367,7 +377,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
             seed=test_util.test_seed(sampler_type='stateless')))
 
     p_accept = tf.math.exp(
-        tfp.math.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
+        generic.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
     mean_step_size = tf.reduce_mean(step_size)
     mean_max_trajectory_length = tf.reduce_mean(max_trajectory_length)
 
@@ -388,8 +398,8 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     if tf.executing_eagerly() and not JAX_MODE:
       self.skipTest('Too slow for TF Eager.')
 
-    target = tfd.Independent(
-        tfd.Normal(0., tf.constant([1., 10.], self.dtype)), 1)
+    target = independent.Independent(
+        normal.Normal(0., tf.constant([1., 10.], self.dtype)), 1)
 
     num_burnin_steps = 1000
     num_adaptation_steps = int(num_burnin_steps * 0.8)
@@ -397,18 +407,16 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     num_chains = 16
     step_size = 0.1
 
-    kernel = tfp.experimental.mcmc.PreconditionedHamiltonianMonteCarlo(
+    kernel = phmc.PreconditionedHamiltonianMonteCarlo(
         target_log_prob_fn=target.log_prob,
         step_size=step_size,
         num_leapfrog_steps=1,
-        momentum_distribution=tfd.Independent(
-            tfd.Normal(0., tf.constant([1., 1. / 10.], self.dtype)), 1),
+        momentum_distribution=independent.Independent(
+            normal.Normal(0., tf.constant([1., 1. / 10.], self.dtype)), 1),
     )
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
-        kernel,
-        num_adaptation_steps=num_adaptation_steps,
-        validate_args=True)
-    kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
+        kernel, num_adaptation_steps=num_adaptation_steps, validate_args=True)
+    kernel = dassa.DualAveragingStepSizeAdaptation(
         kernel, num_adaptation_steps=num_adaptation_steps)
 
     def trace_fn(_, pkr):
@@ -422,7 +430,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     # The chain will be stepped for num_results + num_burnin_steps, adapting for
     # the first num_adaptation_steps.
     chain, [step_size, max_trajectory_length, log_accept_ratio] = (
-        tfp.mcmc.sample_chain(
+        sample.sample_chain(
             num_results=num_results,
             num_burnin_steps=num_burnin_steps,
             current_state=tf.zeros([num_chains, 2], dtype=self.dtype),
@@ -431,7 +439,7 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
             seed=test_util.test_seed(sampler_type='stateless')))
 
     p_accept = tf.math.exp(
-        tfp.math.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
+        generic.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
     mean_step_size = tf.reduce_mean(step_size)
     mean_max_trajectory_length = tf.reduce_mean(max_trajectory_length)
 
@@ -451,16 +459,13 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
     def target_log_prob_fn(x):
       return -x**2
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(
+    kernel = hmc.HamiltonianMonteCarlo(
         target_log_prob_fn=target_log_prob_fn,
         step_size=0.1,
         num_leapfrog_steps=1,
     )
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
-        kernel,
-        num_adaptation_steps=1,
-        adaptation_rate=1.,
-        validate_args=True)
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
+        kernel, num_adaptation_steps=1, adaptation_rate=1., validate_args=True)
 
     state = tf.zeros([64], self.dtype)
     seed = test_util.test_seed(sampler_type='stateless')
@@ -486,8 +491,8 @@ class _GradientBasedTrajectoryLengthAdaptationTest(test_util.TestCase):
                         step_2_kernel_results.max_trajectory_length)
 
   @parameterized.named_parameters(
-      ('ChEES', tfp.experimental.mcmc.chees_criterion),
-      ('ChEESR', tfp.experimental.mcmc.chees_rate_criterion),
+      ('ChEES', gbtla.chees_criterion),
+      ('ChEESR', gbtla.chees_rate_criterion),
       ('SNAPER', snaper_criterion_dummy_direction),
   )
   def testCriterionStateEquivalence(self, criterion_fn):
@@ -528,22 +533,20 @@ class GradientBasedTrajectoryLengthAdaptationTestFloat64(
 class DistributedGBTLATest(distribute_test_lib.DistributedTest):
 
   def test_gbtla_kernel_tracks_axis_names(self):
-    inner_kernel = tfp.mcmc.HamiltonianMonteCarlo(tfd.Normal(0, 1).log_prob,
-                                                  step_size=1.9,
-                                                  num_leapfrog_steps=2)
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
-        inner_kernel, 1)
+    inner_kernel = hmc.HamiltonianMonteCarlo(
+        normal.Normal(0, 1).log_prob, step_size=1.9, num_leapfrog_steps=2)
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(inner_kernel, 1)
     self.assertIsNone(kernel.experimental_shard_axis_names)
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         inner_kernel, 1, experimental_shard_axis_names=['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         inner_kernel, 1).experimental_with_shard_axes(['a'])
     self.assertListEqual(kernel.experimental_shard_axis_names, ['a'])
 
   @parameterized.named_parameters(
-      ('ChEES', tfp.experimental.mcmc.chees_criterion),
-      ('ChEESR', tfp.experimental.mcmc.chees_rate_criterion),
+      ('ChEES', gbtla.chees_criterion),
+      ('ChEESR', gbtla.chees_rate_criterion),
       ('SNAPER', snaper_criterion_dummy_direction),
   )
   def test_gbtla_kernel_computes_same_criterion_info_with_sharded_state(
@@ -555,15 +558,13 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
       self.skipTest('Test in TF runs into `merge_call` error: see b/178944108')
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + distribute_lib.psum(tfd.Normal(
-              distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b), 'foo'))
+      return (normal.Normal(0., 1.).log_prob(a) + distribute_lib.psum(
+          normal.Normal(distribute_lib.pbroadcast(a, 'foo'), 1.).log_prob(b),
+          'foo'))
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
-                                            step_size=1e-2,
-                                            num_leapfrog_steps=2)
-    kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+    kernel = hmc.HamiltonianMonteCarlo(
+        target_log_prob, step_size=1e-2, num_leapfrog_steps=2)
+    kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
         kernel, 10, criterion_fn=criterion_fn)
     sharded_kernel = kernel.experimental_with_shard_axes([None, ['foo']])
 
@@ -593,22 +594,20 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
       self.assertAllClose(avg_max_tl[0], avg_max_tl[i])
 
   @parameterized.named_parameters(
-      ('ChEES', tfp.experimental.mcmc.chees_criterion),
-      ('ChEESR', tfp.experimental.mcmc.chees_rate_criterion),
+      ('ChEES', gbtla.chees_criterion),
+      ('ChEESR', gbtla.chees_rate_criterion),
       ('SNAPER', snaper_criterion_dummy_direction),
   )
   def test_gbtla_kernel_can_shard_chains_across_devices(self, criterion_fn):
 
     def target_log_prob(a, b):
-      return (
-          tfd.Normal(0., 1.).log_prob(a)
-          + tfd.Sample(tfd.Normal(a, 1.), 4).log_prob(b))
+      return (normal.Normal(0., 1.).log_prob(a) +
+              sample_dist_lib.Sample(normal.Normal(a, 1.), 4).log_prob(b))
 
-    kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob,
-                                            step_size=1e-2,
-                                            num_leapfrog_steps=2)
+    kernel = hmc.HamiltonianMonteCarlo(
+        target_log_prob, step_size=1e-2, num_leapfrog_steps=2)
     sharded_kernel = (
-        tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+        gbtla.GradientBasedTrajectoryLengthAdaptation(
             kernel,
             10,
             experimental_reduce_chain_axis_names=self.axis_name,
@@ -628,8 +627,10 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
           kr.averaged_max_trajectory_length
       )
 
-    seeds = self.shard_values(tf.stack(tfp.random.split_seed(
-        samplers.zeros_seed(), distribute_test_lib.NUM_DEVICES)), 0)
+    seeds = self.shard_values(
+        tf.stack(
+            samplers.split_seed(samplers.zeros_seed(),
+                                distribute_test_lib.NUM_DEVICES)), 0)
 
     avg_sq_grad, avg_max_tl = self.evaluate(
         self.per_replica_to_tensor(self.strategy_run(
@@ -640,7 +641,7 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
       self.assertAllClose(avg_max_tl[0], avg_max_tl[i])
 
   @parameterized.named_parameters(
-      ('ChEES', tfp.experimental.mcmc.chees_rate_criterion),
+      ('ChEES', gbtla.chees_rate_criterion),
       ('SNAPER', snaper_criterion_2d_direction),
   )
   def test_adaptation(self, criterion_fn):
@@ -650,8 +651,8 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
     if not JAX_MODE:
       self.skipTest('TF does not have pmax implemented.')
 
-    target = tfd.Independent(
-        tfd.Normal(0., tf.constant([1., 10.])), 1)
+    target = independent.Independent(
+        normal.Normal(0., tf.constant([1., 10.])), 1)
 
     def run(seed):
       num_burnin_steps = 1000
@@ -660,19 +661,20 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
       num_chains = 16 // distribute_test_lib.NUM_DEVICES
       step_size = 0.1
 
-      kernel = tfp.mcmc.HamiltonianMonteCarlo(
+      kernel = hmc.HamiltonianMonteCarlo(
           target_log_prob_fn=target.log_prob,
           step_size=step_size,
           num_leapfrog_steps=1,
       )
-      kernel = tfp.experimental.mcmc.GradientBasedTrajectoryLengthAdaptation(
+      kernel = gbtla.GradientBasedTrajectoryLengthAdaptation(
           kernel,
           num_adaptation_steps=num_adaptation_steps,
           criterion_fn=criterion_fn,
           experimental_reduce_chain_axis_names=self.axis_name,
           validate_args=True)
-      kernel = tfp.mcmc.DualAveragingStepSizeAdaptation(
-          kernel, num_adaptation_steps=num_adaptation_steps,
+      kernel = dassa.DualAveragingStepSizeAdaptation(
+          kernel,
+          num_adaptation_steps=num_adaptation_steps,
           experimental_reduce_chain_axis_names=self.axis_name)
 
       def trace_fn(_, pkr):
@@ -686,7 +688,7 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
       # The chain will be stepped for num_results + num_burnin_steps, adapting
       # for the first num_adaptation_steps.
       chain, [step_size, max_trajectory_length, log_accept_ratio] = (
-          tfp.mcmc.sample_chain(
+          sample.sample_chain(
               num_results=num_results,
               num_burnin_steps=num_burnin_steps,
               current_state=tf.zeros([num_chains, 2]),
@@ -695,7 +697,7 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
               seed=seed))
 
       p_accept = tf.math.exp(
-          tfp.math.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
+          generic.reduce_logmeanexp(tf.minimum(log_accept_ratio, 0.)))
       mean_step_size = tf.reduce_mean(step_size)
       mean_max_trajectory_length = tf.reduce_mean(max_trajectory_length)
       mean = tf.reduce_mean(chain, axis=[0, 1])
@@ -703,8 +705,10 @@ class DistributedGBTLATest(distribute_test_lib.DistributedTest):
 
       return mean, var, p_accept, mean_step_size, mean_max_trajectory_length
 
-    seeds = self.shard_values(tf.stack(tfp.random.split_seed(
-        samplers.zeros_seed(), distribute_test_lib.NUM_DEVICES)), 0)
+    seeds = self.shard_values(
+        tf.stack(
+            samplers.split_seed(samplers.zeros_seed(),
+                                distribute_test_lib.NUM_DEVICES)), 0)
 
     (mean, var, p_accept, mean_step_size, mean_max_trajectory_length) = (
         self.evaluate(

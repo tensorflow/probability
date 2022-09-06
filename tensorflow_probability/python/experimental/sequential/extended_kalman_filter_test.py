@@ -16,28 +16,28 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.distributions import mvn_diag
+from tensorflow_probability.python.experimental.sequential import extended_kalman_filter
 from tensorflow_probability.python.internal import prefer_static
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 @test_util.test_all_tf_execution_regimes
 class ExtendedKalmanFilterTest(test_util.TestCase):
 
   def test_simple_nonlinear_system(self):
-    initial_state_prior = tfd.MultivariateNormalDiag(
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
         0., scale_diag=[1., 0.3], validate_args=True)
     observation_noise_scale = 0.5
 
     # x_{0, t+1} = x_{0, t} - 0.1 * x_{1, t}**3; x_{1, t+1} = x_{1, t}
     def transition_fn(x):
-      return tfd.MultivariateNormalDiag(
-          tf.stack(
-              [x[..., 0] - 0.1 * tf.pow(x[..., 1], 3), x[..., 1]], axis=-1),
-          scale_diag=[0.5, 0.05], validate_args=True)
+      return mvn_diag.MultivariateNormalDiag(
+          tf.stack([x[..., 0] - 0.1 * tf.pow(x[..., 1], 3), x[..., 1]],
+                   axis=-1),
+          scale_diag=[0.5, 0.05],
+          validate_args=True)
 
     def transition_jacobian_fn(x):
       return tf.reshape(
@@ -47,10 +47,8 @@ class ExtendedKalmanFilterTest(test_util.TestCase):
           [2, 2])
 
     def observation_fn(x):
-      return tfd.MultivariateNormalDiag(
-          x[..., :1],
-          scale_diag=[observation_noise_scale],
-          validate_args=True)
+      return mvn_diag.MultivariateNormalDiag(
+          x[..., :1], scale_diag=[observation_noise_scale], validate_args=True)
 
     observation_jacobian_fn = lambda x: [[1., 0.]]
 
@@ -62,7 +60,7 @@ class ExtendedKalmanFilterTest(test_util.TestCase):
     x = tf.stack(x)
     observations = observation_fn(x).sample(seed=test_util.test_seed())
 
-    results = tfp.experimental.sequential.extended_kalman_filter(
+    results = extended_kalman_filter.extended_kalman_filter(
         observations=observations,
         initial_state_prior=initial_state_prior,
         transition_fn=transition_fn,
@@ -94,7 +92,7 @@ class ExtendedKalmanFilterTest(test_util.TestCase):
     # test structured input
     observations_struct = {'a': observations, 'b': (observations, observations)}
     nested_results = self.evaluate(
-        tfp.experimental.sequential.extended_kalman_filter(
+        extended_kalman_filter.extended_kalman_filter(
             observations=observations_struct,
             initial_state_prior=initial_state_prior,
             transition_fn=transition_fn,
@@ -113,7 +111,7 @@ class ExtendedKalmanFilterTest(test_util.TestCase):
       loc = tf.stack(
           [x[..., 0], tf.reduce_sum(x, axis=-1), tf.reduce_prod(x, axis=-1)],
           axis=-1)
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           loc, scale_diag=[0.5, 0.5, 0.5], validate_args=True)
 
     def observation_jacobian_fn_3dim(x):
@@ -122,7 +120,7 @@ class ExtendedKalmanFilterTest(test_util.TestCase):
 
     observations_3dim = observation_fn_3dim(x).sample(
         seed=test_util.test_seed())
-    results_3dim = tfp.experimental.sequential.extended_kalman_filter(
+    results_3dim = extended_kalman_filter.extended_kalman_filter(
         observations=observations_3dim,
         initial_state_prior=initial_state_prior,
         transition_fn=transition_fn,
@@ -157,7 +155,7 @@ class ExtendedKalmanFilterTest(test_util.TestCase):
       p_s = 1. - tf.math.exp(-infection_rate * x[..., 1] / population_size)
       p_r = 1. - tf.math.exp(-recovery_rate)
       d_s = -x[..., 0] * p_s
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           x + tf.stack([d_s, -d_s - x[..., 1] * p_r], axis=-1),
           scale_diag=tf.stack(
               [x[..., 0] * p_s * (1 - p_s), x[..., 1] * p_r * (1 - p_r)],
@@ -179,7 +177,7 @@ class ExtendedKalmanFilterTest(test_util.TestCase):
     # We use the Binomial mean and covariance, assuming observed infections are
     # detected with `prob=detection_rate`.
     def observation_fn(x):
-      return tfd.MultivariateNormalDiag(
+      return mvn_diag.MultivariateNormalDiag(
           detection_rate * x[..., 1:],
           scale_diag=x[..., 1:] * detection_rate * (1 - detection_rate),
           validate_args=True)
@@ -188,11 +186,11 @@ class ExtendedKalmanFilterTest(test_util.TestCase):
 
     # Start with an incorrect guess for susceptible and infected.
     x = np.array([population_size - 25, 25]).astype(np.float32)
-    initial_state_prior = tfd.MultivariateNormalDiag(
-        x, scale_diag=0.1*x, validate_args=True)
+    initial_state_prior = mvn_diag.MultivariateNormalDiag(
+        x, scale_diag=0.1 * x, validate_args=True)
 
     results = self.evaluate(
-        tfp.experimental.sequential.extended_kalman_filter(
+        extended_kalman_filter.extended_kalman_filter(
             observations=observed_infections,
             initial_state_prior=initial_state_prior,
             transition_fn=transition_fn,

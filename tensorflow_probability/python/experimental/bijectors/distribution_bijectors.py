@@ -16,7 +16,11 @@
 
 
 import tensorflow.compat.v2 as tf
-from tensorflow_probability.python import bijectors as tfb
+from tensorflow_probability.python.bijectors import inline
+from tensorflow_probability.python.bijectors import invert
+from tensorflow_probability.python.bijectors import normal_cdf
+from tensorflow_probability.python.bijectors import scale
+from tensorflow_probability.python.bijectors import shift
 from tensorflow_probability.python.distributions import deterministic
 from tensorflow_probability.python.distributions import independent
 from tensorflow_probability.python.distributions import joint_distribution
@@ -34,24 +38,29 @@ from tensorflow_probability.python.internal import samplers
 
 # pylint: disable=g-long-lambda,protected-access
 preconditioning_bijector_fns = {
-    deterministic.Deterministic: (
-        lambda d: d.experimental_default_event_space_bijector()),
-    independent.Independent: lambda d: make_distribution_bijector(
-        d.distribution),
-    markov_chain.MarkovChain: lambda d: markov_chain._MarkovChainBijector(
-        chain=d,
-        transition_bijector=make_distribution_bijector(
-            d.transition_fn(
-                0, d.initial_state_prior.sample(seed=samplers.zeros_seed()))),
-        bijector_fn=make_distribution_bijector),
-    normal.Normal: lambda d: tfb.Shift(d.loc)(tfb.Scale(d.scale)),
-    sample.Sample: lambda d: sample._DefaultSampleBijector(
-        distribution=d.distribution,
-        sample_shape=d.sample_shape,
-        sum_fn=d._sum_fn(),
-        bijector=make_distribution_bijector(d.distribution)),
-    uniform.Uniform: lambda d: (
-        tfb.Shift(d.low)(tfb.Scale(d.high - d.low)(tfb.NormalCDF())))
+    deterministic.Deterministic:
+        (lambda d: d.experimental_default_event_space_bijector()),
+    independent.Independent:
+        lambda d: make_distribution_bijector(d.distribution),
+    markov_chain.MarkovChain:
+        lambda d: markov_chain._MarkovChainBijector(
+            chain=d,
+            transition_bijector=make_distribution_bijector(
+                d.transition_fn(
+                    0, d.initial_state_prior.sample(seed=samplers.zeros_seed()))
+            ),
+            bijector_fn=make_distribution_bijector),
+    normal.Normal:
+        lambda d: shift.Shift(d.loc)(scale.Scale(d.scale)),
+    sample.Sample:
+        lambda d: sample._DefaultSampleBijector(
+            distribution=d.distribution,
+            sample_shape=d.sample_shape,
+            sum_fn=d._sum_fn(),
+            bijector=make_distribution_bijector(d.distribution)),
+    uniform.Uniform:
+        lambda d: (shift.Shift(d.low)(scale.Scale(d.high - d.low)
+                                      (normal_cdf.NormalCDF())))
 }
 # pylint: enable=g-long-lambda,protected-access
 
@@ -232,19 +241,20 @@ def make_distribution_bijector(distribution, name='make_distribution_bijector'):
     if implements_cdf and implements_quantile:
       # This path will only trigger for scalar distributions, since multivariate
       # distributions have non-invertible CDF and so cannot define a `quantile`.
-      return tfb.Inline(forward_fn=distribution.quantile,
-                        inverse_fn=distribution.cdf,
-                        forward_min_event_ndims=ps.rank_from_shape(
-                            distribution.event_shape_tensor,
-                            distribution.event_shape))(tfb.NormalCDF())
+      return inline.Inline(
+          forward_fn=distribution.quantile,
+          inverse_fn=distribution.cdf,
+          forward_min_event_ndims=ps.rank_from_shape(
+              distribution.event_shape_tensor, distribution.event_shape))(
+                  normal_cdf.NormalCDF())
 
     # If the events are scalar, try to invert the CDF numerically.
     if implements_cdf and tf.get_static_value(distribution.is_scalar_event()):
-      return tfb.Invert(
+      return invert.Invert(
           scalar_function_with_inferred_inverse
           .ScalarFunctionWithInferredInverse(
-              distribution.cdf,
-              domain_constraint_fn=(event_space_bijector)))(tfb.NormalCDF())
+              distribution.cdf, domain_constraint_fn=(event_space_bijector)))(
+                  normal_cdf.NormalCDF())
 
     raise NotImplementedError('Could not automatically construct a '
                               'bijector for distribution type '

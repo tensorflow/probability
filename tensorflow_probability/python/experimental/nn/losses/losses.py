@@ -21,7 +21,7 @@ from tensorflow_probability.python.distributions import kullback_leibler as kl_l
 from tensorflow_probability.python.experimental.nn import layers as layers_lib
 from tensorflow_probability.python.experimental.nn import variational_base as vi_lib
 from tensorflow_probability.python.internal.reparameterization import FULLY_REPARAMETERIZED
-from tensorflow_probability.python.monte_carlo import expectation
+from tensorflow_probability.python.monte_carlo.expectation import expectation
 
 
 __all__ = [

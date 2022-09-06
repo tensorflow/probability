@@ -48,6 +48,7 @@ multi_substrate_py_library(
     deps = [
         # tensorflow dep,
         "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
         "//tensorflow_probability/python/distributions:mvn_tril",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:prefer_static",
@@ -59,7 +60,10 @@ multi_substrate_py_library(
     srcs = ["ensemble_kalman_filter.py"],
     deps = [
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
+        "//tensorflow_probability/python/distributions:mvn_linear_operator",
+        "//tensorflow_probability/python/distributions:mvn_low_rank_update_linear_operator_covariance",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/internal:distribution_util",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -68,8 +72,8 @@ multi_substrate_py_library(
     name = "ensemble_adjustment_kalman_filter",
     srcs = ["ensemble_adjustment_kalman_filter.py"],
     deps = [
+        ":ensemble_kalman_filter",
         # tensorflow dep,
-        "//tensorflow_probability/python/distributions",
         "//tensorflow_probability/python/internal:dtype_util",
     ],
 )
@@ -85,7 +89,7 @@ multi_substrate_py_test(
         ":extended_kalman_filter",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -100,9 +104,13 @@ multi_substrate_py_test(
         ":ensemble_kalman_filter",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:joint_distribution_named",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:mvn_tril",
+        "//tensorflow_probability/python/distributions:poisson",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/stats:sample_stats",
     ],
 )
 
@@ -112,9 +120,11 @@ multi_substrate_py_test(
     srcs = ["ensemble_adjustment_kalman_filter_test.py"],
     deps = [
         ":ensemble_adjustment_kalman_filter",
+        ":ensemble_kalman_filter",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/distributions:joint_distribution_named",
+        "//tensorflow_probability/python/distributions:mvn_diag",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:test_util",
     ],
@@ -125,8 +135,14 @@ multi_substrate_py_library(
     srcs = ["iterated_filter.py"],
     deps = [
         # tensorflow dep,
+        "//tensorflow_probability/python/bijectors:invert",
+        "//tensorflow_probability/python/distributions:distribution",
         "//tensorflow_probability/python/distributions:independent",
+        "//tensorflow_probability/python/distributions:joint_distribution_named",
+        "//tensorflow_probability/python/distributions:joint_distribution_sequential",
         "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/experimental/mcmc:particle_filter",
         "//tensorflow_probability/python/internal:prefer_static",
     ],
 )
@@ -140,7 +156,13 @@ multi_substrate_py_test(
         ":iterated_filter",
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
+        "//tensorflow_probability/python/bijectors:softplus",
+        "//tensorflow_probability/python/distributions:deterministic",
+        "//tensorflow_probability/python/distributions:joint_distribution_named",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:poisson",
+        "//tensorflow_probability/python/distributions:transformed_distribution",
+        "//tensorflow_probability/python/distributions:uniform",
         "//tensorflow_probability/python/internal:test_util",
     ],
 )

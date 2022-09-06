@@ -18,11 +18,12 @@ import collections
 
 # Dependency imports
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.experimental.mcmc import expectations_reducer
+from tensorflow_probability.python.experimental.mcmc import step
+from tensorflow_probability.python.experimental.mcmc import with_reductions
 from tensorflow_probability.python.experimental.mcmc.internal import test_fixtures
 from tensorflow_probability.python.internal import test_util
-
-tfd = tfp.distributions
 
 
 FakeKernelResults = collections.namedtuple(
@@ -44,7 +45,7 @@ class ExpectationsReducerTest(test_util.TestCase):
       del sample
       return kr.inner_results.value
 
-    mean_reducer = tfp.experimental.mcmc.ExpectationsReducer(
+    mean_reducer = expectations_reducer.ExpectationsReducer(
         transform_fn=[kernel_average, inner_average])
     kernel_results = FakeKernelResults(0, FakeInnerResults(0))
     state = mean_reducer.initialize(0, kernel_results)
@@ -55,7 +56,7 @@ class ExpectationsReducerTest(test_util.TestCase):
     self.assertEqual([2.5, 3.5], mean)
 
   def test_chunking(self):
-    mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
+    mean_reducer = expectations_reducer.ExpectationsReducer()
     state = mean_reducer.initialize(tf.ones((3,)))
     for sample in range(6):
       state = mean_reducer.one_step(
@@ -66,10 +67,9 @@ class ExpectationsReducerTest(test_util.TestCase):
 
   def test_in_step_kernel(self):
     fake_kernel = test_fixtures.TestTransitionKernel()
-    mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
-    reduced_kernel = tfp.experimental.mcmc.WithReductions(
-        fake_kernel, mean_reducer)
-    _, kernel_results = tfp.experimental.mcmc.step_kernel(
+    mean_reducer = expectations_reducer.ExpectationsReducer()
+    reduced_kernel = with_reductions.WithReductions(fake_kernel, mean_reducer)
+    _, kernel_results = step.step_kernel(
         num_steps=5,
         current_state=8,
         kernel=reduced_kernel,
@@ -81,8 +81,8 @@ class ExpectationsReducerTest(test_util.TestCase):
 
   @test_util.numpy_disable_test_missing_functionality('composite tensors')
   def test_composite_kernel_results(self):
-    kr = tfd.Normal(0., 1.)
-    mean_reducer = tfp.experimental.mcmc.ExpectationsReducer()
+    kr = normal.Normal(0., 1.)
+    mean_reducer = expectations_reducer.ExpectationsReducer()
     state = mean_reducer.initialize(tf.zeros((2,)), kr)
     state = mean_reducer.one_step(tf.ones((2,)), state, kr)
     mean_reducer.finalize(state)

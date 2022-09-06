@@ -16,18 +16,16 @@
 
 import numpy as np
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
 
+from tensorflow_probability.python.experimental.distributions import marginal_fns
 from tensorflow_probability.python.internal import test_util
-
-
-marginal_fns = tfp.experimental.distributions.marginal_fns
+from tensorflow_probability.python.math import gradient
 
 
 def _value_and_grads(f, x, has_aux=False):
-  val, grad = tfp.math.value_and_gradient(f, x, has_aux=has_aux)
-  _, grad_of_grad = tfp.math.value_and_gradient(
-      lambda t: tfp.math.value_and_gradient(f, t)[1], x)
+  val, grad = gradient.value_and_gradient(f, x, has_aux=has_aux)
+  _, grad_of_grad = gradient.value_and_gradient(
+      lambda t: gradient.value_and_gradient(f, t)[1], x)
   return val, grad, grad_of_grad
 
 

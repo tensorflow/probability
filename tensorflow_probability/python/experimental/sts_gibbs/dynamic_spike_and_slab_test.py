@@ -20,13 +20,12 @@ import numpy as np
 
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
+from tensorflow_probability.python.distributions import inverse_gamma
+from tensorflow_probability.python.distributions import normal_conjugate_posteriors as ncp
 from tensorflow_probability.python.experimental.sts_gibbs import dynamic_spike_and_slab
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
 from tensorflow_probability.python.mcmc.internal import util as mcmc_util
-
-tfd = tfp.distributions
 
 
 def _compute_conditional_weights_mean(nonzeros, weights_posterior_precision,
@@ -106,13 +105,12 @@ class SpikeAndSlabTest(test_util.TestCase):
     # other weights to be zero (which is sensible in this case), versus slicing
     # into the covariance which would give the marginal (unconditional) prior
     # on the selected weights.
-    (restricted_weights_posterior_mean,
-     _) = tfd.mvn_conjugate_linear_update(
-         prior_scale=tf.linalg.cholesky(
-             tf.linalg.inv(nonzero_submatrix(sampler.weights_prior_precision))),
-         linear_transformation=nonzero_subvector(design_matrix),
-         likelihood_scale=tf.eye(20),
-         observation=targets)
+    (restricted_weights_posterior_mean, _) = ncp.mvn_conjugate_linear_update(
+        prior_scale=tf.linalg.cholesky(
+            tf.linalg.inv(nonzero_submatrix(sampler.weights_prior_precision))),
+        linear_transformation=nonzero_subvector(design_matrix),
+        likelihood_scale=tf.eye(20),
+        observation=targets)
 
     # The sampler's posterior should match the posterior from the restricted
     # problem.
@@ -139,11 +137,11 @@ class SpikeAndSlabTest(test_util.TestCase):
     observation_noise_variance_prior_concentration = 0.03
     observation_noise_variance_prior_scale = 0.015
     # Posterior on noise variance if all weights are zero.
-    naive_posterior = tfd.InverseGamma(
+    naive_posterior = inverse_gamma.InverseGamma(
         concentration=(observation_noise_variance_prior_concentration +
                        num_outputs / 2.),
-        scale=(observation_noise_variance_prior_scale + tf.reduce_sum(
-            tf.square(targets), axis=-1) / 2.))
+        scale=(observation_noise_variance_prior_scale +
+               tf.reduce_sum(tf.square(targets), axis=-1) / 2.))
 
     # Compare to sampler with weights constrained to near-zero.
     # We can do this by reducing the width of the slab (here),

@@ -43,9 +43,9 @@ import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
 
-from tensorflow_probability.python import math as tfp_math
 from tensorflow_probability.python import random as tfp_random
 from tensorflow_probability.python.experimental import auto_batching as ab
+from tensorflow_probability.python.math import gradient
 from tensorflow_probability.python.mcmc import kernel as kernel_base
 from tensorflow_probability.python.util.seed_stream import SeedStream
 
@@ -171,8 +171,10 @@ class NoUTurnSampler(kernel_base.TransitionKernel):
     self.name = "nuts_kernel" if name is None else name
     # TODO(b/125544625): Identify why we need `use_gradient_tape=True`, i.e.,
     # what's different between `tape.gradient` and `tf.gradient`.
-    value_and_gradients_fn = lambda *args: tfp_math.value_and_gradient(  # pylint: disable=g-long-lambda
-        self.target_log_prob_fn, args, use_gradient_tape=True)
+    value_and_gradients_fn = lambda *args: gradient.value_and_gradient(  # pylint: disable=g-long-lambda
+        self.target_log_prob_fn,
+        args,
+        use_gradient_tape=True)
     self.value_and_gradients_fn = _embed_no_none_gradient_check(
         value_and_gradients_fn)
     max_tree_edges = max_tree_depth - 1

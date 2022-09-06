@@ -20,16 +20,33 @@ from absl.testing import parameterized
 import numpy as np
 import tensorflow.compat.v1 as tf1
 import tensorflow.compat.v2 as tf
-import tensorflow_probability as tfp
+from tensorflow_probability.python.bijectors import exp
+from tensorflow_probability.python.bijectors import fill_triangular
+from tensorflow_probability.python.bijectors import identity
+from tensorflow_probability.python.bijectors import joint_map
+from tensorflow_probability.python.bijectors import masked_autoregressive as maf_lib
+from tensorflow_probability.python.bijectors import sigmoid
+from tensorflow_probability.python.bijectors import softplus
+from tensorflow_probability.python.distributions import deterministic
+from tensorflow_probability.python.distributions import exponential
+from tensorflow_probability.python.distributions import gamma
+from tensorflow_probability.python.distributions import independent
+from tensorflow_probability.python.distributions import joint_distribution_coroutine as jdc
+from tensorflow_probability.python.distributions import joint_distribution_named as jdn
+from tensorflow_probability.python.distributions import joint_distribution_sequential as jds
+from tensorflow_probability.python.distributions import laplace
+from tensorflow_probability.python.distributions import logistic
+from tensorflow_probability.python.distributions import normal
+from tensorflow_probability.python.distributions import sample
+from tensorflow_probability.python.distributions import student_t
+from tensorflow_probability.python.experimental.vi import surrogate_posteriors
 from tensorflow_probability.python.internal import nest_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
+from tensorflow_probability.python.vi import optimization
 
 from tensorflow.python.util import nest  # pylint: disable=g-direct-tensorflow-import
-
-tfb = tfp.bijectors
-tfd = tfp.distributions
 
 JAX_MODE = False
 
@@ -50,11 +67,11 @@ class _SurrogatePosterior(object):
     # TODO(davmre): refactor to support testing gradients of stateless
     # surrogates.
     if is_stateless:
-      build_fn = getattr(tfp.experimental.vi, family_str + '_stateless')
+      build_fn = getattr(surrogate_posteriors, family_str + '_stateless')
       init_fn, apply_fn = build_fn(**kwargs)
       return apply_fn(init_fn(seed=seed))
     else:
-      build_fn = getattr(tfp.experimental.vi, family_str)
+      build_fn = getattr(surrogate_posteriors, family_str)
       surrogate_posterior = build_fn(seed=seed, **kwargs)
       self.evaluate([v.initializer
                      for v in surrogate_posterior.trainable_variables])
@@ -110,7 +127,7 @@ class _SurrogatePosterior(object):
 
     # Fit model.
     y = [0.2, 0.5, 0.3, 0.7]
-    losses = tfp.vi.fit_surrogate_posterior(
+    losses = optimization.fit_surrogate_posterior(
         lambda rate, concentration: model.log_prob((rate, concentration, y)),
         surrogate_posterior,
         num_steps=5,  # Don't optimize to completion.
@@ -127,46 +144,67 @@ class _SurrogatePosterior(object):
     self.evaluate([losses, posterior_mean, posterior_stddev])
 
   def _make_gamma_model(self):
-    Root = tfd.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
+    Root = jdc.JointDistributionCoroutine.Root  # pylint: disable=invalid-name
 
     def model_fn():
-      concentration = yield Root(tfd.Exponential(1.))
-      rate = yield Root(tfd.Exponential(1.))
-      y = yield tfd.Sample(  # pylint: disable=unused-variable
-          tfd.Gamma(concentration=concentration, rate=rate),
+      concentration = yield Root(exponential.Exponential(1.))
+      rate = yield Root(exponential.Exponential(1.))
+      y = yield sample.Sample(  # pylint: disable=unused-variable
+          gamma.Gamma(concentration=concentration, rate=rate),
           sample_shape=4)
-    return tfd.JointDistributionCoroutine(model_fn)
+
+    return jdc.JointDistributionCoroutine(model_fn)
 
 
 @test_util.test_all_tf_execution_regimes
 class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 
   @parameterized.named_parameters(
-      {'testcase_name': 'TensorEvent',
-       'event_shape': tf.TensorShape([4]),
-       'bijector': tfb.Sigmoid(),
-       'dtype': np.float64,
-       'is_static': True},
-      {'testcase_name': 'ListEventStateless',
-       'event_shape': [tf.TensorShape([3]),
-                       tf.TensorShape([]),
-                       tf.TensorShape([2, 2])],
-       'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
-       'dtype': np.float32,
-       'is_static': False,
-       'is_stateless': True},
-      {'testcase_name': 'DictEvent',
-       'event_shape': {'x': tf.TensorShape([1]), 'y': tf.TensorShape([])},
-       'bijector': None,
-       'dtype': np.float64,
-       'is_static': True},
-      {'testcase_name': 'NestedEvent',
-       'event_shape': {'x': [tf.TensorShape([1]), tf.TensorShape([1, 2])],
-                       'y': tf.TensorShape([])},
-       'bijector': {
-           'x': [tfb.Identity(), tfb.Softplus()], 'y': tfb.Sigmoid()},
-       'dtype': np.float32,
-       'is_static': True},
+      {
+          'testcase_name': 'TensorEvent',
+          'event_shape': tf.TensorShape([4]),
+          'bijector': sigmoid.Sigmoid(),
+          'dtype': np.float64,
+          'is_static': True
+      },
+      {
+          'testcase_name': 'ListEventStateless',
+          'event_shape':
+              [tf.TensorShape([3]),
+               tf.TensorShape([]),
+               tf.TensorShape([2, 2])],
+          'bijector':
+              [softplus.Softplus(), None,
+               fill_triangular.FillTriangular()],
+          'dtype': np.float32,
+          'is_static': False,
+          'is_stateless': True
+      },
+      {
+          'testcase_name': 'DictEvent',
+          'event_shape': {
+              'x': tf.TensorShape([1]),
+              'y': tf.TensorShape([])
+          },
+          'bijector': None,
+          'dtype': np.float64,
+          'is_static': True
+      },
+      {
+          'testcase_name': 'NestedEvent',
+          'event_shape': {
+              'x': [tf.TensorShape([1]),
+                    tf.TensorShape([1, 2])],
+              'y': tf.TensorShape([])
+          },
+          'bijector': {
+              'x': [identity.Identity(),
+                    softplus.Softplus()],
+              'y': sigmoid.Sigmoid()
+          },
+          'dtype': np.float32,
+          'is_static': True
+      },
   )
   def test_specifying_event_shape(
       self, event_shape, bijector, dtype, is_static, is_stateless=JAX_MODE):
@@ -194,38 +232,53 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
       self._test_gradients(surrogate_posterior, seed=grads_seed)
 
   @parameterized.named_parameters(
-      {'testcase_name': 'TensorEventStateless',
-       'event_shape': [4],
-       'initial_loc': np.array([[[0.9, 0.1, 0.5, 0.7]]]),
-       'batch_shape': [1, 1],
-       'bijector': tfb.Sigmoid(),
-       'dtype': np.float32,
-       'is_static': False,
-       'is_stateless': True},
-      {'testcase_name': 'ListEvent',
-       'event_shape': [[3], [], [2, 2]],
-       'initial_loc': [np.array([0.1, 7., 3.]),
-                       0.1,
-                       np.array([[1., 0], [-4., 2.]])],
-       'batch_shape': [],
-       'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
-       'dtype': np.float64,
-       'is_static': True},
-      {'testcase_name': 'DictEvent',
-       'event_shape': {'x': [2], 'y': []},
-       'initial_loc': {'x': np.array([[0.9, 1.2]]),
-                       'y': np.array([-4.1])},
-       'batch_shape': [1],
-       'bijector': None,
-       'dtype': np.float32,
-       'is_static': False},
-      {'testcase_name': 'ExplicitBatchShape',
-       'event_shape': [[3], [4]],
-       'initial_loc': [0., 0.],
-       'batch_shape': [5, 1],
-       'bijector': None,
-       'dtype': np.float32,
-       'is_static': False},
+      {
+          'testcase_name': 'TensorEventStateless',
+          'event_shape': [4],
+          'initial_loc': np.array([[[0.9, 0.1, 0.5, 0.7]]]),
+          'batch_shape': [1, 1],
+          'bijector': sigmoid.Sigmoid(),
+          'dtype': np.float32,
+          'is_static': False,
+          'is_stateless': True
+      },
+      {
+          'testcase_name': 'ListEvent',
+          'event_shape': [[3], [], [2, 2]],
+          'initial_loc':
+              [np.array([0.1, 7., 3.]), 0.1,
+               np.array([[1., 0], [-4., 2.]])],
+          'batch_shape': [],
+          'bijector':
+              [softplus.Softplus(), None,
+               fill_triangular.FillTriangular()],
+          'dtype': np.float64,
+          'is_static': True
+      },
+      {
+          'testcase_name': 'DictEvent',
+          'event_shape': {
+              'x': [2],
+              'y': []
+          },
+          'initial_loc': {
+              'x': np.array([[0.9, 1.2]]),
+              'y': np.array([-4.1])
+          },
+          'batch_shape': [1],
+          'bijector': None,
+          'dtype': np.float32,
+          'is_static': False
+      },
+      {
+          'testcase_name': 'ExplicitBatchShape',
+          'event_shape': [[3], [4]],
+          'initial_loc': [0., 0.],
+          'batch_shape': [5, 1],
+          'bijector': None,
+          'dtype': np.float32,
+          'is_static': False
+      },
   )
   def test_specifying_initial_loc(
       self, event_shape, initial_loc, batch_shape, bijector, dtype,
@@ -276,16 +329,24 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
         atol=1e-4)
 
   @parameterized.named_parameters(
-      {'testcase_name': 'TensorEventAllDeterministic',
-       'event_shape': [4],
-       'base_distribution_cls': tfd.Deterministic},
-      {'testcase_name': 'ListEventSingleDeterministicStateless',
-       'event_shape': [[3], [], [2, 2]],
-       'base_distribution_cls': tfd.Deterministic,
-       'is_stateless': True},
-      {'testcase_name': 'ListEventDeterministicNormalStudentT',
-       'event_shape': [[3], [], [2, 2]],
-       'base_distribution_cls': [tfd.Deterministic, tfd.Normal, tfd.StudentT]},
+      {
+          'testcase_name': 'TensorEventAllDeterministic',
+          'event_shape': [4],
+          'base_distribution_cls': deterministic.Deterministic
+      },
+      {
+          'testcase_name': 'ListEventSingleDeterministicStateless',
+          'event_shape': [[3], [], [2, 2]],
+          'base_distribution_cls': deterministic.Deterministic,
+          'is_stateless': True
+      },
+      {
+          'testcase_name':
+              'ListEventDeterministicNormalStudentT',
+          'event_shape': [[3], [], [2, 2]],
+          'base_distribution_cls':
+              [deterministic.Deterministic, normal.Normal, student_t.StudentT]
+      },
   )
   def test_specifying_distribution_type(
       self, event_shape, base_distribution_cls, is_stateless=JAX_MODE):
@@ -307,7 +368,7 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
     for cls, d in zip(
         nest_util.broadcast_structure(ds, base_distribution_cls), ds):
       d = _as_concrete_instance(d)
-      while isinstance(d, tfd.Independent):
+      while isinstance(d, independent.Independent):
         d = _as_concrete_instance(d.distribution)
       self.assertIsInstance(d, cls)
 
@@ -315,9 +376,10 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
   def test_that_gamma_fitting_example_runs(self):
     model = self._make_gamma_model()
     surrogate_posterior = (
-        tfp.experimental.vi.build_factored_surrogate_posterior(
+        surrogate_posteriors.build_factored_surrogate_posterior(
             event_shape=model.event_shape_tensor()[:-1],
-            bijector=[tfb.Softplus(), tfb.Softplus()]))
+            bijector=[softplus.Softplus(),
+                      softplus.Softplus()]))
     self._test_fitting(model, surrogate_posterior)
 
   def test_can_jit_creation_of_stateless_surrogate_posterior(self):
@@ -328,18 +390,19 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 
     @jax.jit
     def init(seed):
-      model = tfd.Normal(0., 1.)
+      model = normal.Normal(0., 1.)
       init_fn, _ = (
-          tfp.experimental.vi.build_factored_surrogate_posterior_stateless(
+          surrogate_posteriors.build_factored_surrogate_posterior_stateless(
               event_shape=model.event_shape))
       return init_fn(seed)
     init(seed)
 
   def test_multipart_bijector(self):
-    dist = tfd.JointDistributionNamed({
-        'a': tfd.Exponential(1.),
-        'b': tfd.Normal(0., 1.),
-        'c': lambda b, a: tfd.Sample(tfd.Normal(b, a), sample_shape=[5])})
+    dist = jdn.JointDistributionNamed({
+        'a': exponential.Exponential(1.),
+        'b': normal.Normal(0., 1.),
+        'c': lambda b, a: sample.Sample(normal.Normal(b, a), sample_shape=[5])
+    })
 
     surrogate_posterior = self._initialize_surrogate(
         'build_factored_surrogate_posterior',
@@ -375,39 +438,56 @@ class FactoredSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
 
   @parameterized.named_parameters(
-      {'testcase_name': 'TensorEvent',
-       'dist_classes': tfd.Normal,
-       'event_shape': [4],
-       'operators': [tf.linalg.LinearOperatorLowerTriangular],
-       'initial_loc': np.array([[[0.9, 0.1, 0.5, 0.7]]]),
-       'implicit_batch_shape': [1, 1],
-       'bijector': tfb.Sigmoid(),
-       'dtype': np.float32,
-       'is_static': False},
-      {'testcase_name': 'ListEvent',
-       'dist_classes': [tfd.Laplace, tfd.Normal, tfd.Logistic],
-       'event_shape': [[3], [], [2, 2]],
-       'operators': [tf.linalg.LinearOperatorDiag,
-                     tf.linalg.LinearOperatorDiag,
-                     tf.linalg.LinearOperatorLowerTriangular],
-       'initial_loc': [np.array([0.1, 7., 3.]),
-                       0.1,
-                       np.array([[1., 0], [-4., 2.]])],
-       'implicit_batch_shape': [],
-       'bijector': [tfb.FillTriangular(), None, tfb.Softplus()],
-       'dtype': np.float64,
-       'is_static': True},
-      {'testcase_name': 'DictEventStateless',
-       'dist_classes': {'x': tfd.Logistic, 'y': tfd.Normal},
-       'event_shape': {'x': [2], 'y': []},
-       'operators': 'tril',
-       'initial_loc': {'x': np.array([[0.9, 1.2]]),
-                       'y': np.array([-4.1])},
-       'implicit_batch_shape': [1],
-       'bijector': None,
-       'dtype': np.float32,
-       'is_static': False,
-       'is_stateless': True},
+      {
+          'testcase_name': 'TensorEvent',
+          'dist_classes': normal.Normal,
+          'event_shape': [4],
+          'operators': [tf.linalg.LinearOperatorLowerTriangular],
+          'initial_loc': np.array([[[0.9, 0.1, 0.5, 0.7]]]),
+          'implicit_batch_shape': [1, 1],
+          'bijector': sigmoid.Sigmoid(),
+          'dtype': np.float32,
+          'is_static': False
+      },
+      {
+          'testcase_name': 'ListEvent',
+          'dist_classes': [laplace.Laplace, normal.Normal, logistic.Logistic],
+          'event_shape': [[3], [], [2, 2]],
+          'operators': [
+              tf.linalg.LinearOperatorDiag, tf.linalg.LinearOperatorDiag,
+              tf.linalg.LinearOperatorLowerTriangular
+          ],
+          'initial_loc':
+              [np.array([0.1, 7., 3.]), 0.1,
+               np.array([[1., 0], [-4., 2.]])],
+          'implicit_batch_shape': [],
+          'bijector':
+              [fill_triangular.FillTriangular(), None,
+               softplus.Softplus()],
+          'dtype': np.float64,
+          'is_static': True
+      },
+      {
+          'testcase_name': 'DictEventStateless',
+          'dist_classes': {
+              'x': logistic.Logistic,
+              'y': normal.Normal
+          },
+          'event_shape': {
+              'x': [2],
+              'y': []
+          },
+          'operators': 'tril',
+          'initial_loc': {
+              'x': np.array([[0.9, 1.2]]),
+              'y': np.array([-4.1])
+          },
+          'implicit_batch_shape': [1],
+          'bijector': None,
+          'dtype': np.float32,
+          'is_static': False,
+          'is_stateless': True
+      },
   )
   def test_constrained_affine_from_distributions(
       self, dist_classes, event_shape, operators, initial_loc,
@@ -426,11 +506,10 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
                                     is_static=is_static),
         initial_loc)
     distributions = nest.map_structure_up_to(
-        dist_classes,
-        lambda d, loc, s: tfd.Independent(
+        dist_classes, lambda d, loc, s: independent.Independent(
             d(loc=loc, scale=1.),
-            reinterpreted_batch_ndims=ps.rank_from_shape(s)),
-        dist_classes, initial_loc, event_shape)
+            reinterpreted_batch_ndims=ps.rank_from_shape(s)), dist_classes,
+        initial_loc, event_shape)
     # pylint: enable=g-long-lambda
 
     surrogate_posterior = self._initialize_surrogate(
@@ -457,46 +536,72 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
       self._test_gradients(surrogate_posterior, seed=grads_seed)
 
   @parameterized.named_parameters(
-      {'testcase_name': 'TensorEvent',
-       'event_shape': tf.TensorShape([3]),
-       'operators': [tf.linalg.LinearOperatorDiag],
-       'batch_shape': (),
-       'bijector': tfb.Exp(),
-       'dtype': np.float32,
-       'is_static': True},
-      {'testcase_name': 'ListEvent',
-       'event_shape': [tf.TensorShape([3]),
-                       tf.TensorShape([]),
-                       tf.TensorShape([2, 2])],
-       'operators': 'diag',
-       'batch_shape': (),
-       'bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
-       'dtype': np.float32,
-       'is_static': False},
-      {'testcase_name': 'DictEvent',
-       'event_shape': {'x': tf.TensorShape([3]), 'y': tf.TensorShape([])},
-       'operators': [[tf.linalg.LinearOperatorDiag],
-                     [tf.linalg.LinearOperatorFullMatrix,
-                      tf.linalg.LinearOperatorLowerTriangular]],
-       'batch_shape': (),
-       'bijector': None,
-       'dtype': np.float64,
-       'is_static': True},
-      {'testcase_name': 'BatchShapeStateless',
-       'event_shape': [tf.TensorShape([3]), tf.TensorShape([])],
-       'operators': 'tril',
-       'batch_shape': (2, 1),
-       'bijector': [tfb.Softplus(), None,],
-       'dtype': np.float32,
-       'is_static': True,
-       'is_stateless': True},
-      {'testcase_name': 'DynamicBatchShape',
-       'event_shape': [tf.TensorShape([3]), tf.TensorShape([])],
-       'operators': 'tril',
-       'batch_shape': (2, 1),
-       'bijector': [tfb.Softplus(), None,],
-       'dtype': np.float32,
-       'is_static': False},
+      {
+          'testcase_name': 'TensorEvent',
+          'event_shape': tf.TensorShape([3]),
+          'operators': [tf.linalg.LinearOperatorDiag],
+          'batch_shape': (),
+          'bijector': exp.Exp(),
+          'dtype': np.float32,
+          'is_static': True
+      },
+      {
+          'testcase_name': 'ListEvent',
+          'event_shape':
+              [tf.TensorShape([3]),
+               tf.TensorShape([]),
+               tf.TensorShape([2, 2])],
+          'operators': 'diag',
+          'batch_shape': (),
+          'bijector':
+              [softplus.Softplus(), None,
+               fill_triangular.FillTriangular()],
+          'dtype': np.float32,
+          'is_static': False
+      },
+      {
+          'testcase_name': 'DictEvent',
+          'event_shape': {
+              'x': tf.TensorShape([3]),
+              'y': tf.TensorShape([])
+          },
+          'operators': [[tf.linalg.LinearOperatorDiag],
+                        [
+                            tf.linalg.LinearOperatorFullMatrix,
+                            tf.linalg.LinearOperatorLowerTriangular
+                        ]],
+          'batch_shape': (),
+          'bijector': None,
+          'dtype': np.float64,
+          'is_static': True
+      },
+      {
+          'testcase_name': 'BatchShapeStateless',
+          'event_shape': [tf.TensorShape([3]),
+                          tf.TensorShape([])],
+          'operators': 'tril',
+          'batch_shape': (2, 1),
+          'bijector': [
+              softplus.Softplus(),
+              None,
+          ],
+          'dtype': np.float32,
+          'is_static': True,
+          'is_stateless': True
+      },
+      {
+          'testcase_name': 'DynamicBatchShape',
+          'event_shape': [tf.TensorShape([3]),
+                          tf.TensorShape([])],
+          'operators': 'tril',
+          'batch_shape': (2, 1),
+          'bijector': [
+              softplus.Softplus(),
+              None,
+          ],
+          'dtype': np.float32,
+          'is_static': False
+      },
   )
   def test_constrained_affine_from_event_shape(
       self, event_shape, operators, bijector, batch_shape, dtype, is_static,
@@ -534,11 +639,12 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
       self._test_gradients(surrogate_posterior, seed=grads_seed)
 
   def test_constrained_affine_from_joint_inputs(self):
-    base_distribution = tfd.JointDistributionSequential(
-        [tfd.Sample(tfd.Normal(0., 1.), sample_shape=[3, 2]),
-         tfd.Logistic(0., 1.),
-         tfd.Sample(tfd.Normal(0., 1.), sample_shape=[4])],
-        validate_args=True)
+    base_distribution = jds.JointDistributionSequential([
+        sample.Sample(normal.Normal(0., 1.), sample_shape=[3, 2]),
+        logistic.Logistic(0., 1.),
+        sample.Sample(normal.Normal(0., 1.), sample_shape=[4])
+    ],
+                                                        validate_args=True)
     operator = tf.linalg.LinearOperatorBlockDiag(
         operators=[
             tf.linalg.LinearOperatorScaledIdentity(
@@ -546,8 +652,10 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
             tf.linalg.LinearOperatorDiag(tf.Variable([1.])),
             tf.linalg.LinearOperatorDiag(tf.Variable(tf.ones([4])))],
         is_non_singular=True)
-    bijector = tfb.JointMap([tfb.Exp(), tfb.Identity(), tfb.Softplus()],
-                            validate_args=True)
+    bijector = joint_map.JointMap(
+        [exp.Exp(), identity.Identity(),
+         softplus.Softplus()],
+        validate_args=True)
     surrogate_posterior = self._initialize_surrogate(
         'build_affine_surrogate_posterior_from_base_distribution',
         seed=test_util.test_seed(),
@@ -565,20 +673,22 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
         nest.map_structure(ps.shape, sample_))
 
   def test_mixed_dtypes_raises(self):
-    base_distribution = {'a': tfd.Normal(tf.zeros([], dtype=tf.float32), 1.),
-                         'b': tfd.Logistic(tf.zeros([], dtype=tf.float64), 1.)}
+    base_distribution = {
+        'a': normal.Normal(tf.zeros([], dtype=tf.float32), 1.),
+        'b': logistic.Logistic(tf.zeros([], dtype=tf.float64), 1.)
+    }
     operators = [tf.linalg.LinearOperatorDiag] * 2
     with self.assertRaisesRegexp(NotImplementedError, 'mixed dtype'):
       init_fn, apply_fn = (
-          tfp.experimental.vi.
-          build_affine_surrogate_posterior_from_base_distribution_stateless(
+          surrogate_posteriors
+          .build_affine_surrogate_posterior_from_base_distribution_stateless(
               base_distribution, operators=operators, validate_args=True))
       apply_fn(init_fn(seed=test_util.test_seed(sampler_type='stateless')))
 
   def test_deterministic_initialization_from_seed(self):
     initial_samples = []
     seed = test_util.test_seed(sampler_type='stateless')
-    init_seed, sample_seed = tfp.random.split_seed(seed)
+    init_seed, sample_seed = samplers.split_seed(seed)
     for _ in range(2):
       surrogate_posterior = self._initialize_surrogate(
           'build_affine_surrogate_posterior',
@@ -596,14 +706,13 @@ class AffineSurrogatePosterior(test_util.TestCase, _SurrogatePosterior):
   def test_that_gamma_fitting_example_runs(self):
     model = self._make_gamma_model()
     surrogate_posterior = (
-        tfp.experimental.
-        vi.build_affine_surrogate_posterior(
+        surrogate_posteriors.build_affine_surrogate_posterior(
             model.event_shape_tensor()[:-1],
-            operators=[
-                [tf.linalg.LinearOperatorLowerTriangular],
-                [None, tf.linalg.LinearOperatorDiag]],
-            bijector=[tfb.Softplus(), tfb.Softplus()],
-            base_distribution=tfd.Logistic,
+            operators=[[tf.linalg.LinearOperatorLowerTriangular],
+                       [None, tf.linalg.LinearOperatorDiag]],
+            bijector=[softplus.Softplus(),
+                      softplus.Softplus()],
+            base_distribution=logistic.Logistic,
             validate_args=True))
     self._test_fitting(model, surrogate_posterior)
 
@@ -613,26 +722,38 @@ class SplitFlowSurrogatePosterior(
     test_util.TestCase, _SurrogatePosterior):
 
   @parameterized.named_parameters(
-      {'testcase_name': 'TensorEvent',
-       'event_shape': [6],
-       'constraining_bijector': tfb.Softplus(),
-       'batch_shape': [2],
-       'dtype': np.float32,
-       'is_static': True},
-      {'testcase_name': 'ListEvent',
-       'event_shape': [tf.TensorShape([3]),
-                       tf.TensorShape([]),
-                       tf.TensorShape([2, 2])],
-       'constraining_bijector': [tfb.Softplus(), None, tfb.FillTriangular()],
-       'batch_shape': tf.TensorShape([2, 2]),
-       'dtype': np.float32,
-       'is_static': False},
-      {'testcase_name': 'DictEvent',
-       'event_shape': {'x': tf.TensorShape([3]), 'y': tf.TensorShape([])},
-       'constraining_bijector': None,
-       'batch_shape': tf.TensorShape([]),
-       'dtype': np.float64,
-       'is_static': True},
+      {
+          'testcase_name': 'TensorEvent',
+          'event_shape': [6],
+          'constraining_bijector': softplus.Softplus(),
+          'batch_shape': [2],
+          'dtype': np.float32,
+          'is_static': True
+      },
+      {
+          'testcase_name': 'ListEvent',
+          'event_shape':
+              [tf.TensorShape([3]),
+               tf.TensorShape([]),
+               tf.TensorShape([2, 2])],
+          'constraining_bijector':
+              [softplus.Softplus(), None,
+               fill_triangular.FillTriangular()],
+          'batch_shape': tf.TensorShape([2, 2]),
+          'dtype': np.float32,
+          'is_static': False
+      },
+      {
+          'testcase_name': 'DictEvent',
+          'event_shape': {
+              'x': tf.TensorShape([3]),
+              'y': tf.TensorShape([])
+          },
+          'constraining_bijector': None,
+          'batch_shape': tf.TensorShape([]),
+          'dtype': np.float64,
+          'is_static': True
+      },
   )
   @test_util.jax_disable_variable_test
   def test_shapes_and_gradients(
@@ -640,16 +761,17 @@ class SplitFlowSurrogatePosterior(
     if not tf.executing_eagerly() and not is_static:
       self.skipTest('tfb.Reshape requires statically known shapes in graph'
                     ' mode.')
-    net = tfb.AutoregressiveNetwork(2, hidden_units=[4, 4], dtype=dtype)
-    maf = tfb.MaskedAutoregressiveFlow(
+    net = maf_lib.AutoregressiveNetwork(2, hidden_units=[4, 4], dtype=dtype)
+    maf = maf_lib.MaskedAutoregressiveFlow(
         shift_and_log_scale_fn=net, validate_args=True)
 
     seed = test_util.test_seed_stream()
     surrogate_posterior = (
-        tfp.experimental.vi.build_split_flow_surrogate_posterior(
+        surrogate_posteriors.build_split_flow_surrogate_posterior(
             event_shape=tf.nest.map_structure(
                 lambda s: self.maybe_static(  # pylint: disable=g-long-lambda
-                    np.array(s, dtype=np.int32), is_static=is_static),
+                    np.array(s, dtype=np.int32),
+                    is_static=is_static),
                 event_shape),
             constraining_bijector=constraining_bijector,
             batch_shape=batch_shape,

@@ -18,16 +18,15 @@ import collections
 import numpy as np
 import tensorflow.compat.v2 as tf
 
-import tensorflow_probability as tfp
-
+from tensorflow_probability.python.distributions import linear_gaussian_ssm as lgssm
+from tensorflow_probability.python.distributions import mvn_tril
 from tensorflow_probability.python.experimental.parallel_filter import parallel_kalman_filter_lib
 from tensorflow_probability.python.internal import distribution_util
 from tensorflow_probability.python.internal import prefer_static as ps
 from tensorflow_probability.python.internal import samplers
 from tensorflow_probability.python.internal import test_util
-
-
-tfd = tfp.distributions
+from tensorflow_probability.python.math import gradient
+from tensorflow_probability.python.stats import sample_stats
 
 
 def _random_variance(dim, batch, dtype, seed):
@@ -233,23 +232,22 @@ class _KalmanFilterTest(test_util.TestCase):
            (type(my_filter_results)(1, 2, 3, 2, 3, 2, 3), 2, 1))
 
       # pylint: disable=g-long-lambda,cell-var-from-loop
-      dist = tfd.LinearGaussianStateSpaceModel(
+      dist = lgssm.LinearGaussianStateSpaceModel(
           num_timesteps=nsteps,
           transition_matrix=lambda t: tf.linalg.LinearOperatorFullMatrix(
               tf.gather(transition_matrix, t, axis=0)),
-          transition_noise=lambda t: tfd.MultivariateNormalTriL(
+          transition_noise=lambda t: mvn_tril.MultivariateNormalTriL(
               loc=tf.gather(transition_mean, t, axis=0),
               scale_tril=tf.linalg.cholesky(
                   tf.gather(transition_cov, t, axis=0))),
           observation_matrix=lambda t: tf.linalg.LinearOperatorFullMatrix(
               tf.gather(observation_matrix, t, axis=0)),
-          observation_noise=lambda t: tfd.MultivariateNormalTriL(
+          observation_noise=lambda t: mvn_tril.MultivariateNormalTriL(
               loc=tf.gather(observation_mean, t, axis=0),
               scale_tril=tf.linalg.cholesky(
                   tf.gather(observation_cov, t, axis=0))),
-          initial_state_prior=tfd.MultivariateNormalTriL(
-              loc=initial_mean,
-              scale_tril=tf.linalg.cholesky(initial_cov)),
+          initial_state_prior=mvn_tril.MultivariateNormalTriL(
+              loc=initial_mean, scale_tril=tf.linalg.cholesky(initial_cov)),
           experimental_parallelize=False)  # Compare against sequential filter.
       # pylint: enable=g-long-lambda,cell-var-from-loop
 
@@ -310,15 +308,11 @@ class _KalmanFilterTest(test_util.TestCase):
               y=y,
               mask=None))
       return tf.reduce_sum(log_likelihoods)
-    grads = tfp.math.value_and_gradient(lp, (initial_mean,
-                                             initial_cov,
-                                             transition_matrix,
-                                             transition_mean,
-                                             transition_cov,
-                                             observation_matrix,
-                                             observation_mean,
-                                             observation_cov,
-                                             y))
+
+    grads = gradient.value_and_gradient(
+        lp, (initial_mean, initial_cov, transition_matrix, transition_mean,
+             transition_cov, observation_matrix, observation_mean,
+             observation_cov, y))
     for g in grads:
       self.assertIsNotNone(g)
 
@@ -364,7 +358,7 @@ class _KalmanFilterTest(test_util.TestCase):
             observation_mean=observation_mean,
             seed=s[8]))
     empirical_initial_mean = np.mean(x[0], axis=0)
-    empirical_initial_cov = self.evaluate(tfp.stats.covariance(x[0]))
+    empirical_initial_cov = self.evaluate(sample_stats.covariance(x[0]))
     self.assertAllClose(empirical_initial_mean, initial_mean, atol=0.1)
     self.assertAllClose(empirical_initial_cov, initial_cov, atol=0.1)
 
@@ -372,7 +366,7 @@ class _KalmanFilterTest(test_util.TestCase):
         transition_matrix[:-1, tf.newaxis, ...], x[:-1]))
     empirical_transition_mean = np.mean(transition_residuals, axis=1)
     empirical_transition_cov = self.evaluate(
-        tfp.stats.covariance(transition_residuals, sample_axis=1))
+        sample_stats.covariance(transition_residuals, sample_axis=1))
     # Checking the mean and cov of residuals implicitly also
     # checks the `transition_matrix` used to compute them.
     self.assertAllClose(empirical_transition_mean,
@@ -384,8 +378,7 @@ class _KalmanFilterTest(test_util.TestCase):
         y - tf.linalg.matvec(observation_matrix[:, tf.newaxis, ...], x))
     empirical_observation_mean = np.mean(observation_residuals, axis=1)
     empirical_observation_cov = self.evaluate(
-        tfp.stats.covariance(observation_residuals,
-                             sample_axis=1))
+        sample_stats.covariance(observation_residuals, sample_axis=1))
     self.assertAllClose(empirical_observation_mean,
                         observation_mean, atol=0.1)
     self.assertAllClose(empirical_observation_cov,

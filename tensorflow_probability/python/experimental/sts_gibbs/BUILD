@@ -46,12 +46,14 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     tags = ["notap"],
     deps = [
+        ":gibbs_sampler",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/sts_gibbs",
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/sts/internal:missing_values_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
@@ -76,6 +78,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/distributions:mvn_linear_operator",
         "//tensorflow_probability/python/distributions:normal",
         "//tensorflow_probability/python/distributions:normal_conjugate_posteriors",
+        "//tensorflow_probability/python/experimental/distributions:mvn_precision_factor_linop",
         "//tensorflow_probability/python/internal:dtype_util",
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:reparameterization",
@@ -83,6 +86,8 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/sts/components:local_level",
         "//tensorflow_probability/python/sts/components:local_linear_trend",
         "//tensorflow_probability/python/sts/components:regression",
+        "//tensorflow_probability/python/sts/components:seasonal",
+        "//tensorflow_probability/python/sts/components:sum",
         "//tensorflow_probability/python/sts/internal",
     ],
 )
@@ -94,12 +99,26 @@ multi_substrate_py_test(
     disabled_substrates = ["numpy"],
     shard_count = 4,
     deps = [
+        ":gibbs_sampler",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/sts_gibbs",
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/distributions:linear_gaussian_ssm",
+        "//tensorflow_probability/python/distributions:lognormal",
+        "//tensorflow_probability/python/distributions:mvn_diag",
+        "//tensorflow_probability/python/distributions:normal",
+        "//tensorflow_probability/python/distributions:student_t",
+        "//tensorflow_probability/python/experimental/distributions:mvn_precision_factor_linop",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/stats:sample_stats",
+        "//tensorflow_probability/python/sts:forecast",
+        "//tensorflow_probability/python/sts/components:local_level",
+        "//tensorflow_probability/python/sts/components:local_linear_trend",
+        "//tensorflow_probability/python/sts/components:regression",
+        "//tensorflow_probability/python/sts/components:seasonal",
+        "//tensorflow_probability/python/sts/components:sum",
+        "//tensorflow_probability/python/sts/internal:missing_values_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
@@ -121,7 +140,6 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:vectorization_util",
-        "//tensorflow_probability/python/math",
         "//tensorflow_probability/python/mcmc/internal:util",
     ],
 )
@@ -135,12 +153,15 @@ multi_substrate_py_test(
         "jax",
     ],
     deps = [
+        ":dynamic_spike_and_slab",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/sts_gibbs",
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/distributions:normal_conjugate_posteriors",
+        "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:test_util",
+        "//tensorflow_probability/python/mcmc/internal:util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
 )
@@ -162,7 +183,7 @@ multi_substrate_py_library(
         "//tensorflow_probability/python/internal:prefer_static",
         "//tensorflow_probability/python/internal:samplers",
         "//tensorflow_probability/python/internal:vectorization_util",
-        "//tensorflow_probability/python/math",
+        "//tensorflow_probability/python/math:linalg",
         "//tensorflow_probability/python/mcmc/internal:util",
     ],
 )
@@ -173,11 +194,12 @@ multi_substrate_py_test(
     srcs = ["spike_and_slab_test.py"],
     disabled_substrates = ["numpy"],
     deps = [
+        ":sts_gibbs",
         # absl/testing:parameterized dep,
         # numpy dep,
         # tensorflow dep,
-        "//tensorflow_probability",
-        "//tensorflow_probability/python/experimental/sts_gibbs",
+        "//tensorflow_probability/python/distributions:inverse_gamma",
+        "//tensorflow_probability/python/distributions:normal_conjugate_posteriors",
         "//tensorflow_probability/python/internal:test_util",
 #         "//third_party/tensorflow/compiler/jit:xla_cpu_jit",  # DisableOnExport
     ],
