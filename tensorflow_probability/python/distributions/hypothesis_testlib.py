@@ -90,9 +90,7 @@ SPECIAL_DISTS = (
     'TransformedDistribution',  # (has strategy)
     'QuantizedDistribution',  # (has strategy)
     'VariationalGaussianProcess',  # PSDKernel strategy not implemented.
-    'WishartLinearOperator',
-    'ZeroInflatedNegativeBinomial',  # b/244737961
-)
+    'WishartLinearOperator')
 
 
 # MUTEX_PARAMS are mutually exclusive parameters that cannot be drawn together
