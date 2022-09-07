@@ -55,20 +55,23 @@ class _IIDNormalTest(test_util.TestCase):
                               observation_variance):
     """Build a model whose outputs are IID normal by construction."""
 
-    transition_variance = self._build_placeholder(transition_variance)
-    observation_variance = self._build_placeholder(observation_variance)
+    transition_variance = self._build_placeholder(
+        self.dtype(transition_variance))
+    observation_variance = self._build_placeholder(
+        self.dtype(observation_variance))
 
     # Use orthogonal matrices to project a (potentially
     # high-dimensional) latent space of IID normal variables into a
     # low-dimensional observation that is still IID normal.
     random_orthogonal_matrix = lambda: np.linalg.qr(
         np.random.randn(latent_size, latent_size))[0][:observation_size, :]
-    observation_matrix = self._build_placeholder(random_orthogonal_matrix())
+    observation_matrix = self._build_placeholder(
+        random_orthogonal_matrix().astype(self.dtype))
 
     model = lgssm.LinearGaussianStateSpaceModel(
         num_timesteps=num_timesteps,
         transition_matrix=self._build_placeholder(
-            np.zeros([latent_size, latent_size])),
+            np.zeros([latent_size, latent_size]).astype(self.dtype)),
         transition_noise=mvn_diag.MultivariateNormalDiag(
             scale_diag=tf.sqrt(transition_variance) *
             tf.ones([latent_size], dtype=self.dtype)),
@@ -389,23 +392,27 @@ class _SanityChecks(test_util.TestCase):
     transition_std = 3.0
     observation_std = 5.0
 
+    dtype = np.float32
+
     num_timesteps = tfp_hps.defer_and_count_usage(
         tf.Variable(1, name='num_timesteps'))
     transition_matrix = tfp_hps.defer_and_count_usage(
-        tf.Variable(np.eye(latent_size), name='transition_matrix'))
+        tf.Variable(
+            np.eye(latent_size).astype(dtype), name='transition_matrix'))
     transition_noise_scale = tfp_hps.defer_and_count_usage(
         tf.Variable(
-            np.full([latent_size], transition_std),
+            np.full([latent_size], transition_std).astype(dtype),
             name='transition_noise_scale'))
     observation_matrix = tfp_hps.defer_and_count_usage(
-        tf.Variable(np.eye(latent_size), name='observation_matrix'))
+        tf.Variable(
+            np.eye(latent_size).astype(dtype), name='observation_matrix'))
     observation_noise_scale = tfp_hps.defer_and_count_usage(
         tf.Variable(
-            np.full([latent_size], observation_std),
+            np.full([latent_size], observation_std).astype(dtype),
             name='observation_noise_scale'))
     initial_state_prior_scale = tfp_hps.defer_and_count_usage(
         tf.Variable(
-            np.full([latent_size], observation_std),
+            np.full([latent_size], observation_std).astype(dtype),
             name='initial_state_prior_scale'))
 
     model = lgssm.LinearGaussianStateSpaceModel(

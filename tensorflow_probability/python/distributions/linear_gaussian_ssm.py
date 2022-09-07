@@ -393,8 +393,17 @@ class LinearGaussianStateSpaceModel(
           mask, dtype_hint=tf.bool, name='mask')
       self._experimental_parallelize = experimental_parallelize
 
-      # TODO(b/78475680): Friendly dtype inference.
-      dtype = initial_state_prior.dtype
+      dtype_list = [initial_state_prior,
+                    observation_matrix,
+                    transition_matrix,
+                    transition_noise,
+                    observation_noise]
+
+      # Infer dtype from time invariant objects. This list will be non-empty
+      # since it will always include `initial_state_prior`.
+      dtype = dtype_util.common_dtype(
+          list(filter(lambda x: not callable(x), dtype_list)),
+          dtype_hint=tf.float32)
 
       # Internally, the transition and observation matrices are
       # canonicalized as callables returning a LinearOperator. This
