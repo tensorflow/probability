@@ -16,7 +16,7 @@
 
 # We follow Semantic Versioning (https://semver.org/)
 _MAJOR_VERSION = '0'
-_MINOR_VERSION = '17'
+_MINOR_VERSION = '18'
 _PATCH_VERSION = '0'
 
 # When building releases, we can update this value on the release branch to
@@ -24,7 +24,7 @@ _PATCH_VERSION = '0'
 # stable release (indicated by `_VERSION_SUFFIX = ''`). Outside the context of a
 # release branch, the current version is by default assumed to be a
 # 'development' version, labeled 'dev'.
-_VERSION_SUFFIX = 'dev'
+_VERSION_SUFFIX = ''
 
 # Example, '0.4.0-dev'
 __version__ = '.'.join([
