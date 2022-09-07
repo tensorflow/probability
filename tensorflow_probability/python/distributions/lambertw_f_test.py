@@ -193,7 +193,7 @@ class LambertWNormalTest(test_util.TestCase):
         tf.keras.layers.Dense(1 + 1 + 1),
         dist_layer])
     negloglik = lambda y, p_y: -p_y.log_prob(y)
-    if tf.__internal__.tf2.enabled():
+    if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
       optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
     else:
       optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.01)

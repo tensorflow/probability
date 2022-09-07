@@ -84,7 +84,7 @@ class DenseVariationalLayerTest(test_util.TestCase):
         tfp.layers.DistributionLambda(lambda t: tfd.Normal(loc=t, scale=1))
     ])
 
-    if tf.__internal__.tf2.enabled():
+    if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
       optimizer = tf.keras.optimizers.Adam(learning_rate=0.05)
     else:
       optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.05)

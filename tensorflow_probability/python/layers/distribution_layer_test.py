@@ -55,7 +55,7 @@ def _unwrap_tensor_coercible(dist):
 
 
 def _get_adam_optimizer(learning_rate):
-  if tf.__internal__.tf2.enabled():
+  if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
     return tf.keras.optimizers.Adam(learning_rate=learning_rate)
   return tf.keras.optimizers.legacy.Adam(learning_rate=learning_rate)
 

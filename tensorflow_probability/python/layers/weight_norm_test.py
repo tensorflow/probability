@@ -224,7 +224,7 @@ class WeightNormTest(test_util.TestCase):
 
   @parameterized.parameters(['sequential', 'sequential_no_input', 'functional'])
   def testTrainableVariableInitializationInModelFit(self, model_type):
-    if tf.__internal__.tf2.enabled():
+    if tf.__internal__.tf2.enabled() and tf.executing_eagerly():
       sgd = tf.keras.optimizers.SGD(lr=0.)
     else:
       sgd = tf.keras.optimizers.legacy.SGD(lr=0.)
