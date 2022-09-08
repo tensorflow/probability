@@ -428,16 +428,16 @@ def particle_filter(observations,
     )
 
     traced_results = sequential_monte_carlo(
-      # Weighted particles weighted also considering the observations.
-      initial_state=initial_particles,
-      propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
-      condition_fn=lambda step, state, num_traced, trace: step < ps.size0(observations),
-      resample_fn=resample_fn,
-      resample_criterion_fn=resample_criterion_fn,
-      # rejuvenation_fn=...,
-      # rejuvenation_criterion_fn=...,
-      trace_fn=trace_fn,
-      num_timesteps=num_timesteps
+        # Weighted particles weighted also considering the observations.
+        initial_state=initial_particles,
+        propose_and_update_log_weights_fn=propose_and_update_log_weights_fn,
+        condition_fn=lambda step, state, num_traced, trace: step < ps.size0(observations),
+        resample_fn=resample_fn,
+        resample_criterion_fn=resample_criterion_fn,
+        # rejuvenation_fn=...,
+        # rejuvenation_criterion_fn=...,
+        trace_fn=trace_fn,
+        num_timesteps=num_timesteps
     )
 
     return traced_results
@@ -487,7 +487,8 @@ def _propose_and_update_log_weights_fn(
         step,
         state,
         seed,
-        num_transitions_per_observation=1):
+        num_transitions_per_observation=1
+):
   """Particle filter propose and update for single steps"""
   particles, log_weights = (
       proposal_fn(step, state.particles).experimental_sample_and_log_prob(seed=seed)
